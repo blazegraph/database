@@ -31,14 +31,13 @@ import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.net.Inet4Address;
-import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 
 import com.bigdata.concurrent.LockManager;
+import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IResourceLockService;
@@ -259,19 +258,20 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
         /*
          * Start the timestamp service.
          */
-        timestampService = new EmbeddedTimestampService( UUID.randomUUID(), properties );
+        timestampService = new EmbeddedTimestampServiceImpl(UUID.randomUUID(),
+                properties).start();
 
         /*
          * Start the lock manager.
          */
-        resourceLockManager = new EmbeddedResourceLockManager(UUID.randomUUID(),
-                properties);
+        resourceLockManager = new EmbeddedResourceLockServiceImpl(UUID.randomUUID(),
+                properties).start();
         
         /*
          * Start the load balancer.
          */
-        loadBalancerService = new EmbeddedLoadBalancerService(UUID.randomUUID(),
-                properties);
+        loadBalancerService = new EmbeddedLoadBalancerServiceImpl(UUID.randomUUID(),
+                properties).start();
 
         /*
          * The directory in which the data files will reside.
@@ -476,40 +476,51 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
                 this.ndataServices = ndataServices;
                 
             }
-            
-        }
-        
-        /*
-         * Have the data services join the load balancer.
-         */
-        {
 
-            final String hostname;
-            try {
-                hostname = Inet4Address.getLocalHost().getCanonicalHostName();
-            } catch (UnknownHostException e1) {
-                // should never happen for the local host.
-                throw new AssertionError();
-            }
-            
-            for(IDataService ds : this.dataService ) {
+        }
+
+        {
+        
+            final String hostname = AbstractStatisticsCollector.fullyQualifiedHostName;
+
+            /*
+             * Have the data services join the load balancer.
+             */
+            for (IDataService ds : this.dataService) {
 
                 try {
 
-                    loadBalancerService.join(ds.getServiceUUID(), hostname);
-                    
+                    loadBalancerService.join(ds.getServiceUUID(), ds
+                            .getServiceIface(), hostname);
+
                 } catch (IOException e) {
-                    
+
                     // Should never be thrown for an embedded service.
-                    
-                    log.warn(e.getMessage(),e);
-                    
+
+                    log.warn(e.getMessage(), e);
+
                 }
 
             }
-            
+
+            /*
+             * Other service joins.
+             */
+
+            loadBalancerService.join(timestampService.getServiceUUID(),
+                    timestampService.getServiceIface(), hostname);
+
+            loadBalancerService.join(loadBalancerService.getServiceUUID(),
+                    loadBalancerService.getServiceIface(), hostname);
+
+            loadBalancerService.join(resourceLockManager.getServiceUUID(),
+                    resourceLockManager.getServiceIface(), hostname);
+
+            loadBalancerService.join(metadataService.getServiceUUID(),
+                    metadataService.getServiceIface(), hostname);
+
         }
-        
+
     }
 
     /**
@@ -651,7 +662,64 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
         }
 
     }
+    
+    protected class EmbeddedLoadBalancerServiceImpl extends AbstractEmbeddedLoadBalancerService {
+        
+        /**
+         * @param serviceUUID
+         * @param properties
+         */
+        public EmbeddedLoadBalancerServiceImpl(UUID serviceUUID, Properties properties) {
+       
+            super(serviceUUID, properties);
+            
+        }
 
+        @Override
+        public EmbeddedFederation getFederation() {
+
+            return EmbeddedFederation.this;
+
+        }
+
+    }
+    
+    protected class EmbeddedResourceLockServiceImpl extends AbstractEmbeddedResourceLockManager {
+
+        /**
+         * @param serviceUUID
+         * @param properties
+         */
+        public EmbeddedResourceLockServiceImpl(UUID serviceUUID, Properties properties) {
+            super(serviceUUID, properties);
+        }
+
+        @Override
+        public AbstractFederation getFederation() {
+            return EmbeddedFederation.this;
+        }
+        
+    }
+
+    protected class EmbeddedTimestampServiceImpl extends AbstractEmbeddedTimestampService {
+
+        /**
+         * @param serviceUUID
+         * @param properties
+         */
+        public EmbeddedTimestampServiceImpl(UUID serviceUUID, Properties properties) {
+            super(serviceUUID, properties);
+        }
+
+        @Override
+        public EmbeddedFederation getFederation() {
+
+            return EmbeddedFederation.this;
+
+        }
+        
+    }
+    
 //    public IMetadataIndex getMetadataIndex(String name, long timestamp) {
 //
 //        assertOpen();

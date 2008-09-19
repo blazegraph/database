@@ -31,13 +31,13 @@
     </target>
 
 	<!-- Note: javac error results often if verbose is disabled. -->
-	<!-- I was able to perform a build with 1.6.07. -->
+	<!-- I was able to perform a build with 1.6.0_07. -->
 	<!-- I set the target to 1.5 to support deployment on non-1.6 JVMs. -->
     <target name="compile" depends="prepare">
         <mkdir dir="${build.dir}"/>
         <javac destdir="${build.dir}" 
                classpathref="build.classpath"
-        	   verbose="on"
+        	   verbose="off"
         	   target="1.5"
                debug="on">
             <src path="${bigdata.dir}/src/java"/>

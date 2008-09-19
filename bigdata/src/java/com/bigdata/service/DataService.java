@@ -27,25 +27,21 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
-import java.io.ByteArrayOutputStream;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URLEncoder;
+import java.io.Writer;
 import java.nio.ByteBuffer;
-import java.rmi.NoSuchObjectException;
-import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.Vector;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
@@ -57,19 +53,14 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.proc.IIndexProcedure;
-import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
-import com.bigdata.counters.ICounter;
-import com.bigdata.counters.ICounterSet;
-import com.bigdata.counters.IServiceCounters;
 import com.bigdata.counters.Instrument;
-import com.bigdata.counters.OneShotInstrument;
-import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.DropIndexTask;
+import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ILocalTransactionManager;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITimestampService;
@@ -79,19 +70,16 @@ import com.bigdata.journal.IndexProcedureTask;
 import com.bigdata.journal.RegisterIndexTask;
 import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.mdi.IResourceMetadata;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StoreManager;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
-import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
  * An implementation of a network-capable {@link IDataService}. The service is
  * started using the {@link DataServer} class. Operations are submitted using an
- * {@link IConcurrentManager#submitAndGetResult(AbstractTask)} and will run with the
+ * {@link IConcurrencyManager#submit(AbstractTask)} and will run with the
  * appropriate concurrency controls as imposed by that method.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -165,14 +153,12 @@ abstract public class DataService extends AbstractService
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final static protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final static protected boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final static protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final static protected boolean DEBUG = log.isDebugEnabled();
     
     /**
      * Options understood by the {@link DataService}.
@@ -186,94 +172,7 @@ abstract public class DataService extends AbstractService
             com.bigdata.counters.AbstractStatisticsCollector.Options
             // @todo local tx manager options?
             {
-     
-//        /**
-//         * The delay between scheduled invocations of the {@link StatusTask}.
-//         * 
-//         * @see #DEFAULT_STATUS_DELAY
-//         */
-//        String STATUS_DELAY = "statusDelay";
-//        
-//        /**
-//         * The default {@link #STATUS_DELAY}.
-//         */
-//        String DEFAULT_STATUS_DELAY = "10000";
-//    
-//        /**
-//         * An optional regular expression that will be used to filter the
-//         * performance counters reported by the {@link StatusTask}. Some
-//         * examples are:
-//         * <dl>
-//         * <dt>.*Unisolated.*</dt>
-//         * <dd>All counters dealing with unisolated operations.</dd>
-//         * <dt>.*Unisolated Write Service/#.*</dt>
-//         * <dd>All counters for the unisolated write service.</dd>
-//         * </dl>
-//         * <p>
-//         * Note: if the regular expression can not be compiled then an error
-//         * message will be logged and ALL counters will be logged by the
-//         * {@link StatusTask} (the filter will default to <code>null</code> in
-//         * the case of an error).
-//         * 
-//         * @see #DEFAULT_STATUS_FILTER
-//         */
-//        String STATUS_FILTER = "statusFilter";
-//        
-//        /**
-//         * @todo work up a more interesting default filter.
-//         */
-//        // String DEFAULT_STATUS_FILTER = ".*Unisolated.*";
-//        String DEFAULT_STATUS_FILTER = ".*Unisolated Write Service/(#.*|averageQueueLength)";        
 
-//        /**
-//         * Boolean option for the collection of statistics from the underlying
-//         * operating system (default
-//         * {@value #DEFAULT_COLLECT_PLATFORM_STATISTICS}).
-//         * 
-//         * @see AbstractStatisticsCollector#newInstance(Properties)
-//         */
-//        String COLLECT_PLATFORM_STATISTICS = "collectPlatformStatistics";
-//
-//        String DEFAULT_COLLECT_PLATFORM_STATISTICS = "true";
-//
-//        /**
-//         * Boolean option for the collection of statistics from the various
-//         * queues using to run tasks (default
-//         * {@link #DEFAULT_COLLECT_QUEUE_STATISTICS}).
-//         * 
-//         * @see QueueStatisticsTask
-//         */
-//        String COLLECT_QUEUE_STATISTICS = "collectQueueStatistics";
-//
-//        String DEFAULT_COLLECT_QUEUE_STATISTICS = "true";
-//
-//        /**
-//         * Integer option specifies the port on which an httpd service will be
-//         * started that exposes the {@link CounterSet} for the client. When ZERO
-//         * (0), a random port will be used. The httpd service may be disabled by
-//         * specifying <code>-1</code> as the port.
-//         */
-//        String HTTPD_PORT = "httpdPort";
-//
-//        /**
-//         * The default http service port is ZERO (0), which means that a random
-//         * port will be choosen.
-//         */
-//        String DEFAULT_HTTPD_PORT = "0";
-        
-        /**
-         * The delay between scheduled invocations of the {@link ReportTask} (60
-         * seconds).
-         * 
-         * @see #DEFAULT_REPORT_DELAY
-         */
-        String REPORT_DELAY = "reportDelay";
-        
-        /**
-         * The default {@link #REPORT_DELAY}.
-         */
-        String DEFAULT_REPORT_DELAY = ""+(60*1000);
-    
     }
     
     /**
@@ -304,48 +203,6 @@ abstract public class DataService extends AbstractService
     private AbstractLocalTransactionManager localTransactionManager;
     
     /**
-     * Local httpd service exposing the live {@link CounterSet} for the
-     * {@link DataService}.
-     */
-    private AbstractHTTPD httpd;
-    
-    /**
-     * Note: this value is not bound until the {@link #getServiceUUID()} reports
-     * a non-null value.
-     * 
-     * @see StartDeferredTasksTask
-     * @see ReportTask
-     */
-    private AbstractStatisticsCollector statisticsCollector;
-
-//    /**
-//     * <code>true</code> iff we will collect O/S statistics.
-//     * 
-//     * @see Options#COLLECT_PLATFORM_STATISTICS
-//     */
-//    final boolean collectPlatformStatistics;
-//    
-//    /**
-//     * <code>true</code> iff we will collect queue statistics.
-//     * 
-//     * @see Options#COLLECT_QUEUE_STATISTICS
-//     */
-//    final boolean collectQueueStatistics;
-//
-//    /**
-//     * The port on which the httpd service will be started.
-//     * 
-//     * @see Options#HTTPD_PORT
-//     */
-//    final int httpdPort;
-    
-    /**
-     * Runs a {@link ReportTask} communicating performance counters on a
-     * periodic basis to the {@link ILoadBalancerService}.
-     */
-    private ScheduledExecutorService reportService;
-    
-    /**
      * The object used to manage the local resources.
      */
     public ResourceManager getResourceManager() {
@@ -373,21 +230,6 @@ abstract public class DataService extends AbstractService
         
     }
     
-    /**
-     * Return the proxy used to access other services in the federation.
-     * 
-     * @todo access to the {@link ITimestampService}, {@link IMetadataService}
-     *       and the {@link ILoadBalancerService} now goes through this method.
-     *       The code making those requests needs to be modified since it used
-     *       to except a <code>null</code> return for the individual services
-     *       if they were not available and it can not see an exception if the
-     *       federation itself is not available (I believe that this can only
-     *       happen for the JiniFederation since the various embedded
-     *       federations wind up returning a closely held reference whereas the
-     *       JiniFederation is obtained from the JiniClient#getClient().
-     */
-    abstract public IBigdataFederation getFederation();
-
     /**
      * Returns the {@link IResourceManager}.
      * 
@@ -460,45 +302,6 @@ abstract public class DataService extends AbstractService
         Banner.banner();
 
         this.properties = (Properties) properties.clone();
-
-//        {
-//
-//            collectPlatformStatistics = Boolean.parseBoolean(properties
-//                    .getProperty(Options.COLLECT_PLATFORM_STATISTICS,
-//                            Options.DEFAULT_COLLECT_PLATFORM_STATISTICS));
-//
-//            if (INFO)
-//                log.info(Options.COLLECT_PLATFORM_STATISTICS + "="
-//                        + collectPlatformStatistics);
-//
-//        }
-//
-//        {
-//
-//            collectQueueStatistics = Boolean.parseBoolean(properties
-//                    .getProperty(Options.COLLECT_QUEUE_STATISTICS,
-//                            Options.DEFAULT_COLLECT_QUEUE_STATISTICS));
-//
-//            if (INFO)
-//                log.info(Options.COLLECT_QUEUE_STATISTICS + "="
-//                        + collectQueueStatistics);
-//
-//        }
-//
-//        {
-//
-//            httpdPort = Integer.parseInt(properties.getProperty(
-//                    Options.HTTPD_PORT, Options.DEFAULT_HTTPD_PORT));
-//
-//            if (INFO)
-//                log.info(Options.HTTPD_PORT + "=" + httpdPort);
-//
-//            if (httpdPort < 0 && httpdPort != -1)
-//                throw new RuntimeException(
-//                        Options.HTTPD_PORT
-//                                + " must be -1 (disabled), 0 (random port), or positive");
-//
-//        }
         
     }
     
@@ -522,19 +325,11 @@ abstract public class DataService extends AbstractService
     
     /**
      * Starts the {@link DataService}.
-     * <p>
-     * Note: A {@link #start()} is required in order to give subclasses an
-     * opportunity to be fully initialized before they are required to begin
-     * operations. It is impossible to encapsulate the startup logic cleanly
-     * without this ctor() + start() pattern. Those familiar with Objective-C
-     * will recognized this.
-     * 
-     * @return <i>this</i> (the return type should be strengthened by the
-     *         concrete implementation to return the actual type).
      * 
      * @todo it would be nice if {@link #start()} could restart after
      *       {@link #shutdown()} but that is hardly necessary.
      */
+    @Override
     synchronized public DataService start() {
         
         if(isOpen()) {
@@ -542,7 +337,7 @@ abstract public class DataService extends AbstractService
             throw new IllegalStateException(); 
             
         }
-
+        
         resourceManager = (ResourceManager) newResourceManager(properties);
 
         localTransactionManager = new AbstractLocalTransactionManager(resourceManager) {
@@ -579,30 +374,230 @@ abstract public class DataService extends AbstractService
                     .setConcurrencyManager(concurrencyManager);
 
         }
-
-        /*
-         * Setup to collect statistics and report about this host.
-         * 
-         * Note: this is just starting the task that will start reporting once
-         * the load balancer has been discovered, so the initialDelay and the
-         * delay between retries are relatively short.  We are just waiting for
-         * the load balancer before we can start the ReportTask.
-         */
-        {
-
-            reportService = Executors
-                    .newSingleThreadScheduledExecutor(DaemonThreadFactory
-                            .defaultThreadFactory());
-
-            reportService.scheduleWithFixedDelay(new StartDeferredTasksTask(),
-                    150, // initialDelay (ms)
-                    150, // delay
-                    TimeUnit.MILLISECONDS // unit
-                    );
-
-        }
         
         return this;
+        
+    }
+    
+    /**
+     * Delegate handles custom counters for the {@link ResourceManager}, local
+     * {@link TransactionService} and the {@link ConcurrencyManager}, dynamic
+     * re-attachment of counters, etc. This delegate must be set on the
+     * {@link AbstractClient} for those additional features to work.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static public class DataServiceFederationDelegate extends
+            DefaultServiceFederationDelegate<DataService> {
+
+        public DataServiceFederationDelegate(DataService service) {
+
+            super(service);
+            
+        }
+        
+        /**
+         * Dynamically detach and attach the counters for the named indices
+         * underneath of the {@link IndexManager}.
+         * <p>
+         * Note: This method limits the frequency of update to no more than once per
+         * second.
+         */
+        synchronized public void reattachDynamicCounters() {
+
+            final long now = System.currentTimeMillis();
+
+            final long elapsed = now - lastReattachMillis;
+
+            if (service.isOpen() && service.resourceManager.isRunning()
+                    && elapsed > 1000/* ms */) {
+
+                final CounterSet tmp = service.resourceManager
+                        .getIndexManagerCounters();
+
+                assert tmp != null;
+
+                synchronized (tmp) {
+
+                    tmp.detach("indices");
+
+                    tmp.makePath("indices").attach(
+                            service.concurrencyManager.getIndexCounters()
+                    // resourceManager.getLiveJournal().getNamedIndexCounters()
+                            );
+
+                }
+
+                lastReattachMillis = now;
+
+            }
+
+        }
+        private long lastReattachMillis = 0L;
+
+        public boolean isServiceReady() {
+            
+            if(!service.resourceManager.isOpen()) {
+                
+                /*
+                 * This will happen if the store manager is unable to discover
+                 * the timestamp service. It will halt its startup process and
+                 * report that it is closed. At that point the data service can
+                 * not start and will shutdown.
+                 */
+
+                log.fatal("Store manager not open - will shutdown.");
+
+                // shutdown the data service.
+                service.shutdownNow();
+
+                // collection was not started.
+                return false;
+
+            }
+
+            if (!service.resourceManager.isRunning()) {
+
+                log.warn("Resource manager is not running yet.");
+
+                return false;
+
+            }
+
+            return true;
+
+        }
+
+        /**
+         * Extended to setup {@link DataService} specific counters and to write
+         * the client URL onto a file in the service's data directory.
+         */
+        public void didStart() {
+
+            super.didStart();
+
+            setupCounters();
+
+            logHttpdURL();
+
+        }
+
+        /**
+         * Sets up {@link DataService} specific counters.
+         * 
+         * @todo Add some counters providing a histogram of the index partitions
+         *       that have touched or that are "hot"?
+         * 
+         * @see IDataServiceCounters
+         */
+        protected void setupCounters() {
+
+            if (getServiceUUID() == null) {
+
+                throw new IllegalStateException(
+                        "The ServiceUUID is not available yet");
+
+            }
+
+            /*
+             * Service specific counters.
+             */
+
+            final CounterSet serviceRoot = service.getFederation()
+                    .getServiceCounterSet();
+
+            serviceRoot.makePath(IDataServiceCounters.resourceManager).attach(
+                    service.resourceManager.getCounters());
+
+            serviceRoot.makePath(IDataServiceCounters.concurrencyManager)
+                    .attach(service.concurrencyManager.getCounters());
+
+            serviceRoot.makePath(IDataServiceCounters.transactionManager)
+                    .attach(service.localTransactionManager.getCounters());
+
+            // block API.
+            {
+
+                CounterSet tmp = serviceRoot.makePath("Block API");
+
+                tmp.addCounter("Blocks Read", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(service.readBlockApiCounters.readBlockCount);
+                    }
+                });
+
+                tmp.addCounter("Blocks Read Per Second",
+                        new Instrument<Double>() {
+                            public void sample() {
+
+                                // @todo encapsulate this logic.
+
+                                long secs = TimeUnit.SECONDS
+                                        .convert(
+                                                service.readBlockApiCounters.readBlockNanos,
+                                                TimeUnit.NANOSECONDS);
+
+                                final double v;
+
+                                if (secs == 0L)
+                                    v = 0d;
+                                else
+                                    v = service.readBlockApiCounters.readBlockCount
+                                            / secs;
+
+                                setValue(v);
+
+                            }
+                        });
+
+            }
+
+        }
+
+        /**
+         * Writes the URL of the local httpd service for the {@link DataService}
+         * onto a file named <code>httpd.url</code> in the data directory that
+         * was configured for the {@link DataService}.
+         */
+        protected void logHttpdURL() {
+            
+            final File dir = service.getResourceManager().getDataDir();
+            
+            final File httpdURLFile = new File(dir, "httpd.url");
+            
+            // delete in case old version exists.
+            httpdURLFile.delete();
+            
+            final String httpdURL = service.getFederation().getHttpdURL();
+
+            if (httpdURL != null) {
+
+                try {
+
+                    final Writer w = new BufferedWriter(new FileWriter(
+                            httpdURLFile));
+
+                    try {
+
+                        w.write(httpdURL);
+
+                    } finally {
+
+                        w.close();
+
+                    }
+
+                } catch (IOException ex) {
+
+                    log.warn("Problem writing httpdURL on file: "
+                            + httpdURLFile);
+                    
+                }
+
+            }
+
+        }
         
     }
     
@@ -613,8 +608,6 @@ abstract public class DataService extends AbstractService
     synchronized public void shutdown() {
 
         if(!isOpen()) return;
-        
-        notifyLeave(false/*immediateShutdown*/);
         
         if (concurrencyManager != null) {
             concurrencyManager.shutdown();
@@ -631,26 +624,7 @@ abstract public class DataService extends AbstractService
             resourceManager = null;
         }
 
-        if(reportService!=null) {
-            reportService.shutdown();
-            reportService = null;
-        }
-
-        if (statisticsCollector != null) {
-
-            statisticsCollector.stop();
-
-            statisticsCollector = null;
-
-        }
-
-        if( httpd != null) {
-            
-            httpd.shutdown();
-            
-            httpd = null;
-            
-        }
+        super.shutdown();
         
     }
 
@@ -662,97 +636,22 @@ abstract public class DataService extends AbstractService
 
         if(!isOpen()) return;
 
-        notifyLeave(true/*immediateShutdown*/);
-
         if (concurrencyManager != null) {
-        
             concurrencyManager.shutdownNow();
-
             concurrencyManager = null;
-            
         }
 
         if (localTransactionManager != null) {
-
             localTransactionManager.shutdownNow();
-
             localTransactionManager = null;
-
         }
 
         if (resourceManager != null) {
-
             resourceManager.shutdownNow();
-
             resourceManager = null;
-
         }
 
-        if (reportService != null) {
-        
-            reportService.shutdownNow();
-
-            reportService = null;
-
-        }
-        
-        if (statisticsCollector != null) {
-
-            // Note: value is not bound until after the service UUID is bound.
-            
-            statisticsCollector.stop();
-            
-            statisticsCollector = null;
-            
-        }
-
-        if( httpd != null) {
-            
-            httpd.shutdownNow();
-            
-            httpd = null;
-            
-        }
-        
-//        if (INFO)
-//            log.info(getCounters().toString());
-        
-    }
-    
-    private void notifyLeave(boolean immediateShutdown) {
-
-        final ILoadBalancerService loadBalancerService;
-        try {
-            loadBalancerService = getFederation().getLoadBalancerService();
-        } catch(IllegalStateException ex) {
-            log.warn("Could not notify load balancer: "+ex);
-            return;
-        }
-
-        if (loadBalancerService != null) {
-            
-            final UUID serviceUUID = getServiceUUID();
-            
-            final String msg = "Goodbye: class=" + getClass().getName()
-                    + ", immediateShutdown=" + immediateShutdown;
-            
-            try {
-
-                // notify leave event.
-                loadBalancerService.leave(msg, serviceUUID);
-
-            } catch (NoSuchObjectException e) {
-                
-                log.warn("Load balancer gone? : "+e);
-                
-            } catch (IOException e) {
-
-                log.warn(e.getMessage(), e);
-
-            }
-            
-        }
-
+        super.shutdownNow();
 
     }
 
@@ -781,112 +680,7 @@ abstract public class DataService extends AbstractService
         String resourceManager = "Resource Manager";
         
     }
-    
-    /**
-     * Return the {@link ICounterSet} hierarchy used to report on the activity
-     * of this service. The counters are automatically setup first time this
-     * method is called.
-     * <p>
-     * The prefix for the counter hierarchy will be
-     * <code>hostname/service/<i>serviceIface</i>/serviceUUID</code> where
-     * <i>serviceIface</i> is the name of the class returned by
-     * {@link #getServiceIface()}. This method therefore has a dependency on
-     * {@link #getServiceUUID()} and must be invoked after the
-     * <code>serviceUUID</code> is known. The timing of that event depends on
-     * whether the service is embedded or using a distributed services framework
-     * such as <code>jini</code>.
-     * <p>
-     * Subclasses MAY extend this method to report additional {@link ICounter}s.
-     * 
-     * @todo Add some counters providing a histogram of the index partitions
-     *       that have touched or that are "hot"?
-     * 
-     * @see IDataServiceCounters
-     */
-    synchronized public ICounterSet getCounters() {
-     
-        if (countersRoot == null) {
-
-            final UUID serviceUUID = getServiceUUID();
-            
-            if (serviceUUID == null) {
-                
-                throw new IllegalStateException("The ServiceUUID is not available yet");
-                
-            }
-            
-            countersRoot = new CounterSet();
-
-            final String ps = ICounterSet.pathSeparator;
-            
-            final String hostname = AbstractStatisticsCollector.fullyQualifiedHostName;
-                       
-            final String pathPrefix = ps + hostname + ps + "service" + ps
-                    + getServiceIface().getName() + ps + serviceUUID + ps;
-
-            serviceRoot = countersRoot.makePath(pathPrefix);
-
-            /*
-             * Service generic counters. 
-             */
-            AbstractStatisticsCollector.addBasicServiceOrClientCounters(
-                    serviceRoot, this, properties);
-
-            /*
-             * Service specific counters.
-             */
-            
-            serviceRoot.makePath(IDataServiceCounters.resourceManager).attach(
-                    resourceManager.getCounters());
-
-            serviceRoot.makePath(IDataServiceCounters.concurrencyManager).attach(
-                    concurrencyManager.getCounters());
-
-            serviceRoot.makePath(IDataServiceCounters.transactionManager).attach(
-                    localTransactionManager.getCounters());
-
-            // block API.
-            {
-            
-                CounterSet tmp = serviceRoot.makePath("Block API");
-
-                tmp.addCounter("Blocks Read", new Instrument<Long>() {
-                    public void sample() {
-                        setValue(readBlockApiCounters.readBlockCount);
-                    }
-                });
-
-                tmp.addCounter("Blocks Read Per Second",
-                        new Instrument<Double>() {
-                            public void sample() {
-
-                                // @todo encapsulate this logic.
-                                
-                                long secs = TimeUnit.SECONDS.convert(
-                                        readBlockApiCounters.readBlockNanos,
-                                        TimeUnit.NANOSECONDS);
-
-                                final double v;
-
-                                if (secs == 0L)
-                                    v = 0d;
-                                else
-                                    v = readBlockApiCounters.readBlockCount / secs;
-
-                                setValue(v);
-                                
-                            }
-                        });
-                
-            }
-        }
         
-        return countersRoot;
-        
-    }
-    private CounterSet countersRoot;
-    private CounterSet serviceRoot; 
-    
     /*
      * ITxCommitProtocol.
      */
@@ -959,419 +753,6 @@ abstract public class DataService extends AbstractService
         }
         
         return name + "#" + partitionId;
-
-    }
-
-    /**
-     * An XML Serialization of performance counters.
-     */
-    public String getStatistics() throws IOException {
-        
-        return getCounters().asXML(null/*filter*/);
-        
-    }
-    
-    /**
-     * This task runs periodically. Once {@link IDataService#getServiceUUID()}
-     * reports a non-<code>null</code> value AND
-     * {@link ResourceManager#isRunning()} reports <code>true</code>, it will
-     * start an (optional) {@link AbstractStatisticsCollector}, an (optional)
-     * httpd service, and the (required) {@link ReportTask}.
-     * <p>
-     * Note: The {@link ReportTask} will relay any collected performance
-     * counters to the {@link ILoadBalancerService}, but it also lets the
-     * {@link ILoadBalancerService} know which services exist which is important
-     * for some of its functions.
-     * <p>
-     * Once these task(s) have been started, this task will throw an exception
-     * in order to prevent it from being re-executed by the
-     * {@link DataService#reportService}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    protected class StartDeferredTasksTask implements Runnable {
-
-        /**
-         * Note: The logger is named for this class, but since it is an inner
-         * class the name uses a "$" delimiter (vs a ".") between the outer and
-         * the inner class names.
-         */
-        final protected Logger log = Logger.getLogger(StartDeferredTasksTask.class);
-        
-        public StartDeferredTasksTask() {
-        
-        }
-
-        /**
-         * @throws RuntimeException
-         *             once the deferred task(s) are running to prevent
-         *             re-execution of this startup task.
-         */
-        public void run() {
-
-            final boolean started;
-            
-            try {
-                
-                started = startDeferredTasks();
-                
-            } catch (Throwable t) {
-
-                log.warn("Problem in report task?", t);
-
-                return;
-                
-            }
-
-            if (started) {
-
-                /*
-                 * Note: This exception is thrown once this task has executed
-                 * successfully.
-                 */
-                
-                throw new RuntimeException("Normal completion.");
-                
-            }
-            
-        }
-        
-        /**
-         * Starts performance counter collection once the service {@link UUID}
-         * is known.
-         * 
-         * @return <code>true</code> iff performance counter collection was
-         *         started.
-         * 
-         * @throws IOException
-         *             if {@link IDataService#getServiceUUID()} throws this
-         *             exception (it never should since it is a local method
-         *             call).
-         */
-        protected boolean startDeferredTasks() throws IOException {
-
-            if(!resourceManager.isOpen()) {
-                
-                /*
-                 * This will happen if the store manager is unable to discover
-                 * the timestamp service. It will halt its startup process and
-                 * report that it is closed. At that point the data service can
-                 * not start and will shutdown.
-                 */
-                
-                log.fatal("Store manager not open - will shutdown.");
-                
-                // shutdown the data service.
-                DataService.this.shutdownNow();
-
-                // collection was not started.
-                return false;
-                
-            }
-            
-            final UUID uuid = getServiceUUID();
-
-            if (uuid == null) {
-
-                log.warn("Service UUID is not assigned yet.");
-
-                return false;
-
-            }
-            
-            if(!resourceManager.isRunning()) {
-                
-                log.warn("Resource manager is not running yet.");
-                
-                return false;
-                
-            }
-
-            /*
-             * Start collecting performance counters from the OS.
-             */
-            if (getFederation().getClient().getCollectPlatformStatistics()) {
-
-                final Properties p = getProperties();
-
-                p.setProperty(AbstractStatisticsCollector.Options.PROCESS_NAME,
-                        "service" + ICounterSet.pathSeparator
-                                + getServiceIface().getName()
-                                + ICounterSet.pathSeparator + uuid.toString());
-
-                statisticsCollector = AbstractStatisticsCollector
-                        .newInstance(p);
-
-                statisticsCollector.start();
-                
-                /*
-                 * Attach the counters that will be reported by the statistics
-                 * collector service.
-                 */
-                ((CounterSet)getCounters()).attach(statisticsCollector.getCounters());
-
-                if (INFO)
-                    log.info("Collecting platform statistics: uuid=" + uuid);
-
-            }
-            
-            /*
-             * Start task to report service and counters to the load balancer.
-             */
-            {
-            
-                final long delay = Long.parseLong(properties.getProperty(
-                        Options.REPORT_DELAY, Options.DEFAULT_REPORT_DELAY));
-
-                if (INFO)
-                    log.info(Options.REPORT_DELAY + "=" + delay);
-
-                final TimeUnit unit = TimeUnit.MILLISECONDS;
-
-                /*
-                 * Note: We set [initialDelay := 0] so that we run the
-                 * ReportTask immediately. This is needed in order to notify()
-                 * the load balancer service so that the data service will enter
-                 * into its set of active services.
-                 * 
-                 * Note: If the data service does not notify() the load balancer
-                 * service then the load balancer will be unable to recommend a
-                 * data service on which to register an index and a new
-                 * application will not be able to get started. During new
-                 * federation startup it is critical that at least one data
-                 * service and the metadata service have discovered and notify()
-                 * the load balancer service.
-                 * 
-                 * Note: This logic is also executed for the MetadataService,
-                 * which is just a subclass of the DataService.
-                 */
-                final long initialDelay = 0; // Note: Immediate notify()!
-
-                reportService.scheduleWithFixedDelay(new ReportTask(),
-                        initialDelay, delay, unit);
-
-                if(INFO) log.info("Started ReportTask.");
-            
-            }
-
-            final int httpdPort = getFederation().getClient().getHttpdPort();
-
-            if (httpdPort != -1) {
-                
-                /*
-                 * HTTPD service reporting out statistics on either a specified
-                 * or a randomly assigned port. The port is reported to the load
-                 * balancer and also written into the file system. The httpd
-                 * service will be shutdown with the data service.
-                 * 
-                 * Note: some counter sets need to be dynamically (re-)attached
-                 * in order to present a current view. This httpd instance
-                 * overrides doGet() in order to refresh the data before
-                 * generating the view.
-                 * 
-                 * @todo write port into the [serviceDir], but serviceDir needs
-                 * to be declared!
-                 */
-                
-                try {
-
-                    final CounterSet counterSet = (CounterSet) getCounters();
-                    
-                    DataService.this.httpd = new CounterSetHTTPD(httpdPort, counterSet ) {
-                        
-                        public Response doGet(String uri, String method, Properties header,
-                                Map<String, Vector<String>> parms) throws Exception {
-                            
-                            try {
-                                
-                                reattachDynamicCounters();
-                                
-                            } catch(Exception ex) {
-                                
-                                /*
-                                 * Typically this is because the live journal
-                                 * has been concurrently closed during the
-                                 * request.
-                                 */
-                                
-                                log.warn("Could not re-attach dynamic counters: "+ex, ex);
-                                
-                            }
-                            
-                            return super.doGet(uri, method, header, parms);
-                            
-                        }
-                        
-                    };
-                    
-                    // the URL that may be used to access the local httpd.
-                    final String url = "http://"
-                            + AbstractStatisticsCollector.fullyQualifiedHostName
-                            + ":" + DataService.this.httpd.getPort()
-                            + "?path="+URLEncoder.encode(serviceRoot.getPath(),"UTF-8");
-                    
-                    // add counter reporting that url to the load balancer.
-                    DataService.this.serviceRoot.addCounter(IServiceCounters.LOCAL_HTTPD, 
-                            new OneShotInstrument<String>(url));
-                    
-                } catch (IOException e) {
-                    
-                    log.error("Could not start httpd", e);
-                    
-                }
-                
-            }
-
-            return true;
-            
-        }
-        
-    }
-    
-    /**
-     * Dynamically detach and attach the counters for the named indices
-     * underneath of the {@link IndexManager}.
-     * <p>
-     * Note: This method limits the frequency of update to no more than once per
-     * second.
-     */
-    synchronized protected void reattachDynamicCounters() {
-
-        final long now = System.currentTimeMillis();
-
-        final long elapsed = now - lastReattachMillis;
-
-        if (elapsed > 1000/* ms */) {
-
-            CounterSet tmp = resourceManager.getIndexManagerCounters();
-
-            assert tmp != null;
-
-            synchronized (tmp) {
-
-                tmp.detach("indices");
-
-                tmp.makePath("indices").attach(
-                        concurrencyManager.getIndexCounters()
-                // resourceManager.getLiveJournal().getNamedIndexCounters()
-                        );
-
-            }
-
-            lastReattachMillis = now;
-
-        }
-
-    }
-    private long lastReattachMillis = 0L;
-    
-    /**
-     * Periodically send performance counter data to the
-     * {@link ILoadBalancerService}.
-     * 
-     * @see AbstractFederation.ReportTask
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public class ReportTask implements Runnable {
-
-        /**
-         * Note: The logger is named for this class, but since it is an inner
-         * class the name uses a "$" delimiter (vs a ".") between the outer and
-         * the inner class names.
-         */
-        final protected Logger log = Logger.getLogger(ReportTask.class);
-
-        /**
-         * True iff the {@link #log} level is INFO or less.
-         */
-        final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-                .toInt();
-
-        public ReportTask() {
-
-        }
-
-        /**
-         * Note: Don't throw anything here since we don't want to have the task
-         * suppressed!
-         */
-        public void run() {
-
-            try {
-                
-                reattachDynamicCounters();
-
-            } catch (Throwable t) {
-
-                log.warn("Problem trying to update index counter views?", t);
-
-            }
-            
-            try {
-
-                /*
-                 * Report the performance counters to the load balancer.
-                 */
-                
-                reportPerformanceCounters();
-                
-            } catch (Throwable t) {
-
-                log.warn("Problem in report task?", t);
-
-            }
-
-        }
-        
-        /**
-         * Send performance counters to the load balancer.
-         * 
-         * @throws IOException 
-         */
-        protected void reportPerformanceCounters() throws IOException {
-
-            // Note: This _is_ a local method call.
-            final UUID serviceUUID = getServiceUUID();
-
-            // Will be null until assigned by the service registrar.
-            if (serviceUUID == null) {
-
-                log.info("Service UUID not assigned yet.");
-
-                return;
-
-            }
-
-            final ILoadBalancerService loadBalancerService = getFederation().getLoadBalancerService();
-
-            if (loadBalancerService == null) {
-
-                log.warn("Could not discover load balancer service.");
-
-                return;
-
-            }
-
-            /*
-             * @todo this is probably worth compressing as there will be a lot
-             * of redundency.
-             * 
-             * @todo allow filter on what gets sent to the load balancer?
-             */
-            ByteArrayOutputStream baos = new ByteArrayOutputStream(
-                    Bytes.kilobyte32 * 2);
-
-            getCounters().asXML(baos, "UTF-8", null/* filter */);
-            
-            loadBalancerService.notify("Hello", serviceUUID, getServiceIface()
-                    .getName(), baos.toByteArray());
-
-            log.info("Notified the load balancer.");
-            
-        }
 
     }
 
@@ -1776,7 +1157,7 @@ abstract public class DataService extends AbstractService
                 public InputStream inputStream() {
     
                     // this is when it actually reads the data.
-                    ByteBuffer buf = store.read(addr);
+                    final ByteBuffer buf = store.read(addr);
 
                     // #of bytes buffered.
                     readBlockApiCounters.readBlockBytes += byteCount;

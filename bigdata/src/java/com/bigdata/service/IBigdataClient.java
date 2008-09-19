@@ -28,7 +28,6 @@
 package com.bigdata.service;
 
 import java.util.Properties;
-import java.util.UUID;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.proc.IIndexProcedure;
@@ -211,11 +210,6 @@ public interface IBigdataClient {
     public Properties getProperties();
     
     /**
-     * The {@link UUID} for this client (assigned when the client is started).
-     */
-    public UUID getClientUUID();
-
-    /**
      * Configuration options for {@link IBigdataClient}s.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -338,6 +332,16 @@ public interface IBigdataClient {
         String DEFAULT_CLIENT_INDEX_CACHE_CAPACITY = "20";
         
         /**
+         * The maximum extent for a {@link TemporaryStore} before a new
+         * {@link TemporaryStore} will be created by
+         * {@link IIndexStore#getTempStore()} for an {@link IBigdataClient}
+         * (default {@value #DEFAULT_TEMP_STORE_MAX_EXTENT}).
+         */
+        String TEMP_STORE_MAX_EXTENT = "tempStore.maxExtent";
+
+        String DEFAULT_TEMP_STORE_MAX_EXTENT = "" + (5 * Bytes.gigabyte);
+        
+        /**
          * Boolean option for the collection of statistics from the underlying
          * operating system (default
          * {@value #DEFAULT_COLLECT_PLATFORM_STATISTICS}).
@@ -360,6 +364,19 @@ public interface IBigdataClient {
         String DEFAULT_COLLECT_QUEUE_STATISTICS = "true";
 
         /**
+         * The delay between reports of performance counters to the
+         * {@link ILoadBalancerService} in milliseconds ({@value #DEFAULT_REPORT_DELAY}).
+         * 
+         * @see #DEFAULT_REPORT_DELAY
+         */
+        String REPORT_DELAY = "reportDelay";
+        
+        /**
+         * The default {@link #REPORT_DELAY}.
+         */
+        String DEFAULT_REPORT_DELAY = ""+(60*1000);
+    
+        /**
          * Integer option specifies the port on which an httpd service will be
          * started that exposes the {@link CounterSet} for the client. When ZERO
          * (0), a random port will be used. The httpd service may be disabled by
@@ -380,15 +397,36 @@ public interface IBigdataClient {
          */
         String DEFAULT_HTTPD_PORT = "0";
         
-        /**
-         * The maximum extent for a {@link TemporaryStore} before a new
-         * {@link TemporaryStore} will be created by
-         * {@link IIndexStore#getTempStore()} for an {@link IBigdataClient}
-         * (default {@value #DEFAULT_TEMP_STORE_MAX_EXTENT}).
+        /*
+         * note: something that might be re-purpose for perf counter reporting
+         * or perhaps the LBS should register with joined services and request
+         * specific counters.
          */
-        String TEMP_STORE_MAX_EXTENT = "tempStore.maxExtent";
-
-        String DEFAULT_TEMP_STORE_MAX_EXTENT = "" + (5 * Bytes.gigabyte);
+//      /**
+//      * An optional regular expression that will be used to filter the
+//      * performance counters reported by the {@link StatusTask}. Some
+//      * examples are:
+//      * <dl>
+//      * <dt>.*Unisolated.*</dt>
+//      * <dd>All counters dealing with unisolated operations.</dd>
+//      * <dt>.*Unisolated Write Service/#.*</dt>
+//      * <dd>All counters for the unisolated write service.</dd>
+//      * </dl>
+//      * <p>
+//      * Note: if the regular expression can not be compiled then an error
+//      * message will be logged and ALL counters will be logged by the
+//      * {@link StatusTask} (the filter will default to <code>null</code> in
+//      * the case of an error).
+//      * 
+//      * @see #DEFAULT_STATUS_FILTER
+//      */
+//     String STATUS_FILTER = "statusFilter";
+//     
+//     /**
+//      * ... work up a more interesting default filter.
+//      */
+//     // String DEFAULT_STATUS_FILTER = ".*Unisolated.*";
+//     String DEFAULT_STATUS_FILTER = ".*Unisolated Write Service/(#.*|averageQueueLength)";        
         
     };
 

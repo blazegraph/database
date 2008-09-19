@@ -29,9 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service;
 
 import java.util.Properties;
-import java.util.UUID;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.Banner;
@@ -49,14 +47,12 @@ abstract public class AbstractClient implements IBigdataClient {
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    protected static final boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    protected static final boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    protected static final boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    protected static final boolean DEBUG = log.isDebugEnabled();
     
     /**
      * The properties specified to the ctor.
@@ -68,15 +64,7 @@ abstract public class AbstractClient implements IBigdataClient {
         return new Properties( properties );
         
     }
-    
-    private final UUID clientUUID;
-    
-    final public UUID getClientUUID() {
-        
-        return clientUUID;
-        
-    }
-    
+
     private final int defaultRangeQueryCapacity;
     private final boolean batchApiOnly;
     private final int threadPoolSize;
@@ -158,7 +146,7 @@ abstract public class AbstractClient implements IBigdataClient {
         return httpdPort;
         
     }
-    
+
     /**
      * 
      * @param properties
@@ -174,8 +162,6 @@ abstract public class AbstractClient implements IBigdataClient {
 
         this.properties = properties;
 
-        this.clientUUID = UUID.randomUUID();
-        
         // client thread pool setup.
         {
          
@@ -343,6 +329,71 @@ abstract public class AbstractClient implements IBigdataClient {
                                 + " must be -1 (disabled), 0 (random port), or positive");
 
         }
+        
+    }
+    
+    private IFederationDelegate delegate = null;
+
+    /**
+     * The delegate for the federation.
+     */
+    public final synchronized IFederationDelegate getDelegate() {
+        
+        return delegate;
+        
+    }
+
+    /**
+     * Set the delegate for the federation.
+     * 
+     * @param delegate
+     *            The delegate.
+     * @throws IllegalArgumentException
+     *             if the argument is <code>null</code>.
+     * @throws IllegalStateException
+     *             if the property has already been set to a value.
+     * @throws IllegalStateException
+     *             if the client is already connected.
+     */
+    public final synchronized void setDelegate(IFederationDelegate delegate) {
+        
+        if (delegate == null) {
+
+            throw new IllegalArgumentException();
+            
+        }
+        
+        if(isConnected()) {
+            
+            throw new IllegalStateException();
+            
+        }
+        
+        if (this.delegate != null && this.delegate != delegate) {
+
+            throw new IllegalStateException();
+            
+        }
+        
+        this.delegate = delegate;
+        
+    }
+
+    /**
+     * Extended to {@link IBigdataClient#disconnect(boolean)} if the client is
+     * still connected when it is finalized.
+     */
+    protected void finalize() throws Throwable {
+
+        if (isConnected()) {
+
+            log.warn("Disconnnecting client or service");
+            
+            disconnect(true/* immediateShutdown */);
+
+        }
+        
+        super.finalize();
         
     }
     

@@ -282,7 +282,7 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
          */
         {
 
-            EmbeddedLoadBalancerService lbs = ((EmbeddedLoadBalancerService)((EmbeddedFederation)fed).getLoadBalancerService());
+            AbstractEmbeddedLoadBalancerService lbs = ((AbstractEmbeddedLoadBalancerService)((EmbeddedFederation)fed).getLoadBalancerService());
 
             lbs.log.setLevel(Level.INFO);
             

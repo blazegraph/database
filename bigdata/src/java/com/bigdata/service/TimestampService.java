@@ -48,20 +48,9 @@ import com.bigdata.util.MillisecondTimestampFactory;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class TimestampService implements ITimestampService, IServiceShutdown {
+abstract public class TimestampService extends AbstractService implements
+        ITimestampService, IServiceShutdown {
 
-    private final Properties properties;
-    
-    /**
-     * An object wrapping the properties specified to the ctor.
-     * @return
-     */
-    public Properties getProperties() {
-        
-        return new Properties( properties );
-        
-    }
-    
     /**
      * Options understood by the {@link TimestampService}.
      * 
@@ -80,11 +69,6 @@ abstract public class TimestampService implements ITimestampService, IServiceShu
 
         if (properties == null)
             throw new IllegalArgumentException();
-
-        // clone to avoid side effects of modifications by the caller.
-        this.properties = (Properties) properties.clone();
-        
-        this.open = true;
         
     }
 
@@ -143,31 +127,41 @@ abstract public class TimestampService implements ITimestampService, IServiceShu
         
     }
 
-    /**
-     * Return the {@link UUID} for the {@link ITimestampService}.
-     * 
-     * @throws IOException
-     */
-    abstract public UUID getServiceUUID() throws IOException;
+    /** NOP */
+    @Override
+    public TimestampService start() {
+        
+        return this;
+        
+    }
+    
+    public Class getServiceIface() {
+
+        return ITimestampService.class;
+        
+    }
 
     public boolean isOpen() {
         
         return open;
         
     }
-    
+    private boolean open = true;
+
     synchronized public void shutdown() {
- 
-        open = false;
+        
+        if(!isOpen()) return;
+        
+        super.shutdown();
         
     }
     
     synchronized public void shutdownNow() {
         
-        open = false;
+        if(!isOpen()) return;
+        
+        super.shutdownNow();
         
     }
-
-    private boolean open;
     
 }

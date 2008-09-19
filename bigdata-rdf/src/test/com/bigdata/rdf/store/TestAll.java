@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.store;
 
+import com.bigdata.service.jini.JiniServicesHelper;
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -65,9 +67,6 @@ public class TestAll extends TestCase {
         /*
          * Run each of the kinds of triple stores through both their specific
          * and shared unit tests.
-         * 
-         * FIXME add variants to test with and without statement identifiers
-         * (each of the database modes: tripleStore, provenance, and quadStore).
          */
 
         suite.addTest( com.bigdata.rdf.store.TestTempTripleStore.suite() );
@@ -79,13 +78,12 @@ public class TestAll extends TestCase {
 
         suite.addTest( TestScaleOutTripleStoreWithLocalDataServiceFederation.suite() );
 
-//        suite.addTest( com.bigdata.rdf.store.TestLocalTripleStoreWithEmbeddedDataService.suite() );
-
         suite.addTest(com.bigdata.rdf.store.TestScaleOutTripleStoreWithEmbeddedFederation
                         .suite());
 
         if (Boolean.parseBoolean(System.getProperty("maven.test.services.skip",
-                "false"))) {
+                "false"))
+                || !JiniServicesHelper.isJiniRunning()) {
 
             /*
              * Test scale-out RDF database.

@@ -469,6 +469,9 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
         final Map<String, Object> map = indexManager.getGlobalRowStore().read(
                 RelationSchema.INSTANCE, namespace);
 
+//        System.err.println("Reading properties: "+namespace);
+//        log.fatal("Reading properties: "+namespace,new RuntimeException());
+        
         if (map == null) {
 
             if (DEBUG) {

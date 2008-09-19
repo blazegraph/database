@@ -11,12 +11,12 @@ import java.util.UUID;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class EmbeddedLoadBalancerService extends LoadBalancerService {
+abstract public class AbstractEmbeddedLoadBalancerService extends LoadBalancerService {
 
 //    final private UUID serviceUUID;
     final private String hostname;
     
-    public EmbeddedLoadBalancerService(UUID serviceUUID,
+    public AbstractEmbeddedLoadBalancerService(UUID serviceUUID,
             Properties properties) {
         
         super( properties );
@@ -42,6 +42,13 @@ public class EmbeddedLoadBalancerService extends LoadBalancerService {
 
     }
 
+//    @Override
+//    public AbstractFederation getFederation() {
+//
+//        return server.getClient().getFederation();
+//        
+//    }
+    
 //    public UUID getServiceUUID() {
 //        
 //        return serviceUUID;

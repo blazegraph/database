@@ -389,11 +389,12 @@ public class ConcurrentDataLoader {
 
         if (ourCounterSet == null) {
 
-            final String path = fed.getClientCounterPathPrefix()
-                    + "Concurrent Data Loader";
+//            final String path = fed.getServiceCounterPathPrefix()
+//                    + "Concurrent Data Loader";
 
             // make path to the counter set for the data loader.
-            ourCounterSet = fed.getCounterSet().makePath(path);
+            ourCounterSet = fed.getServiceCounterSet().makePath(
+                    "Concurrent Data Loader");
 
             ourCounterSet.addCounter("#clients", new OneShotInstrument<Integer>(
                             nclients));

@@ -32,7 +32,9 @@ import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.journal.ITimestampService;
 
 /**
  * Abstract base class defines protocols for setting the service {@link UUID},
@@ -44,6 +46,8 @@ import com.bigdata.counters.CounterSet;
 abstract public class AbstractService implements IService {
 
     protected static final Logger log = Logger.getLogger(AbstractService.class);
+    
+    protected static final boolean INFO = log.isInfoEnabled();
     
     private UUID serviceUUID;
     
@@ -83,7 +87,8 @@ abstract public class AbstractService implements IService {
         if (this.serviceUUID != null)
             throw new IllegalStateException();
 
-        log.info("uuid=" + serviceUUID);
+        if (INFO)
+            log.info("uuid=" + serviceUUID);
 
         this.serviceUUID = serviceUUID;
 
@@ -99,5 +104,73 @@ abstract public class AbstractService implements IService {
      * Return the most interesting interface for the service.
      */
     abstract public Class getServiceIface();
+
+    /**
+     * Starts the {@link AbstractService}.
+     * <p>
+     * Note: A {@link #start()} is required in order to give subclasses an
+     * opportunity to be fully initialized before they are required to begin
+     * operations. It is impossible to encapsulate the startup logic cleanly
+     * without this ctor() + start() pattern. Those familiar with Objective-C
+     * will recognized this.
+     * 
+     * @return <i>this</i> (the return type should be strengthened by the
+     *         concrete implementation to return the actual type).
+     */
+    abstract public AbstractService start();
+    
+    /**
+     * Return the proxy used to access other services in the federation.
+     * 
+     * @todo access to the {@link ITimestampService}, {@link IMetadataService}
+     *       and the {@link ILoadBalancerService} now goes through this method.
+     *       The code making those requests needs to be modified since it used
+     *       to except a <code>null</code> return for the individual services
+     *       if they were not available and it can not see an exception if the
+     *       federation itself is not available (I believe that this can only
+     *       happen for the JiniFederation since the various embedded
+     *       federations wind up returning a closely held reference whereas the
+     *       JiniFederation is obtained from the JiniClient#getClient().
+     */
+    abstract public AbstractFederation getFederation();
+
+    public final String getHostname() {
+        
+        return AbstractStatisticsCollector.fullyQualifiedHostName;
+        
+    }
+    
+//    /**
+//     * Shuts down the {@link #getFederation()} used by this service.
+//     */
+    public synchronized void shutdown() {
+        
+//        if(!isOpen()) return;
+        
+//        getFederation().shutdown();
+
+//        open = false;
+
+    }
+    
+//    /**
+//     * Shuts down the {@link #getFederation()} used by this service.
+//     */
+    public synchronized void shutdownNow() {
+
+//        if(!isOpen()) return;
+        
+//        getFederation().shutdownNow();
+        
+//        open = false;
+        
+    }
+    
+//    final public boolean isOpen() {
+//        
+//        return open;
+//        
+//    }
+//    private boolean open = true;
 
 }

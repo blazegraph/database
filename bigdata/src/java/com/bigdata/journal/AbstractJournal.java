@@ -2348,7 +2348,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
                 // Note: Does not set lastCommitTime.
                 obj = BTree.load(this, checkpointAddr);
-             
+                    
                 obj.setReadOnly(true);
                 
             }

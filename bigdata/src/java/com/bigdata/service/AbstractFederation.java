@@ -30,29 +30,25 @@ package com.bigdata.service;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
-import java.util.Iterator;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.Vector;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.bfs.GlobalFileSystemHelper;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.cache.ICacheEntry;
-import com.bigdata.cache.LRUCache;
-import com.bigdata.cache.WeakValueCache;
-import com.bigdata.concurrent.NamedLock;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounter;
@@ -60,21 +56,20 @@ import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.IServiceCounters;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
-import com.bigdata.journal.ITx;
 import com.bigdata.journal.QueueStatisticsTask;
 import com.bigdata.journal.TaskCounters;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.TemporaryStoreFactory;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.relation.locator.DefaultResourceLocator;
+import com.bigdata.service.IBigdataClient.Options;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
-import com.bigdata.util.NT;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
- * Abstract base class for common functionality for {@link IBigdataFederation}s.
+ * Abstract base class.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -84,7 +79,7 @@ import com.bigdata.util.httpd.AbstractHTTPD;
  *       that the IServiceShutdown.Options interface is flattened into
  *       IServiceShutdown and it shadows the Options that are being used.
  */
-abstract public class AbstractFederation implements IBigdataFederation {
+abstract public class AbstractFederation implements IBigdataFederation, IFederationDelegate {
 
     protected static final Logger log = Logger.getLogger(IBigdataFederation.class);
 
@@ -164,14 +159,15 @@ abstract public class AbstractFederation implements IBigdataFederation {
             
             httpd.shutdown();
             
+            httpd = null;
+            
+            httpdURL = null;
+            
         }
         
-        // @todo run a final ReportTask?
-        // @todo send leave() notice to the LBS?
-
         if (INFO)
             log.info("done: elapsed=" + (System.currentTimeMillis() - begin));
-
+        
         client = null;
         
     }
@@ -221,10 +217,14 @@ abstract public class AbstractFederation implements IBigdataFederation {
             
             httpd.shutdownNow();
             
+            httpd = null;
+            
+            httpdURL = null;
+            
         }
-        
+
         if (INFO)
-            log.info("done: elapsed="+(System.currentTimeMillis()-begin));
+            log.info("done: elapsed=" + (System.currentTimeMillis() - begin));
         
         client = null;
         
@@ -262,6 +262,18 @@ abstract public class AbstractFederation implements IBigdataFederation {
      * the federation.
      */
     private AbstractHTTPD httpd;
+    
+    /**
+     * The URL that may be used to access the httpd service exposed by this
+     * client.
+     */
+    private String httpdURL;
+
+    final public String getHttpdURL() {
+        
+        return httpdURL;
+        
+    }
     
     /**
      * Locator for relations.
@@ -460,7 +472,9 @@ abstract public class AbstractFederation implements IBigdataFederation {
             throw new IllegalArgumentException();
 
         if (INFO)
-            log.info("Adding task: " + task.getClass());
+            log.info("Scheduling task: task=" + task.getClass()
+                    + ", initialDelay=" + initialDelay + ", delay=" + delay
+                    + ", unit=" + unit);
 
         return sampleService.scheduleWithFixedDelay(task, initialDelay, delay,
                 unit);
@@ -479,14 +493,14 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
             }
 
-            clientRoot = countersRoot.makePath(getClientCounterPathPrefix());
+            serviceRoot = countersRoot.makePath(getServiceCounterPathPrefix());
 
             /*
              * Basic counters.
              */
 
             AbstractStatisticsCollector.addBasicServiceOrClientCounters(
-                    clientRoot, getClient(), client.getProperties());
+                    serviceRoot, getServiceIface(), client.getProperties());
 
         }
 
@@ -494,18 +508,55 @@ abstract public class AbstractFederation implements IBigdataFederation {
         
     }
     private CounterSet countersRoot;
-    private CounterSet clientRoot;
+    private CounterSet serviceRoot;
     
-    public String getClientCounterPathPrefix() {
+    public CounterSet getServiceCounterSet() {
 
-        final UUID clientUUID = getClient().getClientUUID();
+        // note: defines [serviceRoot] as side effect.
+        getCounterSet();
+        
+        return serviceRoot;
+        
+    }
 
-        final String ps = ICounterSet.pathSeparator;
+    public String getServiceCounterPathPrefix() {
 
         final String hostname = AbstractStatisticsCollector.fullyQualifiedHostName;
 
+        return getServiceCounterPathPrefix(getServiceUUID(), getServiceIface(),
+                hostname);
+
+    }
+
+    /**
+     * The path prefix under which all of the client or service's counters are
+     * located. The returned path prefix is terminated by an
+     * {@link ICounterSet#pathSeparator}.
+     * 
+     * @param serviceUUID
+     *            The service {@link UUID}.
+     * @param serviceIface
+     *            The primary interface or class for the service.
+     * @param hostname
+     *            The fully qualified name of the host on which the service is
+     *            running.
+     */
+    static public String getServiceCounterPathPrefix(UUID serviceUUID,
+            Class serviceIface, String hostname) {
+
+        if (serviceUUID == null)
+            throw new IllegalArgumentException();
+        
+        if (serviceIface == null)
+            throw new IllegalArgumentException();
+        
+        if (hostname == null)
+            throw new IllegalArgumentException();
+        
+        final String ps = ICounterSet.pathSeparator;
+
         final String pathPrefix = ps + hostname + ps + "service" + ps
-                + IBigdataClient.class.getName() + ps + clientUUID + ps;
+                + serviceIface.getName() + ps + serviceUUID + ps;
 
         return pathPrefix;
 
@@ -526,6 +577,17 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
         this.client = (AbstractClient) client;
 
+        if (this.client.getDelegate() == null) {
+
+            /*
+             * If no service has set the delegate by this point then we setup a
+             * default delegate.
+             */
+
+            this.client.setDelegate(new DefaultClientDelegate(this));
+            
+        }
+        
         final int threadPoolSize = client.getThreadPoolSize();
 
         if (threadPoolSize == 0) {
@@ -543,124 +605,16 @@ abstract public class AbstractFederation implements IBigdataFederation {
         
         tempStoreFactory = new TemporaryStoreFactory(this.client
                 .getTempStoreMaxExtent());
-
-        if (client.getCollectPlatformStatistics()) {
-
-            /*
-             * Start collecting performance counters from the OS.
-             */
-            
-            final UUID clientUUID = client.getClientUUID();
-
-            if (INFO)
-                log.info("Starting performance counter collection: uuid="
-                        + clientUUID);
-
-            final Properties p = client.getProperties();
-
-            p.setProperty(  AbstractStatisticsCollector.Options.PROCESS_NAME,
-                            "service" + ICounterSet.pathSeparator
-                                    + IBigdataClient.class.getName()
-                                    + ICounterSet.pathSeparator
-                                    + clientUUID.toString());
-
-            statisticsCollector = AbstractStatisticsCollector.newInstance(p);
-
-            statisticsCollector.start();
-
-        }
-
-        if(client.getCollectQueueStatistics()){
-
-            /*
-             * Setup sampling on the client's thread pool. This collects
-             * interesting statistics about the thread pool for reporting to the
-             * load balancer service.
-             */
-            
-            final long initialDelay = 0; // initial delay in ms.
-            final long delay = 1000; // delay in ms.
-            final TimeUnit unit = TimeUnit.MILLISECONDS;
-
-            final String relpath = "Thread Pool";
-
-            final QueueStatisticsTask queueStatisticsTask = new QueueStatisticsTask(
-                    relpath, threadPool, taskCounters);
-
-            addScheduledStatisticsTask(queueStatisticsTask, initialDelay,
-                    delay, unit);
-
-            // make sure the counter set is constructed.
-            getCounterSet();
-
-            assert clientRoot != null;
-
-            queueStatisticsTask.addCounters(clientRoot.makePath(relpath));
-
-        }
         
-        /*
-         * Setup reporting to the load balancer service.
-         * 
-         * Note: the short initial delay means that we will run the ReportTask
-         * immediately after which has the effect of notify()ing the load
-         * balancer service that this client is now running.
-         * 
-         * Note: the initialDelay is not zero because we may have to discover
-         * the load balancer service and that is done within a subclass and is
-         * an asynchronous process in anycase.
-         */
-        {
-            
-            addScheduledStatisticsTask(new ReportTask(), 3/* initialDelay */,
-                    60/* delay */, TimeUnit.SECONDS);
-            
-        }
-
-        final int httpdPort = client.getHttpdPort();
-        if (httpdPort != -1) {
-            
-            /*
-             * HTTPD service reporting out statistics on either a specified or a
-             * randomly assigned port. The port is reported to the load balancer
-             * and also written into the file system. The httpd service will be
-             * shutdown with the connection to the federation.
-             * 
-             * @todo write port into the [serviceDir], but serviceDir needs to
-             * be declared!
-             */
-            
-            try {
-
-                final CounterSet counterSet = (CounterSet) getCounterSet();
-                
-                httpd = new CounterSetHTTPD(httpdPort, counterSet);
-                
-                // the URL that may be used to access the local httpd.
-                final String url = "http://"
-                        + AbstractStatisticsCollector.fullyQualifiedHostName
-                        + ":" + httpd.getPort()
-                        + "?path="+URLEncoder.encode(getClientCounterPathPrefix(),"UTF-8");
-                
-                // add counter reporting that url to the load balancer.
-                clientRoot.addCounter(IServiceCounters.LOCAL_HTTPD,
-                        new OneShotInstrument<String>(url));
-                
-            } catch (IOException e) {
-                
-                log.error("Could not start httpd", e);
-                
-            }
-            
-        }
-
-        /*
-         * Setup locator.
-         */
-        resourceLocator = new DefaultResourceLocator(//
-                this,//
-                null //delegate
+        addScheduledStatisticsTask(//
+                new StartDeferredTasksTask(),// task to run.
+                150, // initialDelay (ms)
+                150, // delay
+                TimeUnit.MILLISECONDS // unit
                 );
+
+        // Setup locator.
+        resourceLocator = new DefaultResourceLocator(this, null /* delegate */);
         
     }
     
@@ -748,178 +702,6 @@ abstract public class AbstractFederation implements IBigdataFederation {
     }
 
     /**
-     * Abstract base class providing caching for {@link IIndex} like objects. A
-     * canonicalizing cache is used with weak references to the {@link IIndex}s
-     * back by a hard reference LRU cache. This tends to keep around views that
-     * are reused while letting references for unused views be cleared by the
-     * garbage collector in a timely manner.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * @param <T>
-     */
-    abstract public static class AbstractIndexCache<T extends IRangeQuery> {
-        
-        /**
-         * A canonicalizing cache for the client's {@link IIndex} proxy objects. The
-         * keys are {@link NT} objects which represent both the name of the index
-         * and the timestamp for the index view. The values are the {@link IIndex}
-         * proxy objects.
-         * <p>
-         * Note: The "dirty" flag associated with the object in this cache is
-         * ignored.
-         */
-        final private WeakValueCache<NT, T> indexCache;
-        
-        final private NamedLock<NT> indexCacheLock = new NamedLock<NT>();
-
-        /**
-         * 
-         * @param capacity
-         *            The capacity of the backing LRU hard reference cache.
-         */
-        protected AbstractIndexCache(int capacity) {
-            
-            indexCache = new WeakValueCache<NT, T>(
-                    new LRUCache<NT, T>(capacity));
-            
-        }
-        
-        /**
-         * Method is invoked on a cache miss and returns a view of the described
-         * index.
-         * 
-         * @param name
-         * @param timestamp
-         * 
-         * @return The index view -or- <code>null</code> if the described
-         *         index does not exist.
-         */
-        abstract protected T newView(final String name, final long timestamp);
-        
-        /**
-         * Request a view of an index. If there is a cache miss then a new view
-         * will be created.
-         * 
-         * @param nt
-         * 
-         * @return The index view -or- <code>null</code> if the described
-         *         index does not exist.
-         */
-        public T getIndex(final String name, final long timestamp) {
-            
-            if (INFO)
-                log.info("name="+name+" @ "+timestamp);
-            
-            final NT nt = new NT(name, timestamp);
-
-            /*
-             * Acquire a lock for the index name and timestamp. This allows
-             * concurrent resolution of views of the same index and views of other
-             * indices as well.
-             */
-            final Lock lock = indexCacheLock.acquireLock(nt);
-
-            try {
-
-                T ndx = indexCache.get(nt);
-
-                if (ndx == null) {
-
-                    if ((ndx = newView(name, timestamp)) == null) {
-
-                        if (INFO)
-                            log.info("name=" + name + " @ " + timestamp
-                                    + " : no such index.");
-                        
-                        return null;
-                        
-                    }
-
-                    // add to the cache.
-                    indexCache.put(nt, ndx, false/* dirty */);
-
-                    if (INFO)
-                        log.info("name=" + name + " @ " + timestamp
-                                + " : index exists.");
-
-                } else {
-
-                    if (INFO)
-                        log.info("name=" + name + " @ " + timestamp
-                                + " : cache hit.");
-
-                }
-
-                return ndx;
-            
-            } finally {
-                
-                lock.unlock();
-                
-            }
-
-        }
-
-        /**
-         * Drop the {@link ITx#UNISOLATED} and {@link ITx#READ_COMMITTED}
-         * entries for the named index from the cache.
-         * <p>
-         * Historical and transactional reads are still allowed, but we remove
-         * the read-committed or unisolated views from the cache once the index
-         * has been dropped. If a client wants them, it needs to re-request. If
-         * they have been re-registered on the metadata service then they will
-         * become available again.
-         * <p>
-         * Note: Operations against unisolated or read-committed indices will
-         * throw exceptions if they execute after the index was dropped.
-         */
-        protected void dropIndexFromCache(String name) {
-            
-            synchronized(indexCache) {
-                
-                final Iterator<ICacheEntry<NT,T>> itr = indexCache.entryIterator();
-                
-                while(itr.hasNext()) {
-                    
-                    final ICacheEntry<NT,T> entry = itr.next();
-                    
-//                    final T ndx = entry.getObject();
-                    final NT nt = entry.getKey();
-                    
-                    if(name.equals(nt.getName())) {
-                        
-                        final long timestamp = nt.getTimestamp();
-
-                        if (timestamp == ITx.UNISOLATED
-                                || timestamp == ITx.READ_COMMITTED) {
-                        
-                            if (INFO)
-                                log.info("dropped from cache: " + name + " @ "
-                                        + timestamp);
-                            
-                            // remove from the cache.
-                            indexCache.remove(entry.getKey());
-
-                        }
-                        
-                    }
-                    
-                }
-                
-            }
-            
-        }
-
-        protected void shutdown() {
-            
-            indexCache.clear();
-            
-        }
-        
-    }
-    
-    /**
      * Return the cache for {@link IIndex} objects.
      */
     abstract protected AbstractIndexCache<? extends IIndex> getIndexCache();
@@ -986,15 +768,413 @@ abstract public class AbstractFederation implements IBigdataFederation {
     private final TemporaryStoreFactory tempStoreFactory;
 
     /**
-     * Periodically sends performance {@link ICounterSet} data to the
-     * {@link ILoadBalancerService}.
-     * 
-     * @see DataService.ReportTask
+     * Forces the immediate reporting of the {@link CounterSet} to the
+     * {@link ILoadBalancerService}. Any errors will be logged, not thrown.
+     */
+    public void reportCounters() {
+
+        new ReportTask(this).run();
+        
+    }
+
+    /**
+     * Delegated.
+     */
+    public Class getServiceIface() {
+    
+        return client.getDelegate().getServiceIface();
+        
+    }
+    
+    /**
+     * Delegated.
+     */
+    public UUID getServiceUUID() {
+        
+        return client.getDelegate().getServiceUUID();
+        
+    }
+    
+    /**
+     * Delegated.
+     */
+    public boolean isServiceReady() {
+        
+        return client.getDelegate().isServiceReady();
+        
+    }
+    
+    /**
+     * Delegated.
+     */
+    public void reattachDynamicCounters() {
+        
+        client.getDelegate().reattachDynamicCounters();
+        
+    }
+    
+    /**
+     * Delegated.
+     */
+    public void didStart() {
+        
+        client.getDelegate().didStart();
+        
+    }
+    
+    public void serviceJoin(IService service, UUID serviceUUID) {
+        
+        if(INFO) {
+            
+            log.info("service=" + service + ", serviceUUID" + serviceUUID);
+            
+        }
+        
+        client.getDelegate().serviceJoin(service, serviceUUID);
+        
+    }
+
+    public void serviceLeave(UUID serviceUUID) {
+        
+        if(INFO) {
+            
+            log.info("serviceUUID="+serviceUUID);
+            
+        }
+        
+        client.getDelegate().serviceLeave(serviceUUID);
+        
+    }
+    
+    /**
+     * This task runs periodically. Once {@link #getServiceUUID()} reports a
+     * non-<code>null</code> value, it will start an (optional)
+     * {@link AbstractStatisticsCollector}, an (optional) httpd service, and
+     * the (required) {@link ReportTask}.
+     * <p>
+     * Note: The {@link ReportTask} will relay any collected performance
+     * counters to the {@link ILoadBalancerService}, but it also lets the
+     * {@link ILoadBalancerService} know which services exist, which is
+     * important for some of its functions.
+     * <p>
+     * Once these task(s) have been started, this task will throw an exception
+     * in order to prevent it from being re-executed.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public class ReportTask implements Runnable {
+    protected class StartDeferredTasksTask implements Runnable {
+
+        /**
+         * Note: The logger is named for this class, but since it is an inner
+         * class the name uses a "$" delimiter (vs a ".") between the outer and
+         * the inner class names.
+         */
+        final protected Logger log = Logger.getLogger(StartDeferredTasksTask.class);
+
+        final protected boolean INFO = log.isInfoEnabled();
+        
+        public StartDeferredTasksTask() {
+        
+        }
+
+        /**
+         * @throws RuntimeException
+         *             once the deferred task(s) are running to prevent
+         *             re-execution of this startup task.
+         */
+        public void run() {
+
+            final boolean started;
+            
+            try {
+                
+                started = startDeferredTasks();
+                
+            } catch (Throwable t) {
+
+                log.warn("Problem in report task?", t);
+
+                return;
+                
+            }
+
+            if (started) {
+
+                /*
+                 * Note: This exception is thrown once this task has executed
+                 * successfully.
+                 */
+                
+                throw new RuntimeException("Normal completion.");
+                
+            }
+            
+        }
+
+        /**
+         * Starts performance counter collection once the service {@link UUID}
+         * is known.
+         * 
+         * @return <code>true</code> iff performance counter collection was
+         *         started.
+         * 
+         * @throws IOException
+         *             if {@link IDataService#getServiceUUID()} throws this
+         *             exception (it never should since it is a local method
+         *             call).
+         */
+        protected boolean startDeferredTasks() throws IOException {
+
+            if (getServiceUUID() == null) {
+
+                log.warn("Service UUID is not assigned yet.");
+
+                return false;
+
+            }
+            
+            if(!isServiceReady()) {
+            
+                log.warn("Service not ready yet.");
+
+                return false;
+                
+            }
+            
+            /*
+             * start collection on various work queues.
+             * 
+             * Note: The data service starts collection for its queues
+             * (actually, the concurrency managers queues) once it is up and
+             * running.
+             * 
+             * @todo have it collect using the same scheduled thread pool.
+             */
+            startQueueStatisticsCollection();
+            
+            // start collecting performance counters (if enabled).
+            startPerformanceCounterCollection();
+
+//            // notify the load balancer of this service join.
+//            notifyJoin();
+            
+            // start reporting to the load balancer.
+            startReportTask();
+
+            // start the local httpd service reporting on this service.
+            startHttpdService();
+            
+            // notify delegates that deferred startup has occurred.
+            AbstractFederation.this.didStart();
+
+            return true;
+
+        }
+
+
+        /**
+         * Setup sampling on the client's thread pool. This collects interesting
+         * statistics about the thread pool for reporting to the load balancer
+         * service.
+         */
+        protected void startQueueStatisticsCollection() {
+
+            if (!client.getCollectQueueStatistics()) {
+
+                if (INFO)
+                    log.info("Queue statistics collection disabled: "
+                            + getServiceIface());
+
+                return;
+
+            }
+
+            final long initialDelay = 0; // initial delay in ms.
+            final long delay = 1000; // delay in ms.
+            final TimeUnit unit = TimeUnit.MILLISECONDS;
+
+            final String relpath = "Thread Pool";
+
+            final QueueStatisticsTask queueStatisticsTask = new QueueStatisticsTask(
+                    relpath, threadPool, taskCounters);
+
+            addScheduledStatisticsTask(queueStatisticsTask, initialDelay,
+                    delay, unit);
+
+            queueStatisticsTask.addCounters(getServiceCounterSet().makePath(relpath));
+
+        }
+        
+        /**
+         * Start collecting performance counters from the OS (if enabled).
+         */
+        protected void startPerformanceCounterCollection() {
+
+            final UUID serviceUUID = getServiceUUID();
+
+            final Properties p = getClient().getProperties();
+
+            if (getClient().getCollectPlatformStatistics()) {
+
+                p.setProperty(AbstractStatisticsCollector.Options.PROCESS_NAME,
+                        "service" + ICounterSet.pathSeparator
+                                + getServiceIface().getName()
+                                + ICounterSet.pathSeparator
+                                + serviceUUID.toString());
+
+                statisticsCollector = AbstractStatisticsCollector
+                        .newInstance(p);
+
+                statisticsCollector.start();
+
+                /*
+                 * Attach the counters that will be reported by the statistics
+                 * collector service.
+                 */
+                ((CounterSet) getCounterSet()).attach(statisticsCollector
+                        .getCounters());
+
+                if (INFO)
+                    log.info("Collecting platform statistics: uuid="
+                            + serviceUUID);
+
+            }
+
+        }
+
+        /**
+         * Start task to report service and counters to the load balancer.
+         */
+        protected void startReportTask() {
+
+            final Properties p = getClient().getProperties();
+
+            final long delay = Long.parseLong(p.getProperty(
+                    Options.REPORT_DELAY, Options.DEFAULT_REPORT_DELAY));
+
+            if (INFO)
+                log.info(Options.REPORT_DELAY + "=" + delay);
+
+            final TimeUnit unit = TimeUnit.MILLISECONDS;
+
+            final long initialDelay = delay;
+
+            addScheduledStatisticsTask(new ReportTask(AbstractFederation.this),
+                    initialDelay, delay, unit);
+
+            if (INFO)
+                log.info("Started ReportTask.");
+
+        }
+
+        /**
+         * Start the local httpd service (if enabled). The service is started on
+         * the {@link IBigdataClient#getHttpdPort()}, on a randomly assigned
+         * port if the port is <code>0</code>, or NOT started if the port is
+         * <code>-1</code>. If the service is started, then the URL for the
+         * service is reported to the load balancer and also written into the
+         * file system. When started, the httpd service will be shutdown with
+         * the federation.
+         * 
+         * @throws UnsupportedEncodingException
+         */
+        protected void startHttpdService() throws UnsupportedEncodingException {
+
+            final int httpdPort = client.getHttpdPort();
+
+            if (httpdPort == -1) {
+
+                if (INFO)
+                    log.info("httpd disabled: "
+                                    + getServiceCounterPathPrefix());
+                
+                return;
+
+            }
+
+            try {
+
+                AbstractFederation.this.httpd = newHttpd(httpdPort,
+                        getCounterSet());
+
+            } catch (IOException e) {
+
+                log.error("Could not start httpd : "
+                        + getServiceCounterPathPrefix(), e);
+
+                return;
+                
+            }
+
+            // the URL that may be used to access the local httpd.
+            httpdURL = "http://"
+                    + AbstractStatisticsCollector.fullyQualifiedHostName + ":"
+                    + httpd.getPort() + "?path="
+                    + URLEncoder.encode(getServiceCounterPathPrefix(), "UTF-8");
+
+            if (INFO)
+                log.info("start:\n" + httpdURL);
+
+            // add counter reporting that url to the load balancer.
+            serviceRoot.addCounter(IServiceCounters.LOCAL_HTTPD,
+                    new OneShotInstrument<String>(httpdURL));
+
+        }
+        
+        /**
+         * Create a new {@link AbstractHTTPD} instance.
+         * 
+         * @param port
+         *            The port, or zero for a random port.
+         * @param counterSet
+         *            The root {@link CounterSet} that will be served up.
+         * 
+         * @throws IOException
+         */
+        protected final AbstractHTTPD newHttpd(final int httpdPort,
+                CounterSet counterSet) throws IOException {
+
+            return new CounterSetHTTPD(httpdPort, counterSet) {
+
+                public Response doGet(String uri, String method,
+                        Properties header, Map<String, Vector<String>> parms)
+                        throws Exception {
+
+                    try {
+
+                        reattachDynamicCounters();
+
+                    } catch (Exception ex) {
+
+                        /*
+                         * Typically this is because the live journal has been
+                         * concurrently closed during the request.
+                         */
+
+                        log.warn("Could not re-attach dynamic counters: " + ex,
+                                ex);
+
+                    }
+
+                    return super.doGet(uri, method, header, parms);
+
+                }
+
+            };
+
+        }
+
+    }
+    
+    /**
+     * Periodically report performance counter data to the
+     * {@link ILoadBalancerService}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class ReportTask implements Runnable {
 
         /**
          * Note: The logger is named for this class, but since it is an inner
@@ -1003,9 +1183,20 @@ abstract public class AbstractFederation implements IBigdataFederation {
          */
         final protected Logger log = Logger.getLogger(ReportTask.class);
 
+        /**
+         * True iff the {@link #log} level is INFO or less.
+         */
         final protected boolean INFO = log.isInfoEnabled();
 
-        public ReportTask() {
+        private final AbstractFederation fed;
+        
+        public ReportTask(AbstractFederation fed) {
+
+            if (fed == null)
+                throw new IllegalArgumentException();
+            
+            this.fed = fed;
+            
         }
 
         /**
@@ -1015,12 +1206,26 @@ abstract public class AbstractFederation implements IBigdataFederation {
         public void run() {
 
             try {
+                
+                fed.reattachDynamicCounters();
 
+            } catch (Throwable t) {
+
+                log.error("Could not update performance counter view : " + t, t);
+
+            }
+            
+            try {
+
+                /*
+                 * Report the performance counters to the load balancer.
+                 */
+                
                 reportPerformanceCounters();
                 
             } catch (Throwable t) {
 
-                log.warn("Problem in report task?", t);
+                log.error("Could not report performance counters : " + t, t);
 
             }
 
@@ -1033,9 +1238,20 @@ abstract public class AbstractFederation implements IBigdataFederation {
          */
         protected void reportPerformanceCounters() throws IOException {
 
-            final UUID clientUUID = getClient().getClientUUID();
+            // Note: This _is_ a local method call.
+            final UUID serviceUUID = fed.getServiceUUID();
 
-            final ILoadBalancerService loadBalancerService = getLoadBalancerService();
+            // Will be null until assigned by the service registrar.
+            if (serviceUUID == null) {
+
+                if(INFO)
+                    log.info("Service UUID not assigned yet.");
+
+                return;
+
+            }
+
+            final ILoadBalancerService loadBalancerService = fed.getLoadBalancerService();
 
             if (loadBalancerService == null) {
 
@@ -1051,29 +1267,18 @@ abstract public class AbstractFederation implements IBigdataFederation {
              * 
              * @todo allow filter on what gets sent to the load balancer?
              */
-            ByteArrayOutputStream baos = new ByteArrayOutputStream(
+            final ByteArrayOutputStream baos = new ByteArrayOutputStream(
                     Bytes.kilobyte32 * 2);
 
-            getCounterSet().asXML(baos, "UTF-8", null/* filter */);
+            fed.getCounterSet().asXML(baos, "UTF-8", null/* filter */);
 
-            loadBalancerService.notify("Hello", clientUUID,
-                    IBigdataClient.class.getName(), baos.toByteArray());
+            loadBalancerService.notify(serviceUUID, baos.toByteArray());
 
             if (INFO)
                 log.info("Notified the load balancer.");
             
         }
 
-    }
-
-    /**
-     * Forces the immediate reporting of the {@link CounterSet} to the
-     * {@link ILoadBalancerService}.
-     */
-    public void reportCounters() {
-
-        new ReportTask().run();
-        
     }
 
 }

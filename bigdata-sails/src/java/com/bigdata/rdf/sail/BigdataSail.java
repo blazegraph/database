@@ -981,7 +981,7 @@ public class BigdataSail extends SailBase implements Sail {
         /**
          * The implementation object.
          */
-        public AbstractTripleStore getDatabase() {
+        public AbstractTripleStore getTripleStore() {
             
             return database;
             
@@ -1795,7 +1795,7 @@ public class BigdataSail extends SailBase implements Sail {
          * re-computing the closure.
          * <p>
          * Note: This method does NOT commit the database. See
-         * {@link ITripleStore#commit()} and {@link #getDatabase()}.
+         * {@link ITripleStore#commit()} and {@link #getTripleStore()}.
          * 
          * @see #removeAllEntailments()
          */

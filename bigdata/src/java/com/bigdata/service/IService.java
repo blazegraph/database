@@ -55,4 +55,20 @@ public interface IService extends Remote {
      */
     UUID getServiceUUID() throws IOException;
     
+    /**
+     * Return the most interesting interface for the service.
+     * 
+     * @throws IOException
+     *             since you can use this method with RMI.
+     */
+    Class getServiceIface() throws IOException;
+
+    /**
+     * The host on which this service is running.
+     * 
+     * @throws IOException
+     *             since you can use this method with RMI.
+     */
+    String getHostname() throws IOException;
+    
 }

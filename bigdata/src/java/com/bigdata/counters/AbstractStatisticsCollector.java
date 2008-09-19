@@ -39,7 +39,6 @@ import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.system.SystemUtil;
 
@@ -76,17 +75,15 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final protected static boolean DEBUG = log.isDebugEnabled();
 
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final protected static boolean INFO = log.isInfoEnabled();
 
-    /** {@link InetAddress#getHostName()} for this host. */
-    static final public String hostname;
+//    /** {@link InetAddress#getHostName()} for this host. */
+//    static final public String hostname;
 
     /** {@link InetAddress#getCanonicalHostName()} for this host. */
     static final public String fullyQualifiedHostName;
@@ -98,7 +95,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
     
         try {
 
-            hostname = InetAddress.getLocalHost().getHostName();
+//            hostname = InetAddress.getLocalHost().getHostName();
             
             fullyQualifiedHostName = InetAddress.getLocalHost().getCanonicalHostName();
             
@@ -112,7 +109,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
                 + ICounterSet.pathSeparator;
 
         if (INFO) {
-            log.info("hostname  : " + hostname);
+//            log.info("hostname  : " + hostname);
             log.info("FQDN      : " + fullyQualifiedHostName);
             log.info("hostPrefix: " + hostPathPrefix);
         }
@@ -242,13 +239,14 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      * @param serviceRoot
      *            The {@link CounterSet} corresponding to the service (or
      *            client).
-     * @param serviceOrClient
-     *            The service (or client).
+     * @param serviceIface
+     *            The class or interface that best represents the service or
+     *            client.
      * @param properties
      *            The properties used to configure that service or client.
      */
     static public void addBasicServiceOrClientCounters(CounterSet serviceRoot,
-            Object serviceOrClient, Properties properties) {
+            Class serviceIface, Properties properties) {
         
         // Service info.
         {
@@ -256,8 +254,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
             final CounterSet serviceInfoSet = serviceRoot.makePath("Info");
 
             serviceInfoSet.addCounter("Service Type",
-                    new OneShotInstrument<String>(
-                            serviceOrClient.getClass().getName()));
+                    new OneShotInstrument<String>(serviceIface.getName()));
 
             AbstractStatisticsCollector.addServiceProperties(serviceInfoSet,
                     properties);
@@ -523,9 +520,9 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
          * The interval in seconds at which the performance counters of the host
          * platform will be sampled (default 60).
          */
-        public String INTERVAL = "counters.interval";
+        public String PERFORMANCE_COUNTERS_SAMPLE_INTERVAL = "counters.interval";
         
-        public String DEFAULT_INTERVAL = "60";
+        public String DEFAULT_PERFORMANCE_COUNTERS_SAMPLE_INTERVAL = "60";
         
         /**
          * The name of the process whose per-process performance counters are to
@@ -559,7 +556,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
     public static AbstractStatisticsCollector newInstance(Properties properties) {
         
         final int interval = Integer.parseInt(properties.getProperty(
-                Options.INTERVAL, Options.DEFAULT_INTERVAL));
+                Options.PERFORMANCE_COUNTERS_SAMPLE_INTERVAL, Options.DEFAULT_PERFORMANCE_COUNTERS_SAMPLE_INTERVAL));
 
         if (interval <= 0)
             throw new IllegalArgumentException();
@@ -595,9 +592,9 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      * operating system. Before performance counter collection starts the static
      * counters will be written on stdout. The appropriate process(es) are then
      * started to collect the dynamic performance counters. Collection will
-     * occur every {@link Options#INTERVAL} seconds. The program will make 10
+     * occur every {@link Options#PERFORMANCE_COUNTERS_SAMPLE_INTERVAL} seconds. The program will make 10
      * collections by default and will write the updated counters on stdout
-     * every {@link Options#INTERVAL} seconds.
+     * every {@link Options#PERFORMANCE_COUNTERS_SAMPLE_INTERVAL} seconds.
      * <p>
      * Parameters also may be specified using <code>-D</code>. See
      * {@link Options}.
@@ -606,7 +603,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      *            <i>interval</i> [<i>count</i>]]
      *            <p>
      *            <i>interval</i> is the collection interval in seconds and
-     *            defaults to {@link Options#DEFAULT_INTERVAL}.
+     *            defaults to {@link Options#DEFAULT_PERFORMANCE_COUNTERS_SAMPLE_INTERVAL}.
      *            <p>
      *            <i>count</i> is the #of collections to be made and defaults
      *            to <code>10</code>. Specify zero (0) to run until halted.
@@ -624,7 +621,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
         final int interval;
         final int count;
         if (nargs == 0) {
-            interval = Integer.parseInt(Options.DEFAULT_INTERVAL);
+            interval = Integer.parseInt(Options.DEFAULT_PERFORMANCE_COUNTERS_SAMPLE_INTERVAL);
             count = DEFAULT_COUNT;
         } else if (nargs == 1) {
             interval = Integer.parseInt(args[0]);
@@ -647,7 +644,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
         if (nargs != 0) {
             
             // Override the interval property from the command line.
-            properties.setProperty(Options.INTERVAL,""+interval);
+            properties.setProperty(Options.PERFORMANCE_COUNTERS_SAMPLE_INTERVAL,""+interval);
             
         }
 

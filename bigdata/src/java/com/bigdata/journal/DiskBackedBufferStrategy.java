@@ -30,6 +30,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
 import com.bigdata.io.FileChannelUtility;
+import com.bigdata.io.FileLockUtility;
 
 /**
  * Abstract base class for implementations that use a direct buffer as a write
@@ -132,7 +133,7 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
 
         try {
 
-            FileMetadata.closeFile(file, raf);
+            FileLockUtility.closeFile(file, raf);
             
         } catch( IOException ex ) {
             
@@ -282,7 +283,7 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
 
         try {
 
-            raf = FileMetadata.openFile(file, fileMode, true/*tryFileLock*/);
+            raf = FileLockUtility.openFile(file, fileMode, true/*tryFileLock*/);
         
             log.warn("Re-opened file: "+file);
             

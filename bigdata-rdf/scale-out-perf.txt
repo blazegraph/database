@@ -651,10 +651,6 @@ Short term tasks:
        The directory needs to be relative to the service directory, so
        a method needs to expose that directory to the service.
 
-     - Done. (Not quite sure what the problem was here, but I made a
-       few changes and it appears to be fixed.)  The concurrent data
-       loader was failing to halt once it started the flush tasks.
-
      - Done.  (Modified to accept samples out of timestamp order and
        to record the #of and total of samples falling within a given
        period.)  Loosing some samples through reporting w/in the same
@@ -696,9 +692,9 @@ Short term tasks:
        average track the total number and compute the instanteous
        average per minute.
  
-     - Done (reports the #of stores in the weak value
-       cache). Likewise, the StoreManager should report the #of open
-       journals and index segments.
+     - Done (reports the #of stores in the weak cache). Likewise, the
+       StoreManager should report the #of open journals and index
+       segments.
 
      - Done. Anything with "%" or "percent" in the name should be
        formatted as a percentage in [0.00:1.00].
@@ -1087,7 +1083,7 @@ Short term tasks:
     ClientHashPartitionedIndex (vs the ClientIndexView, which could be
     renamed as KeyRangePartitionedIndex)
 
-  - (*****) Iterator refactor
+  - Iterator refactor
 
      * Change the striterator heirarchy into an implementation
        heirarchy (StriteratorImpl) for co-varying generics and a use
@@ -1120,21 +1116,6 @@ Short term tasks:
        read-consistent view of the metadata index and hence does not
        see the locator updates.
 
-   - LocalTripleStoreWithEmbeddedDataService
-
-     - Benchmark with owl:sameAs backchainer.
-
-     - (*****) Optimized JOIN that assumes that all indices are local
-       within the data service and reads locally on both access paths.
-       This would probably be implemented as a AbstractTask and it
-       would need to declare access to the indices being used for the
-       left and right hand sides of the join.
-
-     - test small and large document sets with and without incremental
-       closure:
-
-       -server -Xmx500m -DtestClass=com.bigdata.rdf.store.TestLocalTripleStore -Ddocuments.directory=../rdf-data/metrics/smallDocuments -Ddocuments.ontology=../rdf-data/metrics/metricsOntology_v1.9.rdfs -Dfile=C:/smallDocuments.jnl -DdataLoader.commit=None -DdataLoader.closure=None
-
    - ScaleOutTripleStore
 
      - ConcurrentDataLoader
@@ -1151,26 +1132,6 @@ Short term tasks:
        - More cleanup.
 
        - Reconcile with m/r architecture and bigdata repo.
-
-     - (*****) Optimized JOIN for the scale-out triple store.  It
-       needs to block up a set of right hand tuples that will be
-       joined against data on a given data service and then send those
-       tuples to that data service, recieving the results in
-       return. It will also have to handle stale locators if the join
-       is running in an read-committed mode, but not if it is
-       transactional or a historical read.
-
-       Inference is slow due to a large #of small join results.
-       Parallel sub-query is probably the way to beat that.  After
-       tuning, compare to the purely local unconcurrent line.
-
-       Consider batching a set of rangeQueries together in a single
-       operation vs parallel submits.
-
-     - Done. (get() and find() were running as unisolated tasks.)  I
-       am seeing a lot of tasks in the concurrency manager for the
-       metadata service, but few commits on the live journal.  What
-       the heck is the being reported for the metadata service?
 
    - OverflowManager
 
@@ -1193,7 +1154,7 @@ Short term tasks:
         purged even if the LRU is not being touched).  Do this for the
         index segment cache in the IndexManager as well.
 
-      - (*) Better concurrency for openIndex, openStore, getJournal,
+      - Done. Better concurrency for openIndex, openStore, getJournal,
         and getIndexOnStore
 
       - Modify WeakValueCache to use ConcurrentHashMap and support an
@@ -1289,11 +1250,6 @@ Short term tasks:
      cache buffer for a temporary store and use that buffer as the
      in-memory store before it overflows onto the disk.
 
-   - *** Batch API for extractor, allowing runs directly against the
-         KB.  Form a single prefix-scan query from a sort of all
-         simple terms in the document and then piece together the
-         phrases from the result.
-
    - Consider dropping the BasicRioLoader, PresortRioLoader, etc.  All
      of the benefit is in the use of the StatementBuffer.  These
      loaders just obscure the RIO mechanism and make them harder to
@@ -1377,18 +1333,6 @@ Short term tasks:
 
 	   Done. write unit tests for TM cases when using statement
 	   identifiers to make metadata statements.
-
-	 - Work through an import scenario from an application that is
-           using URIs generated from the {s,p,o} to represent the
-           statement identifier.
-
-	 - Survey all of the ways in which reportStatement/3 gets
-           called in RDFXMLParser and decide whether or not "context"
-           (the variable set based on bigdata:sid) is always correct
-           (either "" or the sid) or if there are some uses, such as
-           reification, where "context" should be ignored and update
-           the calls to reportStatement/3 or reportStatement/4 as
-           appropriate.
       
       2. Done. RDF/XML w/ statement identifiers in/out.
 
@@ -1424,32 +1368,10 @@ Short term tasks:
      split, move, and join.  See services/StressTestConcurrent. It can
      be parameterized for this purpose.
 
-   - streaming io for block read/write.
-
-     - Asynch IO for the disk only strategy will not have an impact if
-       we are doing commits whose size fits within a single write
-       cache (10M by default).
-
-     - Use a pool of direct buffers (the same pool that is used for
-       the TemporaryRawStore) for the data service and handle all
-       block io/out requests with that pool.  this will help about OOM
-       problems with "temporary" direct byte buffers.
-
-     - It is possible that we will need to use the TemporaryRawStore
-       static buffer pool for all reads from the store (or writes that
-       are not via a write cache backed by a direct buffer) since
-       otherwise Java could allocate for us, and then fail to
-       correctly release, a "temporary" direct buffer. This would
-       impose ReentrantLock on all reads....
-
    - write performance test drivers and run on cluster.
 
       - rdf concurrent query (rdf lubm is not designed to test with
         concurrent loads).
-
-      - bigdata file system workload (must provide reverse traversal
-        iterator to handle atomic append for the key-range partitioned
-        indices).
 
       - (****) Write script to allocate services to nodes.
 
@@ -1469,10 +1391,6 @@ Short term tasks:
           but presumably they will be fetched quickly enough and
           become stable - or maybe not?
 
-	- Need to touch up launch-all after the jini install as well
-          as installing from a pre-touched version fixing the
-          LD_ASSUME_KERNEL_VERSION bug.
-
 	- (***) Get clusterondemand account.
 
 	- Support downloadable code in the configuration, including a
@@ -1481,12 +1399,10 @@ Short term tasks:
         - Make sure that yum-updatesd does not run on the servers.  It
           absorbs an entire CPU for quite a while.
 
-      - (*******) rdf concurrent data load.
-
 	- Still an annoying problem with the service names as
-          displayed by the jini browser....  This may well be an issue
-          with failing to expose the interfaces and service classes
-          via an http service as downloadable code.
+          displayed by the jini browser....  The problem is that we do
+          not have an httpd server fronting for the JARs and that the
+          CODEBASE is not being set.
  
 ============================================================
 
@@ -1618,7 +1534,7 @@ java.lang.IllegalStateException
 
    - document setup.
 
-   - jini class setup, httpd, and codebase property.
+   - **** jini class setup, httpd, and codebase property.
    
    - Done. The various server setups either all need to be copied into
      appropriate locations on the host on which they will run or they
@@ -1656,7 +1572,8 @@ java.lang.IllegalStateException
      on all hosts since we are bundling the jars) for consistency.
      also emacs install.
 
-   - Done. problem with multicase. solved using unicast to host3.
+   - Done. problem with multicast. solved using unicast to
+     host3. (multicast issue on the servers has since been resolved.)
 
    - Run multiple clients as well as multiple servers specifying
      nclients=3 and clientNum={0,1,2}
@@ -1755,35 +1672,6 @@ Main issues:
         cluster.
 
     (-) ...
-
-============================================================
-
-(*) Optimize JOINs
-
-    (Done) LDS optimization (all indices are local, use read-committed
-           view).
-
-	   - Might be able to further optimize the closure rounds -
-             currently each round is submitted as a separate task.
-
-    (-) Scale-out optimization (essentially unrolling the loops).
-
-    (-) Integrate optimized JOINs with Sesame 2.
-
-    (Done) Generalize the JOIN paradigm so that it can be used for
-           things other than RDF.
-
-	   - Explore lexicon + SPO joins.
-
-	   - Explore distinct term scan as a filter on an SPO
-             predicate.
-
-    (-) Original LUBM benchmark.
-
-    (-) Modified LUBM benchmark.
-
-	Can this be modified to generate the data dynamically for
-	distributed clients?
 
 ============================================================
 
@@ -2029,16 +1917,6 @@ JF-U100-host23-2DS:  ******** RUNNING NOW *********
 ============================================================
 
 
-- MetadataService
-
-    - Caching.
-
-       - Collect statistics and monitor the MDS as we split the
-         indices.
-
-       - Consider caching to reduce RMI for splitting operations
-         across index partitions.
-
 - Scale-out scripts
 
     - Script to collect nohups, config files, and counters in a
@@ -2161,6 +2039,20 @@ JF-U100-host23-2DS:  ******** RUNNING NOW *********
    - Done. The normalized [score] is not being computed for hosts or
      services (it is always zero).
 
+ - TemporaryRawStore abuse.  
+      
+   * BigdataClient temporary raw store to cache information locally.
+     This should periodically be dropped as it can grow without bound.
+
+   * The StoreManager uses either a temporary raw store for the
+     indices it maintains for the resources that is is managing.
+
+ - Resource locators
+
+   - Finish the TestDefaultResourceLocator
+
+   - Address issue with read-committed BTree views.
+
 ============================================================
 
 Index allocation:
@@ -2243,14 +2135,6 @@ Caused by: java.lang.NullPointerException
 
 ============================================================
 
-   *** Snapshot release
-
-       - web app for row store & how to
-
-       - how to for Sesame 2.
-
-       - publish current javadoc.
-
    - Monitor the [executorService] queue for {Journal, TemporaryStore}
 	 
    - ScaleOutTripleStore {LDS, EDS, JDS}
@@ -2265,20 +2149,6 @@ Caused by: java.lang.NullPointerException
          on a third. This will give very good performance for Query
          and Truth Maintenance since the JOINs will be mostly
          executing against live index objects.
-
-       - Verify serialization of the JoinNexusFactory, setup of the
-         JoinNexus on the data service, and distributed execution.
-
-       - Axioms need to be serialized for the DoNotAddFilter for
-         scale-out joins.  (We could serialize the Axiom model
-         identifiers and the cache it for a given db instance, but
-         serializing the axioms themselves is not much effort - it is
-         an array of ~200 SPOs.)
-
-       - Export a proxy for IChunkedOrderedIterator when using an
-         async process, but if LT 1000 results then fully buffer
-         instead of creating a proxy (have to wait to figure that
-         out).
 
        - *** The LDS is running each round as a separate procedure
          submitted to the concurrency manager.  Why not run all rounds
@@ -2305,11 +2175,6 @@ Caused by: java.lang.NullPointerException
 	 Consider the use of magic sets as an alternative to "fixing"
 	 justifications tracking for scale-out.
 
-       - BlockingBuffer - tune for effective chunk sizes.  The buffer
-         sizes can be easily configured by the IJoinNexusFactory, as
-         can parameters for timeouts, etc. for the blocking buffer's
-         iterator.
-
 Translate Sesame2 queries to Rules dynamically so that they can
 execute on the native rule engine.
    
@@ -2319,9 +2184,13 @@ execute on the native rule engine.
 
    - done. simple conjunctive query.
 
-   - optionals (done. requires a change to the rule evaluation plan
-     since a zero range count for an optional does not mean that the
-     rule will have no solutions.)
+   - Optionals (native rules support optionals, but we are not
+     rewriting SPARQL optionals onto native optionals yet.)
+
+   - Support the SPARQL constructs which allow you to obtain a slice
+     of a result set.  This may require that we impose a stable
+     evaluation order when a slice is requested, which means turning
+     off join subquery parallelism for such queries.
 
    - resolution of terms to term ids and visa versa using JOINs?
      (batch resolution is done, but not by joins to the lexicon).
@@ -2332,18 +2201,24 @@ execute on the native rule engine.
    - filters that require JOINs to the lexicon and ordered scans by
      datatype literals.
 
-   * LUBM performance numbers.
+   - LUBM Query 9 is an example where a JOIN can be eliminated given
+     the ontology. Given (?y ub:teacherOf ?z) we can infer (?z
+     rdf:type ub:Course) from the ontology.  Introduce such JOIN
+     eliminations into the query rewrite, maybe w/ the Sesame people
+     since it does not depend on anything in the bigdata layer.
 
 - Snapshot release:
+
+   - web app for row store & how to
+
+   - how to for Sesame 2.
+
+   - publish current javadoc.
 
    - Move the ant build to the bigdata module and also the startup kit
      and its documentation.
 
 ============================================================
-
-x. misc tests, performance problems and improvements for the RDF DB.
-
-  - Finish the TestDefaultResourceLocator
 
   - (defer) Optimize by assigning variables in a rule a positional
     index and use a long[] for bindings for SPORelation self-joins.
@@ -2355,83 +2230,7 @@ x. misc tests, performance problems and improvements for the RDF DB.
 
   - performance testing for owl:sameAs processing at scale.
 
-- Performance testing of Fast vs Full and then set the default closure
-  method appropriately.
-
-  Re-evaluate the effect of the buffer capacity for the chunked
-  iterators.  When we are running parallel rules and asynchronous
-  iterators it could make sense to use much smaller buffers (10k vs
-  200k).
-
-* Test concurrent data loader on multiple servers
-
-  - with and without closure
-
-  - with and without overflow enabled (e.g., with and without
-    autopartitining)
-
-* Verify TM.
-
-* Sesame 2 TCK integration.
-
 ============================================================
-
-Priority list:
-
-x. *** Get 1-2B scaling numbers on the DPP cluster for DaveL and post
-       at http://esw.w3.org/topic/LargeTripleStores.
-
-       * Running U8000 (1B) or U50000 (7B) will require either a
-         machine with a lot of (local preferred) disk or a larger
-         closure and more join optimizations (for JDS closure and
-         query).
-
-       * Increase the journal chunk size (config files) and split
-         point (done).
-
-       * Initially, disable overflow for EDS, JDS.
-
-       - Note the time writing on the statement indices during closure
-         and compare it with the time reading on those indices.  What
-         takes more time?  For which rules?
-
-       - First, do a pure bulk load - triples only.
-
-	    - Without compression this will have to be on more than
-	      one machine or using NAS.
-
-	    - Without overflow processing the triple store will take
-              up more space due to the WORM nature of the store.
-
-	    * leading prefix compress can help to compenate for this,
-              but it has not been implemented yet.
-
-       - Then compute the database at once closure.
-
-	    - Done. add some of the missing rules for LUBM
-              competeness, e.g., owl:inversePropertyOf, etc.
-
-       - Then run LUBM benchmarks
-       
-            - Done: rewrite Sesame2 queries to native JOINs.
-
-       Do this for U100, U1000, and U8000 on one machine and then for
-       the same data sets on three machines using MONOLITHIC indices.
-       Put the statement indices on one host (make sure that optimized
-       joins are enabled) and the lexicon on another.  The full text
-       index can be on a third.  Read the source data from NFS.
-
-       - Once I have these numbers, go back and try again to work
-         through dynamic partitioning, load balancing.
-
-       - Compute the database-at-once closure once the data are safely
-         loaded (verify!) using dynamic partitioning, run some LUBM
-         benchmarks.  (This will force validation of the scale-out
-         joins, including serialization, the async iterator, and
-         efficiency).
-
-       - Then run the LUBM benchmarks again against the distributed,
-         key-range partitioned indices.
 
 x. Full text index performance.
 
@@ -2493,113 +2292,14 @@ x. Map/reduce harvest pipeline and info arch changes w/ MikeP towards
        - Focus on two CONOPS: incremental updates (crud) and map /
          reduce style index builds (bulk write).   
 
-x. ZooKeeper integration for resource lock manager?
+x. Resource lock manager
 
-============================================================
+   - ZooKeeper integration for resource lock manager?
 
-
-   - TempTripleStore use and abuse:
- 
-     * Fix TruthMaintenance#applyExistingStatements() - should use
-       bulk filter not point tests!
-
-     * Closure for StatementIdentifers should reuse the same
-       TemporaryStore and close() vs closeAndDelete().
-
-     * TruthMaintenance should reuse the same TemporaryStore (at least
-       for a given closure) and close() vs closeAndDelete().
-
-   - TemporaryRawStore abuse.  The overflow PostProcessOldJournalTask,
-     the StoreManager, and the BigdataClient all use a
-     TemporaryRawStore.
-
-       PostProcessOldJournalTask allocates one per task and therefore
-       does not allow the temporary raw store to grow without bound.
-       
-     * BigdataClient temporary raw store to cache information locally.
-       This should periodically be dropped as it can grow without
-       bound.
-
-     * The StoreManager uses either a temporary raw store for the
-       indices it maintains for the resources that is is managing.
-
-   - Bulk loads on the DPP (U100, U1000, U8000) and LUBM query tests.
-
-      - cache range counts (and maybe more) for historical access
-        paths.
-
-      - Test w/ Sesame 2 custom lubm benchmarking extensions - look
-        for other places where we can boost performance.
-
-      * The LDS should be able to run the entire closure program as a
-	single task on the concurrency manager -- refactor until it
-	does!
-	
-	LDS U10 Load rate w/o closure on d620 with 10 threads and 100k
-	statement buffer.  Not bad.
-
-	Database: #terms=315059, #stmts=1272953, rate=12355.0 in 103031 ms.
-
-      * Use an LRU cache in front of the LexiconRelation to quickly
-        resolve terms to their identifiers for commonly seen terms.
-        This should help to reduce the latency for high-level query
-        since we will avoid hits on the lexicon when converting the
-        query Values into BigdataValues.
-
-      * EDS, JDS
-
-        - Either verify overflow or disable overflow for EDS, JDS.
-
-        - Option to constrain the placement of the SPO indices onto a
-          host and run with (much of) the same efficiency as the LTS
-          or LDS but with overflow.  There will be some cost if the
-          MDS is remote as the #of partitions grows.
-
-	- During verification of scale-out data load (JDS U10)
-
-Caused by: java.lang.IllegalStateException
-	at com.bigdata.rdf.spo.SPO.setStatementType(SPO.java:653)
-	at com.bigdata.rdf.spo.BulkCompleteConverter.convert(BulkCompleteConverter.java:135)
-	at com.bigdata.rdf.spo.SPOConvertingIterator.convert(SPOConvertingIterator.java:59)
-	at com.bigdata.rdf.spo.SPOConvertingIterator.hasNext(SPOConvertingIterator.java:93)
-	at com.bigdata.rdf.store.ConcurrentDataLoader$VerifyStatementBuffer.incrementalWrite(ConcurrentDataLoader.java:1637)
-	at com.bigdata.rdf.rio.StatementBuffer.flush(StatementBuffer.java:377)
-	at com.bigdata.rdf.rio.PresortRioLoader.success(PresortRioLoader.java:71)
-	at com.bigdata.rdf.rio.BasicRioLoader.loadRdf2(BasicRioLoader.java:214)
-	at com.bigdata.rdf.rio.BasicRioLoader.loadRdf(BasicRioLoader.java:145)
-	at com.bigdata.rdf.store.ConcurrentDataLoader$ReaderTask.readData(ConcurrentDataLoader.java:1493)
-	at com.bigdata.rdf.store.ConcurrentDataLoader$ReaderTask.run(ConcurrentDataLoader.java:1404)
-
-        - Jini smart proxy for ResourceLock.
+   - Jini smart proxy for ResourceLock.
 	    
-	    The state is just the lock UUID, so this can be done
-	    easily enough.
-
-	    A real impl. might use ZooKeeper.
-
-   - (Various MikeP)
-
-     - Setup some test data w/ owlSameAs and tune the sameAs
-       backchainer and the type resource backchainer.
-
-     * Specialize type resource for the case when s is not null
-       to do less work.
-     
-     * Make the backchainer run async and expose an iterator that the
-       caller reads on to reduce latency.  right now we have to wait
-       for the complete set of sameAs entailments before the client
-       can read the 1st triple from the iterator.
-     
-     4. Consider a rewrite of the owl:sameAs backchainer as a rewrite
-       of the statement pattern in the query into 3 statement patterns
-       that use the native rule execution to accomplish the same ends
-       as the owl:sameAs backchainer.
-
-       - if we do optional, then raise it into Sesame2 query as well.
-
-     * Consider when there is an unbound s or o for the owl:sameAs
-       backchainer whether we can fix point a chunk of subjects (or
-       objects) at a time, rather than fix pointing one at a time.
+     The state is just the lock UUID, so this can be done easily
+     enough.
 
 ============================================================
 
@@ -2687,71 +2387,35 @@ Caused by: java.lang.RuntimeException: Child is not persistent: index=6
 
 ------
 
-*** The mutationCount is double-counting. IBuffer#flush() returns the
-    number of elements written onto the relation since the last
-    IBuffer#reset().  This suggests that the total mutationCount
-    should be extracted after all rules are finished, or only updated
-    at points where we know that the buffers have been flushed and can
-    be safely reset so that we do not double count.
+  - bigdata-sail/TestSearchQuery#test_restart() is failing?!?
 
-*** bigdata-sail/TestSearchQuery#test_restart() is failing?!?
+  * Re-compare performance of fast vs full and serial vs parallel
+    closure on a server platform and when the joins are using parallel
+    subquery evaluation.  How does this differ by platform and data
+    set?  What is a good default for the various configuration
+    variables?  What about [maxParallelSubqueries]?  Try an
+    'experiment' driver for an LUBM data set with a variety of
+    interesting conditions?
 
-*** Fix the match() execution (bulk extractor).
+  * We need a pattern for producing tasks that are run on either a
+    local executor service or (map/reduce) on a distributed executor
+    service.  The maximum concurrency imposed on the service by the
+    producer should be limited, at least for some producers.  Others
+    producers will just add tasks directly to the service, e.g., in
+    order to avoid livelock/deadlock conditions which might otherwise
+    arise.  The existing map/reduce system has something which does
+    this but it needs to be refactored for more general reuse.  Other
+    users include closure of a rule set and parallel subquery
+    evaluation for joins.
 
-    *** The test is failing because the "lit" variable is being
-        dropped when the matchRule is specialized.  We need to
-        preserve variable names during specialization, which may mean
-        a refactor of how variable names are handled.
-
-** Re-compare performance of fast vs full and serial vs parallel
-   closure on a server platform and when the joins are using parallel
-   subquery evaluation.  How does this differ by platform and data
-   set?  What is a good default for the various configuration
-   variables?  What about [maxParallelSubqueries]?
-
-   * We need a pattern for producing tasks that are run on either a
-     local executor service or (map/reduce) on a distributed executor
-     service.  The maximum concurrency imposed on the service by the
-     producer should be limited, at least for some producers.  Others
-     producers will just add tasks directly to the service, e.g., in
-     order to avoid livelock/deadlock conditions which might otherwise
-     arise.  The existing map/reduce system has something which does
-     this but it needs to be refactored for more general reuse.  Other
-     users include closure of a rule set and parallel subquery
-     evaluation for joins.
-
-   - Is there a small variation in the exact statement count for U10
-     between runs with parallel subquery evaluation enabled!?!
+  - Is there a small variation in the exact statement count for U10
+    between runs with parallel subquery evaluation enabled!?!
 
      exactStatementCount 1598981 vs 1598986.
     
 *** LUBM 50
 
-    - Verify answers.
-
-    - Can the owl restrictions be imposed by a rule that captures the
-      semantics of the ontology?
-
-    - Get times on server platform - use ant script to build and
-      modify runlubm to execute.
-
-    - Unlike load, closure appears to be IO bound.  Some of that may
-      be swapping back in parts of the JVM and code since closure uses
-      different classes than data load.  A server run will answer
-      that.
-
-    - Is concurrent data load IO bound?
-
-    - Single threaded load is CPU bound, and we only get about 60% of
-      a CPU once things settle down.
-
-    - What is the LDS vs LTS performance on a server platform?
-    
-    (retry query in case all swapped out and look at perfmon during
-    query)
-
-    - Note: turned off the sameAs expander for the moment (in lubm
-      factory) -- this property does not appear to be persistent?
+    - ant script to build and modify runlubm to execute on server.
 
     - Query 9
 
@@ -2774,195 +2438,10 @@ Caused by: java.lang.RuntimeException: Child is not persistent: index=6
 	term identifiers by indirection and sorting is 1/3 of the
 	total cost of the batch lookup of the term identifiers.
 
-      - Done (little change) Try async read ahead on the source
-        iterator while the consumer is pulling from the resolved
-        iterator.
-
-      - Done. Make sure that we are doing fully ordered reads on the
-        lexicon (verify ids are ordered).
-
-      - Try reducing lock contention for the buffer by changing the
-        use to add a chunk and read a chunk (make the buffer a simple
-        iterator and make the generic type <E[]> vs <E>).
-
-*** Performance analyzer:
-
-       Done. Range counts were not cached.  Index metadata was not
-       cached (for LDS).  The use of a cached thread pool was causing
-       the work queue to be a synchronous queue and that broke the
-       logic to delay tasks when the work queue was nearing its
-       capacity (the synchronous queue has a zero capacity).  The
-       Journal's ResourceMetadata was not being cached and that was
-       leading to significant overhead so I dropped the size() method
-       and now IResourceMetadata is invariant once the store is
-       created.
-
-       Try U5 or U10 since U1 is now too fast to make distinctions and
-       is swamped by startup costs, JVM tuning, etc.
-
-       - LTS:
-
-         Load and close U1 in 10 seconds.
-
-	 Query9 is 780ms.
-
-       - LDS:
-
-         Load and close U1 in 12 seconds w/ distributed joins.
-        
-	 Load and close U1 in 12 seconds w/ local joins (pretty similar).
-
-	 Query9 is 559ms (local joins) or 1500ms (distributed joins).
-
-       - EDS:
-
-         Load and close U1 in 12 seconds
-	 
-	 * query9=3000ms and SLOWS DOWN EACH TIME WE RUN IT!!!
-	 
-	   The problem is that parallel subquery is allowing too many
-	   threads to start when the chunk has a large #of elements.
-       
-         - Examine MDS caching w/ performance analyzer.
-
-       - JDS:
-
-         Load and close U1 in U1 25 seconds.
-
-	 - Done. Make sure to re-enable NIO for benchmarking in the
-           run configs.
-
-****     * It looks like the issue is (a) the large number of threads
-           running when we start an (in process) JiniFederation
-           combined with (b) yielding everytime we write on, or try to
-           read from, a BlockingBuffer.  When the #of competing
-           threads is low, this does not appear to cause contention.
-           But JDS results (at least in this in-process setup) in a
-           large #of threads.  It seems that each time we yeild, each
-           of those other threads must be offered an opportunity to
-           execute, even if it has no work to do.
-
-	   The IBuffer was developed originally for a single-threaded
-	   writer.  The IBlockingBuffer extends this for an
-	   asynchronous iterator, and appears to work well for the
-	   LTS, LDS, and EDS use cases - and might work for JDS if the
-	   services were running in their own JVMs (test this!).
-	   
-	   The rules have potential parallelism when performing
-	   closure.  Each join has potential parallelism as well for
-	   subqueries.  We could even define a PARALLEL iterator flag
-	   and have parallelism across index partitions for a
-	   read-historical iterator since the data service locators
-	   are immutable for historical reads.
-
-	   Rule-level parallelism (for fix point closure of a rule
-	   set) and join subquery-level parallelism could be
-	   distributed to available workers in a cluster.  In a
-	   similar way, high-level queries could be distributed to
-	   workers in a cluster to evaluation.  Such distribution
-	   would increase the practical parallelism beyond what a
-	   single machine could support as long as the total
-	   parallelism does not overload the cluster.
-	   
-	   There is a pragmatic limit on the #of concurrent threads
-	   for a single host.  When those threads target a blocking
-	   queue, then thread contention becomes very high and
-	   throughput drops drammatically.  This is why parallelism in
-	   FullClosure (fix point of all RDFS++ rules) is slow and
-	   also why JDS is slow -- a thread scheduling problem arises
-	   each time an element is added to a buffer.
-
-       *** We can reduce this problem by allocating a distinct buffer
-	   to each task.  The task collects a 'chunk' in the buffer.
-	   When full, the buffer propagates onto a thread-safe buffer
-	   of chunks targetting either the target relation (mutation)
-	   or feeding an asynchronous iterator (high-level query). It
-	   is chunks themselves that accumulate in this thread-safe
-	   buffer, so each add() on that buffer may cause the thread
-	   to yeild, but the return for yeilding is an entire chunk in
-	   the buffer, not just a single element.
-
-	   Right now we have two buffer factories: one for query and
-	   one for mutation.  We can further decompose the buffer
-	   factories by adding a factory for a chunk buffer (a buffer
-	   that is NOT thread-safe and that is designed to store a
-	   single chunk of elements, e.g., in an array E[N]).  These
-	   buffers could be allocated by a ThreadLocal factory that
-	   was initialized with the desired chunk size and the target
-	   thread-safe buffer (either the mutation buffer or the query
-	   buffer).
-
-	 * We can already run a LDS program (IStep) on a DataService.
-	 
-           This capability should be generalized so that we can easily
-           run an IStep on any DataService in a cluster, thereby
-           parallelizing the execution of rules in a massive fix point
-           closure operation across a cluster.
-
-	   While all JOINs for a given rule will begin their
-           evaluation on the DataService (or client) choosen to
-           evaluate the rule, but subqueries MAY be distributed to
-           other DataServices for execution.  Therefore, the subquery
-           JOIN capability should be generalized so that we can easily
-           run a JOIN subquery on any DataService.
-
-	   For LDS, of course, we will always choose to run the
-	   program inside of the DataService as an AbstractTask since
-	   there are no additional computational resources to be
-	   leveraged.
-
-	   However, we can disable the LDS "smart" program execution
-	   and test distributed execution of parallel rules and JOIN
-	   subqueries.  We can test the same thing with EDS and JDS,
-	   but there will be additional overhead involved.
-
-       *** EDS and JDS need to cache read-historical range counts and
-	   locator scans.  (EDS might need to be refactored to share a
-	   common abstract class with JDS.)
-
-	   - The locator scan is very common.  For a historical index
-             view the set of locators never changes.  This definately
-             needs to be cached.  For a historical view of an index
-             with a small number of index partitions (1 ~ 1000), we
-             should just cache them all when we retrieve the
-             IndexMetadata for the scale-out index.  This effectively
-             caches the MDI itself, and in fact we obtain a local
-             image of the MDI that we use for all further operations.
-
-	     It is an open question what to do for read-committed and
-	     unisolated views and for read-historical indices with a
-	     very large #of index partitions.
-
-	 - bigdata-rdf/embedded federation test suite has errors.
-           Mostly can't find 'testXX' lexicon.  Also some in
-           TestTruthMaintenance.  Maybe problem with read-committed
-           BTree semantics?
-
-	 - JDS Closure times are now good (~2x the LTS or LDS times).
-
-	 - JDS query times are NOT so good.  So look at the iterator
-           proxy and serialization costs.
-
-         - Spin lock waiting for full chunks for the proxied iterator
-           and return the chunk itself if the iterator is exhaused in
-           the first chunk.
-
-         - Modify SerializerUtil to optionally collect a histogram of
-           serialization size/time by class.  That will be useful for
-           examining JDS costs attributable to Serialization.  Tune
-           serialization for elements materialized by high-level query
-           (it is using java default serialization).
-
-	 - Done. See if there are optimizations for type resource
-           expansion that are not in place yet.
-
-         - A scale-out join may have to ignore the backchain expanders
-           (they are only enabled for query in any case). Depending on
-           the expander, they can introduce non-local effects that
-           might prove too costly, at least for now. The main expander
-           of interest is owl:sameAs, and MikeP is working on a
-           rule-based variant of that.  The scale-out world could well
-           live without (x type resource).
+   - bigdata-rdf/embedded federation test suite has errors.  Mostly
+     can't find 'testXX' lexicon.  Also some in TestTruthMaintenance
+     for LocalDataServiceFederation - maybe the problem with
+     read-committed BTree semantics?
 
    ** reduce byte[] allocation for DoNotAddFilter. It is
       single-threaded in use, other than the instance on the
@@ -3014,7 +2493,7 @@ Caused by: java.lang.RuntimeException: Child is not persistent: index=6
 
 ============================================================
 
-*** TruthMaintenance performance should be optimized and vetted.
+*** TruthMaintenance performance should be optimized and re-vetted.
 
     - Remove use of deprecated classes.
 
@@ -3034,12 +2513,21 @@ Caused by: java.lang.RuntimeException: Child is not persistent: index=6
 
     - Test w/ APSTARs data set (incremental loads).
 
-   * Review performance for sameAs processing during query.  Note that
-     transitive for owl:same1b was moved to forward closure.  Test
-     with the old classes and owl:sameAs1b backward vs the new
-     rule-based expander and the owl:sameAs1b forward.
+    * Review performance for sameAs processing during query.  Note
+      that transitive for owl:same1b was moved to forward closure.
+      Test with the old classes and owl:sameAs1b backward vs the new
+      rule-based expander and the owl:sameAs1b forward.
 
     - Defer. tune up justifications.
+
+    * Fix TruthMaintenance#applyExistingStatements() - should use bulk
+      filter not point tests!
+
+    * Closure for StatementIdentifers should reuse the same
+      TemporaryStore and close() vs closeAndDelete().
+
+    * TruthMaintenance should reuse the same TemporaryStore (at least
+      for a given closure) and close() vs closeAndDelete().
 
 *** Get a SYSTAP (~100 documents) and NGA benchmark (~1000+) data set
     and queries from MikeP.  Add to the lubm test harness in CVS.  Add
@@ -3049,10 +2537,6 @@ Caused by: java.lang.RuntimeException: Child is not persistent: index=6
     - delete entity is an ELM command so I really need the generated
       delete sets or I need to capture the code for that command and
       run it and then run the delete.
-
-*** Get scaling numbers for LTS (1B) and JDS (3 servers, 2+B).
-
-    * Fix JDS performance for high-level query.
 
 *** Annotator as first class KB citizen.
 
@@ -3070,23 +2554,6 @@ Caused by: java.lang.RuntimeException: Child is not persistent: index=6
   - defer content repository change over.
 
 ============================================================
-
-4. Test and performance test for LTS, LDS, EDS, and of course JDS.
-   See if high-level query is now fast for JDS.
-
-   Closure appears to be much faster (2x for LTS).  This does not
-   effect the total time for load+close much for U1 since it is now
-   ~.75 seconds rather than ~1.4 seconds.
-
-   - Query is somewhat slower for LTS, but JDS query is faster even
-     though some JDS queries are still slow.
-
-   - Query 8 and 9 are slow for JDS.
-
-     In Query 9, given (?y ub:teacherOf ?z) we can infer (?z rdf:type
-     ub:Course) from the ontology and thereby eliminate one join from
-     the query.  With this change the evaluation time is ~40 - ~60
-     seconds.
 
    * Mutation count is busted.  
 
@@ -3117,30 +2584,282 @@ Caused by: java.lang.RuntimeException: Child is not persistent: index=6
      first chunk and can therefore benefit from running with full
      parallelism for the first chunk.
 
-     Try turning off Unicode support.
-
      Try a larger branching factor (must reload the data).
 
    - Search on the immutable key buffer is a significant part of the
      costs for the BTree during query.
 
-Next: Examine JDS; 2x as fast as it used to be.
+   * Compression
 
-      query 8 is 8953ms and then nearly doubles in time for most of
-      the runs with an average of 13092.  maybe this is GC?  Check
-      serialization costs.
+     - Add leading byte key compression for the nodes and make it the
+       default for leaves as well.
 
-      query 9 is similar.  both are CPU heavy and disk light, at least
-      for U1.
+     - Compare FastRDFKeyCompression with no compression and with
+       leading byte compression.  How do they do for time and space?
+       (I see little difference in time: Fast uses 25746220 bytes
+       while None uses 25748167, which is basically NO difference in
+       space either, which is weird.) There is probably going to be
+       some interaction with the ImmutableKeyBuffer so this issue will
+       need to be revisited again once that one is resolved.  Note
+       that there is no value compression for the statement indices
+       when statement identifiers are enabled.
 
-      x. Serialization histogram
 
-      x. performance analyzer.
+Priority list:
 
-   - Modify RemoteChunkedIterator. It requires us to wait until the
-     next chunk is available or the iterator is exhausted before
-     returning.  This could reduce latency.  This will require
-     hasNext(timeout) and next(timeout) on the IAsynchronousIterator
-     and a corresponding update to BlockingBuffer's combineChunks()
-     method.
+x. *** Get 1-2B scaling numbers on the DPP cluster for DaveL and post
+       at http://esw.w3.org/topic/LargeTripleStores.
+
+       * Running U8000 (1B) or U50000 (7B) will require either a
+         machine with a lot of (local preferred) disk or a larger
+         closure and more join optimizations (for JDS closure and
+         query).
+
+       * Increase the journal chunk size (config files) and split
+         point (done).
+
+       * Initially, disable overflow for EDS, JDS.
+
+       - Note the time writing on the statement indices during closure
+         and compare it with the time reading on those indices.  What
+         takes more time?  For which rules?  Enable the load balancer
+         and httpd reporting for at least shakedown runs.
+
+       - First, load lubm with RDFS++ closure.
+
+	    - Without compression this will have to be on more than
+	      one machine or using NAS.
+
+	    - Without overflow processing the triple store will take
+              up more space due to the WORM nature of the store.
+
+	    * leading prefix compress can help to compenate for this,
+              but it has not been implemented yet.
+
+       - Then run LUBM benchmarks
+       
+            - Done: rewrite Sesame2 queries to native JOINs.
+
+       Do this for U100, U1000, and U8000 on one machine and then for
+       the same data sets on three machines using MONOLITHIC indices.
+       Put the statement indices on one host (make sure that optimized
+       joins are enabled) and the lexicon on another.  The full text
+       index can be on a third.  Read the source data from NFS.
+
+      * EDS/JDS - Support an option to constrain the placement of the
+        SPO indices onto a specific data service and run with (much
+        of) the same efficiency as the LTS or LDS.  Overflow can be
+        allowed for this condition IF index partition MOVEs are
+        disabled.
+
+      * The LDS should be able to run the entire closure program as a
+	single task on the concurrency manager -- refactor until it
+	does!
+	
+	LDS U10 Load rate w/o closure on d620 with 10 threads and 100k
+	statement buffer.  Not bad.
+
+	Database: #terms=315059, #stmts=1272953, rate=12355.0 in 103031 ms.
+
+       - Once I have these numbers, go back and try again to work
+         through dynamic partitioning, load balancing.
+
+       - Compute the database-at-once closure once the data are safely
+         loaded (verify!) using dynamic partitioning, run some LUBM
+         benchmarks.  (This will force validation of the scale-out
+         joins, including serialization, the async iterator, and
+         efficiency).
+
+       - Then run the LUBM benchmarks again against the distributed,
+         key-range partitioned indices.
+
+   - Modify SerializerUtil to optionally collect a histogram of
+     serialization size/time by class.  That will be useful for
+     examining JDS costs attributable to Serialization.  Tune
+     serialization for elements materialized by high-level query (it
+     is using java default serialization). (extSer already has a
+     profiler but it does not handle object graph uniquification yet).
+
+   - Add custom serialization for the IAsynchronousIterator via
+     IJoinNexus and RemoteChunkIterator.  extser would actually work
+     here just fine since we can in effect send along the dictionary.
+     so would gom style data records.  however, we should also
+     eliminate common values -- there will be a LOT of duplicate of
+     values in binding sets.  In fact, since Java default
+     serialization uniquifies an object graph and since we do not
+     clone the constants, just the binding sets, it might do pretty
+     well.
+
+	    unit tests for RemoteChunk (de-)serialization - these
+	    exist, right?
+
+	    unit tests for ISolution (de-)serialization and efficient
+	    impls.
+
+   - A scale-out system may well choose to disable the (x type
+     resource) expander, or at least the all unbound variant.
+
+   * Get numbers for LTS (1B) and JDS (3 servers, 2+B).
+
+   - Bulk loads on the DPP (U100, U1000, U8000) and LUBM query tests.
+
+      - Test w/ Sesame 2 custom lubm benchmarking extensions - look
+        for other places where we can boost performance.
+
+      * EDS, JDS
+
+        - Either verify overflow or disable overflow for EDS, JDS.
+
+	- During verification of scale-out data load (JDS U10)
+
+Caused by: java.lang.IllegalStateException
+	at com.bigdata.rdf.spo.SPO.setStatementType(SPO.java:653)
+	at com.bigdata.rdf.spo.BulkCompleteConverter.convert(BulkCompleteConverter.java:135)
+	at com.bigdata.rdf.spo.SPOConvertingIterator.convert(SPOConvertingIterator.java:59)
+	at com.bigdata.rdf.spo.SPOConvertingIterator.hasNext(SPOConvertingIterator.java:93)
+	at com.bigdata.rdf.store.ConcurrentDataLoader$VerifyStatementBuffer.incrementalWrite(ConcurrentDataLoader.java:1637)
+	at com.bigdata.rdf.rio.StatementBuffer.flush(StatementBuffer.java:377)
+	at com.bigdata.rdf.rio.PresortRioLoader.success(PresortRioLoader.java:71)
+	at com.bigdata.rdf.rio.BasicRioLoader.loadRdf2(BasicRioLoader.java:214)
+	at com.bigdata.rdf.rio.BasicRioLoader.loadRdf(BasicRioLoader.java:145)
+	at com.bigdata.rdf.store.ConcurrentDataLoader$ReaderTask.readData(ConcurrentDataLoader.java:1493)
+	at com.bigdata.rdf.store.ConcurrentDataLoader$ReaderTask.run(ConcurrentDataLoader.java:1404)
+
+
+============================================================
+
+Reduce GC drivers for U1000
+
+  * Reduce byte[] allocation, which is one of the main drivers of the
+    heap and hence of time lost to GC.
+
+    Create an abstraction for a buffer containing ordered (byte[] key,
+    byte[] val) tuples that is in fact backed by a direct buffer
+    allocated from our DirectBufferPool.  The KeyBuilder will write
+    onto the buffer, rather than allocating a byte[] for each key.
+    Likewise, a DataOutputBuffer can be (re-)used and the data copied
+    onto the direct buffer for each byte[] value written. When writing
+    on the buffer would cause an overflow, trigger the desired
+    operation (batch lookup, batch insert, etc) for just those data in
+    the buffer.  The operation should use a socket to blast across the
+    nio buffer to the server (just like the block API) and transfer
+    the other parameters via RMI.  The server should allocate a direct
+    buffer from the pool to receive the data and apply the operation
+    to those data.
+
+      We should be able to apply leading key compression as part of
+      this abstraction as the data are being written on the buffer.
+
+      Applying dictionary based or other compression techniques is
+      more tricky -- there is an impedence mismatch there that I still
+      have not resolved to my satisifaction.
+
+      Modify the batch operation implementations to use the direct
+      buffer, possibly with one DataOutputBuffer for the key and
+      another for the value to minimize allocation when, for example,
+      we are just doing lookups (or conditional inserts coded as
+      lookup + insert).  On insert, we need to copy the key and value
+      into the leaf.
+
+      There should be some abstraction, perhaps parallel to
+      CharSequence such as ByteSequence, which allows us to operate on
+      byte[] data or on a slide of a byte[] or on a slice of a direct
+      buffer.  This would allow us to keep the BTree API for insert,
+      lookup, contains and delete simple while increasing the
+      flexibility such that we can avoid allocation when copying keys
+      into the BTree.
+
+    Immutable B+Tree nodes are being converted to normal nodes on
+    de-serialization.  This is a historical artifact and immutable
+    nodes should be scrapped.
+
+    The node and leaf need a GOM like data structure to minimize
+    allocation where they are compacted and/or reallocated only as
+    required.
+
+  - Size chunks by expected end result cardinality for subqueries
+    (this is a bit difficult to get right).
+
+  - Disable the GC overhead limit.
+
+  - Tune GC parameters.
+
+  - Examine the performance during closure for U1000.
+
+    What is going on with the CPU, GC, and work queues during rule
+    executions?
+
+    Is there any easy way to mark the events corresponding to the
+    execution timeline for correlation with the performance counters
+    from the OS, JVM, and application?
+
+    Does more parallelism help?  It will doubtless increase GC
+    problems but might reduce latency for closure and keep up the CPU
+    utilization.
+
+    We would do better to maintain a blocking queue of tasks to be run
+    from which a thread pool draws so that we can keep the pace up.
+    Right now each set of subquery tasks runs to a barrier and then we
+    issue a new set of subquery tasks.
+
+  - Optimize JOINs when SPORelation is locked onto a data service.
+
+  - Setup the other servers and try 2-server runs on U100 and U1000.
+    Look for throughput multipler for data load even if closure is not
+    optimized.
+
+  - Test advisory locks on NFS mount.
+
+============================================================
+
+- LBS will prefer one DS until new scores are computed so the initial
+  DS allocations will favor one service. When the scores are (near)
+  equal use a round robin among the available DS.
+
+  Verify 2/3 DS allocate strategy for lubm testing.
+
+- ResourceManager does not reveal read-historical indices (or
+  read-committed?), just those where we write on the index.  This
+  makes the index metadata unavailable during read-only runs, such as
+  the lubm benchmark.
+
+* There is a lot of reading on the globalRowStore.  This is all
+  related to locating the TripleStore resource and its contained
+  SPORelation and LexiconRelations.
+
+  (a) We do not read against the appropriate (historical) view of the
+      global row store.  We need to obtain that view from the
+      federation, which can only return the current view.
+
+  (b) We do not cache recently read property sets for historical reads
+     (because we are always doing read-committed property set reads).
+
+  (c) We should read the properties sets for the container
+      (tripleStore) and all contained resources (lexicon, text index,
+      and spo relation) from the property store using a single
+      operation.  Use a logical row scan to build up the property set
+      for these resources in one go and then return the appropriate
+      layered Properties object on request.  (We need to layer the
+      property sets so that you can override properties on a contained
+      resource, but in fact the contained resources that we are using
+      always have exactly the same property set as their container,
+      which is a bit of redundency that we don't really need.)
+
+  (d) Defer. We should recognize unknown properties, much like log4j.
+
+- jury rig a multi-machine jini U100 load with 2 clients running 10
+  threads each.  then go back and modify the ConcurrentDataLoader to
+  make this easy by allocating tasks to each of the data services in
+  the federation.
+
+============================================================
+
+- Seeing "Ignoring sample WAY out of timestamp order" messages in the
+  load balancer log.  This is probably a parsing / format error for
+  the sysstat package.
+
+- See "object not in table" errors during concurrent data load.  This
+  cases the load to fail. The problem was that the MetadataServer0
+  instance had not been killed so there was an attempt to connect to
+  an old instance.  kill -9 fixed this.
 
