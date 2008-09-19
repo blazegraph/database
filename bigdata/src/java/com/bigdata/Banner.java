@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata;
 
+import java.util.Date;
+
 /**
  * Class has a static method which writes a copyright banner on stdout once per
  * JVM. This method is invoked from several core classes in order to ensure that
@@ -53,7 +55,7 @@ public class Banner {
     }
 
     private static final String banner =
-        "\nBIGDATA(tm)"+
+        "\nBIGDATA(R)"+
         "\n"+
         "\n                   Flexible"+
         "\n                   Reliable"+
@@ -61,7 +63,8 @@ public class Banner {
         "\n      Web-Scale Computing for the Enterprise"+
         "\n"+
         "\nCopyright SYSTAP, LLC 2006-2008.  All rights reserved."+
-        "\n"
+        "\n"+
+        "\n"+new Date()
         ;
     
 }
