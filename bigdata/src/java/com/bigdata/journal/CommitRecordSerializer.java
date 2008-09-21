@@ -72,8 +72,9 @@ public class CommitRecordSerializer {
             LongPacker.packLong(dos, n);
             
             for(int i=0; i<n; i++) {
-                
-                LongPacker.packLong(dos, commitRecord.getRootAddr(i));
+  
+                dos.writeLong(commitRecord.getRootAddr(i));
+//                LongPacker.packLong(dos, commitRecord.getRootAddr(i));
                 
             }
             
@@ -110,7 +111,8 @@ public class CommitRecordSerializer {
 
             for (int i = 0; i < n; i++) {
 
-                roots[i] = LongPacker.unpackLong(dis);
+                roots[i] = dis.readLong();
+//                roots[i] = LongPacker.unpackLong(dis);
 
             }
             
