@@ -30,14 +30,12 @@ package com.bigdata.service;
 
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.ExecutionException;
 
 import com.bigdata.btree.ILinearList;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.journal.ITransactionManager;
-import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.MetadataIndexView;
@@ -45,7 +43,6 @@ import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.service.AbstractScaleOutClient.MetadataIndexCachePolicy;
 import com.bigdata.service.AbstractScaleOutClient.Options;
-import com.bigdata.util.InnerCause;
 
 /**
  * Abstract base class for federation implementation uses the scale-out index
@@ -83,8 +80,17 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
         
     }
     
-    private final MetadataIndexCachePolicy metadataIndexCachePolicy;
+    protected final MetadataIndexCachePolicy metadataIndexCachePolicy;
 
+    /**
+     * Strengthens the return type.
+     */
+    public ClientIndexView getIndex(String name, long timestamp) {
+
+        return (ClientIndexView) super.getIndex(name, timestamp);
+        
+    }
+    
     public synchronized void shutdown() {
         
         super.shutdown();
@@ -207,7 +213,7 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
      * @todo the cache should contain de-serialized locators. I work around this
      * using an LRU cache internal to the {@link MetadataIndexView}.
      */
-    private MetadataIndex cacheMetadataIndex(String name, long timestamp,
+    protected MetadataIndex cacheMetadataIndex(String name, long timestamp,
             MetadataIndexMetadata mdmd) {
 
         assertOpen();
@@ -293,7 +299,7 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
     private final IndexCache indexCache;
     private final MetadataIndexCache metadataIndexCache;
     
-    protected AbstractIndexCache<ClientIndexView> getIndexCache() {
+    protected IndexCache getIndexCache() {
         
         return indexCache;
         
@@ -305,162 +311,6 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
     protected MetadataIndexCache getMetadataIndexCache() {
         
         return metadataIndexCache;
-        
-    }
-    
-    /**
-     * Concrete implementation for {@link IClientIndex} views.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * @param <T>
-     */
-    public static class IndexCache extends AbstractIndexCache<ClientIndexView>{
-        
-        private final AbstractScaleOutFederation fed;
-        
-        public IndexCache(final AbstractScaleOutFederation fed, final int capacity) {
-            
-            super(capacity);
-
-            if (fed == null)
-                throw new IllegalArgumentException();
-            
-            this.fed = fed;
-
-        }
-        
-        @Override
-        protected ClientIndexView newView(final String name, final long timestamp) {
-            
-            final IMetadataIndex mdi = fed.getMetadataIndex(name, timestamp);
-
-            // No such index.
-            if (mdi == null) {
-
-                if (INFO)
-                    log.info("name=" + name + " @ " + timestamp
-                            + " : is not registered");
-
-                return null;
-
-            }
-
-            // Index exists.
-            return new ClientIndexView(fed, name, timestamp, mdi);
-            
-        }
-        
-    }
-    
-    /**
-     * Concrete implementation for {@link IMetadataIndex} views.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * @param <T>
-     */
-    public static class MetadataIndexCache extends AbstractIndexCache<IMetadataIndex>{
-
-        private final AbstractScaleOutFederation fed;
-
-        public MetadataIndexCache(final AbstractScaleOutFederation fed,
-                final int capacity) {
-            
-            super(capacity);
-
-            if (fed == null)
-                throw new IllegalArgumentException();
-            
-            this.fed = fed;
-
-        }
-
-        @Override
-        protected IMetadataIndex newView(String name, long timestamp) {
-            
-            final MetadataIndexMetadata mdmd = getMetadataIndexMetadata(
-                    name, timestamp);
-            
-            // No such index.
-            if (mdmd == null) return null;
-                    
-            switch (fed.metadataIndexCachePolicy) {
-
-            case NoCache:
-                return new NoCacheMetadataIndexView(fed, name, timestamp, mdmd);
-
-            case CacheAll:
-
-                return fed.cacheMetadataIndex(name, timestamp, mdmd);
-
-            default:
-                throw new AssertionError("Unknown option: "
-                        + fed.metadataIndexCachePolicy);
-            }
-            
-        }
-        
-        /**
-         * Return the metadata for the metadata index itself.
-         * <p>
-         * Note: This method always reads through!
-         * 
-         * @param name
-         *            The name of the scale-out index.
-         * 
-         * @param timestamp
-         * 
-         * @return The metadata for the metadata index or <code>null</code>
-         *         iff no scale-out index is registered by that name at that
-         *         timestamp.
-         */
-        protected MetadataIndexMetadata getMetadataIndexMetadata(String name,
-                long timestamp) {
-
-            final MetadataIndexMetadata mdmd;
-            try {
-
-                // @todo test cache for this object as of that timestamp?
-                mdmd = (MetadataIndexMetadata) fed.getMetadataService()
-                        .getIndexMetadata(
-                                MetadataService.getMetadataIndexName(name),
-                                timestamp);
-                
-                assert mdmd != null;
-
-            } catch( NoSuchIndexException ex ) {
-                
-                return null;
-            
-            } catch (ExecutionException ex) {
-                
-                if (InnerCause.isInnerCause(ex, NoSuchIndexException.class)) {
-
-                    // per API.
-                    return null;
-                    
-                }
-                
-                throw new RuntimeException(ex);
-                
-            } catch (Exception ex) {
-
-                throw new RuntimeException(ex);
-
-            }
-            
-            if (mdmd == null) {
-
-                // No such index.
-                
-                return null;
-
-            }
-            
-            return mdmd;
-
-        }
         
     }
 

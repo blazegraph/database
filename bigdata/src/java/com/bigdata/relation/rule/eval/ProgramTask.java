@@ -51,7 +51,7 @@ import com.bigdata.relation.rule.IStep;
 import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.DataService.IDataServiceAwareProcedure;
+import com.bigdata.service.IDataServiceAwareProcedure;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.ICloseableIterator;
 

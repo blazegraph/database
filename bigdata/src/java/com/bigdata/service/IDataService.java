@@ -47,7 +47,6 @@ import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.StaleLocatorException;
-import com.bigdata.service.DataService.IDataServiceAwareProcedure;
 import com.bigdata.sparse.SparseRowStore;
 
 /**

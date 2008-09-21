@@ -159,14 +159,12 @@ public class ClientIndexView implements IClientIndex {
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final protected static boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final protected static boolean DEBUG = log.isDebugEnabled();
 
     private final AbstractFederation fed;
 
@@ -790,7 +788,7 @@ public class ClientIndexView implements IClientIndex {
      *       matter?
      */
     @SuppressWarnings("unchecked")
-    protected ITupleIterator<PartitionLocator> locatorScan(boolean reverseScan,
+    public ITupleIterator<PartitionLocator> locatorScan(boolean reverseScan,
             long timestamp, final byte[] fromKey, final byte[] toKey) {
         
         if (INFO)

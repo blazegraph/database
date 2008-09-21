@@ -72,7 +72,9 @@ import com.bigdata.util.InnerCause;
  */
 public class DumpJournal {
 
-    protected static Logger log = Logger.getLogger(DumpJournal.class);
+    protected static final Logger log = Logger.getLogger(DumpJournal.class);
+    
+//    protected static final boolean INFO = log.isInfoEnabled();
     
     public DumpJournal() {
         

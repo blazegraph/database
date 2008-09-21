@@ -60,7 +60,7 @@ import com.bigdata.relation.rule.IStep;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IClientIndex;
-import com.bigdata.service.DataService.IDataServiceAwareProcedure;
+import com.bigdata.service.IDataServiceAwareProcedure;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
