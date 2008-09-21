@@ -50,10 +50,10 @@ import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
+import com.bigdata.service.IDataServiceAwareProcedure;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.service.RawDataServiceTupleIterator;
-import com.bigdata.service.DataService.IDataServiceAwareProcedure;
 
 /**
  * Historical read task is used to copy a view of an index partition as of the
