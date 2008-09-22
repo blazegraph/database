@@ -358,6 +358,8 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
 
         // sleep interval if not ready (ms).
         final long interval = Math.min(100, timeout / 10);
+
+        int ntries = 0;
         
         // updated each time through the loop.
         IMetadataService metadataService = null;
@@ -366,6 +368,8 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
         UUID[] dataServiceUUIDs = new UUID[0];
         
         while ((System.currentTimeMillis() - begin) < timeout) {
+            
+            ntries++;
 
             // verify that the client has/can get the metadata service.
             metadataService = getMetadataService();
@@ -379,7 +383,7 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
                     || dataServiceUUIDs.length < minDataServices) {
                 
                 if(INFO)
-                log.info("Waiting : metadataService="
+                log.info("Waiting : ntries="+ntries+", metadataService="
                         + (metadataService == null ? "not " : "")
                         + " found; #dataServices=" + dataServiceUUIDs.length
                         + " out of " + minDataServices + " required : "
