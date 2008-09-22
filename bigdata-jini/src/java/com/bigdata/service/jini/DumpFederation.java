@@ -176,7 +176,7 @@ public class DumpFederation {
                         
                     }
 
-                    dumpIndexLocators(fed, name, ndx);
+                    dumpIndexLocators(fed, scaleOutIndexName, ndx);
 
                 }
 

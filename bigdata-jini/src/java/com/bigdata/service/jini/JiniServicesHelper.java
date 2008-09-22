@@ -1,11 +1,15 @@
 package com.bigdata.service.jini;
 
 import java.net.MalformedURLException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import net.jini.core.discovery.LookupLocator;
 import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceRegistrar;
 import net.jini.discovery.LookupLocatorDiscovery;
+
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * A helper class that starts all the necessary services for a Jini federation.
@@ -59,6 +63,9 @@ public class JiniServicesHelper {
 
     private final String path;
 
+    private ExecutorService threadPool = Executors
+            .newCachedThreadPool(DaemonThreadFactory.defaultThreadFactory());
+    
     /**
      * Starts all services and connects the {@link JiniClient} to the
      * federation.
@@ -74,102 +81,44 @@ public class JiniServicesHelper {
         /*
          * Start up a resource lock server.
          */
-        resourceLockServer0 = new ResourceLockServer(new String[] { path
-                + "ResourceLockServer0.config" });
+        threadPool.execute(resourceLockServer0 = new ResourceLockServer(
+                new String[] { path + "ResourceLockServer0.config" }));
 
-        new Thread() {
-
-            public void run() {
-
-                resourceLockServer0.run();
-
-            }
-
-        }.start();
 
         /*
          * Start up a timestamp server.
          */
-        timestampServer0 = new TimestampServer(new String[] { path
-                + "TimestampServer0.config" });
+        threadPool.execute(timestampServer0 = new TimestampServer(
+                new String[] { path + "TimestampServer0.config" }));
 
-        new Thread() {
-
-            public void run() {
-
-                timestampServer0.run();
-
-            }
-
-        }.start();
-
+        
         /*
          * Start up a data server before the metadata server so that we can
          * make sure that it is detected by the metadata server once it
          * starts up.
          */
-        dataServer1 = new DataServer(
-                new String[] { path + "DataServer1.config" });
-
-        new Thread() {
-
-            public void run() {
-
-                dataServer1.run();
-
-            }
-
-        }.start();
+        threadPool.execute(dataServer1 = new DataServer(
+                new String[] { path + "DataServer1.config" }));
 
         /*
          * Start up a load balancer server.
          */
-        loadBalancerServer0 = new LoadBalancerServer(new String[] { path
-                + "LoadBalancerServer0.config" });
-
-        new Thread() {
-
-            public void run() {
-
-                loadBalancerServer0.run();
-
-            }
-
-        }.start();
+        threadPool.execute(loadBalancerServer0 = new LoadBalancerServer(
+                new String[] { path + "LoadBalancerServer0.config" }));
 
         /*
          * Start the metadata server.
          */
-        metadataServer0 = new MetadataServer(new String[] { path
-                + "MetadataServer0.config" });
-
-        new Thread() {
-
-            public void run() {
-
-                metadataServer0.run();
-
-            }
-
-        }.start();
+        threadPool.execute(metadataServer0 = new MetadataServer(
+                new String[] { path + "MetadataServer0.config" }));
 
         /*
          * Start up a data server after the metadata server so that we can
          * make sure that it is detected by the metadata server once it
          * starts up.
          */
-        dataServer0 = new DataServer(
-                new String[] { path + "DataServer0.config" });
-
-        new Thread() {
-
-            public void run() {
-
-                dataServer0.run();
-
-            }
-
-        }.start();
+        threadPool.execute(dataServer0 = new DataServer(new String[] { path
+                + "DataServer0.config" }));
 
         client = JiniClient
                 .newInstance(new String[] { path + "Client.config" });
@@ -242,54 +191,56 @@ public class JiniServicesHelper {
             client = null;
 
         }
-
-        if (metadataServer0 != null) {
-
-            metadataServer0.shutdownNow();
-
-            metadataServer0 = null;
-
-        }
-
-        if (dataServer0 != null) {
-
-            dataServer0.shutdownNow();
-
-            dataServer0 = null;
-
-        }
-
-        if (dataServer1 != null) {
-
-            dataServer1.shutdownNow();
-
-            dataServer1 = null;
-
-        }
-
-        if (loadBalancerServer0 != null) {
-
-            loadBalancerServer0.shutdownNow();
-
-            loadBalancerServer0 = null;
-
-        }
-
-        if (timestampServer0 != null) {
-
-            timestampServer0.shutdownNow();
-
-            timestampServer0 = null;
-
-        }
-
-        if (resourceLockServer0 != null) {
-
-            resourceLockServer0.shutdownNow();
-
-            resourceLockServer0 = null;
-
-        }
+        
+        threadPool.shutdownNow();
+        
+//        if (metadataServer0 != null) {
+//
+//            metadataServer0.shutdownNow();
+//
+//            metadataServer0 = null;
+//
+//        }
+//
+//        if (dataServer0 != null) {
+//
+//            dataServer0.shutdownNow();
+//
+//            dataServer0 = null;
+//
+//        }
+//
+//        if (dataServer1 != null) {
+//
+//            dataServer1.shutdownNow();
+//
+//            dataServer1 = null;
+//
+//        }
+//
+//        if (loadBalancerServer0 != null) {
+//
+//            loadBalancerServer0.shutdownNow();
+//
+//            loadBalancerServer0 = null;
+//
+//        }
+//
+//        if (timestampServer0 != null) {
+//
+//            timestampServer0.shutdownNow();
+//
+//            timestampServer0 = null;
+//
+//        }
+//
+//        if (resourceLockServer0 != null) {
+//
+//            resourceLockServer0.shutdownNow();
+//
+//            resourceLockServer0 = null;
+//
+//        }
 
     }
 
