@@ -69,7 +69,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
- * Abstract base class.
+ * Abstract base class for {@link IBigdataFederation} implementations.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

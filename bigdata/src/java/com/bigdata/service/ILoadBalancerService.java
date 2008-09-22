@@ -135,6 +135,9 @@ public interface ILoadBalancerService extends IService {
      *       that it can be used with services other than data services, e.g.,
      *       metadata services, map/reduce services, {@link IBigdataClient}s,
      *       etc.
+     * 
+     * @todo probably should use {@link Integer#MAX_VALUE} rather than ZERO for
+     *       the "no limit" signifier for [maxCount].
      */
     public UUID[] getUnderUtilizedDataServices(int minCount, int maxCount,
             UUID exclude) throws IOException, TimeoutException, InterruptedException;

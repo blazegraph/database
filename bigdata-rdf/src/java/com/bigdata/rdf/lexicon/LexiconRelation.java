@@ -11,7 +11,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -22,6 +21,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -1551,8 +1551,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
             return Collections.EMPTY_MAP;
             
         }
+
+        final long begin = System.currentTimeMillis();
         
-        final Map<Long/* id */, BigdataValue/* term */> ret = new HashMap<Long, BigdataValue>( n );
+        final ConcurrentHashMap<Long/* id */, BigdataValue/* term */> ret = new ConcurrentHashMap<Long, BigdataValue>(
+                n);
 
         /*
          * An array of any term identifiers that were not resolved in this first
@@ -1615,36 +1618,164 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
             // the id:term index.
             final IIndex ndx = getId2TermIndex();
 
+            final int MAX_CHUNK = 5000;
+            if (numNotFound < MAX_CHUNK) {
+
+                /*
+                 * Resolve everything in one go.
+                 */
+                
+                new ResolveTermTask(ndx, 0/* fromIndex */,
+                        numNotFound/* toIndex */, keys, notFound, ret).call();
+                
+            } else {
+                
+                /*
+                 * Break it down into multiple chunks and resolve those chunks
+                 * in parallel.
+                 */
+                
+                final LinkedList tasks = new LinkedList<Callable>();
+
+                int fromIndex = 0;
+                int remaining = numNotFound;
+
+                while (remaining > 0) {
+
+                    final int chunkSize = Math.min(MAX_CHUNK, remaining);
+
+                    final int toIndex = fromIndex + chunkSize;
+
+                    tasks.add(new ResolveTermTask(ndx, fromIndex, toIndex,
+                            keys, notFound, ret));
+
+                    fromIndex = toIndex;
+
+                    remaining -= chunkSize;
+                    
+                }
+                
+                final List<Future> futures;
+                try {
+                    futures = getExecutorService().invokeAll(tasks);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                
+                for(Future f : futures) {
+                    
+                    // verify task executed Ok.
+                    try {
+                        f.get();
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }                    
+                }
+
+                final long elapsed = System.currentTimeMillis() - begin;
+                
+                System.err.println("resolved " + numNotFound + " terms in "
+                        + tasks.size() + " chunks and " + elapsed + "ms");
+                
+            }
+
+        }
+
+        return ret;
+        
+    }
+    
+    /**
+     * Task resolves a chunk of terms against the lexicon.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private class ResolveTermTask implements Callable<Void> {
+        
+        final IIndex ndx;
+
+        final int fromIndex;
+
+        final int toIndex;
+
+        final byte[][] keys;
+
+        final Long[] notFound;
+
+        final ConcurrentHashMap<Long, BigdataValue> map;
+        
+        /**
+         * 
+         * @param ndx
+         *            The index that will be used to resolve the term
+         *            identifiers.
+         * @param fromIndex
+         *            The first index in <i>keys</i> to resolve.
+         * @param toIndex
+         *            The first index in <i>keys</i> that will not be resolved.
+         * @param keys
+         *            The serialized term identifiers.
+         * @param notFound
+         *            An array of term identifiers whose corresponding
+         *            {@link BigdataValue} must be resolved against the index.
+         *            The indices in this array are correlated 1:1 with those
+         *            for <i>keys</i>.
+         * @param map
+         *            Terms are inserted into this map under using their term
+         *            identifier as the key.
+         */
+        ResolveTermTask(final IIndex ndx, final int fromIndex,
+                final int toIndex, final byte[][] keys, final Long[] notFound,
+                ConcurrentHashMap<Long, BigdataValue> map) {
+
+            this.ndx = ndx;
+            this.fromIndex = fromIndex;
+            this.toIndex = toIndex;
+            this.keys = keys;
+            this.notFound = notFound;
+            this.map = map;
+
+        }
+
+        public Void call() {
+
             // aggregates results if lookup split across index partitions.
             final ResultBufferHandler resultHandler = new ResultBufferHandler(
-                    numNotFound, ndx.getIndexMetadata().getTupleSerializer()
+                    toIndex, ndx.getIndexMetadata().getTupleSerializer()
                             .getLeafValueSerializer());
 
             // batch lookup
-            ndx.submit(0/* fromIndex */, numNotFound/* toIndex */, keys,
-                    null/* vals */, BatchLookupConstructor.INSTANCE,
-                    resultHandler);
-        
+            ndx.submit(fromIndex, toIndex/* toIndex */, keys, null/* vals */,
+                    BatchLookupConstructor.INSTANCE, resultHandler);
+
             // the aggregated results.
             final ResultBuffer results = resultHandler.getResult();
-            
+
             /*
              * synchronize on the term cache before updating it.
              * 
-             * @todo move de-serialization out of the synchronized block?
+             * Note: This is synchronized to guard against a race condition
+             * where concurrent threads resolve the term against the database.
+             * If both threads attempt to insert their resolved term
+             * definitions, which are distinct objects, into the cache then one
+             * will get an IllegalStateException since the other's object will
+             * already be in the cache.
+             * 
+             * @todo move de-serialization out of the synchronized block and the
+             * putAll() into the term cache?
              */
-//            synchronized (termCache) 
             {
 
-                for (int i = 0; i < numNotFound; i++) {
-                    
+                for (int i = fromIndex; i < toIndex; i++) {
+
                     final Long id = notFound[i];
 
                     final byte[] data = results.getResult(i);
 
                     if (data == null) {
 
-                        log.warn("No such term: " + id );
+                        log.warn("No such term: " + id);
 
                         continue;
 
@@ -1652,27 +1783,21 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
                     /*
                      * Note: This automatically sets the valueFactory reference
-                     * on the de-serialized value. 
+                     * on the de-serialized value.
                      */
                     final BigdataValue value = valueFactory
                             .getValueSerializer().deserialize(data);
-                    
-                    /*
-                     * Note: This code block is synchronized to address a
-                     * possible race condition where concurrent threads resolve
-                     * the term against the database. It both threads attempt to
-                     * insert their resolved term definitions, which are
-                     * distinct objects, into the cache then one will get an
-                     * IllegalStateException since the other's object will
-                     * already be in the cache.
-                     */
 
                     if (termCache != null) {
-                        
-                        if (termCache.get(id) == null) {
 
-                            termCache.put(id, value, false/* dirty */);
+                        synchronized (termCache) {
 
+                            if (termCache.get(id) == null) {
+
+                                termCache.put(id, value, false/* dirty */);
+
+                            }
+                            
                         }
                         
                     }
@@ -1683,18 +1808,18 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                      * IllegalStateException if the value somehow was assigned
                      * the wrong term identifier (paranoia test).
                      */
-                    value.setTermId( id );
+                    value.setTermId(id);
 
                     // save in local map.
-                    ret.put(id, value);
-                    
+                    map.put(id, value);
+
                 }
 
             }
+
+            return null;
             
         }
-        
-        return ret;
         
     }
     
@@ -1876,8 +2001,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      *       minimize the #of terms that it has to resolve against the indices -
      *       this especially matters for the scale-out implementation.
      */
-//    private LRUCache<Long, BigdataValue> termCache = null;
-    private LRUCache<Long, BigdataValue> termCache = new LRUCache<Long, BigdataValue>(10000);
+    private LRUCache<Long, BigdataValue> termCache = null;
+//    private LRUCache<Long, BigdataValue> termCache = new LRUCache<Long, BigdataValue>(10000);
 
     /**
      * Handles {@link IRawTripleStore#NULL}, blank node identifiers, statement

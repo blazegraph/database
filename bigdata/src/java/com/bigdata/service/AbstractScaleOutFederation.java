@@ -28,8 +28,10 @@
 
 package com.bigdata.service;
 
+import java.util.Arrays;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 import com.bigdata.btree.ILinearList;
 import com.bigdata.btree.IRangeQuery;
@@ -45,8 +47,8 @@ import com.bigdata.service.AbstractScaleOutClient.MetadataIndexCachePolicy;
 import com.bigdata.service.AbstractScaleOutClient.Options;
 
 /**
- * Abstract base class for federation implementation uses the scale-out index
- * architecture (supporting key ranged partitioned indices).
+ * Abstract base class for federation implementations using the scale-out index
+ * architecture (federations that support key-range partitioned indices).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -311,6 +313,96 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
     protected MetadataIndexCache getMetadataIndexCache() {
         
         return metadataIndexCache;
+        
+    }
+
+    /**
+     * Await the availability of an {@link IMetadataService} and the specified
+     * minimum #of {@link IDataService}s.
+     * 
+     * @param minDataServices
+     *            The minimum #of data services.
+     * @param timeout
+     *            The timeout (ms).
+     * 
+     * @return An array #of the {@link UUID}s of the {@link IDataService}s
+     *         that have been discovered by <em>this</em> client. Note that at
+     *         least <i>minDataServices</i> elements will be present in this
+     *         array but that ALL discovered data services may be reported.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>minDataServices</i> is non-positive.
+     * @throws IllegalArgumentException
+     *             if <i>timeout</i> is non-positive.
+     * @throws IllegalStateException
+     *             if the client is not connected to the federation.
+     * @throws InterruptedException
+     *             if this thread is interrupted while awaiting the availability
+     *             of the {@link MetadataService} or the specified #of
+     *             {@link DataService}s.
+     * @throws TimeoutException
+     *             If a timeout occurs.
+     */
+    public UUID[] awaitServices(final int minDataServices, long timeout)
+            throws InterruptedException, TimeoutException {
+
+        assertOpen();
+
+        if (minDataServices <= 0)
+            throw new IllegalArgumentException();
+
+        if (timeout <= 0)
+            throw new IllegalArgumentException();
+        
+        final long begin = System.currentTimeMillis();
+
+        // sleep interval if not ready (ms).
+        final long interval = Math.min(100, timeout / 10);
+        
+        // updated each time through the loop.
+        IMetadataService metadataService = null;
+        
+        // updated each time through the loop.
+        UUID[] dataServiceUUIDs = new UUID[0];
+        
+        while ((System.currentTimeMillis() - begin) < timeout) {
+
+            // verify that the client has/can get the metadata service.
+            metadataService = getMetadataService();
+
+            // find all data services.
+            dataServiceUUIDs = getDataServiceUUIDs(0/*all*/);
+//            // find at most that many data services.
+//            UUID[] dataServiceUUIDs = getDataServiceUUIDs(minDataServices);
+        
+            if (metadataService == null
+                    || dataServiceUUIDs.length < minDataServices) {
+                
+                if(INFO)
+                log.info("Waiting : metadataService="
+                        + (metadataService == null ? "not " : "")
+                        + " found; #dataServices=" + dataServiceUUIDs.length
+                        + " out of " + minDataServices + " required : "
+                        + Arrays.toString(dataServiceUUIDs));
+                
+                Thread.sleep(interval);
+                
+                continue;
+                
+            }
+            
+            if (INFO)
+                log.info("Have metadata service and " + dataServiceUUIDs.length
+                        + " data services");
+            
+            return dataServiceUUIDs;
+            
+        }
+        
+        throw new TimeoutException("elapsed="
+                + (System.currentTimeMillis() - begin) + "ms: metadataService="
+                + (metadataService != null) + ", dataServices="
+                + dataServiceUUIDs.length);
         
     }
 
