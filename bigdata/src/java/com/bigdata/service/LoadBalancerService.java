@@ -2220,22 +2220,37 @@ abstract public class LoadBalancerService extends AbstractService
                     maxCount, exclude);
             
         }
-        
+
         Arrays.sort(a);
 
         final int n = Math.max(maxCount, a.length);
         
         final UUID[] b = new UUID[ n ];
 
+        if(INFO) {
+            
+            log.info("Have "+a.length+" data services and will make "+n+" assignments.");
+            
+        }
+        
         int i = 0;
         while(i < b.length) {
             
             final UUID uuid = a[roundRobinIndex.getAndIncrement() % a.length];
             
+            assert uuid != null;
+            
             if (uuid == exclude)
                 continue;
+
+            b[i++] = uuid;
+
+        }
+        
+        if(INFO) {
             
-            i++;
+            log.info("Assigned UUIDs: "+Arrays.toString(b));
+            
         }
         
         return b;
