@@ -70,7 +70,7 @@ abstract public class AbstractDistributedBigdataFederationTestCase extends TestC
 
     protected void tearDown() throws Exception {
         
-        services.shutdown();
+        services.destroy();
         
     }
     
