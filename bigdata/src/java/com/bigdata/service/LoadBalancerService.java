@@ -2052,6 +2052,19 @@ abstract public class LoadBalancerService extends AbstractService
             
             lock.lock();
 
+            if (nupdates < 10) {
+
+                /*
+                 * Use a round-robin assignment for the first 5 minutes.
+                 * 
+                 * @todo this is a hack for starting a new federation and
+                 * allocating services on that federation.
+                 */
+                return getUnderUtilizedDataServicesRoundRobin(minCount,
+                        maxCount, exclude);
+            
+            }
+            
             final ServiceScore[] scores = this.serviceScores.get();
 
             try {
