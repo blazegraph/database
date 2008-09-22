@@ -23,6 +23,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.service;
 
+import java.io.Serializable;
+import java.util.concurrent.Future;
+
 import com.bigdata.io.ISerializer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.striterator.IKeyOrder;
@@ -107,5 +110,17 @@ abstract public class AbstractDistributedFederation extends AbstractScaleOutFede
             ISerializer<? extends Object[]> serializer, //
             IKeyOrder<? extends Object> keyOrder//
     );
+
+    /**
+     * Return a proxy object for a {@link Future} suitable for use in an RMI
+     * environment.
+     * 
+     * @param future
+     *            The future.
+     * 
+     * @return The proxy for that future.
+     */
+    public abstract Future<? extends Object> getProxy(
+            Future<? extends Object> future);
 
 }

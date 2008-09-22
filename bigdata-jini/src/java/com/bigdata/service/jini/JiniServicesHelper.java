@@ -231,6 +231,69 @@ public class JiniServicesHelper {
     }
 
     /**
+     * Immediate shutdown.
+     */
+    public void shutdown() {
+
+        if (client != null && client.isConnected()) {
+
+            client.disconnect(true/* immediateShutdown */);
+
+            client = null;
+
+        }
+
+        if (metadataServer0 != null) {
+
+            metadataServer0.shutdownNow();
+
+            metadataServer0 = null;
+
+        }
+
+        if (dataServer0 != null) {
+
+            dataServer0.shutdownNow();
+
+            dataServer0 = null;
+
+        }
+
+        if (dataServer1 != null) {
+
+            dataServer1.shutdownNow();
+
+            dataServer1 = null;
+
+        }
+
+        if (loadBalancerServer0 != null) {
+
+            loadBalancerServer0.shutdownNow();
+
+            loadBalancerServer0 = null;
+
+        }
+
+        if (timestampServer0 != null) {
+
+            timestampServer0.shutdownNow();
+
+            timestampServer0 = null;
+
+        }
+
+        if (resourceLockServer0 != null) {
+
+            resourceLockServer0.shutdownNow();
+
+            resourceLockServer0 = null;
+
+        }
+
+    }
+
+    /**
      * Shuts down and <em>destroys</em> the services in the federation. The
      * shutdown is abrubt. You can expect to see messages about interrupted IO
      * such as
@@ -244,10 +307,9 @@ public class JiniServicesHelper {
      *     at $Proxy5.notify(Ljava.lang.String;Ljava.util.UUID;Ljava.lang.String;[B)V(Unknown Source)
      * </pre>
      * 
-     * These messages can be safely ignored IF they occur during
-     * {@link #shutdown()}.
+     * These messages can be safely ignored IF they occur during this method.
      */
-    public void shutdown() {
+    public void destroy() {
 
         if (client != null && client.isConnected()) {
 

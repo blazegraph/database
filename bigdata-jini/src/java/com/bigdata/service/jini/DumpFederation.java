@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.jini;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.Arrays;
@@ -48,14 +49,16 @@ import com.bigdata.io.DataInputBuffer;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.DumpJournal;
 import com.bigdata.journal.Name2Addr;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
+import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
-import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IDataServiceAwareProcedure;
 import com.bigdata.service.MetadataService;
+import com.bigdata.util.InnerCause;
 
 /**
  * A client utility that connects to and dumps various interesting aspects of a
@@ -106,49 +109,107 @@ public class DumpFederation {
             
         }
         
-        final JiniClient client = JiniClient.newInstance(args);
+        final JiniClient client;
         
+        JiniServicesHelper helper = null;
+        if (true) {// @todo command line option for this.
+         
+            helper = new JiniServicesHelper(new File(args[0]).getParent()
+                    .toString()+File.separator);
+            
+            helper.start();
+        
+            client = helper.client;
+            
+        } else {
+
+            client = JiniClient.newInstance(args);
+
+        }
+
         final JiniFederation fed = client.connect();
 
-        fed.awaitServices(1/*minDataServices*/, 10000L/*timeout(ms)*/);
+        try {
 
-        final long lastCommitTime = fed.getLastCommitTime();
-        
-        // the names of all registered scale-out indices.
-        final String[] names = (String[]) fed.getMetadataService().submit(
-                new ListIndicesTask()).get();
-        
-        System.out.println("Found " + names.length + " indices: "
-                + Arrays.toString(names));
+            fed.awaitServices(1/* minDataServices */, 10000L/* timeout(ms) */);
 
-        final boolean dumpIndexLocators = true;
-        
-        if(dumpIndexLocators) {
+            final long lastCommitTime = fed.getLastCommitTime();
+
+            final long timestamp = TimestampUtility.asHistoricalRead(lastCommitTime);
             
-            for(String name : names) {
+            // the names of all registered scale-out indices.
+            final String[] names = (String[]) fed.getMetadataService().submit(
+                    new ListIndicesTask()).get();
 
-                final ClientIndexView ndx = fed.getIndex(name, lastCommitTime);
+            System.out.println("Found " + names.length + " indices: "
+                    + Arrays.toString(names));
+
+            final boolean dumpIndexLocators = true;
+
+            if (dumpIndexLocators) {
+
+                for (String name : names) {
+
+                    // strip off the prefix to get the scale-out index name.
+                    final String scaleOutIndexName = name.substring("metadata-"
+                            .length());
+
+                    final IMetadataIndex ndx;
+                    try {
+                    
+                        ndx = fed.getMetadataIndex(scaleOutIndexName, timestamp);
+                    
+                    } catch (Throwable t) {
+                        
+                        final Throwable t2 = InnerCause.getInnerCause(t,
+                                ClassNotFoundException.class);
+                        
+                        if (t2 != null) {
+                        
+                            log.error("CODEBASE/CLASSPATH problem:", t2);
+                            
+                            continue;
+                        
+                        }
+                        
+                        throw new RuntimeException(t);
+                        
+                    }
+
+                    dumpIndexLocators(fed, name, ndx);
+
+                }
+
+            }
+
+            System.out.println("Done.");
+
+        } finally {
+
+            if (helper != null) {
+
+                helper.shutdown();
                 
-                dumpIndexLocators(ndx);
+            } else {
+                
+                client.disconnect(true/* immediateShutdown */);
                 
             }
-            
+
         }
-        
-        client.disconnect(true/* immediateShutdown */);
         
     }
 
     static Map<UUID, String> service2Hostname = new HashMap<UUID, String>();
     
-    static synchronized String getServiceHostName(ClientIndexView ndx, UUID uuid) {
+    static synchronized String getServiceHostName(IBigdataFederation fed, UUID uuid) {
 
         String hostname = service2Hostname.get(uuid);
 
         if (hostname != null)
             return hostname;
 
-        IDataService service = ndx.getFederation().getDataService(uuid);
+        IDataService service = fed.getDataService(uuid);
 
         if (service == null) {
 
@@ -178,32 +239,30 @@ public class DumpFederation {
      * @param ndx
      *            The scale-out index.
      */
-    static public void dumpIndexLocators(ClientIndexView ndx) {
-        
-        System.out.println("\n\nname="+ndx.getName());
-        
-        final ITupleIterator<PartitionLocator> itr = ndx.locatorScan(
-                false/* reverseScan */, ndx.getTimestamp(),
-                null/* fromKey */, null/* toKey */);
+    static public void dumpIndexLocators(IBigdataFederation fed, String name,
+            IMetadataIndex ndx) {
 
-        while(itr.hasNext()) {
-            
+        System.out.println("\n\nname=" + name);
+
+        final ITupleIterator<PartitionLocator> itr = ndx.rangeIterator();
+
+        while (itr.hasNext()) {
+
             final PartitionLocator locator = itr.next().getObject();
-            
-            System.err.println(locator.toString());
+
+            System.err.println("\t"+locator.toString());
 
             for (UUID uuid : locator.getDataServices()) {
 
-                System.err
-                        .println("DataService: " + uuid + " on "
-                        + getServiceHostName(ndx, uuid));
+                System.err.println("\t\tDataService: " + uuid + " on "
+                        + getServiceHostName(fed, uuid));
 
             }
 
         }
 
     }
-    
+
     /**
      * Task returns an ordered list of the named indices on the
      * {@link DataService} to which it is submitted. Note that
@@ -226,7 +285,7 @@ public class DumpFederation {
         
         transient protected static final boolean INFO = log.isInfoEnabled();
         
-        private DataService dataService;
+        private transient DataService dataService;
 
         public ListIndicesTask() {
             

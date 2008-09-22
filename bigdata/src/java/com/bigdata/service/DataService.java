@@ -974,12 +974,18 @@ abstract public class DataService extends AbstractService
     }
 
     /**
-     * The task will be run on the {@link IBigdataFederation#getExecutorService()}.
+     * The task will be run on the
+     * {@link IBigdataFederation#getExecutorService()}.
      * <p>
      * The {@link Callable} MAY implement {@link IDataServiceAwareProcedure} to
      * obtain the {@link DataService} reference, which can be used to obtain a
      * local {@link IBigdataClient} reference or to submit additional tasks to
      * the {@link ConcurrencyManager}.
+     * <p>
+     * Note: When the {@link DataService} is accessed via RMI the {@link Future}
+     * MUST be a proxy.
+     * 
+     * @see AbstractDistributedFederation#getProxy(Future)
      * 
      * @todo Map/reduce can be handled in the this manner.
      *       <p>

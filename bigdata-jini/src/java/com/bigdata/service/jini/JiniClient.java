@@ -68,6 +68,23 @@ public class JiniClient extends AbstractScaleOutClient {
         
     }
     
+    /**
+     * @param immediateShutdown
+     *            When <code>true</code> the shutdown is <em>abrubt</em>.
+     *            You can expect to see messages about interrupted IO such as
+     * 
+     * <pre>
+     * java.rmi.MarshalException: error marshalling arguments; nested exception is: 
+     *     java.io.IOException: request I/O interrupted
+     *     at net.jini.jeri.BasicInvocationHandler.invokeRemoteMethodOnce(BasicInvocationHandler.java:785)
+     *     at net.jini.jeri.BasicInvocationHandler.invokeRemoteMethod(BasicInvocationHandler.java:659)
+     *     at net.jini.jeri.BasicInvocationHandler.invoke(BasicInvocationHandler.java:528)
+     *     at $Proxy5.notify(Ljava.lang.String;Ljava.util.UUID;Ljava.lang.String;[B)V(Unknown Source)
+     * </pre>
+     * 
+     * These messages may be safely ignored if they occur during immediate
+     * shutdown.
+     */
     synchronized public void disconnect(boolean immediateShutdown) {
         
         if (fed != null) {
