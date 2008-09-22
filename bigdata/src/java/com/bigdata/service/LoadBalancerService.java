@@ -18,6 +18,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
@@ -57,7 +58,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * self-identify index partitions to be shed and move them onto the identified
  * under-utilized {@link DataService}s. The {@link LoadBalancerService} learns
  * of these actions solely through their effect on host and service load as
- * self- reported by various services. *
+ * self- reported by various services.
  * <p>
  * Note: utilization should be defined in terms of transient system resources :
  * CPU, IO (DISK and NET), RAM. DISK exhaustion on the otherhand is the basis
@@ -703,44 +704,6 @@ abstract public class LoadBalancerService extends AbstractService
 
     }
 
-//    /**
-//     * Extended to setup the generic per-service {@link CounterSet}, but NOT
-//     * the per-host counters.
-//     * <p>
-//     * This means that the {@link LoadBalancerService} will report the
-//     * performance counters for its own service to itself, but it will not have
-//     * any history for those counters.
-//     * <p>
-//     * Since the counters as collected from the O/S do not have history, the
-//     * {@link LoadBalancerService} does NOT collect the per-host counters
-//     * directly from the O/S but relies on the existence of at least one other
-//     * service running on the same host as it to collect and report the counters
-//     * to the {@link LoadBalancerService}.
-//     * 
-//     * FIXME review? is javadoc correct?
-//     */
-//    public void setServiceUUID(UUID serviceUUID) {
-//        
-//        super.setServiceUUID(serviceUUID);
-//        
-//        final String ps = ICounterSet.pathSeparator;
-//
-//        final String hostname = AbstractStatisticsCollector.fullyQualifiedHostName;
-//                   
-//        final String pathPrefix = ps + hostname + ps + "service" + ps
-//                + getServiceIface().getName() + ps + serviceUUID + ps;
-//
-//        final CounterSet serviceRoot = counters.makePath(pathPrefix);
-//
-//        /*
-//         * Service generic counters. 
-//         */
-//        
-//        AbstractStatisticsCollector.addBasicServiceOrClientCounters(
-//                serviceRoot, getServiceIface(), properties);
-//
-//    }
-    
     /**
      * Returns {@link ILoadBalancerService}.
      */
@@ -1876,11 +1839,6 @@ abstract public class LoadBalancerService extends AbstractService
                 
                 try {
 
-//                    // make sure that the counter set node exists.
-//                    getFederation().getCounterSet().makePath(
-//                            AbstractFederation.getServiceCounterPathPrefix(
-//                                    serviceUUID, serviceIface, hostname));
-
                     // read the counters into our local history.
                     getFederation().getCounterSet().readXML(
                             new ByteArrayInputStream(data), instrumentFactory,
@@ -2196,6 +2154,60 @@ abstract public class LoadBalancerService extends AbstractService
     }
 
     /**
+     * Issues {@link UUID}s using a round-robin over those that are joined. For
+     * this purpose, the joined {@link DataService}s are appended to an ordered
+     * set. The index of the most recently assigned service is maintained in a
+     * counter. Services that leave are removed from the set, but we do not
+     * bother to adjust the counter. We always return the {@link UUID} of the
+     * service at index MOD N, where N is the #of services that are joined at
+     * the time that this method looks at the set. We then post-increment the
+     * counter.
+     * <p>
+     * The round-robin allocate strategy is a good choice where there is little
+     * real data on the services, or when there is a set of services whose
+     * scores place them into an equivalence class such that we have no
+     * principled reason for preferring one service over another among those in
+     * the equivalence class.
+     * 
+     * @throws TimeoutException
+     * @throws InterruptedException
+     * 
+     * @todo develop the concept of equivalence classes further. divide the
+     *       joined services into a set of equivalence classes. parameterize
+     *       this method to accept an equivalence class. always apply this
+     *       method when drawing from an equivalence class.
+     */
+    protected UUID[] getUnderUtilizedDataServicesRoundRobin(int minCount,
+            int maxCount, UUID exclude) throws InterruptedException,
+            TimeoutException {
+
+        /*
+         * Note: In order to reduce the state that we track I've coded this to
+         * build the UUID[] array on demand from the joined services and then
+         * sort the UUIDs. This gives us a single additional item of state over
+         * that already recorded by the load balancer - the counter itself. This
+         * is just a pragmatic hack to get a round-robin behavior into place.
+         */
+
+        final UUID[] a = ((AbstractScaleOutFederation) getFederation())
+                .awaitServices(minCount == 0 ? 1 : 0/* minCount */, 10000/* timeout(ms) */);
+
+        Arrays.sort(a);
+
+        final UUID[] b = new UUID[Math.max(maxCount, a.length)];
+
+        for (int i = 0; i < b.length; i++) {
+            
+            b[i] = a[roundRobinIndex.getAndIncrement() % a.length];
+            
+        }
+        
+        return b;
+        
+    }
+    private final AtomicInteger roundRobinIndex = new AtomicInteger();
+    
+    /**
      * Computes the under-utilized services in the case where where <i>minCount</i>
      * is non-zero and we do not have pre-computed {@link #serviceScores} on hand. If
      * there are also no active services, then this awaits the join of at least
@@ -2212,9 +2224,10 @@ abstract public class LoadBalancerService extends AbstractService
             int maxCount, UUID exclude) throws TimeoutException,
             InterruptedException {
 
-        log.info("begin");
+        if(INFO) 
+            log.info("begin");
         
-        long begin = System.currentTimeMillis();
+        final long begin = System.currentTimeMillis();
 
         while (true) {
 
@@ -2332,9 +2345,10 @@ abstract public class LoadBalancerService extends AbstractService
             int maxCount, UUID exclude, UUID knownGood, ServiceScore[] scores)
             throws TimeoutException, InterruptedException {
 
-        log.info("begin");
+        if(INFO)
+            log.info("begin");
         
-        long begin = System.currentTimeMillis();
+        final long begin = System.currentTimeMillis();
 
         while (true) {
 

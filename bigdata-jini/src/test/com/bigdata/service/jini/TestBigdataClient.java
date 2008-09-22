@@ -234,7 +234,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
         assertNotNull("metadataService", metadataService0);
 
         assertEquals("#dataServices", 2, fed.awaitServices(
-                2/* minDataServices */, 2000/* timeout(ms) */));
+                2/* minDataServices */, 2000/* timeout(ms) */).length);
         
         assertTrue(metadataServer0.getProxy() instanceof IMetadataService);
         assertTrue(fed.getMetadataService() instanceof IMetadataService);

@@ -167,7 +167,7 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
          * Await at least N data services and one metadata service (otherwise
          * abort).
          */
-        final int N = fed.awaitServices(minDataServices, timeout);
+        final int N = fed.awaitServices(minDataServices, timeout).length;
         
         System.err.println("Will run with "+N+" data services");
 

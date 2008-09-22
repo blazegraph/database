@@ -29,9 +29,9 @@ import com.bigdata.striterator.IKeyOrder;
 import com.bigdata.striterator.IRemoteChunkedIterator;
 
 /**
- * This class encapsulates access to the services for a remote bigdata
- * federation - it is in effect a proxy object for the distributed set of
- * services that comprise the federation.
+ * Abstract base class for {@link IBigdataFederation} implementations where the
+ * services are distributed using RMI and are running, at least in principle,
+ * across more than one host/JVM.
  * 
  * @todo Explore a variety of cached and uncached strategies for the metadata
  *       index. An uncached strategy is currently used. However, caching may be
