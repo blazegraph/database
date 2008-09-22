@@ -842,8 +842,14 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
             
         }
         
-        client.getDelegate().serviceLeave(serviceUUID);
-        
+        final AbstractClient client = this.client;
+
+        if (client != null && client.isConnected()) {
+
+            client.getDelegate().serviceLeave(serviceUUID);
+
+        }
+
     }
     
     /**

@@ -209,12 +209,6 @@ abstract public class LoadBalancerService extends AbstractService
      */
     protected AtomicReference<ServiceScore[]> serviceScores = new AtomicReference<ServiceScore[]>(null);
     
-//    /**
-//     * Aggregated performance counters for all hosts and services. The services
-//     * are all listed under their host, e.g., <code>hostname/serviceUUID</code>
-//     */
-//    protected CounterSet counters = new CounterSet();
-
     /**
      * The #of {@link UpdateTask}s which have run so far.
      */
@@ -564,6 +558,16 @@ abstract public class LoadBalancerService extends AbstractService
     }
 
     /**
+     * 
+     * Note: The load balancer MUST NOT collect host statistics unless it is the
+     * only service running on that host. Normally it relies on another service
+     * running on the same host to collect statistics for that host and those
+     * statistics are then reported to the load balancer and aggregated along
+     * with the rest of the performance counters reported by the other services
+     * in the federation. However, if the load balanacer itself collects host
+     * statistics then it will only know about and report the current (last 60
+     * seconds) statistics for the host rather than having the historical data
+     * for the host.
      * 
      * @param properties
      *            See {@link Options}

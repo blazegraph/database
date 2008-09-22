@@ -129,14 +129,19 @@ abstract public class MetadataService extends DataService implements
     }
     
     /**
-     * Disallowed. You should not be running arbitrary tasks on a
+     * Note: You SHOULD NOT be running arbitrary tasks on a
      * {@link MetadataService}. They are specialized for the index partition
-     * locator information and should not be overloaded for other purposes.
+     * locator information and SHOULD NOT be overloaded for other purposes.
+     * 
+     * @throws ExecutionException 
+     * @throws InterruptedException 
      */
     @Override
-    public Future<? extends Object> submit(Callable<? extends Object> proc) {
+    public Future<? extends Object> submit(Callable<? extends Object> task)
+            throws InterruptedException, ExecutionException {
 
-        throw new UnsupportedOperationException();
+        // throw new UnsupportedOperationException();
+        return super.submit(task);
         
     }
     
