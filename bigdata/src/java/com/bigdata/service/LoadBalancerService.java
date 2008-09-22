@@ -2202,17 +2202,40 @@ abstract public class LoadBalancerService extends AbstractService
          * is just a pragmatic hack to get a round-robin behavior into place.
          */
 
+        if (INFO)
+            log.info("minCount=" + minCount + ", maxCount=" + maxCount
+                    + ", exclude=" + exclude);
+        
         final UUID[] a = ((AbstractScaleOutFederation) getFederation())
-                .awaitServices(minCount == 0 ? 1 : 0/* minCount */, 10000/* timeout(ms) */);
+                .awaitServices(minCount == 0 ? 1 : minCount/* minCount */,
+                        10000/* timeout(ms) */);
 
+        if (a.length == 1 && exclude != null && a[0] == exclude) {
+
+            /*
+             * Make sure that we have at least one unexcluded service.
+             */
+            
+            return getUnderUtilizedDataServicesRoundRobin(minCount + 1,
+                    maxCount, exclude);
+            
+        }
+        
         Arrays.sort(a);
 
-        final UUID[] b = new UUID[Math.max(maxCount, a.length)];
+        final int n = Math.max(maxCount, a.length);
+        
+        final UUID[] b = new UUID[ n ];
 
-        for (int i = 0; i < b.length; i++) {
+        int i = 0;
+        while(i < b.length) {
             
-            b[i] = a[roundRobinIndex.getAndIncrement() % a.length];
+            final UUID uuid = a[roundRobinIndex.getAndIncrement() % a.length];
             
+            if (uuid == exclude)
+                continue;
+            
+            i++;
         }
         
         return b;
