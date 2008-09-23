@@ -260,21 +260,29 @@ public class FileLockUtility {
         if (raf == null)
             throw new IllegalArgumentException();
         
-        if(!raf.getChannel().isOpen()) {
-
-            throw new IllegalStateException();
-            
-        }
-        
         try {
 
-            // close the file.
-            raf.close();
-        
+            if (raf.getChannel().isOpen()) {
+
+                /*
+                 * close the file iff open.
+                 * 
+                 * Note: a thread that is interrupted during an IO can cause the
+                 * file to be closed asynchronously. This is handled by the
+                 * disk-based store modes.
+                 */
+                raf.close();
+
+            }
+
         } finally {
 
+            /*
+             * Remove the advisory lock (if present) regardles of whether the
+             * file is currently open (see note above).
+             */
             removeAdvisoryLock(file);
-            
+
         }
 
     }
