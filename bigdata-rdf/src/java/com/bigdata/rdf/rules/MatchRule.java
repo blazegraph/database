@@ -5,7 +5,6 @@ import org.openrdf.model.URI;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
-import com.bigdata.rdf.inf.IN;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOPredicate;
@@ -13,6 +12,7 @@ import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IConstraint;
+import com.bigdata.relation.rule.IN;
 import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.Rule;
 
