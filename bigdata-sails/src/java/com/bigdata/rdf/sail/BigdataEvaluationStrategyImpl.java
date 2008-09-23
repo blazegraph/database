@@ -455,13 +455,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             return generateConstraint((SameTerm) valueExpr);
         } else if (valueExpr instanceof Compare) {
             return generateConstraint((Compare) valueExpr);
-        } else if (valueExpr instanceof Regex) {
-            return generateConstraint((Regex) valueExpr);
         }
-        return null;
-    }
-    
-    private IConstraint generateConstraint(Regex regex) {
         return null;
     }
     
