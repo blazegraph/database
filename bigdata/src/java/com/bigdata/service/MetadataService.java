@@ -79,9 +79,14 @@ abstract public class MetadataService extends DataService implements
      */
     public static String getMetadataIndexName(String name) {
         
-        return "metadata-"+name;
+        return METADATA_INDEX_NAMESPACE + name;
         
     }
+    
+    /**
+     * The namespace for the metadata indices.
+     */
+    public static final String METADATA_INDEX_NAMESPACE = "metadata-";
 
     /**
      * Options for the {@link MetadataService}.
