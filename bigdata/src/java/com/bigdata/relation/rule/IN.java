@@ -47,9 +47,15 @@ Modifications:
 
 package com.bigdata.relation.rule;
 
+import java.util.HashSet;
+
+
 /**
  * A constraint that a variable may only take on the bindings enumerated by some
  * set.
+ * 
+ * @todo this could be optimized in a variety of ways, including the use of a
+ *       {@link HashSet} or a sorted array and a binary search.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -59,19 +65,21 @@ public class IN implements IConstraint {
     /**
      * 
      */
-    private static final long serialVersionUID = 6152887151773826714L;
+    private static final long serialVersionUID = 5805883429399100605L;
+
+    private final IVariable<Long> x;
     
-    private final IVariable x;
-    private final IConstant[] set;
+    private final long[] set;
 
     /**
      * 
      * @param x
      *            Some variable.
      * @param set
-     *            A set of allowable values for that variable.
+     *            A set of legal term identifiers providing a constraint on the
+     *            allowable values for that variable.
      */
-    public IN(IVariable x, IConstant[] set) {
+    public IN(IVariable<Long> x, long[] set) {
         
         if (x == null || set == null)
             throw new IllegalArgumentException();
@@ -85,23 +93,23 @@ public class IN implements IConstraint {
         
     }
     
-    public boolean accept(IBindingSet s) {
+    public boolean accept(IBindingSet bindingSet) {
         
         // get binding for "x".
-        final IConstant x = s.get(this.x);
-        
-        if (x == null)
-            return true; // not yet bound.
-        
-        for (int i = 0; i < set.length; i++) {
+        final IConstant<Long> x = bindingSet.get(this.x);
+       
+        if(x==null) return true; // not yet bound.
 
-            if (x.equals(set[i]))
-                return true;
-
+        final long v = x.get();
+        
+        for(int i=0; i<set.length; i++) {
+            
+            if(v == set[i]) return true;
+            
         }
-
+        
         return false;
 
-    }
+   }
 
 }

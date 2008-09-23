@@ -766,14 +766,14 @@ public class BigdataSail extends SailBase implements Sail {
         
     }
     
-    /*
+    /**
      * Strengthens the return type.
+     */
     public BigdataSailConnection getConnection() throws SailException {
         
         return (BigdataSailConnection) super.getConnection();
         
     }
-     */
 
     /**
      * Inner class implements the {@link SailConnection}. Some additional
