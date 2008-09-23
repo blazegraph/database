@@ -486,8 +486,6 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
         
         try {
         
-            log.info("hello world");
-            
             sail.initialize();
             
             final Repository repo = new BigdataSailRepository(sail);
@@ -556,6 +554,125 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
                         }
                         
                         assertTrue(numResults == 2);
+                       
+                    } finally {
+                       
+                        result.close();
+                       
+                    }
+                    
+                }
+                
+            } catch(Exception ex) {
+                
+                cxn.rollback();
+                
+                throw ex;
+                
+            } finally {
+    
+                cxn.close();
+    
+            }
+        
+        } finally {
+            
+            sail.shutdownAndDelete();
+            
+        }
+
+    }
+    
+    public void test_filter_regex() throws Exception {
+
+        final String ns = "http://www.bigdata.com/rdf#";
+        
+        final URI mike = new URIImpl(ns+"Mike");
+        
+        final URI jane = new URIImpl(ns+"Jane");
+        
+        final URI person = new URIImpl(ns+"Person");
+        
+        final File journal = File.createTempFile("bigdata", ".jnl");
+        
+        journal.deleteOnExit();
+        
+        final Properties props = new Properties();
+        
+        props.setProperty(BigdataSail.Options.FILE, journal.getAbsolutePath());
+        
+        final BigdataSail sail = new BigdataSail(props);
+        
+        try {
+        
+            sail.initialize();
+            
+            final Repository repo = new BigdataSailRepository(sail);
+            
+            final RepositoryConnection cxn = repo.getConnection();
+            
+            try {
+
+                cxn.setAutoCommit(false);
+                
+                cxn.add(new StatementImpl(mike, RDF.TYPE, person));
+                
+                cxn.add(new StatementImpl(mike, RDFS.LABEL, new LiteralImpl("Mike")));
+                
+                cxn.add(new StatementImpl(jane, RDF.TYPE, person));
+                
+                cxn.add(new StatementImpl(jane, RDFS.LABEL, new LiteralImpl("Jane")));
+                
+                cxn.commit();
+                
+                String query = 
+                    "select ?s "+
+                    "where { " +
+                    "  ?s <"+RDF.TYPE+"> <"+person+"> . " +
+                    "  ?s <"+RDFS.LABEL+"> ?label . " +
+                    "  FILTER REGEX(?label, 'Mi*', 'i')" +
+                    "}";
+                
+                { // evalute it once so i can see it
+                    
+                    final StringWriter sw = new StringWriter();
+                    
+                    final SPARQLResultsXMLWriter handler = 
+                        new SPARQLResultsXMLWriter(new XMLWriter(sw));
+    
+                    final TupleQuery tupleQuery = 
+                        cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                    
+                    tupleQuery.evaluate(handler);
+                    
+                    System.err.println(sw.toString());
+
+                }
+                
+                {
+                    
+                    final TupleQuery tupleQuery = 
+                        cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                    
+                    final TupleQueryResult result = tupleQuery.evaluate();
+                    
+                    try {
+                        
+                        int numResults = 0;
+                        
+                        while (result.hasNext()) {
+                            
+                            BindingSet bindingSet = result.next();
+                           
+                            Value valueOfS = bindingSet.getValue("s");
+                           
+                            assertTrue(valueOfS.equals(mike));
+
+                            numResults++;
+                           
+                        }
+                        
+                        assertTrue(numResults == 1);
                        
                     } finally {
                        
