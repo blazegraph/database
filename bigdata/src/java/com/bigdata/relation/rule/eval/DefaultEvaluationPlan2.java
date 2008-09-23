@@ -61,6 +61,12 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
 
     private final int tailCount;
     
+    private final long BOTH_OPTIONAL = Long.MAX_VALUE-1;
+    
+    private final long ONE_OPTIONAL = Long.MAX_VALUE-2;
+    
+    private final long NO_SHARED_VARS = Long.MAX_VALUE-3;
+    
     /**
      * The computed evaluation order. The elements in this array are the order
      * in which each tail predicate will be evaluated. The index into the array
@@ -261,6 +267,23 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
                 minTail = tail;
             }
         }
+        // if we are at the "no shared variables" tails, order by range count
+        if (minCardinality == NO_SHARED_VARS) {
+            minCardinality = Long.MAX_VALUE;
+            for (int i = 0; i < tailCount; i++) {
+                // only check unused tails
+                if (used[i]) {
+                    continue;
+                }
+                Tail tail = new Tail(i, rangeCount(i), getVars(i));
+                long tailCardinality = cardinality(i);
+                if (tailCardinality < minCardinality) {
+                    if(DEBUG) log.debug("found a new min: " + tailCardinality);
+                    minCardinality = tailCardinality;
+                    minTail = tail;
+                }
+            }            
+        }
         // the join variables is the union of the join dimensions' variables
         Set<String> vars = new HashSet<String>();
         vars.addAll(d1.getVars());
@@ -336,10 +359,10 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
     protected long computeJoinCardinality(IJoinDimension d1, IJoinDimension d2) {
         // two optionals is worse than one
         if (d1.isOptional() && d2.isOptional()) {
-            return Long.MAX_VALUE-1;
+            return BOTH_OPTIONAL;
         }
         if (d1.isOptional() || d2.isOptional()) {
-            return Long.MAX_VALUE-2;
+            return ONE_OPTIONAL;
         }
         final boolean sharedVars = hasSharedVars(d1, d2);
         final boolean unsharedVars = hasUnsharedVars(d1, d2);
@@ -348,7 +371,7 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
             // no shared vars - take the sum
             // joinCardinality = d1.getCardinality() + d2.getCardinality();
             // different approach - give preference to shared variables
-            joinCardinality = Long.MAX_VALUE-1;
+            joinCardinality = NO_SHARED_VARS;
         } else {
             if (unsharedVars == false) {
                 // shared vars and no unshared vars - take the min
