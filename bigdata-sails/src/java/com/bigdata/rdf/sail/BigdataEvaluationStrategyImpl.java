@@ -505,6 +505,11 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             return null;
         }
         
+        if (INFO) {
+            log.info("var: " + var);
+            log.info("constant: " + constant);
+        }
+        
         if (var == null || constant == null) {
             if (INFO) {
                 log.info("left: " + left);
