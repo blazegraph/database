@@ -1,5 +1,6 @@
 package com.bigdata.rdf.sail;
 
+import java.util.List;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
@@ -54,10 +55,9 @@ public class BigdataEvaluationStatistics extends EvaluationStatistics {
     }
 
     @Override
-    protected CardinalityCalculator getCardinalityCalculator(
-            Set<String> boundVars) {
+    protected CardinalityCalculator createCardinalityCalculator() {
 
-        return new BigdataCardinalityCalculator(boundVars);
+        return new BigdataCardinalityCalculator();
 
     }
 
@@ -70,9 +70,7 @@ public class BigdataEvaluationStatistics extends EvaluationStatistics {
      */
     protected class BigdataCardinalityCalculator extends CardinalityCalculator {
 
-        public BigdataCardinalityCalculator(Set<String> boundVars) {
-
-            super(boundVars);
+        public BigdataCardinalityCalculator() {
 
         }
 
@@ -163,22 +161,19 @@ public class BigdataEvaluationStatistics extends EvaluationStatistics {
 //
 //            final int sqrtFactor = 2 * boundVarCount;
 
-            final int constantVarCount = countConstantVars(sp);
+            List<Var> vars = sp.getVarList();
             
-            final int boundVarCount = countBoundVars(sp);
-
-            final int sqrtFactor = 2 * boundVarCount + constantVarCount;
+            final int constantVarCount = countConstantVars(vars);
             
-            if (sqrtFactor > 1) {
+			final double unboundVarFactor = 
+				(double)(vars.size() - constantVarCount) / vars.size();
+            
+            cardinality = Math.pow(rangeCount, unboundVarFactor);
 
-                cardinality = Math.pow(cardinality, 1.0 / sqrtFactor);
-
-                if (log.isInfoEnabled())
-                    log.info("cardinality=" + cardinality + ", nbound="
-                            + boundVarCount + ", rangeCount=" + rangeCount
-                            + ", pattern=" + sp);
-
-            }
+            if (log.isInfoEnabled())
+                log.info("cardinality=" + cardinality + ", nconstant="
+                        + constantVarCount + ", rangeCount=" + rangeCount
+                        + ", pattern=" + sp);
 
         }
 

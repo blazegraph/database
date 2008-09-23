@@ -15,13 +15,22 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
+import org.openrdf.query.algebra.And;
 import org.openrdf.query.algebra.BinaryTupleOperator;
+import org.openrdf.query.algebra.Compare;
+import org.openrdf.query.algebra.Filter;
 import org.openrdf.query.algebra.Join;
+import org.openrdf.query.algebra.Or;
+import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.UnaryTupleOperator;
+import org.openrdf.query.algebra.ValueConstant;
+import org.openrdf.query.algebra.ValueExpr;
 import org.openrdf.query.algebra.Var;
+import org.openrdf.query.algebra.Compare.CompareOp;
 import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
+import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
 
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.rules.RuleContextEnum;
@@ -32,9 +41,15 @@ import com.bigdata.rdf.store.BNS;
 import com.bigdata.rdf.store.BigdataSolutionResolverator;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.rule.Constant;
+import com.bigdata.relation.rule.EQConstant;
+import com.bigdata.relation.rule.IConstant;
+import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.IVariableOrConstant;
+import com.bigdata.relation.rule.NEConstant;
+import com.bigdata.relation.rule.OR;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
@@ -270,120 +285,243 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         if (nativeJoins == false) {
             return super.evaluate(join, bindings);
         }
+       
+        if (INFO) log.info("evaluating native join:\n"+join);
         
-        if (INFO) log.info("evaluating native join");
         Collection<StatementPattern> stmtPatterns = 
             new LinkedList<StatementPattern>();
-        collectStatementPatterns(join, stmtPatterns);
+        Collection<Filter> filters = new LinkedList<Filter>();
+        collectStatementPatterns(join, stmtPatterns, filters);
+        
         if (INFO) {
             for (StatementPattern stmtPattern : stmtPatterns) {
                 log.info(stmtPattern);
             }
+            for (Filter filter : filters) {
+                log.info(filter.getCondition());
+            }
         }
-        // name of the SPO relation.
-        final String SPO = database.getSPORelation().getNamespace();
+        
+        // generate tails
         final Collection<IPredicate> tails = new LinkedList<IPredicate>();
         for (StatementPattern stmtPattern : stmtPatterns) {
-            final IVariableOrConstant<Long> s;
-            {
-                Var var = stmtPattern.getSubjectVar();
-                Value val = var.getValue();
-                String name = var.getName();
-                if (val == null) {
-                    s = com.bigdata.relation.rule.Var.var(name);
-                } else {
-                    final Long id = ((BigdataValue)val).getTermId();
-                    if (id.longValue() == NULL)
-                        return new EmptyIteration<BindingSet, QueryEvaluationException>();
-                    s = new Constant<Long>(id);
-                }
+            IPredicate tail = generateTail(stmtPattern);
+            if (tail == null) {
+                return new EmptyIteration<BindingSet, QueryEvaluationException>();
             }
-            final IVariableOrConstant<Long> p;
-            {
-                Var var = stmtPattern.getPredicateVar();
-                Value val = var.getValue();
-                String name = var.getName();
-                if (val == null) {
-                    p = com.bigdata.relation.rule.Var.var(name);
-                } else {
-                    final Long id = ((BigdataValue)val).getTermId();
-                    if (id.longValue() == NULL)
-                        return new EmptyIteration<BindingSet, QueryEvaluationException>();
-                    p = new Constant<Long>(id);
-                }
-            }
-            final IVariableOrConstant<Long> o;
-            {
-                Var var = stmtPattern.getObjectVar();
-                Value val = var.getValue();
-                String name = var.getName();
-                if (val == null) {
-                    o = com.bigdata.relation.rule.Var.var(name);
-                } else {
-                    final Long id = ((BigdataValue)val).getTermId();
-                    if (id.longValue() == NULL)
-                        return new EmptyIteration<BindingSet, QueryEvaluationException>();
-                    o = new Constant<Long>(id);
-                }
-            }
-            final IVariableOrConstant<Long> c;
-            {
-                final Var var = stmtPattern.getContextVar();
-                if (var == null) {
-                    // context position is not used.
-                    c = null;
-                } else {
-                    final Value val = var.getValue();
-                    if (val != null) {
-                        /*
-                         * Note: The context position is used as a statement
-                         * identifier (SID). SIDs may be used to retrieve
-                         * provenance statements (statements about statement)
-                         * using high-level query. SIDs are represented as blank
-                         * nodes and is not possible to have them bound in the
-                         * original query. They only become bound during query
-                         * evaluation.
-                         */
-                        throw new QueryEvaluationException(
-                                "Context position is a statement identifier and may not be bound in the original query: "
-                                        + join);
-                    }
-                    final String name = var.getName();
-                    c = com.bigdata.relation.rule.Var.var(name);
-                }
-            }
-            tails.add(new SPOPredicate(new String[] { SPO },//
-                    s, p, o, c, //
-                    false, // optional
-                    !tripleSource.includeInferred ? ExplicitSPOFilter.INSTANCE : null,
-                    null// expander
-                    ));
+            tails.add(tail);
         }
+        
+        // generate constraints
+        final Collection<IConstraint> constraints = new LinkedList<IConstraint>();
+        final Iterator<Filter> filterIt = filters.iterator();
+        while (filterIt.hasNext()) {
+            Filter filter = filterIt.next();
+            IConstraint constraint = generateConstraint(filter);
+            if (constraint != null) {
+                // remove if we are able to generate a native constraint for it
+                if (INFO) {
+                    log.info("able to generate a constraint: " + constraint);
+                }
+                filterIt.remove();
+                constraints.add(constraint);
+            }
+        }
+        
+        // generate native rule
         final IRule rule = new Rule(
                 "nativeJoin",
                 null, // head
                 tails.toArray(new IPredicate[tails.size()]),
                 // constraints on the rule.
-                null
+                constraints.size() > 0 ? 
+                constraints.toArray(new IConstraint[constraints.size()]) : null
         );
 
-        return runQuery(join, rule);
-        
+        CloseableIteration<BindingSet, QueryEvaluationException> result = 
+            runQuery(join, rule);
+
+        // use the basic filter iterator for remaining filters
+        for (Filter filter : filters) {
+            if (log.isInfoEnabled()) log.info(filter);
+            result = new FilterIterator(filter, result, this);
+        }
+
+        return result;
+
     }
     
-    private void collectStatementPatterns(TupleExpr tupleExpr, Collection<StatementPattern> stmtPatterns) {
+    private void collectStatementPatterns(TupleExpr tupleExpr, 
+            Collection<StatementPattern> stmtPatterns,
+            Collection<Filter> filters) {
         if (tupleExpr instanceof StatementPattern) {
             stmtPatterns.add((StatementPattern) tupleExpr);
+        } else if (tupleExpr instanceof Filter) {
+            Filter filter = (Filter) tupleExpr;
+            filters.add(filter);
+            TupleExpr arg = filter.getArg();
+            collectStatementPatterns(arg, stmtPatterns, filters);
         } else if (tupleExpr instanceof Join) {
             Join join = (Join) tupleExpr;
             TupleExpr left = join.getLeftArg();
             TupleExpr right = join.getRightArg();
-            collectStatementPatterns(left, stmtPatterns);
-            collectStatementPatterns(right, stmtPatterns);
+            collectStatementPatterns(left, stmtPatterns, filters);
+            collectStatementPatterns(right, stmtPatterns, filters);
         } else {
             throw new RuntimeException("encountered unexpected TupleExpr: "
                     + tupleExpr.getClass());
         }
+    }
+
+    private IPredicate generateTail(StatementPattern stmtPattern) 
+        throws QueryEvaluationException {
+        final IVariableOrConstant<Long> s = 
+            generateVariableOrConstant(stmtPattern.getSubjectVar());
+        if (s == null) {
+            return null;
+        }
+        final IVariableOrConstant<Long> p =
+            generateVariableOrConstant(stmtPattern.getPredicateVar());
+        if (p == null) {
+            return null;
+        }
+        final IVariableOrConstant<Long> o =
+            generateVariableOrConstant(stmtPattern.getObjectVar());
+        if (o == null) {
+            return null;
+        }
+        final IVariableOrConstant<Long> c;
+        {
+            final Var var = stmtPattern.getContextVar();
+            if (var == null) {
+                // context position is not used.
+                c = null;
+            } else {
+                final Value val = var.getValue();
+                if (val != null) {
+                    /*
+                     * Note: The context position is used as a statement
+                     * identifier (SID). SIDs may be used to retrieve
+                     * provenance statements (statements about statement)
+                     * using high-level query. SIDs are represented as blank
+                     * nodes and is not possible to have them bound in the
+                     * original query. They only become bound during query
+                     * evaluation.
+                     */
+                    throw new QueryEvaluationException(
+                            "Context position is a statement identifier and may not be bound in the original query: "
+                                    + stmtPattern);
+                }
+                final String name = var.getName();
+                c = com.bigdata.relation.rule.Var.var(name);
+            }
+        }
+        return new SPOPredicate(
+                new String[] { database.getSPORelation().getNamespace() },//
+                s, p, o, c, //
+                false, // optional
+                !tripleSource.includeInferred ? ExplicitSPOFilter.INSTANCE : null,
+                null// expander
+                );
+    }
+    
+    private IVariableOrConstant<Long> generateVariableOrConstant(Var var) {
+        final IVariableOrConstant<Long> result;
+        Value val = var.getValue();
+        String name = var.getName();
+        if (val == null) {
+            result = com.bigdata.relation.rule.Var.var(name);
+        } else {
+            final Long id = database.getTermId(val);
+            if (id.longValue() == NULL)
+                return null;
+            result = new Constant<Long>(id);
+        }
+        return result;
+    }
+    
+    private IConstraint generateConstraint(Filter filter) {
+        return generateConstraint(filter.getCondition());
+    }
+    
+    private IConstraint generateConstraint(ValueExpr valueExpr) {
+        if (valueExpr instanceof Or) {
+            return generateConstraint((Or) valueExpr);
+        } else if (valueExpr instanceof SameTerm) {
+            return generateConstraint((SameTerm) valueExpr);
+        } else if (valueExpr instanceof Compare) {
+            return generateConstraint((Compare) valueExpr);
+        }
+        return null;
+    }
+    
+    private IConstraint generateConstraint(Or or) {
+        IConstraint left = generateConstraint(or.getLeftArg());
+        IConstraint right = generateConstraint(or.getRightArg());
+        if (left != null && right != null) {
+            return new OR(left, right);
+        }
+        return null;
+    }
+
+    private IConstraint generateConstraint(SameTerm sameTerm) {
+        return generateConstraint
+            ( sameTerm.getLeftArg(), sameTerm.getRightArg(), CompareOp.EQ
+              );
+    }
+
+    private IConstraint generateConstraint(Compare compare) {
+        return generateConstraint
+            ( compare.getLeftArg(), compare.getRightArg(), compare.getOperator()
+              );
+    }
+    
+    private IConstraint generateConstraint(ValueExpr left, ValueExpr right, 
+            CompareOp operator) {
+        IVariable<Long> var = null;
+        IConstant<Long> constant = null;
+        
+        if (left instanceof Var) {
+            var = com.bigdata.relation.rule.Var.var(((Var)left).getName());
+        } else if (left instanceof ValueConstant) {
+            Value value = ((ValueConstant)left).getValue();
+            final Long id = database.getTermId(value);
+            if (id.longValue() == NULL)
+                return null;
+            constant = new Constant<Long>(id);
+        } else {
+            return null;
+        }
+        
+        if (right instanceof Var) {
+            var = com.bigdata.relation.rule.Var.var(((Var)right).getName());
+        } else if (right instanceof ValueConstant) {
+            Value value = ((ValueConstant)right).getValue();
+            final Long id = database.getTermId(value);
+            if (id.longValue() == NULL)
+                return null;
+            constant = new Constant<Long>(id);
+        } else {
+            return null;
+        }
+        
+        if (var == null || constant == null) {
+            if (INFO) {
+                log.info("left: " + left);
+                log.info("right: " + right);
+            }
+            return null;
+        }
+        
+        // we can do equals, not equals
+        if (operator == CompareOp.EQ) {
+            return new EQConstant(var, constant);
+        } else if (operator == CompareOp.NE) {
+            return new NEConstant(var, constant);
+        } else { 
+            return null;
+        }
+        
     }
 
     /**

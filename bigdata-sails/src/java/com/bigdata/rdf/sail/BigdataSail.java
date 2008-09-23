@@ -101,6 +101,7 @@ import org.openrdf.query.algebra.evaluation.impl.QueryJoinOptimizer;
 import org.openrdf.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 import org.openrdf.query.algebra.evaluation.util.QueryOptimizerList;
 import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
+import org.openrdf.sail.NotifyingSailConnection;
 import org.openrdf.sail.Sail;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailConnectionListener;
@@ -745,7 +746,7 @@ public class BigdataSail extends SailBase implements Sail {
      * @todo many of the store can support concurrent writers, but there is a
      *       requirement to serialize writers when truth maintenance is enabled.
      */
-    protected BigdataSailConnection getConnectionInternal() throws SailException {
+    protected NotifyingSailConnection getConnectionInternal() throws SailException {
 
         // this will block until the semaphore is available.
         try {
@@ -765,14 +766,14 @@ public class BigdataSail extends SailBase implements Sail {
         
     }
     
-    /**
+    /*
      * Strengthens the return type.
-     */
     public BigdataSailConnection getConnection() throws SailException {
         
         return (BigdataSailConnection) super.getConnection();
         
     }
+     */
 
     /**
      * Inner class implements the {@link SailConnection}. Some additional
@@ -782,7 +783,7 @@ public class BigdataSail extends SailBase implements Sail {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public class BigdataSailConnection implements SailConnection {
+    public class BigdataSailConnection implements NotifyingSailConnection {
 
         /**
          * The database view.
