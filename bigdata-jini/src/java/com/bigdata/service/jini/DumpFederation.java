@@ -30,33 +30,24 @@ package com.bigdata.service.jini;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.Serializable;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-import java.util.Vector;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.IIndex;
-import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
-import com.bigdata.io.DataInputBuffer;
-import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.DumpJournal;
-import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.TimestampUtility;
-import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
+import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.DataService;
-import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.IDataServiceAwareProcedure;
+import com.bigdata.service.ListIndicesTask;
 import com.bigdata.service.MetadataService;
 import com.bigdata.util.InnerCause;
 
@@ -79,6 +70,18 @@ public class DumpFederation {
     
     protected static final boolean INFO = log.isInfoEnabled();
 
+    private final AbstractScaleOutFederation fed;
+
+    private final long commitTime;
+    
+    public DumpFederation(AbstractScaleOutFederation fed, final long commitTime) {
+        
+        this.fed = fed;
+        
+        this.commitTime = commitTime;
+        
+    }
+    
     /**
      * Dumps interesting things about the federation.
      * <p>
@@ -106,22 +109,31 @@ public class DumpFederation {
             System.err.println("usage: <client-config-file>");
 
             System.exit(1);
-            
+
         }
-        
+
         final JiniClient client;
-        
+
         JiniServicesHelper helper = null;
-        if (true) {// @todo command line option for this.
-         
+        if (false) {// @todo command line option for this.
+
+            /*
+             * Use the services helper to (re-)start an embedded jini
+             * federation.
+             */
             helper = new JiniServicesHelper(new File(args[0]).getParent()
-                    .toString()+File.separator);
-            
+                    .toString()
+                    + File.separator);
+
             helper.start();
-        
+
             client = helper.client;
-            
+
         } else {
+            
+            /*
+             * Connect to an existing jini federation.
+             */
 
             client = JiniClient.newInstance(args);
 
@@ -133,17 +145,15 @@ public class DumpFederation {
 
             fed.awaitServices(1/* minDataServices */, 10000L/* timeout(ms) */);
 
-            final long lastCommitTime = fed.getLastCommitTime();
+            final DumpFederation dumper = new DumpFederation(fed, fed
+                    .getLastCommitTime());
 
-            final long timestamp = TimestampUtility.asHistoricalRead(lastCommitTime);
-            
-            // the names of all registered scale-out indices.
-            final String[] names = (String[]) fed.getMetadataService().submit(
-                    new ListIndicesTask()).get();
+            final String[] names = dumper.getIndexNames();
 
             System.out.println("Found " + names.length + " indices: "
                     + Arrays.toString(names));
 
+            // @todo command line option.
             final boolean dumpIndexLocators = true;
 
             if (dumpIndexLocators) {
@@ -151,32 +161,11 @@ public class DumpFederation {
                 for (String name : names) {
 
                     // strip off the prefix to get the scale-out index name.
-                    final String scaleOutIndexName = name.substring("metadata-"
-                            .length());
+                    final String scaleOutIndexName = name
+                            .substring(MetadataService.METADATA_INDEX_NAMESPACE
+                                    .length());
 
-                    final IMetadataIndex ndx;
-                    try {
-                    
-                        ndx = fed.getMetadataIndex(scaleOutIndexName, timestamp);
-                    
-                    } catch (Throwable t) {
-                        
-                        final Throwable t2 = InnerCause.getInnerCause(t,
-                                ClassNotFoundException.class);
-                        
-                        if (t2 != null) {
-                        
-                            log.error("CODEBASE/CLASSPATH problem:", t2);
-                            
-                            continue;
-                        
-                        }
-                        
-                        throw new RuntimeException(t);
-                        
-                    }
-
-                    dumpIndexLocators(fed, scaleOutIndexName, ndx);
+                    dumper.dumpIndexLocators(scaleOutIndexName);
 
                 }
 
@@ -189,20 +178,217 @@ public class DumpFederation {
             if (helper != null) {
 
                 helper.shutdown();
-                
+
             } else {
-                
+
                 client.disconnect(true/* immediateShutdown */);
-                
+
             }
 
         }
         
     }
 
-    static Map<UUID, String> service2Hostname = new HashMap<UUID, String>();
+    /**
+     * The names of all registered scale-out indices.
+     * 
+     * @throws IOException
+     * @throws ExecutionException
+     * @throws InterruptedException
+     * 
+     */
+    public String[] getIndexNames() throws InterruptedException,
+            ExecutionException, IOException {
+
+        return (String[]) fed.getMetadataService().submit(
+                new ListIndicesTask(commitTime)).get();
+
+    }
+
+    /**
+     * Dumps the {@link PartitionLocator}s for the named index.
+     * 
+     * @param name
+     *            The name of a scale-out index.
+     */
+    public void dumpIndexLocators(String name) {
+
+        final long timestamp = TimestampUtility.asHistoricalRead(commitTime);
+
+        final IMetadataIndex ndx;
+        try {
+
+            ndx = fed.getMetadataIndex(name, timestamp);
+
+        } catch (Throwable t) {
+
+            final Throwable t2 = InnerCause.getInnerCause(t,
+                    ClassNotFoundException.class);
+
+            if (t2 != null) {
+
+                log.error("CODEBASE/CLASSPATH problem:", t2);
+
+                return;
+
+            }
+
+            throw new RuntimeException(t);
+
+        }
+
+        dumpIndexLocators(name, ndx);
+
+    }
     
-    static synchronized String getServiceHostName(IBigdataFederation fed, UUID uuid) {
+    /**
+     * Dumps the locators for a scale-out index.
+     * 
+     * @param ndx
+     *            The scale-out index.
+     */
+    protected void dumpIndexLocators(String name, IMetadataIndex ndx) {
+
+        System.out.println("\n\nname=" + name);
+
+        final ITupleIterator<PartitionLocator> itr = ndx.rangeIterator();
+
+        while (itr.hasNext()) {
+
+            final PartitionLocator locator = itr.next().getObject();
+
+            System.out.println("\t"+locator.toString());
+
+            for (UUID uuid : locator.getDataServices()) {
+
+                final ServiceMetadata smd = getServiceMetadata(uuid);
+                
+                System.out.println("\t\tDataService: label=" +smd.label+", uuid="+uuid);
+
+            }
+
+        }
+
+    }
+
+    /**
+     * Service metadata extracted by {@link DumpFederation}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class ServiceMetadata {
+
+        private final UUID uuid;
+        private final String hostname;
+        private final String label;
+        
+        public ServiceMetadata(UUID uuid,String hostname,String label) {
+            
+            if (uuid == null)
+                throw new IllegalArgumentException();
+            
+            if (hostname == null)
+                throw new IllegalArgumentException();
+            
+            if (label == null)
+                throw new IllegalArgumentException();
+
+            this.uuid = uuid;
+            
+            this.hostname = hostname;
+            
+            this.label = label;
+
+        }
+        
+        /**
+         * The service {@link UUID}.
+         */
+        public UUID getUUID() {
+            
+            return uuid;
+            
+        }
+        
+        /**
+         * The hostname of the machine on which the service is running.
+         */
+        public String getHostname() {
+            
+            return hostname;
+            
+        }
+        
+        /**
+         * A label assigned to the service (easier to read than its {@link UUID}).
+         */
+        public String getLabel() {
+         
+            return label;
+            
+        }
+        
+    }
+    
+    /**
+     * Return a label for the service that is easier for people to read than its
+     * {@link UUID}. The assignment of the label to the service is stable for
+     * the life of the {@link DumpFederation} instance.
+     */
+    synchronized ServiceMetadata getServiceMetadata(UUID uuid) {
+
+        if (uuid == null)
+            throw new IllegalArgumentException();
+
+        final String hostname = getServiceHostName(uuid);
+
+        final String label = getServiceLabel(uuid);
+
+        return new ServiceMetadata(uuid, hostname, label);
+
+    }
+
+    /**
+     * Assign a label to a service.
+     * 
+     * @param uuid
+     *            The service {@link UUID}.
+     *            
+     * @return An easy to read label.
+     */
+    synchronized String getServiceLabel(UUID uuid) {
+
+        String label = service2Label.get(uuid);
+
+        if (label == null) {
+
+            final String hostname = getServiceHostName(uuid);
+
+            label = hostname + "#" + serviceLabelCount++;
+
+            service2Label.put(uuid, label);
+
+        }
+
+        return label;
+        
+    }
+    private int serviceLabelCount = 0;
+    private final Map<UUID, String> service2Label = new HashMap<UUID, String>();
+
+    /**
+     * Return the hostname of a service (caching).
+     * 
+     * @param uuid
+     *            The service {@link UUID}.
+     * 
+     * @return The hostname.
+     */
+    synchronized String getServiceHostName(UUID uuid) {
+
+        if (uuid == null)
+            throw new IllegalArgumentException();
 
         String hostname = service2Hostname.get(uuid);
 
@@ -232,121 +418,6 @@ public class DumpFederation {
         return hostname;
         
     }
-    
-    /**
-     * Dumps the locators for a scale-out index.
-     * 
-     * @param ndx
-     *            The scale-out index.
-     */
-    static public void dumpIndexLocators(IBigdataFederation fed, String name,
-            IMetadataIndex ndx) {
-
-        System.out.println("\n\nname=" + name);
-
-        final ITupleIterator<PartitionLocator> itr = ndx.rangeIterator();
-
-        while (itr.hasNext()) {
-
-            final PartitionLocator locator = itr.next().getObject();
-
-            System.err.println("\t"+locator.toString());
-
-            for (UUID uuid : locator.getDataServices()) {
-
-                System.err.println("\t\tDataService: " + uuid + " on "
-                        + getServiceHostName(fed, uuid));
-
-            }
-
-        }
-
-    }
-
-    /**
-     * Task returns an ordered list of the named indices on the
-     * {@link DataService} to which it is submitted. Note that
-     * {@link MetadataService} extends {@link DataService} so this task can also
-     * be used to enumerate the scale-out indices in an
-     * {@link IBigdataFederation}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class ListIndicesTask implements Callable<String[]>,
-            IDataServiceAwareProcedure, Serializable {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = -831267313813825903L;
-
-        transient protected static final Logger log = Logger.getLogger(DumpFederation.class);
-        
-        transient protected static final boolean INFO = log.isInfoEnabled();
-        
-        private transient DataService dataService;
-
-        public ListIndicesTask() {
-            
-        }
-        
-        public void setDataService(DataService dataService) {
-        
-            this.dataService = dataService;
-            
-        }
-        
-        /**
-         * @todo to be robust this should temporarily disable overflow for the
-         *       data service otherwise it is possible that the live journal
-         *       will be concurrently closed out.
-         */
-        public String[] call() throws Exception {
-            
-            if (dataService == null)
-                throw new IllegalStateException("DataService not set.");
-            
-            final AbstractJournal journal = dataService.getResourceManager()
-                    .getLiveJournal();
-            
-            final long lastCommitTime = journal.getLastCommitTime();
-            
-            final IIndex name2Addr = journal.getName2Addr(lastCommitTime);
-            
-            final int n = (int) name2Addr.rangeCount();
-            
-            if (INFO)
-                log.info("Will read " + n + " index names from "
-                        + dataService.getClass().getSimpleName());
-            
-            final Vector<String> names = new Vector<String>( n );
-            
-            final ITupleIterator itr = name2Addr.rangeIterator();
-            
-            while(itr.hasNext()) {
-                
-                final ITuple tuple = itr.next();
-                
-                final byte[] val = tuple.getValue();
-                
-                final Name2Addr.Entry entry = EntrySerializer.INSTANCE
-                        .deserialize(new DataInputBuffer(val));
-                
-                if(INFO) {
-
-                    log.info(entry.toString());
-                    
-                }
-                
-                names.add(entry.name);
-                
-            }
-            
-            return names.toArray(new String[] {});
-            
-        }
-
-    }
+    private final Map<UUID, String> service2Hostname = new HashMap<UUID, String>();
     
 }
