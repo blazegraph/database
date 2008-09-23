@@ -344,18 +344,8 @@ public class DataServicesClient {
      */
     public IDataService getDataService(UUID serviceUUID) {
 
-        if (serviceUUID == null)
-            throw new IllegalArgumentException();
-
-        if(!cacheDataServices) {
-            
-            throw new UnsupportedOperationException();
-            
-        }
-
-        final ServiceItem serviceItem = serviceMap.getServiceItemByID(JiniUtil
-                .uuid2ServiceID(serviceUUID));
-
+        ServiceItem serviceItem = getServiceItem(serviceUUID);
+        
         if (serviceItem == null) {
 
             log.warn("No such service: uuid=" + serviceUUID);
@@ -372,6 +362,33 @@ public class DataServicesClient {
         
         // return the data service.
         return (IDataService) serviceItem.service;
+        
+    }
+    
+    /**
+     * Return the {@link ServiceItem} associated with the {@link UUID}.
+     * 
+     * @param serviceUUID
+     *            The service {@link UUID}.
+     *            
+     * @return The service item iff it is found in the cache and
+     *         <code>null</code> otherwise.
+     */
+    public ServiceItem getServiceItem(UUID serviceUUID) {
+
+        if (serviceUUID == null)
+            throw new IllegalArgumentException();
+
+        if(!cacheDataServices) {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+
+        final ServiceItem serviceItem = serviceMap.getServiceItemByID(JiniUtil
+                .uuid2ServiceID(serviceUUID));
+
+        return serviceItem;
         
     }
 

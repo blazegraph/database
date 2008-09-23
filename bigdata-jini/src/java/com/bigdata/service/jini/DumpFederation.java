@@ -37,6 +37,10 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
+import net.jini.core.entry.Entry;
+import net.jini.core.lookup.ServiceItem;
+import net.jini.lookup.entry.Name;
+
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.ITupleIterator;
@@ -44,7 +48,6 @@ import com.bigdata.journal.DumpJournal;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
-import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ListIndicesTask;
@@ -70,11 +73,11 @@ public class DumpFederation {
     
     protected static final boolean INFO = log.isInfoEnabled();
 
-    private final AbstractScaleOutFederation fed;
+    private final JiniFederation fed;
 
     private final long commitTime;
     
-    public DumpFederation(AbstractScaleOutFederation fed, final long commitTime) {
+    public DumpFederation(JiniFederation fed, final long commitTime) {
         
         this.fed = fed;
         
@@ -359,10 +362,47 @@ public class DumpFederation {
      */
     synchronized String getServiceLabel(UUID uuid) {
 
-        String label = service2Label.get(uuid);
+        String label = null;
+
+        label = service2Label.get(uuid);
+        
+        if (label == null) {
+            
+            /*
+             * Lookup the label on the attributes associated with the
+             * ServiceItem for the service.
+             */
+            
+            // lookup the service in the client's cache.
+            final ServiceItem serviceItem = fed.dataServicesClient
+                    .getServiceItem(uuid);
+
+            if (serviceItem != null) {
+         
+                // scan the Entry[]
+                final Entry[] attribs = serviceItem.attributeSets;
+
+                for (Entry e : attribs) {
+
+                    if (e instanceof Name) {
+
+                        // found a name.
+                        label = ((Name) e).name;
+
+                    }
+
+                }
+                
+            }
+            
+        }
 
         if (label == null) {
 
+            /*
+             * Generate a name since no label was discovered above.
+             */
+            
             final String hostname = getServiceHostName(uuid);
 
             label = hostname + "#" + serviceLabelCount++;
