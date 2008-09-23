@@ -458,4 +458,131 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
 
     }
     
+    public void test_filter_literals() throws Exception {
+
+        final String ns = "http://www.bigdata.com/rdf#";
+        
+        final URI mike = new URIImpl(ns+"Mike");
+        
+        final URI jane = new URIImpl(ns+"Jane");
+        
+        final URI person = new URIImpl(ns+"Person");
+        
+        final URI property1 = new URIImpl(ns+"property1");
+        
+        final URI property2 = new URIImpl(ns+"property2");
+        
+        final Literal label = new LiteralImpl("The Label");
+        
+        final File journal = File.createTempFile("bigdata", ".jnl");
+        
+        journal.deleteOnExit();
+        
+        final Properties props = new Properties();
+        
+        props.setProperty(BigdataSail.Options.FILE, journal.getAbsolutePath());
+        
+        final BigdataSail sail = new BigdataSail(props);
+        
+        try {
+        
+            log.info("hello world");
+            
+            sail.initialize();
+            
+            final Repository repo = new BigdataSailRepository(sail);
+            
+            final RepositoryConnection cxn = repo.getConnection();
+            
+            try {
+
+                cxn.setAutoCommit(false);
+                
+                cxn.add(new StatementImpl(mike, RDF.TYPE, person));
+                
+                cxn.add(new StatementImpl(mike, RDFS.LABEL, label));
+                
+                cxn.add(new StatementImpl(jane, RDF.TYPE, person));
+                
+                cxn.add(new StatementImpl(jane, RDFS.LABEL, label));
+                
+                cxn.commit();
+                
+                String query = 
+                    "select ?s "+
+                    "where { " +
+                    "  ?s <"+RDF.TYPE+"> <"+person+"> . " +
+                    "  ?s <"+RDFS.LABEL+"> ?label . " +
+                    "  FILTER(?label = \""+label.getLabel()+"\" || ?label = \""+label.getLabel()+"\")" +
+                    "}";
+                
+                { // evalute it once so i can see it
+                    
+                    final StringWriter sw = new StringWriter();
+                    
+                    final SPARQLResultsXMLWriter handler = 
+                        new SPARQLResultsXMLWriter(new XMLWriter(sw));
+    
+                    final TupleQuery tupleQuery = 
+                        cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                    
+                    tupleQuery.evaluate(handler);
+                    
+                    System.err.println(sw.toString());
+
+                }
+                
+                {
+                    
+                    final TupleQuery tupleQuery = 
+                        cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                    
+                    final TupleQueryResult result = tupleQuery.evaluate();
+                    
+                    try {
+                        
+                        int numResults = 0;
+                        
+                        while (result.hasNext()) {
+                            
+                            BindingSet bindingSet = result.next();
+                           
+                            Value valueOfS = bindingSet.getValue("s");
+                           
+                            assertTrue(valueOfS.equals(mike) || valueOfS.equals(jane));
+
+                            numResults++;
+                           
+                        }
+                        
+                        assertTrue(numResults == 2);
+                       
+                    } finally {
+                       
+                        result.close();
+                       
+                    }
+                    
+                }
+                
+            } catch(Exception ex) {
+                
+                cxn.rollback();
+                
+                throw ex;
+                
+            } finally {
+    
+                cxn.close();
+    
+            }
+        
+        } finally {
+            
+            sail.shutdownAndDelete();
+            
+        }
+
+    }
+    
 }
