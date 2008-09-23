@@ -21,6 +21,7 @@ import org.openrdf.query.algebra.Compare;
 import org.openrdf.query.algebra.Filter;
 import org.openrdf.query.algebra.Join;
 import org.openrdf.query.algebra.Or;
+import org.openrdf.query.algebra.Regex;
 import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
@@ -342,8 +343,11 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             runQuery(join, rule);
 
         // use the basic filter iterator for remaining filters
+        if (INFO && filters.size() > 0) {
+            log.info("could not translate " + filters.size() + " filters into native constraints:");
+        }
         for (Filter filter : filters) {
-            if (log.isInfoEnabled()) log.info(filter);
+            if (INFO) log.info("\n"+filter.getCondition());
             result = new FilterIterator(filter, result, this);
         }
 
@@ -451,7 +455,13 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             return generateConstraint((SameTerm) valueExpr);
         } else if (valueExpr instanceof Compare) {
             return generateConstraint((Compare) valueExpr);
+        } else if (valueExpr instanceof Regex) {
+            return generateConstraint((Regex) valueExpr);
         }
+        return null;
+    }
+    
+    private IConstraint generateConstraint(Regex regex) {
         return null;
     }
     
