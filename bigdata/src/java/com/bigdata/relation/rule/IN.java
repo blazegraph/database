@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.relation.rule;
 
+import java.util.Arrays;
 import java.util.HashSet;
 
 
@@ -54,22 +55,23 @@ import java.util.HashSet;
  * A constraint that a variable may only take on the bindings enumerated by some
  * set.
  * 
- * @todo this could be optimized in a variety of ways, including the use of a
- *       {@link HashSet} or a sorted array and a binary search.
+ * @todo This uses binary search, which is thread-safe. It could aslo use a
+ *       {@link HashSet}, but the {@link HashSet} needs to be thread-safe since
+ *       the filter could be applied concurrently during evaluation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class IN implements IConstraint {
+public class IN<T> implements IConstraint {
 
     /**
      * 
      */
     private static final long serialVersionUID = 5805883429399100605L;
 
-    private final IVariable<Long> x;
+    private final IVariable<T> x;
     
-    private final long[] set;
+    private final T[] set;
 
     /**
      * 
@@ -79,36 +81,49 @@ public class IN implements IConstraint {
      *            A set of legal term identifiers providing a constraint on the
      *            allowable values for that variable.
      */
-    public IN(IVariable<Long> x, long[] set) {
-        
+    public IN(final IVariable<T> x, final IConstant<T>[] set) {
+
         if (x == null || set == null)
             throw new IllegalArgumentException();
 
-        if (set.length==0)
+        if (set.length == 0)
             throw new IllegalArgumentException();
         
         this.x = x;
         
-        this.set = set;
+        // allocate an array of the correct type.
+        this.set = (T[]) java.lang.reflect.Array.newInstance(set[0].getClass(),
+                set.length);
+
+        for (int i = 0; i < set.length; i++) {
+
+            this.set[i] = set[i].get();
+            
+        }
+        
+        Arrays.sort(this.set);
         
     }
     
     public boolean accept(IBindingSet bindingSet) {
         
         // get binding for "x".
-        final IConstant<Long> x = bindingSet.get(this.x);
-       
-        if(x==null) return true; // not yet bound.
+        final IConstant<T> x = bindingSet.get(this.x);
 
-        final long v = x.get();
-        
-        for(int i=0; i<set.length; i++) {
-            
-            if(v == set[i]) return true;
+        if (x == null) {
+
+            // not yet bound.
+            return true;
             
         }
+
+        final T v = x.get();
+
+        // lookup the bound value in the set of values.
+        final int pos = Arrays.binarySearch(set, v);
         
-        return false;
+        // true iff the bound value was found in the set.
+        return pos >= 0;
 
    }
 

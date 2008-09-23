@@ -579,7 +579,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
     }
 
     /**
-     * A scan of all literals having any of the given literal as a prefix.
+     * A scan of all literals having the given literal as a prefix.
      * 
      * @param lit
      *            A literal.
