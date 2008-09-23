@@ -2056,22 +2056,22 @@ abstract public class LoadBalancerService extends AbstractService
             
             lock.lock();
 
-            if (nupdates < 10) {
-
-                /*
-                 * Use a round-robin assignment for the first 5 minutes.
-                 * 
-                 * @todo this is a hack for starting a new federation and
-                 * allocating services on that federation.
-                 */
-                return getUnderUtilizedDataServicesRoundRobin(minCount,
-                        maxCount, exclude);
-            
-            }
-            
-            final ServiceScore[] scores = this.serviceScores.get();
-
             try {
+
+                if (nupdates < 10) {
+
+                    /*
+                     * Use a round-robin assignment for the first 5 minutes.
+                     * 
+                     * @todo this is a hack for starting a new federation and
+                     * allocating services on that federation.
+                     */
+                    return getUnderUtilizedDataServicesRoundRobin(minCount,
+                            maxCount, exclude);
+                
+                }
+                
+                final ServiceScore[] scores = this.serviceScores.get();
 
                 if (scores == null) {
                     
@@ -2193,6 +2193,10 @@ abstract public class LoadBalancerService extends AbstractService
      *       joined services into a set of equivalence classes. parameterize
      *       this method to accept an equivalence class. always apply this
      *       method when drawing from an equivalence class.
+     * 
+     * @todo there should be unit tests for this. in particular, we need a test
+     *       when minCount=maxCount=1 and there are N=2 and N GT 2 data services
+     *       to verify correct round robin assignment.
      */
     protected UUID[] getUnderUtilizedDataServicesRoundRobin(int minCount,
             int maxCount, UUID exclude) throws InterruptedException,
@@ -2227,7 +2231,7 @@ abstract public class LoadBalancerService extends AbstractService
 
         Arrays.sort(a);
 
-        final int n = Math.max(maxCount, a.length);
+        final int n = Math.min(maxCount, a.length);
         
         final UUID[] b = new UUID[ n ];
 
