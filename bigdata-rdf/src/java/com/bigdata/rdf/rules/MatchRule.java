@@ -30,7 +30,7 @@ public class MatchRule extends Rule<SPO> {
     private static final long serialVersionUID = -5002902183499739018L;
 
     public MatchRule(String relationName, Vocabulary vocab,
-            IVariable<Long> lit, long[] preds,
+            IVariable<Long> lit, IConstant<Long>[] preds,
             IConstant<Long> cls) {
 
     super(  "matchRule", //

@@ -134,6 +134,7 @@ import com.bigdata.relation.locator.RelationSchema;
 import com.bigdata.relation.rule.ArrayBindingSet;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
+import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
@@ -3755,7 +3756,7 @@ abstract public class AbstractTripleStore extends
         /*
          * Translate the predicates into term identifiers.
          */
-        final long[] _preds = new long[preds.length];
+        final IConstant<Long>[] _preds = new IConstant[preds.length];
         {
             
             int nknown = 0;
@@ -3767,7 +3768,7 @@ abstract public class AbstractTripleStore extends
                 if (tid != NULL)
                     nknown++;
                 
-                _preds[i] = tid;
+                _preds[i] = new Constant<Long>(tid);
                 
             }
             
@@ -3850,7 +3851,7 @@ abstract public class AbstractTripleStore extends
      *         {@link MatchRule}.
      */
     protected Program getMatchProgram(final Literal[] lits,
-            final long[] _preds, final long _cls) {
+            final IConstant<Long>[] _preds, final long _cls) {
         
         final Iterator<Long> termIdIterator = getLexiconRelation().prefixScan(
                 lits);
