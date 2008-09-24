@@ -75,6 +75,8 @@ public class TestBigdataSailWithSids extends AbstractBigdataSailTestCase {
         // test of high-level query on a graph with statements about statements.
         suite.addTestSuite(TestProvenanceQuery.class);
 
+        suite.addTestSuite(TestBigdataSailEvaluationStrategyImpl.class);
+        
         return suite;
         
     }
