@@ -643,7 +643,7 @@ public class Leaf extends AbstractNode implements ILeafData {
                     + splitIndex + ", separatorKey="
                     + keyAsString(separatorKey)
                     );
-            if(DEBUG) dump(Level.DEBUG,System.err);
+//            if(DEBUG) dump(Level.DEBUG,System.err);
         }
 
         int j = 0;
@@ -746,11 +746,11 @@ public class Leaf extends AbstractNode implements ILeafData {
 
         if (INFO) {
             log.info("this="+this+", sibling="+sibling+", rightSibling="+isRightSibling);
-            if(DEBUG) {
-                System.err.println("this"); dump(Level.DEBUG,System.err);
-                System.err.println("sibling"); sibling.dump(Level.DEBUG,System.err);
-                System.err.println("parent"); p.dump(Level.DEBUG,System.err);
-            }
+//            if(DEBUG) {
+//                System.err.println("this"); dump(Level.DEBUG,System.err);
+//                System.err.println("sibling"); sibling.dump(Level.DEBUG,System.err);
+//                System.err.println("parent"); p.dump(Level.DEBUG,System.err);
+//            }
         }
 
         /*
@@ -900,11 +900,11 @@ public class Leaf extends AbstractNode implements ILeafData {
 
         if (INFO) {
             log.info("this="+this+", sibling="+sibling+", rightSibling="+isRightSibling);
-            if(DEBUG) {
-                System.err.println("this"); dump(Level.DEBUG,System.err);
-                System.err.println("sibling"); sibling.dump(Level.DEBUG,System.err);
-                System.err.println("parent"); p.dump(Level.DEBUG,System.err);
-            }
+//            if(DEBUG) {
+//                System.err.println("this"); dump(Level.DEBUG,System.err);
+//                System.err.println("sibling"); sibling.dump(Level.DEBUG,System.err);
+//                System.err.println("parent"); p.dump(Level.DEBUG,System.err);
+//            }
         }
 
         /*
