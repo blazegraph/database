@@ -52,6 +52,8 @@ public class Program implements IProgram {
     private final boolean parallel;
     
     private final boolean closure;
+
+    private final IQueryOptions queryOptions;
     
     private final List<IStep> steps = new LinkedList<IStep>();
     
@@ -65,29 +67,81 @@ public class Program implements IProgram {
     /**
      * An empty program.
      * 
+     * @param name
+     *            A label for the program.
      * @param parallel
      *            <code>true</code> iff the steps in the program are
-     *            parallelizable.
+     *            parallelizable (this does not imply that they will be executed
+     *            in parallel, only that they do not have dependencies among the
+     *            steps and hence are in principle parallelizable).
      */
     public Program(String name, boolean parallel) {
 
-        this(name,parallel,false/*closure*/);
-        
+        this(name, parallel, false/* closure */, QueryOptions.NONE);
+
     }
-    
+
     /**
      * An empty program.
      * 
+     * @param name
+     *            A label for the program.
      * @param parallel
      *            <code>true</code> iff the steps in the program are
-     *            parallelizable.
+     *            parallelizable (this does not imply that they will be executed
+     *            in parallel, only that they do not have dependencies among the
+     *            steps and hence are in principle parallelizable).
+     * @param queryOptions
+     *            Options that will be imposed if the iprogram is evaluated as a
+     *            query.
+     */
+    public Program(String name, boolean parallel, IQueryOptions queryOptions) {
+
+        this(name, parallel, false/* closure */, queryOptions);
+
+    }
+
+    /**
+     * An empty program.
+     * 
+     * @param name
+     *            A label for the program.
+     * @param parallel
+     *            <code>true</code> iff the steps in the program are
+     *            parallelizable (this does not imply that they will be executed
+     *            in parallel, only that they do not have dependencies among the
+     *            steps and hence are in principle parallelizable).
      * @param closure
      *            <code>true</code> iff the steps in the program must be run
      *            until a fixed point is achieved.
      */
     protected Program(String name, boolean parallel, boolean closure) {
-        
+
+        this(name, parallel, closure, QueryOptions.NONE);
+    }
+
+    /**
+     * Fully specific ctor.
+     * 
+     * @param parallel
+     *            <code>true</code> iff the steps in the program are
+     *            parallelizable (this does not imply that they will be executed
+     *            in parallel, only that they do not have dependencies among the
+     *            steps and hence are in principle parallelizable).
+     * @param closure
+     *            <code>true</code> iff the steps in the program must be run
+     *            until a fixed point is achieved.
+     * @param queryOptions
+     *            Options that will be imposed if the iprogram is evaluated as a
+     *            query.
+     */
+    private Program(String name, boolean parallel, boolean closure,
+            IQueryOptions queryOptions) {
+    
         if (name == null)
+            throw new IllegalArgumentException();
+        
+        if (queryOptions == null)
             throw new IllegalArgumentException();
         
         this.name = name;
@@ -95,6 +149,8 @@ public class Program implements IProgram {
         this.parallel = parallel;
         
         this.closure = closure;
+        
+        this.queryOptions = queryOptions;
         
     }
     
@@ -119,6 +175,12 @@ public class Program implements IProgram {
     public boolean isClosure() {
         
         return closure;
+        
+    }
+
+    public IQueryOptions getQueryOptions() {
+        
+        return queryOptions;
         
     }
     

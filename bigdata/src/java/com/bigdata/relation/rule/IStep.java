@@ -49,7 +49,13 @@ public interface IStep extends Serializable {
      * <code>false</code> iff the step is an {@link IProgram}.
      */
     public boolean isRule();
-
+    
+    /**
+     * Return additional constraints that must be imposed during query
+     * evaluation.
+     */
+    public IQueryOptions getQueryOptions();
+    
     /**
      * A human readable representation of the {@link IStep}.
      */

@@ -1331,7 +1331,7 @@ public class RDFJoinNexus implements IJoinNexus {
         final IChunkedOrderedIterator<ISolution> itr = (IChunkedOrderedIterator<ISolution>) runProgram(
                 ActionEnum.Query, step);
 
-        if (step.isRule() && ((IRule) step).isDistinct()) {
+        if (step.isRule() && ((IRule) step).getQueryOptions().isDistinct()) {
 
             /*
              * Impose a DISTINCT constraint based on the variable bindings

@@ -21,6 +21,7 @@ import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.ISolutionExpander;
 import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.IVariableOrConstant;
+import com.bigdata.relation.rule.QueryOptions;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.Var;
 import com.bigdata.relation.rule.eval.ActionEnum;
@@ -113,7 +114,7 @@ public class OwlSameAsPropertiesExpandingIterator implements
                         new SPOPredicate(SPO, _sameO, sameAs, o,
                                 sameAsSelfExpander),
                         new SPOPredicate(SPO, _sameS, _p, _sameO) },
-                        true, // distinct
+                        QueryOptions.DISTINCT, // distinct
                         // constraints on the rule.
                         new IConstraint[] { new RejectSameAsSelf(head.s(), head
                                 .p(), head.o()) });
@@ -145,7 +146,7 @@ public class OwlSameAsPropertiesExpandingIterator implements
                         new SPOPredicate(SPO, _sameS, _p, _o), // ?s b ?o  -> y b w
                         new SPOPredicate(SPO, _o, sameAs, _sameO, true,
                                 sameAsSelfExpander) },
-                        true, // distinct
+                        QueryOptions.DISTINCT, // distinct
                         // constraints on the rule.
                         new IConstraint[] { new RejectSameAsSelf(head.s(), head
                                 .p(), head.o()) });
@@ -177,7 +178,7 @@ public class OwlSameAsPropertiesExpandingIterator implements
                         new SPOPredicate(SPO, _s, _p, _sameO),
                         new SPOPredicate(SPO, _s, sameAs, _sameS, true,
                                 sameAsSelfExpander) }, 
-                        true, // distinct
+                        QueryOptions.DISTINCT, // distinct
                         // constraints on the rule.
                         new IConstraint[] { new RejectSameAsSelf(head.s(), head
                                 .p(), head.o()) });
@@ -209,7 +210,7 @@ public class OwlSameAsPropertiesExpandingIterator implements
                         new SPOPredicate(SPO, _sameO, sameAs, _o, true,
                                 sameAsSelfExpander),
                         new SPOPredicate(SPO, _s, _p, _o) }, 
-                        true, // distinct
+                        QueryOptions.DISTINCT, // distinct
                         // constraints on the rule.
                         new IConstraint[] { new RejectSameAsSelf(head.s(), head
                                 .p(), head.o()) });

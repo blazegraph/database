@@ -289,14 +289,18 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             log.info("closed.");
         
     }
-    
+
     private final void notifyIterator() {
 
-        synchronized(iterator) {
-            
-            iterator.notify();
-            
-        }
+        /*
+         * The iterator does not actually wait() on anything so this is not
+         * necessary.
+         */
+//        synchronized(iterator) {
+//            
+//            iterator.notify();
+//            
+//        }
 
     }
     
@@ -501,6 +505,13 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                  * fail to progress. To avoid this, and to have the source
                  * process terminate eagerly if the client closes the iterator,
                  * we cancel the future if it is not yet done.
+                 * 
+                 * Note: This means that processes writing on a BlockingBuffer
+                 * MUST treat an interrupt() as normal (but eager) termination.
+                 * 
+                 * The best example is rule execution. When the (nested) joins
+                 * for a rule are executed, each join-task can write on this
+                 * buffer.
                  */
                 
                 if(DEBUG) {

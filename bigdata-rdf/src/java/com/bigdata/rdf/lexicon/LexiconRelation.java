@@ -1674,8 +1674,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
                 final long elapsed = System.currentTimeMillis() - begin;
                 
-                System.err.println("resolved " + numNotFound + " terms in "
-                        + tasks.size() + " chunks and " + elapsed + "ms");
+                if (INFO)
+                    log.info("resolved " + numNotFound + " terms in "
+                            + tasks.size() + " chunks and " + elapsed + "ms");
                 
             }
 

@@ -34,7 +34,6 @@ import java.util.Set;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.IJoinNexus;
-import com.bigdata.striterator.DistinctFilter;
 
 /**
  * Conjunctive query of N {@link IPredicate}s with optional {@link IConstraint}s.
@@ -51,12 +50,6 @@ import com.bigdata.striterator.DistinctFilter;
  */
 public interface IRule<E> extends IStep {
 
-    /**
-     * <code>true</code> if a {@link DistinctFilter} should be applied when
-     * the rule is evaluated as a <em>query</em>.
-     */
-    public boolean isDistinct();
-    
     /**
      * The #of distinct variables declared by the rule.
      */
