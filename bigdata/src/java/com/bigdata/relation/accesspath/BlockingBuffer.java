@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.accesspath;
 
+import java.nio.channels.FileChannel;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -37,6 +38,11 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+
+import com.bigdata.relation.rule.IQueryOptions;
+import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.eval.NestedSubqueryWithJoinThreadsTask;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * <p>
@@ -279,6 +285,12 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         
     }
 
+    /**
+     * Closes the {@link BlockingBuffer} such that it will not accept new
+     * elements. The {@link IAsynchronousIterator} will drain any elements
+     * remaining in the {@link BlockingBuffer} (this does NOT close the
+     * {@link BlockingIterator}).
+     */
     public void close() {
     
         this.open = false;
@@ -406,8 +418,29 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     
     /**
      * The iterator is NOT thread-safe and does NOT support remove().
+     * <p>
+     * Note: If the {@link IAsynchronousIterator} is
+     * {@link ICloseableIterator#close()}d before the {@link Future} of the
+     * process writing on the {@link BlockingBuffer} is done, then the
+     * {@link Future} will be cancelled using {@link Thread#interrupt()}. Owing
+     * to a feature of {@link FileChannel}, this will cause the backing store
+     * to be asynchronously closed if the interupt is detected during an IO. T
+     * backing store will be re-opened transparently, but there is overhead
+     * associated with that (locks to be re-acquired, etc).
+     * <p>
+     * The most common reason to close an iterator early are that you want to
+     * only visit a limited #of elements. However, if you use either
+     * {@link IAccessPath#iterator(int, int)} or {@link IRule} with an
+     * {@link IQueryOptions} to impose that limit, then most processes that
+     * produce {@link IAsynchronousIterator}s will automatically terminate when
+     * they reach the desired limit, thereby avoiding issuing interrupts. Those
+     * processes include {@link IAccessPath} scans where the #of elements to be
+     * visited exceeds the fully materialized chunk threashold and {@link IRule}
+     * evaluation, e.g., by {@link NestedSubqueryWithJoinThreadsTask}.
      * 
      * @return The iterator (this is a singleton).
+     * 
+     * @see BlockingIterator#close()
      */
     public IAsynchronousIterator<E> iterator() {
 
@@ -486,6 +519,25 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
         /**
          * Notes that the iterator is closed and hence may no longer be read.
+         * <p>
+         * If the source is still running and we close the iterator then the
+         * source will block once the iterator fills up and it will fail to
+         * progress. To avoid this, and to have the source process terminate
+         * eagerly if the client closes the iterator, we cancel the future if it
+         * is not yet done.
+         * <p>
+         * Note: This means that processes writing on a BlockingBuffer MUST
+         * treat an interrupt() as normal (but eager) termination. The best
+         * example is rule execution. When the (nested) joins for a rule are
+         * executed, each join-task can write on this buffer. However, if the
+         * interrupt is noticed during an IO then the {@link FileChannel} for
+         * the backing store will be closed asynchronously. While it will be
+         * re-opened transparently, it is best to avoid that overhead. For most
+         * cases you can do this using either
+         * {@link IAccessPath#iterator(int, int)} or an {@link IRule} with an
+         * {@link IQueryOptions} that specifies a LIMIT.
+         * 
+         * @see BlockingBuffer#iterator()
          */
         public void close() {
 
@@ -499,21 +551,6 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
             if (future != null && !future.isDone()) {
 
-                /*
-                 * If the source is still running and we close the iterator then
-                 * the source will block once the iterator fills up and it will
-                 * fail to progress. To avoid this, and to have the source
-                 * process terminate eagerly if the client closes the iterator,
-                 * we cancel the future if it is not yet done.
-                 * 
-                 * Note: This means that processes writing on a BlockingBuffer
-                 * MUST treat an interrupt() as normal (but eager) termination.
-                 * 
-                 * The best example is rule execution. When the (nested) joins
-                 * for a rule are executed, each join-task can write on this
-                 * buffer.
-                 */
-                
                 if(DEBUG) {
                     
                     log.debug("will cancel future: "+future);
