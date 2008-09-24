@@ -615,8 +615,8 @@ public class Node extends AbstractNode implements INodeData {
 
         }
 
-        System.err.println("this: "); dump(Level.DEBUG,System.err);
-        System.err.println("newChild: "); newChild.dump(Level.DEBUG,System.err);
+//        System.err.println("this: "); dump(Level.DEBUG,System.err);
+//        System.err.println("newChild: "); newChild.dump(Level.DEBUG,System.err);
         throw new IllegalArgumentException("Not our child : oldChildKey="
                 + oldChildKey);
 
@@ -990,7 +990,7 @@ public class Node extends AbstractNode implements INodeData {
                     + splitIndex + ", separatorKey="
                     + keyAsString(separatorKey)
                     );
-            if(DEBUG) dump(Level.DEBUG,System.err);
+//            if(DEBUG) dump(Level.DEBUG,System.err);
         }
 
         /* 
@@ -1159,11 +1159,11 @@ public class Node extends AbstractNode implements INodeData {
         
         if (INFO) {
             log.info("this="+this+", sibling="+sibling+", rightSibling="+isRightSibling);
-            if(DEBUG) {
-                System.err.println("this"); dump(Level.DEBUG,System.err);
-                System.err.println("sibling"); sibling.dump(Level.DEBUG,System.err);
-                System.err.println("parent"); p.dump(Level.DEBUG,System.err);
-            }
+//            if(DEBUG) {
+//                System.err.println("this"); dump(Level.DEBUG,System.err);
+//                System.err.println("sibling"); sibling.dump(Level.DEBUG,System.err);
+//                System.err.println("parent"); p.dump(Level.DEBUG,System.err);
+//            }
         }
         
         /*
@@ -1331,11 +1331,11 @@ public class Node extends AbstractNode implements INodeData {
         if (INFO) {
             log.info("this=" + this + ", sibling=" + sibling
                     + ", rightSibling=" + isRightSibling);
-            if(DEBUG) {
-                System.err.println("this"); dump(Level.DEBUG,System.err);
-                System.err.println("sibling"); sibling.dump(Level.DEBUG,System.err);
-                System.err.println("parent"); p.dump(Level.DEBUG,System.err);
-            }
+//            if(DEBUG) {
+//                System.err.println("this"); dump(Level.DEBUG,System.err);
+//                System.err.println("sibling"); sibling.dump(Level.DEBUG,System.err);
+//                System.err.println("parent"); p.dump(Level.DEBUG,System.err);
+//            }
         }
 
         final int siblingEntryCount = s.getEntryCount();
@@ -1529,7 +1529,7 @@ public class Node extends AbstractNode implements INodeData {
              * The key is already present. This is an error.
              */
 
-            btree.dump(Level.DEBUG,System.err);
+//            btree.dump(Level.DEBUG,System.err);
             
             throw new AssertionError("Split on existing key: key="
                     + keyAsString(key));
@@ -1955,9 +1955,9 @@ public class Node extends AbstractNode implements INodeData {
                 if(DEBUG) {
                     log.debug("replacing root: root=" + btree.root + ", node="
                             + this + ", lastChild=" + lastChild);
-                    System.err.println("root"); btree.root.dump(Level.DEBUG,System.err);
-                    System.err.println("this"); this.dump(Level.DEBUG,System.err);
-                    System.err.println("lastChild"); lastChild.dump(Level.DEBUG,System.err);
+//                    System.err.println("root"); btree.root.dump(Level.DEBUG,System.err);
+//                    System.err.println("this"); this.dump(Level.DEBUG,System.err);
+//                    System.err.println("lastChild"); lastChild.dump(Level.DEBUG,System.err);
                 }
                 
                 final boolean wasDirty = btree.root.dirty;
@@ -2112,7 +2112,16 @@ public class Node extends AbstractNode implements INodeData {
             final long key = childAddr[index];
 
             if (key == NULL) {
-                dump(Level.DEBUG, System.err);
+//                dump(Level.DEBUG, System.err);
+                /*
+                 * Note: It appears that this can be triggered by a full disk,
+                 * but I am not quite certain how a full disk leads to this
+                 * condition. Presumably the full disk would cause a write of
+                 * the child to fail. In turn, that should cause the thread
+                 * writing on the B+Tree to fail. If group commit is being used,
+                 * the B+Tree should then be discarded and reloaded from its
+                 * last commit point.
+                 */
                 throw new AssertionError(
                         "Child does not have persistent identity: this=" + this
                                 + ", index=" + index);

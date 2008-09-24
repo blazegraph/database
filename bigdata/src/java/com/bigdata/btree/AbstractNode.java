@@ -472,9 +472,9 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
 
             if(INFO) {
                 log.info("this="+this+", trigger="+triggeredByChildId);
-                if( DEBUG ) {
-                    System.err.println("this"); dump(Level.DEBUG,System.err);
-                }
+//                if( DEBUG ) {
+//                    System.err.println("this"); dump(Level.DEBUG,System.err);
+//                }
             }
 
             // cast to mutable implementation class.
@@ -744,7 +744,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      */
     protected final void assertInvariants() {
 
-        try {
+//        try {
 
             /*
              * either the root or the parent is reachable.
@@ -764,16 +764,16 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
             // max #of keys.
             assert nkeys <= maxKeys;
 
-        } catch (AssertionError ex) {
-
-            log.fatal("Invariants failed\n"
-                    + ex.getStackTrace()[0].toString());
-            
-            dump(Level.FATAL, System.err);
-            
-            throw ex;
-            
-        }
+//        } catch (AssertionError ex) {
+//
+//            log.fatal("Invariants failed\n"
+//                    + ex.getStackTrace()[0].toString());
+//            
+//            dump(Level.FATAL, System.err);
+//            
+//            throw ex;
+//            
+//        }
 
     }
     
@@ -945,9 +945,9 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
 
         if (INFO) {
             log.info("this="+this);
-            if(DEBUG) {
-                System.err.println("this"); dump(Level.DEBUG,System.err);
-            }
+//            if(DEBUG) {
+//                System.err.println("this"); dump(Level.DEBUG,System.err);
+//            }
         }
         
         if( this instanceof Leaf ) {
