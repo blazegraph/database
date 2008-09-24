@@ -75,12 +75,12 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO.toInt();
+    final protected static boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG.toInt();
+    final protected static boolean DEBUG = log.isInfoEnabled();
 
     /**
      * The BTree.
