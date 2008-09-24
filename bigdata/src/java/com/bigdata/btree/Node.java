@@ -386,7 +386,7 @@ public class Node extends AbstractNode implements INodeData {
         btree.counters.rootsSplit++;
 
         // Note: nnodes and nleaves might not reflect rightSibling yet.
-        if (btree.INFO) {
+        if (BTree.INFO) {
             BTree.log.info("increasing tree height: height=" + btree.height
                     + ", utilization=" + btree.getUtilization()[2] + "%");
         }
