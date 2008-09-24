@@ -834,6 +834,8 @@ abstract public class DataService extends AbstractService
      */
     protected void clearLoggingContext() {
         
+        MDC.remove("serviceName");
+
         MDC.remove("serviceUUID");
         
     }
