@@ -331,10 +331,10 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         
         /*
          * FIXME MikeP : impose DISTINCT, ORDER_BY, LIMIT and OFFSET (slice)
-         * here. Note that I have not yet implemented ORDER_BY or LIMIT for a
-         * UNION (you can mark a program as serial, but I also need to force
-         * serialize execution of subquery joins).  I also have not written
-         * an IRuleTaskFactory yet for the magic predicate for search. -b
+         * here. Note that I have not yet implemented ORDER_BY. LIMIT for a
+         * UNION should work if you mark a program as serial (!parallel). I also
+         * have not written an IRuleTaskFactory yet for the magic predicate for
+         * search. -b
          */
         final IQueryOptions queryOptions = QueryOptions.NONE;
         
