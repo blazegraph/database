@@ -54,6 +54,7 @@ import net.jini.lease.LeaseRenewalManager;
 import net.jini.lookup.DiscoveryAdmin;
 import net.jini.lookup.JoinManager;
 import net.jini.lookup.ServiceIDListener;
+import net.jini.lookup.entry.Name;
 
 import org.apache.log4j.Logger;
 
@@ -182,6 +183,22 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
      * server is started.
      */
     private Configuration config;
+
+    /**
+     * A configured name for the service -or- <code>null</code> if no
+     * {@link Name} was found in the {@link Configuration}.
+     */
+    private String serviceName;
+
+    /**
+     * A configured name for the service -or- <code>null</code> if no
+     * {@link Name} was found in the {@link Configuration}.
+     */
+    public String getServiceName() {
+        
+        return serviceName;
+        
+    }
 
     /**
      * Responsible for exporting a proxy for the service. Note that the
@@ -379,6 +396,22 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
             entries = (Entry[]) config.getEntry(ADVERT_LABEL, "entries",
                     Entry[].class, null/* default */);
 
+            /*
+             * Extract the name(s) associated with the service.
+             */
+            for (Entry e : entries) {
+
+                if (e instanceof Name) {
+
+                    // found a name.
+                    serviceName = ((Name) e).name;
+
+                    break;
+                    
+                }
+
+            }
+            
             /*
              * Extract how the service will provision itself from the
              * Configuration.

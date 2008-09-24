@@ -346,21 +346,25 @@ public class DumpFederation {
 
         final String hostname = getServiceHostName(uuid);
 
-        final String label = getServiceLabel(uuid);
+        final String label = getServiceName(uuid);
 
         return new ServiceMetadata(uuid, hostname, label);
 
     }
 
     /**
-     * Assign a label to a service.
+     * Return a name for the service.
+     * <p>
+     * Note: Normally this is a {@link Name} from the {@link ServiceItem}. When
+     * no name is found a label is assembled from the hostname and a one up
+     * counter.
      * 
      * @param uuid
      *            The service {@link UUID}.
-     *            
-     * @return An easy to read label.
+     * 
+     * @return A name associated with that service.
      */
-    synchronized String getServiceLabel(UUID uuid) {
+    synchronized String getServiceName(UUID uuid) {
 
         String label = null;
 

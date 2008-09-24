@@ -71,4 +71,12 @@ public interface IService extends Remote {
      */
     String getHostname() throws IOException;
     
+    /**
+     * Return name by which a user might recognize this service.
+     * 
+     * @throws IOException
+     *             since you can use this method with RMI.
+     */
+    String getServiceName() throws IOException;
+    
 }

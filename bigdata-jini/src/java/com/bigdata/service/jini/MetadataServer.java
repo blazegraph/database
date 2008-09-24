@@ -40,6 +40,7 @@ import net.jini.config.Configuration;
 import net.jini.export.ServerContext;
 import net.jini.io.context.ClientHost;
 import net.jini.io.context.ClientSubject;
+import net.jini.lookup.entry.Name;
 
 import org.apache.log4j.MDC;
 
@@ -290,6 +291,23 @@ public class MetadataServer extends DataServer {
 
             return getFederation().getProxy(super.submit(task));
             
+        }
+
+        /**
+         * Extends the base behavior to return a {@link Name} of the service
+         * from the {@link Configuration}. If no name was specified in the
+         * {@link Configuration} then the value returned by the base class is
+         * returned instead.
+         */
+        public String getServiceName() {
+
+            String s = server.getServiceName();
+
+            if (s == null)
+                s = super.getServiceName();
+
+            return s;
+
         }
 
     }

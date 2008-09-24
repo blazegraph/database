@@ -856,7 +856,7 @@ public class History<T> {
             // most recent timestamp for that sample.
             timestamps[physicalSlot] = timestamp;
 
-            assert size <= capacity : "size=" + size;
+            assert size <= capacity : "size=" + size+", capacity="+capacity;
 
         }
 
