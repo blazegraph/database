@@ -208,9 +208,6 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
         
         this.maxParallelSubqueries = joinNexus.getMaxParallelSubqueries();
         
-        this.joinService = (ThreadPoolExecutor) (maxParallelSubqueries == 0 ? null
-                : joinNexus.getIndexManager().getExecutorService());
-        
         final ISlice slice = rule.getQueryOptions().getSlice();
         
         if (slice == null) {
@@ -220,6 +217,13 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
             offset = slice.getOffset();
             last = slice.getLast();
         }
+
+        // Note: turn off parallel subquery execution if [stable] was requested.
+        final boolean stable = rule.getQueryOptions().isStable();
+        
+        this.joinService = (ThreadPoolExecutor) (stable
+                || maxParallelSubqueries == 0 ? null : joinNexus
+                .getIndexManager().getExecutorService());
         
     }
     
