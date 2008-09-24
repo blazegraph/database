@@ -92,8 +92,8 @@ public class IN<T> implements IConstraint {
         this.x = x;
         
         // allocate an array of the correct type.
-        this.set = (T[]) java.lang.reflect.Array.newInstance(set[0].getClass(),
-                set.length);
+        this.set = (T[]) java.lang.reflect.Array.newInstance(set[0].get()
+                .getClass(), set.length);
 
         for (int i = 0; i < set.length; i++) {
 
