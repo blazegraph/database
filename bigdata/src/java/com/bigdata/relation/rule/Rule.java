@@ -48,6 +48,10 @@ public class Rule<E> implements IRule<E> {
 
     final static transient protected Logger log = Logger.getLogger(Rule.class);
 
+    final static transient protected boolean INFO = log.isInfoEnabled();
+
+    final static transient protected boolean DEBUG = log.isDebugEnabled();
+
     /**
      * Singleton factory for {@link Var}s (delegates to {@link Var#var(String)}).
      * 
@@ -86,11 +90,16 @@ public class Rule<E> implements IRule<E> {
      */
     final private IPredicate[] tail;
 
+//    /**
+//     * <code>true</code> iff a DISTINCT constraint will be imposed when the
+//     * rule is evaluated as a query.
+//     */
+//    final private boolean distinct;
+
     /**
-     * <code>true</code> iff a DISTINCT constraint will be imposed when the
-     * rule is evaluated as a query.
+     * Options that effect query evaluation.
      */
-    final private boolean distinct;
+    final private IQueryOptions queryOptions;
     
     /**
      * Optional constraints on the bindings.
@@ -148,11 +157,17 @@ public class Rule<E> implements IRule<E> {
         
     }
 
-    final public boolean isDistinct() {
+    final public IQueryOptions getQueryOptions() {
         
-        return distinct;
+        return queryOptions;
         
     }
+    
+//    final public boolean isDistinct() {
+//        
+//        return distinct;
+//        
+//    }
     
     final public int getConstraintCount() {
         
@@ -232,6 +247,12 @@ public class Rule<E> implements IRule<E> {
             
         }
         
+        if (queryOptions != null) {
+            
+            sb.append(", queryOptions=" + queryOptions);
+            
+        }
+        
         return sb.toString();
 
     }
@@ -273,8 +294,8 @@ public class Rule<E> implements IRule<E> {
     public Rule(String name, IPredicate head, IPredicate[] tail,
             IConstraint[] constraints) {
 
-        this(name, head, tail, false/* distinct */, constraints,
-                null/* constants */, null/* task */);
+        this(name, head, tail, QueryOptions.NONE, constraints,
+                null/* constants */, null/* taskFactory */);
         
     }
 
@@ -287,9 +308,8 @@ public class Rule<E> implements IRule<E> {
      *            The subset of bindings that are selected by the rule.
      * @param tail
      *            The tail (aka body) of the rule.
-     * @param distinct
-     *            <code>true</code> iff a DISTINCT constraint will be applied
-     *            when the {@link IRule} is evaluated as a query.
+     * @param queryOptions
+     *            Options that effect evaluation of the rule as a query.
      * @param constraints
      *            An array of constaints on the legal states of the bindings
      *            materialized for the rule.
@@ -316,10 +336,10 @@ public class Rule<E> implements IRule<E> {
 //    *             (tails may name more than one, which is interpreted as a
 //    *             fused view of the named relations).
     public Rule(String name, IPredicate head, IPredicate[] tail, 
-            final boolean distinct, IConstraint[] constraints) {
+            final IQueryOptions queryOptions, IConstraint[] constraints) {
 
-        this(name, head, tail, distinct, constraints, null/* constants */,
-                null/* task */);
+        this(name, head, tail, queryOptions, constraints,
+                null/* constants */, null/* taskFactory */);
 
     }
 
@@ -335,9 +355,9 @@ public class Rule<E> implements IRule<E> {
      *            {@link ActionEnum}.
      * @param tail
      *            The predicates in the tail of the rule.
-     * @param distinct
-     *            <code>true</code> iff a DISTINCT constraint will be applied
-     *            when the {@link IRule} is evaluated as a query.
+     * @param queryOptions
+     *            Additional constraints on the evaluate of a rule as a query
+     *            (required, but see {@link QueryOptions#NONE}).
      * @param constraints
      *            The constraints on the rule (optional).
      * @param constants
@@ -348,8 +368,8 @@ public class Rule<E> implements IRule<E> {
      *            <code>null</code>).
      */
     public Rule(String name, IPredicate head, IPredicate[] tail,
-            boolean distinct, IConstraint[] constraints, IBindingSet constants,
-            IRuleTaskFactory taskFactory) {
+            IQueryOptions queryOptions, IConstraint[] constraints,
+            IBindingSet constants, IRuleTaskFactory taskFactory) {
 
         if (name == null)
             throw new IllegalArgumentException();
@@ -360,6 +380,9 @@ public class Rule<E> implements IRule<E> {
         if (tail == null)
             throw new IllegalArgumentException();
 
+        if (queryOptions == null)
+            throw new IllegalArgumentException();
+        
         if (constants == null) {
             
             constants = EmptyBindingSet.INSTANCE;
@@ -432,7 +455,7 @@ public class Rule<E> implements IRule<E> {
         // make the collection immutable.
         this.vars = Collections.unmodifiableSet(vars);
 
-        this.distinct = distinct;
+        this.queryOptions = queryOptions;
         
         // constraint(s) on the variable bindings (MAY be null).
         this.constraints = constraints;
@@ -523,8 +546,8 @@ public class Rule<E> implements IRule<E> {
         
         final IRuleTaskFactory taskFactory = getTaskFactory();
 
-        final IRule<E> newRule = new Rule<E>(name, newHead, newTail, distinct,
-                newConstraint, bindingSet, taskFactory);
+        final IRule<E> newRule = new Rule<E>(name, newHead, newTail,
+                queryOptions, newConstraint, bindingSet, taskFactory);
 
         return newRule;
 
@@ -697,7 +720,7 @@ public class Rule<E> implements IRule<E> {
                 
                 if (!constraint.accept(bindingSet)) {
 
-                    if(log.isDebugEnabled()) {
+                    if(DEBUG) {
                         
                         log.debug("Rejected by "
                                 + constraint.getClass().getSimpleName()

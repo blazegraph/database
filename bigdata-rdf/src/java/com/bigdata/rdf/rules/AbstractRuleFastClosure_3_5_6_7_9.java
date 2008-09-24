@@ -47,6 +47,7 @@ import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IRuleTaskFactory;
+import com.bigdata.relation.rule.QueryOptions;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.Var;
 import com.bigdata.relation.rule.eval.IJoinNexus;
@@ -109,7 +110,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
                 new SPOPredicate[] {//
                 new SPOPredicate(relationName, var("x"), var("{P}"), var("y")) //
                 },//
-                false, // distinct
+                QueryOptions.NONE,//
                 null, // constraints
                 null, // constants
                 taskFactory

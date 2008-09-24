@@ -15,13 +15,11 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
-import org.openrdf.query.algebra.And;
 import org.openrdf.query.algebra.BinaryTupleOperator;
 import org.openrdf.query.algebra.Compare;
 import org.openrdf.query.algebra.Filter;
 import org.openrdf.query.algebra.Join;
 import org.openrdf.query.algebra.Or;
-import org.openrdf.query.algebra.Regex;
 import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
@@ -46,11 +44,13 @@ import com.bigdata.relation.rule.EQConstant;
 import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.IPredicate;
+import com.bigdata.relation.rule.IQueryOptions;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.NEConstant;
 import com.bigdata.relation.rule.OR;
+import com.bigdata.relation.rule.QueryOptions;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
@@ -329,11 +329,21 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             }
         }
         
+        /*
+         * FIXME MikeP : impose DISTINCT, ORDER_BY, LIMIT and OFFSET (slice)
+         * here. Note that I have not yet implemented ORDER_BY or LIMIT for a
+         * UNION (you can mark a program as serial, but I also need to force
+         * serialize execution of subquery joins).  I also have not written
+         * an IRuleTaskFactory yet for the magic predicate for search. -b
+         */
+        final IQueryOptions queryOptions = QueryOptions.NONE;
+        
         // generate native rule
         final IRule rule = new Rule(
                 "nativeJoin",
                 null, // head
                 tails.toArray(new IPredicate[tails.size()]),
+                queryOptions,//
                 // constraints on the rule.
                 constraints.size() > 0 ? 
                 constraints.toArray(new IConstraint[constraints.size()]) : null

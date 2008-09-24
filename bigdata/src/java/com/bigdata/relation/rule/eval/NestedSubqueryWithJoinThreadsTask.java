@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.rule.eval;
 
+import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -39,13 +40,18 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.proc.BatchContains;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.IPredicate;
+import com.bigdata.relation.rule.IProgram;
+import com.bigdata.relation.rule.IQueryOptions;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.ISlice;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
@@ -106,7 +112,51 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
     protected final RuleState ruleState;
     protected final RuleStats ruleStats;
     protected final int tailCount;
-
+    
+    /**
+     * The offset first computed solution that will be inserted into the
+     * {@link #buffer}.
+     * <p>
+     * Note: We handle an {@link ISlice} directly in order to avoid having the
+     * caller close an {@link IAsynchronousIterator} reading from a
+     * {@link BlockingBuffer}. That causes the {@link Future} writing on the
+     * {@link BlockingBuffer} to be interrupted, and if that interrupt is
+     * noticed during an IO the {@link FileChannel} backing the store will be
+     * asynchronously closed. While it will be automatically re-opened, it is
+     * best to avoid the latency associated with that process (which requires
+     * re-obtaining any necessary locks, etc).
+     * <p>
+     * The logic to handle an {@link ISlice} is scattered across several places
+     * in this class and in the {@link SubqueryTask}. This is necessary in
+     * order for processing to halt eagerly if limit {@link ISolution} have been
+     * written onto the {@link #buffer}.
+     * <p>
+     * When a complex {@link IProgramTask} is being executed, the {@link ISlice}
+     * is defined in terms of the total #of solutions generated. Since the
+     * <code>solutionCount</code> is tracked on a per-rule execution basis,
+     * you MUST serialize the {@link IRule}s in the {@link IProgram} by
+     * specifying {@link IQueryOptions#isStable()} or simply marking the
+     * {@link IProgram} as NOT {@link IProgram#isParallel()}.
+     * 
+     * FIXME mark programs as NOT parallel when UNION is used with SLICE.
+     */
+    protected final long offset;
+    
+    /**
+     * The index of the last solutionCount that we will generate (OFFSET +
+     * LIMIT). The value of this property MUST be computed such that overflow is
+     * not possible. If OFFSET+LIMIT would be greater than
+     * {@link Long#MAX_VALUE}, then use {@link Long#MAX_VALUE} instead.
+     * <p>
+     * Note: {@link ISolution}s are added to the buffer IFF the solutionCount
+     * is GE {@link #offset} and LT {@link #last}.
+     * <p>
+     * Consider (OFFSET=0, LIMIT=1, LAST=1). We would emit a solution for
+     * solutionCount==0 (GE OFFSET) but NOT emit a solution for solutionCount==1
+     * (LT LAST).
+     */
+    protected final long last;
+    
     /**
      * The maximum #of subqueries for the first join dimension that will be
      * issued in parallel. Use ZERO(0) to avoid the use of the
@@ -161,6 +211,16 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
         this.joinService = (ThreadPoolExecutor) (maxParallelSubqueries == 0 ? null
                 : joinNexus.getIndexManager().getExecutorService());
         
+        final ISlice slice = rule.getQueryOptions().getSlice();
+        
+        if (slice == null) {
+            offset = 0L;
+            last = Long.MAX_VALUE;
+        } else {
+            offset = slice.getOffset();
+            last = slice.getLast();
+        }
+        
     }
     
     /**
@@ -188,7 +248,30 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 
         final IBindingSet bindingSet = joinNexus.newBindingSet(rule);
 
-        apply(0/* orderIndex */, bindingSet);
+        try {
+            
+            apply(0/* orderIndex */, bindingSet);
+            
+        } catch (InterruptedException ex) {
+            
+            /*
+             * Note: This exception will be thrown during query if the
+             * BlockingBuffer on which the query solutions are being written is
+             * closed, e.g., because someone closed a high-level iterator
+             * reading solutions from the BlockingBuffer. Closing the
+             * BlockingBuffer causes the Future that is writing on the
+             * BlockingBuffer to be interrupted in order to eagerly terminate
+             * processing.
+             * 
+             * FIXME Using Thread#interrupt() to halt asynchronous processing
+             * for query is NOT ideal as it will typically force the FileChannel
+             * to be closed asynchronously.
+             */
+            
+//            if(INFO)
+                log.warn("Join evaluation terminated by interrupt: "+ex);
+            
+        }
 
         ruleStats.elapsed += System.currentTimeMillis() - begin;
 
@@ -239,8 +322,22 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      *            scanned.
      * @param bindingSet
      *            The bindings from the prior join(s) (if any).
+     * 
+     * @throws InterruptedException
+     *             This exception will be thrown during query if the
+     *             {@link BlockingBuffer} on which the query {@link ISolution}s
+     *             are being written is closed, e.g., because someone closed a
+     *             high-level iterator reading solutions from the
+     *             {@link BlockingBuffer}. Note that closing the
+     *             {@link BlockingBuffer} causes the {@link Future} that is
+     *             writing on the {@link BlockingBuffer} to be interrupted in
+     *             order to eagerly terminate processing. When that interrupt is
+     *             detected, we handle it by no longer evaluating the JOIN(s)
+     *             and the caller will get whatever {@link ISolution}s are
+     *             already in the {@link BlockingBuffer}.
      */
-    protected void apply(final int orderIndex, IBindingSet bindingSet) {
+    protected void apply(final int orderIndex, IBindingSet bindingSet)
+            throws InterruptedException {
         
         /*
          * Per-subquery buffer : NOT thread-safe (for better performance).
@@ -283,7 +380,8 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      *            buffer specified to the ctor.
      */
     final protected void apply(final int orderIndex,
-            final IBindingSet bindingSet, final IBuffer<ISolution> buffer) {
+            final IBindingSet bindingSet, final IBuffer<ISolution> buffer)
+            throws InterruptedException {
 
         // Obtain the iterator for the current join dimension.
         final IChunkedOrderedIterator itr = getAccessPath(orderIndex,
@@ -302,6 +400,13 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
             
             while (itr.hasNext()) {
 
+                if (ruleStats.solutionCount.get() >= last) {
+
+                    // no more solutions to be generated.
+                    return;
+                    
+                }
+                
                 if (orderIndex + 1 < tailCount) {
 
                     // Nested subquery.
@@ -391,7 +496,8 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      *            object is NOT thread-safe.
      */
     protected void applyOptional(final int orderIndex,
-            final IBindingSet bindingSet, IBuffer<ISolution> buffer) {
+            final IBindingSet bindingSet, IBuffer<ISolution> buffer)
+            throws InterruptedException {
 
         final int tailIndex = getTailIndex(orderIndex);
         
@@ -408,9 +514,21 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
                 final ISolution solution = joinNexus.newSolution(rule,
                         bindingSet);
 
-                ruleStats.solutionCount.incrementAndGet();
+                final long solutionCount = ruleStats.solutionCount.incrementAndGet();
+                
+                if (solutionCount >= last) {
 
-                buffer.add(solution);
+                    // done generating solutions.
+                    return;
+                    
+                }
+
+                if (solutionCount >= offset) {
+
+                    // add the solution to the buffer.
+                    buffer.add(solution);
+                    
+                }
 
             }
 
@@ -468,7 +586,8 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      *            object is NOT thread-safe.
      */
     protected void runSubQueries(final int orderIndex, final Object[] chunk,
-            final IBindingSet bindingSet, IBuffer<ISolution> buffer) {
+            final IBindingSet bindingSet, IBuffer<ISolution> buffer)
+            throws InterruptedException {
         
         /*
          * Note: At this stage all we want to do is build the subquery tasks.
@@ -560,12 +679,19 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      */
     protected void runSubQueriesInCallersThread(final int orderIndex,
             final Object[] chunk, final IBindingSet bindingSet,
-            final IBuffer<ISolution> buffer) {
+            final IBuffer<ISolution> buffer) throws InterruptedException {
 
         final int tailIndex = getTailIndex(orderIndex);
         
         for (Object e : chunk) {
 
+            if (ruleStats.solutionCount.get() >= last) {
+
+                // no more solutions to be generated.
+                return;
+                
+            }
+            
             if (DEBUG) {
                 log.debug("Considering: " + e.toString() + ", tailIndex="
                         + orderIndex + ", rule=" + rule.getName());
@@ -626,7 +752,8 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      *       exposed by the {@link IIndexManager}).
      */
     protected void runSubQueriesOnThreadPool(final int orderIndex,
-            final Object[] chunk, final IBindingSet bindingSet) {
+            final Object[] chunk, final IBindingSet bindingSet)
+            throws InterruptedException {
 
         final int tailIndex = getTailIndex(orderIndex);
 
@@ -645,6 +772,13 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
         
         // for each element in the chunk.
         for (Object e : chunk) {
+
+            if (ruleStats.solutionCount.get() >= last) {
+
+                // no more solutions to be generated.
+                return;
+                
+            }
 
             if (DEBUG) {
                 log.debug("Considering: " + e.toString() + ", tailIndex="
@@ -717,7 +851,8 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      * Submit subquery tasks, wait until they are done, and verify that all
      * tasks were executed without error.
      */
-    protected void submitTasks(final List<Callable<Void>> tasks ) {
+    protected void submitTasks(final List<Callable<Void>> tasks)
+            throws InterruptedException {
         
         if (tasks.isEmpty()) {
             
@@ -726,6 +861,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
             
         }
         
+        boolean interrupted = false;
         final List<Future<Void>> futures;
         try {
 
@@ -741,7 +877,15 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
             
         } catch (InterruptedException ex) {
 
-            throw new RuntimeException("Terminated by interrupt", ex);
+            /*
+             * The task writing on the buffer was interrupted. For query, this
+             * is how we eagerly terminate rule evaluation, e.g., when a
+             * high-level iterator is closed without fully materializing the
+             * solutions that are (or are being) computed. A LIMIT clause on a
+             * rule can have this effect.
+             */
+            
+            interrupted = true;
 
         } catch (ExecutionException ex) {
 
@@ -749,6 +893,12 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 
         }
 
+        if(interrupted) {
+
+            throw new InterruptedException("Terminated by interrupt");
+            
+        }
+        
     }
     
     /**
@@ -829,9 +979,21 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
                 final ISolution solution = joinNexus.newSolution(rule,
                         bindingSet);
 
-                ruleStats.solutionCount.incrementAndGet();
+                final long solutionCount = ruleStats.solutionCount.incrementAndGet();
+                
+                if (solutionCount >= last) {
 
-                buffer.add(solution);
+                    // done generating solutions.
+                    return;
+                    
+                }
+
+                if (solutionCount >= offset) {
+
+                    // add the solution to the buffer.
+                    buffer.add(solution);
+                    
+                }
 
             }
 
