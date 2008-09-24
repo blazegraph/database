@@ -784,11 +784,18 @@ abstract public class DataService extends AbstractService
      * in a <code>finally</code> clause. You can extend this method to add
      * additional context.
      * <p>
-     * This implementation add the "serviceUUID" parameter to the {@link MDC}.
-     * The serviceUUID is, in general, assigned asynchronously by the service
-     * registrar. Once the serviceUUID becomes available it will be added to the
-     * {@link MDC}. This datum can be injected into log messages using
-     * %X{serviceUUID} in your log4j pattern layout.
+     * This implementation adds the following parameters to the {@link MDC}.
+     * <dl>
+     * <dt>serviceName</dt>
+     * <dd> The serviceName is typically a configuration property for the
+     * service. This datum can be injected into log messages using
+     * <em>%X{serviceName}</em> in your log4j pattern layout.</dd>
+     * <dt>serviceUUID</dt>
+     * <dd>The serviceUUID is, in general, assigned asynchronously by the
+     * service registrar. Once the serviceUUID becomes available it will be
+     * added to the {@link MDC}. This datum can be injected into log messages
+     * using <em>%X{serviceUUID}</em> in your log4j pattern layout.</dd>
+     * </dl>
      */
     protected void setupLoggingContext() {
 
@@ -808,12 +815,16 @@ abstract public class DataService extends AbstractService
             
             // Add to the logging context for the current thread.
             
+            MDC.put("serviceName", getServiceName());
+
             MDC.put("serviceUUID", serviceUUID);
 
         } catch(Throwable t) {
+
             /*
              * Ignore.
              */
+            
         }
         
     }

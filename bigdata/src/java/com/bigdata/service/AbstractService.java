@@ -49,12 +49,16 @@ abstract public class AbstractService implements IService {
     
     protected static final boolean INFO = log.isInfoEnabled();
     
+    private String serviceName;
     private UUID serviceUUID;
     
     /**
      * 
      */
     protected AbstractService() {
+        
+        serviceName = getHostname() + "#" + getServiceIface();
+        
     }
 
     /**
@@ -173,4 +177,14 @@ abstract public class AbstractService implements IService {
 //    }
 //    private boolean open = true;
 
+    /**
+     * Note: This is overriden in the jini integration to return a configured
+     * name for the service.
+     */
+    public String getServiceName() {
+    
+        return serviceName;
+        
+    }
+    
 }

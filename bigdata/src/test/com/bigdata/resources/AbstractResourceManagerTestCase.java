@@ -380,6 +380,11 @@ public class AbstractResourceManagerTestCase extends
             return null;
         }
 
+        public String getServiceName() throws IOException {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
     }
 
     /**
