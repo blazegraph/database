@@ -139,6 +139,6 @@ public interface IRelation<E> extends ILocatableResource<IRelation<E>>{
      * @throws IllegalStateException
      *             if the predicate is not fully bound given those bindings.
      */
-    Object newElement(IPredicate predicate, IBindingSet bindingSet);
+    E newElement(IPredicate<E> predicate, IBindingSet bindingSet);
 
 }

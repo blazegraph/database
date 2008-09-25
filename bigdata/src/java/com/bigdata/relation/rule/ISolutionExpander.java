@@ -93,6 +93,9 @@ public interface ISolutionExpander<E> extends Serializable {
      * @return The {@link IAccessPath} that will be used. You can return the
      *         given <i>accessPath</i> or you can layer additional semantics
      *         onto or otherwise override the given {@link IAccessPath}.
+     * 
+     * @todo just fold this into {@link IPredicate} in place of
+     *       {@link IPredicate#getSolutionExpander()} and drop that method.
      */
     IAccessPath<E> getAccessPath(IAccessPath<E> accessPath);
     

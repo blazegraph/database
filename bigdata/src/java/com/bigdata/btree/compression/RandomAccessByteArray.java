@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Mar 6, 2008
  */
 
-package com.bigdata.btree;
+package com.bigdata.btree.compression;
 
 import java.io.DataInput;
 import java.io.DataOutput;
@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+import com.bigdata.btree.MutableKeyBuffer;
 import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
 
 /**

@@ -30,6 +30,7 @@ package com.bigdata.btree;
 
 import java.io.Serializable;
 
+import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;

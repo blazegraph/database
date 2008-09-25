@@ -32,9 +32,9 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
 import com.bigdata.btree.Errors;
-import com.bigdata.btree.IDataSerializer;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ISimpleBTree;
+import com.bigdata.btree.compression.IDataSerializer;
 
 /**
  * Batch insert operation.

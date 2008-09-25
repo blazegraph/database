@@ -143,7 +143,8 @@ public interface IAccessPath<R> extends Iterable<R> {
     public IChunkedOrderedIterator<R> iterator(int limit, int capacity);
 
     /**
-     * Remove all elements selected by the {@link IPredicate}.
+     * Remove all elements selected by the {@link IPredicate} (optional
+     * operation).
      * 
      * @return The #of elements that were removed.
      */

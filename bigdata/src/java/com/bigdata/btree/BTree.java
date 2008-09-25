@@ -157,8 +157,6 @@ import com.bigdata.rawstore.IRawStore;
  * @todo derive a string index that uses patricia trees in the leaves per
  *       several published papers.
  * 
- * @todo consider the use of a high-level 
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -167,7 +165,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
     /**
      * The default branching factor.
      */
-    static public final int DEFAULT_BRANCHING_FACTOR = 32; //256
+    static public final int DEFAULT_BRANCHING_FACTOR = 32;//32; //256
     
     /**
      * The minimum hard reference queue capacity is two(2) in order to avoid

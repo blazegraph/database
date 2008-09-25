@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.spo;
 
+import it.unimi.dsi.fastutil.bytes.ByteArrayFrontCodedList;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -46,12 +48,12 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.DefaultTupleSerializer;
-import com.bigdata.btree.IDataSerializer;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.filter.FilterConstructor;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -945,8 +947,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
                 
     }
     
-    @SuppressWarnings("unchecked")
-    public SPO newElement(IPredicate predicate, IBindingSet bindingSet) {
+    public SPO newElement(final IPredicate<ISPO> predicate, final IBindingSet bindingSet) {
 
         if (predicate == null)
             throw new IllegalArgumentException();
@@ -954,13 +955,11 @@ public class SPORelation extends AbstractRelation<ISPO> {
         if (bindingSet == null)
             throw new IllegalArgumentException();
         
-        final IPredicate<ISPO> pred = (IPredicate<ISPO>) predicate;
+        final long s = asBound(predicate, 0, bindingSet);
 
-        final long s = asBound(pred, 0, bindingSet);
+        final long p = asBound(predicate, 1, bindingSet);
 
-        final long p = asBound(pred, 1, bindingSet);
-
-        final long o = asBound(pred, 2, bindingSet);
+        final long o = asBound(predicate, 2, bindingSet);
 
         final SPO spo = new SPO(s, p, o, StatementEnum.Inferred);
         

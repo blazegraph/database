@@ -25,7 +25,15 @@ package com.bigdata.btree;
 
 import java.io.DataInput;
 import java.io.DataOutput;
+import java.io.Externalizable;
 import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
+
+import org.CognitiveWeb.extser.LongPacker;
+
+import com.bigdata.btree.compression.IDataSerializer;
+import com.bigdata.btree.compression.IRandomAccessByteArray;
 
 /**
  * A compact and efficient representation of immutable keys. The largest common
@@ -682,4 +690,261 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
 
     }
     
+    /**
+     * Simple prefix compression of ordered keys. The common prefix shared by
+     * all keys is factored out and written once followed by the remainder for
+     * each key. This implementation does not permit null values.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class SimplePrefixSerializer implements IDataSerializer, Externalizable {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -8354230015113732733L;
+
+        public final transient static SimplePrefixSerializer INSTANCE = new SimplePrefixSerializer();
+
+        public void read(DataInput in, IRandomAccessByteArray raba) throws IOException {
+            
+            // #of keys in the node or leaf.
+            final int nkeys = (int) LongPacker.unpackLong(in);
+            
+            if(nkeys==0) return;
+            
+//            // maximum #of keys allowed in the node or leaf.
+//            final int maxKeys = (int) LongPacker.unpackLong(in);
+            
+            // length of the byte[] containing the prefix and the remainder for each key.
+            final int bufferLength = (int) LongPacker.unpackLong(in);
+            
+            /*
+             * Read in deltas for each key and re-create the offsets.
+             */
+            final int[] offsets = new int[nkeys];
+            
+            int lastOffset = 0; // prefixLength;
+
+            for( int i=0; i<nkeys; i++ ) {
+                
+                final int delta = (int) LongPacker.unpackLong(in);
+                
+                final int offset = lastOffset + delta;
+                
+                offsets[i] = offset;
+                
+                lastOffset = offset;
+                
+            }
+            
+            final byte[] buf = new byte[bufferLength];
+            
+            in.readFully(buf);
+
+//            final byte[][] keys = new byte[maxKeys][];
+
+            final int prefixLength = offsets[0];
+            
+            for (int i = 0; i < nkeys; i++) {
+
+//              final int remainderLength = getRemainderLength(index);
+                final int remainderLength;
+                {
+                    int offset = offsets[i];
+
+                    int next_offset = i == nkeys - 1 ? buf.length
+                            : offsets[i + 1];
+
+                    remainderLength = next_offset - offset;
+                }
+
+                final int len = prefixLength + remainderLength;
+
+                final byte[] key = new byte[len];
+                
+                System.arraycopy(buf, 0, key, 0, prefixLength);
+
+                System.arraycopy(buf, offsets[i], key, prefixLength, remainderLength);
+                
+                raba.add(key);
+
+            }
+            
+        }
+
+        public void write(DataOutput out, IRandomAccessByteArray raba) throws IOException {
+
+            final int nkeys = raba.getKeyCount();
+                
+            // #of keys in the node or leaf.
+//            LongPacker.packLong(os, nkeys);
+            LongPacker.packLong(out,nkeys);
+            
+            if(nkeys==0) return;
+
+            if(raba instanceof ImmutableKeyBuffer) {
+                
+                /*
+                 * Optimized since the source is generally an
+                 * ImmutableKeyBuffer, at least until we remove that dependency
+                 * in the BTree code.
+                 */
+                
+                final ImmutableKeyBuffer keys = (ImmutableKeyBuffer)raba;
+                
+                final int bufferLength = keys.buf.length;
+                
+                // maximum #of keys allowed in the node or leaf.
+//                LongPacker.packLong(os, keys.maxKeys);
+
+                // length of the byte[] buffer containing the prefix and remainder for each key.
+                LongPacker.packLong(out, bufferLength);
+//                os.packLong(bufferLength);
+                
+                /*
+                 * Write out deltas between offsets.
+                 */
+                int lastOffset = 0; // keys.prefixLength;
+                
+                for( int i=0; i<nkeys; i++) {
+                    
+                    int offset = keys.offsets[i];
+                    
+                    int delta = offset - lastOffset;
+                    
+                    LongPacker.packLong(out, delta);
+//                    os.packLong(delta);
+                    
+                    lastOffset = offset;
+                    
+                }
+                
+                out.write(keys.buf, 0, bufferLength);
+//                os.write(keys.buf, 0, bufferLength);
+                
+                return;
+                
+            } else {
+                
+                /*
+                 * Computes the length of the prefix by computed by counting the #of leading
+                 * bytes that match for the first and last key in the buffer.
+                 */
+    
+                final int prefixLength;// = keys.getPrefixLength();
+                
+                if (nkeys == 0) {
+                    
+                    prefixLength = 0;
+                    
+                } else if (nkeys == 1) {
+                    
+                    prefixLength = raba.getKey(0).length;
+                    
+                } else {
+                 
+                    prefixLength = BytesUtil.getPrefixLength(raba.getKey(0), raba.getKey(nkeys - 1));
+                    
+                }
+                
+                // offsets into the serialized key buffer.
+                final int[] offsets = new int[nkeys];
+                
+                // compute the total length of the key buffer.
+                int bufferLength = prefixLength;
+                
+                for(int i=0; i<nkeys; i++) {
+                    
+                    // offset to the remainder of the ith key in the buffer.
+                    offsets[i] = bufferLength;
+                    
+                    int remainder = raba.getKey(i).length - prefixLength;
+                    
+                    assert remainder >= 0;
+                    
+                    bufferLength += remainder;
+                    
+                }
+    
+                // maximum #of keys allowed in the node or leaf.
+    //            LongPacker.packLong(os, keys.getMaxKeys());
+    //            LongPacker.packLong(os,(deserializedSize==0?nkeys:deserializedSize));//keys.getMaxKeys());
+    
+                // length of the byte[] buffer containing the prefix and remainder for each key.
+    //            LongPacker.packLong(os, bufferLength);
+                LongPacker.packLong(out,bufferLength);
+                
+                /*
+                 * Write out deltas between offsets.
+                 * 
+                 * Note: this is 60% of the cost of this method. This is not pack long
+                 * so much as doing individual byte put operations on the output stream
+                 * (which is over a ByteBuffer).  Just using a BAOS here doubles the 
+                 * index segment build throughput.
+                 */
+                {
+    //                ByteArrayOutputStream baos = new ByteArrayOutputStream(nkeys*8);
+    //                DataOutputStream dbaos = new DataOutputStream(baos);
+    
+                    int lastOffset = 0;
+                
+                for( int i=0; i<nkeys; i++) {
+                    
+                    int offset = offsets[i];
+                    
+                    int delta = offset - lastOffset;
+                    
+                    LongPacker.packLong(out, delta);
+    //                os.packLong(delta);
+                    
+                    lastOffset = offset;
+                    
+                }
+                
+    //            dbaos.flush();
+    //            
+    //            os.write(baos.toByteArray());
+                }
+                
+                /*
+                 * write out the prefix followed by the remainder of each key in
+                 * turn.
+                 */
+    
+                if (nkeys > 0) {
+    
+                    out.write(raba.getKey(0), 0, prefixLength);
+    
+                    for (int i = 0; i < nkeys; i++) {
+    
+                        final byte[] key = raba.getKey(i);
+                        
+                        final int remainder = key.length - prefixLength;
+    
+                        out.write(key, prefixLength, remainder);
+    
+                    }
+                    
+                }
+
+            }
+            
+        }
+
+        public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+
+            // NOP
+            
+        }
+
+        public void writeExternal(ObjectOutput out) throws IOException {
+            
+            // NOP.
+            
+        }
+        
+    }
+
 }

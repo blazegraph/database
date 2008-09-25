@@ -15,7 +15,6 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
-import org.openrdf.query.algebra.BinaryTupleOperator;
 import org.openrdf.query.algebra.Compare;
 import org.openrdf.query.algebra.Filter;
 import org.openrdf.query.algebra.Join;
@@ -23,7 +22,6 @@ import org.openrdf.query.algebra.Or;
 import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
-import org.openrdf.query.algebra.UnaryTupleOperator;
 import org.openrdf.query.algebra.ValueConstant;
 import org.openrdf.query.algebra.ValueExpr;
 import org.openrdf.query.algebra.Var;
@@ -31,23 +29,36 @@ import org.openrdf.query.algebra.Compare.CompareOp;
 import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
 import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
 
+import com.bigdata.btree.keys.IKeyBuilderFactory;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.rules.RuleContextEnum;
+import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
+import com.bigdata.rdf.spo.SPOAccessPath;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BNS;
 import com.bigdata.rdf.store.BigdataSolutionResolverator;
+import com.bigdata.rdf.store.FullTextIndexAccessPath;
 import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.Constant;
+import com.bigdata.relation.rule.EQ;
 import com.bigdata.relation.rule.EQConstant;
 import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IConstraint;
+import com.bigdata.relation.rule.IN;
 import com.bigdata.relation.rule.IPredicate;
+import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IQueryOptions;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.ISolutionExpander;
+import com.bigdata.relation.rule.ISortOrder;
 import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.IVariableOrConstant;
+import com.bigdata.relation.rule.NE;
 import com.bigdata.relation.rule.NEConstant;
 import com.bigdata.relation.rule.OR;
 import com.bigdata.relation.rule.QueryOptions;
@@ -58,17 +69,146 @@ import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 import com.bigdata.relation.rule.eval.ISolution;
+import com.bigdata.relation.rule.eval.NestedSubqueryWithJoinThreadsTask;
+import com.bigdata.relation.rule.eval.RuleStats;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.search.IHit;
+import com.bigdata.striterator.DistinctFilter;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * Extended to rewrite Sesame {@link TupleExpr}s onto native {@link Rule}s and
- * to evaluate magic predicates for full text search, etc.
+ * to evaluate magic predicates for full text search, etc. Query evaluation can
+ * proceed either by Sesame 2 evaluation or, if {@link Options#NATIVE_JOINS} is
+ * enabled, then by translation of Sesame 2 query expressions into native
+ * {@link IRule}s and native evaluation of those {@link IRule}s.
  * 
- * FIXME Capture more kinds of {@link BinaryTupleOperator} and
- * {@link UnaryTupleOperator} using native rule evaluation, including rolling
- * filters and optionals into the native rules, etc.
+ * <h2>Query options</h2>
+ * The following summarizes how various high-level query language feature are
+ * mapped onto native {@link IRule}s.
+ * <dl>
+ * <dt>DISTINCT</dt>
+ * <dd>{@link IQueryOptions#isDistinct()}, which is realized using
+ * {@link DistinctFilter}.</dd>
+ * <dt>ORDER BY</dt>
+ * <dd>{@link IQueryOptions#getOrderBy()} is effected by a custom
+ * {@link IKeyBuilderFactory} which generates sort keys that capture the desired
+ * sort order from the bindings in an {@link ISolution}. Unless DISTINCT is
+ * also specified, the generated sort keys are made unique by appending a one up
+ * long integer to the key - this prevents sort keys that otherwise compare as
+ * equals from dropping solutions. Note that the SORT is actually imposed by the
+ * {@link DistinctFilter} using an {@link IKeyBuilderFactory} assembled from the
+ * ORDER BY constraints.
+ * 
+ * FIXME BryanT - implement the {@link IKeyBuilderFactory}.
+ * 
+ * FIXME MikeP - assemble the {@link ISortOrder}[] from the query and set on
+ * the {@link IQueryOptions}. </dd>
+ * <dt>OFFSET and LIMIT</dt>
+ * <dd>
+ * <p>
+ * {@link IQueryOptions#getSlice()}, which is effected as a conditional in
+ * {@link NestedSubqueryWithJoinThreadsTask} based on the
+ * {@link RuleStats#solutionCount}. Query {@link ISolution}s are counted as
+ * they are generated, but they are only entered into the {@link ISolution}
+ * {@link IBuffer} when the solutionCount is GE the OFFSET and LT the LIMIT.
+ * Query evaluation halts once the LIMIT is reached.
+ * </p>
+ * <p>
+ * Note that when DISTINCT and either LIMIT and/or OFFSET are specified
+ * together, then the LIMIT and OFFSET <strong>MUST</strong> be applied after
+ * the solutions have been generated since we may have to generate more than
+ * LIMIT solutions in order to have LIMIT <em>DISTINCT</em> solutions. We
+ * handle this for now by NOT translating the LIMIT and OFFSET onto the
+ * {@link IRule} and instead let Sesame close the iterator once it has enough
+ * solutions.
+ * 
+ * FIXME MikeP - verify integration.
+ * </p>
+ * <p>
+ * Note that LIMIT and SLICE requires an evaluation plan that provides stable
+ * results. For a simple query this is achieved by setting
+ * {@link IQueryOptions#isStable()} to <code>true</code>.
+ * 
+ * For a UNION query, you must also set {@link IProgram#isParallel()} to
+ * <code>false</code> to prevent parallelized execution of the {@link IRule}s
+ * in the {@link IProgram}.
+ * </p>
+ * </dd>
+ * <dt>UNION</dt>
+ * <dd>A UNION is translated into an {@link IProgram} consisting of one
+ * {@link IRule} for each clause in the UNION.
+ * 
+ * FIXME MikeP - implement. </dd>
+ * </dl>
+ * <h2>Filters</h2>
+ * The following provides a summary of how various kinds of FILTER are handled.
+ * A filter that is not explicitly handled is left untranslated and will be
+ * applied by Sesame against the generated {@link ISolution}s.
+ * <p>
+ * Whenever possible, a FILTER is translated into an {@link IConstraint} on an
+ * {@link IPredicate} in the generated native {@link IRule}. Some filters are
+ * essentially JOINs against the {@link LexiconRelation}. Those can be handled
+ * either as JOINs (generating an additional {@link IPredicate} in the
+ * {@link IRule}) or as an {@link IN} constraint, where the inclusion set is
+ * pre-populated by some operation on the {@link LexiconRelation}.
+ * <dl>
+ * <dt>EQ</dt>
+ * <dd>Translated into an {@link EQ} constraint on an {@link IPredicate}.</dd>
+ * <dt>NE</dt>
+ * <dd>Translated into an {@link NE} constraint on an {@link IPredicate}.</dd>
+ * <dt>IN</dt>
+ * <dd>Translated into an {@link IN} constraint on an {@link IPredicate}.</dd>
+ * <dt>OR</dt>
+ * <dd>Translated into an {@link OR} constraint on an {@link IPredicate}.</dd>
+ * <dt></dt>
+ * <dd></dd>
+ * </dl>
+ * <h2>Magic predicates</h2>
+ * <p>
+ * {@link BNS#SEARCH} is the only magic predicate at this time. When the object
+ * position is bound to a constant, the magic predicate is evaluated once and
+ * the result is used to generate a set of term identifiers that are matches for
+ * the token(s) extracted from the {@link Literal} in the object position. Those
+ * term identifiers are then used to populate an {@link IN} constraint.
+ * 
+ * FIXME MikeP - integrate. I have written {@link FullTextIndexAccessPath}. It
+ * needs to be imposed on the magic predicate as an {@link ISolutionExpander}
+ * (just replaces the normal {@link SPOAccessPath}).
+ * </p>
+ * <p>
+ * When the object position is an unbound variable, then the magic predicate is
+ * translated as an additional {@link IPredicate} and is evaluated for each
+ * {@link ISolution}. This is essentially a JOIN against a custom
+ * {@link IAccessPath} for the {@link FullTextIndex}.
+ * 
+ * FIXME This is NOT implemented. For now the object position in the
+ * {@link BNS#SEARCH} MUST be bound to a constant.
+ * </p>
+ * 
+ * @todo REGEX : if there is a &quot;&circ;&quot; literal followed by a wildcard
+ *       AND there are no flags which would cause problems (case-folding, etc)
+ *       then the REGEX can be rewritten as a prefix scan on the lexicon, which
+ *       is very efficient, and converted to an IN filter. When the set size is
+ *       huge we should rewrite it as another tail in the query instead.
+ *       <p>
+ *       Otherwise, regex filters are left outside of the rule. We can't
+ *       optimize that until we generate rules that perform JOINs across the
+ *       lexicon and the spo relations (which we could do, in which case it
+ *       becomes a constraint on that join).
+ *       <p>
+ *       We don't have any indices that are designed to optimize regex scans,
+ *       but we could process a regex scan as a parallel iterator scan against
+ *       the lexicon.
+ * 
+ * @todo Roll more kinds of filters into the native {@link IRule}s as
+ *       {@link IConstraint}s on {@link IPredicate}s.
+ *       <p>
+ *       isURI(), etc. can be evaluated by testing a bit flag on the term
+ *       identifier, which is very efficient.
+ *       <p>
+ * 
+ * @todo Verify handling of datatype operations.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -150,23 +290,23 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             if (oval == null) {
 
                 throw new QueryEvaluationException(MAGIC_SEARCH
-                        + " : value must be bound.");
+                        + " : object must be bound.");
 
             }
 
             if (!(oval instanceof Literal)) {
 
                 throw new QueryEvaluationException(MAGIC_SEARCH
-                        + " : value must be literal.");
+                        + " : object must be literal.");
 
             }
 
-            Literal lit = (Literal) oval;
+            final Literal lit = (Literal) oval;
 
             if (lit.getDatatype() != null) {
 
                 throw new QueryEvaluationException(MAGIC_SEARCH
-                        + " : value must not be a datatype literal.");
+                        + " : object is datatype literal.");
 
             }
 
@@ -231,17 +371,8 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         if (log.isInfoEnabled())
             log.info("languageCode=" + languageCode + ", label=" + label);
 
-        final Iterator<IHit> itr;
-        try {
-
-            itr = database.getSearchEngine().search(label, languageCode,
-                    0d/* minCosine */, 10000/* maxRank */);
-
-        } catch (InterruptedException e) {
-
-            throw new QueryEvaluationException("Interrupted.");
-
-        }
+        final Iterator<IHit> itr = database.getSearchEngine().search(label,
+                languageCode, 0d/* minCosine */, 10000/* maxRank */);
 
         // Return an iterator that converts the term identifiers to var bindings
         return new HitConvertor(database, itr, svar, bindings);
@@ -335,7 +466,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
          * UNION should work if you mark a program as serial (!parallel). A
          * UNION that does not use LIMIT can run in parallel. I also have not
          * written an IRuleTaskFactory yet for the magic predicate for search.
-         * -b
+         * See my notes in the javadoc at the top of this file. -b
          */
         final IQueryOptions queryOptions = QueryOptions.NONE;
         

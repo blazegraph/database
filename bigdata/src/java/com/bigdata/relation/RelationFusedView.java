@@ -107,7 +107,7 @@ public class RelationFusedView<E> implements IRelation<E> {
         
     }
     
-    public Object newElement(IPredicate predicate, IBindingSet bindingSet) {
+    public E newElement(IPredicate<E> predicate, IBindingSet bindingSet) {
 
         return relation1.newElement(predicate, bindingSet);
 

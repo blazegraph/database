@@ -33,7 +33,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.IDataSerializer.NoDataSerializer;
+import com.bigdata.btree.compression.NoDataSerializer;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.rdf.model.StatementEnum;
