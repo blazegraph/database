@@ -24,6 +24,7 @@ import org.openrdf.query.algebra.Or;
 import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
+import org.openrdf.query.algebra.Union;
 import org.openrdf.query.algebra.ValueConstant;
 import org.openrdf.query.algebra.ValueExpr;
 import org.openrdf.query.algebra.Var;
@@ -279,14 +280,30 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
     }
 
     @Override
-    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(Distinct distinct,
-            BindingSet bindings)
-        throws QueryEvaluationException
-    {
-        return new DistinctIteration<BindingSet, QueryEvaluationException>(
-                evaluate(distinct.getArg(), bindings));
+    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
+            org.openrdf.query.algebra.Slice slice, BindingSet bindings)
+            throws QueryEvaluationException {
+        this.slice = true;
+        this.offset = slice.getOffset();
+        this.limit = slice.getLimit();
+        return super.evaluate(slice, bindings);
     }
 
+    @Override
+    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
+            Union union, BindingSet bindings) throws QueryEvaluationException {
+        this.union = true;
+        return super.evaluate(union, bindings);
+    }
+
+    @Override
+    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
+            Distinct distinct, BindingSet bindings)
+            throws QueryEvaluationException {
+        this.distinct = true;
+        return super.evaluate(distinct, bindings);
+    }
+    
     /**
      * Overriden to recognize magic predicates.
      */
@@ -490,7 +507,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         
         if (slice && !distinct && !union) {
             ISlice slice = new Slice(offset, limit);
-            queryOptions = new QueryOptions(false, false, null, slice);
+            queryOptions = new QueryOptions(false, true, null, slice);
         }
         
         // generate native rule
