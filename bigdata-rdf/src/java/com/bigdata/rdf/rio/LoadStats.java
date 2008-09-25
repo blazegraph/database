@@ -39,6 +39,14 @@ public class LoadStats {
     public long commitTime;
     public long totalTime;
     
+    private transient long lastReportTime = 0l;
+
+    /**
+     * The internal with which this class will log on {@link System#out} in
+     * milliseconds (it is se to every 10 minutes).
+     */
+    protected static transient long REPORT_INTERVAL = 10 * 60 * 1000; 
+    
     /**
      * Used iff the closure is computed as the data are loaded.
      */
@@ -65,7 +73,34 @@ public class LoadStats {
             closureStats.add(stats.closureStats);
 
         }
-        
+
+        /*
+         * Handle incremental reporting for large data loads.
+         */
+        final long now = System.currentTimeMillis();
+
+        if (lastReportTime == 0L) {
+
+            if (loadTime >= REPORT_INTERVAL) {
+
+                System.out.println("loading: " + toString());
+
+                lastReportTime = now;
+
+            }
+
+        } else {
+
+            if ((now - lastReportTime) >= REPORT_INTERVAL) {
+
+                System.out.println("loading: " + toString());
+
+                lastReportTime = now;
+
+            }
+
+        }
+
     }
     
     /**
