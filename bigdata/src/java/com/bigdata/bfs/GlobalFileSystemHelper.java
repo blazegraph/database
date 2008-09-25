@@ -86,7 +86,7 @@ public class GlobalFileSystemHelper {
     /**
      * {@link ITx#READ_COMMITTED} view.
      */
-    synchronized public BigdataFileSystem getReadCommitted() {
+    public BigdataFileSystem getReadCommitted() {
 
         if (log.isInfoEnabled())
             log.info("");

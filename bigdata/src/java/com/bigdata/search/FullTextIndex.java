@@ -312,7 +312,7 @@ public class FullTextIndex extends AbstractRelation {
          * 
          * @todo the configuration should probably come from a configuration
          *       properties stored for the full text indexer in the
-         *       {@link IBigdataFederation#getGlobalRowStore()}. The main issue
+         *       {@link IBigdataFederation#getGlobalRowStore(timestamp)}. The main issue
          *       is how you want to encode unicode strings for search, which can
          *       be different than encoding for other purposes.
          * 

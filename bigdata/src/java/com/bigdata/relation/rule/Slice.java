@@ -99,4 +99,10 @@ public class Slice implements ISlice {
         
     }
     
+    public String toString() {
+        
+        return "Slice{offset="+offset+", limit="+limit+", last="+last+"}";
+        
+    }
+    
 }

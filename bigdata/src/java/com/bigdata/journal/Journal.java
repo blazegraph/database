@@ -735,7 +735,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     /*
      * global row store.
      */
-    synchronized public SparseRowStore getGlobalRowStore() {
+    synchronized public SparseRowStore getGlobalRowStore(long timestamp) {
 
         if (globalRowStoreHelper == null) {
 
@@ -743,7 +743,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         }
 
-        return globalRowStoreHelper.getGlobalRowStore();
+        return globalRowStoreHelper.getGlobalRowStore(timestamp);
 
     }
     private GlobalRowStoreHelper globalRowStoreHelper;

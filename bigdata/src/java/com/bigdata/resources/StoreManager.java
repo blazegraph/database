@@ -1843,9 +1843,9 @@ abstract public class StoreManager extends ResourceEvents implements
             
         }
 
-        public SparseRowStore getGlobalRowStore() {
+        public SparseRowStore getGlobalRowStore(long timestamp) {
             
-            return getFederation().getGlobalRowStore();
+            return getFederation().getGlobalRowStore(timestamp);
             
         }
         

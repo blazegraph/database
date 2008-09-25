@@ -48,14 +48,12 @@ public class UnsynchronizedArrayBuffer<E> implements IBuffer<E> {
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    protected static final boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    protected static final boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    protected static final boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    protected static final boolean DEBUG = log.isDebugEnabled();
 
     /**
      * The buffer onto which chunks are evicted by {@link #overflow()}.
