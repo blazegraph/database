@@ -1,10 +1,10 @@
 package com.bigdata.btree.proc;
 
 import com.bigdata.btree.DefaultTupleSerializer;
-import com.bigdata.btree.IDataSerializer;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.service.IDataService;
 
 /**

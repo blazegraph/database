@@ -45,10 +45,10 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Errors;
-import com.bigdata.btree.IDataSerializer;
-import com.bigdata.btree.IRandomAccessByteArray;
 import com.bigdata.btree.ITupleSerializer;
-import com.bigdata.btree.RandomAccessByteArray;
+import com.bigdata.btree.compression.IDataSerializer;
+import com.bigdata.btree.compression.IRandomAccessByteArray;
+import com.bigdata.btree.compression.RandomAccessByteArray;
 import com.bigdata.service.Split;
 
 /**

@@ -33,10 +33,10 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
 import com.bigdata.btree.DefaultTupleSerializer;
-import com.bigdata.btree.IDataSerializer;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleSerializer;
+import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;

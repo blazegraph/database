@@ -110,6 +110,9 @@ public interface IPredicate<E> extends Cloneable, Serializable {
      * evaluation of the predicate.
      * 
      * @return The {@link ISolutionExpander}.
+     * 
+     * @todo replace with {@link ISolutionExpander#getAccessPath(IAccessPath)},
+     *       which is the only method declared by {@link ISolutionExpander}.
      */
     public ISolutionExpander<E> getSolutionExpander();
     

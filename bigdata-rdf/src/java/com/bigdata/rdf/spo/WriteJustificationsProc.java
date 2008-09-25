@@ -28,8 +28,8 @@
 
 package com.bigdata.rdf.spo;
 
-import com.bigdata.btree.IDataSerializer;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;

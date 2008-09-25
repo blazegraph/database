@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import com.bigdata.btree.compression.IRandomAccessByteArray;
+
 /**
  * Interface for operations on an ordered set of keys. Each key is a variable
  * length unsigned byte[]. Keys are considered to be <em>immutable</em>,

@@ -2,7 +2,6 @@ package com.bigdata.search;
 
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 /**
@@ -20,14 +19,12 @@ public class Hit implements IHit, Comparable<Hit>{
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final protected static boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final protected static boolean DEBUG = log.isDebugEnabled();
    
     /** note: defaults to an illegal value. */
     private long docId = -1;

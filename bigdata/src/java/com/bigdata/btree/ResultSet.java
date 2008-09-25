@@ -39,6 +39,8 @@ import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.compression.IRandomAccessByteArray;
+import com.bigdata.btree.compression.RandomAccessByteArray;
 import com.bigdata.btree.filter.ITupleFilter;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;

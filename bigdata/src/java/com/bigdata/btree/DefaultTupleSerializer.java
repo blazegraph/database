@@ -34,8 +34,9 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.util.Properties;
 
-import com.bigdata.btree.IDataSerializer.DefaultDataSerializer;
-import com.bigdata.btree.IDataSerializer.SimplePrefixSerializer;
+import com.bigdata.btree.ImmutableKeyBuffer.SimplePrefixSerializer;
+import com.bigdata.btree.compression.DefaultDataSerializer;
+import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
@@ -73,6 +74,7 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
     static public final IDataSerializer getDefaultLeafKeySerializer() {
         
         return SimplePrefixSerializer.INSTANCE;
+//        return PrefixSerializer.INSTANCE;
         
     }
     
@@ -182,15 +184,25 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
 
         if (keyBuilderFactory == null)
             throw new IllegalArgumentException();
+
+        if (leafKeySer == null)
+            throw new IllegalArgumentException();
+
+        if (leafValSer == null)
+            throw new IllegalArgumentException();
         
         threadLocalKeyBuilderFactory = new ThreadLocalKeyBuilderFactory(
                 keyBuilderFactory);
         
         this.delegateKeyBuilderFactory = keyBuilderFactory;
+
+        this.leafKeySer = leafKeySer;
         
-        this.leafKeySer = SimplePrefixSerializer.INSTANCE;
+        this.leafValSer = leafValSer;
         
-        this.leafValSer = DefaultDataSerializer.INSTANCE;
+//        this.leafKeySer = SimplePrefixSerializer.INSTANCE;
+//        
+//        this.leafValSer = DefaultDataSerializer.INSTANCE;
         
     }
 

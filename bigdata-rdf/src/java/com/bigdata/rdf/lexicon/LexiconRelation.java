@@ -500,13 +500,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
     }
 
-//    @Override
-//    public String getFQN(IKeyOrder<? extends BigdataValue> keyOrder) {
-//
-//        return getNamespace() + ((LexiconKeyOrder)keyOrder).getIndexName();
-//        
-//    }
-
     public Set<String> getIndexNames() {
 
         return indexNames;
@@ -546,7 +539,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      * 
      * @throws UnsupportedOperationException
      */
-    public Object newElement(IPredicate predicate, IBindingSet bindingSet) {
+    public BigdataValue newElement(IPredicate<BigdataValue> predicate, IBindingSet bindingSet) {
         
         throw new UnsupportedOperationException();
         

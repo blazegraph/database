@@ -17,8 +17,8 @@ import java.util.Map;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.IDataSerializer;
-import com.bigdata.btree.IRandomAccessByteArray;
+import com.bigdata.btree.compression.IDataSerializer;
+import com.bigdata.btree.compression.IRandomAccessByteArray;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
 

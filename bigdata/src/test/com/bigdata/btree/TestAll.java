@@ -63,6 +63,9 @@ public class TestAll extends TestCase {
         // unsigned byte[] key encoding and decoding.
         suite.addTest(com.bigdata.btree.keys.TestAll.suite());
 
+        // key[] and value[] compression.
+        suite.addTest(com.bigdata.btree.compression.TestAll.suite());
+        
         // test mutable key buffer.
         suite.addTestSuite(TestMutableKeyBuffer.class);
         // test immutable key buffer.

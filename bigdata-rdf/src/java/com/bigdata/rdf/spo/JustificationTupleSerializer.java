@@ -34,7 +34,7 @@ import java.io.ObjectOutput;
 
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITuple;
-import com.bigdata.btree.IDataSerializer.NoDataSerializer;
+import com.bigdata.btree.compression.NoDataSerializer;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;

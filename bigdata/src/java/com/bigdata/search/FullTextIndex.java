@@ -43,11 +43,11 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.LowerCaseFilter;
@@ -88,7 +88,6 @@ import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.striterator.IChunkedOrderedIterator;
-import com.bigdata.striterator.IKeyOrder;
 
 /**
  * Full text indexing and search support.
@@ -259,14 +258,12 @@ public class FullTextIndex extends AbstractRelation {
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final protected static boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final protected static boolean DEBUG = log.isDebugEnabled();
     
     /**
      * The backing index.
@@ -1089,7 +1086,8 @@ public class FullTextIndex extends AbstractRelation {
     
     /**
      * Performs a full text search against indexed documents returning a hit
-     * list.
+     * list using a default minCosine of <code>0.4</code> and a default
+     * maxRank of <code>10,000</code>.
      * 
      * @param query
      *            The query (it will be parsed into tokens).
@@ -1100,10 +1098,8 @@ public class FullTextIndex extends AbstractRelation {
      * 
      * @return A {@link Iterator} which may be used to traverse the search
      *         results in order of decreasing relevance to the query.
-     *         
-     * @throws InterruptedException 
      */
-    public Hiterator search(String query, String languageCode) throws InterruptedException {
+    public Hiterator search(String query, String languageCode) {
 
         return search( //
                 query,//
@@ -1136,7 +1132,9 @@ public class FullTextIndex extends AbstractRelation {
      * <p>
      * The collection of hits is scored and hits that fail a threshold are
      * discarded. The remaining hits are placed into a total order and the
-     * caller is returned an iterator which can read from that order.
+     * caller is returned an iterator which can read from that order. If the
+     * operation is interrupted, then only those {@link IHit}s that have
+     * already been computed will be returned.
      * 
      * @param query
      *            The query (it will be parsed into tokens).
@@ -1151,9 +1149,11 @@ public class FullTextIndex extends AbstractRelation {
      * 
      * @return The hit list.
      * 
-     * @todo there is a upper bound on [maxRank] of 10000 results that is
-     *       currently hard-coded. this could be raised, but at some point the
-     *       evaluate needs to be pruned further.
+     * @todo note that we can not incrementally materialize the search results
+     *       since they are being delivered in rank order and the search
+     *       algorithm achieves rank order by a post-search sort. mg4j supports
+     *       incremental evaluation and would be a full-featured replacement for
+     *       this package.
      * 
      * @todo manage the life of the result sets and perhaps serialize them onto
      *       an index backed by a {@link TemporaryStore}. The fromIndex/toIndex
@@ -1167,14 +1167,9 @@ public class FullTextIndex extends AbstractRelation {
      * @todo allow search within field(s). This will be a filter on the range
      *       iterator that is sent to the data service such that the search
      *       terms are visited only when they occur in the matching field(s).
-     * 
-     * @throws InterruptedException
-     *             If the operation is interrupted. Since the search runs on the
-     *             {@link IBigdataFederation#getExecutorService()}, a disconnect
-     *             from the federation will automatically interrupt the search.
      */
     public Hiterator search(String query, String languageCode,
-            double minCosine, int maxRank) throws InterruptedException {
+            double minCosine, int maxRank) {
 
         final long begin = System.currentTimeMillis();
         
@@ -1242,18 +1237,33 @@ public class FullTextIndex extends AbstractRelation {
 
         final ExecutorService executorService = getExecutorService();
 
-        // run on the client's thread pool.
-        final List<Future<Object>> futures = executorService.invokeAll(tasks,
-                timeout, TimeUnit.MILLISECONDS);
-
-        for (Future f : futures) {
+        try {
             
-            if(!f.isDone()) {
+            // run on the client's thread pool.
+            final List<Future<Object>> futures = executorService.invokeAll(
+                    tasks, timeout, TimeUnit.MILLISECONDS);
+            
+            // check for execution errors.
+            for (Future f : futures) {
+
+                try {
+                    
+                    f.get();
+                    
+                } catch(ExecutionException ex) {
+                    
+                    throw new RuntimeException(ex);
+                    
+                }
                 
             }
             
+        } catch (InterruptedException e) {
+            
+            log.warn("Interrupted - only partial results will be returned.");
+            
         }
-        
+
         // #of hits.
         final int nhits = hits.size();
         
@@ -1289,8 +1299,8 @@ public class FullTextIndex extends AbstractRelation {
 
         /*
          * Note: The caller will only see those documents which satisify both
-         * results below a threshold will be pruned. Any relevant results
-         * exceeding the maxRank will be pruned.
+         * constraints (minCosine and maxRank). Results below a threshold will
+         * be pruned. Any relevant results exceeding the maxRank will be pruned.
          */
         return new Hiterator<Hit>(Arrays.asList(a), elapsed, minCosine, maxRank);
 
@@ -1299,11 +1309,6 @@ public class FullTextIndex extends AbstractRelation {
     /*
      * @todo implement the relevant methods.
      */
-
-    @Override
-    public String getFQN(IKeyOrder keyOrder) {
-        throw new UnsupportedOperationException();
-    }
 
     public long delete(IChunkedOrderedIterator itr) {
         throw new UnsupportedOperationException();
@@ -1317,15 +1322,12 @@ public class FullTextIndex extends AbstractRelation {
         throw new UnsupportedOperationException();
     }
 
-//    public long getElementCount(boolean exact) {
-//        throw new UnsupportedOperationException();
-//    }
-
-    public Set getIndexNames() {
+    public Set<String> getIndexNames() {
         throw new UnsupportedOperationException();
     }
 
-    public Object newElement(IPredicate predicate, IBindingSet bindingSet) {
+    public Object newElement(IPredicate predicate,
+            IBindingSet bindingSet) {
         throw new UnsupportedOperationException();
     }
         

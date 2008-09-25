@@ -27,9 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.proc;
 
-import com.bigdata.btree.IDataSerializer;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ISimpleBTree;
+import com.bigdata.btree.compression.IDataSerializer;
 
 /**
  * Batch existence test operation. Existence tests SHOULD be used in place of

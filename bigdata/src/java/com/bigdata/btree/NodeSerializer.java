@@ -41,6 +41,8 @@ import java.nio.ByteBuffer;
 
 import org.CognitiveWeb.extser.LongPacker;
 
+import com.bigdata.btree.compression.IDataSerializer;
+import com.bigdata.btree.compression.RandomAccessByteArray;
 import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;

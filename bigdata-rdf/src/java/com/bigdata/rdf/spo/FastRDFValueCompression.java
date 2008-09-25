@@ -12,8 +12,8 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.OutputStream;
 
-import com.bigdata.btree.IDataSerializer;
-import com.bigdata.btree.IRandomAccessByteArray;
+import com.bigdata.btree.compression.IDataSerializer;
+import com.bigdata.btree.compression.IRandomAccessByteArray;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
 

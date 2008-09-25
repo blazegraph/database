@@ -26,11 +26,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 5, 2008
  */
 
-package com.bigdata.btree.keys;
+package com.bigdata.btree.compression;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+
+import com.bigdata.btree.TestBytesUtil;
+import com.bigdata.btree.TestImmutableKeyBuffer;
+import com.bigdata.btree.TestKeyBufferSearch;
+import com.bigdata.btree.TestMutableKeyBuffer;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -42,34 +47,21 @@ public class TestAll extends TestCase {
      * 
      */
     public TestAll() {
-        
     }
 
     /**
      * @param arg0
      */
     public TestAll(String arg0) {
-     
         super(arg0);
-        
     }
 
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("BTree keys");
-        
-        /*
-         * test key encoding and comparison support.
-         */
-        
-        // test methods that compute the successor for various data types.
-        suite.addTestSuite( TestSuccessorUtil.class );
+        TestSuite suite = new TestSuite("Compression");
 
-        // test key encoding operations.
-        suite.addTestSuite(TestKeyBuilder.class);
-        suite.addTestSuite(TestJDKUnicodeKeyBuilder.class);
-        suite.addTestSuite(TestICUUnicodeKeyBuilder.class);
+        suite.addTestSuite(TestPrefixSerializer.class);
 
         return suite;
         

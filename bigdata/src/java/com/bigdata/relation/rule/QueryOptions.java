@@ -52,7 +52,7 @@ public class QueryOptions implements IQueryOptions {
      * {@link IQueryOptions}.
      */
     public static final transient IQueryOptions NONE = new QueryOptions(
-            false/* distinct */, false/* stable */, null/* orderBy */, null/* querySlice */);
+            false/* distinct */, false/* stable */, null/* orderBy */, null/* Slice */);
 
     /**
      * An instance specifying <code>distinct := true</code> but none of the

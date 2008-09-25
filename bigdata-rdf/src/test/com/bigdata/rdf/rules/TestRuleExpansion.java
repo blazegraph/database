@@ -223,7 +223,8 @@ public class TestRuleExpansion extends AbstractInferenceEngineTestCase {
                             spo = s.isConstant() ?
                                     new SPO(s.get(), p.get(), constant) :
                                     new SPO(constant, p.get(), o.get());
-                            log.info("appending SPO: " + spo.toString(db));
+                            if (log.isInfoEnabled())
+                                log.info("appending SPO: " + spo.toString(db));
                         } else {
                             spo = null;
                         }
