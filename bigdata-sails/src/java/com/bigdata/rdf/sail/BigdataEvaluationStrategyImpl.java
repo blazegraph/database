@@ -1,6 +1,7 @@
 package com.bigdata.rdf.sail;
 
 import info.aduna.iteration.CloseableIteration;
+import info.aduna.iteration.DistinctIteration;
 import info.aduna.iteration.EmptyIteration;
 
 import java.util.Collection;
@@ -16,6 +17,7 @@ import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.Compare;
+import org.openrdf.query.algebra.Distinct;
 import org.openrdf.query.algebra.Filter;
 import org.openrdf.query.algebra.Join;
 import org.openrdf.query.algebra.Or;
@@ -54,6 +56,7 @@ import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IQueryOptions;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.ISlice;
 import com.bigdata.relation.rule.ISolutionExpander;
 import com.bigdata.relation.rule.ISortOrder;
 import com.bigdata.relation.rule.IVariable;
@@ -63,6 +66,7 @@ import com.bigdata.relation.rule.NEConstant;
 import com.bigdata.relation.rule.OR;
 import com.bigdata.relation.rule.QueryOptions;
 import com.bigdata.relation.rule.Rule;
+import com.bigdata.relation.rule.Slice;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
 import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
@@ -241,6 +245,10 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
     private final AbstractTripleStore database;
     
     private final boolean nativeJoins;
+    
+    private boolean slice = false, distinct = false, union = false;
+    
+    private long offset = 0, limit = 0;
 
     /**
      * @param tripleSource
@@ -270,9 +278,19 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
 
     }
 
+    @Override
+    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(Distinct distinct,
+            BindingSet bindings)
+        throws QueryEvaluationException
+    {
+        return new DistinctIteration<BindingSet, QueryEvaluationException>(
+                evaluate(distinct.getArg(), bindings));
+    }
+
     /**
      * Overriden to recognize magic predicates.
      */
+    @Override
     public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
             StatementPattern sp, BindingSet bindings)
             throws QueryEvaluationException {
@@ -468,7 +486,12 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
          * written an IRuleTaskFactory yet for the magic predicate for search.
          * See my notes in the javadoc at the top of this file. -b
          */
-        final IQueryOptions queryOptions = QueryOptions.NONE;
+        IQueryOptions queryOptions = QueryOptions.NONE;
+        
+        if (slice && !distinct && !union) {
+            ISlice slice = new Slice(offset, limit);
+            queryOptions = new QueryOptions(false, false, null, slice);
+        }
         
         // generate native rule
         final IRule rule = new Rule(
