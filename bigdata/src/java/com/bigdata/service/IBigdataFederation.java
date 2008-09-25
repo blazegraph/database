@@ -290,7 +290,7 @@ public interface IBigdataFederation extends IIndexManager {
      * 
      * @see GlobalRowStoreSchema
      */
-    public SparseRowStore getGlobalRowStore();
+    public SparseRowStore getGlobalRowStore(long timestamp);
     
     /**
      * Destroys all discovered services belonging to the federation and their

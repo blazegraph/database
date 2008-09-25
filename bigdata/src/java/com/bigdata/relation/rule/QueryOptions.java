@@ -61,6 +61,16 @@ public class QueryOptions implements IQueryOptions {
     public static final transient IQueryOptions DISTINCT = new QueryOptions(
             true/* distinct */, false/* stable */, null/* orderBy */, null/* querySlice */);
     
+    /**
+     * @param distinct
+     * @param stable
+     * @param orderBy
+     * @param slice
+     * @throws IllegalArgumentException
+     *             if a <i>stable</i> is <code>false</code> and a slice is
+     *             specified with a non-zero offset and/or a non-{@link Long#MAX_VALUE}
+     *             limit
+     */
     public QueryOptions(boolean distinct, boolean stable,
             ISortOrder[] orderBy, ISlice slice) {
 
@@ -74,6 +84,14 @@ public class QueryOptions implements IQueryOptions {
         // MAY be null.
         this.slice = slice;
 
+        if (!stable
+                && slice != null
+                && (slice.getOffset() != 0L || slice.getLimit() != Long.MAX_VALUE)) {
+
+            throw new IllegalArgumentException("slices must be stable");
+            
+        }
+        
     }
 
     public boolean isDistinct() {

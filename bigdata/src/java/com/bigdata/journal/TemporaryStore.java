@@ -329,11 +329,11 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
         
     }
 
-    public SparseRowStore getGlobalRowStore() {
+    public SparseRowStore getGlobalRowStore(long timestamp) {
 
         assertOpen();
         
-        return globalRowStoreHelper.getGlobalRowStore();
+        return globalRowStoreHelper.getGlobalRowStore(timestamp);
         
     }
     private GlobalRowStoreHelper globalRowStoreHelper = new GlobalRowStoreHelper(this); 

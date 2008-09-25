@@ -165,7 +165,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
     /**
      * The default branching factor.
      */
-    static public final int DEFAULT_BRANCHING_FACTOR = 32;//32; //256
+    static public final int DEFAULT_BRANCHING_FACTOR = 256;//32; //256
     
     /**
      * The minimum hard reference queue capacity is two(2) in order to avoid

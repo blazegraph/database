@@ -34,9 +34,9 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.util.Properties;
 
-import com.bigdata.btree.ImmutableKeyBuffer.SimplePrefixSerializer;
 import com.bigdata.btree.compression.DefaultDataSerializer;
 import com.bigdata.btree.compression.IDataSerializer;
+import com.bigdata.btree.compression.PrefixSerializer;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
@@ -73,8 +73,8 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
      */
     static public final IDataSerializer getDefaultLeafKeySerializer() {
         
-        return SimplePrefixSerializer.INSTANCE;
-//        return PrefixSerializer.INSTANCE;
+//        return SimplePrefixSerializer.INSTANCE;
+        return PrefixSerializer.INSTANCE;
         
     }
     

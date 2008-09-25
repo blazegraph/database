@@ -58,7 +58,7 @@ import com.bigdata.service.IBigdataFederation;
  * </pre>
  * 
  * <p>
- * A relation is located using the {@link IIndexStore#getGlobalRowStore()} and
+ * A relation is located using the {@link IIndexStore#getGlobalRowStore(long)} and
  * materialized by supplying an {@link IIndexManager} that will be able to
  * resolve the indices for the relation's view. Several different contexts are
  * handled:
@@ -67,7 +67,7 @@ import com.bigdata.service.IBigdataFederation;
  * <dt>{@link IBigdataFederation}</dt>
  * 
  * <dd>The {@link IRelation} will be resolved using the
- * {@link IBigdataFederation#getGlobalRowStore()} and the
+ * {@link IBigdataFederation#getGlobalRowStore(long)} and the
  * {@link IBigdataFederation} as its {@link IIndexManager}. The makes access to
  * a remote and potentially distributed {@link IIndex} transparent to the
  * {@link IRelation}. However, it is NOT possible to resolve local resources on
@@ -77,7 +77,7 @@ import com.bigdata.service.IBigdataFederation;
  * <dt>{@link Journal}</dt>
  * 
  * <dd>The {@link IRelation} will be resolved using the
- * {@link Journal#getGlobalRowStore()} and will use the local index objects
+ * {@link Journal#getGlobalRowStore(long)} and will use the local index objects
  * directly.</dd>
  * 
  * <dt>{@link AbstractTask}</dt>
@@ -185,7 +185,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
              */
             final AtomicReference<IIndexManager> foundOn = new AtomicReference<IIndexManager>();
 
-            final Properties properties = locateResource(namespace, foundOn);
+            final Properties properties = locateResource(namespace, timestamp, foundOn);
             
             if (properties == null) {
 
@@ -330,14 +330,15 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
      * 
      * @param namespace
      *            The namespace for the resource.
+     * @param timestamp
      * @param foundOn
      *            Used to pass back the {@link IIndexManager} on which the
      *            resource was found as a side-effect.
      * 
      * @return The properties for that resource.
      */
-    protected Properties locateResource(String namespace,
-            AtomicReference<IIndexManager> foundOn) {
+    protected Properties locateResource(final String namespace,
+            final long timestamp, final AtomicReference<IIndexManager> foundOn) {
 
         synchronized (seeAlso) {
 
@@ -351,7 +352,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
                 try {
                 
-                    properties = locateResourceOn(indexManager, namespace);
+                    properties = locateResourceOn(indexManager, namespace, timestamp);
                     
                 } catch(IllegalStateException t) {
                     
@@ -413,7 +414,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
          * manager.
          */
         
-        final Properties properties = locateResourceOn(indexManager, namespace);
+        final Properties properties = locateResourceOn(indexManager, namespace, timestamp);
 
         if (properties != null) {
 
@@ -453,7 +454,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
      *         namespace.
      */
     protected Properties locateResourceOn(IIndexManager indexManager,
-            String namespace) {
+            final String namespace, final long timestamp) {
 
         if (INFO) {
 
@@ -462,11 +463,12 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
         }
 
         /*
-         * Note: This is a READ_COMMITTED request. The [timestamp] does not get
-         * passed in as it has different semantics for the row store! (Caching
-         * here may be useful.)
+         * Look at the global row store view corresponding to the specified
+         * timestamp.
+         * 
+         * @todo caching may be useful here for historical reads.
          */
-        final Map<String, Object> map = indexManager.getGlobalRowStore().read(
+        final Map<String, Object> map = indexManager.getGlobalRowStore(timestamp).read(
                 RelationSchema.INSTANCE, namespace);
 
 //        System.err.println("Reading properties: "+namespace);

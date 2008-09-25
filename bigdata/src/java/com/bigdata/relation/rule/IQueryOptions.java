@@ -70,26 +70,6 @@ public interface IQueryOptions extends Serializable {
      * Note: Using an {@link ISlice} requires that the solutions are stable
      * for queries against the same commit point of the database.
      * 
-     * @todo Stable solution sets can be handled in at least two ways.
-     *       <p>
-     *       (1) Forcing single-threaded execution on the {@link IRule} in order
-     *       to remove an indeterminacy (at least, any due to parallelism);
-     *       <p>
-     *       (2)Pre-generating the entire solution set and then returning a view
-     *       onto a slice of the solution set. The latter approach requires some
-     *       means to eventually release the solution set. One reasonable
-     *       approach is to use the {@link TemporaryStoreFactory} associated
-     *       with the {@link IIndexManager} on the <em>client</em> and to hold
-     *       a hard reference on a {@link DelayQueue} to the
-     *       {@link TemporaryStore} on which the solution set was materialized.
-     *       Manging such temporary solutions sets is, in fact, the easy part
-     *       since we also need to know whether or not we are seeing the same
-     *       query (against the same commit point) with only the exception that
-     *       a different slice was requested.
-     *       <p>
-     *       Another twist is that a SORT or DISTINCT needs to be applied to the
-     *       solution set as a whole.
-     * 
      * @return The {@link ISlice} -or- <code>null</code> if there is no
      *         constraint on the solutions that will be visited.
      */

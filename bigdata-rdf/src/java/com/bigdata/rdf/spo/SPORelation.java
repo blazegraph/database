@@ -28,8 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.spo;
 
-import it.unimi.dsi.fastutil.bytes.ByteArrayFrontCodedList;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -610,14 +608,19 @@ public class SPORelation extends AbstractRelation<ISPO> {
         final IndexMetadata metadata = getIndexMetadata(getFQN(keyOrder));
 
         final IDataSerializer leafKeySer;
-        if(true) {
+        if(false) {
             
             /*
-             * FIXME performance comparison of this key compression technique with
-             * some others, including leading value compression, huffman
-             * compression, and hu-tucker compression (the latter offers no benefit
-             * since we will fully de-serialize the keys before performing search in
-             * a leaf).
+             * Note: This shows a substantial savings on disk and is only
+             * slightly more expensive than the PrefixSerializer. See
+             * src/architecture/index performance tradeoffs.xls for details. The
+             * best overall performance on LUBM U5 was observed at m=256.
+             * 
+             * FIXME performance comparison of this key compression technique
+             * with some others, including leading value compression, huffman
+             * compression, and hu-tucker compression (the latter offers no
+             * benefit since we will fully de-serialize the keys before
+             * performing search in a leaf).
              */
             leafKeySer = FastRDFKeyCompression.N3;
             

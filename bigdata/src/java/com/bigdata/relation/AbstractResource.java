@@ -286,7 +286,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E>{
         }
     
         // Write the map on the row store.
-        final Map afterMap = indexManager.getGlobalRowStore().write(
+        final Map afterMap = indexManager.getGlobalRowStore(getTimestamp()).write(
                 RelationSchema.INSTANCE, map);
         
         if(log.isDebugEnabled()) {
@@ -315,7 +315,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E>{
             log.info(toString());
     
         // Delete the entry for this relation from the row store.
-        indexManager.getGlobalRowStore().delete(RelationSchema.INSTANCE, namespace);
+        indexManager.getGlobalRowStore(getTimestamp()).delete(RelationSchema.INSTANCE, namespace);
         
     }
 

@@ -442,7 +442,7 @@ public class AbstractResourceManagerTestCase extends
             
         }
 
-        public SparseRowStore getGlobalRowStore() {
+        public SparseRowStore getGlobalRowStore(long timestamp) {
             // TODO Auto-generated method stub
             return null;
         }

@@ -356,14 +356,23 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
          * default from IJoinNexus? The goal is to reduce the churn in the
          * nursery.
          */
+        
+        final int chunkSize = joinNexus.getChunkCapacity();
+        
         final IBuffer<ISolution> tmp = joinNexus.newUnsynchronizedBuffer(
-                buffer, joinNexus.getChunkCapacity());
+                buffer, chunkSize);
 
-        // run the (sub-)query.
-        apply(orderIndex, bindingSet, tmp);
+        try {
 
-        // flush buffer onto the chunked buffer.
-        tmp.flush();
+            // run the (sub-)query.
+            apply(orderIndex, bindingSet, tmp);
+            
+        } finally {
+
+            // flush buffer onto the chunked buffer.
+            tmp.flush();
+            
+        }
 
     }
     
@@ -634,7 +643,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
          * Those subqueries are just run in the caller's thread.
          */
         
-        if (maxParallelSubqueries==0 || orderIndex > 0 || chunk.length <= 1
+        if (maxParallelSubqueries==0 || joinService==null || orderIndex > 0 || chunk.length <= 1
 //                || !useJoinService
 //                || (orderIndex > 2 || joinService.getQueue().size() > 100)
                 ) {

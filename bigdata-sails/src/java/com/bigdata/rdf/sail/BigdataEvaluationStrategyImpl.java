@@ -1,7 +1,6 @@
 package com.bigdata.rdf.sail;
 
 import info.aduna.iteration.CloseableIteration;
-import info.aduna.iteration.DistinctIteration;
 import info.aduna.iteration.EmptyIteration;
 
 import java.util.Collection;
@@ -249,7 +248,8 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
     
     private boolean slice = false, distinct = false, union = false;
     
-    private long offset = 0, limit = 0;
+    // Note: defaults are illegal values.
+    private long offset = -1L, limit = 0L;
 
     /**
      * @param tripleSource
@@ -276,6 +276,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         this.database = tripleSource.getDatabase();
         
         this.nativeJoins = nativeJoins;
+//        this.nativeJoins = false;
 
     }
 
@@ -283,9 +284,23 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
     public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
             org.openrdf.query.algebra.Slice slice, BindingSet bindings)
             throws QueryEvaluationException {
-        this.slice = true;
-        this.offset = slice.getOffset();
-        this.limit = slice.getLimit();
+        /*
+         * Note: Sesame has somewhat different semantics for offset and limit.
+         * They are [int]s. -1 is used to indicate the the offset or limit was
+         * not specified. you use hasFoo() to see if there is an offset or a
+         * limit and then assign the value. For bigdata, the NOP offset is 0L
+         * and the NOP limit is Long.MAX_VALUE.
+         * 
+         * @todo We can't process the offset natively unless we remove the slice
+         * from the Sesame operator tree. If we did then we would skip over the
+         * first OFFSET solutions and Sesame would skip over the first OFFSET
+         * solutions that we passed on, essentially doubling the offset.
+         */
+        if (!slice.hasOffset()) {
+            this.slice = true;
+            this.offset = slice.hasOffset() ? slice.getOffset() : 0L;
+            this.limit = slice.hasLimit() ? slice.getLimit() : Long.MAX_VALUE;
+        }
         return super.evaluate(slice, bindings);
     }
 
@@ -495,20 +510,13 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             }
         }
         
-        /*
-         * FIXME MikeP : impose DISTINCT, ORDER_BY, LIMIT and OFFSET (slice)
-         * here. Note that I have not yet implemented ORDER_BY. LIMIT for a
-         * UNION should work if you mark a program as serial (!parallel). A
-         * UNION that does not use LIMIT can run in parallel. I also have not
-         * written an IRuleTaskFactory yet for the magic predicate for search.
-         * See my notes in the javadoc at the top of this file. -b
-         */
         IQueryOptions queryOptions = QueryOptions.NONE;
         
         if (slice) {
-            if (!distinct && !union) {
-                ISlice slice = new Slice(offset, limit);
-                queryOptions = new QueryOptions(false, true, null, slice);
+            if (false&&!distinct && !union) {
+                final ISlice slice = new Slice(offset, limit);
+                queryOptions = new QueryOptions(false/* distinct */,
+                        true/* stable */, null/* orderBy */, slice);
             }
         } else {
             if (distinct && !union) {
