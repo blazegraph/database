@@ -505,9 +505,15 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
          */
         IQueryOptions queryOptions = QueryOptions.NONE;
         
-        if (slice && !distinct && !union) {
-            ISlice slice = new Slice(offset, limit);
-            queryOptions = new QueryOptions(false, true, null, slice);
+        if (slice) {
+            if (!distinct && !union) {
+                ISlice slice = new Slice(offset, limit);
+                queryOptions = new QueryOptions(false, true, null, slice);
+            }
+        } else {
+            if (distinct && !union) {
+                queryOptions = QueryOptions.DISTINCT;
+            }
         }
         
         // generate native rule
