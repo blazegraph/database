@@ -744,15 +744,39 @@ public class DataLoader {
         
     }
 
-    public LoadStats loadFiles(File file, String baseURL, RDFFormat rdfFormat,
+    /**
+     * 
+     * @param file
+     *            The file or directory (required).
+     * @param baseURI
+     *            The baseURI (optional, when not specified the name of the each
+     *            file load is converted to a URL and used as the baseURI for
+     *            that file).
+     * @param rdfFormat
+     *            The format of the file (optional, when not specified the
+     *            format is deduced for each file in turn using the
+     *            {@link RDFFormat} static methods).
+     * @param filter
+     *            A filter selecting the file names that will be loaded
+     *            (optional). When specified, the filter MUST accept directories
+     *            if directories are to be recursively processed.
+     * 
+     * @return The aggregated load statistics.
+     * 
+     * @throws IOException
+     */
+    public LoadStats loadFiles(File file, String baseURI, RDFFormat rdfFormat,
             FilenameFilter filter) throws IOException {
 
-        return loadFiles(0/* depth */, file, baseURL, rdfFormat, filter, true/* endOfBatch */
+        if (file == null)
+            throw new IllegalArgumentException();
+        
+        return loadFiles(0/* depth */, file, baseURI, rdfFormat, filter, true/* endOfBatch */
         );
 
     }
 
-    protected LoadStats loadFiles(int depth, File file, String baseURL,
+    protected LoadStats loadFiles(int depth, File file, String baseURI,
             RDFFormat rdfFormat, FilenameFilter filter, boolean endOfBatch)
             throws IOException {
 
@@ -770,7 +794,7 @@ public class DataLoader {
                 final RDFFormat fmt = RDFFormat.forFileName(f.toString(),
                         rdfFormat);
 
-                loadStats.add(loadFiles(depth + 1, f, baseURL, fmt, filter,
+                loadStats.add(loadFiles(depth + 1, f, baseURI, fmt, filter,
                         (depth == 0 && i < files.length ? false : endOfBatch)));
                 
             }
@@ -793,7 +817,11 @@ public class DataLoader {
         
         try {
 
-            return loadData3(reader, baseURL, rdfFormat, endOfBatch);
+            // baseURI for this file.
+            final String s = baseURI != null ? baseURI : file.toURI()
+                    .toString();
+
+            return loadData3(reader, s, rdfFormat, endOfBatch);
 
         } catch (Exception ex) {
 
