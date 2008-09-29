@@ -36,7 +36,6 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.TimestampUtility;
 
 /**
  * Helper class.
@@ -61,11 +60,10 @@ public class GlobalRowStoreHelper {
         
     }
     
-    /**
-     * The unisolated view (cached).
-     */
-    synchronized private SparseRowStore _getGlobalRowStore() {
+    synchronized public SparseRowStore getGlobalRowStore() {
         
+        if(log.isInfoEnabled()) log.info("");
+
         if (globalRowStore == null) {
 
             IIndex ndx = indexManager.getIndex(GLOBAL_ROW_STORE_INDEX, ITx.UNISOLATED);
@@ -106,29 +104,31 @@ public class GlobalRowStoreHelper {
     private transient SparseRowStore globalRowStore;
 
     /**
-     * Return the requested view.
+     * Return an {@link ITx#READ_COMMITTED} view IFF the backing index exists.
      */
-    synchronized public SparseRowStore getGlobalRowStore(long timestamp) {
+    synchronized public SparseRowStore getReadCommitted() {
 
-        if (timestamp == ITx.UNISOLATED) {
+        if(log.isInfoEnabled()) log.info("");
 
-            // request for the unisolated view.
-            return _getGlobalRowStore();
+//        if (globalRowStore == null) {
+
+            IIndex ndx = indexManager.getIndex(GLOBAL_ROW_STORE_INDEX, ITx.READ_COMMITTED);
+
+            if (ndx == null) {
+
+                if (log.isInfoEnabled())
+                    log.info("Global row store does not exist - will try to register now");
+
+                return null;
+                
+            }
             
-        }
+//            globalRowStore = 
+                return new SparseRowStore(ndx);
+            
+//        }
         
-        if (log.isInfoEnabled())
-            log.info("timestamp=" + TimestampUtility.toString(timestamp));
-    
-        IIndex ndx = indexManager.getIndex(GLOBAL_ROW_STORE_INDEX, timestamp);
-
-        if (ndx == null) {
-
-            return null;
-
-        }
-
-        return new SparseRowStore(ndx);
+//        return globalRowStore;
 
     }
     

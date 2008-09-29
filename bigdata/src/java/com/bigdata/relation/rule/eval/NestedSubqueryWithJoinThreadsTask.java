@@ -35,6 +35,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
 
@@ -137,8 +138,6 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      * you MUST serialize the {@link IRule}s in the {@link IProgram} by
      * specifying {@link IQueryOptions#isStable()} or simply marking the
      * {@link IProgram} as NOT {@link IProgram#isParallel()}.
-     * 
-     * FIXME mark programs as NOT parallel when UNION is used with SLICE.
      */
     protected final long offset;
     
@@ -148,12 +147,37 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      * not possible. If OFFSET+LIMIT would be greater than
      * {@link Long#MAX_VALUE}, then use {@link Long#MAX_VALUE} instead.
      * <p>
-     * Note: {@link ISolution}s are added to the buffer IFF the solutionCount
-     * is GE {@link #offset} and LT {@link #last}.
+     * Whether or not an {@link ISolution} is part of the slice is based on the
+     * <em>post-increment</em> value of the {@link AtomicLong}
+     * {@link RuleStats#solutionCount}. If the post-increment value is GT
+     * {@link #last} then we have exhausted the slice. Else, if the
+     * post-increment value is GT {@link #offset} then we add the
+     * {@link ISolution} to the {@link IBuffer}. Else the {@link ISolution} is
+     * before the offset of the slice and it will be ignored.
      * <p>
-     * Consider (OFFSET=0, LIMIT=1, LAST=1). We would emit a solution for
-     * solutionCount==0 (GE OFFSET) but NOT emit a solution for solutionCount==1
-     * (LT LAST).
+     * Note: {@link AtomicLong#incrementAndGet()} is used to make an atomic
+     * decision concerning which solutions are allowed into the buffer. This
+     * works even in the face of parallel-subquery, even though we in fact turn
+     * off parallel subquery when evaluating a slice in order to have the
+     * results be stable with respect to a given commit point. The fence posts
+     * for the tests are different than you might expect because we must
+     * consider the <em>post-increment</em> state of the
+     * {@link RuleStats#solutionCount}.
+     * <p>
+     * Note: Each {@link IRule} executes with its own {@link RuleStats}
+     * instance. This means that concurrent execution of rules would not see the
+     * same {@link RuleStats#solutionCount} field and hence that a slice would
+     * not be computed correctly when executing {@link IRule}s in parallel for
+     * some program. However, as pointed out above, we always disable
+     * parallelism for a slice in order to have a stable result set for a given
+     * commit point. The stable property is required for client to be able to
+     * page through the solutions using a series of slices.
+     * <p>
+     * Consider (OFFSET=0, LIMIT=1, LAST=1). We would emit a solution for the
+     * post-increment solutionCount value ONE (1) (GT OFFSET) but NOT emit a
+     * solution for the post-increment solutionCount value TWO (2) (GT LAST).
+     * 
+     * @see RuleStats#solutionCount
      */
     protected final long last;
     
@@ -206,24 +230,29 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
         
         this.tailCount = rule.getTailCount();
         
-        this.maxParallelSubqueries = joinNexus.getMaxParallelSubqueries();
-        
         final ISlice slice = rule.getQueryOptions().getSlice();
         
         if (slice == null) {
             offset = 0L;
-            last = Long.MAX_VALUE;
+            last = 0L; //Long.MAX_VALUE;
         } else {
             offset = slice.getOffset();
-            last = slice.getLast();
+            if(slice.getLast()==Long.MAX_VALUE) {
+                last = 0L;
+            } else {
+                last = slice.getLast();
+            }
         }
 
-        // Note: turn off parallel subquery execution if [stable] was requested.
+        // true if query evaluation should be stable (no concurrency)
         final boolean stable = rule.getQueryOptions().isStable();
         
-        this.joinService = (ThreadPoolExecutor) (stable
-                || maxParallelSubqueries == 0 ? null : joinNexus
-                .getIndexManager().getExecutorService());
+        // turn off parallel subquery if [stable] was requested.
+        this.maxParallelSubqueries = stable ? 0 : joinNexus
+                .getMaxParallelSubqueries();
+        
+        this.joinService = (ThreadPoolExecutor) (maxParallelSubqueries == 0 ? null
+                : joinNexus.getIndexManager().getExecutorService());
         
     }
     
@@ -267,9 +296,9 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
              * BlockingBuffer to be interrupted in order to eagerly terminate
              * processing.
              * 
-             * FIXME Using Thread#interrupt() to halt asynchronous processing
+             * Note: Using Thread#interrupt() to halt asynchronous processing
              * for query is NOT ideal as it will typically force the FileChannel
-             * to be closed asynchronously.
+             * to be closed asynchronously.  You are better off using a SLICE.
              */
             
 //            if(INFO)
@@ -355,6 +384,11 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
          * a shared variable) with a floor 1000 elements and otherwise the
          * default from IJoinNexus? The goal is to reduce the churn in the
          * nursery.
+         * 
+         * Note: We CAN NOT reduce the chunkSize when a SLICE is used to the
+         * OFFSET+LIMIT since we do not know how many elements on each join
+         * dimension must be consumed before we find OFFSET + LIMIT solutions
+         * and can halt processing for the rule.
          */
         
         final int chunkSize = joinNexus.getChunkCapacity();
@@ -370,7 +404,9 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
         } finally {
 
             // flush buffer onto the chunked buffer.
-            tmp.flush();
+//            long nflushed = 
+                tmp.flush();
+//            System.err.println("flushed "+nflushed+" solutions onto the buffer");
             
         }
 
@@ -413,7 +449,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
             
             while (itr.hasNext()) {
 
-                if (ruleStats.solutionCount.get() >= last) {
+                if (last > 0 && ruleStats.solutionCount.get() > last) {
 
                     // no more solutions to be generated.
                     return;
@@ -529,14 +565,14 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 
                 final long solutionCount = ruleStats.solutionCount.incrementAndGet();
                 
-                if (solutionCount >= last) {
+                if (last > 0 && solutionCount > last) {
 
                     // done generating solutions.
                     return;
                     
                 }
 
-                if (solutionCount >= offset) {
+                if (solutionCount > offset) {
 
                     // add the solution to the buffer.
                     buffer.add(solution);
@@ -698,7 +734,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
         
         for (Object e : chunk) {
 
-            if (ruleStats.solutionCount.get() >= last) {
+            if (last > 0 && ruleStats.solutionCount.get() > last) {
 
                 // no more solutions to be generated.
                 return;
@@ -786,7 +822,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
         // for each element in the chunk.
         for (Object e : chunk) {
 
-            if (ruleStats.solutionCount.get() >= last) {
+            if (last > 0 && ruleStats.solutionCount.get() > last) {
 
                 // no more solutions to be generated.
                 return;
@@ -994,14 +1030,14 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 
                 final long solutionCount = ruleStats.solutionCount.incrementAndGet();
                 
-                if (solutionCount >= last) {
+                if (last > 0 && solutionCount > last) {
 
                     // done generating solutions.
                     return;
                     
                 }
 
-                if (solutionCount >= offset) {
+                if (solutionCount > offset) {
 
                     // add the solution to the buffer.
                     buffer.add(solution);

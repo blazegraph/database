@@ -43,7 +43,8 @@ public class LoadStats {
 
     /**
      * The internal with which this class will log on {@link System#out} in
-     * milliseconds (it is se to every 10 minutes).
+     * milliseconds (it is se to every 10 minutes). This helps to track progress
+     * on very large data loads.
      */
     protected static transient long REPORT_INTERVAL = 10 * 60 * 1000; 
     

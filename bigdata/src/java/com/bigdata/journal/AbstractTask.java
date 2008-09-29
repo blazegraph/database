@@ -2067,29 +2067,23 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
         }
 
         /**
-         * Returns the view if the index exists but returns an
-         * {@link ITx#UNISOLATED} view IFF the {@link AbstractTask} declared the
-         * name of the backing index as one of the resources for which it
+         * Returns an {@link ITx#READ_COMMITTED} view if the index exists -or-
+         * an {@link ITx#UNISOLATED} view IFF the {@link AbstractTask} declared
+         * the name of the backing index as one of the resources for which it
          * acquired a lock.
          */
-        public SparseRowStore getGlobalRowStore(long timestamp) {
+        public SparseRowStore getGlobalRowStore() {
             
-            if (timestamp == ITx.UNISOLATED
-                    && !isResource(GlobalRowStoreHelper.GLOBAL_ROW_STORE_INDEX)) {
-
-                /*
-                 * The unisolated view was requested but the task did not
-                 * declare the resource name.
-                 * 
-                 * @todo vs exception?
-                 */
-
-                return null;
-
+            // did the task declare the resource name?
+            if(isResource(GlobalRowStoreHelper.GLOBAL_ROW_STORE_INDEX)) {
+                
+                // unisolated view - will create if it does not exist.
+                return new GlobalRowStoreHelper(this).getGlobalRowStore();
+                
             }
             
-            // return the requested view.
-            return new GlobalRowStoreHelper(this).getGlobalRowStore(timestamp);
+            // read committed view IFF it exists otherwise [null]
+            return new GlobalRowStoreHelper(this).getReadCommitted();
             
         }
         
@@ -2419,7 +2413,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
          * Returns an {@link ITx#READ_COMMITTED} view iff the index exists and
          * <code>null</code> otherwise.
          */
-        public SparseRowStore getGlobalRowStore(long timestamp) {
+        public SparseRowStore getGlobalRowStore() {
 
             /*
              * Note: This goes around getIndex(name,timestamp) on this method
@@ -2430,15 +2424,8 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             
 //            return new GlobalRowStoreHelper(this).getReadCommitted();
 
-//            // last commit time.
-//            final long timestamp = delegate.getRootBlockView().getLastCommitTime();
-            
-            if (timestamp == ITx.UNISOLATED) {
-
-                // access not allowed to the unisolated view.
-                return null;
-                
-            }
+            // last commit time.
+            final long timestamp = delegate.getRootBlockView().getLastCommitTime();
             
             final IIndex ndx = delegate.getIndex(
                     GlobalRowStoreHelper.GLOBAL_ROW_STORE_INDEX,
@@ -2704,8 +2691,8 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             return delegate.getGlobalFileSystem();
         }
 
-        public SparseRowStore getGlobalRowStore(long timestamp) {
-            return delegate.getGlobalRowStore(timestamp);
+        public SparseRowStore getGlobalRowStore() {
+            return delegate.getGlobalRowStore();
         }
 
         public IIndex getIndex(String name, long timestamp) {

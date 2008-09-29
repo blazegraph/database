@@ -48,6 +48,10 @@ abstract public class AbstractCachingResourceLocator<T extends ILocatableResourc
 
     private int capacity;
     
+    /**
+     * The default #of recently located resources whose hard references will be
+     * retained by the {@link LRUCache}.
+     */
     protected static transient final int DEFAULT_CACHE_CAPACITY = 10;
 
     /**

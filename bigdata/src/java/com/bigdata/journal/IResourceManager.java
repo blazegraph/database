@@ -182,6 +182,8 @@ public interface IResourceManager extends IServiceShutdown {
      *                operation is executed and the {@link IResourceManager} has
      *                information which indicates that the index partition has
      *                been split, joined or moved.
+     * 
+     * @see IIndexStore#getIndex(String, long)
      */
     public IIndex getIndex(String name, long timestamp);
 

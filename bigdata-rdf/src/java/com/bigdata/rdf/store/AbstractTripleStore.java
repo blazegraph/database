@@ -1345,7 +1345,7 @@ abstract public class AbstractTripleStore extends
                     map.put(TripleStoreSchema.VOCABULARY, vocab);
 
                     // Write the map on the row store.
-                    getIndexManager().getGlobalRowStore(getTimestamp()).write(
+                    getIndexManager().getGlobalRowStore().write(
                             RelationSchema.INSTANCE, map);
 
                 }
@@ -1430,8 +1430,7 @@ abstract public class AbstractTripleStore extends
                 if (axioms == null) {
 
                     // read from the global row store.
-                    final ITPS tps = getIndexManager().getGlobalRowStore(
-                            getTimestamp()).read(
+                    final ITPS tps = getIndexManager().getGlobalRowStore().read(
                                     RelationSchema.INSTANCE,
                                     getNamespace(),
                                     Long.MAX_VALUE,
@@ -1485,8 +1484,7 @@ abstract public class AbstractTripleStore extends
                 if (vocab == null) {
 
                     // read from the global row store.
-                    final ITPS tps = getIndexManager().getGlobalRowStore(
-                            getTimestamp())
+                    final ITPS tps = getIndexManager().getGlobalRowStore()
                             .read(
                                     RelationSchema.INSTANCE,
                                     getNamespace(),

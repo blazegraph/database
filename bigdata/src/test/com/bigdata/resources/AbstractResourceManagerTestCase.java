@@ -337,12 +337,12 @@ public class AbstractResourceManagerTestCase extends
         }
 
         public PartitionLocator get(String name, long timestamp, byte[] key) throws InterruptedException, ExecutionException, IOException {
-            // TODO Auto-generated method stub
+
             return null;
         }
 
         public PartitionLocator find(String name, long timestamp, byte[] key) throws InterruptedException, ExecutionException, IOException {
-            // TODO Auto-generated method stub
+
             return null;
         }
 
@@ -366,22 +366,22 @@ public class AbstractResourceManagerTestCase extends
 
        public Future<? extends Object> submit(Callable<? extends Object> proc)
                 throws InterruptedException, ExecutionException, IOException {
-            // TODO Auto-generated method stub
+
             return null;
         }
 
         public String getHostname() throws IOException {
-            // TODO Auto-generated method stub
+
             return null;
         }
 
         public Class getServiceIface() throws IOException {
-            // TODO Auto-generated method stub
+
             return null;
         }
 
         public String getServiceName() throws IOException {
-            // TODO Auto-generated method stub
+
             return null;
         }
 
@@ -397,42 +397,42 @@ public class AbstractResourceManagerTestCase extends
     protected class MockFederation implements IBigdataFederation {
 
         public void destroy() {
-            // TODO Auto-generated method stub
+
             
         }
 
         public void dropIndex(String name) {
-            // TODO Auto-generated method stub
+
             
         }
 
         public IDataService getAnyDataService() {
-            // TODO Auto-generated method stub
+
             return null;
         }
 
         public IBigdataClient getClient() {
-            // TODO Auto-generated method stub
+
             return null;
         }
 
         public String getServiceCounterPathPrefix() {
-            // TODO Auto-generated method stub
+
             return null;
         }
 
         public CounterSet getCounterSet() {
-            // TODO Auto-generated method stub
+
             return null;
         }
 
         public IDataService getDataService(UUID serviceUUID) {
-            // TODO Auto-generated method stub
+
             return null;
         }
 
         public UUID[] getDataServiceUUIDs(int maxCount) {
-            // TODO Auto-generated method stub
+
             return null;
         }
 
@@ -442,103 +442,103 @@ public class AbstractResourceManagerTestCase extends
             
         }
 
-        public SparseRowStore getGlobalRowStore(long timestamp) {
-            // TODO Auto-generated method stub
+        public SparseRowStore getGlobalRowStore() {
+
             return null;
         }
 
         public IIndex getIndex(String name, long timestamp) {
-            // TODO Auto-generated method stub
+
             return null;
         }
 
         public IKeyBuilder getKeyBuilder() {
-            // TODO Auto-generated method stub
+
             return null;
         }
 
         public ILoadBalancerService getLoadBalancerService() {
-            // TODO Auto-generated method stub
+
             return null;
         }
 
         public IMetadataIndex getMetadataIndex(String name, long timestamp) {
-            // TODO Auto-generated method stub
+
             return null;
         }
 
         public IMetadataService getMetadataService() {
-            // TODO Auto-generated method stub
+
             return null;
         }
 
         public ITimestampService getTimestampService() {
-            // TODO Auto-generated method stub
+
             return null;
         }
 
         public boolean isDistributed() {
-            // TODO Auto-generated method stub
+
             return false;
         }
 
         public boolean isScaleOut() {
-            // TODO Auto-generated method stub
+
             return false;
         }
 
         public boolean isStable() {
-            // TODO Auto-generated method stub
+
             return false;
         }
 
         public long getLastCommitTime() {
-            // TODO Auto-generated method stub
+
             return 0;
         }
 
         public void registerIndex(IndexMetadata metadata) {
-            // TODO Auto-generated method stub
+
             
         }
 
         public UUID registerIndex(IndexMetadata metadata, UUID dataServiceUUID) {
-            // TODO Auto-generated method stub
+
             return null;
         }
 
         public UUID registerIndex(IndexMetadata metadata, byte[][] separatorKeys, UUID[] dataServiceUUIDs) {
-            // TODO Auto-generated method stub
+
             return null;
         }
 
         public IResourceLocator getResourceLocator() {
-            // TODO Auto-generated method stub
+
             return null;
         }
 
         public IResourceLockService getResourceLockService() {
-            // TODO Auto-generated method stub
+
             return null;
         }
 
         public BigdataFileSystem getGlobalFileSystem() {
-            // TODO Auto-generated method stub
+
             return null;
         }
 
         public TemporaryStore getTempStore() {
-            // TODO Auto-generated method stub
+
             return null;
         }
 
         public String getHttpdURL() {
-            // TODO Auto-generated method stub
+
             return null;
         }
 
         public CounterSet getServiceCounterSet() {
-            // TODO Auto-generated method stub
+
             return null;
         }
         

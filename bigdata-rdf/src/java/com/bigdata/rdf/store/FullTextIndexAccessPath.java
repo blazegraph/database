@@ -132,22 +132,45 @@ public class FullTextIndexAccessPath implements IAccessPath<IHit> {
 
     final public IChunkedOrderedIterator<IHit> iterator() {
         
-        return iterator(0, 0);
+        return iterator(0L/* offset */, 0L/* limit */, 0/* capacity */);
         
     }
 
     public IChunkedOrderedIterator<IHit> iterator(int limit, int capacity) {
 
-        if (limit != 0) {
+        return iterator(0L/* offset */, limit, capacity);
+        
+    }
+
+    public IChunkedOrderedIterator<IHit> iterator(long offset, long limit,
+            int capacity) {
+
+        if (offset < 0)
+            throw new IllegalArgumentException();
+        
+        if (limit <= 0)
+            throw new IllegalArgumentException();
+        
+        if (limit == Long.MAX_VALUE)
+            limit = 0L;
+
+        // @todo support offset GT zero.
+        if (offset > 0)
+            throw new UnsupportedOperationException();
+        
+        if (limit > Integer.MAX_VALUE)
+            throw new UnsupportedOperationException();
+        
+        if (limit > 0L) {
 
             // [limit] imposes an additional constraint.
-            limit = Math.min(limit, maxRank);
+            limit = Math.min(offset + limit, maxRank);
 
         }
 
         return new ChunkedWrappedIterator<IHit>(textIndex.search(query,
                 languageCode, minCosine, maxRank));
-        
+
     }
 
     /**

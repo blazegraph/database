@@ -741,9 +741,9 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
 
     }
 
-    public SparseRowStore getGlobalRowStore(long timestamp) {
+    public SparseRowStore getGlobalRowStore() {
         
-        return globalRowStoreHelper.getGlobalRowStore(timestamp);
+        return globalRowStoreHelper.getGlobalRowStore();
 
     }
 

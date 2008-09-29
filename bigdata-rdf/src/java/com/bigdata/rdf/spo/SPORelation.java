@@ -130,7 +130,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
     protected static final boolean DEBUG = log.isDebugEnabled();
     
-    private transient final long NULL = IRawTripleStore.NULL;
+    private static transient final long NULL = IRawTripleStore.NULL;
     
     private final Set<String> indexNames;
     

@@ -70,6 +70,9 @@ public class TestAll extends TestCase {
         
         // @todo test binding set impls.
         suite.addTestSuite(TestBindingSet.class);
+
+        // test ISlice() impl.
+        suite.addTestSuite(TestSlice.class);
         
         // test suite for basic rule mechanisms.
         suite.addTestSuite( TestRule.class );
