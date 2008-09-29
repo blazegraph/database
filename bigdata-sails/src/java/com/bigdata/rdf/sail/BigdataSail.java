@@ -486,6 +486,8 @@ public class BigdataSail extends SailBase implements Sail {
         // nativeJoins
         {
             
+//            nativeJoins = false;
+//            System.err.println("native joins are disabled.");
             nativeJoins = Boolean.parseBoolean(properties.getProperty(
                     BigdataSail.Options.NATIVE_JOINS,
                     BigdataSail.Options.DEFAULT_NATIVE_JOINS));

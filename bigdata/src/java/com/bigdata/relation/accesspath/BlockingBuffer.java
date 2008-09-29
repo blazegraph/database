@@ -36,7 +36,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.relation.rule.IQueryOptions;
@@ -78,14 +77,12 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    protected static final boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    protected static final boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    protected static final boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    protected static final boolean DEBUG = log.isDebugEnabled();
 
     /**
      * <code>true</code> until the buffer is {@link #close()}ed.
@@ -181,10 +178,6 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     public BlockingBuffer(final int capacity, final int chunkSize,
             final long chunkTimeout, final TimeUnit chunkTimeoutUnit) {
 
-        /*
-         * FIXME test w/ synchronous queue. The chunk combiner should still
-         * work.
-         */
         this(capacity == 0 ? new SynchronousQueue<E>()
                 : new ArrayBlockingQueue<E>(capacity),
                 chunkSize,
@@ -255,7 +248,9 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
     /**
      * @throws IllegalStateException
-     *             if the buffer is not open.
+     *             if the buffer is not open. The cause of that
+     *             IllegalStateException will be set if
+     *             {@link #abort(Throwable)} was used.
      */
     private void assertOpen() {
         
@@ -295,33 +290,18 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     
         this.open = false;
 
-        notifyIterator();
-        
         if (INFO)
             log.info("closed.");
         
     }
 
-    private final void notifyIterator() {
-
-        /*
-         * The iterator does not actually wait() on anything so this is not
-         * necessary.
-         */
-//        synchronized(iterator) {
-//            
-//            iterator.notify();
-//            
-//        }
-
-    }
-    
     public void abort(Throwable cause) {
 
         if (cause == null)
             throw new IllegalArgumentException();
 
-        log.warn("cause=" + cause, cause);
+        if (INFO)
+            log.info("cause=" + cause, cause);
 
         synchronized (this) {
 
@@ -333,8 +313,10 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
             }
 
+            // set the cause.
             this.cause = cause;
 
+            // mark as closed.
             this.open = false;
             
         }
@@ -383,7 +365,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                 
             } catch (InterruptedException ex) {
 
-                close();
+                abort(ex);
 
                 throw new RuntimeException("Buffer closed by interrupt", ex);
                 
@@ -393,8 +375,6 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
             if (DEBUG)
                 log.debug("added: " + e.toString());
-            
-            notifyIterator();
             
             return;
             

@@ -1151,7 +1151,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         if (fileMetadata.writeCache != null && !fileMetadata.readOnly
                 && fileMetadata.closeTime == 0L) {
 
-            log.info("Enabling writeCache: capacity="
+            if(INFO)
+                log.info("Enabling writeCache: capacity="
                     + fileMetadata.writeCache.capacity());
 
             writeCache = new WriteCache( fileMetadata.writeCache );
@@ -1167,7 +1168,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         if (fileMetadata.readCacheCapacity > 0) {
 
-            log.info("Enabling read cache: capacity="
+            if(INFO)
+                log.info("Enabling read cache: capacity="
                     + fileMetadata.readCacheCapacity + ", maxRecordSize="
                     + fileMetadata.readCacheMaxRecordSize);
 
@@ -2090,7 +2092,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         }
 
-        if (log.isDebugEnabled())
+        if (DEBUG)
             log.debug("wrote root block: "+rootBlock);
         
         counters.nwriteRootBlock++;
@@ -2146,7 +2148,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             
             log.warn("newLength="+cf.format(newExtent)+", file="+file);
             
-            if(log.isInfoEnabled())
+            if(INFO)
                 log.info(getCounters().toString());
             
         } catch(IOException ex) {

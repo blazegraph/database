@@ -170,8 +170,8 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
                     log.debug("cache hit: " + resource);
                     
-                    System.err.println("cache hit: namespace=" + namespace + ", timestamp="
-                        + timestamp);
+//                    System.err.println("cache hit: namespace=" + namespace + ", timestamp="
+//                        + timestamp);
 
                 }
 
@@ -491,7 +491,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
         final Map<String, Object> map = rowStore == null ? null : rowStore
                 .read(RelationSchema.INSTANCE, namespace);
 
-        System.err.println("Reading properties: namespace="+namespace+", timestamp="+timestampIsIgnored);
+//        System.err.println("Reading properties: namespace="+namespace+", timestamp="+timestampIsIgnored);
 //        log.fatal("Reading properties: "+namespace,new RuntimeException());
         
         if (map == null) {

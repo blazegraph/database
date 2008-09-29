@@ -51,7 +51,11 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
      * Log for btree opeations.
      */
     protected static final Logger log = Logger.getLogger(AbstractBufferStrategy.class);
-
+    
+    protected static final boolean INFO = log.isInfoEnabled();
+    
+    protected static final boolean DEBUG = log.isDebugEnabled();
+    
     /**
      * Text of the error message used when a {@link ByteBuffer} with zero bytes
      * {@link ByteBuffer#remaining()} is passed to {@link #write(ByteBuffer)}.
