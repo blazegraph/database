@@ -608,7 +608,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
         final IndexMetadata metadata = getIndexMetadata(getFQN(keyOrder));
 
         final IDataSerializer leafKeySer;
-        if(false) {
+        if(true) {
             
             /*
              * Note: This shows a substantial savings on disk and is only

@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.rule.eval;
 
+import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
@@ -56,6 +57,7 @@ import com.bigdata.relation.rule.ISlice;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
+import com.bigdata.util.InnerCause;
 
 /**
  * Evaluation of an {@link IRule} using nested subquery (one or more JOINs plus
@@ -285,25 +287,60 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
             
             apply(0/* orderIndex */, bindingSet);
             
-        } catch (InterruptedException ex) {
-            
-            /*
-             * Note: This exception will be thrown during query if the
-             * BlockingBuffer on which the query solutions are being written is
-             * closed, e.g., because someone closed a high-level iterator
-             * reading solutions from the BlockingBuffer. Closing the
-             * BlockingBuffer causes the Future that is writing on the
-             * BlockingBuffer to be interrupted in order to eagerly terminate
-             * processing.
-             * 
-             * Note: Using Thread#interrupt() to halt asynchronous processing
-             * for query is NOT ideal as it will typically force the FileChannel
-             * to be closed asynchronously.  You are better off using a SLICE.
-             */
-            
-//            if(INFO)
-                log.warn("Join evaluation terminated by interrupt: "+ex);
-            
+        } catch (Throwable t) {
+
+            if (InnerCause.isInnerCause(t, InterruptedException.class)||
+                InnerCause.isInnerCause(t, ClosedByInterruptException.class)) {
+                
+                /*
+                 * The root cause was the asynchronous close of the buffer that
+                 * is the overflow() target for the unsynchronized buffer. This
+                 * will occur if the high-level iterator was closed() while join
+                 * thread(s) are still executing.
+                 * 
+                 * Note: InterruptedException will be thrown during query if the
+                 * BlockingBuffer on which the query solutions are being written
+                 * is closed, e.g., because someone closed a high-level iterator
+                 * reading solutions from the BlockingBuffer. Closing the
+                 * BlockingBuffer causes the Future that is writing on the
+                 * BlockingBuffer to be interrupted in order to eagerly
+                 * terminate processing.
+                 * 
+                 * Note: ClosedByInterruptException will be the cause if the
+                 * interrupt was noticed during an IO by the thread in which
+                 * this exception was thrown.
+                 * 
+                 * Note: AsynchronousCloseException will be the cause if the
+                 * interrupt was noticed during an IO by a different thread
+                 * resulting in the asynchronous close of the backing channel.
+                 * However, the AsynchronousCloseException is trapped by
+                 * DiskOnlyStrategy and results in the transparent re-opening of
+                 * the backing channel. Since the target buffer will be closed,
+                 * the AsynchronousCloseException should be swiftly followed by
+                 * an BlockingBuffer#add() throwing an IllegalStateException if
+                 * there is an attempt to write on a closed buffer.
+                 * 
+                 * Note: Using Thread#interrupt() to halt asynchronous
+                 * processing for query is NOT ideal as it will typically force
+                 * the FileChannel to be closed asynchronously. You are better
+                 * off using a SLICE. However, when the query has a FILTER as
+                 * well as a SLICE and the filter can not be evaluated inside of
+                 * the the JOINs then the caller must pull solutions through the
+                 * filter and close the iterator once the slice is satisified.
+                 * That will trigger an interrupt of join thread(s) unless join
+                 * processing is already complete.
+                 */
+                
+                if (INFO)
+                    log.info("Asyncronous terminatation: " + t);
+                
+            } else {
+                
+                // something else, something unexpected.
+                throw new RuntimeException(t);
+                
+            }
+
         }
 
         ruleStats.elapsed += System.currentTimeMillis() - begin;
@@ -396,19 +433,13 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
         final IBuffer<ISolution> tmp = joinNexus.newUnsynchronizedBuffer(
                 buffer, chunkSize);
 
-        try {
-
-            // run the (sub-)query.
-            apply(orderIndex, bindingSet, tmp);
-            
-        } finally {
-
-            // flush buffer onto the chunked buffer.
-//            long nflushed = 
-                tmp.flush();
-//            System.err.println("flushed "+nflushed+" solutions onto the buffer");
-            
-        }
+        //  run the (sub-)query.
+        apply(orderIndex, bindingSet, tmp);
+        
+        // flush buffer onto the chunked buffer (unless interrupted).
+//          long nflushed =
+        tmp.flush();
+//          System.err.println("flushed "+nflushed+" solutions onto the buffer");
 
     }
     
@@ -1001,7 +1032,8 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      *            object is NOT thread-safe.
      */
     protected void emitSolutions(final int orderIndex, final Object[] chunk,
-            final IBindingSet bindingSet, final IBuffer<ISolution> buffer) {
+            final IBindingSet bindingSet, final IBuffer<ISolution> buffer)
+            throws InterruptedException {
 
         final int tailIndex = getTailIndex(orderIndex);
 
