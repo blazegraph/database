@@ -893,6 +893,9 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
             
             val = properties.getProperty(Options.FILE);
 
+            if (INFO)
+                log.info(Options.FILE + "=" + val);
+
             if(createTempFile && val != null) {
                 
                 throw new RuntimeException("Can not use option '"
@@ -936,11 +939,29 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                 
                 isEmptyFile = true;
                 
+            } else {
+                
+                /*
+                 * Make sure that the parent directory (if any) exists.
+                 */
+                
+                final File parent = file.getParentFile();
+                
+                if(parent != null && !parent.exists()) {
+                   
+                    // create the parent directory.
+                    
+                    if (!parent.mkdirs()) {
+                        
+                        throw new RuntimeException(
+                                "Could not create parent directory: " + parent);
+                        
+                    }
+                    
+                }
+                
             }
             
-            if (INFO)
-                log.info(Options.FILE + "=" + val);
-
         }
 
         /*
