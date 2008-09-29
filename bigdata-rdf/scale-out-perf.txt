@@ -1,333 +1,3 @@
-nciOncology.owl, embedded federation.
-
-INFO : 31844   Main Thread com.bigdata.rdf.rio.BasicRioLoader.loadRdf(BasicRioLoader.java:194): parse complete: elapsed=28187ms, toldTriples=464841, tps=16491
-
-INFO : 882875   Main Thread com.bigdata.rdf.store.DataLoader.loadData(DataLoader.java:517): Loaded 1 resources: 464841 stmts added in 28.265 secs, rate= 528, commitLatency=0ms
-rule    	ms	#entms	entms/ms
-RuleFastClosure13	15	0	0
-RuleOwlEquivalentProperty	16	0	0
-RuleRdfs02	5890	395806	67
-RuleRdfs03	3297	395806	120
-RuleRdfs08	31	41618	1342
-RuleRdfs09	12109	41724	3
-RuleRdfs10	110	41618	378
-RuleRdfs11	720126	5324314	7
-totals: elapsed=741594, nadded=376849, numComputed=6241034, added/sec=508, computed/sec=8415
-
-Note: this appears to be incremental TM rather than database at once closure.
-
-========================================
-
-Modified to use database at once closure.
-
-nciOncology.owl, embedded federation.
-
-INFO : 36188   Main Thread com.bigdata.rdf.store.DataLoader.loadData2(DataLoader.java:628): 464841 stmts added in 32.109 secs, rate= 14476, commitLatency=0ms
-
-rule    	ms	#entms	entms/ms
-RuleOwlEquivalentProperty	157	0	0
-RuleRdf01	110	43	0
-RuleRdfs02	8859	395958	44
-RuleRdfs03	7125	395958	55
-RuleRdfs08	250	41631	166
-RuleRdfs09	11406	41759	3
-RuleRdfs10	219	41631	190
-RuleRdfs11	240719	3951672	16
-totals: elapsed=268845, nadded=3951672, numComputed=4868778, added/sec=14698, computed/sec=18109
-
-Computed closure in 301500ms yeilding 841842 statements total, 376849 inferences, entailmentsPerSec=1249
-
-
-============================================================
-
-
-nciOncology.owl, no closure.
-
-ids: #entries(est)=289871
-SPO: #entries(est)=464993
-POS: #entries(est)=464993
-OSP: #entries(est)=464993
-just: #entries(est)=0
-
-!!!Note: be careful to choose the line that reports after the commit on the store!!!
-
-local, unisolated:
-
-run 1: Loaded 1 resources: 464841 stmts added in 23.656 secs, rate= 19650, commitLatency=172ms
-run 2: Loaded 1 resources: 464841 stmts added in 24.094 secs, rate= 19292, commitLatency=156ms
-run 3: Loaded 1 resources: 464841 stmts added in 24.328 secs, rate= 19107, commitLatency=235ms (after refactor for procedures)
-(Computed closure in 141047ms yeilding 841842 statements total, 376849 inferences, entailmentsPerSec=2671)
-
-local, isolated:
-
-run 1: Loaded 1 resources: 464841 stmts added in 26.735 secs, rate= 17386, commitLatency=438ms
-run 2: Loaded 1 resources: 464841 stmts added in 25.719 secs, rate= 18073, commitLatency=297ms
-
-embedded data service:
-run 1: Loaded 1 resources: 464841 stmts added in 27.532 secs, rate= 16883, commitLatency=0ms (SPOArrayIterator)
-(Computed closure in 375953ms yeilding 841842 statements total, 376849 inferences, entailmentsPerSec=1002)
-run 2: Loaded 1 resources: 464841 stmts added in 27.016 secs, rate= 17206, commitLatency=0ms (SPOIterator - no mem cap)
-(Computed closure in 482453ms yeilding 841842 statements total, 376849 inferences, entailmentsPerSec=781)
-ren 3: Loaded 1 resources: 464841 stmts added in 27.485 secs, rate= 16912, commitLatency=0ms (SPOIterator - no mem cap)
-(Computed closure in 436266ms yeilding 841842 statements total, 376849 inferences, entailmentsPerSec=863)
-
-embedded federation:
-
-run 1: Loaded 1 resources: 464841 stmts added in 32.313 secs, rate= 14385, commitLatency=31ms
-
-jini federation:
-
-run 1: Loaded 1 resources: 464841 stmts added in 57.204 secs, rate= 8126, commitLatency=16ms
-run 2: Loaded 1 resources: 464841 stmts added in 49.172 secs, rate= 9453, commitLatency=16ms
-
-(done) Report more data about the scale-out indices, including the #of
-partitions, where each partition is located, and the size on disk on
-the partition (the btrees on the journal are conflated so the journal
-space needs to be factored out but we can report the #of entries on
-the journal and maybe even the bytes written on the journal by the
-btree).  Call out the time spent on each index - we need better
-counters to report that correctly, or even counters on the data
-service.
-
-The embedded federation has a substantial drop in performance when
-compared to the local store using isolated indices (the data services
-always use isolated indices so that is the point for comparison), but
-the big drop is the jini federation - presumably that cost is entirely
-attributable to the serialization overhead for RPCs.
-
-Examine in more depth why the embedded federation is slower.  Try a
-run on a larger data set and see if this is related to start up costs.
-
-Thesaurus.owl: #terms=586945, #stmts=1,047,647
-
-local, unisolated  : Loaded 1 resources: 1086012 stmts added in  59.609 secs, rate= 18218, commitLatency=312ms
-                   : Loaded 1 resources: 1086012 stmts added in  57.765 secs, rate= 18800, commitLatency=328ms
-                   : Loaded 1 resources: 1086012 stmts added in  58.313 secs, rate= 18623, commitLatency=312ms
-		   : Loaded 1 resources: 1086012 stmts added in  58.687 secs, rate= 18505, commitLatency=312ms (keybuilder refactor)
-local,   isolated  : Loaded 1 resources: 1086012 stmts added in  64.562 secs, rate= 16821, commitLatency=156ms
-embedded federation: Loaded 1 resources: 1086012 stmts added in  76.969 secs, rate= 14109, commitLatency=31ms
-                   : Loaded 1 resources: 1086012 stmts added in  76.938 secs, rate= 14115, commitLatency=16ms
-jini federation    : Loaded 1 resources: 1086012 stmts added in 103.734 secs, rate= 10469, commitLatency=0ms
-                   : Loaded 1 resources: 1086012 stmts added in 103.859 secs, rate= 10456, commitLatency=31ms
-
-Results for a variety of serialization/compression approaches for the
-various Procedures (IndexWriteProc, JustificationWriteProc, etc), but
-NOT for serialization changes to the ResultSet (which is really only
-used during inference).  In all cases these results are obtained for
-the jini federation since that is the only case where we are forced to
-serialize the data in a Procedure or a ResultSet for RPC.
-
-NoCompression.  This serializes each key and value as a full length
-byte[].
-
-   Loaded 1 resources: 1086012 stmts added in 107.922 secs, rate= 10062, commitLatency=0ms
-   Loaded 1 resources: 1086012 stmts added in 105.531 secs, rate= 10290, commitLatency=16ms
-
-NoCompression, but writing on a DataOutputBuffer and then copying the
-results to the output stream (see if this case improves if we reuse
-the buffer for each request or using a thread-local variable):
-
-   Loaded 1 resources: 1086012 stmts added in 149.484 secs, rate= 7265, commitLatency=16ms
-
-BTreeCompression.  This uses prefix compression on the keys and simple
-serialization of the values.
-
-   Loaded 1 resources: 1086012 stmts added in 103.203 secs, rate= 10523, commitLatency=16ms
-
-FastRDFCompression
-
-   Loaded 1 resources: 1086012 stmts added in 102.109 secs, rate= 10635, commitLatency=16ms
-   Loaded 1 resources: 1086012 stmts added in  99.75  secs, rate= 10887, commitLatency=16ms (NIO)
-   Loaded 1 resources: 1086012 stmts added in  99.313 secs, rate= 10935, commitLatency=15ms (NIO)
-
-The "FastRDF" approach is probably as good as I can make it for the
-statement indices.  It performs only marginally better than the no
-compression approach.
-
-Perhaps the additional overhead is a mixture of:
-
- - de-serialization to support RPC;
- - the mechanisms of RPC (client, server, protocol, network)
- - the added burden on the heap
-
-NIO for the RPC protocol appears to help a bit, but it runs out of
-memory in the test suite (this shows up as an NPE in ByteBuffer).
-
-
-Concurrent load rates:
-
-Explore interaction of the group commit policy.  If we check point vs
-commit vs do not wait around then how does that effect the
-throughput!!!
-
-Note: smaller buffer sizes (1000 statements) makes the total run much
-slower.  Try this with more threads, but we will probably have to wait
-on the group commit so that won't help with the current policy.
-
-Note: larger buffer sizes will cap out since there is only so much
-data in the LUBM files.
-
-U10
-
-embedded data service:
-
-Finished: #loaded=189 files in 96015 ms, #stmts=1272577, rate=13253.0
-(#threads=3, largestPoolSize=3, bufferCapacity=10000, #done=189,
-#ok=189, #err=0)
-
-Finished: #loaded=189 files in 73797 ms, #stmts=1272577, rate=17244.0
-(#threads=20, largestPoolSize=20, bufferCapacity=10000, #done=189,
-#ok=189, #err=0)
-
-Finished: #loaded=189 files in 85625 ms, #stmts=1272577, rate=14862.0
-(#threads=20, largestPoolSize=20, bufferCapacity=10000, #done=189,
-#ok=189, #err=0)
-
-Finished: #loaded=189 files in 78750 ms, #stmts=1272577, rate=16159.0
-(#threads=20, largestPoolSize=20, bufferCapacity=10000, #done=189,
-#ok=189, #err=0)
-
-Finished: #loaded=189 files in 73203 ms, #stmts=1272577, rate=17384.0
-(#threads=20, largestPoolSize=20, bufferCapacity=10000, #done=189,
-#ok=189, #err=0)
-
-All done: #loaded=189 files in 63172 ms, #stmts=1272577, rate=20144.0
-(#threads=20, largestPoolSize=20, bufferCapacity=100000,
-autoFlush=false, #done=189, #ok=189, #err=0)
-
-All done: #loaded=189 files in 59734 ms, #stmts=1272577, rate=21304.0
-(#threads=20, class=LocalTripleStoreWithEmbeddedDataService,
-largestPoolSize=20, bufferCapacity=100000, autoFlush=false, #done=189,
-#ok=189, #err=0)
-
-embedded federation:
-
-Finished: #loaded=189 files in 191828 ms, #stmts=1272577, rate=6633.0
-(#threads=1, largestPoolSize=1, bufferCapacity=10000, #done=189,
-#ok=189, #err=0)
-
-Finished: #loaded=189 files in 122343 ms, #stmts=1272577, rate=10401.0
-(#threads=3, largestPoolSize=3, bufferCapacity=10000, #done=189,
-#ok=189, #err=0)
-
-Finished: #loaded=189 files in 282140 ms, #stmts=1272577, rate=4510.0
-(#threads=3, largestPoolSize=3, bufferCapacity=1000, #done=189,
-#ok=189, #err=0)
-
-Finished: #loaded=189 files in 90860 ms, #stmts=1272577, rate=14005.0
-(#threads=10, largestPoolSize=10, bufferCapacity=10000, #done=189,
-#ok=189, #err=0)
-
-Finished: #loaded=189 files in 85735 ms, #stmts=1272577, rate=14843.0
-(#threads=20, largestPoolSize=20, bufferCapacity=10000, #done=189,
-#ok=189, #err=0)
-
-Finished: #loaded=189 files in 88453 ms, #stmts=1272577, rate=14387.0
-(#threads=20, largestPoolSize=20, bufferCapacity=20000, #done=189,
-#ok=189, #err=0)
-
-Finished: #loaded=189 files in 87359 ms, #stmts=1272577, rate=14567.0
-(#threads=30, largestPoolSize=30, bufferCapacity=10000, #done=189,
-#ok=189, #err=0)
-
-All done: #loaded=189 files in 105203 ms, #stmts=1272577, rate=12096.0
-(#threads=20, class=ScaleOutTripleStore, largestPoolSize=20,
-bufferCapacity=100000, autoFlush=false, #done=189, #ok=189, #err=0)
-
-All done: #loaded=189 files in 106109 ms, #stmts=1272577, rate=11993.0
-(#threads=20, class=ScaleOutTripleStore, largestPoolSize=20,
-bufferCapacity=100000, autoFlush=false, #done=189, #ok=189, #err=0)
-
-   disk: 1,230,029,630 {osp,spo,terms} + 51,870,457 {ids,pos}
-
-Alternative index allocation: 
-
-   Note: This case appears to be much more efficient in term and
-   space, at least for the embedded federation:
-
-   disk: 80,506,107 {terms,spo} + 90,515,091 {ids,pos,osp}
-
-   All done: #loaded=189 files in 88016 ms, #stmts=1272577,
-   rate=14458.0 (#threads=20, class=ScaleOutTripleStore,
-   largestPoolSize=20, bufferCapacity=100000, autoFlush=false,
-   #done=189, #ok=189, #err=0)
-
-jini federation:
-
-Finished: #loaded=189 files in 392078 ms, #stmts=1272578, rate=3245.0
-(#threads=20, largestPoolSize=20, bufferCapacity=10000, #done=189,
-#ok=189, #err=0)
-
-Finished: #loaded=189 files in 371297 ms, #stmts=1272582, rate=3427.0
-(#threads=20, largestPoolSize=20, bufferCapacity=10000, #done=189,
-#ok=189, #err=0)
-
-All done: #loaded=189 files in 82328 ms, #stmts=1272577, rate=15457.0
-(#threads=20, class=ScaleOutTripleStore, largestPoolSize=20,
-bufferCapacity=100000, autoFlush=false, #done=189, #ok=189, #err=0)
-
-    Note: This is an extremely odd result.  It was obtained by running
-    immediately after the previous jini federation run.  Overall, jini
-    seems very sensitive to initial conditions.  Perhaps this is
-    related to memory limits on the laptop platform?  Often the jini
-    run appears to be very nearly single threaded.
-
-All done: #loaded=189 files in 241672 ms, #terms=314871,
-#stmts=1272577, rate=5265.0 (#threads=20, class=ScaleOutTripleStore,
-largestPoolSize=20, bufferCapacity=100000, autoFlush=false, #done=189,
-#ok=189, #err=0)
-
-server1: All done: #loaded=190 files in 74049 ms, #terms=314871,
-#stmts=1272577, rate=17185.0 (#threads=20, class=ScaleOutTripleStore,
-largestPoolSize=20, bufferCapacity=100000, autoFlush=false, #done=190,
-#ok=189, #err=1)
-
-server1: All done: #loaded=190 files in 76956 ms, #terms=314871,
-#stmts=1272577, rate=16536.0 (#threads=20, class=ScaleOutTripleStore,
-largestPoolSize=20, bufferCapacity=100000, autoFlush=false, #done=190,
-#ok=189, #err=1)
-
-   disk: 90,926,328 {terms,spo} + 90,926,328 {ids,pos,osp}
-
-server1: All done: #loaded=2008 files in 739904 ms, #terms=3301736,
-#stmts=13405383, rate=18117.0 (#threads=20, class=ScaleOutTripleStore,
-largestPoolSize=20, bufferCapacity=100000, autoFlush=false,
-#done=2008, #ok=2007, #err=1) (U100 is 13M triples)
-
-   disk: 1,110,058,584 {terms,spo} + 1,071,640,537 {ids,pos,osp}
-
-[INFO ][memory ] Memory usage report
-[INFO ][memory ] young collections
-[INFO ][memory ]     total GC time =         140.096 s
-[INFO ][memory ] old collections
-[INFO ][memory ]     total GC time =         112.644 s (pause 15.700 s)
-
-server1: #loaded=20022 files in 11419382 ms, #terms=32885169,
-#stmts=133573856, rate=11697.0 (#threads=20,
-class=ScaleOutTripleStore, largestPoolSize=20, bufferCapacity=100000,
-autoFlush=false, #done=20022, #ok=20020, #err=2)
-
-   disk: 14,110,887,061 {terms,spo} + 12,039,810,264 {ids,pos,osp}
-
-[INFO ][memory ] Memory usage report
-[INFO ][memory ] young collections
-[INFO ][memory ]     total GC time =         1319.038 s
-[INFO ][memory ] old collections
-[INFO ][memory ]     total GC time =         693.036 s (pause 103.692 s)
-
-server1: All done: #loaded=20022 files in 11633794 ms, #terms=32885169,
-#stmts=133573856, rate=11481.0 (#threads=20,
-class=ScaleOutTripleStore, largestPoolSize=20, bufferCapacity=100000,
-autoFlush=false, #done=20022, #ok=20020, #err=2)
-
-   disk: 14,093,839,353 {terms,spo} + 12,038,914,891 {ids,pos,osp}
-
-[INFO ][memory ] Memory usage report
-[INFO ][memory ] young collections
-[INFO ][memory ]     total GC time =         1279.318 s
-[INFO ][memory ] old collections
-[INFO ][memory ]     total GC time =         666.388 s (pause 100.395 s)
-
 ============================================================
 
 Notes on store level record checksums and record compression.
@@ -430,8 +100,6 @@ Notes on store level record checksums and record compression.
         and code from that (assuming that value reuse is common - if
         not then at least URIs can be broken down into common
         symbols).
-
-	Done. Do not store bnodes in the id:term index.
 
       - The terms (term:id) index is on the order of 5x larger than
         the ids (id:term) index.  Presumably this is because updates
@@ -898,6 +566,13 @@ Short term tasks:
        operation.  This will be help identify if/when the MDI is a
        bottleneck for the client.
 
+     - On a long run I begin to see assertion failures in
+       com.bigdata.counters.History#859 ( assert size <= capacity :
+       "size=" + size; ).  The size appears to grow by one every
+       minute, causing assertion failures once it exceeds the buffer
+       capacity.  (The run may have been out of disk space by the time
+       these errors emerged.)
+
    - Admin UI
    
      - It would be nice to be able to drill down into the index data,
@@ -1085,6 +760,15 @@ Short term tasks:
 
   - Iterator refactor
 
+     * Drive SLICE (offset as well as limit) through the IRangeQuery
+       API and the ITupleIterator implementations so that we can
+       efficiently process a slice without having to materialize the
+       elements that lie before the desired offset.
+       
+       This will also require changes to the AbstractAccessPath,
+       specifically it must drive both the offset and limit through to
+       the ITupleIterator.
+
      * Change the striterator heirarchy into an implementation
        heirarchy (StriteratorImpl) for co-varying generics and a use
        hierarchy (IStriterator and Striterator) in which only the
@@ -1259,115 +943,10 @@ Short term tasks:
 
      The ConcurrentDataLoader is certainly a useful utility class.
 
-   - Quad store.
-
-    - ** Sesame 2 TCK (integration tests)
-
-         (temp fix) You should add the following URL as a maven
-	 repository to your maven settings.xml file:
-
-	    http://repo.aduna-software.org/maven2/releases/
-
-    - ***** Two database modes: named-graph mode (quads with all 6
-      indices) and provenance mode (3+1 where the context position
-      holding a bnode with a 1:1 relationship to the triple and
-      therefore serving as a statement identifier and is stored as the
-      value associated to the triple in the index; The source
-      extension for RDF/XML needs to be supported such that the given
-      BNode or URI for the source is correlated to the use of that
-      same Resource elsewhere in the same RDF/XML document - we need
-      to extend RIO for this).
-
-      1. 3+1
-
-	 - Done. value serializer must be different when using sids
-
-	 - Note: any partition of the term:id index may be used to
-           assign term identifiers for bnodes since the bnode ID is
-           only required to be distinct, but not stable.
-
-	 - Done. TMStatementBuffer needs to recursively wipe out
-           statements using a statement identifier.  this should be
-           part of truth maintenance.  when we get the original set of
-           explicit statements to be removed we collect their
-           statement identifiers and then collect all statements using
-           those statement identifiers in either the subject or object
-           position and add them to the original set of statements to
-           be removed.
-
-	   Done. AccessPath#removeAll() we also need to collect the
-	   set of statements using a statement identifier and delete
-	   them as well.  this will wind up being a double test for
-	   the original set of statements if TM is being used, but it
-	   is required when TM is not in use.
-
-	   Done. Do not generate statement identifiers if the SPO is
-	   marked as an inference (an optimization).
-	   
-	   Done. Modify the procedure that actually writes on the
-	   statement index to write a ZERO (0L) statement identifier
-	   if the statement is (in fact at the time that we examine
-	   the statement index) an inference or an axiom.  If an
-	   explicit statement is later asserted for the same SPO, then
-	   we need to overwrite that 0L with the assigned statement
-	   identifier.
-
-	   Done. override ISPOIterator#close() when returning an
-	   iterator backed by a temporary store.
-
-	   Done. infinite loop test case fails when sids NOT used. I'm
-	   not sure how the test was succeeding before, but the
-	   problem was failing to verify that a statement was in the
-	   database before adding it to the focusStore.
-
-	   Done. TestTripleStore#removeStatements() has problem with
-	   sids.  The problem is that the sid is not getting placed
-	   onto the SPO by the unit test, but it highlights the fact
-	   that with sids you need to either have the SID on hand
-	   before calling removeStatements() or I need to modify the
-	   code to resolve the sids as a first step when I compute
-	   their fixed point (at which point I could also discard any
-	   statements that were not actually in the database).
-	   (addStatements already resolves sids so as to always make
-	   them consistent).
-
-	   Done. write unit tests for TM cases when using statement
-	   identifiers to make metadata statements.
-      
-      2. Done. RDF/XML w/ statement identifiers in/out.
-
-         - Reduce to only an "explicit" flag rather than {explicit,
-           axiom, inferred} since we can not differentiate between
-           constructed statements and inferences.
-
-      3. High level query for reading variable bindings out.
-
-	 - Done. Verify a CONSTRUCT query.
-
-	 - Done. Verify a SELECT query using statement identifiers.
-      
-      6. Publish on statement level provenance and truth maintenance
-         for SPARQL end points.
-
-      7. Defer "named-graph" style quad store for now.
-
-      8. (***) implement prefix compression and apply to the lexicon.
-         test it out also on the statement indices and see how it
-         stacks up against the "fast rdf key" compression and compare
-         with huffman encoding of the decoded long identifiers as
-         well.
-
-	 See it.unimi.dsi.fastutil.bytes#ByteArrayFrontCodedList.
-
-	 Note: We should use front compression by default for the
-	 nodes of the BTree.  Since the separator keys in the nodes
-	 are dynamically determined prefixes, application specified
-	 compression generally can't be used.
-
    - Done.  Correctness testing for scale-out with index partition
      split, move, and join.  See services/StressTestConcurrent. It can
      be parameterized for this purpose.
-
+ 
    - write performance test drivers and run on cluster.
 
       - rdf concurrent query (rdf lubm is not designed to test with
@@ -1677,19 +1256,20 @@ Main issues:
 
 (*) Index and other performance tuning.
 
-    (*) Implement prefix compression algorithm using mg4j.
+    (-) Replace use of "immutable nodes" throughout.
 
-    (*) Try prefix compression for statement indices to see if I can
-	reduce the (de-)serialization times!
+    (-) Run an Experiment driver with variables for the branching
+        factor, node compression, leave compression, and custom SPO
+        compression.  Examine performance when index segments are
+        built from the views as well.
 
-    (-) Replace use of "immutable nodes" throughout and introduce the
-        default prefix compression algorithm in its place.
+    (-) The best branching factor for an Index Segment is probably
+        limited by the best branching factor for query (or closure)
+        benchmarks.  For the triple store, this looks like it is 256
+        since closure performance takes a beating after that.
 
-    (-) Experiment with higher branching factors on the journal
-        indices now that we will overflow periodically.
-
-    (*) Try co-threading the forward index writes for the statements with
-	the reverse index writes for the term identifiers.
+    (*) Try co-threading the forward index writes for the statements
+	with the reverse index writes for the term identifiers.
 
 ============================================================
 
@@ -2175,48 +1755,64 @@ Caused by: java.lang.NullPointerException
 	 Consider the use of magic sets as an alternative to "fixing"
 	 justifications tracking for scale-out.
 
-Translate Sesame2 queries to Rules dynamically so that they can
-execute on the native rule engine.
-   
-   - done. allow rules with an empty head (for query).
+============================================================
+SPARQL query evaluation and native rule engine optimizations:
 
-   - done. verify that query is against the last committed state of the kb.
+  - ** Sesame 2 TCK (integration tests).  This will give us confidence
+       that we are handling all of SPARQL with our native rule
+       execution layer.
 
-   - done. simple conjunctive query.
+       (temp fix) You should add the following URL as a maven
+       repository to your maven settings.xml file:
 
-   - Optionals (native rules support optionals, but we are not
-     rewriting SPARQL optionals onto native optionals yet.)
+       http://repo.aduna-software.org/maven2/releases/
 
-   - Support the SPARQL constructs which allow you to obtain a slice
-     of a result set.  This may require that we impose a stable
-     evaluation order when a slice is requested, which means turning
-     off join subquery parallelism for such queries.
+  x. *** Native rules have several capabilities that are not being
+         exploited by the SAIL.
 
-   - resolution of terms to term ids and visa versa using JOINs?
+       - Define custom operators corresponding to the native rule
+         constructs (step, rule, program, predicate, etc).
+
+       - Rewrite the tupleExpr into an equivalent tuplExpr that uses
+         our custom operators.
+
+       - Modify the execution (BigdataEvaluationStrategyImpl) to have
+         methods for our custom operators and to trap any non-standard
+         operators that we do not define.  The base class will provide
+         standard Sesame semantics for any operators that we do not
+         rewrite.
+      
+  x. Publish on statement level provenance and truth maintenance for
+     SPARQL end points.
+
+  x. Defer "named-graph" style quad store for now.
+
+  x. resolution of terms to term ids and visa versa using JOINs?
      (batch resolution is done, but not by joins to the lexicon).
 
-   - filters for various kinds of things, especially those that can be
+  x. filters for various kinds of things, especially those that can be
      computed directly from the bit markings on the term identifiers.
 
-   - filters that require JOINs to the lexicon and ordered scans by
+  x. filters that require JOINs to the lexicon and ordered scans by
      datatype literals.
 
-   - LUBM Query 9 is an example where a JOIN can be eliminated given
+  x. LUBM Query 9 is an example where a JOIN can be eliminated given
      the ontology. Given (?y ub:teacherOf ?z) we can infer (?z
      rdf:type ub:Course) from the ontology.  Introduce such JOIN
      eliminations into the query rewrite, maybe w/ the Sesame people
      since it does not depend on anything in the bigdata layer.
 
-- Snapshot release:
+============================================================
+Snapshot release:
 
-   - web app for row store & how to
+  - web app for row store & how to
 
-   - how to for Sesame 2.
+  - how to for Sesame 2.
 
-   - publish current javadoc.
+  - publish current javadoc.
 
-   - Move the ant build to the bigdata module and also the startup kit
-     and its documentation.
+  - Move the ant build to the bigdata module and also the startup kit
+    and its documentation.
 
 ============================================================
 
@@ -2438,6 +2034,22 @@ Caused by: java.lang.RuntimeException: Child is not persistent: index=6
 	term identifiers by indirection and sorting is 1/3 of the
 	total cost of the batch lookup of the term identifiers.
 
+   * Mutation count is busted.  
+
+     1. Modify flush() to either reset the counter or to accept a
+        boolean parameter to optionally reset the counter (if the
+        StatementBuffer is otherwise unhappy).
+
+     2. Modify RuleStats#add() to be transparent - it just rolls up
+        the mutation counter.
+
+     3. The per-round mutation delta should still be correct.
+
+   * Modify the sub-query joins to allocate their buffer based on the
+     expected cardinality of the largest sub-join.  This should wind
+     up being a lot smaller than 20k for most joins and will help to
+     reduce allocation that drives GC in the nursery.
+
    - bigdata-rdf/embedded federation test suite has errors.  Mostly
      can't find 'testXX' lexicon.  Also some in TestTruthMaintenance
      for LocalDataServiceFederation - maybe the problem with
@@ -2472,7 +2084,16 @@ Caused by: java.lang.RuntimeException: Child is not persistent: index=6
 
      Could also lookup the last commit time (or the last closure time)
      and use that timestamp rather than specifying READ_COMMITTED.
-    
+
+     Could copy over the root reference and immutable nodes/leaves
+     from the hard reference queue of the most recently committed
+     unisolated view of the btree.  This would reduce the need to
+     re-read and de-serialize those data from the disk.  We can't keep
+     anything from the read-committed BTree's hard reference queue
+     since nodes and leaves may have been written and flushed by the
+     unisolated view and no longer exist on the queue but have still
+     been modified since the read-committed view.
+
      - DefaultResourceLocator should cache read-committed resource
        views.
 
@@ -2492,118 +2113,6 @@ Caused by: java.lang.RuntimeException: Child is not persistent: index=6
    http://www.ibm.com/developerworks/forums/forum.jspa?forumID=176&start=0       
 
 ============================================================
-
-*** TruthMaintenance performance should be optimized and re-vetted.
-
-    - Remove use of deprecated classes.
-
-    - Use ordered reads and writes for operations on the temporary
-      stores.
-
-    - Ordered operations for statements identifiers.
-
-    - Replace the use of fully buffered iterators with incremental
-      chunked iterators.
-
-    - Handling TM at scale is its own issue and might be best solved
-      using: (a) a magic sets integration; and (b) periodic map/reduce
-      style updates with closure.  (Or database at once closure on a
-      new data set, which is similar to how scale-out text indices are
-      built.)
-
-    - Test w/ APSTARs data set (incremental loads).
-
-    * Review performance for sameAs processing during query.  Note
-      that transitive for owl:same1b was moved to forward closure.
-      Test with the old classes and owl:sameAs1b backward vs the new
-      rule-based expander and the owl:sameAs1b forward.
-
-    - Defer. tune up justifications.
-
-    * Fix TruthMaintenance#applyExistingStatements() - should use bulk
-      filter not point tests!
-
-    * Closure for StatementIdentifers should reuse the same
-      TemporaryStore and close() vs closeAndDelete().
-
-    * TruthMaintenance should reuse the same TemporaryStore (at least
-      for a given closure) and close() vs closeAndDelete().
-
-*** Get a SYSTAP (~100 documents) and NGA benchmark (~1000+) data set
-    and queries from MikeP.  Add to the lubm test harness in CVS.  Add
-    delete test for (a) delete specific entities; and (b) delete
-    specific documents.
-    
-    - delete entity is an ELM command so I really need the generated
-      delete sets or I need to capture the code for that command and
-      run it and then run the delete.
-
-*** Annotator as first class KB citizen.
-
-  - Map/reduce processing:
-
-    * Parallel KB load (CDL refactor).  Allows easy distribution of
-      the load tasks across a federation.
-
-    - harvest and extractor.
-
-*** Global "do not extract" and mention level false positive handling,
-    plus dropping data structures no longer required in the content
-    repository.
-
-  - defer content repository change over.
-
-============================================================
-
-   * Mutation count is busted.  
-
-     1. Modify flush() to either reset the counter or to accept a
-        boolean parameter to optionally reset the counter (if the
-        StatementBuffer is otherwise unhappy).
-
-     2. Modify RuleStats#add() to be transparent - it just rolls up
-        the mutation counter.
-
-     3. The per-round mutation delta should still be correct.
-
-   * Modify the sub-query joins to allocate their buffer based on the
-     expected cardinality of the largest sub-join.  This should wind
-     up being a lot smaller than 20k for most joins and will help to
-     reduce allocation that drives GC in the nursery.
-
-   - Try closure performance again with rule level parallelism
-     enabled.  Perhaps use maxParallelRules to limit the actual rule
-     level parallelism.  For scale-out, the rule execution itself
-     should be distributed.  Note that there is a client property
-     that already has nearly the same semantics so maybe that should
-     be used instead (maxParallelismPerRequest)
-
-   - Verify lexicon cache and try the perf. analyzer on slow U50
-     queries (6 and 14).  These are both statement pattern scans.
-     Also (2), which has 15 results, all of which are present in the
-     first chunk and can therefore benefit from running with full
-     parallelism for the first chunk.
-
-     Try a larger branching factor (must reload the data).
-
-   - Search on the immutable key buffer is a significant part of the
-     costs for the BTree during query.
-
-   * Compression
-
-     - Add leading byte key compression for the nodes and make it the
-       default for leaves as well.
-
-     - Compare FastRDFKeyCompression with no compression and with
-       leading byte compression.  How do they do for time and space?
-       (I see little difference in time: Fast uses 25746220 bytes
-       while None uses 25748167, which is basically NO difference in
-       space either, which is weird.) There is probably going to be
-       some interaction with the ImmutableKeyBuffer so this issue will
-       need to be revisited again once that one is resolved.  Note
-       that there is no value compression for the statement indices
-       when statement identifiers are enabled.
-
 
 Priority list:
 
@@ -2699,7 +2208,8 @@ x. *** Get 1-2B scaling numbers on the DPP cluster for DaveL and post
    - A scale-out system may well choose to disable the (x type
      resource) expander, or at least the all unbound variant.
 
-   * Get numbers for LTS (1B) and JDS (3 servers, 2+B).
+   * Get numbers for LTS (1B, not enough disk) and JDS (3 servers,
+     let us do ~1B).
 
    - Bulk loads on the DPP (U100, U1000, U8000) and LUBM query tests.
 
@@ -2773,6 +2283,13 @@ Reduce GC drivers for U1000
     de-serialization.  This is a historical artifact and immutable
     nodes should be scrapped.
 
+    - Search on the immutable key buffer is a significant part of the
+      costs for the BTree during query.
+
+    - Try compression alternatives analysis again after re-factoring
+      out ImmutableKeyBuffer since that introduces additional
+      overhead.
+
     The node and leaf need a GOM like data structure to minimize
     allocation where they are compacted and/or reallocated only as
     required.
@@ -2812,12 +2329,6 @@ Reduce GC drivers for U1000
 
 ============================================================
 
-- LBS will prefer one DS until new scores are computed so the initial
-  DS allocations will favor one service. When the scores are (near)
-  equal use a round robin among the available DS.
-
-  Verify 2/3 DS allocate strategy for lubm testing.
-
 - ResourceManager does not reveal read-historical indices (or
   read-committed?), just those where we write on the index.  This
   makes the index metadata unavailable during read-only runs, such as
@@ -2847,10 +2358,39 @@ Reduce GC drivers for U1000
 
   (d) Defer. We should recognize unknown properties, much like log4j.
 
-- jury rig a multi-machine jini U100 load with 2 clients running 10
-  threads each.  then go back and modify the ConcurrentDataLoader to
-  make this easy by allocating tasks to each of the data services in
-  the federation.
+* Did not handle disk full gracefully. Force client disconnect?
+
+* 1st presentation of query 2 is very slow on U50 and used nearly NO
+  CPU. What's that about?  Disk caching?
+
+* WorkAddressManager's packAddr() and unpackAddr(), the
+  IAddressSerializer impls, Name2Addr.Entry's serializer, and
+  CommitRecordSerializer need to be reconciled and tested out at scale
+  for packed addresses.  Also, review the code for anything else that
+  might write out store addresses.    
+
+* Consider introduction of a constrainable allocation policy for index
+  allocations.  The policy would clearly need access to the federation
+  and the namespace of the container as well as a means to identify
+  the services on which any existing indices were registered.  It
+  should also carry (or re-discover) state about allocations that are
+  made in order to be able to either group or distribute the index
+  registrations as necessary.  Should also provide an extensible
+  ability for definiting the initial index partitions.
+
+  A policy along these lines might either be imposed by a client on
+  the federation session or on the container and then imposed on all
+  allocations by contained resources.  Since containers can be nested,
+  the allocation policy would have to use a delegation pattern.
+
+- Done. Run 3 machines w/ one on NAS.
+
+  - Analyze run and decide how to statically place the indices so as
+    to avoid one machine becoming a bottleneck.  Try that run (but we
+    are running out of disk anyway).
+
+  - Try a run w/ dynamic partitioning, but I will need to also do
+    incremental builds for that to be effecient.
 
 ============================================================
 
@@ -2858,8 +2398,135 @@ Reduce GC drivers for U1000
   load balancer log.  This is probably a parsing / format error for
   the sysstat package.
 
-- See "object not in table" errors during concurrent data load.  This
-  cases the load to fail. The problem was that the MetadataServer0
-  instance had not been killed so there was an attempt to connect to
-  an old instance.  kill -9 fixed this.
+- Done (The problem was that the MetadataServer0 instance had not been
+  killed so there was an attempt to connect to an old instance; kill
+  -9 fixed this).  Seeing "object not in table" errors during
+  concurrent data load.  This causes the load to fail.
 
+============================================================
+
+New priorities:
+
+    - improve JDS closure and query performance (latency, per above;
+      serialization costs; etc).
+
+    - magic predicate for search in native rule eval. We also need a
+      unit test for this when there is at least one join.  The object
+      MUST be a constant.  This predicate need to be evaluated first.
+
+    - Native rule ORDER_BY support (custom IKeyBuilderFactory).
+      Verify that a descending sort order is accomplished by the
+      bit-wise negation of a field in the key - is this also true for
+      Unicode sort keys?
+
+*** Get a SYSTAP (~100 documents) and NGA benchmark (~1000+) data set
+    and queries from MikeP.  Add to the lubm test harness in CVS.  Add
+    delete test for (a) delete specific entities; and (b) delete
+    specific documents.
+    
+    - delete entity is an ELM command so I really need the generated
+      delete sets or I need to capture the code for that command and
+      run it and then run the delete.
+
+*** Annotator as first class KB citizen.
+
+  - Map/reduce processing:
+
+    * Parallel KB load (CDL refactor).  Allows easy distribution of
+      the load tasks across a federation.
+
+    - harvest and extractor.
+
+*** Global "do not extract" and mention level false positive handling,
+    plus dropping data structures no longer required in the content
+    repository.
+
+  - Defer. Content repository change over (must handle splits for
+    sparse row store and content repo, plus text index for content
+    repo).
+
+  - TruthMaintenance performance should be optimized and re-vetted.
+
+    - Remove use of deprecated classes.
+
+    - Use ordered reads and writes for operations on the temporary
+      stores.
+
+    - Ordered operations for statements identifiers.
+
+    - Replace the use of fully buffered iterators with incremental
+      chunked iterators.
+
+    - Handling TM at scale is its own issue and might be best solved
+      using: (a) a magic sets integration; and (b) periodic map/reduce
+      style updates with closure.  (Or database at once closure on a
+      new data set, which is similar to how scale-out text indices are
+      built.)
+
+    - Test w/ APSTARs data set (incremental loads).
+
+    * Review performance for sameAs processing during query.  Note
+      that transitive for owl:same1b was moved to forward closure.
+      Test with the old classes and owl:sameAs1b backward vs the new
+      rule-based expander and the owl:sameAs1b forward.
+
+    - Defer. tune up justifications.
+
+    * Fix TruthMaintenance#applyExistingStatements() - should use bulk
+      filter not point tests!
+
+    * Closure for StatementIdentifers should reuse the same
+      TemporaryStore and close() vs closeAndDelete().
+
+    * TruthMaintenance should reuse the same TemporaryStore (at least
+      for a given closure) and close() vs closeAndDelete().
+
+============================================================ 
+
+EOSSYS ranker dataset.
+
+  - query times, load times, properties to use (code), and #of query
+    results, updated CVS tag for checkout.
+
+  - run sails and bigdata test suites first.
+
+  - compare answers to native sesame execution first.	
+  
+  - write unit tests for slice at the irule level (independent of the
+    sail).  verify slices with non-zero offsets.
+
+  - broken something for bigdata-rdf federation runs having to do with
+    access to the global row store from a read-only timestamp.
+    perhaps a deadlock due to how the abstract task accesses the
+    global row store index?
+
+loadTime(ms)=325078, loadRate(tps)=12317, toldTriples=4004108,
+#terms=1694934, nextOffset: 1475898492, bytes/triples=
+
+  - Re-run JDS {1,2,3} with Prefix+Prefix+Fast @m=256.  Try LTS with
+    those same settings on {1 or 2} and see what we get.
+
+    - A run with TERM2ID on NAS is taking a MAJOR IOWAIT penalty - up
+      to 20% in the 1st hour.  I am going to restart and see how the
+      indices are distributed and what impact that has.
+
+*** Fix PrefixSerializer so that it is efficient enough to be used for
+    smaller branching factors; drop ImmutableKeyBuffer.
+
+FIXME AbstractJournal#getIndex(String,long ) is receiving calls from
+      {@link IIndexStore#getIndex(String, long)} and from methods that
+      assume that [commitTime] is a timestamp NOT a commitTime. The
+      culprits are the {@link GlobalRowStoreHelper} and {@link
+      AbstractTask}'s interior {@link IJournal} implementations of
+      {@link IIndexStore#getGlobalRowStore(long)}.  The problem
+      emerged when I was modifying the code to pass a timestamp when
+      obtaining the global row store.  In fact, timestamp ==
+      -commitTime right now so this is totally busted!
+
+FIXME Tune the default LRU cache capacity for the resource locator
+      (10).  A larger value would be nice, but there needs to be an
+      time-based expire on the resources in the cache since they will
+      cause their indices to be held open.
+
+      Configure and tune the access path cache capacity for the
+      SPORelation.

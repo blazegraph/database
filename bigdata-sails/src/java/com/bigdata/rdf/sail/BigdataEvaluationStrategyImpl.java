@@ -16,14 +16,12 @@ import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.Compare;
-import org.openrdf.query.algebra.Distinct;
 import org.openrdf.query.algebra.Filter;
 import org.openrdf.query.algebra.Join;
 import org.openrdf.query.algebra.Or;
 import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
-import org.openrdf.query.algebra.Union;
 import org.openrdf.query.algebra.ValueConstant;
 import org.openrdf.query.algebra.ValueExpr;
 import org.openrdf.query.algebra.Var;
@@ -56,7 +54,6 @@ import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IQueryOptions;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.ISlice;
 import com.bigdata.relation.rule.ISolutionExpander;
 import com.bigdata.relation.rule.ISortOrder;
 import com.bigdata.relation.rule.IVariable;
@@ -66,7 +63,6 @@ import com.bigdata.relation.rule.NEConstant;
 import com.bigdata.relation.rule.OR;
 import com.bigdata.relation.rule.QueryOptions;
 import com.bigdata.relation.rule.Rule;
-import com.bigdata.relation.rule.Slice;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
 import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
@@ -126,14 +122,12 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * handle this for now by NOT translating the LIMIT and OFFSET onto the
  * {@link IRule} and instead let Sesame close the iterator once it has enough
  * solutions.
- * 
- * FIXME MikeP - verify integration.
  * </p>
  * <p>
  * Note that LIMIT and SLICE requires an evaluation plan that provides stable
  * results. For a simple query this is achieved by setting
  * {@link IQueryOptions#isStable()} to <code>true</code>.
- * 
+ * <p>
  * For a UNION query, you must also set {@link IProgram#isParallel()} to
  * <code>false</code> to prevent parallelized execution of the {@link IRule}s
  * in the {@link IProgram}.
@@ -189,6 +183,17 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * FIXME This is NOT implemented. For now the object position in the
  * {@link BNS#SEARCH} MUST be bound to a constant.
  * </p>
+ * 
+ * FIXME We are not in fact rewriting the query operation at all, simply
+ * choosing a different evaluation path as we go. The rewrite should really be
+ * isolated from the execution, e.g., in its own class. That more correct
+ * approach is more than I want to get into right now as we will have to define
+ * variants on the various operators that let us model the native rule system
+ * directly, e.g., an n-ary IProgram, n-ary IRule operator, an IPredicate
+ * operator, etc. Then we can handle evaluation using their model with anything
+ * re-written to our custom operators being caught by our custom evaluate()
+ * methods and everything else running their default methods.  Definately the
+ * right approach, and much easier to write unit tests.
  * 
  * @todo REGEX : if there is a &quot;&circ;&quot; literal followed by a wildcard
  *       AND there are no flags which would cause problems (case-folding, etc)
@@ -246,10 +251,10 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
     
     private final boolean nativeJoins;
     
-    private boolean slice = false, distinct = false, union = false;
-    
-    // Note: defaults are illegal values.
-    private long offset = -1L, limit = 0L;
+//    private boolean slice = false, distinct = false, union = false;
+//    
+//    // Note: defaults are illegal values.
+//    private long offset = -1L, limit = 0L;
 
     /**
      * @param tripleSource
@@ -280,44 +285,51 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
 
     }
 
-    @Override
-    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
-            org.openrdf.query.algebra.Slice slice, BindingSet bindings)
-            throws QueryEvaluationException {
-        /*
-         * Note: Sesame has somewhat different semantics for offset and limit.
-         * They are [int]s. -1 is used to indicate the the offset or limit was
-         * not specified. you use hasFoo() to see if there is an offset or a
-         * limit and then assign the value. For bigdata, the NOP offset is 0L
-         * and the NOP limit is Long.MAX_VALUE.
-         * 
-         * @todo We can't process the offset natively unless we remove the slice
-         * from the Sesame operator tree. If we did then we would skip over the
-         * first OFFSET solutions and Sesame would skip over the first OFFSET
-         * solutions that we passed on, essentially doubling the offset.
-         */
-        if (!slice.hasOffset()) {
-            this.slice = true;
-            this.offset = slice.hasOffset() ? slice.getOffset() : 0L;
-            this.limit = slice.hasLimit() ? slice.getLimit() : Long.MAX_VALUE;
-        }
-        return super.evaluate(slice, bindings);
-    }
-
-    @Override
-    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
-            Union union, BindingSet bindings) throws QueryEvaluationException {
-        this.union = true;
-        return super.evaluate(union, bindings);
-    }
-
-    @Override
-    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
-            Distinct distinct, BindingSet bindings)
-            throws QueryEvaluationException {
-        this.distinct = true;
-        return super.evaluate(distinct, bindings);
-    }
+//    @Override
+//    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
+//            org.openrdf.query.algebra.Slice slice, BindingSet bindings)
+//            throws QueryEvaluationException {
+//        /*
+//         * Note: Sesame has somewhat different semantics for offset and limit.
+//         * They are [int]s. -1 is used to indicate the the offset or limit was
+//         * not specified. you use hasFoo() to see if there is an offset or a
+//         * limit and then assign the value. For bigdata, the NOP offset is 0L
+//         * and the NOP limit is Long.MAX_VALUE.
+//         * 
+//         * Note: We can't process the offset natively unless we remove the slice
+//         * from the Sesame operator tree. If we did then we would skip over the
+//         * first OFFSET solutions and Sesame would skip over the first OFFSET
+//         * solutions that we passed on, essentially doubling the offset.
+//         * 
+//         * FIXME native rule slices work, but they can not be applied if there
+//         * is a non-native filter outside of the join. This code could be
+//         * modified to test for that using tuplExpr.visit(...), but really we
+//         * just need to do a proper rewrite of the query expressions that is
+//         * distinct from their evaluation!
+//         */
+//////        if (!slice.hasOffset()) {
+////            this.slice = true;
+////            this.offset = slice.hasOffset() ? slice.getOffset() : 0L;
+////            this.limit = slice.hasLimit() ? slice.getLimit() : Long.MAX_VALUE;
+//////            return evaluate(slice.getArg(), bindings);
+//////        }
+//        return super.evaluate(slice, bindings);
+//    }
+//    
+//    @Override
+//    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
+//            Union union, BindingSet bindings) throws QueryEvaluationException {
+//        this.union = true;
+//        return super.evaluate(union, bindings);
+//    }
+//
+//    @Override
+//    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
+//            Distinct distinct, BindingSet bindings)
+//            throws QueryEvaluationException {
+//        this.distinct = true;
+//        return super.evaluate(distinct, bindings);
+//    }
     
     /**
      * Overriden to recognize magic predicates.
@@ -418,7 +430,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             Var svar, String languageCode, String label, BindingSet bindings)
             throws QueryEvaluationException {
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("languageCode=" + languageCode + ", label=" + label);
 
         final Iterator<IHit> itr = database.getSearchEngine().search(label,
@@ -464,11 +476,16 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
     public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
             Join join, BindingSet bindings) throws QueryEvaluationException
     {
-        if (nativeJoins == false) {
+
+        if (!nativeJoins) {
+
+            // Use Sesame 2 evaluation for JOINs.
             return super.evaluate(join, bindings);
+            
         }
        
-        if (INFO) log.info("evaluating native join:\n"+join);
+        if (INFO)
+            log.info("evaluating native join:\n" + join);
         
         Collection<StatementPattern> stmtPatterns = 
             new LinkedList<StatementPattern>();
@@ -509,20 +526,26 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                 constraints.add(constraint);
             }
         }
-        
+
+        /*
+         * FIXME Native slice, DISTINCT, etc. are all commented out for now.
+         * Except for ORDER_BY, support exists for all of these features in the
+         * native rules, but we need to separate the rewrite of the tupleExpr
+         * and its evaluation in order to properly handle this stuff.
+         */
         IQueryOptions queryOptions = QueryOptions.NONE;
         
-        if (slice) {
-            if (false&&!distinct && !union) {
-                final ISlice slice = new Slice(offset, limit);
-                queryOptions = new QueryOptions(false/* distinct */,
-                        true/* stable */, null/* orderBy */, slice);
-            }
-        } else {
-            if (distinct && !union) {
-                queryOptions = QueryOptions.DISTINCT;
-            }
-        }
+//        if (slice) {
+//            if (!distinct && !union) {
+//                final ISlice slice = new Slice(offset, limit);
+//                queryOptions = new QueryOptions(false/* distinct */,
+//                        true/* stable */, null/* orderBy */, slice);
+//            }
+//        } else {
+//            if (distinct && !union) {
+//                queryOptions = QueryOptions.DISTINCT;
+//            }
+//        }
         
         // generate native rule
         final IRule rule = new Rule(
@@ -744,7 +767,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             final TupleExpr tupleExpr, final IRule rule)
             throws QueryEvaluationException {
 
-        if (log.isInfoEnabled()) {
+        if (INFO) {
 
             log.info("Running tupleExpr as native rule:\n" + tupleExpr + ",\n"
                     + rule);

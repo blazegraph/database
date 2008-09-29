@@ -46,6 +46,7 @@ import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.rule.IPredicate;
+import com.bigdata.service.IDataService;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.EmptyChunkedIterator;
@@ -82,6 +83,13 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
     private final int fullyBufferedReadThreshold;
     
     /**
+     * The maximum <em>limit</em> that is allowed for a fully-buffered read.
+     * The {@link #asynchronousIterator(Iterator)} will always be used above
+     * this limit.
+     */
+    protected static final int MAX_FULLY_BUFFERED_READ_LIMIT = 250000;
+    
+    /**
      * We cache some stuff for historical reads.
      * <p>
      * Note: We cache results on a per-{@link IAccessPath} basis rather than a
@@ -100,7 +108,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
     /**
      * For {@link #historicalRead}s only, the range count is cached once it is
      * computed. It is also set if we discover using {@link #isEmpty()} or
-     * {@link #iterator(int, int)} that the {@link IAccessPath} is empty.
+     * {@link #iterator(long, long, int)} that the {@link IAccessPath} is empty.
      * Likewise, those methods test this flag to see if we have proven the
      * {@link IAccessPath} to be empty.
      */
@@ -195,13 +203,16 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
      * @param chunkCapacity
      *            The maximum size for a single chunk (generally 10k or better).
      * @param fullyBufferedReadThreshold
-     *            If the estimated rangeCount for an {@link #iterator(int, int)}
-     *            is LTE this threshold then we will do a fully buffered
-     *            (synchronous) read. Otherwise we will do an asynchronous read.
+     *            If the estimated remaining rangeCount for an
+     *            {@link #iterator(long, long, int)} is LTE this threshold then
+     *            we will do a fully buffered (synchronous) read. Otherwise we
+     *            will do an asynchronous read.
      * 
      * @todo This needs to be more generalized so that you can use a index that
      *       is best without being optimal by specifying a low-level filter to
-     *       be applied to the index.
+     *       be applied to the index. That requires a means to dynamically
+     *       filter out the elements we do not want from the key-range scan -
+     *       the filtering should of course be done at the {@link IDataService}.
      */
     protected AbstractAccessPath(//
             final IRelation<R> relation,  // 
@@ -384,7 +395,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
              * proven that the access path is empty.
              */
             
-            return rangeCount == 0;
+            return rangeCount == 0L;
             
         }
         
@@ -404,7 +415,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
                 // the access path is known to be empty.
                 
-                rangeCount = 0;
+                rangeCount = 0L;
                 
             }
             
@@ -420,14 +431,65 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
     final public IChunkedOrderedIterator<R> iterator() {
         
-        return iterator(0,0);
+        return iterator(0L/* offset */, 0L/* limit */, 0);
         
     }
 
-    @SuppressWarnings("unchecked")
     final public IChunkedOrderedIterator<R> iterator(int limit, int capacity) {
+    
+        return iterator(0L/* offset */, limit, capacity);
+        
+    }
+    
+    /**
+     * FIXME Support both offset and limit for asynchronous iterators. right now
+     * this will force the use of the
+     * {@link #synchronousIterator(long, long, Iterator)} when the offset or
+     * limit are non-zero, but that is only permitted up to a limit of
+     * {@link #MAX_FULLY_BUFFERED_READ_LIMIT}.
+     * 
+     * FIXME in order to support large limits we need to verify that the
+     * asynchonous iterator can correctly handle REMOVEALL and that incremental
+     * materialization up to the [limit] will not effect the semantics for
+     * REMOVEALL or the other iterator flags (per above). (In fact, the
+     * asynchronous iterator does not support either [offset] or [limit] at this
+     * time).
+     * 
+     * FIXME write unit tests for slice handling by this method and modify the
+     * SAIL integration to use it for SLICE on an {@link IAccessPath} scan. Note
+     * that there are several {@link IAccessPath} implementations and they all
+     * need to be tested with SLICE.
+     * 
+     * Those tests should be located in
+     * {@link com.bigdata.rdf.store.TestAccessPath}.
+     */
+    @SuppressWarnings("unchecked")
+    final public IChunkedOrderedIterator<R> iterator(long offset, long limit,
+            int capacity) {
 
-        if (historicalRead && rangeCount == 0) {
+        if (offset < 0)
+            throw new IllegalArgumentException();
+        
+        if (limit < 0)
+            throw new IllegalArgumentException();
+        
+        if (limit == Long.MAX_VALUE) {
+            
+            // treat MAX_VALUE as meaning NO limit.
+            limit = 0L;
+            
+        }
+        
+        if (limit > MAX_FULLY_BUFFERED_READ_LIMIT) {
+            
+            // Note: remove constraint when async itr supports SLICE.
+            throw new UnsupportedOperationException("limit=" + limit
+                    + " exceeds maximum fully buffered read limit: "
+                    + MAX_FULLY_BUFFERED_READ_LIMIT);
+            
+        }
+        
+        if (historicalRead && rangeCount >= 0L && ((rangeCount - offset) <= 0L)) {
 
             /*
              * The access path has already been proven to be empty.
@@ -438,32 +500,41 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         }
         
         if (DEBUG)
-            log.debug("limit=" + limit + ", capacity=" + capacity
-                    + ", accessPath=" + this);
+            log.debug("offset=" + offset + ", limit=" + limit + ", capacity="
+                    + capacity + ", accessPath=" + this);
         
         final boolean fullyBufferedRead;
         
         if(predicate.isFullyBound()) {
 
+            if (DEBUG)
+                log.debug("Predicate is fully bound.");
+            
             /*
              * If the predicate is fully bound then there can be at most one
              * element matched so we constrain the limit and capacity
              * accordingly.
              */
             
-            capacity = limit = 1;
+            if (offset > 0L) {
+
+                // the iterator will be empty if the offset is GT zero.
+                return new EmptyChunkedIterator<R>(keyOrder);
+                
+            }
+            
+            capacity = 1;
+
+            limit = 1L;
             
             fullyBufferedRead = true;
             
-            if (DEBUG)
-                log.debug("Predicate is fully bound.");
-            
-        } else if (limit > 0) {
+        } else if (limit > 0L) {
 
             /*
              * A [limit] was specified.
              * 
-             * NOTE: When the [limit] is specified (GT ZERO) we MUST NOT let the
+             * NOTE: When the [limit] is (GT ZERO) we MUST NOT let the
              * DataService layer iterator read more than [limit] elements at a
              * time.
              * 
@@ -474,16 +545,14 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
              * This is also part of the atomic queue operations contract - the
              * head and tail queue operations function by specifying [limit :=
              * 1] (tail also specifies the REVERSE traversal option).
-             */
-            
-            capacity = limit;
-
-            /*
+             * 
              * Note: When the [limit] is specified we always do a fully buffered
              * (aka synchronous) read. This simplifies the behavior of the
              * iterator and limits are generally quite small.
              */
             
+            capacity = (int) limit;
+
             fullyBufferedRead = true;
                 
         } else {
@@ -494,18 +563,25 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
              * Range count the access path and use a synchronous read if the
              * rangeCount is LTE the threshold.
              * 
+             * Note: the range count is corrected by the offset so that it gives
+             * the effective remaining range count. When the effective remaining
+             * range count is zero we know that the iterator will not visit
+             * anything.
+             * 
              * @todo this kind of rangeCount might be replaced by an estimated
              * range count basic on historical data and NOT requiring RMI.
              */
             
-            final long rangeCount = rangeCount(false/* exact */);
-            
+            final long rangeCountRemaining = rangeCount(false/* exact */)
+                    - offset;
+
             if (DEBUG)
-                log.debug("rangeCount=" + rangeCount
+                log.debug("offset=" + offset + ", limit=" + limit
+                        + ", rangeCountRemaining=" + rangeCountRemaining
                         + ", fullyBufferedReadThreashold="
                         + fullyBufferedReadThreshold);
                 
-            if(rangeCount == 0) {
+            if(rangeCountRemaining <= 0) {
                 
                 /*
                  * Since the range count is an upper bound we KNOW that the
@@ -519,9 +595,17 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
                 
             }
             
-            if(rangeCount < fullyBufferedReadThreshold) {
+            if(rangeCountRemaining < fullyBufferedReadThreshold) {
             
-                limit = capacity = (int)rangeCount;
+                // adjust limit to no more than the #of remaining elements.
+                if (limit == 0L) {
+                    limit = rangeCountRemaining;
+                } else {
+                    limit = Math.min(limit, rangeCountRemaining);
+                }
+
+                // adjust capacity to no more than the maximum capacity.
+                capacity = (int) Math.min(MAX_FULLY_BUFFERED_READ_LIMIT, limit);
                 
                 fullyBufferedRead = true;
                 
@@ -540,6 +624,10 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
          * within [filter] and is passed through to the DataService layer. It
          * MUST be Serializable and it will be executed right up against the
          * data.
+         * 
+         * FIXME pass the offset and limit into the source iterator
+         * (IRangeQuery, ITupleIterator). This will require a lot of changes to
+         * the code as that gets used everywhere.
          */
         final Iterator<R> src = new Striterator(rangeIterator(capacity, flags,
                 filter)).addFilter(new TupleObjectResolver());
@@ -550,15 +638,18 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
              * Synchronous fully buffered read of no more than [limit] elements.
              */
 
-            return synchronousIterator(limit, src);
+            return synchronousIterator(offset, limit, src);
 
         } else {
 
             /*
-             * Asynchronous read (no limit).
+             * Asynchronous read (does not support either offset or limit for
+             * now).
              */
 
-            assert limit == 0;
+            assert offset == 0L : "offset=" + limit;
+
+            assert limit == 0L : "limit=" + limit;
             
             return asynchronousIterator(src);
 
@@ -573,45 +664,73 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
      * @param accessPath
      *            The access path (including the triple pattern).
      * 
+     * @param offset
+     *            The first element that will be materialized (non-negative).
      * @param limit
-     *            The maximum #of elements that will be read -or- ZERO (0) if
-     *            all elements should be read.
+     *            The maximum #of elements that will be materialized (must be
+     *            positive, so use a range count before calling this method if
+     *            there was no limit specified by the caller).
+     * 
+     * FIXME pass the offset and limit into the source iterator and remove them
+     * from this method's signature. This will require a change to the
+     * {@link IRangeQuery} API and {@link ITupleIterator} impls.
      */
-    protected IChunkedOrderedIterator<R> synchronousIterator(final int limit,
-            final Iterator<R> src) {
+    @SuppressWarnings("unchecked")
+    final protected IChunkedOrderedIterator<R> synchronousIterator(
+            final long offset, final long limit, final Iterator<R> src) {
 
+        if (offset < 0)
+            throw new IllegalArgumentException();
+        
         if (limit <= 0)
             throw new IllegalArgumentException();
 
+        assert limit < MAX_FULLY_BUFFERED_READ_LIMIT : "limit=" + limit
+                + ", max=" + MAX_FULLY_BUFFERED_READ_LIMIT;
+        
         if (DEBUG) {
 
-            log.debug("limit=" + limit);
+            log.debug("offset=" + offset + ", limit=" + limit);
 
         }
         
         int nread = 0;
+        int nused = 0;
 
         R[] buffer = null;
 
-        while (src.hasNext() && nread < limit) {
+        // skip past the offset elements.
+        while (nread < offset && src.hasNext()) {
+
+            src.next();
+            
+            nread++;
+            
+        }
+        
+        // read up to the limit elements.
+        while (src.hasNext() && nused < limit) {
 
             final R e = src.next();
 
             if (buffer == null) {
 
                 buffer = (R[]) java.lang.reflect.Array.newInstance(
-                        e.getClass(), limit);
+                        e.getClass(), (int)limit);
 
             }
 
-            buffer[nread++] = e;
+            buffer[nused] = e;
+            
+            nused++;
+            nread++;
 
         }
 
         if(DEBUG) {
             
-            log.debug("Fully buffered: read " + nread + " elements, limit="
-                            + limit);
+            log.debug("Fully buffered: read=" + nread + ", used=" + nused
+                    + ", offset=" + offset + ", limit=" + limit);
 
         }
         
@@ -621,7 +740,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
             
         }
         
-        return new ChunkedArrayIterator<R>(nread, buffer, keyOrder);
+        return new ChunkedArrayIterator<R>(nused, buffer, keyOrder);
 
     }
     
@@ -632,7 +751,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
      * 
      * @return
      */
-    protected IChunkedOrderedIterator<R> asynchronousIterator(
+    final protected IChunkedOrderedIterator<R> asynchronousIterator(
             final Iterator<R> src) {
         
         if (src == null)
@@ -738,7 +857,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
      * Note: the range count is cached for a historical read to reduce round
      * trips to the DataService.
      */
-    final private long historicalRangeCount(byte[] fromKey,byte[] toKey) {
+    final private long historicalRangeCount(byte[] fromKey, byte[] toKey) {
         
         if (rangeCount == -1L) {
     

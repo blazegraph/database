@@ -33,6 +33,9 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.rule.IPredicate;
+import com.bigdata.relation.rule.IQueryOptions;
+import com.bigdata.relation.rule.IRule;
+import com.bigdata.service.IDataService;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 
@@ -107,17 +110,18 @@ public interface IAccessPath<R> extends Iterable<R> {
      * selected for the {@link IPredicate}. This is equivalent to
      * 
      * <pre>
-     * iterator(0, 0)
+     * iterator(0L, 0L, 0)
      * </pre>
      * 
-     * since a <i>limit</i> of ZERO (0) means no limit and a <i>capacity</i>
-     * of ZERO (0) means whatever is the default capacity.
+     * since an <i>offset</i> of ZERO (0L) means no offset, a <i>limit</i> of
+     * ZERO (0L) means no limit and a <i>capacity</i> of ZERO (0) means
+     * whatever is the default capacity.
      * <p>
      * Note: Filters should be specified when the {@link IAccessPath} is
-     * constructed so that they will be evalated on the data service rather than
-     * materializing the elements and then filtering then. This can be
-     * accomplished by adding the filter as an {@link IElementFilter} on
-     * the {@link IPredicate} when requesting access path.
+     * constructed so that they will be evalated on the {@link IDataService}
+     * rather than materializing the elements and then filtering then. This can
+     * be accomplished by adding the filter as an {@link IElementFilter} on the
+     * {@link IPredicate} when requesting {@link IAccessPath}.
      * 
      * @return The iterator.
      * 
@@ -139,8 +143,48 @@ public interface IAccessPath<R> extends Iterable<R> {
      *            is specified, the capacity will never exceed the <i>limit</i>.
      * 
      * @return The iterator.
+     * 
+     * @deprecated by {@link #iterator(long, long, int)}
      */
     public IChunkedOrderedIterator<R> iterator(int limit, int capacity);
+
+    /**
+     * An iterator visiting elements using the natural order of the index
+     * selected for the {@link IPredicate}.
+     * <p>
+     * The <i>offset</i> and <i>limit</i> together describe an optional
+     * <em>slice</em> that will be visited by the iterator. When a slice is
+     * specified, the iterator will count off the elements accepted by the
+     * {@link IPredicate} up to the <i>offset</i>, but not materialize them.
+     * Elements by the {@link IPredicate} starting with the <i>offset</i> and
+     * up to (but not including) <i>offset+limit</i> will be materialized for
+     * the client. The iterator will halt processing after observing
+     * <i>offset+limit</i> accepted elements. Note that slices for JOINs (vs a
+     * simple {@link IAccessPath} scan) are handled by {@link IQueryOptions} for
+     * an {@link IRule}.
+     * <p>
+     * The meaning of "accepted" is that: (a) the elements lie in the key-range
+     * constraint implied by the {@link IPredicate}; and (b) the elements pass
+     * any optional constraints that the {@link IPredicate} imposes.
+     * 
+     * @param offset
+     *            The first element accepted by the iterator that it will visit
+     *            (materialize for the client). The offset must be non-negative.
+     *            This is ZERO (0L) to visit all accepted elements.
+     * @param limit
+     *            The last element accepted by the iterator that it will visit
+     *            (materialize for the client). The limit must be non-negatice.
+     *            This is ZERO (0L) to visit all accepted elements (the value
+     *            {@link Long#MAX_VALUE} is interpreted exactly like ZERO(0L)).
+     * @param capacity
+     *            The maximum capacity for the buffer used by the iterator. When
+     *            ZERO(0), a default capacity will be used. When a <i>limit</i>
+     *            is specified, the capacity will never exceed the <i>limit</i>.
+     * 
+     * @return The iterator.
+     */
+    public IChunkedOrderedIterator<R> iterator(long offset, long limit,
+            int capacity);
 
     /**
      * Remove all elements selected by the {@link IPredicate} (optional

@@ -125,7 +125,16 @@ public class EmptyAccessPath<E> implements IAccessPath<E> {
      */
     public IChunkedOrderedIterator<E> iterator() {
         
-        return iterator(0,0);
+        return iterator(0L/* offset */, 0L/* limit */, 0/* capacity */);
+        
+    }
+
+    /**
+     * Visits nothing.
+     */
+    public IChunkedOrderedIterator<E> iterator(int limit, int capacity) {
+
+        return iterator(0L/* offset */, limit, capacity);
         
     }
 
@@ -133,10 +142,11 @@ public class EmptyAccessPath<E> implements IAccessPath<E> {
      * Visits nothing.
      */
     @SuppressWarnings("unchecked")
-    public IChunkedOrderedIterator<E> iterator(int limit, int capacity) {
-        
+    public IChunkedOrderedIterator<E> iterator(long offset, long limit,
+            int capacity) {
+
         return new ChunkedWrappedIterator<E>(Collections.EMPTY_LIST.iterator());
-        
+
     }
 
     /**

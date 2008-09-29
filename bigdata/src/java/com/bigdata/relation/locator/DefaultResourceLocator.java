@@ -48,6 +48,7 @@ import com.bigdata.journal.TemporaryStore;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IRelation;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.sparse.SparseRowStore;
 
 /**
  * Generic implementation relies on a ctor for the resource with the following
@@ -168,6 +169,9 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
                 if (DEBUG) {
 
                     log.debug("cache hit: " + resource);
+                    
+                    System.err.println("cache hit: namespace=" + namespace + ", timestamp="
+                        + timestamp);
 
                 }
 
@@ -447,18 +451,31 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
      * NOT FOUND on this {@link IIndexManager} and the caller SHOULD try another
      * {@link IIndexManager}.
      * 
+     * @param indexManager
      * @param namespace
      *            The resource identifier - this is the primary key.
+     * @param timestampIsIgnored
+     *            The timestamp of the resource view.
      * 
      * @return The {@link Properties} iff there is a logical row for the given
      *         namespace.
+     * 
+     * @todo The timestamp of the resource view is currently ignored. This
+     *       probably should be modified to use the corresponding view of the
+     *       global row store rather than always using the read-committed /
+     *       unisolated view. That would make the properties immutable for a
+     *       historical resource view and thus more easily cached.  However,
+     *       it would also make it impossible to modify those properties for
+     *       historical views as any changes would only apply to views whose
+     *       commit time was after the change to the global row store.
      */
     protected Properties locateResourceOn(IIndexManager indexManager,
-            final String namespace, final long timestamp) {
+            final String namespace, final long timestampIsIgnored) {
 
         if (INFO) {
 
-            log.info("indexManager="+indexManager+", namespace=" + namespace);
+            log.info("indexManager=" + indexManager + ", namespace="
+                    + namespace + ", timestamp=" + timestampIsIgnored);
 
         }
 
@@ -468,10 +485,13 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
          * 
          * @todo caching may be useful here for historical reads.
          */
-        final Map<String, Object> map = indexManager.getGlobalRowStore(timestamp).read(
-                RelationSchema.INSTANCE, namespace);
+        final SparseRowStore rowStore = indexManager
+                .getGlobalRowStore(/*timestamp*/);
+        
+        final Map<String, Object> map = rowStore == null ? null : rowStore
+                .read(RelationSchema.INSTANCE, namespace);
 
-//        System.err.println("Reading properties: "+namespace);
+        System.err.println("Reading properties: namespace="+namespace+", timestamp="+timestampIsIgnored);
 //        log.fatal("Reading properties: "+namespace,new RuntimeException());
         
         if (map == null) {

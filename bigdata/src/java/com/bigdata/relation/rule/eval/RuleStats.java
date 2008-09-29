@@ -36,6 +36,7 @@ import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.ISlice;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.striterator.IKeyOrder;
@@ -209,6 +210,15 @@ public class RuleStats {
      * The #of {@link ISolution}s computed by the rule regardless of whether or
      * not they are written onto an {@link IMutableRelation} and regardless of
      * whether or not they duplicate a solution already computed.
+     * <p>
+     * Note: this counter will be larger than the actual #of solutions generated
+     * when evaluating an {@link ISlice} since the pattern used is to invoke
+     * {@link AtomicLong#incrementAndGet()} and add the {@link ISolution} to the
+     * {@link IBuffer} iff the post-increment value is LT
+     * {@link ISlice#getLast()}. Since we are working with the post-increment
+     * value when handling an {@link ISlice} this is naturally one larger than
+     * the #of {@link ISolution}s actually added to the {@link IBuffer} if we
+     * halt processing because we have reached the limit on the {@link ISlice}.
      */
     public AtomicLong solutionCount = new AtomicLong();
     

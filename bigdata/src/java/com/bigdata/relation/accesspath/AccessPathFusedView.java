@@ -183,31 +183,56 @@ public class AccessPathFusedView<E> implements IAccessPath<E> {
 
     public IChunkedOrderedIterator<E> iterator() {
 
-        return iterator(0, 0);
+        return iterator(0L/* offset */, 0L/* limit */, 0/* capacity */);
 
     }
 
+    public IChunkedOrderedIterator<E> iterator(int limit, int capacity) {
+        
+        return iterator(0L/* offset */, limit, capacity);
+        
+    }
+    
     /**
      * FIXME write tests for optimizations for point tests and small limits. See
-     * {@link AbstractAccessPath#iterator(int, int) for impl details.
+     * {@link AbstractAccessPath#iterator(long, long, int) for impl details.
+     * 
+     * FIXME handle non-zero offset.
      */
-    public IChunkedOrderedIterator<E> iterator(int limit, int capacity) {
+    public IChunkedOrderedIterator<E> iterator(long offset, long limit, int capacity) {
 
+        if (offset > 0L)
+            throw new UnsupportedOperationException();
+        
+        if (limit == Long.MAX_VALUE) {
+            
+            limit = 0L;
+            
+        }
+        
+        if (limit > AbstractAccessPath.MAX_FULLY_BUFFERED_READ_LIMIT) {
+
+            throw new UnsupportedOperationException();
+            
+        }
+        
         /*
          * @todo replace with ChunkedOrderedStriterator.
          */
 
         if (path1.predicate.isFullyBound()) {
 
+            if(log.isDebugEnabled())
+                log.debug("Predicate is fully bound.");
+            
             /*
              * If the predicate is fully bound then there can be at most one
              * element matched so we constrain the limit and capacity
              * accordingly.
              */
 
-            capacity = limit = 1;
-
-            log.debug("Predicate is fully bound.");
+            capacity = 1;
+            limit = 1L;
 
         } else if (limit > 0) {
 
@@ -227,7 +252,7 @@ public class AccessPathFusedView<E> implements IAccessPath<E> {
              * 1] (tail also specifies the REVERSE traversal option).
              */
 
-            capacity = limit;
+            capacity = (int) limit;
 
         }
 

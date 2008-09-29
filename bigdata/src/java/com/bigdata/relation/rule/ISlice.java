@@ -30,6 +30,8 @@ package com.bigdata.relation.rule;
 
 import java.io.Serializable;
 
+import com.bigdata.relation.accesspath.IAccessPath;
+
 /**
  * Indicates the first solution to be returned to the caller (offset) and the
  * #of solutions to be returned (limit).
@@ -48,6 +50,12 @@ public interface ISlice extends Serializable {
     /**
      * The maximum #of solutions to be returned to the caller. A value of
      * {@link Long#MAX_VALUE} indicates that there is no limit.
+     * 
+     * @todo modify to be consistent with
+     *       {@link IAccessPath#iterator(long, long, int)} where a limit of ZERO
+     *       (0L) is interpreted as NO limit and a limit of
+     *       {@link Long#MAX_VALUE} is interpreted as ZERO (0L) (that is, also
+     *       no limit).
      */
     public long getLimit();
 

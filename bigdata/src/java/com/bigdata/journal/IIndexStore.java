@@ -43,7 +43,7 @@ import com.bigdata.sparse.SparseRowStore;
 public interface IIndexStore {
 
     /**
-     * Return a read-only view of the named index as of the specified timestamp.
+     * Return a view of the named index as of the specified timestamp.
      * 
      * @param name
      *            The index name.
@@ -58,6 +58,10 @@ public interface IIndexStore {
     /**
      * Return the global {@link SparseRowStore} used to store named property
      * sets.
+     * 
+     * @see GlobalRowStoreSchema
+     */
+    /*
      * <p>
      * The {@link SparseRowStore} only permits {@link ITx#UNISOLATED} writes, so
      * you MUST specify {@link ITx#UNISOLATED} as the timestamp if you intend to
@@ -68,10 +72,8 @@ public interface IIndexStore {
      * 
      * @param timestamp
      *            The timestamp of the view.
-     * 
-     * @see GlobalRowStoreSchema
      */
-    public SparseRowStore getGlobalRowStore(long timestamp);
+    public SparseRowStore getGlobalRowStore(/*long timestamp*/);
     
     /**
      * Return the global file system used to store block-structured files and

@@ -107,9 +107,6 @@ public class TestAll extends TestCase {
         // Note: rdfs 5 and 11 use the same base class.
         suite.addTestSuite(TestRuleRdfs11.class);
 
-        // test suite for optionals.
-        suite.addTestSuite(TestOptionals.class);
-        
         // test suite for the "match" rule (entity matching).
         suite.addTestSuite(TestMatch.class);
         
@@ -119,19 +116,49 @@ public class TestAll extends TestCase {
         // Note: fast closure rules using the same base class.
         suite.addTestSuite(TestRuleFastClosure_3_5_6_7_9.class);
 
-        // test suite for fix point closure of some rule sets (full and fast).
-        suite.addTestSuite(TestDatabaseAtOnceClosure.class);
-        
         // owl:sameAs rules.
         suite.addTestSuite(TestRuleOwlSameAs.class);
 
-        // test owl:equivilantClass
+        // test owl:equivalentClass
         suite.addTestSuite(TestRuleOwlEquivalentClass.class);
 
-        // test owl:equivilantProperty
+        // test owl:equivalentProperty
         suite.addTestSuite(TestRuleOwlEquivalentProperty.class);
 
-        // compare two means of computing owl:sameAs for equivilence.
+        /*
+         * Test for optionals and for query options applied during native rule
+         * and program evaluation.
+         * 
+         * Note: These features MUST also be tested at the Sesame integration
+         * level. Tests at that level test the correct transform of the query
+         * operation tree into an IRule or IProgram and the correct handling of
+         * the generated (typically asynchronous) iterator reading on the
+         * generated solutions.
+         */
+        
+        // test suite for optionals.
+        suite.addTestSuite(TestOptionals.class);
+
+        // test suite for SLICE (OFFSET + LIMIT).
+        suite.addTestSuite(TestSlice.class);
+        
+        // test suite for DISTINCT.
+        suite.addTestSuite(TestDistinct.class);
+        
+        // test suite for ORDER_BY.
+        suite.addTestSuite(TestOrderBy.class);
+        
+        // test suite for UNION, including interaction with SLICE, DISTINCT, and ORDER_BY.
+        suite.addTestSuite(TestUnion.class);
+
+        /*
+         * Tests for computing closure.
+         */
+        
+        // test suite for fix point closure of some rule sets (full and fast).
+        suite.addTestSuite(TestDatabaseAtOnceClosure.class);
+        
+        // compare two means of computing owl:sameAs for equivalence.
         suite.addTestSuite(TestCompareFullAndFastClosure.class);
         
         /*

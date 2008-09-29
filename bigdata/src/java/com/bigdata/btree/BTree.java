@@ -164,8 +164,13 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
     
     /**
      * The default branching factor.
+     * 
+     * @todo Performance is best for up to at least a 4M triple RDF dataset for
+     *       load, closure and query at m=256, but thereafter performance begins
+     *       to drag. Reconsider once I get rid of the
+     *       {@link ImmutableKeyBuffer} and other cruft that is driving GC.
      */
-    static public final int DEFAULT_BRANCHING_FACTOR = 256;//32; //256
+    static public final int DEFAULT_BRANCHING_FACTOR = 32; //256
     
     /**
      * The minimum hard reference queue capacity is two(2) in order to avoid

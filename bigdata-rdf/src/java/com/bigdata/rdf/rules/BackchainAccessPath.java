@@ -149,10 +149,29 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
      */
     public IChunkedOrderedIterator<ISPO> iterator() {
         
-        return iterator(0,0);
+        return iterator(0L/* offset */, 0L/* limit */, 0/* capacity */);
         
     }
 
+    /**
+     * @todo handle non-zero offset and larger limits?
+     */
+    public IChunkedOrderedIterator<ISPO> iterator(long offset, long limit,
+            int capacity) {
+
+        if (offset > 0L)
+            throw new UnsupportedOperationException();
+
+        if (limit == Long.MAX_VALUE)
+            limit = 0L;
+
+        if (limit > Integer.MAX_VALUE)
+            throw new UnsupportedOperationException();
+
+        return iterator((int) limit, capacity);
+
+    }
+    
     /**
      * Visits elements in the source {@link IAccessPath} plus all entailments
      * licensed by the {@link InferenceEngine} as configured.

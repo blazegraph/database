@@ -469,6 +469,10 @@ public class OwlSameAsPropertiesExpandingIterator implements
             throw new UnsupportedOperationException();
         }
 
+        public IChunkedOrderedIterator<ISPO> iterator(long offset, long limit, int capacity) {
+            throw new UnsupportedOperationException();
+        }
+
         public long rangeCount(boolean exact) {
             return accessPath.rangeCount(exact) + 1;
         }

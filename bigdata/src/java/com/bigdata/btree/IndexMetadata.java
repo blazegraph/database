@@ -35,8 +35,8 @@ import java.util.UUID;
 
 import org.CognitiveWeb.extser.LongPacker;
 
+import com.bigdata.btree.ImmutableKeyBuffer.SimplePrefixSerializer;
 import com.bigdata.btree.compression.IDataSerializer;
-import com.bigdata.btree.compression.PrefixSerializer;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.io.SerializerUtil;
@@ -659,8 +659,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
          */
         this.addrSer = AddressSerializer.INSTANCE;
         
-//        this.nodeKeySer = SimplePrefixSerializer.INSTANCE;
-        this.nodeKeySer = PrefixSerializer.INSTANCE;
+        this.nodeKeySer = SimplePrefixSerializer.INSTANCE;
+//        this.nodeKeySer = PrefixSerializer.INSTANCE;
         
         this.tupleSer = DefaultTupleSerializer.newInstance();
 
