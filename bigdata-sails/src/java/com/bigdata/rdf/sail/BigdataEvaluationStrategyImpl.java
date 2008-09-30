@@ -35,6 +35,7 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.rules.RuleContextEnum;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOAccessPath;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -598,20 +599,41 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
 
     private IPredicate generateTail(StatementPattern stmtPattern) 
         throws QueryEvaluationException {
-        final IVariableOrConstant<Long> s = 
+
+        // create a solution expander for free text search if necessary
+        ISolutionExpander<ISPO> expander = null;
+        final Value predValue = stmtPattern.getPredicateVar().getValue();
+        log.info(predValue);
+        if (predValue != null && MAGIC_SEARCH.equals(predValue)) {
+            final Value objValue = stmtPattern.getObjectVar().getValue();
+            log.info(objValue);
+            if (objValue != null && objValue instanceof Literal) {
+                expander = new FreeTextSearchExpander(database, (Literal) objValue);
+            }
+        }
+        
+        IVariableOrConstant<Long> s = 
             generateVariableOrConstant(stmtPattern.getSubjectVar());
         if (s == null) {
             return null;
         }
-        final IVariableOrConstant<Long> p =
+        IVariableOrConstant<Long> p =
             generateVariableOrConstant(stmtPattern.getPredicateVar());
         if (p == null) {
-            return null;
+            if (expander != null) {
+                p = new Constant<Long>(database.NULL);
+            } else {
+                return null;
+            }
         }
-        final IVariableOrConstant<Long> o =
+        IVariableOrConstant<Long> o =
             generateVariableOrConstant(stmtPattern.getObjectVar());
         if (o == null) {
-            return null;
+            if (expander != null) {
+                o = new Constant<Long>(database.NULL);
+            } else {
+                return null;
+            }
         }
         final IVariableOrConstant<Long> c;
         {
@@ -639,15 +661,16 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                 c = com.bigdata.relation.rule.Var.var(name);
             }
         }
+        
         return new SPOPredicate(
                 new String[] { database.getSPORelation().getNamespace() },//
                 s, p, o, c, //
                 false, // optional
                 !tripleSource.includeInferred ? ExplicitSPOFilter.INSTANCE : null,
-                null// expander
+                expander
                 );
     }
-    
+
     private IVariableOrConstant<Long> generateVariableOrConstant(Var var) {
         final IVariableOrConstant<Long> result;
         Value val = var.getValue();
