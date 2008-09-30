@@ -89,6 +89,7 @@ public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
         }
 
         public IChunkedOrderedIterator<ISPO> iterator() {
+            log.info("iterator");
             final IChunkedOrderedIterator<IHit> itr2 = 
                 new ChunkedWrappedIterator<IHit>(getHiterator());
             final IChunkedOrderedIterator<ISPO> itr3 = 
@@ -108,10 +109,7 @@ public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
 
         public long rangeCount(boolean exact) {
             long rangeCount = 1;
-            if (exact) {
-                rangeCount = getHiterator().size();
-                log.info("exact range count: " + rangeCount);
-            }
+            rangeCount = getHiterator().size();
             log.info("range count: " + rangeCount);
             return rangeCount;
         }
@@ -140,7 +138,7 @@ public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
             ISPO[] spos = new ISPO[hits.length];
             for (int i = 0; i < hits.length; i++) {
                 long s = hits[i].getDocId();
-                spos[i] = new SPO(s, p, o);
+                spos[i] = new SPO(s, database.NULL, database.NULL);
             }
             Arrays.sort(spos, SPOKeyOrder.SPO.getComparator());
             return spos;
