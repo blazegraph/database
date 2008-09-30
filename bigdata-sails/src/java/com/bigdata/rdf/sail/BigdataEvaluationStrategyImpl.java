@@ -617,23 +617,23 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         if (s == null) {
             return null;
         }
-        IVariableOrConstant<Long> p =
-            generateVariableOrConstant(stmtPattern.getPredicateVar());
-        if (p == null) {
-            if (expander != null) {
-                p = new Constant<Long>(database.NULL);
-            } else {
-                return null;
-            }
+        final IVariableOrConstant<Long> p;
+        if (expander == null) {
+            p = generateVariableOrConstant(stmtPattern.getPredicateVar());
+        } else {
+            p = new Constant<Long>(database.NULL);
         }
-        IVariableOrConstant<Long> o =
-            generateVariableOrConstant(stmtPattern.getObjectVar());
+        if (p == null) {
+            return null;
+        }
+        final IVariableOrConstant<Long> o; 
+        if (expander == null) {
+            o = generateVariableOrConstant(stmtPattern.getObjectVar());
+        } else {
+            o = new Constant<Long>(database.NULL);
+        }
         if (o == null) {
-            if (expander != null) {
-                o = new Constant<Long>(database.NULL);
-            } else {
-                return null;
-            }
+            return null;
         }
         final IVariableOrConstant<Long> c;
         {
