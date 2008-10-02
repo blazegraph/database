@@ -345,6 +345,12 @@ public class OwlSameAsPropertiesExpandingIterator implements
     }
 
     private class SameAsSelfExpander implements ISolutionExpander<ISPO> {
+        public boolean backchain() {
+            return false;
+        }
+        public boolean runFirst() {
+            return false;
+        }
         public IAccessPath<ISPO> getAccessPath(
                 final IAccessPath<ISPO> accessPath) {
             return new SameAsSelfAccessPath(accessPath);

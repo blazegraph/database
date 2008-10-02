@@ -99,4 +99,19 @@ public interface ISolutionExpander<E> extends Serializable {
      */
     IAccessPath<E> getAccessPath(IAccessPath<E> accessPath);
     
+    /**
+     * Add the backchainer on top of the expander.
+     * 
+     * @return true if the backchainer should run
+     */
+    boolean backchain();
+    
+    /**
+     * If true, the predicate for this expander will be given priority in the
+     * join order.
+     * 
+     *  @return true if the predicate should be run first
+     */
+    boolean runFirst();
+    
 }
