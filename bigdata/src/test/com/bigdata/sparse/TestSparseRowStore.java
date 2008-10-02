@@ -624,9 +624,9 @@ public class TestSparseRowStore extends ProxyTestCase<IIndexManager> {
      */
     public void test_rowScan_continuationQuery() {
      
-        final Schema schema = new Schema("Employee","Id",KeyType.Long);
+        final Schema schema = new Schema("Employee", "Id", KeyType.Long);
         
-        SparseRowStore srs = new SparseRowStore(btree);
+        final SparseRowStore srs = new SparseRowStore(btree);
         
         {
             
@@ -652,9 +652,9 @@ public class TestSparseRowStore extends ProxyTestCase<IIndexManager> {
 
         }
 
-        Iterator<? extends ITPS> itr = srs.rangeQuery(schema,
+        final Iterator<? extends ITPS> itr = srs.rangeQuery(schema,
                 null/* fromKey */, null/* toKey */, 1/* capacity */,
-                SparseRowStore.MAX_TIMESTAMP, null/*filter*/);
+                SparseRowStore.MAX_TIMESTAMP, null/* filter */);
         
         {
             
@@ -691,7 +691,7 @@ public class TestSparseRowStore extends ProxyTestCase<IIndexManager> {
         if(itr.hasNext()) {
 
             /*
-             * FIXME For LDS but not the Journal I am seeing the following tuple
+             * FIXME For LDS/EDS but not the Journal I am seeing the following tuple
              * reported here when none is expected.
              * 
              * TPS{

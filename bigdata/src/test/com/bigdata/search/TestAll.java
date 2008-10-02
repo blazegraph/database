@@ -73,8 +73,10 @@ public class TestAll extends TestCase {
         // search backed by LDS.
         suite.addTest(proxySuite(new TestLDS("LDS Search"),"LDS"));
 
-        /*
-         * @todo search backed by EDS.
+        // search backed by EDS.
+        suite.addTest(proxySuite(new TestLDS("EDS Search"),"EDS"));
+
+        /* For EDS:
          * 
          * @todo Test when the search index is split across a key-range
          * partition (this can be done statically when the index is created).

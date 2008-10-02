@@ -27,43 +27,43 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
-import java.io.File;
 import java.util.Properties;
 
 import com.bigdata.journal.AbstractIndexManagerTestCase;
 import com.bigdata.journal.ProxyTestCase;
+import com.bigdata.resources.OverflowManager;
 
 /**
  * Delegate for {@link ProxyTestCase}s for services running against an
- * {@link LocalDataServiceFederation}.
+ * {@link EmbeddedFederation}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestLDS extends
-        AbstractIndexManagerTestCase<LocalDataServiceFederation> {
+public class TestEDS extends
+        AbstractIndexManagerTestCase<EmbeddedFederation> {
 
     /**
      * 
      */
-    public TestLDS() {
+    public TestEDS() {
         super();
     }
 
     /**
      * @param name
      */
-    public TestLDS(String name) {
+    public TestEDS(String name) {
         super(name);
     }
 
     public Properties getProperties() {
-        
-        Properties properties = new Properties( super.getProperties() );
-        
-//        // Note: uses transient mode for tests.
-//        properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient
-//                .toString());
+
+        Properties properties = new Properties(super.getProperties());
+
+        // // Note: uses transient mode for tests.
+        // properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient
+        // .toString());
 
         String dir = getName();
 
@@ -71,8 +71,8 @@ public class TestLDS extends
             dir = "test";
         
         // when the data are persistent use the test to name the data directory.
-        properties.setProperty(LocalDataServiceClient.Options.DATA_DIR, dir);
-        
+        properties.setProperty(EmbeddedClient.Options.DATA_DIR, dir);
+
         // Don't collect statistics from the OS.
         properties.setProperty(
                 IBigdataClient.Options.COLLECT_PLATFORM_STATISTICS, "false");
@@ -83,7 +83,16 @@ public class TestLDS extends
 
         // Don't run the httpd service.
         properties.setProperty(IBigdataClient.Options.HTTPD_PORT, "-1");
-        
+
+        // Only one data service for the embedded data service.
+        properties.setProperty(EmbeddedClient.Options.NDATA_SERVICES, "1");
+
+        // Disable overflow of the live journal.
+        properties.setProperty(OverflowManager.Options.OVERFLOW_ENABLED,"false");
+
+        // Disable index partition moves.
+        properties.setProperty(OverflowManager.Options.MAXIMUM_MOVES_PER_TARGET,"0");
+
         return properties;
         
     }
@@ -150,19 +159,19 @@ public class TestLDS extends
 //    }
 
     @Override
-    protected LocalDataServiceFederation getStore(Properties properties) {
+    protected EmbeddedFederation getStore(Properties properties) {
 
-        return new LocalDataServiceClient(properties).connect();
+        return new EmbeddedClient(properties).connect();
     }
 
     @Override
-    protected LocalDataServiceFederation reopenStore(LocalDataServiceFederation fed) {
+    protected EmbeddedFederation reopenStore(EmbeddedFederation fed) {
         
         final Properties properties = fed.getClient().getProperties();
         
         fed.shutdown();
         
-        return new LocalDataServiceClient(properties).connect();
+        return new EmbeddedClient(properties).connect();
                 
     }
     

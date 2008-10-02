@@ -81,8 +81,11 @@ public class TestAll extends TestCase {
         // test row store backed by LDS.
         suite.addTest(proxySuite(new TestLDS("LDS row store"),"LDS"));
 
+        // test row store backed by EDS.
+        suite.addTest(proxySuite(new TestLDS("EDS row store"),"EDS"));
+
         /*
-         * @todo test against EDS.
+         * For EDS:
          * 
          * @todo test when the index is statically partitioned.
          * 

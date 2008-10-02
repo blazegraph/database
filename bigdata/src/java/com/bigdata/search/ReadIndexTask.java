@@ -128,8 +128,8 @@ public class ReadIndexTask implements Callable<Object> {
 //                    false/* successor */, 0L/* docId */, 0/* fieldId */);
 //        }
 
-//        if (DEBUG) log.debug
-            System.err.println
+        if (DEBUG) log.debug
+//            System.err.println
             ("termText=[" + termText + "], prefixMatch=" + prefixMatch
                     + ", queryTermWeight=" + queryTermWeight + "\nfromKey="
                     + BytesUtil.toString(fromKey) + "\ntoKey="

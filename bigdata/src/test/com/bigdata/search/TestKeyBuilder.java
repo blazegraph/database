@@ -92,33 +92,6 @@ public class TestKeyBuilder extends TestCase2 {
     private IKeyBuilder keyBuilder;
     
     /**
-     * @todo this test needs to populate an index with terms that would match if
-     *       we were allowing a prefix match and then verify that the terms are
-     *       NOT matched. it should also verify that terms that are exact
-     *       matches are matched.
-     * 
-     * @todo also test ability to extract the docId and fieldId from the key.
-     * 
-     * @todo refactor into an {@link ITupleSerializer}.
-     * 
-     * @todo make the fieldId optional in the key. this needs to be part of the
-     *       state of the {@link ITupleSerializer}.
-     */
-    public void test_exactMatch_unicode() {
-        
-        final IKeyBuilder keyBuilder = getKeyBuilder();
-        
-        final long docId = 0L;
-        
-        final int fieldId = 0;
-        
-        FullTextIndex.getTokenKey(keyBuilder, "brown", false/* successor */, docId, fieldId);
-        
-        fail("write test");
-        
-    }
-
-    /**
      * @todo this test needs to populate an index with terms that would match on
      *       a prefix match and then verify that they do match and that terms
      *       that are not prefix matches do not match.
@@ -171,6 +144,111 @@ public class TestKeyBuilder extends TestCase2 {
         // verify that the successor of the prefix orders after the successor of the full term.
         assertTrue(BytesUtil.compareBytes(k1s, k0s) > 0);
         
+    }
+
+    /**
+     * Succeeds iff a LT b.
+     * 
+     * @param a
+     * @param b
+     */
+    protected void LT(byte[] a, byte[] b) {
+
+        final int cmp = BytesUtil.compareBytes(a, b);
+
+        if (cmp < 0)
+            return;
+
+        fail("cmp=" + cmp + ", a=" + BytesUtil.toString(a) + ", b="
+                + BytesUtil.toString(b));
+
+    }
+
+    /**
+     * Succeeds iff a GT b.
+     * 
+     * @param a
+     * @param b
+     */
+    protected void GT(byte[] a, byte[] b) {
+
+        final int cmp = BytesUtil.compareBytes(a, b);
+
+        if (cmp > 0)
+            return;
+
+        fail("cmp=" + cmp + ", a=" + BytesUtil.toString(a) + ", b="
+                + BytesUtil.toString(b));
+
+    }
+    
+    /**
+     * @todo this test needs to populate an index with terms that would match if
+     *       we were allowing a prefix match and then verify that the terms are
+     *       NOT matched. it should also verify that terms that are exact
+     *       matches are matched.
+     * 
+     * @todo also test ability to extract the docId and fieldId from the key.
+     * 
+     * @todo refactor into an {@link ITupleSerializer}.
+     * 
+     * @todo make the fieldId optional in the key. this needs to be part of the
+     *       state of the {@link ITupleSerializer}.
+     */
+    public void test_exactMatch_unicode() {
+        
+        final IKeyBuilder keyBuilder = getKeyBuilder();
+        
+        final long docId = 0L;
+        
+        final int fieldId = 0;
+
+        
+        // the full term.
+        final byte[] termSortKey = FullTextIndex.getTokenKey(keyBuilder, "brown",
+                false/* successor */, docId, fieldId);
+        
+        // the successor of the full term allowing prefix matches.
+        final byte[] termPrefixMatchSuccessor = FullTextIndex.getTokenKey(keyBuilder, "brown",
+                true/* successor */, docId, fieldId);
+
+//        // the successor of the full term for an exact match.
+//        final byte[] termExactMatchSuccessor = FullTextIndex.getTokenKey(
+//                keyBuilder, "brown \0", true/* successor */, docId, fieldId);
+//
+//        /*
+//         * verify sort key order for the full term and its prefix match
+//         * successor.
+//         */
+//        LT(termSortKey, termPrefixMatchSuccessor);
+
+//        /*
+//         * verify sort key for the full term orders before its exact match
+//         * successor.
+//         */
+//        LT(termSortKey, termExactMatchSuccessor);
+
+        // term that is longer than the full term.
+        final byte[] longerTermSortKey = FullTextIndex.getTokenKey(keyBuilder,
+                "browns", false/* successor */, docId, fieldId);
+
+        // verify sort order for the full term and the longer term.
+        LT(termSortKey, longerTermSortKey);
+
+        /*
+         * verify longer term is less than the prefix match successor of the
+         * full term.
+         */
+        LT(longerTermSortKey, termPrefixMatchSuccessor);
+
+//        /*
+//         * verify longer term is greater than the exact match successor of the
+//         * full term.
+//         */
+//        GT(longerTermSortKey, termExactMatchSuccessor);
+
+        fail("finish test");
+
     }
 
 }
