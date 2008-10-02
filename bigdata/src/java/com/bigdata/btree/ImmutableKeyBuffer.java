@@ -34,6 +34,7 @@ import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.compression.IRandomAccessByteArray;
+import com.bigdata.btree.compression.PrefixSerializer;
 
 /**
  * A compact and efficient representation of immutable keys. The largest common
@@ -49,6 +50,15 @@ import com.bigdata.btree.compression.IRandomAccessByteArray;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated This class is only used by its unit tests and by the BTree IFF
+ *             the {@link NodeSerializer} chooses to create instances of this
+ *             class when it de-serializes a node or leaf. Its only advantage
+ *             over the {@link MutableKeyBuffer} is that the prefix is
+ *             efficiently factored out, but that does not appear to translate
+ *             into a runtime advantage. it used to be used for 'simple' prefix
+ *             compression, but the {@link PrefixSerializer} now handles that
+ *             much more efficiently.
  */
 public class ImmutableKeyBuffer extends AbstractKeyBuffer {
 
@@ -174,6 +184,8 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
      */
     public ImmutableKeyBuffer(int offset, int nkeys, int maxKeys, byte[][] keys) {
         
+//        if(true) throw new UnsupportedOperationException(); 
+        
         if (offset < 0) {
 
             throw new IllegalArgumentException("offset negative");
@@ -267,6 +279,8 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
      * @param buf
      */
     public ImmutableKeyBuffer(int nkeys, int maxKeys, int[] offsets, byte[] buf ) {
+        
+//        if(true) throw new UnsupportedOperationException();
         
         assert nkeys >= 0;
 //      assert nkeys >= AbstractBTree.MIN_BRANCHING_FACTOR;

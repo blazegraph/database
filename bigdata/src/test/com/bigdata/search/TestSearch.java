@@ -32,8 +32,9 @@ import java.io.StringReader;
 import java.util.Iterator;
 import java.util.Properties;
 
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
-import com.bigdata.service.AbstractLocalDataServiceFederationTestCase;
+import com.bigdata.journal.ProxyTestCase;
 
 /**
  * Test suite using examples based on <a
@@ -48,7 +49,7 @@ import com.bigdata.service.AbstractLocalDataServiceFederationTestCase;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestSearch extends AbstractLocalDataServiceFederationTestCase {
+public class TestSearch extends ProxyTestCase<IIndexManager> {
 
     public TestSearch() {
         super();
@@ -68,7 +69,7 @@ public class TestSearch extends AbstractLocalDataServiceFederationTestCase {
      * stemming, the examples are pre-stemmed. This just reduces the complexity
      * of the system under test.
      */
-    String[] docs = new String[]{
+    final String[] docs = new String[]{
             /* Infant & Toddler First Aid */
             "Infant Toddler",//
             /* Babies Children's Room (For Your Home) */
@@ -104,51 +105,60 @@ public class TestSearch extends AbstractLocalDataServiceFederationTestCase {
     /** all documents are in English. */
     final String languageCode = "EN";
 
-    public void setUp() throws Exception {
-
-        super.setUp();
-
-        ndx = new FullTextIndex(client.getFederation(), NAMESPACE,
-                ITx.UNISOLATED, client.getProperties());
-        
-        ndx.create();
-
-        /*
-         * Index the documents.
-         */
-        long docId = 1;
-        final int fieldId = 0;
-        final TokenBuffer buffer = new TokenBuffer(docs.length,ndx);
-        for(String s : docs) {
-        
-            ndx.index(buffer, docId++, fieldId, languageCode, new StringReader( s ));
-            
-        }
-        
-        // flush index writes to the database.
-        buffer.flush();
-        
-    }
-
-    public void tearDown() throws Exception {
-        
-        super.tearDown();
-        
-    }
-    
     public void test_ChildProofing() throws InterruptedException {
-        
-        String query = "child proofing";
-        
-        Hiterator itr = ndx.search(query, languageCode,0d/*minCosine*/,Integer.MAX_VALUE/*maxRank*/);
 
-        assertSameHits(new IHit[]{
-                new HT(5L,.5),//
-                new HT(6L,.5),//
-                new HT(2L,.408248290463863d),//
-                new HT(3L,.408248290463863d),//
-        }, itr);
+        final Properties properties = getProperties();
         
+        final IIndexManager indexManager = getStore( properties );
+        
+        try {
+
+            // setup and populate the index.
+            {
+                
+                ndx = new FullTextIndex(indexManager, NAMESPACE,
+                        ITx.UNISOLATED, properties );
+
+                ndx.create();
+
+                /*
+                 * Index the documents.
+                 */
+                long docId = 1;
+                final int fieldId = 0;
+                final TokenBuffer buffer = new TokenBuffer(docs.length, ndx);
+                for (String s : docs) {
+
+                    ndx.index(buffer, docId++, fieldId, languageCode,
+                            new StringReader(s));
+
+                }
+
+                // flush index writes to the database.
+                buffer.flush();
+            }
+
+            // run query and verify results.
+            {
+
+                String query = "child proofing";
+
+                Hiterator itr = ndx.search(query, languageCode,
+                        0d/* minCosine */, Integer.MAX_VALUE/* maxRank */);
+
+                assertSameHits(new IHit[] { new HT(5L, .5),//
+                        new HT(6L, .5),//
+                        new HT(2L, .408248290463863d),//
+                        new HT(3L, .408248290463863d),//
+                }, itr);
+            }
+
+        } finally {
+
+            indexManager.destroy();
+
+        }
+
     }
     
     /**

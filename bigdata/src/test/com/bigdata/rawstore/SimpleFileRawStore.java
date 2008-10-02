@@ -243,7 +243,7 @@ public class SimpleFileRawStore extends AbstractRawWormStore {
 
     }
     
-    public void closeAndDelete() {
+    public void destroy() {
         
         close();
 

@@ -112,6 +112,12 @@ Notes on store level record checksums and record compression.
 	 - A compacting merge of the terms index should greatly reduce
            its size.
 
+	 - Splitting the terms2ids index will allocate more resources
+           and greater parallelism to that index.
+
+	 - Prefix compression may reduce the problem (it is enabled as
+           of 10/1/08).
+
 	 - Nearly ALL _read_ time between the SPO and TERMS index is
            reading the TERMS index (99%).
 
@@ -745,6 +751,14 @@ Short term tasks:
        actual commit time while transactions will use a free
        (-timestamp) value selected by the transaction manager.
 
+     - AbstractJournal#getIndex(String,long ) has different semantics
+       from IIndexStore#getIndex(String,long) (it only accepts a
+       positive commitTime vs the more generalized timestamp, which
+       can represent a transaction, an unisolated request, a
+       read-committed request, or a commitTime).  The root of the
+       issue is commitTime vs historical read, so fix this when I
+       address that issue.
+
      - AbstractResourceManagerTask - documents a potential problem
        with MDI updates without 2-phase commits.  Look into this
        further and see if this problem can be addressed without using
@@ -1256,13 +1270,6 @@ Main issues:
 
 (*) Index and other performance tuning.
 
-    (-) Replace use of "immutable nodes" throughout.
-
-    (-) Run an Experiment driver with variables for the branching
-        factor, node compression, leave compression, and custom SPO
-        compression.  Examine performance when index segments are
-        built from the views as well.
-
     (-) The best branching factor for an Index Segment is probably
         limited by the best branching factor for query (or closure)
         benchmarks.  For the triple store, this looks like it is 256
@@ -1632,6 +1639,15 @@ JF-U100-host23-2DS:  ******** RUNNING NOW *********
    - Finish the TestDefaultResourceLocator
 
    - Address issue with read-committed BTree views.
+
+   - Tune the default LRU cache capacity for the resource locator.  It
+     is currently 10.  A larger value would be nice, but there needs
+     to be an time-based expire on the resources in the cache since
+     they will cause their indices to be held open.
+
+   - Configure and tune the access path cache capacity for the
+     SPORelation.  This has a strong effect on the locator cache for
+     the triple store.
 
 ============================================================
 
@@ -2085,8 +2101,8 @@ Caused by: java.lang.RuntimeException: Child is not persistent: index=6
      Could also lookup the last commit time (or the last closure time)
      and use that timestamp rather than specifying READ_COMMITTED.
 
-     Could copy over the root reference and immutable nodes/leaves
-     from the hard reference queue of the most recently committed
+     Could copy over the root reference and clean nodes / leaves from
+     the hard reference queue of the most recently committed
      unisolated view of the btree.  This would reduce the need to
      re-read and de-serialize those data from the disk.  We can't keep
      anything from the read-committed BTree's hard reference queue
@@ -2279,20 +2295,34 @@ Reduce GC drivers for U1000
       flexibility such that we can avoid allocation when copying keys
       into the BTree.
 
-    Immutable B+Tree nodes are being converted to normal nodes on
-    de-serialization.  This is a historical artifact and immutable
-    nodes should be scrapped.
+    - Done. Immutable B+Tree nodes are being converted to normal nodes
+      on de-serialization.  This is a historical artifact and
+      immutable nodes should be scrapped.
 
-    - Search on the immutable key buffer is a significant part of the
+    - Reduce key search costs.  Search is a significant part of the
       costs for the BTree during query.
 
-    - Try compression alternatives analysis again after re-factoring
-      out ImmutableKeyBuffer since that introduces additional
-      overhead.
+      - Operate with the keys in their compressed state, e.g., using
+        hu-tucker or prefix coding.
 
-    The node and leaf need a GOM like data structure to minimize
-    allocation where they are compacted and/or reallocated only as
-    required.
+      - (***) 27% of the MutableKeyBuffer search cost is figuring out
+        the prefix length so that we can then perform the search on
+        the remainder of the key against the remainder of the keys in
+        the node or leaf.
+
+      - (***) Try tracking the prefix length. It is only changed when
+        we add or remove the first or last key in the buffer.  Since
+        mutation is single threaded, it can be computed in the ctor
+        and then updated each time we add or remove the first/last key
+        in the buffer.
+
+	Note: at present the node/leaf logic directly manipulates the
+	keys.  That will have to be changed to track the prefix
+	length.
+
+    - The node and leaf need a GOM like data structure to minimize
+      allocation where they are compacted and/or reallocated only as
+      required.
 
   - Size chunks by expected end result cardinality for subqueries
     (this is a bit difficult to get right).
@@ -2369,20 +2399,6 @@ Reduce GC drivers for U1000
   for packed addresses.  Also, review the code for anything else that
   might write out store addresses.    
 
-* Consider introduction of a constrainable allocation policy for index
-  allocations.  The policy would clearly need access to the federation
-  and the namespace of the container as well as a means to identify
-  the services on which any existing indices were registered.  It
-  should also carry (or re-discover) state about allocations that are
-  made in order to be able to either group or distribute the index
-  registrations as necessary.  Should also provide an extensible
-  ability for definiting the initial index partitions.
-
-  A policy along these lines might either be imposed by a client on
-  the federation session or on the container and then imposed on all
-  allocations by contained resources.  Since containers can be nested,
-  the allocation policy would have to use a delegation pattern.
-
 - Done. Run 3 machines w/ one on NAS.
 
   - Analyze run and decide how to statically place the indices so as
@@ -2410,9 +2426,29 @@ New priorities:
     - improve JDS closure and query performance (latency, per above;
       serialization costs; etc).
 
-    - magic predicate for search in native rule eval. We also need a
-      unit test for this when there is at least one join.  The object
-      MUST be a constant.  This predicate need to be evaluated first.
+    - search
+
+      - Examine costs and performance for full text search.  Compare
+        with use of Lucene native or m4gj native indexing and search.
+        These might be far better.
+
+      - magic predicate search and magic predicate prefix search
+        (beginsWith).  These can be written using expanders or program
+        rewrites (the way the match rule for the extractors is
+        handled).
+
+    - Generalize rule evaluation for foreign key joins.
+
+    - use the service name for the performance counter paths, however
+      this can be a problem if service names are modified over time or
+      simply not unique, so maybe make that an option?
+
+    - support performance counter collection, aggregation, httpd
+      service and periodic counter set logging for LTS, which means
+      for the Journal.
+
+    - Add by task reporting of performance counters (#of invocations,
+      time, and RMI latency if available).
 
     - Native rule ORDER_BY support (custom IKeyBuilderFactory).
       Verify that a descending sort order is accomplished by the
@@ -2483,26 +2519,6 @@ New priorities:
 
 ============================================================ 
 
-EOSSYS ranker dataset.
-
-  - query times, load times, properties to use (code), and #of query
-    results, updated CVS tag for checkout.
-
-  - run sails and bigdata test suites first.
-
-  - compare answers to native sesame execution first.	
-  
-  - write unit tests for slice at the irule level (independent of the
-    sail).  verify slices with non-zero offsets.
-
-  - broken something for bigdata-rdf federation runs having to do with
-    access to the global row store from a read-only timestamp.
-    perhaps a deadlock due to how the abstract task accesses the
-    global row store index?
-
-loadTime(ms)=325078, loadRate(tps)=12317, toldTriples=4004108,
-#terms=1694934, nextOffset: 1475898492, bytes/triples=
-
   - Re-run JDS {1,2,3} with Prefix+Prefix+Fast @m=256.  Try LTS with
     those same settings on {1 or 2} and see what we get.
 
@@ -2510,23 +2526,74 @@ loadTime(ms)=325078, loadRate(tps)=12317, toldTriples=4004108,
       to 20% in the 1st hour.  I am going to restart and see how the
       indices are distributed and what impact that has.
 
-*** Fix PrefixSerializer so that it is efficient enough to be used for
-    smaller branching factors; drop ImmutableKeyBuffer.
+      With a constrained run and TERM2ID on dp-aether1 I am still
+      seeing a major IOWAIT penalty.  If we were to key-range
+      partition this index then we could distribute that cost across
+      all of the hardware rather than centralizing it on a single
+      machine.
 
-FIXME AbstractJournal#getIndex(String,long ) is receiving calls from
-      {@link IIndexStore#getIndex(String, long)} and from methods that
-      assume that [commitTime] is a timestamp NOT a commitTime. The
-      culprits are the {@link GlobalRowStoreHelper} and {@link
-      AbstractTask}'s interior {@link IJournal} implementations of
-      {@link IIndexStore#getGlobalRowStore(long)}.  The problem
-      emerged when I was modifying the code to pass a timestamp when
-      obtaining the global row store.  In fact, timestamp ==
-      -commitTime right now so this is totally busted!
+    - Get the full performance curves for the most recent JDS run.
 
-FIXME Tune the default LRU cache capacity for the resource locator
-      (10).  A larger value would be nice, but there needs to be an
-      time-based expire on the resources in the cache since they will
-      cause their indices to be held open.
+    - Try a performance curve for a single-host run.
 
-      Configure and tune the access path cache capacity for the
-      SPORelation.
+ - Consider changing the JiniClient properties to allow the client to
+   override index properties ala log4j, where the data service on
+   which the index will initially be registered is just one such
+   property.  Other properties include the key and value serializers
+   and compression providers, index split/join criteria, etc.
+
+   index.[namespace].property=value
+
+   so
+
+   index.kb.spo.SPO.initalDataService=DataService0
+
+   would cause the [kb.spo.SPO] index to be registered on
+   DataService0.
+
+   We should also be using log4j style reflection to identify unknown
+   property values and to set those property values (this is probably
+   beans stuff).
+
+* Review use of finalized() in code, and especially in the iterators
+  used by rule evaluation and high level query.  Evidentally this can
+  make it difficult for the JVM to release those references leading to
+  a nasty message from the JVM:
+
+On Thu, 2008-10-02 at 10:21 -0400, James Leigh wrote:
+> Hi Bryan,
+>
+> I have been trying to run Bigdata through a benchmark using the Sesame
+> driver, but I am running into some gc related problems. It seems
+> bigdata-src-snapshot-30-jun-2008 has the same problem Sesame has. The
+> problem is that many of the iterators used for query evaluation have a
+> finalizer. This causes the gc to delay freeing them. This can causes a
+> problem if most of the heap is made up these objects that cannot be
+> freed quickly. In that case the gc may take up too much CPU in trying to
+> find objects it can free up and if the limit is exceeded it will through
+> an out-of-memory exception.
+> http://java.sun.com/javase/technologies/hotspot/gc/gc_tuning_6.html#par_gc.oom
+>
+> Sesame is addressing this in version 2.5 by removing Iterations (w/
+> finalizers) from the query evaluation and using Cursors (w/o finalizers)
+> in the SAIL API. We will also be changing to only use locks with
+> finalizers if debug mode is enabled. You may want to do the same thing
+> in the next release of Bigdata.
+>
+> http://www.openrdf.org/issues/browse/SES-594
+>
+> James
+
+
+============================================================
+
+Done. Write unit tests for KeyBuilder that verify the expected sort
+order for "bro" and "brown".
+
+Write unit tests for search that verify prefix matching.
+
+Modify search so that prefix matching can be enabled or disabled on a
+per-query basis.
+
+Commit the changes to MikeP for the eossys and aether.
+

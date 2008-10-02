@@ -41,7 +41,7 @@ import junit.framework.TestSuite;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @see AbstractTestCase
+ * @see AbstractJournalTestCase
  * @see ProxyTestCase
  */
 public class TestJournalBasics extends TestCase {

@@ -397,7 +397,7 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
             int ndataService1 = 0;
             
             final ITupleIterator itr = new RawDataServiceTupleIterator(
-                    metadataService,//
+                    fed.getMetadataService(),//
                     MetadataService.getMetadataIndexName(name), //
                     ITx.READ_COMMITTED,//
                     true, // readConsistent

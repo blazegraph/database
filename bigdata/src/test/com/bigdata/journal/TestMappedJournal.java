@@ -42,7 +42,7 @@ import com.bigdata.rawstore.IRawStore;
  * @version $Id$
  */
 
-public class TestMappedJournal extends AbstractTestCase {
+public class TestMappedJournal extends AbstractJournalTestCase {
 
     public TestMappedJournal() {
         super();
@@ -146,7 +146,7 @@ public class TestMappedJournal extends AbstractTestCase {
         assertEquals("bufferCapacity", bufferStrategy.getUserExtent(),
                 bufferStrategy.getBuffer().capacity());
 
-        journal.closeAndDelete();
+        journal.destroy();
 
     }
     

@@ -64,16 +64,32 @@ public class TestPrefixSerializer extends TestCase2 {
 
     final Random r = new Random();
 
-    public void test_prefixCompressionEmptyArray() throws IOException {
+    public void test_prefixCompression_Empty() throws IOException {
 
         // capacity of the array.
         final int capacity = r.nextInt(10);
 
         doRandomRoundTripTest(0, capacity);
-        
+
+    }
+
+    public void test_prefixCompression_1() throws IOException {
+
+        doRandomRoundTripTest(1/* n */, 1/* capacity */);
+
+        doRandomRoundTripTest(1/* n */, 2/* capacity */);
+
+    }
+
+    public void test_prefixCompression_2() throws IOException {
+
+        doRandomRoundTripTest(2/* n */, 2/* capacity */);
+
+        doRandomRoundTripTest(2/* n */, 3/* capacity */);
+
     }
     
-    public void test_prefixCompressionOnce() throws IOException {
+    public void test_prefixCompressionOnceRandom() throws IOException {
         
         // #of elements.
         final int n = r.nextInt(100);
@@ -147,8 +163,12 @@ public class TestPrefixSerializer extends TestCase2 {
         final IRandomAccessByteArray raba2;
         {
 
+//            final int n = raba.getKeyCount();
+            
+            final int capacity = raba.getMaxKeys();
+            
             raba2 = new RandomAccessByteArray(0/* fromIndex */,
-                    0/* toIndex */, new byte[raba.getMaxKeys()][]);
+                    0/* toIndex */, new byte[capacity][]);
 
             final DataInput in = new DataInputStream(new ByteArrayInputStream(
                     data));
@@ -159,7 +179,7 @@ public class TestPrefixSerializer extends TestCase2 {
 
         assertEquals(raba, raba2);
 
-        if (true) {
+        if (log.isInfoEnabled()) {
         
             int nbytes = 0;
             
@@ -173,8 +193,7 @@ public class TestPrefixSerializer extends TestCase2 {
              * Note: this is for compression of sorted random data, you can
              * expect to do better for real data.
              */
-            if (log.isInfoEnabled())
-                log.info("original: "+nbytes+", compressed: "+data.length);
+            log.info("original: "+nbytes+", compressed: "+data.length);
             
         }
         

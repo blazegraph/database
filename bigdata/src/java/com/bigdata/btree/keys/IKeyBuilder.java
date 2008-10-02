@@ -251,10 +251,6 @@ public interface IKeyBuilder extends ISortKeyBuilder {
      * 
      * @return The {@link IKeyBuilder}.
      * 
-     * @throws UnsupportedOperationException
-     *             if <i>unicode == true</i> but the {@link IKeyBuilder} does
-     *             not support Unicode.
-     * 
      * @see http://www.unicode.org/reports/tr10/tr10-10.html#Interleaved_Levels
      */
     public IKeyBuilder appendText(String text, boolean unicode,

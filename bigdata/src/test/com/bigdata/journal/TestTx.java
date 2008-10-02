@@ -48,7 +48,7 @@ import com.bigdata.isolation.IsolatedFusedView;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestTx extends ProxyTestCase {
+public class TestTx extends ProxyTestCase<Journal> {
     
     public TestTx() {
     }
@@ -95,7 +95,7 @@ public class TestTx extends ProxyTestCase {
         // commit.
         assertEquals(0L,journal.commit(tx));
 
-        journal.closeAndDelete();
+        journal.destroy();
         
     }
 
@@ -143,7 +143,7 @@ public class TestTx extends ProxyTestCase {
         
         journal.abort(tx2);
         
-        journal.closeAndDelete();
+        journal.destroy();
         
     }
 
@@ -191,7 +191,7 @@ public class TestTx extends ProxyTestCase {
 
         assertTrue( ndx2 == journal.getIndex(name,tx2));
         
-        journal.closeAndDelete();
+        journal.destroy();
         
     }
     
@@ -300,7 +300,7 @@ public class TestTx extends ProxyTestCase {
         
         journal.abort(tx2);
 
-        journal.closeAndDelete();
+        journal.destroy();
         
     }
 
@@ -448,7 +448,7 @@ public class TestTx extends ProxyTestCase {
             
         }
         
-        journal.closeAndDelete();
+        journal.destroy();
         
     }
 
@@ -546,7 +546,7 @@ public class TestTx extends ProxyTestCase {
          // Still visible in global scope.
          assertTrue(journal.getIndex(name).contains(id0));
 
-         journal.closeAndDelete();
+         journal.destroy();
     
     }
 
@@ -656,7 +656,7 @@ public class TestTx extends ProxyTestCase {
         // Still not visible in global scope.
         assertFalse(journal.getIndex(name).contains(id0));
 
-        journal.closeAndDelete();
+        journal.destroy();
 
     }
 
@@ -746,7 +746,7 @@ public class TestTx extends ProxyTestCase {
         assertTrue(journal.getIndex(name).contains(id0));
         assertEquals(v1, (byte[])journal.getIndex(name).lookup(id0));
 
-        journal.closeAndDelete();
+        journal.destroy();
 
     }
 
@@ -873,7 +873,7 @@ public class TestTx extends ProxyTestCase {
         assertEquals(v0, (byte[]) journal.getIndex(name).lookup(
                 id1));
 
-        journal.closeAndDelete();
+        journal.destroy();
 
     }
 
@@ -937,7 +937,7 @@ public class TestTx extends ProxyTestCase {
         // data version now deleted in global scope.
         assertFalse(journal.getIndex(name).contains(id0));
 
-        journal.closeAndDelete();
+        journal.destroy();
 
     }
 

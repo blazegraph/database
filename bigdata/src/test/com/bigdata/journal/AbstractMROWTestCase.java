@@ -107,7 +107,7 @@ abstract public class AbstractMROWTestCase extends AbstractRawStoreTestCase {
         doMROWTest(store, nwrites, writeDelayMillis, timeout,
                 nclients, ntrials, reclen, nreads);
         
-        store.closeAndDelete();
+        store.destroy();
         
     }
 

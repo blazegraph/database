@@ -211,7 +211,7 @@ public class TestDefaultResourceLocator extends TestCase2 {
             
         } finally {
             
-            store.closeAndDelete();
+            store.destroy();
             
             executorService.shutdownNow();
             

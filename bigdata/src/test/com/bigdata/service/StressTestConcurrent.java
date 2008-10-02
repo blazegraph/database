@@ -589,7 +589,7 @@ public class StressTestConcurrent extends
 
                 groundTruth[i] = null;
                 
-                groundTruthStore[i].closeAndDelete();
+                groundTruthStore[i].destroy();
                 
             }
             

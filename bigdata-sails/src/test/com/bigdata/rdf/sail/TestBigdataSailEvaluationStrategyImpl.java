@@ -34,14 +34,11 @@ package com.bigdata.rdf.sail;
 import info.aduna.xml.XMLWriter;
 
 import java.io.File;
-import java.io.IOException;
 import java.io.StringWriter;
 import java.util.Properties;
 
 import junit.framework.TestCase2;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
@@ -51,15 +48,14 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.BindingSet;
-import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.resultio.sparqlxml.SPARQLResultsXMLWriter;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
-import org.openrdf.repository.RepositoryException;
-import org.openrdf.sail.SailException;
+
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BNS;
 
 /**
@@ -848,6 +844,8 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
         final Properties props = new Properties();
         
         props.setProperty(BigdataSail.Options.FILE, journal.getAbsolutePath());
+
+        props.setProperty(AbstractTripleStore.Options.MAX_PARALLEL_SUBQUERIES,"0");
         
         final BigdataSail sail = new BigdataSail(props);
         

@@ -188,7 +188,7 @@ public class TestConflictResolution extends TestCase2 {
             assertTrue(tmp.isAborted());
         }
         
-        journal.closeAndDelete();
+        journal.destroy();
 
     }
     
@@ -267,7 +267,7 @@ public class TestConflictResolution extends TestCase2 {
          */
         assertEquals(v1c,(byte[])journal.getIndex(name).lookup(k1));
         
-        journal.closeAndDelete();
+        journal.destroy();
 
     }
     

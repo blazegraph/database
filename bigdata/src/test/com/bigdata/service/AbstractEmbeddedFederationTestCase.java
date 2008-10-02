@@ -55,7 +55,7 @@ import com.bigdata.search.FullTextIndex;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME modify this and {@link AbstractLocalDataServiceFederationTestCase} to
+ * FIXME modify this and {@link TestLDS} to
  * be proxy test suites so that I can run tests against both with ease and make
  * use of them for testing the {@link FullTextIndex} and
  * {@link BigdataFileSystem}.
@@ -360,7 +360,7 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
     protected int getPartitionCount(String name) {
         
         final ITupleIterator itr = new RawDataServiceTupleIterator(
-                metadataService,//
+                fed.getMetadataService(),//
                 MetadataService.getMetadataIndexName(name), //
                 ITx.READ_COMMITTED,//
                 true, // readConsistent

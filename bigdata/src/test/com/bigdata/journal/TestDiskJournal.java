@@ -34,7 +34,6 @@ import java.util.Properties;
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
-import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
 import com.bigdata.rawstore.IRawStore;
 
@@ -44,7 +43,7 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestDiskJournal extends AbstractTestCase {
+public class TestDiskJournal extends AbstractJournalTestCase {
 
     public TestDiskJournal() {
         super();
@@ -137,7 +136,7 @@ public class TestDiskJournal extends AbstractTestCase {
         assertEquals(Options.BUFFER_MODE, BufferMode.Disk, bufferStrategy
                 .getBufferMode());
 
-        journal.closeAndDelete();
+        journal.destroy();
 
     }
     
@@ -218,7 +217,7 @@ public class TestDiskJournal extends AbstractTestCase {
                 
             } finally {
 
-                store.closeAndDelete();
+                store.destroy();
             
             }
             
@@ -264,7 +263,7 @@ public class TestDiskJournal extends AbstractTestCase {
                 
             } finally {
 
-                store.closeAndDelete();
+                store.destroy();
             
             }
 
@@ -335,7 +334,7 @@ public class TestDiskJournal extends AbstractTestCase {
                 
             } finally {
 
-                store.closeAndDelete();
+                store.destroy();
             
             }
 
@@ -408,7 +407,7 @@ public class TestDiskJournal extends AbstractTestCase {
                 
             } finally {
 
-                store.closeAndDelete();
+                store.destroy();
             
             }
 
@@ -484,7 +483,7 @@ public class TestDiskJournal extends AbstractTestCase {
                 
             } finally {
 
-                store.closeAndDelete();
+                store.destroy();
             
             }
 

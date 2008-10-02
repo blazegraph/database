@@ -1087,13 +1087,14 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
          */
         protected void startHttpdService() throws UnsupportedEncodingException {
 
+            final String path = getServiceCounterPathPrefix();
+            
             final int httpdPort = client.getHttpdPort();
 
             if (httpdPort == -1) {
 
                 if (INFO)
-                    log.info("httpd disabled: "
-                                    + getServiceCounterPathPrefix());
+                    log.info("httpd disabled: "+path);
                 
                 return;
 
@@ -1106,8 +1107,7 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
 
             } catch (IOException e) {
 
-                log.error("Could not start httpd : "
-                        + getServiceCounterPathPrefix(), e);
+                log.error("Could not start httpd : "+path, e);
 
                 return;
                 
@@ -1117,7 +1117,7 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
             httpdURL = "http://"
                     + AbstractStatisticsCollector.fullyQualifiedHostName + ":"
                     + httpd.getPort() + "?path="
-                    + URLEncoder.encode(getServiceCounterPathPrefix(), "UTF-8");
+                    + URLEncoder.encode(path, "UTF-8");
 
             if (INFO)
                 log.info("start:\n" + httpdURL);

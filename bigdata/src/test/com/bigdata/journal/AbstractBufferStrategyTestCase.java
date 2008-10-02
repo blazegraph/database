@@ -166,7 +166,7 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
 
         } finally {
 
-            store.closeAndDelete();
+            store.destroy();
             
         }
         
@@ -207,7 +207,7 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
 
         } finally {
         
-        store.closeAndDelete();
+        store.destroy();
         
         }
 
@@ -357,7 +357,7 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
     
         } finally {
         
-        store.closeAndDelete();
+        store.destroy();
         
         }
 

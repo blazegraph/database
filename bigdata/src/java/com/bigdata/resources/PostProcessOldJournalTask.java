@@ -1701,7 +1701,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             if (tmpStore != null) {
 
                 try {
-                    tmpStore.closeAndDelete();
+                    tmpStore.destroy();
                 } catch (Throwable t) {
                     log.warn(t.getMessage(), t);
                 }

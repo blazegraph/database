@@ -206,7 +206,7 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
             
         }
 
-        store.closeAndDelete();
+        store.destroy();
 
     }
     
@@ -327,7 +327,7 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
             
         }
 
-        store.closeAndDelete();
+        store.destroy();
         
     }
     
@@ -383,7 +383,7 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
             
         }
 
-        store.closeAndDelete();
+        store.destroy();
         
     }
     

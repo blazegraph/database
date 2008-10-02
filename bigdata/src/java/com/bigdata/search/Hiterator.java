@@ -1,6 +1,7 @@
 package com.bigdata.search;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -179,5 +180,12 @@ public class Hiterator<A extends IHit> implements Iterator<A> {
         throw new UnsupportedOperationException();
         
     }
-    
+
+    public String toString() {
+        
+        return "Hiterator{elapsed=" + elapsed + ", minCosine=" + minCosine
+                + ", maxRank=" + maxRank + ", nhits=" + hits.size() + "} : "
+                + hits;
+        
+    }
 }

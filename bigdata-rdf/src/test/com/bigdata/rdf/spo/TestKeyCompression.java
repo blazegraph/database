@@ -27,7 +27,23 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.spo;
 
-import junit.framework.TestCase;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.Random;
+
+import junit.framework.TestCase2;
+
+import com.bigdata.btree.ICounter;
+import com.bigdata.btree.compression.IDataSerializer;
+import com.bigdata.btree.compression.IRandomAccessByteArray;
+import com.bigdata.btree.compression.PrefixSerializer;
+import com.bigdata.btree.compression.RandomAccessByteArray;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 
 /**
  * Test suite for approaches to key compression for statement indices (keys are
@@ -76,7 +92,7 @@ import junit.framework.TestCase;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestKeyCompression extends TestCase {
+public class TestKeyCompression extends TestCase2 {
 
     /**
      * 
@@ -96,6 +112,187 @@ public class TestKeyCompression extends TestCase {
      * @todo write tests.
      */
     public void test_nothing() {
+        
+    }
+
+    private final Random r = new Random();
+    
+    /**
+     * Random positive integer (note that the lower two bits indicate either
+     * a URI, BNode, Literal or Statement Identifier and are randomly assigned
+     * along with the rest of the bits). The actual term identifiers for a
+     * triple store are assigned by the {@link ICounter} for the
+     * {@link LexiconRelation}'s TERM2id index.
+     */
+    protected long getTermId() {
+        
+        return r.nextInt(Integer.MAX_VALUE - 1) + 1;
+        
+    }
+    
+    /**
+     * Return an array of {@link SPO}s.
+     * 
+     * @param n
+     *            The #of elements in the array.
+     *            
+     * @return The array.
+     */
+    protected SPO[] getData(int n) {
+        
+        final SPO[] a = new SPO[n];
+
+        for (int i = 0; i < n; i++) {
+
+            /*
+             * Note: Only the {s,p,o} are assigned. The statement type and the
+             * statement identifier are not part of the key for the statement
+             * indices.
+             */
+            a[i] = new SPO(getTermId(), getTermId(), getTermId());
+            
+        }
+
+        // place into sorted order.
+        Arrays.sort(a, 0, a.length, SPOComparator.INSTANCE);
+        
+        return a;
+        
+    }
+
+    public void test_prefixSerializer() throws IOException {
+        
+        final IDataSerializer ser = FastRDFKeyCompression.N3;
+        
+        doRoundTripTest(getData(0), ser);
+        
+        doRoundTripTest(getData(1), ser);
+        
+        doRoundTripTest(getData(10), ser);
+        
+        doRoundTripTest(getData(100), ser);
+
+        doRoundTripTest(getData(1000), ser);
+        
+        doRoundTripTest(getData(10000), ser);
+
+    }
+    
+    public void test_fastKeyCompression() throws IOException {
+
+        final IDataSerializer ser = FastRDFKeyCompression.N3;
+        
+        doRoundTripTest(getData(0), ser);
+        
+        doRoundTripTest(getData(1), ser);
+        
+        doRoundTripTest(getData(10), ser);
+        
+        doRoundTripTest(getData(100), ser);
+
+        doRoundTripTest(getData(1000), ser);
+        
+        doRoundTripTest(getData(10000), ser);
+
+    }
+    
+    /**
+     * Do a round-trip compression test.
+     * 
+     * @param a
+     *            The array of {@link SPO}s.
+     * @param ser
+     *            The compression provider.
+     * 
+     * @throws IOException
+     */
+    protected void doRoundTripTest(final SPO[] a, final IDataSerializer ser)
+            throws IOException {
+
+        /*
+         * Generate keys from the SPOs.
+         */
+        final SPOTupleSerializer tupleSer = new SPOTupleSerializer(SPOKeyOrder.SPO);
+        final byte[][] keys = new byte[a.length][];
+        {
+
+            for (int i = 0; i < a.length; i++) {
+
+                keys[i] = tupleSer.serializeKey(a[i]);
+
+            }
+
+        }
+
+        /*
+         * Compress the keys.
+         */
+        final byte[] data;
+        {
+            final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+            final DataOutputStream os = new DataOutputStream(baos);
+
+            final IRandomAccessByteArray raba = new RandomAccessByteArray(keys);
+
+            ser.write(os, raba);
+
+            os.flush();
+            
+            data = baos.toByteArray();
+
+            log.info("#keys="
+                            + a.length
+                            + ", #bytes="
+                            + data.length
+                            + (a.length <= 10 ? ", data="
+                                    + Arrays.toString(data) : ""));
+            
+        }
+
+        /*
+         * De-compress the keys and compare to the keys generated above.
+         */
+        final IRandomAccessByteArray raba2;
+        {
+            
+            final ByteArrayInputStream bais = new ByteArrayInputStream(data);
+            
+            final DataInputStream in = new DataInputStream(bais);
+            
+            raba2 = new RandomAccessByteArray(0,0,new byte[a.length][]);
+
+            ser.read(in, raba2);
+            
+            in.close();
+
+        }
+        
+        // verify decompressed data.
+        {
+            
+            final Iterator<byte[]> itr = raba2.iterator();
+            
+            int i = 0;
+            
+            while(itr.hasNext()) {
+                
+                final byte[] expected = keys[i];
+                
+                final byte[] actual = itr.next();
+
+//                System.err.println("#nkeys=" + a.length + ", spo="
+//                        + a[i].toString() + ", expected="
+//                        + Arrays.toString(expected) + ", actual="
+//                        + Arrays.toString(actual));
+                
+                assertEquals("#keys=" + a.length + ", i=" + i, expected, actual);
+
+                i++;
+                
+            }
+            
+        }
         
     }
 

@@ -458,7 +458,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
          * Closing the journal.
          */
         System.err.println("Closing journal.");
-        btree.getStore().closeAndDelete();
+        btree.getStore().destroy();
         
     }
 

@@ -42,7 +42,7 @@ import com.bigdata.rawstore.IRawStore;
  * @version $Id$
  */
 
-public class TestDirectJournal extends AbstractTestCase {
+public class TestDirectJournal extends AbstractJournalTestCase {
 
     public TestDirectJournal() {
         super();
@@ -138,7 +138,7 @@ public class TestDirectJournal extends AbstractTestCase {
         assertEquals("bufferCapacity", bufferStrategy.getUserExtent(),
                 bufferStrategy.getBuffer().capacity());
 
-        journal.closeAndDelete();
+        journal.destroy();
 
     }
 

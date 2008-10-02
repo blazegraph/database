@@ -27,9 +27,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.sparse;
 
+import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+
+import com.bigdata.journal.AbstractIndexManagerTestCase;
+import com.bigdata.journal.IIndexManager;
+import com.bigdata.service.TestJournal;
+import com.bigdata.service.TestLDS;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -69,25 +75,52 @@ public class TestAll extends TestCase {
         // encoding and decoding of keys.
         suite.addTestSuite(TestKeyEncodeDecode.class);
         
-        // sparse row store operations.
-        suite.addTestSuite(TestSparseRowStore.class);
-        
+        // test row store backed by a Journal.
+        suite.addTest(proxySuite(new TestJournal("Journal row store"),"Journal"));
+
+        // test row store backed by LDS.
+        suite.addTest(proxySuite(new TestLDS("LDS row store"),"LDS"));
+
         /*
-         * @todo use of btree to support column store (in another package)
+         * @todo test against EDS.
          * 
-         * @todo handle column names and timestamp as part of the key.
+         * @todo test when the index is statically partitioned.
          * 
-         * @todo test data load utility for CSV and the like.
+         * @todo test consistent across split/join operations.
          * 
-         * @todo test version expiration based on age
          * 
-         * @todo test version expiration based on #of versions.
          * 
-         * @todo test on partitioned index. 
+         * @todo use of btree to support column store (in another package)?
+         * 
+         * @todo test version expiration based on age?
+         * 
+         * @todo test version expiration based on #of versions?
          */
         
         return suite;
         
     }
     
+    /**
+     * Create and populate a {@link ProxyTestSuite} with the unit tests that we
+     * will run against any of the {@link IIndexManager} implementations.
+     * 
+     * @param delegate
+     *            The delegate for the proxied unit tests.
+     * @param name
+     *            The name of the test suite.
+     * @return The {@link ProxyTestSuite} populated with the unit tests.
+     */
+    protected static ProxyTestSuite proxySuite(
+            AbstractIndexManagerTestCase<? extends IIndexManager> delegate, String name) {
+
+        final ProxyTestSuite suite = new ProxyTestSuite(delegate, name);
+
+        // sparse row store operations.
+        suite.addTestSuite(TestSparseRowStore.class);
+        
+        return suite;
+        
+    }
+
 }

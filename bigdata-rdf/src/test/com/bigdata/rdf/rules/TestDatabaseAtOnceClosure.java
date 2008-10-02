@@ -559,7 +559,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
                 /*
                  * FIXME This assertion is failing. The problem is how the
                  * mutation count is being reported the closure of the rule. The
-                 * compute closure is correct.
+                 * computed closure is correct.
                  */
                 assertEquals("mutationCount", 3, mutationCount);
 

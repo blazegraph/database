@@ -315,7 +315,7 @@ public class TokenBuffer {
 
                 final String termText = termMetadata.termText();
                 
-                final byte[] key = textIndexer.getTokenKey(keyBuilder, termText,
+                final byte[] key = FullTextIndex.getTokenKey(keyBuilder, termText,
                         false/* successor */, docId, fieldId);
                 
                 if(DEBUG) {

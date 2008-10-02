@@ -27,9 +27,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.search;
 
+import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+
+import com.bigdata.journal.AbstractIndexManagerTestCase;
+import com.bigdata.journal.IIndexManager;
+import com.bigdata.service.TestJournal;
+import com.bigdata.service.TestLDS;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -54,14 +60,57 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("full text indexing");
+        final TestSuite suite = new TestSuite("Full Text Index and Search");
 
-        suite.addTestSuite(TestRestartSafeWithLDS.class);
+        // test key formation
+        suite.addTestSuite(TestKeyBuilder.class);
         
-        suite.addTestSuite(TestSearch.class);
+        // @todo test other facets of search that do not interact with persistence.
+        
+        // search backed by a Journal.
+        suite.addTest(proxySuite(new TestJournal("Journal Search"),"Journal"));
+
+        // search backed by LDS.
+        suite.addTest(proxySuite(new TestLDS("LDS Search"),"LDS"));
+
+        /*
+         * @todo search backed by EDS.
+         * 
+         * @todo Test when the search index is split across a key-range
+         * partition (this can be done statically when the index is created).
+         * 
+         * @todo test overflow handing.
+         */
         
         return suite;
+
+    }
+
+    /**
+     * Create and populate a {@link ProxyTestSuite} with the unit tests that we
+     * will run against any of the {@link IIndexManager} implementations.
+     * 
+     * @param delegate
+     *            The delegate for the proxied unit tests.
+     * @param name
+     *            The name of the test suite.
+     * @return The {@link ProxyTestSuite} populated with the unit tests.
+     */
+    protected static ProxyTestSuite proxySuite(
+            AbstractIndexManagerTestCase<? extends IIndexManager> delegate, String name) {
+
+        final ProxyTestSuite suite = new ProxyTestSuite(delegate, name);
         
+        // test of search correctness, focusing on cosine computations.
+        suite.addTestSuite(TestSearch.class);
+        
+        // test of prefix search
+        suite.addTestSuite(TestPrefixSearch.class);
+        
+        // test verifies search index is restart safe.
+        suite.addTestSuite(TestSearchRestartSafe.class);
+
+        return suite;
     }
     
 }

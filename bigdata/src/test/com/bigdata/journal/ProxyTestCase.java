@@ -35,10 +35,10 @@ import junit.framework.Test;
 /**
  * <p>
  * This class provides proxy delegation logic for abstract methods declared by
- * {@link AbstractTestCase} and is used to extend the set of tests that will be
+ * {@link AbstractJournalTestCase} and is used to extend the set of tests that will be
  * applied to all implementations of the generic object model Java API. If you
  * want to test a new implementation, you MUST extend the
- * {@link AbstractTestCase} instead and implement its abstract methods for your
+ * {@link AbstractJournalTestCase} instead and implement its abstract methods for your
  * implementation. This class provides an implementation neutral way to add new
  * tests, not a means for testing specific generic object model Java API
  * implementations.
@@ -48,11 +48,10 @@ import junit.framework.Test;
  * this class and write test methods.
  * </p>
  * 
- * @see AbstractTestCase
+ * @see AbstractJournalTestCase
  */
-
-public abstract class ProxyTestCase
-    extends AbstractTestCase
+public abstract class ProxyTestCase<S extends IIndexManager>
+    extends AbstractIndexManagerTestCase<S>
     implements IProxyTest
 {
 
@@ -63,11 +62,11 @@ public abstract class ProxyTestCase
     //************************ IProxyTest ************************
     //************************************************************
 
-    private Test m_delegate = null;
+    private AbstractIndexManagerTestCase<S> m_delegate = null;
 
     public void setDelegate(Test delegate) {
 
-        m_delegate = delegate;
+        m_delegate = (AbstractIndexManagerTestCase<S>)delegate;
 
     }
 
@@ -79,10 +78,10 @@ public abstract class ProxyTestCase
 
     /**
      * Returns the delegate after first making sure that it is non-null and
-     * extends {@link AbstractTestCase}.
+     * extends {@link AbstractJournalTestCase}.
      */
 
-    public AbstractTestCase getOurDelegate() {
+    public AbstractIndexManagerTestCase<S> getOurDelegate() {
 
         if (m_delegate == null) {
 
@@ -109,7 +108,7 @@ public abstract class ProxyTestCase
             }
             try {
                 Class cl = Class.forName(testClass);
-                m_delegate = (Test) cl.newInstance();
+                m_delegate = (AbstractIndexManagerTestCase<S>) cl.newInstance();
             } catch (Exception ex) {
                 throw new RuntimeException(ex);
             }
@@ -120,14 +119,14 @@ public abstract class ProxyTestCase
 
         }
 
-        if (m_delegate instanceof AbstractTestCase) {
+        if (m_delegate instanceof AbstractIndexManagerTestCase) {
 
-            return (AbstractTestCase) m_delegate;
+            return (AbstractIndexManagerTestCase) m_delegate;
 
         }
 
         throw new IllegalStateException("The delegate MUST extend "
-                + AbstractTestCase.class.getName() + ", not "
+                + AbstractIndexManagerTestCase.class.getName() + ", not "
                 + m_delegate.getClass().getName());
 
     }
@@ -156,7 +155,26 @@ public abstract class ProxyTestCase
         return getOurDelegate().getProperties();
     }
 
-    public Journal reopenStore(Journal store) {
+    /**
+     * Open/create an {@link IIndexManager} using the properties reported by
+     * {@link #getProperties()}.
+     */
+    public S getStore() {
+        return getOurDelegate().getStore(getProperties());
+    }
+
+    /**
+     * Open/create an {@link IIndexManager} using the given properties.
+     */
+    public S getStore(Properties properties) {
+        return getOurDelegate().getStore(properties);
+    }
+
+    /**
+     * Close the {@link IIndexManager} and re-open an {@link IIndexManager}
+     * backed by the same persistent storage.
+     */
+    public S reopenStore(S store) {
         return getOurDelegate().reopenStore(store);
     }
 

@@ -54,7 +54,7 @@ import com.bigdata.btree.SimpleEntry;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestNamedIndices extends ProxyTestCase {
+public class TestNamedIndices extends ProxyTestCase<Journal> {
 
     public TestNamedIndices() {
     }
@@ -118,7 +118,7 @@ public class TestNamedIndices extends ProxyTestCase {
 
         }
 
-        journal.closeAndDelete();
+        journal.destroy();
 
     }
 

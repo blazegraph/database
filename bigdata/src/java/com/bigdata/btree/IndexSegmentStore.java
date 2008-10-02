@@ -651,7 +651,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
 
     }
     
-    synchronized public void closeAndDelete() {
+    synchronized public void destroy() {
         
         close();
 

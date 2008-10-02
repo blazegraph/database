@@ -157,7 +157,7 @@ public class TempTripleStore extends AbstractLocalTripleStore {
      */
     final public void closeAndDelete() {
         
-        store.closeAndDelete();
+        store.destroy();
         
         super.closeAndDelete();
         
