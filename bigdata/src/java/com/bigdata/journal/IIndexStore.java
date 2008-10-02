@@ -149,4 +149,9 @@ public interface IIndexStore {
      */
     public long getLastCommitTime();
     
+    /**
+     * Destroy the {@link IIndexStore}.
+     */
+    public void destroy();
+    
 }

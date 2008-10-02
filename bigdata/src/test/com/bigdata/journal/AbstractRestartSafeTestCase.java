@@ -169,7 +169,7 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
 //        // verify that the data are all zeros since we did not commit the store.
 //        assertEquals(new byte[len],actual);
 
-        store.closeAndDelete();
+        store.destroy();
         
     }
     
@@ -226,7 +226,7 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
         
         assertEquals(expected,actual);
 
-        store.closeAndDelete();
+        store.destroy();
         
     }
     
@@ -317,7 +317,7 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
             
         }
 
-        store.closeAndDelete();
+        store.destroy();
         
     }
     

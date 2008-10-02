@@ -620,7 +620,8 @@ public class NodeSerializer {
                  */
                 MutableKeyBuffer tmp = new MutableKeyBuffer(branchingFactor);
                 nodeKeySerializer.read(is, tmp);
-                keys = new ImmutableKeyBuffer(tmp);
+//                keys = new ImmutableKeyBuffer(tmp);
+                keys = tmp;
             }
 
             final int nkeys = keys.getKeyCount();
@@ -893,7 +894,8 @@ public class NodeSerializer {
                  */
                 MutableKeyBuffer tmp = new MutableKeyBuffer(branchingFactor+1);
                 leafKeySerializer.read(is, tmp);
-                keys = new ImmutableKeyBuffer(tmp);
+//                keys = new ImmutableKeyBuffer(tmp);
+                keys = tmp;
             }
 
             final int nkeys = keys.getKeyCount();

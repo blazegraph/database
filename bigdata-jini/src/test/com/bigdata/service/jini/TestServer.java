@@ -632,7 +632,7 @@ public class TestServer implements LeaseListener, ServiceIDListener
 
                         try {
 
-                            getJournal().closeAndDelete();
+                            getJournal().destroy();
 
                             log.info("Journal deleted.");
                             

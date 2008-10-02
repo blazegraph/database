@@ -41,7 +41,7 @@ import com.bigdata.btree.BTree;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestCommitHistory extends ProxyTestCase {
+public class TestCommitHistory extends ProxyTestCase<Journal> {
 
     /**
      * 
@@ -99,7 +99,7 @@ public class TestCommitHistory extends ProxyTestCase {
 
         assertNull(journal.getCommitRecord(journal.nextTimestamp()));
         
-        journal.closeAndDelete();
+        journal.destroy();
         
     }
     
@@ -139,7 +139,7 @@ public class TestCommitHistory extends ProxyTestCase {
         
         assertEquals(journal.getCommitRecord(),commitRecord);
         
-        journal.closeAndDelete();
+        journal.destroy();
         
     }
     
@@ -154,7 +154,7 @@ public class TestCommitHistory extends ProxyTestCase {
             
             // test only applies to restart-safe journals.
             
-            journal.closeAndDelete();
+            journal.destroy();
             
             return;
             
@@ -199,7 +199,7 @@ public class TestCommitHistory extends ProxyTestCase {
         assertEquals(commitRecord1, commitRecord3);
         assertEquals(commitRecord2, commitRecord3);
         
-        journal.closeAndDelete();
+        journal.destroy();
 
     }
     
@@ -323,7 +323,7 @@ public class TestCommitHistory extends ProxyTestCase {
             
         }
         
-        journal.closeAndDelete();
+        journal.destroy();
         
     }
 
@@ -381,7 +381,7 @@ public class TestCommitHistory extends ProxyTestCase {
 
         assertTrue(commitRecord1 == journal.getCommitRecord(commitTime1 + 1));
 
-        journal.closeAndDelete();
+        journal.destroy();
 
     }
     
@@ -522,7 +522,7 @@ public class TestCommitHistory extends ProxyTestCase {
         // the live index must be distinct from the historical index.
         assertTrue(liveIndex != historicalIndex2); 
         
-        journal.closeAndDelete();
+        journal.destroy();
 
     }
     

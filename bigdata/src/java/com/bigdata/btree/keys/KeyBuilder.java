@@ -599,8 +599,15 @@ public class KeyBuilder implements IKeyBuilder {
 
         if (textlen < maxlen) {
 
-            // append a single pad byte.
-            append(pad);
+            /*
+             * append a single pad byte.
+             * 
+             * Note: Changed this to append the pad character (a space) as if it
+             * was already an unsigned value (0x20) rather than its signed value
+             * (0x160). This causes "bro" to sort before "brown", which is
+             * designed. (bbt, 10/1/08)
+             */
+            appendUnsigned(pad);
             
             // append the run length for the trailing pad characters.
             final int runLength = maxlen - textlen;
@@ -835,6 +842,18 @@ public class KeyBuilder implements IKeyBuilder {
 //        return append((short) v);
 //        
 //    }
+
+    final public IKeyBuilder appendUnsigned(final byte v) {
+
+        // performance tweak
+        if (len + 1 > buf.length) ensureCapacity(len+1);
+        // ensureFree(1);
+
+        buf[len++] = (byte)v;
+        
+        return this;
+        
+    }
 
     final public IKeyBuilder append(final byte v) {
 

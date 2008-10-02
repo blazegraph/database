@@ -266,7 +266,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
 
     }
 
-    final public void closeAndDelete() {
+    final public void destroy() {
         
         close();
 

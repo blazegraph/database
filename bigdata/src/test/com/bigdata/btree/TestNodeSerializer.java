@@ -526,8 +526,9 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
          */
         
         Node node = new Node(btree, addr, branchingFactor, nentries,
-                new ImmutableKeyBuffer(nkeys, branchingFactor, keys), children,
-                childEntryCounts);
+//                new ImmutableKeyBuffer(nkeys, branchingFactor, keys),
+                new MutableKeyBuffer(nkeys, keys),
+                children, childEntryCounts);
         
         btree.root = node;
 
@@ -585,7 +586,8 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
          */
 
         Leaf leaf = new Leaf(btree, addr, branchingFactor,
-                new ImmutableKeyBuffer(nkeys, branchingFactor + 1, keys),
+//                new ImmutableKeyBuffer(nkeys, branchingFactor + 1, keys),
+                new MutableKeyBuffer(nkeys, keys),
                 values,//
                 versionTimestamps,//
                 deleteMarkers//

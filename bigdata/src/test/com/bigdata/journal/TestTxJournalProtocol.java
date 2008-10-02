@@ -81,7 +81,7 @@ public class TestTxJournalProtocol extends ProxyTestCase {
 
         tx0.abort();
 
-        journal.closeAndDelete();
+        journal.destroy();
 
     }
     
@@ -126,7 +126,7 @@ public class TestTxJournalProtocol extends ProxyTestCase {
 
         tx0.abort();
 
-        journal.closeAndDelete();
+        journal.destroy();
 
     }
 

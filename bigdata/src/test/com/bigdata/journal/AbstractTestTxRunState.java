@@ -165,7 +165,7 @@ abstract public class AbstractTestTxRunState extends ProxyTestCase {
         assertFalse(tx0.isCommitted());
         assertTrue(tx0.isComplete());
 
-        journal.closeAndDelete();
+        journal.destroy();
 
     }
     
@@ -204,7 +204,7 @@ abstract public class AbstractTestTxRunState extends ProxyTestCase {
             assertFalse( tx0.isCommitted() );
             assertTrue( tx0.isComplete() );
 
-            journal.closeAndDelete();
+            journal.destroy();
 
     }
 
@@ -245,7 +245,7 @@ abstract public class AbstractTestTxRunState extends ProxyTestCase {
             assertTrue( tx0.isCommitted() );
             assertTrue( tx0.isComplete() );
 
-            journal.closeAndDelete();
+            journal.destroy();
 
     }
 
@@ -291,7 +291,7 @@ abstract public class AbstractTestTxRunState extends ProxyTestCase {
         assertFalse(tx0.isCommitted());
         assertTrue(tx0.isComplete());
 
-        journal.closeAndDelete();
+        journal.destroy();
 
     }
 
@@ -339,7 +339,7 @@ abstract public class AbstractTestTxRunState extends ProxyTestCase {
             assertFalse( tx0.isCommitted() );
             assertTrue( tx0.isComplete() );
 
-            journal.closeAndDelete();
+            journal.destroy();
 
     }
 
@@ -377,7 +377,7 @@ abstract public class AbstractTestTxRunState extends ProxyTestCase {
             assertFalse( tx0.isCommitted() );
             assertTrue( tx0.isComplete() );
 
-            journal.closeAndDelete();
+            journal.destroy();
 
     }
 
@@ -473,7 +473,7 @@ abstract public class AbstractTestTxRunState extends ProxyTestCase {
 
         assertNull(journal.getTx(tmp.getStartTimestamp()));
         
-        journal.closeAndDelete();
+        journal.destroy();
 
     }
 

@@ -1525,7 +1525,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
     }
 
-    synchronized public void closeAndDelete() {
+    synchronized public void destroy() {
 
         // Note: per contract for close().
         if(!isOpen()) throw new IllegalStateException();

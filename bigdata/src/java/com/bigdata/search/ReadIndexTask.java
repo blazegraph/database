@@ -6,6 +6,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.ITuple;
@@ -49,8 +50,9 @@ public class ReadIndexTask implements Callable<Object> {
             .toInt();
 
     private final String queryTerm;
+    private final boolean prefixMatch;
     private final double queryTermWeight;
-    private final FullTextIndex searchEngine;
+//    private final FullTextIndex searchEngine;
     private final ConcurrentHashMap<Long, Hit> hits;
     private final ITupleIterator itr;
 
@@ -63,26 +65,82 @@ public class ReadIndexTask implements Callable<Object> {
      */
     private Hit tmp = new Hit();
 
-    public ReadIndexTask(String termText, double queryTermWeight,
-            FullTextIndex searchEngine, ConcurrentHashMap<Long, Hit> hits) {
+    /**
+     * Setup a task that will perform a range scan for entries matching the
+     * search term.
+     * 
+     * @param termText
+     *            The term text for the search term.
+     * @param prefixMatch
+     *            When <code>true</code> any term having <i>termText</i> as a
+     *            prefix will be matched. Otherwise the term must be an exact
+     *            match for the <i>termText</i>.
+     * @param queryTermWeight
+     *            The weight for the search term.
+     * @param searchEngine
+     *            The search engine.
+     * @param hits
+     *            The map where the hits are being aggregated.
+     */
+    public ReadIndexTask(final String termText, final boolean prefixMatch,
+            final double queryTermWeight, final FullTextIndex searchEngine,
+            final ConcurrentHashMap<Long, Hit> hits) {
 
+        if (termText == null)
+            throw new IllegalArgumentException();
+        
+        if (searchEngine == null)
+            throw new IllegalArgumentException();
+        
+        if (hits == null)
+            throw new IllegalArgumentException();
+        
         this.queryTerm = termText;
 
+        this.prefixMatch = prefixMatch;
+        
         this.queryTermWeight = queryTermWeight;
 
-        this.searchEngine = searchEngine;
+//        this.searchEngine = searchEngine;
         
         this.hits = hits;
      
         final IKeyBuilder keyBuilder = searchEngine.getKeyBuilder();
         
-        final byte[] fromKey = searchEngine.getTokenKey(keyBuilder, termText,
-                false/* successor */, 0L, 0);
+        final byte[] fromKey = FullTextIndex.getTokenKey(keyBuilder, termText,
+                false/* successor */, 0L/* docId */, 0/* fieldId */);
 
-        final byte[] toKey = searchEngine.getTokenKey(keyBuilder, termText,
-                true/* successor */, 0L, 0);
+        final byte[] toKey;
+        
+        // FIXME prefixMatch can not be turned off right now.
+//        if (prefixMatch) {
+            /*
+             * Accepts anything starting with the search term. E.g., given
+             * "bro", it will match "broom" and "brown" but not "break".
+             */
+            toKey = FullTextIndex.getTokenKey(keyBuilder, termText,
+                    true/* successor */, 0L/* docId */, 0/* fieldId */);
+//        } else {
+//            /*
+//             * Accepts only those entries that exactly match the search term.
+//             */
+//            toKey = FullTextIndex.getTokenKey(keyBuilder, termText+"\0",
+//                    false/* successor */, 0L/* docId */, 0/* fieldId */);
+//        }
 
-        // @todo filter by field
+//        if (DEBUG) log.debug
+            System.err.println
+            ("termText=[" + termText + "], prefixMatch=" + prefixMatch
+                    + ", queryTermWeight=" + queryTermWeight + "\nfromKey="
+                    + BytesUtil.toString(fromKey) + "\ntoKey="
+                    + BytesUtil.toString(toKey));
+        
+        /*
+         * @todo filter by field. all we need to do is pass in an array of the
+         * fields that should be accepted and formulate and pass along an
+         * ITupleFilter which accepts only those fields. Note that the docId is
+         * in the last position of the key.
+         */
         itr = searchEngine.getIndex()
                 .rangeIterator(fromKey, toKey, 0/* capacity */,
                         IRangeQuery.KEYS | IRangeQuery.VALS, null/*filter*/);
@@ -97,12 +155,9 @@ public class ReadIndexTask implements Callable<Object> {
 
         long nhits = 0;
 
-        if (DEBUG) {
-
+        if (DEBUG)
             log.debug("queryTerm=" + queryTerm + ", termWeight="
                     + queryTermWeight);
-
-        }
 
         while (itr.hasNext()) {
 
@@ -134,14 +189,11 @@ public class ReadIndexTask implements Callable<Object> {
             final int termFreq = dis.readShort();
             final double termWeight = dis.readDouble();
             
-            if(DEBUG) {
-                
+            if (DEBUG)
                 log.debug("hit: term=" + queryTerm + ", docId=" + docId
                         + ", termFreq=" + termFreq + ", termWeight="
                         + termWeight + ", product="
                         + (queryTermWeight * termWeight));
-                
-            }
             
             /*
              * Play a little magic to get the docId in the hit set without race

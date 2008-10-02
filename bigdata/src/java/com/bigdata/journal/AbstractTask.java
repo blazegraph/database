@@ -2159,7 +2159,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             throw new UnsupportedOperationException();
         }
 
-        public void closeAndDelete() {
+        public void destroy() {
             throw new UnsupportedOperationException();
         }
 
@@ -2523,7 +2523,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             throw new UnsupportedOperationException();
         }
 
-        public void closeAndDelete() {
+        public void destroy() {
             throw new UnsupportedOperationException();
         }
 
@@ -2715,6 +2715,10 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             delegate.registerIndex(indexMetadata);
         }
 
+        public void destroy() {
+            delegate.destroy();
+        }
+        
         public TemporaryStore getTempStore() {
             return delegate.getTempStore();
         }

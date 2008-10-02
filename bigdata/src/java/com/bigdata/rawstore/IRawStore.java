@@ -249,7 +249,7 @@ public interface IRawStore extends IAddressManager, IStoreSerializer {
      * 
      * @see #deleteResources()
      */
-    public void closeAndDelete();
+    public void destroy();
     
     /**
      * The backing file -or- <code>null</code> if there is no backing file

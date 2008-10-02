@@ -43,7 +43,7 @@ import com.bigdata.rawstore.IRawStore;
  * @version $Id$
  */
 
-public class TestTransientJournal extends AbstractTestCase {
+public class TestTransientJournal extends AbstractJournalTestCase {
 
     public TestTransientJournal() {
         super();

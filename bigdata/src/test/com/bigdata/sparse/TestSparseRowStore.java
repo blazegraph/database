@@ -37,19 +37,18 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.Vector;
 
-import junit.framework.TestCase2;
-
 import com.bigdata.bfs.BigdataFileSystem;
-import com.bigdata.btree.BTree;
+import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.Journal;
+import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.Options;
-import com.bigdata.rawstore.IRawStore;
+import com.bigdata.journal.ProxyTestCase;
 import com.bigdata.util.CSVReader;
 
 /**
@@ -58,8 +57,6 @@ import com.bigdata.util.CSVReader;
  * Note: A lot of the pragmatic tests are being done by the
  * {@link BigdataFileSystem} which uses the {@link SparseRowStore} for its file
  * metadata index.
- * 
- * FIXME clean up this test suite.
  * 
  * @todo test with auto-generated timestamps.
  * 
@@ -76,11 +73,11 @@ import com.bigdata.util.CSVReader;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestSparseRowStore extends TestCase2 {
+public class TestSparseRowStore extends ProxyTestCase<IIndexManager> {
 
     protected IKeyBuilder keyBuilder;
-    protected IRawStore store;
-    protected BTree btree;
+    protected IIndexManager store;
+    protected IIndex btree;
     
     public Properties getProperties() {
         
@@ -98,19 +95,23 @@ public class TestSparseRowStore extends TestCase2 {
 
         keyBuilder = KeyBuilder.newUnicodeInstance(properties);
 
-        store = new Journal(properties);
+//        store = new Journal(properties);
+        store = getStore(properties);
 
-        IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+        IndexMetadata metadata = new IndexMetadata(getName(), UUID.randomUUID());
 
         metadata.setDeleteMarkers(true);
 
-        btree = BTree.create(store, metadata);
+//        btree = BTree.create(store, metadata);
+        store.registerIndex(metadata);
+        
+        btree = store.getIndex(getName(), ITx.UNISOLATED);
         
     }
     
     public void tearDown() {
         
-        store.closeAndDelete();
+        store.destroy();
         
     }
     
@@ -687,7 +688,24 @@ public class TestSparseRowStore extends TestCase2 {
             
         }
 
-        assertFalse(itr.hasNext());
+        if(itr.hasNext()) {
+
+            /*
+             * FIXME For LDS but not the Journal I am seeing the following tuple
+             * reported here when none is expected.
+             * 
+             * TPS{
+             * schema=Schema{name=Employee,primaryKeyName=Id,primaryKeyType=Long},
+             * timestamp=9223372036854775807, tuples={
+             * com.bigdata.sparse.TPS$TP@1a6415=TPS{name=Id,timestamp=9223372036854775807,value=1},
+             * com.bigdata.sparse.TPS$TP@1a6446=TPS{name=Name,timestamp=9223372036854775807,value=Bryan},
+             * com.bigdata.sparse.TPS$TP@1a6475=TPS{name=State,timestamp=9223372036854775807,value=NC}}
+             * }
+             */
+            
+            fail("Not expecting: "+itr.next());
+            
+        }
         
     }
 

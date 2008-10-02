@@ -1334,7 +1334,7 @@ abstract public class StoreManager extends ResourceEvents implements
         }
 
         try {
-            tmpStore.closeAndDelete();
+            tmpStore.destroy();
         } catch (Exception ex) {
             log.warn(ex.getMessage(), ex);
         }
@@ -1369,7 +1369,7 @@ abstract public class StoreManager extends ResourceEvents implements
         }
 
         try {
-            tmpStore.closeAndDelete();
+            tmpStore.destroy();
         } catch (Exception ex) {
             log.warn(ex.getMessage(), ex);
         }

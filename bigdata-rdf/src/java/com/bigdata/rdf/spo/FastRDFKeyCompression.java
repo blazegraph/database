@@ -19,6 +19,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.compression.IRandomAccessByteArray;
+import com.bigdata.btree.compression.PrefixSerializer;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
 
@@ -38,11 +39,22 @@ import com.bigdata.rawstore.Bytes;
  * order-preserving compression (the keys need to be decompressed before they
  * can be processed by the procedure on in the data service so there is no
  * reason to use an order preserving compression).
+ * <p>
+ * Note: The {@link PrefixSerializer} currently (10/1/08) outperforms this class
+ * for load, closure and query. This class only does better in the size on disk.
+ * However, note that problems have been observed when de-mashalling keys from a
+ * remote data service using this class. The stack trace looks like this:
  * 
- * @todo try a variant that uses huffman encoding and compare with byte[] prefix
- *       coding to assess the relative cost of these methods.
- * 
- * @todo test suite.
+ * <pre>
+ * Caused by: java.io.EOFException
+ *     at it.unimi.dsi.mg4j.io.InputBitStream.read(InputBitStream.java:347)
+ *     at it.unimi.dsi.mg4j.io.InputBitStream.readFromCurrent(InputBitStream.java:459)
+ *     at it.unimi.dsi.mg4j.io.InputBitStream.readBit(InputBitStream.java:561)
+ *     at it.unimi.dsi.mg4j.io.InputBitStream.readNibble(InputBitStream.java:1163)
+ *     at com.bigdata.rdf.spo.FastRDFKeyCompression.read(FastRDFKeyCompression.java:151)
+ *     at com.bigdata.btree.ResultSet.readExternal(ResultSet.java:667)
+ * </pre>
+ * No such problem is observed with the {@link PrefixSerializer}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -50,6 +62,10 @@ import com.bigdata.rawstore.Bytes;
 public class FastRDFKeyCompression implements IDataSerializer, Externalizable {
 
     protected transient static final Logger log = Logger.getLogger(FastRDFKeyCompression.class);
+
+    protected transient static boolean INFO = log.isInfoEnabled();
+    
+    protected transient static boolean DEBUG = log.isDebugEnabled();
 
     /**
      * 
@@ -313,7 +329,7 @@ public class FastRDFKeyCompression implements IDataSerializer, Externalizable {
              * auto-extend aggressively or they are writing onto a fixed buffer
              * that writes on a socket.
              */
-            if (log.isDebugEnabled())
+            if (DEBUG)
                 log.debug(n
                         + " statements were serialized in " + obs.writtenBits()
                         + " bytes using " + nsymbols

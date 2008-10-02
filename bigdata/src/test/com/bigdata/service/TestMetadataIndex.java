@@ -83,9 +83,9 @@ public class TestMetadataIndex extends
         
         }
         
-        assertEquals(1,metadataService.nextPartitionId(name));
+        assertEquals(1,fed.getMetadataService().nextPartitionId(name));
         
-        assertEquals(2,metadataService.nextPartitionId(name));
+        assertEquals(2,fed.getMetadataService().nextPartitionId(name));
         
     }
     

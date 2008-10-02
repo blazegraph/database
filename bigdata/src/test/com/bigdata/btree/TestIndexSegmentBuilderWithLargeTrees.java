@@ -308,7 +308,7 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
          * Closing the journal.
          */
         System.err.println("Closing journal.");
-        btree.getStore().closeAndDelete();
+        btree.getStore().destroy();
         
     }
 

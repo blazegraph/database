@@ -527,11 +527,11 @@ public class ReplicatedStore implements IRawStore {
         
     }
 
-    public void closeAndDelete() {
+    public void destroy() {
 
         shutdown();
 
-        localStore.closeAndDelete();
+        localStore.destroy();
         
     }
 

@@ -138,7 +138,7 @@ public class TestReadOnlyTx extends ProxyTestCase {
             
         }
 
-        journal.closeAndDelete();
+        journal.destroy();
         
     }
 

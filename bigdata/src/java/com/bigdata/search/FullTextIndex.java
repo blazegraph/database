@@ -1001,7 +1001,7 @@ public class FullTextIndex extends AbstractRelation {
      * 
      * @return The key.
      */
-    protected byte[] getTokenKey(IKeyBuilder keyBuilder, String termText,
+    static protected byte[] getTokenKey(IKeyBuilder keyBuilder, String termText,
             boolean successor, long docId, int fieldId) {
         
         keyBuilder.reset();
@@ -1101,13 +1101,21 @@ public class FullTextIndex extends AbstractRelation {
      */
     public Hiterator search(String query, String languageCode) {
 
+        return search(query, languageCode, false/* prefixMatch */);
+        
+    }
+    
+    public Hiterator search(String query, String languageCode,
+            boolean prefixMatch) {
+
         return search( //
                 query,//
                 languageCode,//
+                prefixMatch,//
                 .4, // minCosine
                 10000 // maxRank
                 );
-        
+    
     }
     
     /**
@@ -1170,6 +1178,14 @@ public class FullTextIndex extends AbstractRelation {
      */
     public Hiterator search(String query, String languageCode,
             double minCosine, int maxRank) {
+        
+        return search(query, languageCode, false/* prefixMatch */, minCosine,
+                maxRank);
+        
+    }
+
+    public Hiterator search(String query, String languageCode,
+            boolean prefixMatch, double minCosine, int maxRank) {
 
         final long begin = System.currentTimeMillis();
         
@@ -1230,7 +1246,7 @@ public class FullTextIndex extends AbstractRelation {
         
         for(TermMetadata md : qdata.terms.values()) {
             
-            tasks.add(new ReadIndexTask(md.termText(), md.localTermWeight, this,
+            tasks.add(new ReadIndexTask(md.termText(), prefixMatch, md.localTermWeight, this,
                             hits));
             
         }

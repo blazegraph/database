@@ -46,7 +46,7 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestRestartSafe extends ProxyTestCase {
+public class TestRestartSafe extends ProxyTestCase<Journal> {
 
     /**
      * 
@@ -249,7 +249,7 @@ public class TestRestartSafe extends ProxyTestCase {
 
         finally {
 
-            journal.closeAndDelete();
+            journal.destroy();
             
         }
 
@@ -297,7 +297,7 @@ public class TestRestartSafe extends ProxyTestCase {
 
         } finally {
 
-            journal.closeAndDelete();
+            journal.destroy();
             
         }
         
@@ -388,7 +388,7 @@ public class TestRestartSafe extends ProxyTestCase {
 
         } finally {
 
-            journal.closeAndDelete();
+            journal.destroy();
             
         }
 

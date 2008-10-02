@@ -229,7 +229,7 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
         
         try {
 
-            journal.closeAndDelete();
+            journal.destroy();
             
         }
 

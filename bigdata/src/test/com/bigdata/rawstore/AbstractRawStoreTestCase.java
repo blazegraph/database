@@ -142,7 +142,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
             
         }   
 
-        store.closeAndDelete();
+        store.destroy();
         
     }
 
@@ -166,7 +166,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
             
         }   
         
-        store.closeAndDelete();
+        store.destroy();
 
     }
     
@@ -189,7 +189,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
             
         }   
 
-        store.closeAndDelete();
+        store.destroy();
             
     }
     
@@ -218,7 +218,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
             
         }   
         
-        store.closeAndDelete();
+        store.destroy();
 
     }
     
@@ -245,7 +245,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
             
         }   
 
-        store.closeAndDelete();
+        store.destroy();
 
     }
     
@@ -358,7 +358,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
         assertEquals(expected.length,actual.limit());
         assertEquals(actual.limit(),actual.capacity());
         
-        store.closeAndDelete();
+        store.destroy();
 
     }
 
@@ -417,7 +417,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
             assertEquals(expected.length, actual2.limit());
         }
     
-        store.closeAndDelete();
+        store.destroy();
 
     }
 
@@ -798,7 +798,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
          */
         assertEquals(expected2,store.read(addr1));
 
-        store.closeAndDelete();
+        store.destroy();
 
     }
 
@@ -852,7 +852,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 
         }
         
-        store.closeAndDelete();
+        store.destroy();
 
     }
     
@@ -914,7 +914,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
             
         }
     
-        store.closeAndDelete();
+        store.destroy();
 
     }
     

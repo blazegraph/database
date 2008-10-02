@@ -495,7 +495,7 @@ abstract public class AbstractMRMWTestCase
         
         System.out.println(store.getCounters().toString());
         
-        store.closeAndDelete();
+        store.destroy();
 
         return ret;
 

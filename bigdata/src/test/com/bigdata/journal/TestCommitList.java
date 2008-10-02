@@ -42,7 +42,7 @@ import com.bigdata.btree.IIndex;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestCommitList extends ProxyTestCase {
+public class TestCommitList extends ProxyTestCase<Journal> {
 
     /**
      * 
@@ -194,7 +194,7 @@ public class TestCommitList extends ProxyTestCase {
         // still not on the commit list.
         assertFalse(journal.name2Addr.willCommit(name));
         
-        journal.closeAndDelete();
+        journal.destroy();
         
     }
     
@@ -269,7 +269,7 @@ public class TestCommitList extends ProxyTestCase {
 
         } finally {
 
-            journal.closeAndDelete();
+            journal.destroy();
 
         }
         
@@ -331,7 +331,7 @@ public class TestCommitList extends ProxyTestCase {
 
         } finally {
 
-            journal.closeAndDelete();
+            journal.destroy();
 
         }
 

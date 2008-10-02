@@ -141,7 +141,7 @@ public class TestReadCommittedTx extends ProxyTestCase {
             
         }
 
-        journal.closeAndDelete();
+        journal.destroy();
         
     }
 
@@ -277,7 +277,7 @@ public class TestReadCommittedTx extends ProxyTestCase {
         }
 
         // close and delete the database.
-        journal.closeAndDelete();
+        journal.destroy();
         
     }
     

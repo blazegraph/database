@@ -293,7 +293,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
                 if (!buf.isOpen())
                     throw new IllegalStateException();
 
-                buf.closeAndDelete();
+                buf.destroy();
 
             } finally {
 
@@ -391,7 +391,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
      * Simply delegates to {@link #close()} since {@link #close()} always
      * deletes the backing file for a temporary store.
      */
-    final public void closeAndDelete() {
+    final public void destroy() {
 
         close();
 

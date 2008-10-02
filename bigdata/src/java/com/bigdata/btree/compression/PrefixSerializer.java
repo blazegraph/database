@@ -1,20 +1,16 @@
 package com.bigdata.btree.compression;
 
-import it.unimi.dsi.fastutil.bytes.ByteArrayFrontCodedList;
+import it.unimi.dsi.fastutil.bytes.CustomByteArrayFrontCodedList;
 
-import java.io.ByteArrayInputStream;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
-import java.io.ObjectInputStream;
 import java.io.ObjectOutput;
 import java.util.Iterator;
 
 import org.apache.log4j.Logger;
-
-import com.bigdata.io.SerializerUtil;
 
 /**
  * Prefix compression.
@@ -39,6 +35,16 @@ public class PrefixSerializer implements IDataSerializer, Externalizable {
         
     }
     
+    /**
+     * The #of keys is written on the output stream. If there is only a single
+     * key, the we just write out the #of bytes in the key followed by the key
+     * itself. If there is more than one key, then the front-coded byte array is
+     * computed. The front coded byte array is serialized as the #of bytes in
+     * the front-coded array followed by the front-coded array. The ratio for
+     * the front-coded array is always the #of keys in the array since we want
+     * as much compression as possible and since access during decompression is
+     * serial.
+     */
     public void write(DataOutput out, IRandomAccessByteArray raba) throws IOException {
 
         /*
@@ -47,27 +53,51 @@ public class PrefixSerializer implements IDataSerializer, Externalizable {
          * the maximum capacity of the array, e.g., the branching factor of
          * the B+Tree, as that will give the best compression.
          */
-        final int ratio = raba.getKeyCount();
+        final int n = raba.getKeyCount();
+        final int ratio = n;
 
-        if (ratio == 0) {
-            
-            // note: zero length indicates NO data.
-            out.writeInt(0);
-            
-            return;
-            
-        }
-        
-        final Iterator<byte[]> itr = raba.iterator();
-        
         if (INFO)
             log.info("ratio=" + ratio + ", n=" + raba.getKeyCount()
                     + ", capacity=" + raba.getMaxKeys());
 
-        final ByteArrayFrontCodedList c = new ByteArrayFrontCodedList(itr,
-                ratio);
+        // note: zero length indicates NO data.
+        out.writeInt(n);
 
-        final byte[] data = SerializerUtil.serialize(c);
+        if (n == 0) {
+            
+            // no keys.
+            
+            return;
+
+        }
+
+        if(n == 1) {
+            
+            // one key.
+            
+            final byte[] key = raba.getKey(0);
+            
+            out.writeInt(key.length);
+            
+            out.write(key);
+            
+            return;
+            
+        }
+
+        // more than one key.
+        
+        final byte[] data;
+        {
+            final Iterator<byte[]> itr = raba.iterator();
+
+            final CustomByteArrayFrontCodedList c = new CustomByteArrayFrontCodedList(
+                    itr, ratio);
+
+            data = c.getArray();
+            // final byte[] data = SerializerUtil.serialize(c);
+        
+        }
 
         // #of bytes.
         out.writeInt(data.length);
@@ -80,30 +110,68 @@ public class PrefixSerializer implements IDataSerializer, Externalizable {
     public void read(DataInput in, IRandomAccessByteArray raba)
             throws IOException {
 
-        final int nbytes = in.readInt();
+        final int nkeys = in.readInt();
 
-        if (nbytes == 0) {
+        if (nkeys == 0) {
 
-            // Note: No data in the array.
+            /*
+             * No keys.
+             */
+
+            return;
+
+        }
+
+        if (nkeys == 1) {
+
+            /*
+             * One key.
+             */
+
+            // #of bytes in the key.
+            final int nbytes = in.readInt();
+
+            // allocate the array.
+            final byte[] key = new byte[nbytes];
+
+            // read the front coded array.
+            in.readFully(key);
+
+            raba.add(key);
+            
             return;
             
         }
+
+        /*
+         * More than one key.
+         */
         
+        // #of bytes in the front coded array.
+        final int nbytes = in.readInt();
+        
+        // allocate the array.
         final byte[] data = new byte[nbytes];
         
+        // read the front coded array.
         in.readFully(data);
         
-        final ByteArrayFrontCodedList c;
-        try {
-
-            c = (ByteArrayFrontCodedList) new ObjectInputStream(
-                    new ByteArrayInputStream(data)).readObject();
-            
-        } catch (ClassNotFoundException e) {
-            
-            throw new IOException(e.getLocalizedMessage());
-            
-        }
+        final int ratio = nkeys;
+        
+        final CustomByteArrayFrontCodedList c = new CustomByteArrayFrontCodedList(
+                nkeys, ratio, data);
+        
+//        final CustomByteArrayFrontCodedList c;
+//        try {
+//
+//            c = (CustomByteArrayFrontCodedList) new ObjectInputStream(
+//                    new ByteArrayInputStream(data)).readObject();
+//            
+//        } catch (ClassNotFoundException e) {
+//            
+//            throw new IOException(e.getLocalizedMessage());
+//            
+//        }
         
         final Iterator<byte[]> itr = c.iterator();
         

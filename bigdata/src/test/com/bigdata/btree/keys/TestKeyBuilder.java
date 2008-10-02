@@ -707,6 +707,71 @@ public class TestKeyBuilder extends TestCase2 {
         
     }
     
+    
+    /**
+     * Test verifies the order among unicode sort keys, including verifying that
+     * the pad byte causes a prefix such as "bro" to sort before a term which
+     * extends that prefix, such as "brown".
+     */
+    public void test_keyBuilder_ascii_order() {        
+
+        KeyBuilder keyBuilder = (KeyBuilder) KeyBuilder.newInstance();
+        
+        KVO<String>[] a = new KVO[] {
+          
+                new KVO<String>(keyBuilder.asSortKey("bro"),null,"bro"),
+                new KVO<String>(keyBuilder.asSortKey("brown"),null,"brown"),
+                new KVO<String>(keyBuilder.asSortKey("bre"),null,"bre"),
+                new KVO<String>(keyBuilder.asSortKey("break"),null,"break"),
+                
+        };
+        
+        // sort by the assigned sort keys.
+        Arrays.sort(a);
+        
+        /*
+         * verify that "bre(ak)" is before "bro(wn)" and that "bre" is before
+         * "break" and "bro" is before "brown".
+         */
+        assertEquals("bre", a[0].obj);
+        assertEquals("break", a[1].obj);
+        assertEquals("bro", a[2].obj);
+        assertEquals("brown", a[3].obj);
+        
+    }
+    
+    /**
+     * Test verifies the order among unicode sort keys, including verifying that
+     * the pad byte causes a prefix such as "bro" to sort before a term which
+     * extends that prefix, such as "brown".
+     */
+    public void test_keyBuilder_unicode_order() {        
+
+        KeyBuilder keyBuilder = (KeyBuilder) KeyBuilder.newUnicodeInstance();
+        
+        KVO<String>[] a = new KVO[] {
+          
+                new KVO<String>(keyBuilder.asSortKey("bro"),null,"bro"),
+                new KVO<String>(keyBuilder.asSortKey("brown"),null,"brown"),
+                new KVO<String>(keyBuilder.asSortKey("bre"),null,"bre"),
+                new KVO<String>(keyBuilder.asSortKey("break"),null,"break"),
+                
+        };
+        
+        // sort by the assigned sort keys.
+        Arrays.sort(a);
+        
+        /*
+         * verify that "bre(ak)" is before "bro(wn)" and that "bre" is before
+         * "break" and "bro" is before "brown".
+         */
+        assertEquals("bre", a[0].obj);
+        assertEquals("break", a[1].obj);
+        assertEquals("bro", a[2].obj);
+        assertEquals("brown", a[3].obj);
+        
+    }
+    
     /**
      * <p>
      * Test that lexiographic order is maintain when a variable length ASCII

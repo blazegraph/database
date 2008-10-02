@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Jun 16, 2008
+ * Created on Jan 23, 2008
  */
 
 package com.bigdata.search;
@@ -33,66 +33,86 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.util.Properties;
 
-import junit.framework.TestCase2;
-
-import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.Journal;
-import com.bigdata.journal.Options;
+import com.bigdata.journal.ProxyTestCase;
+import com.bigdata.service.LocalDataServiceFederation;
 
 /**
  * Simple test verifies that the {@link FullTextIndex} data are restart safe
- * when written on a {@link Journal}.
+ * when written on a {@link LocalDataServiceFederation}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestRestartSafeWithJournal extends TestCase2 {
+public class TestSearchRestartSafe extends ProxyTestCase<IIndexManager> {
 
     /**
      * 
      */
-    public TestRestartSafeWithJournal() {
+    public TestSearchRestartSafe() {
     }
 
     /**
-     * @param name
+     * @param arg0
      */
-    public TestRestartSafeWithJournal(String name) {
-        super(name);
+    public TestSearchRestartSafe(String arg0) {
+        super(arg0);
     }
 
-    public void test_restartSafe() throws IOException, InterruptedException {
+    final File file;
+    {
         
-        final Properties properties = new Properties();
-        
-        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
+        try {
 
-        final File file = File.createTempFile(getName(), ".tmp");
+            file = File.createTempFile(getName(), ".tmp");
+   
+            System.err.println("file="+file);
+         
+        } catch (IOException ex) {
 
-        System.err.println("file="+file);
-        
-        properties.setProperty(Options.FILE,file.toString());
-        
-        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
-        
-        final String NAMESPACE = "test";
+            throw new RuntimeException(ex);
 
-        Journal journal = new Journal(properties);
+        }
+    }
+
+//    public Properties getProperties() {
+//
+//        Properties properties = new Properties( super.getProperties() );
+//            
+//        // Note: overrides the buffer mode so that we can re-open it.
+//        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
+//                .toString());
+//        
+//        properties.setProperty(Options.FILE,file.toString());
+//        
+//        return properties;
+//        
+//    }
+    
+    public void test_simple() throws InterruptedException {
+
+        final Properties properties = getProperties();
+        
+        IIndexManager indexManager = getStore(properties);
 
         try {
 
+            final String NAMESPACE = "test";
+
             /*
-             * Index some stuff.
+             * Index a document.
              */
-            final String text = "The quick brown dog";
-            final String languageCode = "EN";
             final long docId = 12L;
             final int fieldId = 3;
+            final String text = "The quick brown dog";
+            final String languageCode = "EN";
             {
 
-                FullTextIndex ndx = new FullTextIndex(journal,NAMESPACE,
+                FullTextIndex ndx = new FullTextIndex(indexManager, NAMESPACE,
                         ITx.UNISOLATED, properties);
+
+                ndx.create();
 
                 TokenBuffer buffer = new TokenBuffer(2, ndx);
 
@@ -103,13 +123,13 @@ public class TestRestartSafeWithJournal extends TestCase2 {
                         new StringReader("The slow brown cow"));
 
                 buffer.flush();
-                
+
             }
 
-            // do the search.
+            /* Search w/o restart. */
             {
 
-                FullTextIndex ndx = new FullTextIndex(journal,NAMESPACE,
+                FullTextIndex ndx = new FullTextIndex(indexManager, NAMESPACE,
                         ITx.UNISOLATED, properties);
 
                 Hiterator itr = ndx.search(text, languageCode);
@@ -130,21 +150,15 @@ public class TestRestartSafeWithJournal extends TestCase2 {
 
             }
 
-            // commit changes, including the registration of the index!
-            journal.commit();
-            
-            // close the backing store.
-            journal.close();
-
-            // re-open the backing store.
-            journal = new Journal(properties);
-
             /*
-             * Do the search.
+             * Shutdown and restart.
              */
+            indexManager = reopenStore(indexManager);
+
+            /* Search with restart. */
             {
 
-                FullTextIndex ndx = new FullTextIndex(journal,NAMESPACE,
+                FullTextIndex ndx = new FullTextIndex(indexManager, NAMESPACE,
                         ITx.UNISOLATED, properties);
 
                 Hiterator itr = ndx.search(text, languageCode);
@@ -167,7 +181,7 @@ public class TestRestartSafeWithJournal extends TestCase2 {
 
         } finally {
 
-            journal.closeAndDelete();
+            indexManager.destroy();
 
         }
 

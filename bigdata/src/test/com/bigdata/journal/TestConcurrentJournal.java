@@ -1149,7 +1149,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
             
         } finally {
             
-            journal.closeAndDelete();
+            journal.destroy();
             
         }
         
@@ -1203,7 +1203,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
             
         } finally {
             
-            journal.closeAndDelete();
+            journal.destroy();
             
         }
         
@@ -1459,7 +1459,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
             
         } finally {
             
-            journal.closeAndDelete();
+            journal.destroy();
             
         }
         
@@ -1797,7 +1797,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
         } finally {
         
-            journal.closeAndDelete();
+            journal.destroy();
             
         }
 

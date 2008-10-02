@@ -120,7 +120,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore {
 
         if(!isReadOnly()) {
 
-            store.closeAndDelete();
+            store.destroy();
             
         }
         

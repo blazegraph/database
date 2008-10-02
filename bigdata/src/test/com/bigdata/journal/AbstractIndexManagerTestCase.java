@@ -1,33 +1,33 @@
-/**
-
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
-
-Contact:
-     SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
-
-This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; version 2 of the License.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*/
 /*
- * Created on Oct 14, 2006
+
+ Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+
+ Contact:
+ SYSTAP, LLC
+ 4501 Tower Road
+ Greensboro, NC 27410
+ licenses@bigdata.com
+
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; version 2 of the License.
+
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program; if not, write to the Free Software
+ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+ */
+/*
+ * Created on Oct 2, 2008
  */
 
 package com.bigdata.journal;
 
-import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.Properties;
 import java.util.Random;
@@ -36,31 +36,22 @@ import junit.framework.TestCase;
 import junit.framework.TestCase2;
 
 /**
- * <p>
- * Abstract harness for testing under a variety of configurations. In order to
- * test a specific configuration, create a concrete instance of this class. The
- * configuration can be described using a mixture of a <code>.properties</code>
- * file of the same name as the test class and custom code.
- * </p>
- * <p>
- * When debugging from an IDE, it is very helpful to be able to run a single
- * test case. You can do this, but you MUST define the property
- * <code>testClass</code> as the name test class that has the logic required
- * to instantiate and configure an appropriate object manager instance for the
- * test.
- * </p>
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
  */
-abstract public class AbstractTestCase
-    extends TestCase2
-{
+public abstract class AbstractIndexManagerTestCase<S extends IIndexManager> extends TestCase2 {
 
+    protected final static boolean INFO = log.isInfoEnabled();
+
+    protected final static boolean DEBUG = log.isDebugEnabled();
+    
     //
     // Constructors.
     //
 
-    public AbstractTestCase() {}
+    public AbstractIndexManagerTestCase() {}
     
-    public AbstractTestCase(String name) {super(name);}
+    public AbstractIndexManagerTestCase(String name) {super(name);}
 
     //************************************************************
     //************************************************************
@@ -71,6 +62,7 @@ abstract public class AbstractTestCase
      */
     public void setUp(ProxyTestCase testCase) throws Exception {
 
+        if(INFO)
         log.info("\n\n================:BEGIN:" + testCase.getName()
                 + ":BEGIN:====================");
 
@@ -81,10 +73,9 @@ abstract public class AbstractTestCase
      */
     public void tearDown(ProxyTestCase testCase) throws Exception {
 
+        if(INFO)
         log.info("\n================:END:" + testCase.getName()
                 + ":END:====================\n");
-
-        deleteTestFile();
         
     }
     
@@ -92,107 +83,27 @@ abstract public class AbstractTestCase
         
         super.tearDown();
         
-        deleteTestFile();
-        
-    }
-
-    /**
-     * Note: your unit must close the store for delete to work.
-     */
-    protected void deleteTestFile() {
-
-        if(m_properties==null) return; // never requested.
-        
-        String val;
-        
-        val = (String) m_properties.getProperty(Options.FILE);
-        
-        if(val!= null) {
-        
-            File file = new File(val);
-            
-            if(file.exists()) {
-
-                val = (String) m_properties.getProperty(Options.DELETE_ON_EXIT);
-        
-                if(val==null) {
-                    
-                    val = (String) m_properties.getProperty(Options.DELETE_ON_CLOSE);
-                    
-                }
-                
-                if(Boolean.parseBoolean(val)) {
-                    
-                    System.err.println("Attempting to delete file: "+file);
-                    
-                    if(!file.delete()) {
-                    
-                        log.warn("Could not delete file: "+file);
-
-                    }
-                    
-                }
-            
-            }
-            
-        }
-
     }
 
     //
     // Properties
     //
-    
-    private Properties m_properties;
-    
-    /**
-     * <p>
-     * Returns properties read from a hierarchy of sources. The underlying
-     * properties read from those sources are cached, but a new properties
-     * object is returned on each invocation (to prevent side effects by the
-     * caller).
-     * </p>
-     * <p>
-     * In general, a test configuration critically relies on both the properties
-     * returned by this method and the appropriate properties must be provided
-     * either through the command line or in a properties file.
-     * </p>
-     * 
-     * @return A new properties object.
-     */
+
+    @Override
     public Properties getProperties() {
         
-        if( m_properties == null ) {
-            
-            /*
-             * Read properties from a hierarchy of sources and cache a
-             * reference.
-             */
-            
-            m_properties = super.getProperties();
-//          m_properties = new Properties( m_properties );
-         
-            /*
-             * Wrap up the cached properties so that they are not modifable by the
-             * caller (no side effects between calls).
-             */
-            
-            /*
-             * Use a temporary file for the test. Such files are always deleted when
-             * the journal is closed or the VM exits.
-             */
-            m_properties.setProperty(Options.CREATE_TEMP_FILE,"true");
-//            m_properties.setProperty(Options.DELETE_ON_CLOSE,"true");
-            m_properties.setProperty(Options.DELETE_ON_EXIT,"true");
-            
-        }        
-        
-        return m_properties;
+        return super.getProperties();
         
     }
-
+    
     /**
-     * Re-open the same backing store.
+     * Open/create an {@link IIndexManager} using the given properties.
+     */
+    abstract protected S getStore(Properties properties);
+    
+    /**
+     * Close and then re-open an {@link IIndexManager} backed by the same
+     * persistent data.
      * 
      * @param store
      *            the existing store.
@@ -203,40 +114,13 @@ abstract public class AbstractTestCase
      *                if the existing store is closed or if the store can not be
      *                re-opened, e.g., from failure to obtain a file lock, etc.
      */
-    protected Journal reopenStore(Journal store) {
-        
-        // close the store.
-        store.close();
-        
-        if(!store.isStable()) {
-            
-            throw new UnsupportedOperationException("The backing store is not stable");
-            
-        }
-        
-        // Note: clone to avoid modifying!!!
-        Properties properties = (Properties)getProperties().clone();
-        
-        // Turn this off now since we want to re-open the same store.
-        properties.setProperty(Options.CREATE_TEMP_FILE,"false");
-        
-        // The backing file that we need to re-open.
-        File file = store.getFile();
-        
-        assertNotNull(file);
-        
-        // Set the file property explictly.
-        properties.setProperty(Options.FILE,file.toString());
-        
-        return new Journal( properties );
-        
-    }
-
+    abstract protected S reopenStore(S store);
+    
     /**
      * This method is invoked from methods that MUST be proxied to this class.
      * {@link GenericProxyTestCase} extends this class, as do the concrete
      * classes that drive the test suite for specific GOM integration test
-     * configuration. Many method on this class must be proxied from
+     * configuration. Many methods on this class must be proxied from
      * {@link GenericProxyTestCase} to the delegate. Invoking this method from
      * the implementations of those methods in this class provides a means of
      * catching omissions where the corresponding method is NOT being delegated.
@@ -247,7 +131,7 @@ abstract public class AbstractTestCase
      * proxy test.
      */
     
-    protected void checkIfProxy() {
+    final protected void checkIfProxy() {
         
         if( this instanceof ProxyTestCase ) {
             
@@ -256,7 +140,7 @@ abstract public class AbstractTestCase
         }
         
     }
-
+    
     //************************************************************
     //************************************************************
     //************************************************************
