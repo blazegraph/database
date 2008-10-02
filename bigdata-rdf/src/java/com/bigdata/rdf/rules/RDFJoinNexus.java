@@ -77,6 +77,7 @@ import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IRuleTaskFactory;
+import com.bigdata.relation.rule.ISolutionExpander;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.IVariableOrConstant;
@@ -730,19 +731,25 @@ public class RDFJoinNexus implements IJoinNexus {
         // find the best access path for the predicate for that relation.
         IAccessPath accessPath = relation.getAccessPath(predicate);
 
-        if (predicate.getSolutionExpander() != null) {
+        ISolutionExpander expander = predicate.getSolutionExpander();
+        
+        if (expander != null) {
             
             // allow the predicate to wrap the access path.
-            accessPath = predicate.getSolutionExpander().getAccessPath(accessPath);
+            accessPath = expander.getAccessPath(accessPath);
             
         }
         
         if(backchain && relation instanceof SPORelation) {
 
-            final SPORelation spoRelation = (SPORelation)relation;
+            if (expander == null || expander.backchain()) {
             
-            accessPath = new BackchainAccessPath(spoRelation.getContainer(),
+                final SPORelation spoRelation = (SPORelation)relation;
+            
+                accessPath = new BackchainAccessPath(spoRelation.getContainer(),
                     accessPath);
+                
+            }
             
         }
         

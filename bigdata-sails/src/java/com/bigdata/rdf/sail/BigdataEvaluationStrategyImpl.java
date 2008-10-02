@@ -2,11 +2,9 @@ package com.bigdata.rdf.sail;
 
 import info.aduna.iteration.CloseableIteration;
 import info.aduna.iteration.EmptyIteration;
-
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
-
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
@@ -28,7 +26,6 @@ import org.openrdf.query.algebra.Var;
 import org.openrdf.query.algebra.Compare.CompareOp;
 import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
 import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
-
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
@@ -548,6 +545,21 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
 //            }
 //        }
         
+        if (DEBUG) {
+            for (IPredicate<ISPO> tail : tails) {
+                ISolutionExpander<ISPO> expander = tail.getSolutionExpander();
+                if (expander != null) {
+                    IAccessPath<ISPO> accessPath = 
+                        database.getSPORelation().getAccessPath(tail);
+                    accessPath = expander.getAccessPath(accessPath);
+                    IChunkedOrderedIterator<ISPO> it = accessPath.iterator();
+                    while(it.hasNext()) {
+                        log.debug(it.next().toString(database));
+                    }
+                }
+            }
+        }
+        
         // generate native rule
         final IRule rule = new Rule(
                 "nativeJoin",
@@ -603,10 +615,10 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         // create a solution expander for free text search if necessary
         ISolutionExpander<ISPO> expander = null;
         final Value predValue = stmtPattern.getPredicateVar().getValue();
-        log.info(predValue);
+        if (DEBUG) log.debug(predValue);
         if (predValue != null && MAGIC_SEARCH.equals(predValue)) {
             final Value objValue = stmtPattern.getObjectVar().getValue();
-            log.info(objValue);
+            if (DEBUG) log.debug(objValue);
             if (objValue != null && objValue instanceof Literal) {
                 expander = new FreeTextSearchExpander(database, (Literal) objValue);
             }
@@ -795,6 +807,8 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             log.info("Running tupleExpr as native rule:\n" + tupleExpr + ",\n"
                     + rule);
 
+            log.info("backchain: " + (tripleSource.includeInferred&&tripleSource.conn.isQueryTimeExpander()));
+            
         }
 
         // run the query as a native rule.

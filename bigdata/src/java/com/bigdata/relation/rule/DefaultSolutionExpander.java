@@ -70,5 +70,23 @@ public class DefaultSolutionExpander implements ISolutionExpander {
         return accessPath.rangeCount(false/*exact*/);
         
     }
+    
+    /**
+     * Default to true for backchaining.
+     */
+    public boolean backchain() {
+        
+        return true;
+        
+    }
+
+    /**
+     * Default to false for run first.
+     */
+    public boolean runFirst() {
+        
+        return false;
+        
+    }
 
 }

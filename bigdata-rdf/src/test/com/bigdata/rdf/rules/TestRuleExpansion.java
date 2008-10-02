@@ -197,6 +197,12 @@ public class TestRuleExpansion extends AbstractInferenceEngineTestCase {
             {
                 
                 ISolutionExpander<ISPO> expander = new ISolutionExpander<ISPO>() {
+                    public boolean backchain() {
+                        return false;
+                    }
+                    public boolean runFirst() {
+                        return false;
+                    }
                     public IAccessPath<ISPO> getAccessPath(final IAccessPath<ISPO> accessPath) {
                         final IVariableOrConstant<Long> s = accessPath.getPredicate().get(0);
                         final IVariableOrConstant<Long> p = accessPath.getPredicate().get(1);

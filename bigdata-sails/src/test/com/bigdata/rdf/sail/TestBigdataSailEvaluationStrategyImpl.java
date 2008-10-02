@@ -835,6 +835,8 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
         
         final URI jane = new URIImpl(ns+"Jane");
         
+        final URI bryan = new URIImpl(ns+"Bryan");
+        
         final URI person = new URIImpl(ns+"Person");
         
         final File journal = File.createTempFile("bigdata", ".jnl");
@@ -869,14 +871,23 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
                 
                 cxn.add(new StatementImpl(jane, RDFS.LABEL, new LiteralImpl("Jane")));
                 
+                cxn.add(new StatementImpl(bryan, RDF.TYPE, person));
+                
+                cxn.add(new StatementImpl(bryan, RDFS.LABEL, new LiteralImpl("Bryan")));
+                
                 cxn.commit();
+                
+                System.err.println("<mike> = " + sail.getDatabase().getTermId(mike));
+                System.err.println("<jane> = " + sail.getDatabase().getTermId(jane));
+                System.err.println("\"Mike\" = " + sail.getDatabase().getTermId(new LiteralImpl("Mike")));
+                System.err.println("\"Jane\" = " + sail.getDatabase().getTermId(new LiteralImpl("Jane")));
                 
                 String query = 
                     "select ?s ?label " +
                     "where { " +
-                    "  ?s <"+RDF.TYPE+"> <"+person+"> . " +
-                    "  ?s <"+RDFS.LABEL+"> ?label . " +
-                    "  ?label <"+search+"> \"Mike\" . " +
+                    "  ?s <"+RDF.TYPE+"> <"+person+"> . " +   // [160, 8, 164], [156, 8, 164]
+                    "  ?s <"+RDFS.LABEL+"> ?label . " +       // [160, 148, 174], [156, 148, 170] 
+                    "  ?label <"+search+"> \"Mi\" . " +     // [174, 0, 0]
                     "}";
                 
                 { // evalute it once so i can see it

@@ -36,6 +36,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.journal.ITx;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.ISolutionExpander;
 import com.bigdata.relation.rule.IVariableOrConstant;
 
 /**
@@ -54,6 +55,8 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
     protected static final Logger log = Logger.getLogger(DefaultEvaluationPlan2.class);
     
     protected static final boolean DEBUG = log.isDebugEnabled();
+    
+    protected static final boolean INFO = log.isDebugEnabled();
     
     private final IJoinNexus joinNexus;
 
@@ -144,6 +147,12 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
         
         calc();
         
+        if (DEBUG) {
+            for (int i = 0; i < tailCount; i++) {
+                log.info(order[i]);
+            }
+        }
+        
     }
     
     /**
@@ -155,25 +164,8 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
             return;
 
         order = new int[tailCount];
-
         rangeCount = new long[tailCount];
-        
-        // initialize to -1L as indication that rangeCount was not taken yet.
-        for(int i=0; i<tailCount; i++)
-            rangeCount[i] = -1L;
-        
         used = new boolean[tailCount];
-        
-        if (tailCount == 1) {
-            order[0] = 0;
-            return;
-        }
-        
-        if (tailCount == 2) {
-            order[0] = rangeCount(0) <= rangeCount(1) ? 0 : 1;
-            order[1] = rangeCount(0) <= rangeCount(1) ? 1 : 0;
-            return;
-        }
         
         // clear arrays.
         for (int i = 0; i < tailCount; i++) {
@@ -182,6 +174,67 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
             used[i] = false;  // not yet evaluated
         }
 
+        if (tailCount == 1) {
+            order[0] = 0;
+            return;
+        }
+        
+        /*
+        if (tailCount == 2) {
+            order[0] = cardinality(0) <= cardinality(1) ? 0 : 1;
+            order[1] = cardinality(0) <= cardinality(1) ? 1 : 0;
+            return;
+        }
+        */
+        
+        int startIndex = 0;
+        for (int i = 0; i < tailCount; i++) {
+            ISolutionExpander expander = rule.getTail(i).getSolutionExpander();
+            if (expander != null && expander.runFirst()) {
+                if (DEBUG) log.debug("found a run first, tail " + i);
+                order[startIndex++] = i;
+                used[i] = true;
+            }
+        }
+        
+        // if there is only one tail left after the expanders
+        if (startIndex == tailCount-1) {
+            if (DEBUG) log.debug("one tail left");
+            for (int i = 0; i < tailCount; i++) {
+                // only check unused tails
+                if (used[i]) {
+                    continue;
+                }
+                order[tailCount-1] = i;
+                used[i] = true;
+                return;
+            }            
+        }
+        
+        // if there are only two tails left after the expanders
+        if (startIndex == tailCount-2) {
+            if (DEBUG) log.debug("two tails left");
+            int t1 = -1;
+            int t2 = -1;
+            for (int i = 0; i < tailCount; i++) {
+                // only check unused tails
+                if (used[i]) {
+                    continue;
+                }
+                // find the two unused tail indexes
+                if (t1 == -1) {
+                    t1 = i;
+                } else {
+                    t2 = i;
+                    break;
+                }
+            }
+            if (DEBUG) log.debug(t1 + ", " + t2);
+            order[tailCount-2] = cardinality(t1) <= cardinality(t2) ? t1 : t2;
+            order[tailCount-1] = cardinality(t1) <= cardinality(t2) ? t2 : t1;
+            return;
+        }
+        
         /*
          * There will be (tails-1) joins, we just need to figure out what
          * they should be.
@@ -189,11 +242,11 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
         Join join = getFirstJoin();
         int t1 = ((Tail) join.getD1()).getTail();
         int t2 = ((Tail) join.getD2()).getTail();
-        order[0] = cardinality(t1) <= cardinality(t2) ? t1 : t2;
-        order[1] = cardinality(t1) <= cardinality(t2) ? t2 : t1;
-        used[order[0]] = true;
-        used[order[1]] = true;
-        for (int i = 2; i < tailCount; i++) {
+        order[startIndex] = cardinality(t1) <= cardinality(t2) ? t1 : t2;
+        order[startIndex+1] = cardinality(t1) <= cardinality(t2) ? t2 : t1;
+        used[order[startIndex]] = true;
+        used[order[startIndex+1]] = true;
+        for (int i = startIndex+2; i < tailCount; i++) {
             join = getNextJoin(join);
             order[i] = ((Tail) join.getD2()).getTail();
             used[order[i]] = true;
@@ -211,31 +264,49 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
         if (DEBUG) {
             log.debug("evaluating first join");
         }
-        long minCardinality = Long.MAX_VALUE;
-        Tail minD1 = null;
-        Tail minD2 = null;
+        long minJoinCardinality = Long.MAX_VALUE;
+        long minTailCardinality = Long.MAX_VALUE;
+        Tail minT1 = null;
+        Tail minT2 = null;
         for (int i = 0; i < tailCount; i++) {
-            Tail d1 = new Tail(i, rangeCount(i), getVars(i));
+            // only check unused tails
+            if (used[i]) {
+                continue;
+            }
+            Tail t1 = new Tail(i, rangeCount(i), getVars(i));
+            long t1Cardinality = cardinality(i);
             for (int j = 0; j < tailCount; j++) {
-                if (i == j) {
+                // check only non-same and unused tails
+                if (i == j || used[j]) {
                     continue;
                 }
-                Tail d2 = new Tail(j, rangeCount(j), getVars(j));
-                long joinCardinality = computeJoinCardinality(d1, d2);
+                Tail t2 = new Tail(j, rangeCount(j), getVars(j));
+                long t2Cardinality = cardinality(j);
+                long joinCardinality = computeJoinCardinality(t1, t2);
+                long tailCardinality = Math.min(t1Cardinality, t2Cardinality);
                 if(DEBUG) log.debug("evaluating " + i + " X " + j + ": cardinality= " + joinCardinality);
-                if (joinCardinality < minCardinality) {
+                if (joinCardinality < minJoinCardinality) {
                     if(DEBUG) log.debug("found a new min: " + joinCardinality);
-                    minCardinality = joinCardinality;
-                    minD1 = d1;
-                    minD2 = d2;
+                    minJoinCardinality = joinCardinality;
+                    minTailCardinality = tailCardinality;
+                    minT1 = t1;
+                    minT2 = t2;
+                } else if (joinCardinality == minJoinCardinality) {
+                    if (tailCardinality < minTailCardinality) {
+                        if(DEBUG) log.debug("found a new min: " + joinCardinality);
+                        minJoinCardinality = joinCardinality;
+                        minTailCardinality = tailCardinality;
+                        minT1 = t1;
+                        minT2 = t2;
+                    }
                 }
             }
         }
         // the join variables is the union of the join dimensions' variables
         Set<String> vars = new HashSet<String>();
-        vars.addAll(minD1.getVars());
-        vars.addAll(minD2.getVars());
-        return new Join(minD1, minD2, minCardinality, vars);
+        vars.addAll(minT1.getVars());
+        vars.addAll(minT2.getVars());
+        return new Join(minT1, minT2, minJoinCardinality, vars);
     }
     
     /**
