@@ -1332,7 +1332,7 @@ public class Leaf extends AbstractNode implements ILeafData {
         // Set to false iff an inconsistency is detected.
         boolean ok = true;
 
-        if ((btree.getRoot() != this) && (nkeys < minKeys)) {
+        if ((btree.root != this) && (nkeys < minKeys)) {
             // min keys failure (the root may have fewer keys).
             out.println(indent(height) + "ERROR: too few keys: m="
                     + branchingFactor + ", minKeys=" + minKeys + ", nkeys="
@@ -1371,7 +1371,7 @@ public class Leaf extends AbstractNode implements ILeafData {
             out.println(indent(height) + "  parent="
                     + (parent == null ? null : parent.get()));
             
-            out.println(indent(height) + "  isRoot=" + (btree.getRoot() == this)
+            out.println(indent(height) + "  isRoot=" + (btree.root == this)
                     + ", dirty=" + isDirty() + ", nkeys=" + nkeys
                     + ", minKeys=" + minKeys + ", maxKeys=" + maxKeys
                     + ", branchingFactor=" + branchingFactor);

@@ -42,7 +42,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.bigdata.bfs.BigdataFileSystem;
-import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
 import com.bigdata.btree.filter.IFilterConstructor;
@@ -70,6 +69,7 @@ import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.resources.ResourceManager.Options;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IClientIndex;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
@@ -447,7 +447,7 @@ public class AbstractResourceManagerTestCase extends
             return null;
         }
 
-        public IIndex getIndex(String name, long timestamp) {
+        public IClientIndex getIndex(String name, long timestamp) {
 
             return null;
         }

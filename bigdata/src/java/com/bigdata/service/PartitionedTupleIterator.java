@@ -269,9 +269,6 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
 
     public boolean hasNext() {
 
-        if (Thread.interrupted())
-            throw new RuntimeException(new InterruptedException());
-
         if (exhausted) {
 
             return false;
@@ -304,7 +301,10 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
             
         } catch(RuntimeException ex) {
             
-            if(InnerCause.isInnerCause(ex, StaleLocatorException.class)) {
+            final StaleLocatorException cause = (StaleLocatorException) InnerCause
+                    .getInnerCause(ex, StaleLocatorException.class);
+            
+            if(cause != null) {
                 
                 /*
                  * Handle StaleLocatorException. This exception indicates that
@@ -317,8 +317,6 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
                  * locators will not occur for that case either.
                  */
                 
-                if(Thread.interrupted()) throw new RuntimeException(new InterruptedException());
-
                 if (lastStaleLocator != null) {
 
                     if (lastStaleLocator.getPartitionId() == locator
@@ -331,9 +329,12 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
                          * Since a new index partition identifier is assigned
                          * every time there is a split/join/move this is a clear
                          * indication that something is wrong with either the
-                         * locator or the data service. For example, the index
-                         * partition might have been dropped on the data service
-                         * (a no-no to be sure).
+                         * locator, with the cached view of the metadata index
+                         * used by the client, or the data service. For example,
+                         * the client may have failed to refresh its cached view
+                         * for the locator or the index partition might have
+                         * been dropped on the data service (a no-no to be
+                         * sure).
                          */
 
                         throw new RuntimeException(
@@ -343,6 +344,9 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
                     }
                     
                 }
+                
+                // notify the client so that it can refresh its cache.
+                ndx.staleLocator(locator,cause);
                 
                 // save reference
                 lastStaleLocator = locator;
@@ -397,6 +401,13 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
 
         assert ! exhausted;
         
+        if (Thread.interrupted()) {
+
+            // notice an interrupt no later than the next partition.
+            throw new RuntimeException(new InterruptedException());
+            
+        }
+
         if (!locatorItr.hasNext()) {
 
             if(INFO)
@@ -412,7 +423,6 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
             log.info("locator=" + locator);
         
         // submit query to the next partition.
-        
         rangeQuery();
 
         assert src != null;
@@ -430,6 +440,13 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
         
         assert locator != null;
 
+        if (Thread.interrupted()) {
+
+            // notice an interrupt no later than the next chunk.
+            throw new RuntimeException(new InterruptedException());
+            
+        }
+        
         try {
 
             /*

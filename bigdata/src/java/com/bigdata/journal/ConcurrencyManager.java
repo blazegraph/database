@@ -1704,7 +1704,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
                     
                     t.addCounter("pmd" + ICounterSet.pathSeparator
                             + "StaleLocator", new OneShotInstrument<String>(ex
-                            .getReason()));
+                            .getReason().toString()));
                     
                 }
 

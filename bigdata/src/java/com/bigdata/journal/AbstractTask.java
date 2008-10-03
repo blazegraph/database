@@ -65,6 +65,7 @@ import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.resources.StaleLocatorException;
+import com.bigdata.resources.StaleLocatorReason;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.InnerCause;
@@ -527,7 +528,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
         if (timestamp == ITx.UNISOLATED) {
 
-            final String reason = resourceManager.getIndexPartitionGone(name);
+            final StaleLocatorReason reason = resourceManager.getIndexPartitionGone(name);
             
             if (reason != null) {
 

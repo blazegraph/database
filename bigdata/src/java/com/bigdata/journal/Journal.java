@@ -42,9 +42,12 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
+import com.bigdata.btree.ReadCommittedView;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.locator.DefaultResourceLocator;
+import com.bigdata.resources.IndexManager;
+import com.bigdata.resources.StaleLocatorReason;
 import com.bigdata.service.AbstractEmbeddedResourceLockManager;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.IBigdataFederation;
@@ -95,21 +98,19 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         executorService = Executors.newCachedThreadPool(DaemonThreadFactory
                 .defaultThreadFactory());
 
-        resourceLocator = new DefaultResourceLocator(//
-                this,//
-                null //delegate
-                );
+        resourceLocator = new DefaultResourceLocator(this, null/*delegate*/);
 
-        resourceLockManager = new AbstractEmbeddedResourceLockManager(UUID.randomUUID(),properties) {
-            
+        resourceLockManager = new AbstractEmbeddedResourceLockManager(UUID
+                .randomUUID(), properties) {
+
             public AbstractFederation getFederation() {
-                
+
                 throw new UnsupportedOperationException();
-                
+
             }
-            
+
         }.start();
-    
+
         localTransactionManager = new AbstractLocalTransactionManager(this/* resourceManager */) {
 
             public long nextTimestamp() {
@@ -199,8 +200,17 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * less than or equal to <i>timestamp</i> -or- <code>null</code> if there
      * are no {@link ICommitRecord}s that satisify the probe or if the named
      * index was not registered as of that timestamp.
+     * 
+     * @param name
+     * @param timestamp
+     * 
+     * @throws UnsupportedOperationException
+     *             If the <i>timestamp</i> is {@link ITx#READ_COMMITTED}. You
+     *             MUST use {@link #getIndex(String, long)} in order to obtain a
+     *             view that has {@link ITx#READ_COMMITTED} semantics.
      */
-    public AbstractBTree[] getIndexSources(String name, long timestamp) {
+    public AbstractBTree[] getIndexSources(final String name,
+            final long timestamp) {
 
         final BTree btree;
         
@@ -216,39 +226,50 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         } else if (timestamp == ITx.READ_COMMITTED) {
 
             /*
-             * Read committed operation against the most recent commit point.
-             * 
-             * Note: This commit record is always defined, but that does not
-             * mean that any indices have been registered.
+             * BTree does not know how to update its view with intervening
+             * commits. Further, for a variety of reasons including the
+             * synchronization problems that would be imposed, there are no
+             * plans for BTree to be able to provide read-committed semantics.
+             * Instead a ReadCommittedView is returned by
+             * getIndex(name,timestamp) when ITx#READ_COMMITTED is requested and
+             * this method is not invoked.
              */
-
-            final ICommitRecord commitRecord = getCommitRecord();
-
-            final long ts = commitRecord.getTimestamp();
-
-            if (ts == 0L) {
-
-                log.warn("Nothing committed: name="+name+" - read-committed operation.");
-
-                return null;
-
-            }
-
-            // MAY be null.
-            btree = getIndex(name, commitRecord);
-
-            if (btree != null) {
-
-//                /*
-//                 * Mark the B+Tree as read-only.
-//                 */
+            throw new UnsupportedOperationException("Read-committed view");
+            
+//            /*
+//             * Read committed operation against the most recent commit point.
+//             * 
+//             * Note: This commit record is always defined, but that does not
+//             * mean that any indices have been registered.
+//             */
+//
+//            final ICommitRecord commitRecord = getCommitRecord();
+//
+//            final long ts = commitRecord.getTimestamp();
+//
+//            if (ts == 0L) {
+//
+//                log.warn("Nothing committed: name="+name+" - read-committed operation.");
+//
+//                return null;
+//
+//            }
+//
+//            // MAY be null.
+//            btree = getIndex(name, commitRecord);
+//
+//            if (btree != null) {
+//
+////                /*
+////                 * Mark the B+Tree as read-only.
+////                 */
+////                
+////                btree.setReadOnly(true);
+//
+//                assert ((BTree) btree).getLastCommitTime() != 0;
+////                btree.setLastCommitTime(commitRecord.getTimestamp());
 //                
-//                btree.setReadOnly(true);
-
-                assert ((BTree) btree).getLastCommitTime() != 0;
-//                btree.setLastCommitTime(commitRecord.getTimestamp());
-                
-            }
+//            }
             
         } else {
 
@@ -344,7 +365,15 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         localTransactionManager.completedTx(tx);
     }
 
-    public IIndex getIndex(String name, long timestamp) {
+    /**
+     * Note: {@link ITx#READ_COMMITTED} views are given read-committed semantics
+     * using a {@link ReadCommittedView}.  This means that they can be cached
+     * since the view will update automatically as commits are made against
+     * the {@link Journal}.
+     *  
+     * @see IndexManager#getIndex(String, long)
+     */
+    public IIndex getIndex(final String name, final long timestamp) {
         
         if (name == null) {
 
@@ -430,20 +459,30 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
             if (readOnly) {
 
-                final AbstractBTree[] sources = getIndexSources(name, timestamp);
+                if (timestamp == ITx.READ_COMMITTED) {
 
-                if (sources == null) {
+                    tmp = new ReadCommittedView(this, name);
 
-                    log.warn("No such index: name="+name+", timestamp="+timestamp);
-                    
-                    return null;
+                } else {
+
+                    final AbstractBTree[] sources = getIndexSources(name,
+                            timestamp);
+
+                    if (sources == null) {
+
+                        log.warn("No such index: name=" + name + ", timestamp="
+                                + timestamp);
+
+                        return null;
+
+                    }
+
+                    assert sources[0].isReadOnly();
+
+                    tmp = (BTree) sources[0];
 
                 }
                 
-                assert sources[0].isReadOnly();
-
-                tmp = (BTree) sources[0];
-                            
             } else {
                 
                 /*
@@ -726,7 +765,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * Always returns <code>null</code> since index partition moves are not
      * supported.
      */
-    public String getIndexPartitionGone(String name) {
+    public StaleLocatorReason getIndexPartitionGone(String name) {
         
         return null;
         

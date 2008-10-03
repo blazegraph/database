@@ -1987,8 +1987,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
     }
 
     /**
-     * Returns a read-only view of the {@link ICommitRecord} containing the root
-     * addresses.
+     * Returns a read-only view of the most recently committed
+     * {@link ICommitRecord} containing the root addresses.
      * <p>
      * Note: Synchronization was added to this method since the
      * {@link StatusThread} and {@link AbstractTask}s may all invoke this
@@ -2175,7 +2175,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      */
     protected CommitRecordIndex getCommitRecordIndex(long addr) {
 
-        log.info("addr=" + toString(addr));
+        if (INFO)
+            log.info("addr=" + toString(addr));
         
         final CommitRecordIndex ndx;
 
@@ -2241,10 +2242,29 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
     }
 
-    public IIndex getIndex(String name, long commitTime) {
+    /**
+     * @issue negative commit time. This does not have the full semantics of
+     *        {@link IIndexStore#getIndex(String, long)}. Instead it always
+     *        treats the <i>commitTime</i> as exactly that. This will be fixed
+     *        when we resolve the issue dealing timestamps being negative commit
+     *        times.
+     * 
+     * @throws UnsupportedOperationException
+     *             If you pass in {@link ITx#UNISOLATED},
+     *             {@link ITx#READ_COMMITTED}, or a timestamp that corresponds
+     *             to a transaction since those are not "commit times".
+     */
+    public IIndex getIndex(final String name, final long commitTime) {
 
         assertOpen();
 
+        if (commitTime == ITx.UNISOLATED || commitTime == ITx.READ_COMMITTED
+                || TimestampUtility.isTx(commitTime)) {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+        
         final ICommitRecord commitRecord = getCommitRecord(commitTime);
 
         if (commitRecord == null) {
@@ -2342,7 +2362,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      * guarentee is used to facilitate buffer management. Writes on the index
      * are NOT allowed.
      * <p>
-     * Note: This method makes the {@link BTree} as read-only but does not set
+     * Note: This method marks the {@link BTree} as read-only but does not set
      * {@link BTree#setLastCommitTime(long)} since it does not have access to
      * the {@link Entry#commitTime}, only the {@link BTree}s checkpointAddr.
      * See {@link #getIndex(String, ICommitRecord)} which does set

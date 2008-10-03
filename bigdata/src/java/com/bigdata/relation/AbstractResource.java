@@ -56,7 +56,11 @@ import com.bigdata.service.IBigdataFederation;
  */
 abstract public class AbstractResource<E> implements IMutableResource<E>{
 
-    protected static Logger log = Logger.getLogger(AbstractResource.class);
+    protected final static Logger log = Logger.getLogger(AbstractResource.class);
+    
+    protected final static boolean INFO = log.isInfoEnabled();
+
+    protected final static boolean DEBUG = log.isDebugEnabled();
 
     final private IIndexManager indexManager;
     
@@ -105,7 +109,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E>{
 
         properties.setProperty(RelationSchema.CLASS, getClass().getName());
         
-        if (log.isInfoEnabled()) {
+        if (INFO) {
 
             log.info("namespace=" + namespace + ", timestamp=" + timestamp
                     + ", container=" + containerNamespace + ", indexManager="
@@ -289,7 +293,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E>{
         final Map afterMap = indexManager.getGlobalRowStore().write(
                 RelationSchema.INSTANCE, map);
         
-        if(log.isDebugEnabled()) {
+        if(DEBUG) {
             
             log.debug("Properties after write: "+afterMap);
             
@@ -311,7 +315,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E>{
 
     public void destroy() {
     
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info(toString());
     
         // Delete the entry for this relation from the row store.
@@ -341,7 +345,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E>{
         while ((lockService = indexManager.getResourceLockService()) == null
                 && ntries < maxtries) {
             
-            if(log.isInfoEnabled()) {
+            if(INFO) {
                 
                 log.info("Will retry");
                 

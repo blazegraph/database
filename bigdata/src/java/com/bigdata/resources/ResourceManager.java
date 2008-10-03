@@ -31,7 +31,6 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Properties;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.cache.ICacheEntry;
@@ -92,14 +91,12 @@ abstract public class ResourceManager extends OverflowManager implements IResour
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final protected static boolean DEBUG = log.isDebugEnabled();
 
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final protected static boolean INFO = log.isInfoEnabled();
 
     /**
      * Return the {@link CounterSet}.
@@ -215,20 +212,23 @@ abstract public class ResourceManager extends OverflowManager implements IResour
                 if(true)
                     tmp.addCounter("Stale Locators",
                         new Instrument<String>() {
-                            public void sample() {
-                                StringBuilder sb = new StringBuilder();
-                                Iterator<ICacheEntry<String/*name*/,String/*reason*/>> itr = staleLocatorCache.entryIterator();
-                                while(itr.hasNext()) {
-                                    try {
-                                    ICacheEntry<String/*name*/,String/*reason*/> entry = itr.next();
-                                    sb.append(entry.getKey()+"="+entry.getObject()+"\n");
-                                    } catch(NoSuchElementException ex) {
-                                        // Ignore - concurrent modification.
-                                    }
+                        public void sample() {
+                            final StringBuilder sb = new StringBuilder();
+                            final Iterator<ICacheEntry<String/* name */, StaleLocatorReason>> itr = staleLocatorCache
+                                    .entryIterator();
+                            while (itr.hasNext()) {
+                                try {
+                                    final ICacheEntry<String/* name */, StaleLocatorReason> entry = itr
+                                            .next();
+                                    sb.append(entry.getKey() + "="
+                                            + entry.getObject() + "\n");
+                                } catch (NoSuchElementException ex) {
+                                    // Ignore - concurrent modification.
                                 }
-                                setValue(sb.toString());
                             }
-                        });
+                            setValue(sb.toString());
+                        }
+                    });
                 
                 tmp.addCounter("Index Cache Size",
                         new Instrument<Integer>() {

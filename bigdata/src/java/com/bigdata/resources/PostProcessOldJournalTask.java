@@ -1075,7 +1075,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             if(isUsed(name)) continue;
 
             // test for indices that have been split, joined, or moved.
-            final String reason = resourceManager
+            final StaleLocatorReason reason = resourceManager
                     .getIndexPartitionGone(score.name);
 
             if (reason != null) {

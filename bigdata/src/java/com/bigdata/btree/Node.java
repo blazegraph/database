@@ -2396,7 +2396,7 @@ public class Node extends AbstractNode implements INodeData {
         }
 
         {   // nentries
-            if (this == btree.getRoot()) {
+            if (this == btree.root) {
                 if (this.nentries != btree.getEntryCount()) {
                     out.println(indent(height)
                             + "ERROR: root node has nentries=" + this.nentries
@@ -2425,7 +2425,7 @@ public class Node extends AbstractNode implements INodeData {
             }
         }
 
-        if (this == btree.getRoot()) {
+        if (this == btree.root) {
             if (parent != null) {
                 out
                         .println(indent(height)

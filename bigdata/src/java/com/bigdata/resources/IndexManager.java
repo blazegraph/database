@@ -33,7 +33,6 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.locks.Lock;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractBTree;
@@ -47,11 +46,14 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.btree.IndexSegmentStore;
+import com.bigdata.btree.ReadCommittedView;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.concurrent.NamedLock;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.AbstractTask;
+import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
@@ -66,9 +68,11 @@ import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.resources.BuildIndexSegmentTask.BuildResult;
 import com.bigdata.service.ClientIndexView;
+import com.bigdata.service.IBigdataClient;
+import com.bigdata.service.IClientIndex;
+import com.bigdata.service.IDataService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.util.NT;
 
@@ -117,14 +121,12 @@ abstract public class IndexManager extends StoreManager {
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final protected static boolean DEBUG = log.isDebugEnabled();
 
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final protected static boolean INFO = log.isInfoEnabled();
 
     /**
      * Options understood by the {@link IndexManager}.
@@ -208,20 +210,19 @@ abstract public class IndexManager extends StoreManager {
      * Note: The capacity of the backing hard reference LRU effects how many
      * _clean_ indices can be held in the cache. Dirty indices remain strongly
      * reachable owing to their existence in the {@link Name2Addr#commitList}.
+     * <p>
+     * Note: {@link ITx#READ_COMMITTED} indices MUST NOT be allowed into this
+     * cache. Each time there is a commit for a given {@link BTree}, the
+     * {@link ITx#READ_COMMITTED} view of that {@link BTree} needs to be
+     * replaced by the most recently committed view, which is a different
+     * {@link BTree} object and is loaded from a different checkpoint record.
      * 
-     * FIXME {@link ITx#READ_COMMITTED} indices are NOT allowed into this cache.
-     * This is the same problem that is documented in
-     * {@link DefaultResourceLocator}.
-     * <p>
-     * Each time there is a commit for a given BTree, the READ_COMMITTED view of
-     * that BTree needs to be replaced by the most recently committed view,
-     * which is a different BTree object and is loaded from a different
-     * checkpoint record.
-     * <p>
-     * The problem would go aways if we modify BTree such that it was directly
-     * aware of read-committed semantics. In that case the BTree would have to
-     * re-load its state from the backing store if there had been an intervening
-     * checkpoint on the corresponding live BTree.
+     * @todo alternatively, if such views are allowed in then this cache must be
+     *       encapsulated by logic that examines the view when the timestamp is
+     *       {@link ITx#READ_COMMITTED} to make sure that the BTree associated
+     *       with that view is current (as of the last commit point). If not,
+     *       then the entire view needs to be regenerated since the index view
+     *       definition (index segments in use) might have changed as well.
      */
     final private WeakValueCache<NT, IIndex> indexCache;
     
@@ -301,8 +302,9 @@ abstract public class IndexManager extends StoreManager {
      * identifier) either on the same or on another data service. The value is a
      * reason, e.g., "split", "join", or "move".
      */
-//    private // @todo exposed for counters - should be private.
-    protected final LRUCache<String/*name*/, String/*reason*/> staleLocatorCache = new LRUCache<String, String>(1000);  
+    // private // @todo exposed for counters - should be private.
+    protected final LRUCache<String/* name */, StaleLocatorReason/* reason */> staleLocatorCache = new LRUCache<String, StaleLocatorReason>(
+            1000);  
     
     /**
      * Note: this information is based on an LRU cache with a large fixed
@@ -311,13 +313,9 @@ abstract public class IndexManager extends StoreManager {
      * partition split/move/join changes somehow outpace the cache size then
      * the client would see a {@link NoSuchIndexException} instead.
      */
-    public String getIndexPartitionGone(String name) {
+    public StaleLocatorReason getIndexPartitionGone(String name) {
     
-        synchronized(staleLocatorCache) {
-        
-            return staleLocatorCache.get(name);
-            
-        }
+        return staleLocatorCache.get(name);
         
     }
     
@@ -332,20 +330,18 @@ abstract public class IndexManager extends StoreManager {
      * @param reason
      *            The reason (split, join, or move).
      */
-    protected void setIndexPartitionGone(String name,String reason) {
+    protected void setIndexPartitionGone(String name, StaleLocatorReason reason) {
         
-        assert name != null;
+        if (name == null)
+            throw new IllegalArgumentException();
         
-        assert reason != null;
+        if (reason == null)
+            throw new IllegalArgumentException();
+        
+        if (INFO)
+            log.info("name=" + name + ", reason=" + reason);
 
-        synchronized (staleLocatorCache) {
-
-            if (INFO)
-                log.info("name=" + name + ", reason=" + reason);
-
-            staleLocatorCache.put(name, reason, true);
-
-        }
+        staleLocatorCache.put(name, reason, true);
         
     }
 
@@ -570,14 +566,15 @@ abstract public class IndexManager extends StoreManager {
 
                 /*
                  * Note: synchronization is required to have the semantics of an
-                 * atomic get/put.
+                 * atomic get/put against the WeakValueCache.
                  * 
-                 * FIXME if the WeakValueCache used an atomic hash map then we
-                 * could increase the concurrency here. The load of the index
-                 * segment from the store can have significiant latency and this
-                 * code is single threaded during the load.
+                 * Note: The load of the index segment from the store can have
+                 * significiant latency. The use of a named lock allows us to
+                 * load index segments for different index views concurrently.
                  */
-                synchronized (indexSegmentCache) {
+                final Lock lock = namedLock
+                        .acquireLock(new NT(name, timestamp));
+                try {
 
                     // check the cache first.
                     IndexSegment seg = indexSegmentCache.get(storeUUID);
@@ -599,6 +596,10 @@ abstract public class IndexManager extends StoreManager {
                     
                     btree = seg;
 
+                } finally {
+                    
+                    lock.unlock();
+                    
                 }
             
             }
@@ -774,7 +775,26 @@ abstract public class IndexManager extends StoreManager {
     }
     
     /**
-     * Note: logic duplicated by {@link Journal#getIndex(String, long)}
+     * Note: An {@link ITx#READ_COMMITTED} view returned by this method WILL NOT
+     * update if there are intervening commits. This decision was made based on
+     * the fact that views are requested from the {@link IndexManager} by an
+     * {@link AbstractTask} running on the {@link ConcurrencyManager}. Such
+     * tasks, and hence such views, have a relatively short life. However, the
+     * {@link Journal} implementation of this method is different and will
+     * return a {@link ReadCommittedView} precisely because objects are directly
+     * requested from a {@link Journal} by the application and the application
+     * can hold onto a read-committed view for an arbitrary length of time. This
+     * has the pragmatic effect of allowing us to cache read-committed views in
+     * the application and in the {@link IBigdataClient}. For the
+     * {@link IBigdataClient}, the view acquires its read-committed semantics
+     * because an {@link IClientIndex} generates {@link AbstractTask}(s) for
+     * each {@link IIndex} operation and submits those task(s) to the
+     * appropriate {@link IDataService}(s) for evaluation. The
+     * {@link IDataService} will resolve the index using this method, and it
+     * will always see the then-current read-committed view and the
+     * {@link IClientIndex} will appear to have read-committed semantics.
+     * 
+     * @see Journal#getIndex(String, long)
      */
     public IIndex getIndex(String name, long timestamp) {
         
@@ -943,10 +963,11 @@ abstract public class IndexManager extends StoreManager {
 
                     assert timestamp == ITx.UNISOLATED;
 
-                    // Check to see if an index partition was split, joined
-                    // or
-                    // moved.
-                    final String reason = getIndexPartitionGone(name);
+                    /*
+                     * Check to see if an index partition was split, joined or
+                     * moved.
+                     */
+                    final StaleLocatorReason reason = getIndexPartitionGone(name);
 
                     if (reason != null) {
 

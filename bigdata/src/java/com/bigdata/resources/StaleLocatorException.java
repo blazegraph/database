@@ -48,14 +48,17 @@ public class StaleLocatorException extends RuntimeException {
      */
     private static final long serialVersionUID = 8595818286122546905L;
 
-    private String name, reason;
+    private final String name;
+    private final StaleLocatorReason reason;
     
-    /**
-     * De-serialization ctor.
-     */
-    public StaleLocatorException() {
-        super();
-    }
+//    /**
+//     * De-serialization ctor.
+//     */
+//    public StaleLocatorException() {
+//        
+//        super();
+//        
+//    }
 
     public String getName() {
         
@@ -63,7 +66,7 @@ public class StaleLocatorException extends RuntimeException {
         
     }
     
-    public String getReason() {
+    public StaleLocatorReason getReason() {
         
         return reason;
         
@@ -73,31 +76,17 @@ public class StaleLocatorException extends RuntimeException {
      * @param name
      *            The name of the index partition.
      * @param reason
-     *            "split", "join" or "move" as appropriate.
+     *            The reason why the locator is no longer valid (split, join or
+     *            moved).
      */
-    public StaleLocatorException(String name,String reason) {
-        
-        super("locator stale: name="+name+", reason="+reason);
+    public StaleLocatorException(String name, StaleLocatorReason reason) {
+
+        super("name=" + name + ", reason=" + reason);
         
         this.name = name;
         
         this.reason = reason;
         
     }
-
-//    /**
-//     * @param arg0
-//     * @param arg1
-//     */
-//    public StaleLocatorException(String arg0, Throwable arg1) {
-//        super(arg0, arg1);
-//    }
-//
-//    /**
-//     * @param arg0
-//     */
-//    public StaleLocatorException(Throwable arg0) {
-//        super(arg0);
-//    }
 
 }

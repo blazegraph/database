@@ -367,7 +367,7 @@ public class JiniServicesHelper {
         }
 
         if (serviceID == null)
-            throw new AssertionError();
+            throw new RuntimeException("Server did not start? "+server);
 
         return serviceID;
 

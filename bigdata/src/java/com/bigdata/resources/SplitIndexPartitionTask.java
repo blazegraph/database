@@ -861,7 +861,8 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
                         + " was split into " + Arrays.toString(locators));
 
             // will notify tasks that index partition was split.
-            resourceManager.setIndexPartitionGone(name, "split");
+            resourceManager.setIndexPartitionGone(name,
+                    StaleLocatorReason.Split);
            
             // notify successful index partition split.
             resourceManager.splitCounter.incrementAndGet();

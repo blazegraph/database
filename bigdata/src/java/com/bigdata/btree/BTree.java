@@ -369,13 +369,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
             
         }
 
-        // initialize mutable fields from the checkpoint record.
-        this.checkpoint = checkpoint; // save reference.
-        this.height = checkpoint.getHeight();
-        this.nnodes = checkpoint.getNodeCount();
-        this.nleaves = checkpoint.getLeafCount();
-        this.nentries = checkpoint.getEntryCount();
-        this.counter = new AtomicLong( checkpoint.getCounter() );
+        setCheckpoint(checkpoint);
         
 //        // save the address from which the index metadata record was read.
 //        this.lastMetadataAddr = metadata.getMetadataAddr();
@@ -388,6 +382,29 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
 
         reopen();
         
+    }
+    
+    /**
+     * Sets the {@link #checkpoint} and initializes the mutable fields from the
+     * checkpoint record. In order for this operation to be atomic, the caller
+     * must be synchronized on the {@link BTree} or otherwise guarenteed to have
+     * exclusive access, e.g., during the ctor or when the {@link BTree} is
+     * mutable and access is therefore required to be single-threaded.
+     */
+    private void setCheckpoint(Checkpoint checkpoint) {
+
+        this.checkpoint = checkpoint; // save reference.
+        
+        this.height = checkpoint.getHeight();
+        
+        this.nnodes = checkpoint.getNodeCount();
+        
+        this.nleaves = checkpoint.getLeafCount();
+        
+        this.nentries = checkpoint.getEntryCount();
+        
+        this.counter = new AtomicLong( checkpoint.getCounter() );
+
     }
     
     /**
@@ -524,7 +541,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
 
         if (this.readOnly && !readOnly) {
 
-            throw new UnsupportedOperationException(MSG_READ_ONLY);
+            throw new UnsupportedOperationException(ERROR_READ_ONLY);
             
         }
         
@@ -596,7 +613,8 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
             
         }
         
-        log.info("old="+this.lastCommitTime+", new="+lastCommitTime);
+        if (INFO)
+            log.info("old=" + this.lastCommitTime + ", new=" + lastCommitTime);
         
         if (this.lastCommitTime != 0L && this.lastCommitTime > lastCommitTime) {
 
@@ -638,22 +656,24 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
      * Fire an event to the listener (iff set).
      */
     final protected void fireDirtyEvent() {
-        
+
         assertNotReadOnly();
-        
+
         final IDirtyListener l = this.listener;
-        
-        if(l==null) return;
-        
-        if(Thread.interrupted()) {
-            
+
+        if (l == null)
+            return;
+
+        if (Thread.interrupted()) {
+
             throw new RuntimeException(new InterruptedException());
-            
+
         }
-        
+
         l.dirtyEvent(this);
         
-        log.info("");
+        if (INFO)
+            log.info("");
         
     }
     
@@ -671,7 +691,8 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
 
             writeNodeRecursive( root );
             
-            log.info("flushed root: addr="+root.identity);
+            if(INFO)
+                log.info("flushed root: addr=" + root.identity);
             
             return true;
             
@@ -705,7 +726,8 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
         
         assertNotReadOnly();
         
-        log.info("begin");
+        if (INFO)
+            log.info("begin");
         
 //        assert root != null : "root is null"; // i.e., isOpen().
 
@@ -728,7 +750,8 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
 //            // note the address of the new metadata record.
 //            lastMetadataAddr = metadata.getMetadataAddr();
             
-            log.info("wrote updated metadata record");
+            if(INFO)
+                log.info("wrote updated metadata record");
             
         }
         
@@ -1129,23 +1152,23 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
         /*
          * Read checkpoint record from store.
          */
-        final Checkpoint checkpoint = Checkpoint.load(store,addrCheckpoint);
+        final Checkpoint checkpoint = Checkpoint.load(store, addrCheckpoint);
 
         /*
          * Read metadata record from store.
          */
-        final IndexMetadata metadata = IndexMetadata.read(store,
-                checkpoint.getMetadataAddr());
+        final IndexMetadata metadata = IndexMetadata.read(store, checkpoint
+                .getMetadataAddr());
 
-      if (INFO) {
+        if (INFO) {
 
-          // Note: this is the scale-out index name for a partitioned index.
-          final String name = metadata.getName();
-          
-          log.info((name == null ? "" : "name=" + name + ", ")
+            // Note: this is the scale-out index name for a partitioned index.
+            final String name = metadata.getName();
+
+            log.info((name == null ? "" : "name=" + name + ", ")
                     + "readCheckpoint=" + checkpoint);
-          
-      }
+
+        }
 
         /*
          * Create B+Tree object instance.

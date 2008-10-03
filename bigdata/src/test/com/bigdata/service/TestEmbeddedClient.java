@@ -367,7 +367,6 @@ public class TestEmbeddedClient extends AbstractEmbeddedFederationTestCase {
         final IIndex ndx = fed.getIndex(name, ITx.UNISOLATED);
         
         assertNotNull("Expecting index to be registered", ndx);
-
         
         /*
          * Range count the index to verify that it is empty.
@@ -378,7 +377,8 @@ public class TestEmbeddedClient extends AbstractEmbeddedFederationTestCase {
         fed.dropIndex(name);
 
         // request view of index.
-        assertNull("Not expecting index to exist", fed.getIndex(name,ITx.UNISOLATED));
+        assertNull("Not expecting index to exist",
+                fed.getIndex(name,ITx.UNISOLATED));
         
     }
     

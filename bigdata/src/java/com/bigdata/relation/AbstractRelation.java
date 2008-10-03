@@ -76,7 +76,9 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
      * @return The index name.
      */
     public String getFQN(IKeyOrder<? extends E> keyOrder) {
+        
         return getNamespace() + keyOrder.getIndexName();
+        
     }
     
     /**
@@ -147,7 +149,7 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
                 && timestamp == ITx.UNISOLATED
                 && (indexManager instanceof Journal || indexManager instanceof TemporaryStore)) {
 
-            if(log.isDebugEnabled()) {
+            if(DEBUG) {
                 
                 log.debug("Imposing read-write concurrency controls on index: name="
                                 + name);

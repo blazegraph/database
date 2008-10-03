@@ -30,6 +30,8 @@ package com.bigdata.relation.locator;
 
 import java.lang.ref.WeakReference;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.util.NT;
@@ -44,6 +46,10 @@ import com.bigdata.util.NT;
  */
 abstract public class AbstractCachingResourceLocator<T extends ILocatableResource> implements IResourceLocator<T> {
 
+    protected static final Logger log = Logger.getLogger(AbstractCachingResourceLocator.class);
+    
+    protected static final boolean INFO = log.isInfoEnabled();
+    
     private transient WeakValueCache<NT, T> cache;
 
     private int capacity;
@@ -94,7 +100,14 @@ abstract public class AbstractCachingResourceLocator<T extends ILocatableResourc
             throw new IllegalArgumentException();
 
         final T r = cache.get(new NT(namespace, timestamp));
-        
+
+        if (INFO) {
+
+            log.info((r == null ? "miss" : "hit ") + ": namespace=" + namespace
+                    + ", timestamp=" + timestamp);
+
+        }
+
         return r;
 
     }
@@ -104,8 +117,19 @@ abstract public class AbstractCachingResourceLocator<T extends ILocatableResourc
      * <p>
      * Note: The caller MUST be synchronized on the named resource.
      * 
+     * Note: Read committed views are allowed into the cache.
+     * 
+     * For a Journal, this depends on Journal#getIndex(name,timestamp) returning
+     * a ReadCommittedView for an index so that the view does in fact have
+     * read-committed semantics.
+     * 
+     * For a federation, read-committed semantics are achieved by the
+     * IClientIndex implementations since they always make standoff requests to
+     * one (or more) data services. Those requests allow the data service to
+     * resolve the then most recent view for the index for each request.
+     * 
      * @param resource
-     *            The relation.
+     *            The resource.
      */
     protected void put(T resource) {
         
@@ -116,6 +140,13 @@ abstract public class AbstractCachingResourceLocator<T extends ILocatableResourc
 
         final long timestamp = resource.getTimestamp();
         
+        if (INFO) {
+
+            log.info("Caching: namespace=" + namespace + ", timestamp="
+                    + timestamp);
+
+        }
+
         cache.put(new NT(namespace, timestamp), resource, false/* dirty */);
 
     }

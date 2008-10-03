@@ -73,23 +73,28 @@ public class RemoteChunkedIterator<E> implements IRemoteChunkedIterator<E> {
 
     }
 
-    /**
-     * Note: since [keepAlive := false], this appears to be sufficient to force
-     * the proxy to be unexported and force the source iterator to be closed.
+    /*
+     * Commented out finalize() since the presence of this method can lead to GC
+     * problems, and we create a LOT of instances of this method.
      */
-    protected void finalize() throws Throwable {
-
-        if(open) {
-
-            log.warn("Closing iterator");
-
-            close();
-            
-        }
-
-        super.finalize();
-
-    }
+//    
+//    /**
+//     * Note: since [keepAlive := false], this appears to be sufficient to force
+//     * the proxy to be unexported and force the source iterator to be closed.
+//     */
+//    protected void finalize() throws Throwable {
+//
+//        if(open) {
+//
+//            log.warn("Closing iterator");
+//
+//            close();
+//            
+//        }
+//
+//        super.finalize();
+//
+//    }
 
     /**
      * Close the source iterator.

@@ -438,7 +438,8 @@ public class JoinIndexPartitionTask extends AbstractResourceManagerTask {
             for(String name : result.oldnames) {
                 
                 // will notify tasks that the index partition was joined.
-                resourceManager.setIndexPartitionGone(name, "join");
+                resourceManager.setIndexPartitionGone(name,
+                        StaleLocatorReason.Join);
                 
             }
             
