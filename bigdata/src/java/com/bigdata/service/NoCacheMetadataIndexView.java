@@ -14,7 +14,7 @@ import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 
 /**
  * An implementation that performs NO caching. All methods read through to the
- * remote metadata index.
+ * remote metadata index. Basically, this hides the RMI requests.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -190,6 +190,13 @@ public class NoCacheMetadataIndexView implements IMetadataIndex {
                 filter
         );
 
+    }
+
+    /**
+     * NOP since nothing is cached.
+     */
+    public void staleLocator(PartitionLocator locator) {
+        
     }
 
 }

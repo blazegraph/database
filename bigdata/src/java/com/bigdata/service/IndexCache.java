@@ -32,8 +32,8 @@ public class IndexCache extends AbstractIndexCache<ClientIndexView>{
         // No such index.
         if (mdi == null) {
 
-            if (AbstractScaleOutFederation.INFO)
-                AbstractScaleOutFederation.log.info("name=" + name + " @ " + timestamp
+            if (INFO)
+                log.info("name=" + name + " @ " + timestamp
                         + " : is not registered");
 
             return null;
@@ -42,6 +42,16 @@ public class IndexCache extends AbstractIndexCache<ClientIndexView>{
 
         // Index exists.
         return new ClientIndexView(fed, name, timestamp, mdi);
+        
+    }
+ 
+    protected void dropIndexFromCache(String name) {
+
+        // drop the index from the cache.
+        super.dropIndexFromCache(name);
+        
+        // and drop the metadata index from its cache as well.
+        fed.getMetadataIndexCache().dropIndexFromCache(name);
         
     }
     

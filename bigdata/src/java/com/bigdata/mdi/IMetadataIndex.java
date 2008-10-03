@@ -28,29 +28,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.mdi;
 
-import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
-import com.bigdata.service.IMetadataService;
+import com.bigdata.service.IDataService;
 
 /**
- * Interface for a metadata index.
- * 
- * @todo define implementations of this interface that handle smart caching and
- *       update of index partition metadata for the client side. It may be that
- *       those implementations should be a wrapper around an {@link IIndex} that
- *       encapsulates the logic for partition operations, but I also need to
- *       handle caching in a smart way.
- *       <p>
- *       The {@link IMetadataService} currently exposes some of the methods from
- *       the metadata index - perhaps those should be taken out of that API and
- *       moved onto {@link IMetadataIndex}, especially since we tend to cache
- *       things.
- * 
- * @todo If these methods are to be invoked remotely then we will need to
- *       returning the byte[] rather than the de-serialized
- *       {@link PartitionLocator}.
+ * Interface for a metadata index. The metadata index stores the
+ * {@link PartitionLocator}s that specify which {@link IDataService} has data
+ * for each index partition in a scale-out index.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -95,5 +81,16 @@ public interface IMetadataIndex extends IRangeQuery { //extends IIndex {
      *         there are no partitions defined.
      */
     public PartitionLocator find(byte[] key);
+
+    /**
+     * Notification that a locator is stale. Caching implementations of this
+     * interface will use this notice to update their state from the
+     * authoritative metadata index. Non-caching and authoritative
+     * implementations just ignore this message.
+     * 
+     * @param locator
+     *            The locator.
+     */
+    public void staleLocator(PartitionLocator locator);
     
 }

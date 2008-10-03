@@ -76,6 +76,8 @@ abstract public class MetadataService extends DataService implements
      * 
      * @return The name of the corresponding {@link MetadataIndex} that is used
      *         to manage the partitions in the named scale-out index.
+     * 
+     * @see DataService#getIndexPartitionName(String, int)
      */
     public static String getMetadataIndexName(String name) {
         

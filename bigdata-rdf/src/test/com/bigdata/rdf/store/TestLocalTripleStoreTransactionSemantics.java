@@ -61,10 +61,12 @@ public class TestLocalTripleStoreTransactionSemantics extends ProxyTestCase {
 
             // now visible in the view
             /*
-             * @todo this assert is failing. The reason has to do with the
-             * visiblity of read-committed changes in a BTree vs an index
-             * accessed via the ConcurrencyManager. The test failure will go
-             * away once I figure out what I want to do about that problem.
+             * Note: this will fail if the Journal#getIndex(name,timestamp) does
+             * not return an index view with read-committed (vs read-consistent)
+             * semantics. For the index view to have read-committed semantics
+             * the view MUST update if there is an intervening commit. This is
+             * currently handled by returning a ReadCommittedView for this case
+             * rather than a BTree.
              */
             assertTrue(view.hasStatement(s, p, o));
             

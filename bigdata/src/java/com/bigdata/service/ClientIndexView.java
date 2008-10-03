@@ -166,9 +166,9 @@ public class ClientIndexView implements IClientIndex {
      */
     final protected static boolean DEBUG = log.isDebugEnabled();
 
-    private final AbstractFederation fed;
+    private final AbstractScaleOutFederation fed;
 
-    public AbstractFederation getFederation() {
+    public AbstractScaleOutFederation getFederation() {
         
         return fed;
         
@@ -179,7 +179,7 @@ public class ClientIndexView implements IClientIndex {
      */
     protected ThreadPoolExecutor getThreadPool() {
 
-        return (ThreadPoolExecutor)fed.getExecutorService();
+        return (ThreadPoolExecutor) fed.getExecutorService();
 
     }
 
@@ -362,8 +362,9 @@ public class ClientIndexView implements IClientIndex {
      *            object contains the template {@link IndexMetadata} for the
      *            scale-out index partitions.
      */
-    public ClientIndexView(IBigdataFederation fed, String name, long timestamp,
-            IMetadataIndex metadataIndex) {
+    public ClientIndexView(final AbstractScaleOutFederation fed,
+            final String name, final long timestamp,
+            final IMetadataIndex metadataIndex) {
 
         if (fed == null)
             throw new IllegalArgumentException();
@@ -374,7 +375,7 @@ public class ClientIndexView implements IClientIndex {
         if (metadataIndex == null)
             throw new IllegalArgumentException();
         
-        this.fed = (AbstractFederation) fed;
+        this.fed = fed;
 
         this.name = name;
 
@@ -1482,7 +1483,8 @@ public class ClientIndexView implements IClientIndex {
             if (locator == null)
                 throw new IllegalArgumentException();
             
-            if(Thread.interrupted()) throw new InterruptedException();
+            if (Thread.interrupted())
+                throw new InterruptedException();
             
             // resolve service UUID to data service.
             final IDataService dataService = getDataService(locator);
@@ -1496,12 +1498,10 @@ public class ClientIndexView implements IClientIndex {
                     split.pmd.getPartitionId() // the index partition identifier.
                     );
 
-            if(INFO)
-            log.info("Submitting task="+this+" on "+dataService);
-            
-            try {
+            if (INFO)
+                log.info("Submitting task=" + this + " on " + dataService);
 
-                if(Thread.interrupted()) throw new InterruptedException();
+            try {
 
                 submit(dataService, name);
 
@@ -1512,13 +1512,15 @@ public class ClientIndexView implements IClientIndex {
                 
                 causes.add(ex);
                 
-                if(InnerCause.isInnerCause(ex, StaleLocatorException.class)) {
+                final StaleLocatorException cause = (StaleLocatorException) InnerCause
+                        .getInnerCause(ex, StaleLocatorException.class);
+                
+                if(cause != null) {
+
+                    // notify the client so that it can refresh its cache.
+                    staleLocator(locator, cause);
                     
-                    if(Thread.interrupted()) throw new InterruptedException();
-                    
-                    if(INFO)
-                    log.info("Locator stale (will retry) : name="+name+", stale locator="+locator);
-                    
+                    // retry the operation.
                     retry();
                     
                 } else {
@@ -2115,6 +2117,42 @@ public class ClientIndexView implements IClientIndex {
         
         throw new UnsupportedOperationException();
         
+    }
+
+    /**
+     * Notifies the client that a {@link StaleLocatorException} was received.
+     * The client will use this information to refresh the
+     * {@link IMetadataIndex}.
+     * 
+     * @param locator
+     *            The locator that was stale.
+     * 
+     * @throws RuntimeException
+     *             unless the index view is {@link ITx#UNISOLATED} or
+     *             {@link ITx#READ_COMMITTED} since stale locators do not occur
+     *             for other views.
+     */
+    protected void staleLocator(PartitionLocator locator,
+            StaleLocatorException cause) {
+        
+        if (locator == null)
+            throw new IllegalArgumentException();
+        
+        if (timestamp != ITx.UNISOLATED && timestamp != ITx.READ_COMMITTED) {
+            
+            /*
+             * Stale locator exceptions should not be thrown for these views.
+             */
+
+            throw new RuntimeException(
+                    "Stale locator, but views should be consistent? timestamp="
+                            + TimestampUtility.toString(timestamp));
+
+        }
+
+        // notify the metadata index view that it has a stale locator.
+        metadataIndex.staleLocator(locator);
+
     }
 
 }

@@ -268,57 +268,9 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
             resource = newInstance(cls, foundOn.get(), namespace, timestamp,
                     properties);
 
-            {
-                
-                /*
-                 * Add to the cache.
-                 * 
-                 * Note: There is a HUGE performance penalty for the federation
-                 * based modes if we do not allow read-committed views into the
-                 * cache!!!
-                 * 
-                 * FIXME There is a problem when we let in the read-committed
-                 * view of a BTree. Each time there is a commit for a given
-                 * BTree, the READ_COMMITTED view of that BTree needs to be
-                 * replaced by the most recently committed view, which is a
-                 * different BTree object and is loaded from a different
-                 * checkpoint record.
-                 * 
-                 * The problem with READ_COMMITTED BTree instances in the
-                 * locator cache does not arise with the federation based modes
-                 * as they submit requests to a DataService in which the view is
-                 * identified by a timestamp.
-                 * 
-                 * The problem would go aways if we modified BTree such that it
-                 * was directly aware of read-committed semantics. In that case
-                 * the BTree would have to re-load its state from the backing
-                 * store if there had been an intervening checkpoint on the
-                 * corresponding live BTree.
-                 * 
-                 * For now, we are letting READ_COMMITTED resources into the
-                 * cache since it is a huge performance penalty otherwise (3x)
-                 * and since there does not appear to be anything in the RDF DB
-                 * that depends on cached read-committed resources that use
-                 * BTree (vs IIndex) objects.  If there were it would wind up
-                 * with a STALE view. 
-                 */
-
-//                if (timestamp != ITx.READ_COMMITTED)
-                {
-
-                    if (DEBUG) {
-
-                        log.debug("Caching: namespace=" + namespace
-                                + ", timestamp=" + timestamp);
-
-                    }
-
-                    put(resource);
-
-                }
-                
-            }
-
+            // Add to the cache.
+            put(resource);
+            
             return resource;
 
         } finally {

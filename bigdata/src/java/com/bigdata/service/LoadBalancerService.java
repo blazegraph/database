@@ -2214,9 +2214,17 @@ abstract public class LoadBalancerService extends AbstractService
             log.info("minCount=" + minCount + ", maxCount=" + maxCount
                     + ", exclude=" + exclude);
         
-        final UUID[] a = ((AbstractScaleOutFederation) getFederation())
-                .awaitServices(minCount == 0 ? 1 : minCount/* minCount */,
-                        10000/* timeout(ms) */);
+        /*
+         * Note: I've reduced this to only demand a single data service. If more
+         * are available then they are returned. If none are available then we
+         * can not proceed. If only one is available, then it will be assigned
+         * for each of the requested minCount UUIDs.
+         */
+        final long timeout = 10000;// ms.
+        UUID[] a = ((AbstractScaleOutFederation) getFederation())
+                .awaitServices(1,
+                        //minCount == 0 ? 1 : minCount/* minCount */,
+                        timeout);
 
         if (a.length == 1 && exclude != null && a[0] == exclude) {
 
@@ -2224,14 +2232,21 @@ abstract public class LoadBalancerService extends AbstractService
              * Make sure that we have at least one unexcluded service.
              */
             
-            return getUnderUtilizedDataServicesRoundRobin(minCount + 1,
-                    maxCount, exclude);
+            a = ((AbstractScaleOutFederation) getFederation()).awaitServices(
+                    2 /* minCount */, timeout);
             
         }
 
         Arrays.sort(a);
 
-        final int n = Math.min(maxCount, a.length);
+        final int n; // = Math.min(maxCount, a.length);
+        if (a.length > minCount) {
+            // no more than the maxCount.
+            n = Math.min(a.length, maxCount);
+        } else {
+            // no less than the minCount.
+            n = minCount;
+        }
         
         final UUID[] b = new UUID[ n ];
 

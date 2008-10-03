@@ -110,6 +110,26 @@ import com.bigdata.service.Split;
 abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearList  {
 
     /**
+     * The index is already closed.
+     */
+    protected static final String ERROR_CLOSED = "Closed";
+
+    /**
+     * A parameter was less than zero.
+     */
+    protected static final String ERROR_LESS_THAN_ZERO = "Less than zero";
+
+    /**
+     * A parameter was too large.
+     */
+    protected static final String ERROR_TOO_LARGE = "Too large";
+
+    /**
+     * The index is read-only but a mutation operation was requested.
+     */
+    final protected static String ERROR_READ_ONLY = "Read-only";
+    
+    /**
      * Log for btree opeations.
      */
     protected static final Logger log = Logger.getLogger(AbstractBTree.class);
@@ -137,12 +157,6 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
      * {@link Level#DEBUG}.
      */
     final protected boolean debug = DEBUG;
-
-    /**
-     * Text of a message used in exceptions for mutation operations on the index
-     * segment.
-     */
-    final protected transient static String MSG_READ_ONLY = "Read-only index";
 
     /**
      * Counters tracking various aspects of the btree.
@@ -530,7 +544,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
      * after a {@link #close()}. A closed index is transparently restored by
      * either {@link #getRoot()} or {@link #reopen()}. A {@link #close()} on a
      * dirty index MUST discard writes rather than flushing them to the store
-     * and MUST NOT update its {@link Checkpoint} record ({@link #close()} is
+     * and MUST NOT update its {@link Checkpoint} record - ({@link #close()} is
      * used to discard indices with partial writes when an {@link AbstractTask}
      * fails).
      * <p>
@@ -557,7 +571,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
 
         if (root == null) {
 
-            throw new IllegalStateException("Already closed");
+            throw new IllegalStateException(ERROR_CLOSED);
 
         }
 
@@ -641,7 +655,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
         
         if(isReadOnly()) {
             
-            throw new UnsupportedOperationException(MSG_READ_ONLY);
+            throw new UnsupportedOperationException(ERROR_READ_ONLY);
             
         }
         
@@ -699,13 +713,17 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
      */
     public IndexMetadata getIndexMetadata() {
 
-        if(isReadOnly()) {
-            
-            synchronized (this) {
+        if (isReadOnly()) {
 
-                if (metadata2 == null) {
+            if (metadata2 == null) {
 
-                    metadata2 = metadata.clone();
+                synchronized (this) {
+
+                    if (metadata2 == null) {
+
+                        metadata2 = metadata.clone();
+
+                    }
 
                 }
 
@@ -718,7 +736,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
         return metadata;
         
     }
-    private IndexMetadata metadata2;
+    private volatile IndexMetadata metadata2;
    
     /**
      * The metadata record for the index. This data rarely changes during the
@@ -787,7 +805,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
      * @throws RuntimeException
      *             if the key does not lie within the index partition.
      */
-    protected boolean rangeCheck(byte[] key, boolean allowUpperBound) {
+    protected boolean rangeCheck(final byte[] key, final boolean allowUpperBound) {
 
         if (key == null)
             throw new IllegalArgumentException();
@@ -943,8 +961,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
      * 
      * @return Either the root node of the tree or a recently touched leaf that
      *         is known to span the key.
+     * 
+     * @todo This is a placeholder for finger(s) for hot spots in the B+Tree,
+     *       but the finger(s) are currently disabled.
      */
-    protected AbstractNode getRootOrFinger(byte[] key) {
+    protected AbstractNode getRootOrFinger(final byte[] key) {
 
         return getRoot();
 //        
@@ -1123,7 +1144,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
         assertNotReadOnly();
 
         // conditional range check on the key.
-        assert rangeCheck(key,false);
+        assert rangeCheck(key, false);
 
         counters.ninserts++;
         
@@ -1217,11 +1238,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
         assertNotReadOnly();
 
         // conditional range check on the key.
-        assert rangeCheck(key,false);
-        
+        assert rangeCheck(key, false);
+
         counters.nremoves++;
 
-        return getRootOrFinger(key).remove(key,tuple);
+        return getRootOrFinger(key).remove(key, tuple);
 
     }
 
@@ -1276,7 +1297,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
      * @return <i>tuple</i> or <code>null</code> if there is no entry in the
      *         index under the key.
      */
-    public Tuple lookup(byte[] key, Tuple tuple) {
+    public Tuple lookup(final byte[] key, final Tuple tuple) {
 
         if (key == null)
             throw new IllegalArgumentException();
@@ -1288,7 +1309,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
 //        assert tuple.getValuesRequested() : "tuple does not request values.";
         
         // conditional range check on the key.
-        assert rangeCheck(key,false);
+        assert rangeCheck(key, false);
 
         counters.nfinds++;
 
@@ -1333,29 +1354,27 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
 
     }
 
-    public int indexOf(byte[] key) {
+    public int indexOf(final byte[] key) {
 
         if (key == null)
             throw new IllegalArgumentException();
 
         // conditional range check on the key.
-        assert rangeCheck(key,false);
+        assert rangeCheck(key, false);
 
         counters.nindexOf++;
 
-        int index = getRootOrFinger( key).indexOf(key);
-
-        return index;
+        return getRootOrFinger(key).indexOf(key);
 
     }
 
-    public byte[] keyAt(int index) {
+    public byte[] keyAt(final int index) {
 
         if (index < 0)
-            throw new IndexOutOfBoundsException("less than zero");
+            throw new IndexOutOfBoundsException(ERROR_LESS_THAN_ZERO);
 
         if (index >= getEntryCount())
-            throw new IndexOutOfBoundsException("too large");
+            throw new IndexOutOfBoundsException(ERROR_TOO_LARGE);
 
         counters.ngetKey++;
 
@@ -1363,7 +1382,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
 
     }
 
-    public byte[] valueAt(int index) {
+    public byte[] valueAt(final int index) {
 
         final Tuple tuple = lookupTuple.get();
         
@@ -1373,13 +1392,13 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
 
     }
 
-    final public Tuple valueAt(int index,Tuple tuple) {
+    final public Tuple valueAt(final int index, final Tuple tuple) {
 
         if (index < 0)
-            throw new IndexOutOfBoundsException("less than zero");
+            throw new IndexOutOfBoundsException(ERROR_LESS_THAN_ZERO);
 
         if (index >= getEntryCount())
-            throw new IndexOutOfBoundsException("too large");
+            throw new IndexOutOfBoundsException(ERROR_TOO_LARGE);
 
         if (tuple == null || !tuple.getValuesRequested())
             throw new IllegalArgumentException();
@@ -1462,7 +1481,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
      * lookup of the both keys. If both keys are <code>null</code>, then the
      * cost is zero (no IOs).
      */
-    final public long rangeCount(byte[] fromKey, byte[] toKey) {
+    final public long rangeCount(final byte[] fromKey, final byte[] toKey) {
 
         if (fromKey == null && toKey == null) {
 
@@ -2242,7 +2261,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
 
         }
 
-        {
+        if (INFO) {
 
             final long elapsed = System.currentTimeMillis() - begin;
             
@@ -2438,9 +2457,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
 
         if (Thread.interrupted()) {
 
-            final InterruptedException cause = new InterruptedException();
-
-            throw new RuntimeException("Interrupted", cause);
+            throw new RuntimeException(new InterruptedException());
 
         }
 

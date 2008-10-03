@@ -207,19 +207,17 @@ public class BigdataFileSystem extends
         AbstractResource<IDatabase<BigdataFileSystem>> implements
         IContentRepository {
 
-    protected static Logger log = Logger.getLogger(BigdataFileSystem.class);
+    final protected static Logger log = Logger.getLogger(BigdataFileSystem.class);
     
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final protected static boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final protected static boolean DEBUG = log.isDebugEnabled();
 
     /**
      * Configuration options.
@@ -360,7 +358,7 @@ public class BigdataFileSystem extends
         
         blockSize = WormAddressManager.getMaxByteCount(offsetBits) - 1;
         
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("offsetBits=" + offsetBits + ", blockSize=" + blockSize);
         
     }
@@ -453,11 +451,7 @@ public class BigdataFileSystem extends
                 
                 final IndexMetadata md = new IndexMetadata(name, UUID
                         .randomUUID());
-
-//                md.setBranchingFactor(branchingFactor);
-
-//                md.setDeleteMarkers(true);
-
+                
                 indexManager.registerIndex(md);
 
                 final IIndex ndx = indexManager.getIndex(name, getTimestamp());
@@ -478,10 +472,6 @@ public class BigdataFileSystem extends
                 
                 final IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
 
-//                md.setBranchingFactor(branchingFactor);
-
-//                md.setDeleteMarkers(true);
-                
                 /*
                  * @todo unit tests for correct copying of blobs during overflow.
                  * See {@link IOverflowHandler}.
@@ -1227,7 +1217,7 @@ public class BigdataFileSystem extends
      */
     public long deleteHead(String id, int version) {
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("id=" + id + ", version=" + version);
 
         final IKeyBuilder keyBuilder = getDataIndex().getIndexMetadata()
@@ -1361,7 +1351,7 @@ public class BigdataFileSystem extends
 
         if (!itr.hasNext()) {
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("id=" + id + ", version=" + version + " : no blocks");
 
             return null;
@@ -1419,7 +1409,7 @@ public class BigdataFileSystem extends
 
         if (!itr.hasNext()) {
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("id=" + id + ", version=" + version + ", block="
                         + block + " : does not exist");
 
@@ -1624,7 +1614,7 @@ public class BigdataFileSystem extends
 
         final long nblocks = getDataIndex().rangeCount(fromKey, toKey);
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("id=" + id + ", version=" + version + ", nblocks=" + nblocks);
 
         return nblocks;
@@ -1782,7 +1772,7 @@ public class BigdataFileSystem extends
      */
     public FileVersionInputStream inputStream(String id, int version, long tx) {
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("id=" + id + ", version=" + version + ", tx=" + tx);
 
         /*
@@ -1797,7 +1787,7 @@ public class BigdataFileSystem extends
 
         if (tx == ITx.UNISOLATED && getBlockCount(id, version) == 0L) {
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("No data: id=" + id + ", version=" + version);
 
             return null;

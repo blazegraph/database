@@ -280,7 +280,8 @@ public class Tx extends AbstractTx implements ITx {
 
                 // Validation failed.
 
-                log.info("validation failed: " + name);
+                if(INFO)
+                    log.info("validation failed: " + name);
 
                 return false;
 
@@ -460,7 +461,9 @@ public class Tx extends AbstractTx implements ITx {
                  * ground state.
                  */
 
-                log.info("No such index: " + name + ", startTime=" + startTime);
+                if (INFO)
+                    log.info("No such index: " + name + ", startTime="
+                            + startTime);
 
                 return null;
 

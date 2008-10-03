@@ -215,7 +215,17 @@ public class MetadataIndexView extends DelegateIndex implements IMetadataIndex {
      */
     private LRUCache<Integer, PartitionLocator> locatorCache = new LRUCache<Integer, PartitionLocator>(
             1000);
-    
+
+    /**
+     * Remove the locator from the {@link #locatorCache}. It will be re-read on
+     * demand from the {@link #delegate}.
+     */
+    public void staleLocator(PartitionLocator locator) {
+
+        locatorCache.remove(locator.getPartitionId());
+        
+    }
+
     /**
      * Looks up and de-serializes the {@link PartitionLocator} at the given
      * index.
@@ -289,5 +299,5 @@ public class MetadataIndexView extends DelegateIndex implements IMetadataIndex {
         }
 
     }
-    
+
 }

@@ -45,13 +45,15 @@ abstract public class AbstractTx implements ITx {
 
     protected static final Logger log = Logger.getLogger(AbstractTx.class);
     
+    protected static final boolean INFO = log.isInfoEnabled();
+    
     /*
      * Text for error messages.
      */
-    final static String NOT_ACTIVE = "Not active";
-    final static String NOT_PREPARED = "Transaction is not prepared";
-    final static String NOT_COMMITTED = "Transaction is not committed";
-    final static String IS_COMPLETE = "Transaction is complete";
+    final static protected String NOT_ACTIVE = "Not active";
+    final static protected String NOT_PREPARED = "Transaction is not prepared";
+    final static protected String NOT_COMMITTED = "Transaction is not committed";
+    final static protected String IS_COMPLETE = "Transaction is complete";
     
     /**
      * This {@link Lock} is used to obtain exclusive access during certain

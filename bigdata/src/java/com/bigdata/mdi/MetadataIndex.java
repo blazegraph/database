@@ -466,4 +466,14 @@ public class MetadataIndex extends BTree implements IMetadataIndex {
 
     }
 
+    /**
+     * Passes the notice along to the {@link #view}. It caches de-serialized
+     * locators and needs to drop them from its cache if they become stale.
+     */
+    public void staleLocator(PartitionLocator locator) {
+        
+        view.staleLocator(locator);
+        
+    }
+
 }

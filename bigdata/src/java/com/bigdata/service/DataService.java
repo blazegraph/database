@@ -736,8 +736,8 @@ abstract public class DataService extends AbstractService
      * 
      * @return The name of the index partition.
      */
-    public static final String getIndexPartitionName(String name,
-            int partitionId) {
+    public static final String getIndexPartitionName(final String name,
+            final int partitionId) {
 
         if (name == null) {
 

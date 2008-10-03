@@ -293,7 +293,7 @@ public class IndexSegment extends AbstractBTree {
      */
     final public ICounter getCounter() {
         
-        throw new UnsupportedOperationException(MSG_READ_ONLY);
+        throw new UnsupportedOperationException(ERROR_READ_ONLY);
         
     }
     
@@ -362,7 +362,7 @@ public class IndexSegment extends AbstractBTree {
      */
     final public void removeAll() {
         
-        throw new UnsupportedOperationException(MSG_READ_ONLY);
+        throw new UnsupportedOperationException(ERROR_READ_ONLY);
         
     }
     
@@ -602,19 +602,19 @@ public class IndexSegment extends AbstractBTree {
 
             public void delete() {
 
-                throw new UnsupportedOperationException(MSG_READ_ONLY);
+                throw new UnsupportedOperationException(ERROR_READ_ONLY);
 
             }
 
             public Tuple insert(byte[] key, byte[] val, boolean deleted, long timestamp, Tuple tuple) {
 
-                throw new UnsupportedOperationException(MSG_READ_ONLY);
+                throw new UnsupportedOperationException(ERROR_READ_ONLY);
 
             }
 
             public Tuple remove(byte[] key, Tuple tuple) {
 
-                throw new UnsupportedOperationException(MSG_READ_ONLY);
+                throw new UnsupportedOperationException(ERROR_READ_ONLY);
 
             }
 
@@ -670,19 +670,19 @@ public class IndexSegment extends AbstractBTree {
 
             public void delete() {
 
-                throw new UnsupportedOperationException(MSG_READ_ONLY);
+                throw new UnsupportedOperationException(ERROR_READ_ONLY);
 
             }
 
             public Tuple insert(byte[] key, byte[] val, boolean deleted, long timestamp, Tuple tuple) {
 
-                throw new UnsupportedOperationException(MSG_READ_ONLY);
+                throw new UnsupportedOperationException(ERROR_READ_ONLY);
 
             }
 
             public Tuple remove(byte[] key, Tuple tuple) {
 
-                throw new UnsupportedOperationException(MSG_READ_ONLY);
+                throw new UnsupportedOperationException(ERROR_READ_ONLY);
 
             }
     

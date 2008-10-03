@@ -51,6 +51,8 @@ public class GlobalRowStoreHelper {
     
     protected static final transient Logger log = Logger.getLogger(GlobalRowStoreHelper.class);
     
+    protected static final boolean INFO = log.isInfoEnabled();
+    
     public GlobalRowStoreHelper(IIndexManager indexManager) {
         
         if (indexManager == null)
@@ -61,8 +63,9 @@ public class GlobalRowStoreHelper {
     }
     
     synchronized public SparseRowStore getGlobalRowStore() {
-        
-        if(log.isInfoEnabled()) log.info("");
+
+        if (INFO)
+            log.info("");
 
         if (globalRowStore == null) {
 
@@ -70,7 +73,7 @@ public class GlobalRowStoreHelper {
 
             if (ndx == null) {
 
-                if (log.isInfoEnabled())
+                if (INFO)
                     log.info("Global row store does not exist - will try to register now");
                 
                 try {
@@ -101,6 +104,7 @@ public class GlobalRowStoreHelper {
         return globalRowStore;
 
     }
+
     private transient SparseRowStore globalRowStore;
 
     /**
@@ -108,27 +112,19 @@ public class GlobalRowStoreHelper {
      */
     synchronized public SparseRowStore getReadCommitted() {
 
-        if(log.isInfoEnabled()) log.info("");
+        if (INFO)
+            log.info("");
 
-//        if (globalRowStore == null) {
+        final IIndex ndx = indexManager.getIndex(GLOBAL_ROW_STORE_INDEX,
+                ITx.READ_COMMITTED);
 
-            IIndex ndx = indexManager.getIndex(GLOBAL_ROW_STORE_INDEX, ITx.READ_COMMITTED);
+        if (ndx == null) {
 
-            if (ndx == null) {
+            return null;
 
-                if (log.isInfoEnabled())
-                    log.info("Global row store does not exist - will try to register now");
+        }
 
-                return null;
-                
-            }
-            
-//            globalRowStore = 
-                return new SparseRowStore(ndx);
-            
-//        }
-        
-//        return globalRowStore;
+        return new SparseRowStore(ndx);
 
     }
     

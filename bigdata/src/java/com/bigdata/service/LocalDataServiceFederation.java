@@ -303,6 +303,9 @@ public class LocalDataServiceFederation extends AbstractFederation {
         
     }
 
+    /**
+     * Strengthens the return type.
+     */
     public DataServiceIndex getIndex(String name, long timestamp) {
 
         return (DataServiceIndex) super.getIndex(name, timestamp);

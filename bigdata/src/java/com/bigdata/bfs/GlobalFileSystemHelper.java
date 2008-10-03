@@ -48,6 +48,8 @@ public class GlobalFileSystemHelper {
     private final IIndexManager indexManager;
     
     protected static final transient Logger log = Logger.getLogger(GlobalFileSystemHelper.class);
+
+    protected static final boolean INFO = log.isInfoEnabled();
     
     public GlobalFileSystemHelper(IIndexManager indexManager) {
         
@@ -63,7 +65,7 @@ public class GlobalFileSystemHelper {
      */
     synchronized public BigdataFileSystem getGlobalFileSystem() {
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("");
 
         if (globalRowStore == null) {
@@ -88,7 +90,7 @@ public class GlobalFileSystemHelper {
      */
     public BigdataFileSystem getReadCommitted() {
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("");
 
         return (BigdataFileSystem) indexManager.getResourceLocator().locate(

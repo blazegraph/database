@@ -2,6 +2,7 @@ package com.bigdata.service;
 
 import java.util.concurrent.ExecutionException;
 
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
@@ -41,12 +42,35 @@ public class MetadataIndexCache extends AbstractIndexCache<IMetadataIndex>{
                 
         switch (fed.metadataIndexCachePolicy) {
 
-        case NoCache:
+        case NoCache: { 
+        
             return new NoCacheMetadataIndexView(fed, name, timestamp, mdmd);
+            
+        }
 
-        case CacheAll:
+        case CacheAll: {
 
-            return fed.cacheMetadataIndex(name, timestamp, mdmd);
+            if (timestamp == ITx.UNISOLATED || timestamp == ITx.READ_COMMITTED) {
+
+                /*
+                 * A class that is willing to update its cache if the client
+                 * discovers stale locators.
+                 */
+                
+                return new CachingMetadataIndex(fed, name, timestamp, mdmd);
+
+            } else {
+
+                /*
+                 * A class that caches all the locators. This is used for
+                 * historical reads since the locators can not become stale.
+                 */
+                
+                return new CacheOnceMetadataIndex(fed, name, timestamp, mdmd);
+                
+            }
+            
+        }
 
         default:
             throw new AssertionError("Unknown option: "

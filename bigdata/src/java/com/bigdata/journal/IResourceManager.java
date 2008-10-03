@@ -43,6 +43,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StaleLocatorException;
+import com.bigdata.resources.StaleLocatorReason;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
@@ -198,7 +199,7 @@ public interface IResourceManager extends IServiceShutdown {
      * @return The reason (split, join, or move) -or- <code>null</code> iff
      *         the index partition is not known to be gone.
      */
-    public String getIndexPartitionGone(String name);
+    public StaleLocatorReason getIndexPartitionGone(String name);
 
     /**
      * Statistics about the {@link IResourceManager}.
@@ -282,38 +283,6 @@ public interface IResourceManager extends IServiceShutdown {
      */
     public File getIndexSegmentFile(IndexMetadata indexMetadata);
 
-//    /**
-//     * Return the {@link ILoadBalancerService} that is used to identify under-utilized
-//     * {@link IDataService}s (move targets) and over-utilized
-//     * {@link IDataService}s (move sources).
-//     * 
-//     * @deprecated by {@link #getFederation()}
-//     */
-//    public ILoadBalancerService getLoadBalancerService();
-//    
-//    /**
-//     * Return the {@link IMetadataService} that will be used to assign partition
-//     * identifiers and which will be notified when index partitions are splits,
-//     * moved, etc.
-//     * 
-//     * @deprecated by {@link #getFederation()}
-//     */
-//    public IMetadataService getMetadataService();
-//    
-//    /**
-//     * Return the {@link IDataService} identified by the given service
-//     * {@link UUID}.
-//     * 
-//     * @param serviceUUID
-//     *            The service {@link UUID}.
-//     * 
-//     * @return That {@link IDataService} -or- <code>null</code> if the
-//     *         {@link UUID} does not identify an {@link IDataService}.
-//     * 
-//     * @deprecated by {@link #getFederation()}
-//     */
-//    public IDataService getDataService(UUID serviceUUID);
-    
     /**
      * Return the {@link UUID} of the {@link IDataService} whose resources are
      * being managed.

@@ -34,15 +34,9 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import com.bigdata.btree.ILinearList;
-import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.mdi.IMetadataIndex;
-import com.bigdata.mdi.MetadataIndex;
-import com.bigdata.mdi.MetadataIndexView;
 import com.bigdata.mdi.PartitionLocator;
-import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.service.AbstractScaleOutClient.MetadataIndexCachePolicy;
 import com.bigdata.service.AbstractScaleOutClient.Options;
 
@@ -73,12 +67,10 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
                 .getProperty(Options.METADATA_INDEX_CACHE_POLICY,
                         Options.DEFAULT_METADATA_INDEX_CACHE_POLICY));
 
-        if (INFO) {
-
+        if (INFO)
             log.info(Options.METADATA_INDEX_CACHE_POLICY + "="
                     + metadataIndexCachePolicy);
-            
-        }
+       
         
     }
     
@@ -189,6 +181,22 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
      *       locator cache, so such a cache might be reserved for point tests.
      *       Such point tests are used by the sparse row store for its row local
      *       operations (vs scans) but are less common for JOINs.
+     * 
+     * @todo Just create cache view when MDI is large and then cache on demand.
+     * 
+     * @todo If the {@link IMetadataIndex#get(byte[])} and
+     *       {@link IMetadataIndex#find(byte[])} methods are to be invoked
+     *       remotely then we should return the byte[] rather than the
+     *       de-serialized {@link PartitionLocator} so that we don't
+     *       de-serialize them from the index only to serialize them for RMI and
+     *       then de-serialize them again on the client.
+     * 
+     * @todo the easiest way to handle a scale-out metadata index is to make it
+     *       hash-partitioned (vs range-partitioned). We can just flood queries
+     *       to the hash partitioned index. For the iterator, we have to buffer
+     *       the results and place them back into order. A fused view style
+     *       iterator could be used to merge the iterator results from each
+     *       partition into a single totally ordered iterator.
      */
     public IMetadataIndex getMetadataIndex(String name, long timestamp) {
 
@@ -200,95 +208,7 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
         return getMetadataIndexCache().getIndex(name, timestamp);
          
     }
-
-    /**
-     * Cache the index partition metadata in the client.
-     * 
-     * @param name
-     *            The name of the scale-out index.
-     * 
-     * @return The cached partition metadata -or- <code>null</code> iff there
-     *         is no such scale-out index.
-     * 
-     * FIXME Just create cache view when MDI is large and then cache on demand.
-     * 
-     * @todo the cache should contain de-serialized locators. I work around this
-     * using an LRU cache internal to the {@link MetadataIndexView}.
-     */
-    protected MetadataIndex cacheMetadataIndex(String name, long timestamp,
-            MetadataIndexMetadata mdmd) {
-
-        assertOpen();
-
-        // The UUID of the metadata index.
-        final UUID metadataIndexUUID = mdmd.getIndexUUID();
     
-        /*
-         * Allocate a cache for the defined index partitions.
-         */
-        final MetadataIndex mdi = MetadataIndex.create(//
-                getTempStore(),//
-                metadataIndexUUID,//
-                mdmd.getManagedIndexMetadata()// the managed index's metadata.
-        );
-    
-        /*
-         * Bulk copy the partition definitions for the scale-out index into the
-         * client.
-         * 
-         * Note: This assumes that the metadata index is NOT partitioned and
-         * DOES NOT support delete markers.
-         * 
-         * @todo the easiest way to handle a scale-out metadata index is to
-         * make it hash-partitioned (vs range-partitioned).  We can just flood
-         * queries to the hash partitioned index.  For the iterator, we have to
-         * buffer the results and place them back into order.  A fused view style
-         * iterator could be used to merge the iterator results from each partition
-         * into a single totally ordered iterator.
-         */
-        {
-        
-            long n = 0;
-
-            final ITupleIterator itr = new RawDataServiceTupleIterator(
-                    getMetadataService(),//
-                    MetadataService.getMetadataIndexName(name), //
-                    timestamp,//
-                    true, // readConsistent
-                    null, // fromKey
-                    null, // toKey
-                    0, // capacity
-                    IRangeQuery.KEYS | IRangeQuery.VALS, //
-                    null // filter
-                    );
-        
-            while (itr.hasNext()) {
-
-                final ITuple tuple = itr.next();
-
-                final byte[] key = tuple.getKey();
-
-                final byte[] val = tuple.getValue();
-
-                mdi.insert(key, val);
-                
-                
-                n++;
-
-            }
-            
-            if(INFO) {
-                
-                log.info("Copied "+n+" locator records: name="+name);
-                
-            }
-            
-        }
-
-        return mdi;
-    
-    }
-
     /**
      * Return <code>true</code>.
      */

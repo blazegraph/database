@@ -609,7 +609,8 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
                     scaleOutIndexName, oldLocator, newLocator);
             
             // will notify tasks that index partition has moved.
-            resourceManager.setIndexPartitionGone(getOnlyResource(), "move");
+            resourceManager.setIndexPartitionGone(getOnlyResource(),
+                    StaleLocatorReason.Move);
             
             // notify successful index partition move.
             resourceManager.moveCounter.incrementAndGet();

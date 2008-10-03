@@ -308,131 +308,6 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
         return taskCounters;
 
     }
- 
-//    /**
-//     * Counters that aggregate across all instances of the same task submitted
-//     * by the client against the connected federation. Those counters are
-//     * sampled by a {@link QueueStatisticsTask} and reported by the client to
-//     * the {@link ILoadBalancerService}.
-//     */
-//    private final Map<Class, TaskCounters> taskCountersByProc = new HashMap<Class, TaskCounters>();
-//
-//    /**
-//     * Counters that aggregate across all tasks submitted by the client against
-//     * a given scale-out index for the connected federation. Those counters are
-//     * sampled by a {@link QueueStatisticsTask} and reported by the client to
-//     * the {@link ILoadBalancerService}.
-//     */
-//    private final Map<String, TaskCounters> taskCountersByIndex = new HashMap<String, TaskCounters>();
-//    
-//    /**
-//     * Returns the {@link TaskCounters} instance that is used to track
-//     * statistics for the {@link #getThreadPool()} for instances of the given
-//     * procedure. The {@link TaskCounters} will be sampled by a
-//     * {@link QueueStatisticsTask} and the sampled data reported by the client
-//     * to the {@link ILoadBalancerService}.
-//     * 
-//     * @param procedure
-//     *            A procedure.
-//     */
-//    synchronized public TaskCounters getTaskCounters(IIndexProcedure procedure) {
-//
-//        if (procedure == null)
-//            throw new IllegalArgumentException();
-//
-//        final Class cls = procedure.getClass();
-//
-//        TaskCounters taskCounters = taskCountersByProc.get(cls);
-//
-//        if (taskCounters == null) {
-//
-//            taskCounters = new TaskCounters();
-//
-//            taskCountersByProc.put(cls, taskCounters);
-//            
-//            final long initialDelay = 0; // initial delay in ms.
-//            final long delay = 1000; // delay in ms.
-//            final TimeUnit unit = TimeUnit.MILLISECONDS;
-//            
-//            final String relpath = "Thread Pool" + ICounterSet.pathSeparator
-//                    + "procedure" + ICounterSet.pathSeparator + cls.getName();
-//    
-//            if(log.isInfoEnabled()) log.info("Adding counters: relpath="+relpath);
-//            
-//            final QueueStatisticsTask queueStatisticsTask = new QueueStatisticsTask(
-//                    relpath, threadPool, taskCounters);
-//            
-//            addScheduledStatisticsTask(queueStatisticsTask, initialDelay,
-//                    delay, unit);
-//
-//            assert clientRoot != null;
-//            
-//            queueStatisticsTask.addCounters(clientRoot.makePath(relpath));
-//
-//        }
-//
-//        return taskCounters;
-//
-//    }
-//    
-//    /**
-//     * Returns the {@link TaskCounters} instance that is used to track
-//     * statistics for the {@link #getThreadPool()} the given scale-out index.
-//     * The {@link TaskCounters} will be sampled by a {@link QueueStatisticsTask}
-//     * and the sampled data reported by the client to the
-//     * {@link ILoadBalancerService}.
-//     * <p>
-//     * Note: This aggregates across all operations against the scale-out index
-//     * by this client regardless of whether they are {@link ITx#UNISOLATED},
-//     * {@link ITx#READ_COMMITTED}, historical reads, or tasks isolated by a
-//     * transaction.
-//     * 
-//     * @param ndx
-//     *            A procedure.
-//     * 
-//     * @todo it might be nice to break this out into the three services against
-//     *       which those tasks will be run by the data service (the unisolated,
-//     *       read-only, and transaction services).
-//     */
-//    synchronized public TaskCounters getTaskCounters(ClientIndexView ndx) {
-//
-//        if (ndx == null)
-//            throw new IllegalArgumentException();
-//
-//        final String name = ndx.getName();
-//
-//        TaskCounters taskCounters = taskCountersByIndex.get(name);
-//
-//        if (taskCounters == null) {
-//
-//            taskCounters = new TaskCounters();
-//
-//            taskCountersByIndex.put(name, taskCounters);
-//            
-//            final long initialDelay = 0; // initial delay in ms.
-//            final long delay = 1000; // delay in ms.
-//            final TimeUnit unit = TimeUnit.MILLISECONDS;
-//
-//            final String relpath = "Thread Pool" + ICounterSet.pathSeparator
-//                    + "index" + ICounterSet.pathSeparator + name;
-//            
-//            if(log.isInfoEnabled()) log.info("Adding counters: relpath="+relpath);
-//            
-//            final QueueStatisticsTask queueStatisticsTask = new QueueStatisticsTask(
-//                    relpath, threadPool, taskCounters);
-//            
-//            addScheduledStatisticsTask(queueStatisticsTask, initialDelay,
-//                    delay, unit);
-//
-//            assert clientRoot != null;
-//
-//            queueStatisticsTask.addCounters(clientRoot.makePath(relpath));
-//
-//        }
-//
-//        return taskCounters;
-//
-//    }
     
     /**
      * Collects interesting statistics on the client's host and process
@@ -704,9 +579,12 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
     /**
      * Return the cache for {@link IIndex} objects.
      */
-    abstract protected AbstractIndexCache<? extends IIndex> getIndexCache();
+    abstract protected AbstractIndexCache<? extends IClientIndex> getIndexCache();
     
-    public IIndex getIndex(String name,long timestamp) {
+    /**
+     * Applies an {@link AbstractIndexCache} and strengthens the return type.
+     */
+    public IClientIndex getIndex(String name, long timestamp) {
 
         if (INFO)
             log.info("name="+name+" @ "+timestamp);

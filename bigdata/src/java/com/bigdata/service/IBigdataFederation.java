@@ -28,7 +28,6 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
@@ -253,7 +252,7 @@ public interface IBigdataFederation extends IIndexManager {
      * 
      * @return The index or <code>null</code> if the index does not exist.
      */
-    public IIndex getIndex(String name, long timestamp);
+    public IClientIndex getIndex(String name, long timestamp);
     
     /**
      * Return <code>true</code> iff the federation supports scale-out indices

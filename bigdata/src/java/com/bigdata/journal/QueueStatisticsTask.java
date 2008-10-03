@@ -27,6 +27,10 @@ import com.bigdata.counters.Instrument;
 public class QueueStatisticsTask implements Runnable {
 
     protected static final Logger log = Logger.getLogger(QueueStatisticsTask.class);
+
+    protected static final boolean INFO = log.isInfoEnabled();
+    
+    protected static final boolean DEBUG = log.isDebugEnabled();
     
     /**
      * The service that is being monitored.
@@ -347,7 +351,8 @@ public class QueueStatisticsTask implements Runnable {
      *            The weight to be used by
      *            {@link #getMovingAverage(double, double, double)}
      */
-    public QueueStatisticsTask(String name, ThreadPoolExecutor service, TaskCounters taskCounters, double w) {
+    public QueueStatisticsTask(String name, ThreadPoolExecutor service,
+            TaskCounters taskCounters, double w) {
     
         assert name != null;
         
@@ -593,7 +598,7 @@ public class QueueStatisticsTask implements Runnable {
             if (nsamples % period == 0) {
 
                 // todo log all counter values using counterSet.asXML()?
-                if(log.isInfoEnabled())
+                if(INFO)
                 log.info(name + ":\naverageQueueLength=" + averageQueueLength
                         + " (activeCountAverage=" + averageActiveCount
                         + ",queueSizeAverage=" + averageQueueSize
