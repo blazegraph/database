@@ -30,6 +30,9 @@ package com.bigdata;
 
 import java.util.Date;
 
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+
 /**
  * Class has a static method which writes a copyright banner on stdout once per
  * JVM. This method is invoked from several core classes in order to ensure that
@@ -50,6 +53,20 @@ public class Banner {
          
             didBanner = true;
             
+            final Logger log = Logger.getLogger("com.bigdata");
+
+            if (log.getLevel() == null) {
+
+                /*
+                 * Since there is no default for com.bigdata, default to WARN.
+                 */
+                
+                log.setLevel(Level.WARN);
+
+                log.warn("Defaulting log level to WARN: "+log.getName());
+
+            }
+
         }
         
     }
