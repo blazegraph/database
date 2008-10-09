@@ -156,24 +156,34 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
         }
 
-        // lock is only for the named relation.
+        // test cache.
+        T resource = get(namespace, timestamp);
+
+        if (resource != null) {
+
+            if (DEBUG)
+                log.debug("cache hit: " + resource);
+
+            // cache hit.
+            return resource;
+
+        }
+        
+        /*
+         * Since there was a cache miss, acquire a lock the named relation so
+         * that the locate + cache.put sequence will be atomic.
+         */
         final Lock lock = namedLock.acquireLock(namespace);
 
         try {
 
-            // test cache.
-            T resource = get(namespace, timestamp);
+            // test cache now that we have the lock.
+            resource = get(namespace, timestamp);
 
             if (resource != null) {
 
-                if (DEBUG) {
-
+                if (DEBUG)
                     log.debug("cache hit: " + resource);
-                    
-//                    System.err.println("cache hit: namespace=" + namespace + ", timestamp="
-//                        + timestamp);
-
-                }
 
                 return resource;
 

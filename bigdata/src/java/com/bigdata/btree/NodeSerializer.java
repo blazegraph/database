@@ -1052,7 +1052,8 @@ public class NodeSerializer {
         if (n == 0)
             return;
 
-        final OutputBitStream obs = new OutputBitStream(os, 0/* unbuffered! */);
+        final OutputBitStream obs = new OutputBitStream(os,
+                0/* unbuffered! */, false/* reflectionTest */);
 
         for (int i = 0; i < n; i++) {
 
@@ -1081,7 +1082,8 @@ public class NodeSerializer {
         if (n == 0)
             return;
 
-        final InputBitStream ibs = new InputBitStream((InputStream) is, 0/* unbuffered! */);
+        final InputBitStream ibs = new InputBitStream((InputStream) is,
+                0/* unbuffered! */, false/* reflectionTest */);
 
         for (int i = 0; i < n; i++) {
 

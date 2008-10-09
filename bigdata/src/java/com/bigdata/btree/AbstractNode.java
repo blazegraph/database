@@ -49,7 +49,7 @@ import cutthecrap.utils.striterators.Striterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public abstract class AbstractNode extends PO implements IAbstractNode,
+public abstract class AbstractNode<T extends AbstractNode> extends PO implements IAbstractNode,
         IAbstractNodeData {
 
     /**
@@ -80,7 +80,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected static boolean DEBUG = log.isInfoEnabled();
+    final protected static boolean DEBUG = log.isDebugEnabled();
 
     /**
      * The BTree.
@@ -159,6 +159,17 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      */
     protected Reference<Node> parent = null;
 
+    /**
+     * <p>
+     * A {@link Reference} to this {@link Node}. This is created when the node
+     * is created and is reused by a children of the node as the
+     * {@link Reference} to their parent. This results in few {@link Reference}
+     * objects in use by the B+Tree since it effectively provides a canonical
+     * {@link Reference} object for any given {@link Node}.
+     * </p>
+     */
+    protected final Reference<T> self;
+    
     /**
      * The #of times that this node is present on the {@link HardReferenceQueue} .
      * This value is incremented each time the node is added to the queue and is
@@ -295,6 +306,9 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
 
         this.branchingFactor = branchingFactor;
 
+        // reference to self: reused to link parents and children.
+        this.self = (Reference<T>)btree.newRef(this);
+        
         /*
          * Compute the minimum #of children/values. this is the same whether
          * this is a Node or a Leaf.
@@ -347,7 +361,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      * @param src
      *            The source node.
      */
-    protected AbstractNode(AbstractNode src) {
+    protected AbstractNode(AbstractNode<T> src) {
 
         /*
          * Note: We do NOT clone the base class since this is a new

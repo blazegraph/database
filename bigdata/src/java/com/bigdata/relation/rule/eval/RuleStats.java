@@ -280,20 +280,21 @@ public class RuleStats {
     public final IKeyOrder[] keyOrder;
     
     /**
+     * The predicated range counts for each predicate in the body of the rule
+     * (in the order in which they were declared, not the order in which they
+     * were evaluated) as reported by the {@link IRangeCountFactory}. The range
+     * counts are used by the {@link IEvaluationPlan}. You can compare the
+     * {@link #elementCount}s with the {@link #rangeCount}s to see the actual
+     * vs predicated #of elements visited per predicate.
+     */
+    public final long[] rangeCount;
+    
+    /**
      * The #of chunks materialized for each predicate in the body of the rule
      * (in the order in which they were declared, not the order in which they
      * were evaluated).
      */
     public final long[] chunkCount;
-    
-    /**
-     * The #of subqueries examined for each predicate in the rule (in the order
-     * in which they were declared, not the order in which they were evaluated).
-     * While there are N indices for a rule with N predicates, we only evaluate
-     * a subquery for N-1 predicates so at least one index will always be
-     * zero(0).
-     */
-    public final int[] subqueryCount;
     
     /**
      * The #of elements considered for each predicate in the body of the rule
@@ -303,14 +304,13 @@ public class RuleStats {
     public final long[] elementCount;
 
     /**
-     * The predicated range counts for each predicate in the body of the rule
-     * (in the order in which they were declared, not the order in which they
-     * were evaluated) as reported by the {@link IRangeCountFactory}. The range
-     * counts are used by the {@link IEvaluationPlan}. You can compare the
-     * {@link #elementCount}s with the {@link #rangeCount}s to see the actual
-     * vs predicated #of elements visited per predicate.
+     * The #of subqueries examined for each predicate in the rule (in the order
+     * in which they were declared, not the order in which they were evaluated).
+     * While there are N indices for a rule with N predicates, we only evaluate
+     * a subquery for N-1 predicates so at least one index will always be
+     * zero(0).
      */
-    public final long[] rangeCount;
+    public final int[] subqueryCount;
     
     /**
      * Returns the headings.
@@ -342,18 +342,18 @@ public class RuleStats {
      * <dt>keyOrder</dt>
      * <dd>The {@link IKeyOrder} for the predicate(s) in the rule. Basically,
      * this tells you which index was used for each predicate.</dd>
-     * <dt>chunkCount</dt>
-     * <dd>The #of chunks that were generated for the left-hand side of the
-     * JOIN for each predicate in the tail of the rule.</dd>
-     * <dt>subqueryCount</dt>
-     * <dd>The #of subqueries issued for the right-hand side of the JOIN for
-     * each predicate in the tail of the rule.</dd>
-     * <dt>elementCount</dt>
-     * <dd>The #of elements that were actually visited for each tail predicate
-     * in the rule.</dd>
      * <dt>rangeCount</dt>
      * <dd>The #of elements predicated for each tail predicate in the rule by
      * the {@link IRangeCountFactory} on behalf of the {@link IEvaluationPlan}.</dd>
+     * <dt>chunkCount</dt>
+     * <dd>The #of chunks that were generated for the left-hand side of the
+     * JOIN for each predicate in the tail of the rule.</dd>
+     * <dt>elementCount</dt>
+     * <dd>The #of elements that were actually visited for each tail predicate
+     * in the rule.</dd>
+     * <dt>subqueryCount</dt>
+     * <dd>The #of subqueries issued for the right-hand side of the JOIN for
+     * each predicate in the tail of the rule.</dd>
      * <dt>tailIndex</dt>
      * <dd>The index in which the tail predicate(s) for rule were declared for
      * the rule. This information is present iff
@@ -381,7 +381,7 @@ public class RuleStats {
      
         return "rule, elapsed"
                 + ", solutionCount, solutions/sec, mutationCount, mutations/sec"
-                + ", evalOrder, keyOrder, subqueryCount, chunkCount, elementCount, rangeCount"
+                + ", evalOrder, keyOrder, rangeCount, chunkCount, elementCount, subqueryCount"
                 + ", tailIndex, tailPredicate"
         ;
         
@@ -450,10 +450,10 @@ public class RuleStats {
             
             sb.append(", "+(titles?"evalOrder=":"")+q+toString(evalOrder)+q);
             sb.append(", "+(titles?"keyOrder=":"")+q+toString(keyOrder)+q);
-            sb.append(", "+(titles?"subqueryCount=":"")+q+toString(subqueryCount)+q);
+            sb.append(", "+(titles?"rangeCount=":"")+q+ toString(rangeCount)+q);
             sb.append(", "+(titles?"chunkCount=":"")+q+ toString(chunkCount)+q);
             sb.append(", "+(titles?"elementCount=":"")+q+ toString(elementCount)+q);
-            sb.append(", "+(titles?"rangeCount=":"")+q+ toString(rangeCount)+q);
+            sb.append(", "+(titles?"subqueryCount=":"")+q+toString(subqueryCount)+q);
 
             } else {
                 
@@ -472,10 +472,10 @@ public class RuleStats {
                     sb.append(", "+orderIndex);
                     
                     sb.append(", "+keyOrder[i]);
-                    sb.append(", "+subqueryCount[i]);
+                    sb.append(", "+rangeCount[i]);
                     sb.append(", "+chunkCount[i]);
                     sb.append(", "+elementCount[i]);
-                    sb.append(", "+rangeCount[i]);
+                    sb.append(", "+subqueryCount[i]);
                     
                     sb.append(", "+i);
                     
@@ -700,13 +700,13 @@ public class RuleStats {
 
                 // Note: order[] is NOT aggregated.
 
-                chunkCount[i] += o.chunkCount[i];
+                rangeCount[i] += o.rangeCount[i];
 
-                subqueryCount[i] += o.subqueryCount[i];
+                chunkCount[i] += o.chunkCount[i];
 
                 elementCount[i] += o.elementCount[i];
 
-                rangeCount[i] += o.rangeCount[i];
+                subqueryCount[i] += o.subqueryCount[i];
 
             }
             

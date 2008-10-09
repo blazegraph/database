@@ -692,7 +692,8 @@ public class IndexSegment extends AbstractBTree {
 
                     // no more leaves.
 
-                    log.info("No more leaves");
+                    if(INFO)
+                        log.info("No more leaves");
                     
                     return null;
                     
@@ -709,7 +710,8 @@ public class IndexSegment extends AbstractBTree {
 
                     // no more leaves.
 
-                    log.info("No more leaves");
+                    if(INFO)
+                        log.info("No more leaves");
                     
                     return null;
                     
