@@ -698,7 +698,7 @@ public class ResultSet implements Externalizable {
 
 //                if(writebits) {
                 final InputBitStream ibs = new InputBitStream((InputStream) in,
-                        0/* unbuffered! */);
+                        0/* unbuffered! */, false/* reflectionTest */);
 
                 // @todo ibs.read() does not handle ntuples==0 gracefully.
 
@@ -823,7 +823,7 @@ public class ResultSet implements Externalizable {
             
 //            if(writebits) {
             final OutputBitStream obs = new OutputBitStream((OutputStream) out,
-                    0/* unbuffered! */);
+                    0/* unbuffered! */, false/*reflectionTest*/);
             
 //            obs.write(deleteMarkers, ntuples/*len*/);
             

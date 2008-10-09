@@ -566,7 +566,8 @@ abstract public class AbstractKeyArrayIndexProcedure extends
         public void readExternal(ObjectInput in) throws IOException,
                 ClassNotFoundException {
 
-            InputBitStream ibs = new InputBitStream((InputStream) in,0/*unbuffered*/);
+            final InputBitStream ibs = new InputBitStream((InputStream) in,
+                    0/* unbuffered */, false/* reflectionTest */);
 
             n = ibs.readNibble();
             
@@ -582,7 +583,8 @@ abstract public class AbstractKeyArrayIndexProcedure extends
 
         public void writeExternal(ObjectOutput out) throws IOException {
 
-            final OutputBitStream obs = new OutputBitStream((OutputStream) out,0/*unbuffered!*/);
+            final OutputBitStream obs = new OutputBitStream((OutputStream) out,
+                    0/* unbuffered! */, false/*reflectionTest*/);
 
             obs.writeNibble(n);
             

@@ -29,6 +29,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.text.NumberFormat;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.io.FileChannelUtility;
@@ -51,6 +52,9 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
      * Log for btree opeations.
      */
     protected static final Logger log = Logger.getLogger(AbstractBufferStrategy.class);
+    
+    protected static final boolean WARN = log.getEffectiveLevel().toInt() <= Level.WARN
+            .toInt();
     
     protected static final boolean INFO = log.isInfoEnabled();
     
@@ -313,7 +317,8 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
              * overflows the in-memory buffer onto the disk.
              */
 
-            log.warn("Would exceed maximumExtent="+maximumExtent);
+            if(WARN)
+                log.warn("Would exceed maximumExtent="+maximumExtent);
 
             return false;
             

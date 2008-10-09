@@ -36,8 +36,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInput;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.journal.Name2Addr;
 
 /**
@@ -52,7 +50,7 @@ import com.bigdata.journal.Name2Addr;
  */
 public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
 
-    protected static Logger log = Logger.getLogger(DataOutputBuffer.class);
+//    protected static Logger log = Logger.getLogger(DataOutputBuffer.class);
     
     /**
      * Uses {@link ByteArrayBuffer#DEFAULT_INITIAL_CAPACITY}.

@@ -90,6 +90,42 @@ Notes on store level record checksums and record compression.
     public final boolean getUseChecksum() {return useChecksum;}
 
 ============================================================
+Consider a RW store variant.
+
+  A read-write store would be useful for scale-up deployments where
+  access to historical commit points is not required.  If you require
+  access to historical commit points, then a read-write store will not
+  satisify since it will release the storage associated with deleted
+  records no later than the commit point.
+
+  Only the WORM allows access to those historical commit points.  This
+  places a RW store somewhat at odds with the rest of the bigdata
+  architecture since we presume that operations read based on a commit
+  time and that the commit time can be mapped onto a commit point.
+  
+  Regardless, a read-write store would use bit maps for allocations.
+  The handles to the bit maps could be stored in the root block addrs.
+  Deletes would be automatic for B+Tree nodes and leaves and in the
+  hands of the application for low-level record writes.
+
+  Each allocation block would handle records in a certain size range.
+  E.g., LT 512, LT 1024, LT 4096, etc.  The block sizes will tend to
+  be fairly large since records are nearly always B+Tree nodes or
+  leaves.  (It may be possible to dynamically determine the best set
+  of block sizes).
+
+  For a given block size, we probably need a chain of allocation
+  blocks.  This is necessary to handle on the one handle widely
+  varying #s of allocations by block size and on the other to not
+  place a limit on how many allocations there may be of a given block
+  size.  This also lets us keep down the size of the allocation block
+  and hence the amount of metadata that needs to be written on each
+  commit.
+
+  The root block could just hold the addr of the allocation block
+  chains record.  
+
+============================================================
 
     - Tune indices
 
@@ -175,6 +211,37 @@ Notes on store level record checksums and record compression.
 
 	 BigdataMap and BigdataSet will not scale-out until this issue
 	 is resolved.
+
+============================================================
+Lock contention
+
+There are two places where we get a modest amount of lock contention,
+based on -Djrockit.lockprofiling=true.
+
+ - Node#getChild(int)
+
+   This is the gateway for access to child nodes.  It currently uses
+   double-checked locking to avoid synchronization when the desired
+   child is already available.  If the child needs to be read from the
+   disk then the threads are synchronized in order to prevent
+   concurrent requests from reading the same record, deserializing the
+   node or leaf, and then entering different references for that node
+   or leaf into the childRefs[].
+
+   We could allow concurrent resolution of a child that is not in
+   memory if we used an AtomicReference[] and stored the weak
+   references in that and using an atomic operation to set the
+   reference iff it was not already set.  This would require code
+   changes everywhere we use childRefs[] and it is a long shot that
+   this would improve performance at all.
+
+ - DiskOnlyStrategy#reopenChannel().  Contention here arises when an
+   interrupt is recognized during an IO operation and the file channel
+   is closed.  Readers will transparently re-open the channel, but
+   they all want to do so at once which causes contention for this
+   method.  I don't see anyway to improve on this off hand.
+
+============================================================
 
     - Distributed file repository
 
@@ -525,17 +592,22 @@ Short term tasks:
        index partitions.  Also, provide some aggregation over the MDI,
        including the total #of partitions and tuples.
 
-     - The counters are overflowing to days before midnight.  Check
-       the locale and see when timestamp causes an overflow to the
-       next hour and the next day in some unit tests.
-
      - Done. When restoring the LBS counters from XML, the history on
        the counters is being ignored.
 
-     - (****) Make it possible to have more than 60 minutes in the
+     - (**) Make it possible to have more than 60 minutes in the
        buffer but still overflow after 60 minutes onto the hours.
        This will allow a longer reachback at a given level of
        aggregation.
+
+       - The counters are overflowing to days before midnight.  Check
+         the locale and see when timestamp causes an overflow to the
+         next hour and the next day in some unit tests.
+
+         It seems that I get at most 10 hours before the hours start
+         to roll over.
+
+       - Add option to report only minutes, hours, days, etc.
 
      - Add UI elements to set the filter(s), depth, decimalFormat,
        etc.  These should be a FORM with a GET action.
@@ -933,6 +1005,45 @@ Short term tasks:
 
        - Done. Analyzers are not thread-safe.
 
+       - Make prefix match an optional feature (e.g., support exact
+         match queries).
+
+Write unit tests for search that verify prefix matching.
+
+brown:
+[43, 75, 69, 85, 67, 32, 127, -6,     : -128, 0, 0, 0, 0, 0, 0, 0, -128, 0, 0, 0]
+browns: 
+[43, 75, 69, 85, 67, 77, 32, 127, -7, : -128, 0, 0, 0, 0, 0, 0, 0, -128, 0, 0, 0]
+successor(brown):
+[43, 75, 69, 85, 68, 32, 127, -6,     : -128, 0, 0, 0, 0, 0, 0, 0, -128, 0, 0, 0]
+successor(brown\0):
+[43, 75, 69, 85, 68, 32, 127, -7,     : -128, 0, 0, 0, 0, 0, 0, 0, -128, 0, 0, 0]
+
+junit.framework.AssertionFailedError: cmp=1,
+a=[43, 75, 69, 85, 67, 32, 127, 250, 128, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0],
+b=[43, 75, 69, 85, 67, 32, 127, 249, 128, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0]
+
+
+Modify search so that prefix matching can be enabled or disabled on a
+per-query basis.
+
+       - Make the fieldId an optional feature.  It is not used by the
+         RDF DB.  Since we do not support suffix compression, that is
+         4 bytes of unused space for every single indexed term in each
+         literal.
+
+       - Do not re-index terms found in the forward index?  This is
+         definately faster but it lacks the robust guarentee of the
+         unisolated write pattern (all clients write on both all
+         indices to guarentee consistent index states).
+
+       - Make sure that we do not re-write an index entry if it
+         exists.
+
+       - Make sure that we are indexing terms with all possible
+         parallelism as it otherwise adds unwanted latency for the
+         single threaded data loader.
+
        - Compare performance with lucene and mg4j on indexing and
          search, at least for the RDF DB application.
 
@@ -983,8 +1094,6 @@ Short term tasks:
           path first}].  I could also copy the classpath resources,
           but presumably they will be fetched quickly enough and
           become stable - or maybe not?
-
-	- (***) Get clusterondemand account.
 
 	- Support downloadable code in the configuration, including a
           an optional security model.
@@ -1471,9 +1580,9 @@ JF-U100-host23-2DS:  ******** RUNNING NOW *********
       does not become a bottleneck since the current implementation is
       NOT caching.
 
-    * Verify that we use read-committed or read-historical operations
-      whenever possible (e.g., for asynchronous overflow processing,
-      joins, metadata service reads, etc).
+    * Verify that we use read-historical operations whenever possible
+      (e.g., for asynchronous overflow processing, joins, metadata
+      service reads, etc).
 
     - Should report the #of tasks, action on each index, and the
       duration of overflow processing for each event, but that event
@@ -1635,10 +1744,6 @@ JF-U100-host23-2DS:  ******** RUNNING NOW *********
      indices it maintains for the resources that is is managing.
 
  - Resource locators
-
-   - Finish the TestDefaultResourceLocator
-
-   - Address issue with read-committed BTree views.
 
    - Tune the default LRU cache capacity for the resource locator.  It
      is currently 10.  A larger value would be nice, but there needs
@@ -1830,6 +1935,10 @@ Snapshot release:
   - Move the ant build to the bigdata module and also the startup kit
     and its documentation.
 
+  - update with guide to service setup
+
+    http://bigdata.wiki.sourceforge.net/GettingStarted
+
 ============================================================
 
   - (defer) Optimize by assigning variables in a rule a positional
@@ -1843,13 +1952,6 @@ Snapshot release:
   - performance testing for owl:sameAs processing at scale.
 
 ============================================================
-
-x. Full text index performance.
-
-   - Do not re-index terms found in the forward index?  This is
-     definately faster but it lacks the robust guarentee of the
-     unisolated write pattern (all clients write on both all indices
-     to guarentee consistent index states).
 
 x. GOM style "rows" for IRelation yeilding schema flexible JOINs.
    Could even just use GOM for this, but I would also have to extend
@@ -2066,11 +2168,6 @@ Caused by: java.lang.RuntimeException: Child is not persistent: index=6
      up being a lot smaller than 20k for most joins and will help to
      reduce allocation that drives GC in the nursery.
 
-   - bigdata-rdf/embedded federation test suite has errors.  Mostly
-     can't find 'testXX' lexicon.  Also some in TestTruthMaintenance
-     for LocalDataServiceFederation - maybe the problem with
-     read-committed BTree semantics?
-
    ** reduce byte[] allocation for DoNotAddFilter. It is
       single-threaded in use, other than the instance on the
       InferenceEngine.  It could copy the key out of the KeyBuilder
@@ -2084,45 +2181,6 @@ Caused by: java.lang.RuntimeException: Child is not persistent: index=6
 (76% 1413) com.bigdata.rdf.axioms.BaseAxioms.isAxiom [BaseAxioms.java:354]
 (100% 1413) com.bigdata.rdf.rules.DoNotAddFilter.accept [DoNotAddFilter.java:117]
 (100% 1413) com.bigdata.rdf.rules.DoNotAddFilter.accept [DoNotAddFilter.java:1]
-
-  ** Read-committed semantics for BTree are broken.  The
-     read-committed view of the BTree does not automatically update
-     after a commit.  This has consequences throughout the system,
-     including in the DefaultResourceLocator and IndexManager, since
-     we can not cache the read-committed BTree object as it becomes
-     stale after every commit.
-
-     Could have ReadCommitted BTree variant that was notified of (or
-     simply noticed) commits and re-loaded itself from the new
-     checkpoint.  This could be done in getRoot() and in a few
-     additional methods that return fields (index metadata,
-     entryCount, etc).
-
-     Could also lookup the last commit time (or the last closure time)
-     and use that timestamp rather than specifying READ_COMMITTED.
-
-     Could copy over the root reference and clean nodes / leaves from
-     the hard reference queue of the most recently committed
-     unisolated view of the btree.  This would reduce the need to
-     re-read and de-serialize those data from the disk.  We can't keep
-     anything from the read-committed BTree's hard reference queue
-     since nodes and leaves may have been written and flushed by the
-     unisolated view and no longer exist on the queue but have still
-     been modified since the read-committed view.
-
-     - DefaultResourceLocator should cache read-committed resource
-       views.
-
-     - IndexManager should cache read-committed IIndex views.
-
-     - AbstractTripleStore#asReadCommittedView() is broken for the
-       LocalTripleStore as a result of this issue.  This also effects
-       the BigdataSail and
-       com.bigdata.rdf.store.TestLocalTripleStoreTransactionSemantics.
-       The problem is that the BTrees are not truely read-committed
-       views.  They are views as of the last commit time.  However
-       asReadCommittedView() is a singleton so the view never
-       advances.
 
 ** Concurrent programming and Java.
 
@@ -2140,6 +2198,10 @@ x. *** Get 1-2B scaling numbers on the DPP cluster for DaveL and post
          closure and more join optimizations (for JDS closure and
          query).
 
+       * Setup on Amazon E2C: http://aws.amazon.com/ec2/
+
+       * Setup on clusterondemand: http://www.clusterondemand.com/
+
        * Increase the journal chunk size (config files) and split
          point (done).
 
@@ -2152,18 +2214,10 @@ x. *** Get 1-2B scaling numbers on the DPP cluster for DaveL and post
 
        - First, load lubm with RDFS++ closure.
 
-	    - Without compression this will have to be on more than
-	      one machine or using NAS.
-
 	    - Without overflow processing the triple store will take
               up more space due to the WORM nature of the store.
 
-	    * leading prefix compress can help to compenate for this,
-              but it has not been implemented yet.
-
        - Then run LUBM benchmarks
-       
-            - Done: rewrite Sesame2 queries to native JOINs.
 
        Do this for U100, U1000, and U8000 on one machine and then for
        the same data sets on three machines using MONOLITHIC indices.
@@ -2324,6 +2378,10 @@ Reduce GC drivers for U1000
       allocation where they are compacted and/or reallocated only as
       required.
 
+    - Try out a java-specific profiler:
+
+      http://www.yourkit.com/
+
   - Size chunks by expected end result cardinality for subqueries
     (this is a bit difficult to get right).
 
@@ -2364,30 +2422,6 @@ Reduce GC drivers for U1000
   makes the index metadata unavailable during read-only runs, such as
   the lubm benchmark.
 
-* There is a lot of reading on the globalRowStore.  This is all
-  related to locating the TripleStore resource and its contained
-  SPORelation and LexiconRelations.
-
-  (a) We do not read against the appropriate (historical) view of the
-      global row store.  We need to obtain that view from the
-      federation, which can only return the current view.
-
-  (b) We do not cache recently read property sets for historical reads
-     (because we are always doing read-committed property set reads).
-
-  (c) We should read the properties sets for the container
-      (tripleStore) and all contained resources (lexicon, text index,
-      and spo relation) from the property store using a single
-      operation.  Use a logical row scan to build up the property set
-      for these resources in one go and then return the appropriate
-      layered Properties object on request.  (We need to layer the
-      property sets so that you can override properties on a contained
-      resource, but in fact the contained resources that we are using
-      always have exactly the same property set as their container,
-      which is a bit of redundency that we don't really need.)
-
-  (d) Defer. We should recognize unknown properties, much like log4j.
-
 * Did not handle disk full gracefully. Force client disconnect?
 
 * 1st presentation of query 2 is very slow on U50 and used nearly NO
@@ -2419,6 +2453,12 @@ Reduce GC drivers for U1000
   -9 fixed this).  Seeing "object not in table" errors during
   concurrent data load.  This causes the load to fail.
 
+- bigdata-rdf/embedded federation test suite has errors.  Mostly can't
+  find 'testXX' lexicon.  This appears to be a test harness issue or
+  perhaps an issue with how AbstractTripleStore#destroy() is
+  written. The problem shows up during tear down of the test.  The
+  problem does not show up for the LDS, just EDS.
+
 ============================================================
 
 New priorities:
@@ -2426,16 +2466,11 @@ New priorities:
     - improve JDS closure and query performance (latency, per above;
       serialization costs; etc).
 
-    - search
+      - Try jrockit for RMI in scale-out runs.
 
-      - Examine costs and performance for full text search.  Compare
-        with use of Lucene native or m4gj native indexing and search.
-        These might be far better.
-
-      - magic predicate search and magic predicate prefix search
-        (beginsWith).  These can be written using expanders or program
-        rewrites (the way the match rule for the extractors is
-        handled).
+      - Examine impact of RemoteChunkedIterator#finalize() for
+        scale-out runs.  It's possible that this has been driving GC
+        costs.
 
     - Generalize rule evaluation for foreign key joins.
 
@@ -2449,6 +2484,20 @@ New priorities:
 
     - Add by task reporting of performance counters (#of invocations,
       time, and RMI latency if available).
+
+      Counters that aggregate across all instances of the same type of
+      task submitted by the client against some service.  There needs
+      to be some handshaking with the service that is executing the
+      task in order for this data to be collected.  E.g., in
+      beforeExecute() and afterExecute().  Those methods need to track
+      a subset of timing data by the Class of the task that is being
+      executed.  The resulting Map<Class,TaskCounters> needs to be
+      reported out by the client along with the rest of the counters
+      collected for that service (reported by the
+      QueueStatisticsTask).
+     
+      private final Map<Class, TaskCounters> taskCountersByProc = new
+      HashMap<Class, TaskCounters>();
 
     - Native rule ORDER_BY support (custom IKeyBuilderFactory).
       Verify that a descending sort order is accomplished by the
@@ -2469,7 +2518,9 @@ New priorities:
   - Map/reduce processing:
 
     * Parallel KB load (CDL refactor).  Allows easy distribution of
-      the load tasks across a federation.
+      the load tasks across a federation.  Alternatively, consider as
+      a proper map/reduce job, but they we have to run all kinds of
+      services everywhere.
 
     - harvest and extractor.
 
@@ -2499,7 +2550,8 @@ New priorities:
       new data set, which is similar to how scale-out text indices are
       built.)
 
-    - Test w/ APSTARs data set (incremental loads).
+    - Test w/ incremental load data set, e.g., LUBM, or other with
+      owl:sameAs also.
 
     * Review performance for sameAs processing during query.  Note
       that transitive for owl:same1b was moved to forward closure.
@@ -2536,6 +2588,19 @@ New priorities:
 
     - Try a performance curve for a single-host run.
 
+    - (***) Average task queuing time for the client may be
+      under-reported due to the rejected tasks.  If those rejected
+      tasks are being reported with their execution time, which will
+      be extremely short, then they can make it essentially impossible
+      to see the time that the tasks that are running are actually
+      running.  In order to diagnose this I need to figure out whether
+      the rejected tasks are being reported by the queue statistics.
+      if so, then they may even have zero latency which would really
+      skew the results.
+
+============================================================
+Configuration:
+
  - Consider changing the JiniClient properties to allow the client to
    override index properties ala log4j, where the data service on
    which the index will initially be registered is just one such
@@ -2555,45 +2620,177 @@ New priorities:
    property values and to set those property values (this is probably
    beans stuff).
 
-* Review use of finalized() in code, and especially in the iterators
-  used by rule evaluation and high level query.  Evidentally this can
-  make it difficult for the JVM to release those references leading to
-  a nasty message from the JVM:
+============================================================
 
-On Thu, 2008-10-02 at 10:21 -0400, James Leigh wrote:
-> Hi Bryan,
->
-> I have been trying to run Bigdata through a benchmark using the Sesame
-> driver, but I am running into some gc related problems. It seems
-> bigdata-src-snapshot-30-jun-2008 has the same problem Sesame has. The
-> problem is that many of the iterators used for query evaluation have a
-> finalizer. This causes the gc to delay freeing them. This can causes a
-> problem if most of the heap is made up these objects that cannot be
-> freed quickly. In that case the gc may take up too much CPU in trying to
-> find objects it can free up and if the limit is exceeded it will through
-> an out-of-memory exception.
-> http://java.sun.com/javase/technologies/hotspot/gc/gc_tuning_6.html#par_gc.oom
->
-> Sesame is addressing this in version 2.5 by removing Iterations (w/
-> finalizers) from the query evaluation and using Cursors (w/o finalizers)
-> in the SAIL API. We will also be changing to only use locks with
-> finalizers if debug mode is enabled. You may want to do the same thing
-> in the next release of Bigdata.
->
-> http://www.openrdf.org/issues/browse/SES-594
->
-> James
+- post-process tasks should run on the concurrency manager thread
+  pools and there should be histogram reporting for that thread pool
+  as well as for the client thread pools.  If the task is an
+  AbstractTask then we need to report the breakdown by the concrete
+  class, but relly that is always the case.
 
+- The sparse row store continuation query iterator is failing for LDS.
+  Test under EDS also and figure out why it is failing.
+
+============================================================
+Sesame extended LUBM benchmark:
+
+The instructions for using the benchmark are straight forward
+Check out
+http://repo.aduna-software.org/svn/org.openrdf/benchmark/trunk/
+
+Run "ant package", you need java, ant, and mvn (or mvn.bat) on command
+line.
+
+Create a file like this:
+http://repo.aduna-software.org/svn/org.openrdf/benchmark/trunk/sesame/src/main/java/org/openrdf/benchmark/factories/NativeStoreFactory.java
+
+List the class name in a file with this path:
+META-INF/services/org.openrdf.benchmark.repository.RepositoryFactory
+
+Then look at the .bat/.sh files in the zip file created by the ant task
+to see how to run the benchmark and report tool.
+
+If you need more help I am also available on irc freenode#sesame
+
+James
+
+Bryan,
+
+Here is a benchmark branch that does not depend on Mulgara and includes
+a compatible version of Sesame for Bigdata. I am not seeing the same
+performance in OCT_2_2008 as I did in the June snapshot using the BSBM
+benchmark. When you get a chance please share with me the appropriate
+configuration properties.
+
+http://repo.aduna-software.org/svn/org.openrdf/benchmark/branches/0.2/
+
+James
+
+I am not interested in testing truth maintenance or any type of
+inferencing, I only stumbled on that option because it was on by default
+and because it was preventing the benchmark from completing. So, to
+answer you question: queries are slower with the new version.
+
+> What is the BSBM benchmark?  Can you send me the results that you were
+> getting and that you are seeing now as a basis for comparison?
+> 
+BSBM = http://www4.wiwiss.fu-berlin.de/bizer/BerlinSPARQLBenchmark/spec/
+
+The results, I saw was about 7s vs 70s on an iteration. I was using the
+option "truthMaintenance" set to false. Is this still applicable in the
+new version?
+
+============================================================
+Logging
+
+  - Global search and replace changing DEBUG (and log.debug) to TRACE
+
+  - Global search and replace changing INFO (and log.info) to DEBUG
+
+  - Review WARN logging for instances that could be INFO.
+
+  - Remove code in com.bigdata.Banner that defaults the log level.
+
+============================================================
+Performance
+
+  - Done. Recheck lubm query perf: LDS, JDS.  
+
+    LTS.U5: I am not seeing all of the elapsed time reported for the
+    closure.  Only 6 seconds, but the actual run time was 31 seconds.
+    That is very weird.  Maybe it is the flush buffer time that is
+    missing?  (The time spent writing on the indices after the rule
+    has run and before the next rule in a sequence can be executed?)
+
+    JOINs for LTS seem fine, but the JDS case appears to be much
+    slower - especially for Q8 (13 vs 2 secs) and Q9 (8.5 vs 2 secs).
+
+    * DefaultResourceLocator should use the timestamp when reading
+      from the global row store.
+
+    * Now that I have the read-committed issue resolved, apply a
+      performance analyzer again to both LDS and JDS and see what I
+      can do to trim down costs further.
+
+  - Finish the TestDefaultResourceLocator
+
+  - DefaultResourceLocator.  modify to use read-historical views of
+    the sparse row store and verify that it is aggresively caching
+    views.
 
 ============================================================
 
-Done. Write unit tests for KeyBuilder that verify the expected sort
-order for "bro" and "brown".
+- SteveC/DavidL
 
-Write unit tests for search that verify prefix matching.
+  - Trace of 1B+ 3 machine run.
 
-Modify search so that prefix matching can be enabled or disabled on a
-per-query basis.
+  - EC2 worksheet
 
-Commit the changes to MikeP for the eossys and aether.
+  - 1.1B load slides to SteveC, BradB, DavidL.  Include comparison
+    with 2 server run.  Note single server rate or re-run the one
+    server run.
+
+  - Possible visit, combined with BradB.
+
+  - mac fix: http://www.apple.com/support/osfamily/
+
+============================================================
+
+Done. Modified DefaultResourceLocator to test the cache without a
+named lock.  On a miss it acquires the named lock and then verifies
+that there is still no entry in the cache once it holds the lock.  If
+the resource has not been concurrently located, then it is located and
+placed into the cache and the lock is released.  This addresses a hot
+spot where acquiring the named lock was too expensive.
+
+Done. Modified Node#getChild(int) do not declare itself as
+[synchronized] and instead use a double-checked locking pattern.
+Node#childRefs was marked as [volatile] in support of that change.
+This addresses an what appears to be a hot spot in Node#getChild(int)
+where the self-time was higher than could be accounted for by the code
+in the method, leading me to believe that the synchronized keyword was
+causing contention for access to the method for Node instances.
+
+Done. Modified SPORelation to check the access path cache first, then
+synchronize on a lock object iff there was a cache miss and do the
+access path factory behavior and update the cache while synchronized
+on that lock object.
+
+Done. Each child in the B+Tree has its own weak reference to the
+parent.  If we put a weak reference on the parent to itself then the
+child could reuse the same weak reference object.  This would cut down
+on the #of weak reference instances drammatically and that might help
+the garbage collector.
+
+** Retest on EOSSYS data using appropriate chunkCapacity (100) for
+   queries.
+
+Done. Modified InputBitStream and OutputBitStream to have ctor
+variants that avoid a reflection test on the underlying stream.  This
+was causing approximately 5000 MethodNotFoundException instances to be
+thrown per second.  Introduced a new lgpl-utils jar for this change.
+
+** There is a lot of reading on the globalRowStore.  This is all
+   related to locating the TripleStore resource and its contained
+   SPORelation and LexiconRelations.
+
+  (a) We do not read against the appropriate (historical) view of the
+      global row store.  We need to obtain that view from the
+      federation, which can only return the current view.
+
+  (b) We do not cache recently read property sets for historical reads
+      (because we are always doing read-committed property set reads).
+
+  (c) We should read the properties sets for the container
+      (tripleStore) and all contained resources (lexicon, text index,
+      and spo relation) from the property store using a single
+      operation.  Use a logical row scan to build up the property set
+      for these resources in one go and then return the appropriate
+      layered Properties object on request.  (We need to layer the
+      property sets so that you can override properties on a contained
+      resource, but in fact the contained resources that we are using
+      always have exactly the same property set as their container,
+      which is a bit of redundency that we don't really need.)
+
+  (d) Defer. We should recognize unknown properties, much like log4j.
 

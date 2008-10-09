@@ -48,7 +48,7 @@ import cutthecrap.utils.striterators.Striterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Node extends AbstractNode implements INodeData {
+public class Node extends AbstractNode<Node> implements INodeData {
 
     /**
      * <p>
@@ -63,7 +63,7 @@ public class Node extends AbstractNode implements INodeData {
      * computing the split point and performing the split.
      * </p>
      */
-    transient protected Reference<AbstractNode>[] childRefs;
+    transient protected volatile Reference<AbstractNode>[] childRefs;
 
     /**
      * <p>
@@ -145,7 +145,7 @@ public class Node extends AbstractNode implements INodeData {
      */
     protected void updateEntryCount(AbstractNode child, int delta) {
         
-        int index = getIndexOf(child);
+        final int index = getIndexOf(child);
         
         childEntryCounts[ index ] += delta;
         
@@ -320,14 +320,16 @@ public class Node extends AbstractNode implements INodeData {
          * Attach the old root to this node.
          */
 
-        childRefs[0] = btree.newRef(oldRoot);
+        childRefs[0] = oldRoot.self;
+//        childRefs[0] = btree.newRef(oldRoot);
 
         // #of entries from the old root _after_ the split.
         childEntryCounts[0] = oldRoot.getEntryCount();
         
 //        dirtyChildren.add(oldRoot);
 
-        oldRoot.parent = btree.newRef(this);
+        oldRoot.parent = this.self;
+//        oldRoot.parent = btree.newRef(this);
 
         /*
          * The tree is deeper since we just split the root node.
@@ -471,7 +473,8 @@ public class Node extends AbstractNode implements INodeData {
                 assert !child.isDirty();
 
                 // Steal the child.
-                child.parent = btree.newRef(this);
+                child.parent = this.self;
+//                child.parent = btree.newRef(this);
 
 //                // Keep a reference to the clean child.
 //                childRefs[i] = new WeakReference<AbstractNode>(child);
@@ -601,13 +604,15 @@ public class Node extends AbstractNode implements INodeData {
                 childAddr[i] = NULL;
 
                 // Stash reference to the new child.
-                childRefs[i] = btree.newRef(newChild);
+//                childRefs[i] = btree.newRef(newChild);
+                childRefs[i] = newChild.self;
 
 //                // Add the new child to the dirty list.
 //                dirtyChildren.add(newChild);
 
                 // Set the parent on the new child.
-                newChild.parent = btree.newRef(this);
+//                newChild.parent = btree.newRef(this);
+                newChild.parent = this.self;
 
                 return;
 
@@ -681,7 +686,7 @@ public class Node extends AbstractNode implements INodeData {
 
         final int childIndex = findChild(key);
 
-        AbstractNode child = (AbstractNode)getChild(childIndex);
+        final AbstractNode child = (AbstractNode) getChild(childIndex);
 
         /*
          * Compute running total to this child index plus [n], possible iff
@@ -1039,7 +1044,8 @@ public class Node extends AbstractNode implements INodeData {
                  * Update its parent reference.
                  */
                 
-                tmp.parent = btree.newRef(rightSibling);
+//                tmp.parent = btree.newRef(rightSibling);
+                tmp.parent = rightSibling.self;
                 
             }
 
@@ -1203,7 +1209,8 @@ public class Node extends AbstractNode implements INodeData {
             childEntryCounts[nkeys+1] = siblingChildCount;
             AbstractNode child = childRefs[nkeys+1]==null?null:childRefs[nkeys+1].get();
             if( child!=null ) {
-                child.parent = btree.newRef(this);
+                child.parent = this.self;
+//                child.parent = btree.newRef(this);
 //                if( child.isDirty() ) {
 //                    if(!s.dirtyChildren.remove(child)) throw new AssertionError();
 //                    if(!dirtyChildren.add(child)) throw new AssertionError();
@@ -1267,7 +1274,8 @@ public class Node extends AbstractNode implements INodeData {
             childEntryCounts[0] = siblingChildCount;
             AbstractNode child = childRefs[0]==null?null:childRefs[0].get();
             if( child!=null ) {
-                child.parent = btree.newRef(this);
+                child.parent = this.self;
+//                child.parent = btree.newRef(this);
 //                if(child.isDirty()) {
 //                    if(!s.dirtyChildren.remove(child)) throw new AssertionError();
 //                    if(!dirtyChildren.add(child)) throw new AssertionError();
@@ -1394,7 +1402,8 @@ public class Node extends AbstractNode implements INodeData {
             System.arraycopy(s.childEntryCounts, 0, this.childEntryCounts, nkeys, s.nkeys+1);
             
             // update parent on children
-            Reference<Node> weakRef = btree.newRef(this);
+            final Reference<Node> weakRef = this.self;
+//            final Reference<Node> weakRef = btree.newRef(this);
             for( int i=0; i<s.nkeys+1; i++ ) {
                 AbstractNode child = s.childRefs[i]==null?null:s.childRefs[i].get();
                 if( child!=null) {
@@ -1462,7 +1471,8 @@ public class Node extends AbstractNode implements INodeData {
             this.copyKey(s.nkeys, p.keys, index - 1);
             
             // update parent on children.
-            Reference<Node> weakRef = btree.newRef(this);
+            final Reference<Node> weakRef = this.self;
+//            final Reference<Node> weakRef = btree.newRef(this);
             for( int i=0; i<s.nkeys+1; i++ ) {
                 AbstractNode child = s.childRefs[i]==null?null:s.childRefs[i].get();
                 if( child!=null) {
@@ -1573,7 +1583,8 @@ public class Node extends AbstractNode implements INodeData {
         /*
          * Insert child at index+1.
          */
-        childRefs[childIndex + 1] = btree.newRef(child);
+        childRefs[childIndex + 1] = child.self;
+//        childRefs[childIndex + 1] = btree.newRef(child);
 
         childAddr[childIndex + 1] = NULL;
 
@@ -1591,7 +1602,8 @@ public class Node extends AbstractNode implements INodeData {
         
 //        dirtyChildren.add(child);
 
-        child.parent = btree.newRef(this);
+        child.parent = this.self;
+//        child.parent = btree.newRef(this);
 
         nkeys++; keys.nkeys++;
 
@@ -1752,6 +1764,10 @@ public class Node extends AbstractNode implements INodeData {
         /*
          * Scan for location in weak references.
          * 
+         * Note: during reads, this method is used for range counts. During 
+         * writes it is used to update the entry counts on which the range
+         * counts are based.
+         * 
          * @todo Can this be made more efficient by considering the last key on
          * the child and searching the parent for the index that must correspond
          * to that child? Note that when merging two children the keys in the
@@ -1759,7 +1775,7 @@ public class Node extends AbstractNode implements INodeData {
          * called - for things to be coherent you would have to discover the
          * index of the children before modifying their keys.
          * 
-         * @todo 85% of the use of this method is updateEntryCount(). Since that
+         * @todo for writes, 85% of the use of this method is updateEntryCount(). Since that
          * method is only called on update, we would do well to buffer hard
          * references during descent and test the buffer in this method before
          * performing a full search. Since concurrent writers are not allowed,
@@ -1985,7 +2001,7 @@ public class Node extends AbstractNode implements INodeData {
                 // one less node in the tree.
                 btree.nnodes--;
 
-                if(btree.INFO) {
+                if(BTree.INFO) {
                     BTree.log.info("reduced tree height: height="
                             + btree.height + ", newRoot=" + btree.root);
                 }
@@ -2085,7 +2101,7 @@ public class Node extends AbstractNode implements INodeData {
      * 
      * @return The child node or leaf and never null.
      */
-    synchronized final protected AbstractNode getChild(int index) {
+    final protected AbstractNode getChild(int index) {
 
         /*
          * I've take out this test since it turns out to be relatively
@@ -2103,38 +2119,48 @@ public class Node extends AbstractNode implements INodeData {
         
         assert index >= 0 && index <= nkeys;
 
-        final Reference<AbstractNode> childRef = childRefs[index];
+        Reference<AbstractNode> childRef = childRefs[index];
 
         AbstractNode child = childRef == null ? null : childRef.get();
 
         if (child == null) {
 
-            final long key = childAddr[index];
+            synchronized(this) {
 
-            if (key == NULL) {
-//                dump(Level.DEBUG, System.err);
-                /*
-                 * Note: It appears that this can be triggered by a full disk,
-                 * but I am not quite certain how a full disk leads to this
-                 * condition. Presumably the full disk would cause a write of
-                 * the child to fail. In turn, that should cause the thread
-                 * writing on the B+Tree to fail. If group commit is being used,
-                 * the B+Tree should then be discarded and reloaded from its
-                 * last commit point.
-                 */
-                throw new AssertionError(
-                        "Child does not have persistent identity: this=" + this
-                                + ", index=" + index);
+                childRef = childRefs[index];
+
+                child = childRef == null ? null : childRef.get();
+
+                final long key = childAddr[index];
+    
+                if (key == NULL) {
+    //                dump(Level.DEBUG, System.err);
+                    /*
+                     * Note: It appears that this can be triggered by a full disk,
+                     * but I am not quite certain how a full disk leads to this
+                     * condition. Presumably the full disk would cause a write of
+                     * the child to fail. In turn, that should cause the thread
+                     * writing on the B+Tree to fail. If group commit is being used,
+                     * the B+Tree should then be discarded and reloaded from its
+                     * last commit point.
+                     */
+                    throw new AssertionError(
+                            "Child does not have persistent identity: this=" + this
+                                    + ", index=" + index);
+                }
+    
+                child = btree.readNodeOrLeaf(key);
+    
+                // patch parent reference since loaded from store.
+//                child.parent = btree.newRef(this);
+                child.parent = this.self;
+    
+                // patch the child reference.
+//                childRefs[index] = btree.newRef(child);
+                childRefs[index] = child.self;
+                
             }
-
-            child = btree.readNodeOrLeaf(key);
-
-            // patch parent reference since loaded from store.
-            child.parent = btree.newRef(this);
-
-            // patch the child reference.
-            childRefs[index] = btree.newRef(child);
-
+            
         }
      
         /*
@@ -2308,7 +2334,7 @@ public class Node extends AbstractNode implements INodeData {
                  * A child of this node.
                  */
 
-                AbstractNode child = (AbstractNode) childObj;
+                final AbstractNode child = (AbstractNode) childObj;
 
                 if (child instanceof Node) {
 

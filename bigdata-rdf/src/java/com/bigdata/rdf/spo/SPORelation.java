@@ -739,74 +739,78 @@ public class SPORelation extends AbstractRelation<ISPO> {
         if (predicate == null)
             throw new IllegalArgumentException();
         
-        synchronized (accessPathCache) {
+        IAccessPath<ISPO> accessPath = accessPathCache.get(predicate);
 
-            final IAccessPath<ISPO> accessPath = accessPathCache.get(predicate);
+        if (accessPath != null) {
 
-            if (accessPath != null)
+            // cache hit.
+            return accessPath;
+            
+        }
+
+        synchronized (accessPathCacheLock) {
+
+            accessPath = accessPathCache.get(predicate);
+
+            if (accessPath != null) {
+
+                // cache hit after synchronization.
                 return accessPath;
-
-        }
-        
-        final long s = predicate.get(0).isVar() ? NULL : (Long) predicate.get(0).get();
-        final long p = predicate.get(1).isVar() ? NULL : (Long) predicate.get(1).get();
-        final long o = predicate.get(2).isVar() ? NULL : (Long) predicate.get(2).get();
-        // Note: Context is ignored!
-
-        final IAccessPath<ISPO> accessPath;
-        
-        if (s != NULL && p != NULL && o != NULL) {
-
-            accessPath = getAccessPath(SPOKeyOrder.SPO, predicate);
-
-        } else if (s != NULL && p != NULL) {
-
-            accessPath = getAccessPath(SPOKeyOrder.SPO, predicate);
-
-        } else if (s != NULL && o != NULL) {
-
-            accessPath = getAccessPath(SPOKeyOrder.OSP, predicate);
-
-        } else if (p != NULL && o != NULL) {
-
-            accessPath = getAccessPath(SPOKeyOrder.POS, predicate);
-
-        } else if (s != NULL) {
-
-            accessPath = getAccessPath(SPOKeyOrder.SPO, predicate);
-
-        } else if (p != NULL) {
-
-            accessPath = getAccessPath(SPOKeyOrder.POS, predicate);
-
-        } else if (o != NULL) {
-
-            accessPath = getAccessPath(SPOKeyOrder.OSP, predicate);
-
-        } else {
-
-            accessPath = getAccessPath(SPOKeyOrder.SPO, predicate);
-
-        }
-        
-        if (DEBUG)
-            log.debug(accessPath.toString());
-
-        synchronized (accessPathCache) {
-
-            if(accessPathCache.get(predicate)==null) {
-
-                accessPathCache.put(predicate, accessPath, false/* dirty */);
                 
             }
+            
+            final long s = predicate.get(0).isVar() ? NULL : (Long) predicate.get(0).get();
+            final long p = predicate.get(1).isVar() ? NULL : (Long) predicate.get(1).get();
+            final long o = predicate.get(2).isVar() ? NULL : (Long) predicate.get(2).get();
+            // Note: Context is ignored!
+    
+            if (s != NULL && p != NULL && o != NULL) {
+    
+                accessPath = getAccessPath(SPOKeyOrder.SPO, predicate);
+    
+            } else if (s != NULL && p != NULL) {
+    
+                accessPath = getAccessPath(SPOKeyOrder.SPO, predicate);
+    
+            } else if (s != NULL && o != NULL) {
+    
+                accessPath = getAccessPath(SPOKeyOrder.OSP, predicate);
+    
+            } else if (p != NULL && o != NULL) {
+    
+                accessPath = getAccessPath(SPOKeyOrder.POS, predicate);
+    
+            } else if (s != NULL) {
+    
+                accessPath = getAccessPath(SPOKeyOrder.SPO, predicate);
+    
+            } else if (p != NULL) {
+    
+                accessPath = getAccessPath(SPOKeyOrder.POS, predicate);
+    
+            } else if (o != NULL) {
+    
+                accessPath = getAccessPath(SPOKeyOrder.OSP, predicate);
+    
+            } else {
+    
+                accessPath = getAccessPath(SPOKeyOrder.SPO, predicate);
+    
+            }
+            
+            if (DEBUG)
+                log.debug(accessPath.toString());
+
+            accessPathCache.put(predicate, accessPath, false/* dirty */);
             
         }
         
         return accessPath;
         
     }
+    final private Object accessPathCacheLock = new Object();
     // @todo config cache capacity.
-    private WeakValueCache<IPredicate<ISPO>, IAccessPath<ISPO>> accessPathCache = new WeakValueCache<IPredicate<ISPO>, IAccessPath<ISPO>>(
+    final private WeakValueCache<IPredicate<ISPO>, IAccessPath<ISPO>> accessPathCache = new WeakValueCache<IPredicate<ISPO>, IAccessPath<ISPO>>(
             new LRUCache<IPredicate<ISPO>, IAccessPath<ISPO>>(100));
 
     /**

@@ -84,9 +84,8 @@ abstract public class AbstractCachingResourceLocator<T extends ILocatableResourc
     }
 
     /**
-     * Looks up the resource in the cache.
-     * <p>
-     * Note: The caller MUST be synchronized on the named resource.
+     * Looks up the resource in the cache (thread-safe since the underlying
+     * cache is thread-safe).
      * 
      * @param namespace
      * 
@@ -115,14 +114,17 @@ abstract public class AbstractCachingResourceLocator<T extends ILocatableResourc
     /**
      * Places the resource in the cache.
      * <p>
-     * Note: The caller MUST be synchronized on the named resource.
-     * 
+     * Note: The underlying cache is thread-safe. However, when adding an entry
+     * to the cache the caller MUST be synchronized on the named resource, use
+     * {@link #get(String, long)} to determine that there is no such entry in
+     * the cache, and then {@link #put(ILocatableResource)} the entry.
+     * <p>
      * Note: Read committed views are allowed into the cache.
-     * 
+     * <p>
      * For a Journal, this depends on Journal#getIndex(name,timestamp) returning
      * a ReadCommittedView for an index so that the view does in fact have
      * read-committed semantics.
-     * 
+     * <p>
      * For a federation, read-committed semantics are achieved by the
      * IClientIndex implementations since they always make standoff requests to
      * one (or more) data services. Those requests allow the data service to

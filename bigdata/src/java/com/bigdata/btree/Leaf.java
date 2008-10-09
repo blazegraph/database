@@ -62,7 +62,7 @@ import cutthecrap.utils.striterators.SingleValueIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Leaf extends AbstractNode implements ILeafData {
+public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
     /**
      * <p>

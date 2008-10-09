@@ -55,7 +55,8 @@ public class FastRDFValueCompression implements IDataSerializer, Externalizable 
 
     public void read(DataInput in, IRandomAccessByteArray raba) throws IOException {
 
-        InputBitStream ibs = new InputBitStream((InputStream) in, 0/* unbuffered! */);
+        final InputBitStream ibs = new InputBitStream((InputStream) in,
+                0/* unbuffered! */, false/* reflectionTest */);
 
         /*
          * read the values.
@@ -85,7 +86,8 @@ public class FastRDFValueCompression implements IDataSerializer, Externalizable 
 
     public void write(DataOutput out, IRandomAccessByteArray raba) throws IOException {
 
-        final OutputBitStream obs = new OutputBitStream((OutputStream) out, 0 /* unbuffered! */);
+        final OutputBitStream obs = new OutputBitStream((OutputStream) out,
+                0 /* unbuffered! */, false/* reflectionTest */);
 
         /*
          * write the values.

@@ -1248,8 +1248,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         
         if(readCache != null) {
 
-            // @todo change to info level
-            log.warn("readCache: "+readCache.getStatistics());
+            if (INFO)
+                log.info("readCache: " + readCache.getStatistics());
             
             // Discard the LRU cache.
             readCache = null;
@@ -1621,7 +1621,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
             raf = FileLockUtility.openFile(file, fileMode, true/*tryFileLock*/);
         
-            log.warn("Re-opened file: "+file);
+            if(WARN) log.warn("Re-opened file: "+file);
             
         } catch(IOException ex) {
             
@@ -1962,8 +1962,9 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                 // note that it has been opened.
                 fileOpened = true;
 
-//                if(log.isInfoEnabled())
-                log.warn("Opened backing file for temporary store: "+file);
+                if (INFO)
+                    log.info("Opened backing file for temporary store: "
+                                    + file);
                 
             } catch (IOException e) {
                 
@@ -2146,7 +2147,9 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
             counters.ntruncate++;
             
-            log.warn("newLength="+cf.format(newExtent)+", file="+file);
+            if(WARN)
+                log.warn("newLength=" + cf.format(newExtent) + ", file="
+                                + file);
             
             if(INFO)
                 log.info(getCounters().toString());

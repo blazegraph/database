@@ -154,6 +154,12 @@ public class ConcurrentDataLoader {
             .getLogger(ConcurrentDataLoader.class);
     
     /**
+     * True iff the {@link #log} level is WARN or less.
+     */
+    final protected static boolean WARN = log.getEffectiveLevel().toInt() <= Level.WARN
+            .toInt();
+    
+    /**
      * True iff the {@link #log} level is INFO or less.
      */
     final protected static boolean INFO = log.isInfoEnabled();
@@ -581,7 +587,8 @@ public class ConcurrentDataLoader {
                 
                 if(TimeUnit.NANOSECONDS.convert(elapsed, unit)>timeout) {
                 
-                    log.warn("timeout");
+                    if(WARN)
+                        log.warn("timeout");
 
                     return false;
                     
@@ -739,7 +746,8 @@ public class ConcurrentDataLoader {
         
         } catch(Exception ex) {
             
-            log.warn("Could not start task: resource=" + resource + " : " + ex);
+            if(WARN)
+                log.warn("Could not start task: resource=" + resource + " : " + ex);
             
             return;
             
@@ -866,14 +874,12 @@ public class ConcurrentDataLoader {
         /**
          * True iff the {@link #log} level is INFO or less.
          */
-        final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-                .toInt();
+        final protected static boolean INFO = log.isInfoEnabled();
 
         /**
          * True iff the {@link #log} level is DEBUG or less.
          */
-        final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-                .toInt();
+        final protected static boolean DEBUG = log.isDebugEnabled();
 
         /**
          * The {@link Future} for this {@link ReaderTask}.
@@ -1030,7 +1036,7 @@ public class ConcurrentDataLoader {
             
             }
             
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("Submitting task=" + target + " : " + counters);
 
             // attempt to submit the task.
@@ -1051,7 +1057,7 @@ public class ConcurrentDataLoader {
                 throw ex;
             }
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("Submitted task="+target+" : "+counters);
 
             return future;
@@ -1090,7 +1096,8 @@ public class ConcurrentDataLoader {
         
         protected void runTarget() throws InterruptedException {
             
-            log.info("Running task="+target+" : "+counters);
+            if(INFO)
+                log.info("Running task="+target+" : "+counters);
             
             nanoTime_beginWork = System.nanoTime();
             counters.queueWaitingTime.addAndGet(nanoTime_beginWork - nanoTime_submitTask);
@@ -1127,7 +1134,7 @@ public class ConcurrentDataLoader {
 
             counters.taskSuccessCount.incrementAndGet();
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("Success task="+target+" : "+counters);
 
             // may block.
@@ -1294,14 +1301,12 @@ public class ConcurrentDataLoader {
         /**
          * True iff the {@link #log} level is INFO or less.
          */
-        final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-                .toInt();
+        final protected static boolean INFO = log.isInfoEnabled();
 
         /**
          * True iff the {@link #log} level is DEBUG or less.
          */
-        final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-                .toInt();
+        final protected static boolean DEBUG = log.isDebugEnabled();
 
         /**
          * The resource to be loaded.
@@ -1427,7 +1432,8 @@ public class ConcurrentDataLoader {
             // make sure that the buffer is empty.
             buffer.reset();
             
-            log.info("loading: " + resource);
+            if (INFO)
+                log.info("loading: " + resource);
 
             final PresortRioLoader loader = new PresortRioLoader(buffer);
 
@@ -1518,14 +1524,12 @@ public class ConcurrentDataLoader {
         /**
          * True iff the {@link #log} level is INFO or less.
          */
-        final protected  static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-                .toInt();
+        final protected  static boolean INFO = log.isInfoEnabled();
 
         /**
          * True iff the {@link #log} level is DEBUG or less.
          */
-        final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-                .toInt();
+        final protected static boolean DEBUG = log.isDebugEnabled();
 
         final AtomicLong nterms, ntermsNotFound, ntriples, ntriplesNotFound;
         
@@ -1792,14 +1796,12 @@ public class ConcurrentDataLoader {
         /**
          * True iff the {@link #log} level is INFO or less.
          */
-        final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-                .toInt();
+        final protected static boolean INFO = log.isInfoEnabled();
 
         /**
          * True iff the {@link #log} level is DEBUG or less.
          */
-        final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-                .toInt();
+        final protected static boolean DEBUG = log.isDebugEnabled();
 
         /**
          * The database on which the data will be written.
@@ -1934,7 +1936,8 @@ public class ConcurrentDataLoader {
 
         public Runnable newTask(String resource) throws Exception {
             
-            log.info("resource="+resource);
+            if(INFO)
+                log.info("resource="+resource);
             
             final RDFFormat rdfFormat = getRDFFormat( resource );
             
@@ -1946,15 +1949,8 @@ public class ConcurrentDataLoader {
 
             }
 
-            /*
-             * FIXME resolve what the baseURL SHOULD be and generalize for
-             * alternative source (bigdata repo, file system, map/reduce master,
-             * etc.)
-             * 
-             * Note: conversion is to a URL.
-             */
+            // Convert the file path to a URL.
             final String baseURL;
-
             try {
 
                 baseURL = new File(resource).toURL().toString();

@@ -2556,8 +2556,14 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
      * 
      * @return A reference to that node.
      * 
+     * @see AbstractNode#self
      * @see SoftReference
      * @see WeakReference
+     * 
+     * @todo since each node (and leaf) now has a reference to itself and since
+     *       we reuse that reference for all references to the node (or leaf),
+     *       this method can be removed and replaced by a single {@link Reference}
+     *       allocation in {@link AbstractNode#AbstractNode(AbstractBTree, int, boolean)}
      */
     final Reference<AbstractNode> newRef(AbstractNode child) {
         
@@ -2588,24 +2594,24 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
 
     }
     
-    /**
-     * Create the reference that will be used by a node to refer to its parent.
-     * 
-     * @param parent A node.
-     * 
-     * @return A reference to that node.
-     */
-    final Reference<Node> newRef(Node parent) {
-        
-        /*
-         * Note: A weak reference by a child to its parent means that the
-         * existence of the child object does not incline the garbage collector
-         * to keep the parent.
-         */
-
-        return new WeakReference<Node>( parent );
-//      return new SoftReference<Node>( parent ); // retains too much.
-
-    }
+//    /**
+//     * Create the reference that will be used by a node to refer to its parent.
+//     * 
+//     * @param parent A node.
+//     * 
+//     * @return A reference to that node.
+//     */
+//    final Reference<Node> newRef(Node parent) {
+//        
+//        /*
+//         * Note: A weak reference by a child to its parent means that the
+//         * existence of the child object does not incline the garbage collector
+//         * to keep the parent.
+//         */
+//
+//        return new WeakReference<Node>( parent );
+////      return new SoftReference<Node>( parent ); // retains too much.
+//
+//    }
     
 }

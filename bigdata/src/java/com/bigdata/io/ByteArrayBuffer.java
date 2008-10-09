@@ -80,7 +80,9 @@ import org.apache.log4j.Logger;
 public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
         RepositionableStream {
 
-    protected static Logger log = Logger.getLogger(ByteArrayBuffer.class);
+    protected static final Logger log = Logger.getLogger(ByteArrayBuffer.class);
+    
+    protected static final boolean INFO = log.isInfoEnabled();
 
     /**
      * The default capacity of the buffer.
@@ -240,7 +242,8 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
 
         int capacity = Math.max(required, buf.length * 2);
 
-        log.info("Extending buffer to capacity=" + capacity + " bytes.");
+        if(INFO)
+            log.info("Extending buffer to capacity=" + capacity + " bytes.");
 
         return capacity;
         

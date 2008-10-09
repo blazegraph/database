@@ -73,8 +73,6 @@ import com.bigdata.striterator.ICloseableIterator;
  *       BigdataLongSet(), but the same code can serve float, double, and int as
  *       well. Avoid override for duplicate keys to reduce IO.
  * 
- * @todo performance comparisons with the old rule execution logic.
- * 
  * @todo it should be possible to have a different action associated with each
  *       rule in the program, and to have a different target relation for the
  *       head of each rule on which we will write (mutation). Different query or
@@ -83,10 +81,10 @@ import com.bigdata.striterator.ICloseableIterator;
  *       on the same buffer. Query results will therefore be multiplexed as will
  *       mutations counts.
  * 
- * @todo it should be possible to handle different relation classes in the same
- *       rules, e.g., RDF and non-RDF relations. Or even the SPO and lexicon
- *       relation for the RDF DB -- the latter will be useful for materializing
- *       extenalized statements efficiently.
+ * @todo foreign key joins: it should be possible to handle different relation
+ *       classes in the same rules, e.g., RDF and non-RDF relations. Or even the
+ *       SPO and lexicon relation for the RDF DB -- the latter will be useful
+ *       for materializing externalized statements efficiently.
  * 
  * @todo could make the return type a generic for {@link AbstractStepTask} and
  *       make this class a concrete implementation of that one.
