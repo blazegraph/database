@@ -80,14 +80,14 @@ public class TestReadOnlyBTreeCursors extends AbstractBTreeCursorTestCase {
      */
     public void test_remove_not_allowed() {
         
-        BTree btree = BTree.create(new SimpleMemoryRawStore(), new IndexMetadata(
-                UUID.randomUUID()));
+        final BTree btree = BTree.create(new SimpleMemoryRawStore(),
+                new IndexMetadata(UUID.randomUUID()));
 
         btree.insert(10, "Bryan");
         
         btree.setReadOnly(true);
         
-        ITupleCursor<String> cursor = newCursor(btree);
+        final ITupleCursor<String> cursor = newCursor(btree);
         
         assertEquals(new TestTuple<String>(10,"Bryan"),cursor.next());
         

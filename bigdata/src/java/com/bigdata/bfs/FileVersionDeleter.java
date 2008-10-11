@@ -6,8 +6,8 @@ import com.bigdata.btree.filter.Advancer;
 import com.bigdata.btree.filter.TupleUpdater;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.sparse.IRowStoreConstants;
 import com.bigdata.sparse.KeyDecoder;
-import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.sparse.TimestampChooser;
 import com.bigdata.sparse.ValueType;
 import com.bigdata.sparse.TPS.TPV;
@@ -43,8 +43,8 @@ public class FileVersionDeleter extends TupleUpdater<TPV> {
     /**
      * 
      * @param timestamp
-     *            A valid timestamp or {@link SparseRowStore#AUTO_TIMESTAMP}
-     *            or {@link SparseRowStore#AUTO_TIMESTAMP_UNIQUE}.
+     *            A valid timestamp or {@link IRowStoreConstants#AUTO_TIMESTAMP}
+     *            or {@link IRowStoreConstants#AUTO_TIMESTAMP_UNIQUE}.
      */
     public FileVersionDeleter(long timestamp) {
         
@@ -58,9 +58,9 @@ public class FileVersionDeleter extends TupleUpdater<TPV> {
     @Override
     protected boolean isValid(ITuple<TPV> tuple) {
 
-        KeyDecoder keyDecoder = new KeyDecoder(tuple.getKey());
+        final KeyDecoder keyDecoder = new KeyDecoder(tuple.getKey());
         
-        String name = keyDecoder.getColumnName();
+        final String name = keyDecoder.getColumnName();
         
         if(!name.equals(FileMetadataSchema.VERSION)) return false;
 
@@ -94,7 +94,7 @@ public class FileVersionDeleter extends TupleUpdater<TPV> {
      * not then visit the new tuple or that we ignore a "version" row whose
      * value is [null].
      */
-    protected void update(IIndex ndx, ITuple<TPV> tuple) {
+    protected void update(final IIndex ndx, final ITuple<TPV> tuple) {
                     
         final byte[] key = tuple.getKey();
         

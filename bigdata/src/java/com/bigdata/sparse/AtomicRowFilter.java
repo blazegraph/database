@@ -64,55 +64,78 @@ import com.bigdata.sparse.TPS.TPV;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class AtomicRowFilter extends TupleTransformer<TPV, TPS> {
+public class AtomicRowFilter extends TupleTransformer<TPV, TPS> implements
+        IRowStoreConstants {
 
     private static final long serialVersionUID = 4410286292657970569L;
 
-    protected static final Logger log = Logger
+    protected static transient final Logger log = Logger
             .getLogger(AtomicRowFilter.class);
 
+    protected static transient final boolean INFO = log.isInfoEnabled();
+
+    protected static transient final boolean DEBUG = log.isDebugEnabled();
+    
     private final Schema schema;
 
-    private final long timestamp;
+    private final long fromTime;
+    
+    private final long toTime;
 
     private final INameFilter nameFilter;
 
     /**
      * @param schema
      *            The schema governing the row.
-     * @param timestamp
-     *            A timestamp to obtain the value for the named property
-     *            whose timestamp does not exceed <i>timestamp</i> -or-
-     *            {@link SparseRowStore#MAX_TIMESTAMP} to obtain the most
-     *            recent value for the property.
+     * @param fromTime
+     *            The first timestamp for which timestamped property values will
+     *            be accepted.
+     * @param toTime
+     *            The first timestamp for which timestamped property values will
+     *            NOT be accepted -or- {@link IRowStoreConstants#CURRENT_ROW} to
+     *            accept only the most current binding whose timestamp is GTE
+     *            <i>fromTime</i>.
      * @param nameFilter
      *            An optional filter used to select the values for property
      *            names accepted by that filter.
      */
-    protected AtomicRowFilter(Schema schema, long timestamp,
-            INameFilter nameFilter) {
+    protected AtomicRowFilter(final Schema schema, final long fromTime,
+            final long toTime, final INameFilter nameFilter) {
 
         super(TPSTupleSerializer.newInstance());
 
-        if (schema == null)
-            throw new IllegalArgumentException();
+        SparseRowStore.assertArgs(schema, Boolean.TRUE/* fake */, fromTime,
+                toTime);
 
         this.schema = schema;
 
-        this.timestamp = timestamp;
+        this.fromTime = fromTime;
+        
+        this.toTime = toTime;
 
         this.nameFilter = nameFilter;
 
     }
 
+    @Override
+    protected ITupleIterator<TPS> newTransformer(
+            ILookaheadTupleIterator<TPV> src) {
+
+        return new Transformerator<TPV, TPS>(src);
+        
+    }
+    
+    private class Transformerator<E extends TPV/* src */, F extends TPS/* out */>
+            implements ITupleIterator<F> {
+    
     /** #of logical rows read so far. */
-    private int nvisited = 0;
+    private transient long nvisited = 0;
 
     /**
      * One step lookahead for the output iterator containing the next
      * {@link TPS} to be returned.
      */
-    private TPS current = null;
+    private transient TPS current = null;
     
     /**
      * The prefix key for the {@link #current} {@link TPS}. This is
@@ -120,8 +143,26 @@ public class AtomicRowFilter extends TupleTransformer<TPV, TPS> {
      * it this way means that we do not need to encode the primary key and
      * avoids a dependency on a correctly configured {@link IKeyBuilder}.
      */
-    private byte[] prefix;
+    private transient byte[] prefix;
+    
+    private final ILookaheadTupleIterator<E> src;
+    
+    /**
+     * Builds iterator that reads the source tuples and visits the transformed
+     * tuples.
+     * 
+     * @param src
+     *            Visits the source tuples.
+     */
+    public Transformerator(final ILookaheadTupleIterator<E> src) {
 
+            if (src == null)
+                throw new IllegalArgumentException();
+
+            this.src = src;
+        
+    }
+    
     /**
      * Each visited tuple corresponds to a logical row. The key for the
      * tuple is the {schema,primaryKey} for that logical row. The value is
@@ -129,9 +170,12 @@ public class AtomicRowFilter extends TupleTransformer<TPV, TPS> {
      * 
      * @see ITuple#getObject()
      */
-    public ITuple<TPS> next(ILookaheadTupleIterator<TPV> src) {
+    public ITuple<F> next() {
 
-        if (!hasNext(src))
+        /*
+         * Note: Sets [current] as a side-effect.
+         */
+        if (!hasNext())
             throw new NoSuchElementException();
 
         assert current != null;
@@ -140,7 +184,7 @@ public class AtomicRowFilter extends TupleTransformer<TPV, TPS> {
 
         current = null;
 
-        final AbstractTuple<TPS> tuple = new AbstractTuple<TPS>(IRangeQuery.DEFAULT) {
+        final AbstractTuple<F> tuple = new AbstractTuple<F>(IRangeQuery.DEFAULT) {
 
             /**
              * @todo This can't be implemented since the tuples may have
@@ -192,7 +236,7 @@ public class AtomicRowFilter extends TupleTransformer<TPV, TPS> {
      * reaches the first tuple that does not belong to the current logical row.
      * The resulting logical row is set on {@link #current}.
      */
-    public boolean hasNext(ILookaheadTupleIterator<TPV> src) {
+    public boolean hasNext() {
 
         if (current != null) {
 
@@ -202,14 +246,14 @@ public class AtomicRowFilter extends TupleTransformer<TPV, TPS> {
         }
 
         // Result set object.
-        final TPS tps = new TPS(schema, timestamp);
+        final TPS tps = new TPS(schema, 0L);
 
         // clear the prefix - it serves as a flag for this loop.
         prefix = null;
         
         while (src.hasNext()) {
 
-            final ITuple<TPV> tuple = src.next();
+            final ITuple<E> tuple = src.next();
 
             final byte[] prefix = new KeyDecoder(tuple.getKey()).getPrefix();
 
@@ -241,7 +285,19 @@ public class AtomicRowFilter extends TupleTransformer<TPV, TPS> {
              * INameFilter and timestamp, but we will visit it anyway.
              */
 
-            current = tps;
+            if (toTime == CURRENT_ROW) {
+
+                /*
+                 * Strip out everything except the current row.
+                 */
+
+                current = tps.currentRow();
+                
+            } else {
+            
+                current = tps;
+                
+            }
 
             return true;
 
@@ -262,15 +318,13 @@ public class AtomicRowFilter extends TupleTransformer<TPV, TPS> {
      * @param tuple
      *            The tuple.
      */
-    private void handleTuple(TPS tps, ITuple tuple) {
+    private void handleTuple(final TPS tps, final ITuple tuple) {
 
         assert tps != null;
 
         assert tuple != null;
 
         final byte[] key = tuple.getKey();
-
-        final byte[] val = tuple.getValue();
 
         // Decode the key so that we can get the column name.
         final KeyDecoder keyDecoder = new KeyDecoder(key);
@@ -282,9 +336,9 @@ public class AtomicRowFilter extends TupleTransformer<TPV, TPS> {
 
             // Skip property names that have been filtered out.
 
-            if (log.isDebugEnabled()) {
+            if (DEBUG) {
 
-                log.debug("Skipping property: name=" + col);
+                log.debug("Skipping property: name=" + col + " (filtered)");
 
             }
 
@@ -293,18 +347,19 @@ public class AtomicRowFilter extends TupleTransformer<TPV, TPS> {
         }
 
         /*
-         * Skip column values having a timestamp strictly greater than the
-         * given value.
+         * Skip column values whose timestamp lies outside of the specified
+         * half-open range.
          */
         final long columnValueTimestamp = keyDecoder.getTimestamp();
         {
 
-            if (columnValueTimestamp > timestamp) {
+            if (columnValueTimestamp < fromTime) {
 
-                if (log.isDebugEnabled()) {
+                if (DEBUG) {
 
-                    log.debug("Ignoring newer revision: col=" + col
-                            + ", timestamp=" + columnValueTimestamp);
+                    log.debug("Ignoring earlier revision: col=" + col
+                            + ", fromTime=" + fromTime + ", timestamp="
+                            + columnValueTimestamp);
 
                 }
 
@@ -312,6 +367,20 @@ public class AtomicRowFilter extends TupleTransformer<TPV, TPS> {
 
             }
 
+            if (toTime != CURRENT_ROW && columnValueTimestamp >= toTime) {
+
+                if (DEBUG) {
+
+                    log.debug("Ignoring later revision: col=" + col
+                            + ", toTime=" + toTime + ", timestamp="
+                            + columnValueTimestamp);
+
+                }
+
+                return;
+
+            }
+            
         }
 
         /*
@@ -319,18 +388,34 @@ public class AtomicRowFilter extends TupleTransformer<TPV, TPS> {
          * value.
          */
 
+        final byte[] val = tuple.getValue();
+
         final Object v = ValueType.decode(val);
 
         /*
-         * Add to the representation of the row.
+         * Add this timestamped property value to the collection.
          */
 
         tps.set(col, columnValueTimestamp, v);
 
-        if (log.isInfoEnabled())
-            log.info("Read: name=" + col + ", timestamp="
-                    + columnValueTimestamp + ", value=" + v);
+        if (INFO)
+                log.info("Accept: name=" + col + ", timestamp="
+                        + columnValueTimestamp + ", value=" + v + ", key="
+                        + BytesUtil.toString(key));
 
     }
+
+    /**
+     * Not supported.
+     * 
+     * @throws UnsupportedOperationException
+     */
+    public void remove() {
+        
+        throw new UnsupportedOperationException();
+        
+    }
     
+    }
+
 }

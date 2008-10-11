@@ -36,6 +36,7 @@ import java.util.NoSuchElementException;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.filter.IFilterConstructor;
+import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
@@ -55,9 +56,13 @@ import com.bigdata.rawstore.IBlock;
  */
 abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<E> {
 
-    public static final transient Logger log = Logger
+    protected static final transient Logger log = Logger
             .getLogger(AbstractChunkedTupleIterator.class);
 
+    protected static final transient boolean INFO = log.isInfoEnabled();
+
+    protected static final transient boolean DEBUG = log.isDebugEnabled();
+    
     /**
      * Error message used by {@link #getKey()} when the iterator was not
      * provisioned to request keys from the data service.
@@ -247,8 +252,9 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
         
     }
     
-    public AbstractChunkedTupleIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, IFilterConstructor filter) {
+    public AbstractChunkedTupleIterator(final byte[] fromKey,
+            final byte[] toKey, int capacity, final int flags,
+            final IFilterConstructor filter) {
 
         if (capacity < 0) {
 
@@ -290,7 +296,7 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
 
         assert !exhausted;
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("nqueries=" + nqueries + ", fromKey="
                     + BytesUtil.toString(fromKey) + ", toKey="
                     + BytesUtil.toString(toKey));
@@ -308,7 +314,7 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
 
         nqueries++;
 
-        if (log.isInfoEnabled()) {
+        if (INFO) {
 
             log.info("Got chunk: ntuples=" + rset.getNumTuples()
                     + ", exhausted=" + rset.isExhausted() + ", lastKey="
@@ -345,9 +351,13 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
              * result set.
              */
 
-            final byte[] _fromKey = rset.successor();
+            final boolean fixedLengthSuccessor = (flags * IRangeQuery.FIXED_LENGTH_SUCCESSOR) != 0;
+            
+            final byte[] _fromKey = fixedLengthSuccessor ? SuccessorUtil
+                    .successor(rset.getLastKey().clone()) : BytesUtil
+                    .successor(rset.getLastKey());
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("forwardScan: fromKey=" + BytesUtil.toString(_fromKey)
                         + ", toKey=" + BytesUtil.toString(toKey));
 
@@ -366,7 +376,7 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
 
             final byte[] _toKey = rset.getLastKey();
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("reverseScan: fromKey=" + BytesUtil.toString(fromKey)
                         + ", toKey=" + BytesUtil.toString(_toKey));
 
@@ -375,6 +385,7 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
                     flags, filter);
 
         }
+        
         // reset index into the ResultSet.
         lastVisited = -1;
 

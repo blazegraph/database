@@ -321,4 +321,10 @@ public class ReadCommittedView implements IIndex {
         
     }
 
+    public final Counters getBTreeCounters() {
+        
+        return getIndex().counters;
+        
+    }
+    
 }

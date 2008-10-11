@@ -63,8 +63,19 @@ public class Node extends AbstractNode<Node> implements INodeData {
      * computing the split point and performing the split.
      * </p>
      */
-    transient protected volatile Reference<AbstractNode>[] childRefs;
+    protected volatile Reference<AbstractNode>[] childRefs;
 
+    /**
+     * An array of objects used to provide a per-child lock in order to allow
+     * maximum concurrency in {@link #getChild(int)}.
+     * <p>
+     * Note: this array is not allocate for a mutable btree since the caller
+     * will be single threaded and locking is therefore not required in
+     * {@link #getChild(int)}. We only need locking for read-only btrees since
+     * they allow concurrent readers.
+     */
+    private Object[] childLocks;
+    
     /**
      * <p>
      * The persistent keys of the childAddr nodes (may be nodes or leaves). The
@@ -86,7 +97,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      * computing the split point and performing the split.
      * </p>
      */
-    long[] childAddr;
+    protected long[] childAddr;
 
     /**
      * The #of entries spanned by this node. This value should always be equal
@@ -104,7 +115,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      * 
      * This field is initialized by the various {@link Node} constructors.
      */
-    int nentries;
+    protected int nentries;
     
     /**
      * The #of entries spanned by each direct child of this node.
@@ -116,7 +127,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      * able to traverse the {@link AbstractNode#parent} reference in a straight
      * forward manner.
      */
-    int[] childEntryCounts;
+    protected int[] childEntryCounts;
     
     public int getEntryCount() {
     
@@ -240,6 +251,8 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         childRefs = new Reference[branchingFactor+1];
 
+        childLocks = newChildLocks(btree);
+        
 //        // must clear the dirty flag since we just de-serialized this node.
 //        setDirty(false);
 
@@ -258,6 +271,8 @@ public class Node extends AbstractNode<Node> implements INodeData {
         keys = new MutableKeyBuffer(branchingFactor);
 
         childRefs = new Reference[branchingFactor+1];
+
+        childLocks = newChildLocks(btree);
 
         childAddr = new long[branchingFactor+1];
 
@@ -297,6 +312,8 @@ public class Node extends AbstractNode<Node> implements INodeData {
         keys = new MutableKeyBuffer( branchingFactor );
 
         childRefs = new Reference[branchingFactor+1];
+
+        childLocks = newChildLocks(btree);
 
         childAddr = new long[branchingFactor+1];
 
@@ -458,6 +475,8 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
 //        childRefs = new WeakReference[branchingFactor+1];
         childRefs = src.childRefs; src.childRefs = null;
+
+        childLocks = src.childLocks; src.childLocks = null;
 
         for (int i = 0; i <= nkeys; i++) {
 
@@ -2089,12 +2108,14 @@ public class Node extends AbstractNode<Node> implements INodeData {
      * Return the child node or leaf at the specified index in this node. If the
      * node is not in memory then it is read from the store.
      * <p>
-     * Note: This is synchronized in order to make sure that concurrent readers
-     * are single-threaded at the point where they read a node or leaf which is
-     * the child of this {@link Node} from the store into the btree. This
-     * ensures that only one thread will read the missing child in from the
-     * store and that inconsistencies in the data structure can not arise from
-     * concurrent readers.
+     * Note: When concurrent callers are allowed, this is synchronized in order
+     * to make sure that concurrent readers are single-threaded at the point
+     * where they read a node or leaf which is the child of this {@link Node}
+     * from the store into the btree. This ensures that only one thread will
+     * read the missing child in from the store and that inconsistencies in the
+     * data structure can not arise from concurrent readers. (We are not
+     * required to synchronize for a mutable {@link BTree} since the contract
+     * for that class is that the caller is single-threaded.)
      * 
      * @param index
      *            The index in [0:nkeys].
@@ -2119,61 +2140,154 @@ public class Node extends AbstractNode<Node> implements INodeData {
         
         assert index >= 0 && index <= nkeys;
 
-        Reference<AbstractNode> childRef = childRefs[index];
+        final Reference<AbstractNode> childRef = childRefs[index];
 
-        AbstractNode child = childRef == null ? null : childRef.get();
+        final AbstractNode child = childRef == null ? null : childRef.get();
 
         if (child == null) {
 
-            synchronized(this) {
+            if (!btree.isReadOnly()) {
+            
+                /*
+                 * The contract for the mutable B+Tree states that the caller is
+                 * single threaded. Therefore we do not need to synchronize for
+                 * this case.
+                 */
 
-                childRef = childRefs[index];
-
-                child = childRef == null ? null : childRef.get();
-
-                final long key = childAddr[index];
-    
-                if (key == NULL) {
-    //                dump(Level.DEBUG, System.err);
-                    /*
-                     * Note: It appears that this can be triggered by a full disk,
-                     * but I am not quite certain how a full disk leads to this
-                     * condition. Presumably the full disk would cause a write of
-                     * the child to fail. In turn, that should cause the thread
-                     * writing on the B+Tree to fail. If group commit is being used,
-                     * the B+Tree should then be discarded and reloaded from its
-                     * last commit point.
-                     */
-                    throw new AssertionError(
-                            "Child does not have persistent identity: this=" + this
-                                    + ", index=" + index);
-                }
-    
-                child = btree.readNodeOrLeaf(key);
-    
-                // patch parent reference since loaded from store.
-//                child.parent = btree.newRef(this);
-                child.parent = this.self;
-    
-                // patch the child reference.
-//                childRefs[index] = btree.newRef(child);
-                childRefs[index] = child.self;
+                return _getChild(index);
                 
+            }
+            
+            /*
+             * This case handles synchronization for concurrent readers. We use
+             * a per-child index position lock in order to allow the greatest
+             * possible concurrency and to reduce the possibility of lock
+             * contention as much as possible.
+             */
+            
+            if (childLocks != null) {
+            
+                /*
+                 * Synchronize on a per-child lock.
+                 */
+                
+                synchronized (childLocks[index]) {
+
+                    return _getChild(index);
+                    
+                }
+
+            } else {
+            
+                /*
+                 * Synchronize on this node (the parent of the child). This case
+                 * is used if per-child locking is disabled -or- if the parent
+                 * had been read into memory before the BTree was marked as
+                 * read-only since, in this latter case, the per-child locks
+                 * were not allocated at the time that the parent was
+                 * materialized.
+                 */
+                
+                synchronized (this) {
+                    
+                    return _getChild(index);
+                    
+                }
+            
             }
             
         }
      
-        /*
-         * @todo touch the node or leaf here? or here and in the return from the
-         * recursive search and mutation methods?
-         */
-        
-        assert child != null;
-
         return child;
 
     }
 
+    /**
+     * Read the child from the store, setting its parent and the reference in
+     * {@link #childRefs}. <strong>The caller MUST obtain any required
+     * synchronization locks before calling this method in order to prevent
+     * inconsistencies in the BTree structure arising from different threads
+     * reading the child into memory at the same time. This problem does NOT
+     * arise for the mutable {@link BTree} since it requires that its caller is
+     * already single-threaded, but it can arise for read-only {@link BTree}s
+     * and for {@link IndexSegment}s.</strong>
+     * 
+     * @param index
+     *            The index of the child to be read from the store.
+     *            
+     * @return The child.
+     */
+    private final AbstractNode _getChild(final int index) {
+        
+        final long key = childAddr[index];
+
+        if (key == NULL) {
+//                dump(Level.DEBUG, System.err);
+            /*
+             * Note: It appears that this can be triggered by a full disk,
+             * but I am not quite certain how a full disk leads to this
+             * condition. Presumably the full disk would cause a write of
+             * the child to fail. In turn, that should cause the thread
+             * writing on the B+Tree to fail. If group commit is being used,
+             * the B+Tree should then be discarded and reloaded from its
+             * last commit point.
+             */
+            throw new AssertionError(
+                    "Child does not have persistent identity: this=" + this
+                            + ", index=" + index);
+        }
+
+        final AbstractNode child = btree.readNodeOrLeaf(key);
+
+        // patch parent reference since loaded from store.
+//        child.parent = btree.newRef(this);
+        child.parent = this.self;
+
+        // patch the child reference.
+//        childRefs[index] = btree.newRef(child);
+        childRefs[index] = child.self;
+
+        return child;
+        
+    }
+    
+    /**
+     * Static helper method allocates the per-child lock objects.
+     * 
+     * @param btree
+     *            The owning B+Tree.
+     * 
+     * @return The array of lock objects -or- <code>null</code> if the btree
+     *         is not read-only.
+     * 
+     * @see #childLocks
+     */
+    static private final Object[] newChildLocks(final AbstractBTree btree) {
+        
+//        if(true) return null;
+        
+        if(!btree.isReadOnly()) return null;
+        
+        /*
+         * Note: The array is dimensioned to [branchingFactor] and not
+         * [branchingFactor+1]. The "overflow" slot of the various arrays are
+         * only used during node overflow/underflow operations. Those operations
+         * do not occur for a read-only B+Tree.
+         */
+        final int n = btree.branchingFactor + 1;
+        
+        final Object[] a = new Object[n];
+        
+        for (int i = 0; i < n; i++) {
+
+            a[i] = new Object();
+            
+        }
+        
+        return a;
+        
+    }
+    
     /**
      * Iterator visits children, recursively expanding each child with a
      * post-order traversal of its children and finally visits this node

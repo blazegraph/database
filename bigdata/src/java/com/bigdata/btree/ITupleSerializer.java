@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import java.io.Serializable;
+import java.util.Locale;
 
 import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.keys.IKeyBuilder;
@@ -96,14 +97,22 @@ public interface ITupleSerializer<K extends Object, V extends Object> extends
      * </p>
      * <p>
      * Note: A mutable B+Tree is always single-threaded. However, read-only
-     * B+Trees allow concurrent readers. Therefore, thread-safety requirement
-     * for this {@link IKeyBuilderFactory} is
+     * B+Trees allow concurrent readers. Therefore, thread-safety requirement is
      * <em>safe for either a single writers -or- for concurrent readers</em>.
      * </p>
      * <p>
      * Note: If you change this value in a manner that is not backward
      * compatable once entries have been written on the index then you may be
      * unable to any read data already written.
+     * </p>
+     * <p>
+     * Note: This {@link IKeyBuilder} SHOULD be used to form all keys for
+     * <i>this</i> index. This is critical for indices that have Unicode data
+     * in their application keys as the formation of Unicode sort keys from
+     * Unicode data depends on the {@link IKeyBuilderFactory}. If you use a
+     * locally configured {@link IKeyBuilder} then your Unicode keys will be
+     * encoded based on the {@link Locale} configured for the JVM NOT the
+     * factory specified for <i>this</i> index.
      * </p>
      */
     public IKeyBuilder getKeyBuilder();

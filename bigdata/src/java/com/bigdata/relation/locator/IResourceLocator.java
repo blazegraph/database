@@ -36,9 +36,10 @@ import com.bigdata.service.IBigdataFederation;
 /**
  * An object that knows how to resolve a resource identifer (aka namespace) to
  * an {@link ILocatableResource} instance. "Locating" a relation means (a)
- * resolving the identifier for the resource and (b) materializing (often from
- * cache) an {@link ILocatableResource} for that resource. Locatable resources
- * are essentially containers for indices, including an {@link IRelation} and an
+ * resolving the namespace for the resource to the resource declaration as of
+ * some timestamp; and (b) materializing (often from cache) an
+ * {@link ILocatableResource} for that resource. Locatable resources are
+ * essentially containers for indices, including an {@link IRelation} and an
  * {@link IDatabase}, which is essentially a container for {@link IRelation}s.
  * <p>
  * Note: a locator does not proxy for a resource. Either the resource is locally
@@ -58,15 +59,15 @@ public interface IResourceLocator<T extends ILocatableResource> {
     /**
      * Locate.
      * 
-     * @param identifier
-     *            The resource identifier (aka namespace).
+     * @param namespace
+     *            The resource namespace.
      * @param timestamp
      *            The timestamp for the view.
      * 
-     * @return A view of the object iff it exists and never <code>null</code>.
-     * 
-     * @throws RuntimeException
-     *             if there is an error when resolving the identifier.
+     * @return A view of the resource iff it exists (specifically, if the
+     *         declaration for the resource can be resolved) -or-
+     *         <code>null</code> if the resource declaration could not be
+     *         resolved.
      */
     public T locate(String namespace, long timestamp);
     

@@ -112,7 +112,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
     protected static final transient Logger log = Logger
             .getLogger(DefaultResourceLocator.class);
     
-    protected static final boolean INFO = log.isDebugEnabled();
+    protected static final boolean INFO = log.isInfoEnabled();
     
     protected static final boolean DEBUG = log.isDebugEnabled();
 
@@ -236,8 +236,11 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
                 }
                 
-                throw new IllegalStateException("Not found: namespace="
-                        + namespace+", timestamp="+timestamp);
+                log.warn("Not found: namespace=" + namespace + ", timestamp="
+                        + timestamp);
+
+                // not found.
+                return null;
 
             }
 

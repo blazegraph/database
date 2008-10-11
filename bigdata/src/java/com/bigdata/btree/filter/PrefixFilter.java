@@ -111,6 +111,8 @@ public class PrefixFilter<E> implements ITupleFilter<E> {
     protected transient static final Logger log = Logger
             .getLogger(PrefixFilter.class);
 
+    protected transient static final boolean INFO = log.isInfoEnabled();
+    
     private static final long serialVersionUID = 1828228416774862469L;
 
     /**
@@ -236,7 +238,7 @@ public class PrefixFilter<E> implements ITupleFilter<E> {
 
                 if (BytesUtil.compareBytes(key, toKey) >= 0) {
 
-                    if (log.isInfoEnabled())
+                    if (INFO)
                         log.info("Scanned beyond prefix: toKey="
                                 + BytesUtil.toString(toKey) + ", tuple="
                                 + tuple);
@@ -259,7 +261,8 @@ public class PrefixFilter<E> implements ITupleFilter<E> {
 
                     }
 
-                    log.info("No more prefixes.");
+                    if(INFO)
+                        log.info("No more prefixes.");
 
                     return false;
 
@@ -274,7 +277,8 @@ public class PrefixFilter<E> implements ITupleFilter<E> {
 
             // no more tuples (at least in this index partition).
 
-            log.info("No more tuples.");
+            if(INFO)
+                log.info("No more tuples.");
 
             return false;
 
@@ -299,7 +303,7 @@ public class PrefixFilter<E> implements ITupleFilter<E> {
             current = src.seek(prefix);
 //            current = src.tuple();
 
-            if (log.isInfoEnabled()) {
+            if (INFO) {
 
                 log.info("index=" + index + ", prefix="
                         + BytesUtil.toString(prefix) + ", current=" + current);

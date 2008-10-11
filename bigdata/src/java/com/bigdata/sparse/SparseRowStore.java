@@ -27,7 +27,6 @@ package com.bigdata.sparse;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bfs.BigdataFileSystem;
@@ -106,37 +105,32 @@ import cutthecrap.utils.striterators.Striterator;
  * 
  * <pre>
  *                                             
- *                            [employee][12][DateOfHire][t0] : [4/30/02]
- *                            [employee][12][DateOfHire][t1] : [4/30/05]
- *                            [employee][12][Employer][t0]   : [SAIC]
- *                            [employee][12][Employer][t1]   : [SYSTAP]
- *                            [employee][12][Id][t0]         : [12]
- *                            [employee][12][Name][t0]       : [Bryan Thompson]
+ * [employee][12][DateOfHire][t0] : [4/30/02]
+ * [employee][12][DateOfHire][t1] : [4/30/05]
+ * [employee][12][Employer][t0]   : [SAIC]
+ * [employee][12][Employer][t1]   : [SYSTAP]
+ * [employee][12][Id][t0]         : [12]
+ * [employee][12][Name][t0]       : [Bryan Thompson]
  *                                             
  * </pre>
  * 
  * <p>
  * 
  * In order to read the logical row whose last update was <code>t0</code>,
- * the caller would specify <code>t0</code> as the timestamp of interest. The
- * values read in this example would be {&lt;DateOfHire, t0, 4/30/02&gt;,
+ * the caller would specify <code>t0</code> as the <i>toTime</i> of interest.
+ * The values read in this example would be {&lt;DateOfHire, t0, 4/30/02&gt;,
  * &lt;Employer, t0, SAIC&gt;, &lt;Id, t0, 12&gt;, &lt;Name, t0, Bryan
  * Thompson&gt;}.
  * </p>
  * <p>
  * Likewise, in order to read the logical row whose last update was
  * &lt;code&gt;t1&lt;/code&gt; the caller would specify
- * &lt;code&gt;t1&lt;/code&gt; as the timestamp of interest. The values read in
- * this example would be {&lt;DateOfHire, t1, 4/30/05&gt;, &lt;Employer, t0,
- * SYSTAP&gt;, &lt;Id, t0, 12&gt;, &lt;Name, t0, Bryan Thompson&gt;}. Notice
+ * &lt;code&gt;t1&lt;/code&gt; as the <i>toTime</i> of interest. The values
+ * read in this example would be {&lt;DateOfHire, t1, 4/30/05&gt;, &lt;Employer,
+ * t0, SYSTAP&gt;, &lt;Id, t0, 12&gt;, &lt;Name, t0, Bryan Thompson&gt;}. Notice
  * that values written at &lt;code&gt;t0&lt;/code&gt; and not overwritten or
  * deleted by &lt;code&gt;t1&lt;/code&gt; are present in the resulting logical
  * row.
- * </p>
- * <p>
- * Note: The constant {@link #MAX_TIMESTAMP} is commonly used to read the most
- * current row from the sparse row store since its value is greater or equal to
- * any valid timestamp.
  * </p>
  * <p>
  * Note: Very large objects should be stored in the {@link BigdataFileSystem}
@@ -151,33 +145,22 @@ import cutthecrap.utils.striterators.Striterator;
  * {@link SparseRowStore}. A caching layer in the web app could be used to
  * reduce any hotspots.
  * 
- * @todo I am not sure that the timestamp filtering mechanism is of much use.
- *       You can't really filter out the low end for a property value since a
- *       property might have been bound once and never rebound nor deleted
- *       thereafter. Likewise you can't really filter out the upper bound for a
- *       property value since you generally are interested in the current value
- *       for a property. Also, the returned
- *       {@link ITPS timestamped property sets} make it relatively easy to find
- *       the value of interest.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SparseRowStore {
+public class SparseRowStore implements IRowStoreConstants {
 
     protected static final Logger log = Logger.getLogger(SparseRowStore.class);
 
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final protected boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final protected boolean DEBUG = log.isDebugEnabled();
 
     static final String UTF8 = "UTF-8";
     
@@ -192,29 +175,6 @@ public class SparseRowStore {
         
     }
     
-    /**
-     * The maximum value for a timestamp. This may be used to read the most
-     * current logical row from the sparse row store since the value is the
-     * largest timestamp that can be written into the index.
-     */
-    public static final long MAX_TIMESTAMP = Long.MAX_VALUE;
-    
-    /**
-     * A value which indicates that the timestamp will be assigned by the server -
-     * unique timestamps are NOT guarenteed with this constant.
-     * 
-     * @see #AUTO_TIMESTAMP_UNIQUE
-     */
-    public static final long AUTO_TIMESTAMP = -1L;
-    
-    /**
-     * A value which indicates that a unique timestamp will be assigned by
-     * the server.
-     * 
-     * @see #AUTO_TIMESTAMP
-     */
-    public static final long AUTO_TIMESTAMP_UNIQUE = 0L;
-
     /**
      * Create a client-side abstraction that treats an {@link IIndex} as a
      * {@link SparseRowStore}.
@@ -304,24 +264,132 @@ public class SparseRowStore {
 //    }
     
     /**
+     * Verifies the given arguments.
+     */
+    final static void assertArgs(final Schema schema, final Object primaryKey,
+            final long fromTime, final long toTime) {
+        
+        if (schema == null)
+            throw new IllegalArgumentException("schema");
+        
+        if (primaryKey == null)
+            throw new IllegalArgumentException("primaryKey");
+
+        if (fromTime == CURRENT_ROW) {
+            
+            throw new IllegalArgumentException(
+                    "fromTime MAY NOT be 'CURRENT_ROW'");
+            
+        }
+        
+        if (fromTime < MIN_TIMESTAMP) {
+
+            throw new IllegalArgumentException("fromTime less than MIN_TIMESTAMP");
+            
+        }
+        
+        if (toTime != CURRENT_ROW) {
+
+            if (fromTime >= toTime) {
+
+                throw new IllegalArgumentException("from/to time out of order");
+                
+            }
+            
+        }
+        
+    }
+    
+    /**
+     * Verifies the writeTime.
+     * 
+     * @param writeTime
+     */
+    final static void assertWriteTime(long writeTime) {
+        
+        if (writeTime == AUTO_TIMESTAMP)
+            return;
+
+        if (writeTime == AUTO_TIMESTAMP_UNIQUE)
+            return;
+        
+        if (writeTime < MIN_TIMESTAMP)
+            throw new IllegalArgumentException();
+        
+    }
+    
+    /**
+     * Validates the column name productions
+     */
+    final static void assertPropertyNames(final Map<String, Object> propertySet) {
+
+        if (propertySet == null)
+            throw new IllegalArgumentException();
+        
+        final Iterator<String> itr = propertySet.keySet().iterator();
+
+        while (itr.hasNext()) {
+
+            final String col = itr.next();
+
+            // validate the column name production.
+            NameChecker.assertColumnName(col);
+
+        }
+
+    }
+    
+    /**
+     * Return the current binding for the named property.
+     * 
+     * @param schema
+     *            The {@link Schema} governing the logical row.
+     * @param primaryKey
+     *            The primary key that identifies the logical row.
+     * @param name
+     *            The property name.
+     * @return The current binding -or- <code>null</code> iff the property is
+     *         not bound.
+     * 
+     * @todo this can be optimized and should use its own stored procedure. See
+     *       {@link AbstractAtomicRowReadOrWrite#getCurrentValue(IIndex, Schema, Object, String)}
+     */
+    public Object get(final Schema schema, final Object primaryKey, final String name) {
+
+        final TPS tps = (TPS) read(schema, primaryKey, MIN_TIMESTAMP,
+                CURRENT_ROW, new SingleColumnFilter(name));
+
+        if (tps == null) {
+
+            return null;
+            
+        }
+        
+        return tps.get(name).getValue();
+        
+    }
+    
+    /**
      * Read the most recent logical row from the index.
      * 
      * @param schema
      *            The {@link Schema} governing the logical row.
-     * 
      * @param primaryKey
      *            The primary key that identifies the logical row.
      * 
-     * @return The data in that row -or- <code>null</code> if there was no row
-     *         for that primary key.
+     * @return The data for the current state of that logical row -or-
+     *         <code>null</code> IFF there are no property values for that
+     *         logical row (including no deleted property values, no property
+     *         values that are excluded due to their timestamps, and no property
+     *         values that are excluded due to a property name filter). A
+     *         <code>null</code> return is a strong guarentee that NO data
+     *         existed in the row store and that time of the read for the given
+     *         <i>schema</i> and <i>primaryKey</i>.
      */
-    public Map<String,Object> read(Schema schema, Object primaryKey) {
+    public Map<String, Object> read(final Schema schema, final Object primaryKey) {
 
-        final long timestamp = Long.MAX_VALUE;
-        
-        final INameFilter filter = null;
-        
-        TPS tps = (TPS) read(schema, primaryKey, timestamp, filter );
+        final TPS tps = (TPS) read(schema, primaryKey, MIN_TIMESTAMP,
+                CURRENT_ROW, null/* filter */);
 
         if (tps == null) {
 
@@ -329,51 +397,100 @@ public class SparseRowStore {
 
         }
 
-        return tps.asMap(timestamp,filter);
+        return tps.asMap();
 
     }
-    
+
+    /**
+     * Read the most recent logical row from the index.
+     * 
+     * @param schema
+     *            The {@link Schema} governing the logical row.
+     * @param primaryKey
+     *            The primary key that identifies the logical row.
+     * @param filter
+     *            An optional filter.
+     * 
+     * @return The data for the current state of that logical row -or-
+     *         <code>null</code> IFF there are no property values for that
+     *         logical row (including no deleted property values, no property
+     *         values that are excluded due to their timestamps, and no property
+     *         values that are excluded due to a property name filter). A
+     *         <code>null</code> return is a strong guarentee that NO data
+     *         existed in the row store and that time of the read for the given
+     *         <i>schema</i> and <i>primaryKey</i>.
+     */
+    public Map<String, Object> read(final Schema schema,
+            final Object primaryKey, final INameFilter filter) {
+
+        final TPS tps = (TPS) read(schema, primaryKey, MIN_TIMESTAMP,
+                CURRENT_ROW, filter);
+
+        if (tps == null) {
+
+            return null;
+
+        }
+
+        return tps.asMap();
+
+    }
+
     /**
      * Read a logical row from the index.
      * 
      * @param schema
      *            The {@link Schema} governing the logical row.
-     *            
      * @param primaryKey
      *            The primary key that identifies the logical row.
-     * 
-     * @param timestamp
-     *            Property values whose timestamps are not greater than this
-     *            value will be retrieved. Use {@link Long#MAX_VALUE} to read
-     *            the most current property values.
-     * 
+     * @param fromTime
+     *            The first timestamp for which timestamped property values will
+     *            be accepted.
+     * @param toTime
+     *            The first timestamp for which timestamped property values will
+     *            NOT be accepted -or- {@link IRowStoreConstants#CURRENT_ROW} to
+     *            accept only the most current binding whose timestamp is GTE
+     *            <i>fromTime</i>.
      * @param filter
      *            An optional filter that may be used to select values for
      *            property names accepted by the filter.
      * 
-     * @return The data in that row -or- <code>null</code> if there was no row
-     *         for that primary key.
+     * @return The data in that row -or- <code>null</code> IFF there are no
+     *         property values for that logical row (including no deleted
+     *         property values, no property values that are excluded due to
+     *         their timestamps, and no property values that are excluded due to
+     *         a property name filter). A <code>null</code> return is a strong
+     *         guarentee that NO data existed in the row store and that time of
+     *         the read for the given <i>schema</i> and <i>primaryKey</i>.
+     * 
+     * @throws IllegalArgumentException
+     *             if the <i>schema</i> is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if the <i>primaryKey</i> is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if the <i>fromFrom</i> and or <i>toTime</i> are invalid.
      * 
      * @see ITimestampPropertySet#asMap(), return the most current bindings.
      * @see ITimestampPropertySet#asMap(long)), return the most current bindings
      *      as of the specified timestamp.
      * 
-     * @todo consider semantics where {@link Long#MAX_VALUE} returns ONLY the
-     *       current bindings rather than all data available for that primary
-     *       key or define another value such as CURRENT_ROW to obtain only the
-     *       current row. The filtering should be applied on the server side to
-     *       reduce the network traffic.
+     * @see IRowStoreConstants#CURRENT_ROW
+     * @see IRowStoreConstants#MIN_TIMESTAMP
+     * @see IRowStoreConstants#MAX_TIMESTAMP
      */
-    public ITPS read(Schema schema, Object primaryKey, long timestamp,
-            INameFilter filter) {
+    public ITPS read(final Schema schema, final Object primaryKey,
+            final long fromTime, final long toTime, final INameFilter filter) {
 
+        assertArgs(schema, primaryKey, fromTime, toTime);
+        
         if (INFO)
             log.info("schema=" + schema.getName() + ", primaryKey="
-                    + primaryKey + ", timestamp=" + timestamp + ", filter="
+                    + primaryKey + ", fromTime=" + fromTime + ", toTime="
+                    + toTime + ", filter="
                     + (filter == null ? "N/A" : filter.getClass().getName()));
         
-        final AtomicRowRead proc = new AtomicRowRead(schema, primaryKey, timestamp,
-                filter);
+        final AtomicRowRead proc = new AtomicRowRead(schema, primaryKey,
+                fromTime, toTime, filter);
         
         final byte[] key = schema.fromKey(
                 ndx.getIndexMetadata().getKeyBuilder(), primaryKey).getKey();
@@ -384,8 +501,8 @@ public class SparseRowStore {
     }
     
     /**
-     * Atomic write with atomic read of the post-update state of the logical
-     * row.
+     * Atomic write with atomic read-back of the post-update state of the
+     * logical row.
      * <p>
      * Note: In order to cause a column value for row to be deleted you MUST
      * specify a <code>null</code> column value for that column.
@@ -401,19 +518,118 @@ public class SparseRowStore {
      *            The column names and values for that row.
      * 
      * @return The result of an atomic read on the post-update state of the
-     *         logical row.  Only the most current bindings will be present
-     *         for each property.
+     *         logical row. Only the most current bindings will be present for
+     *         each property.
      */
-    public Map<String,Object> write(Schema schema,
-            Map<String, Object> propertySet) {
+    public Map<String, Object> write(final Schema schema,
+            final Map<String, Object> propertySet) {
 
-        return write(schema, propertySet, Long.MAX_VALUE/* timestamp */,
-                null/* filter */, null/* precondition */).asMap();
+        return write(schema, propertySet, AUTO_TIMESTAMP_UNIQUE, null/* filter */,
+                null/* precondition */).asMap();
         
     }
 
     /**
-     * Atomic write with atomic read of the post-update state of the logical
+     * Atomic write with atomic read-back of the post-update state of the
+     * logical row.
+     * 
+     * @param schema
+     *            The {@link Schema} governing the logical row.
+     * @param propertySet
+     *            The column names and values for that row.
+     * @param writeTime
+     *            The timestamp to use for the row -or-
+     *            {@link IRowStoreConstants#AUTO_TIMESTAMP} if the timestamp
+     *            will be generated by the server -or-
+     *            {@link IRowStoreConstants#AUTO_TIMESTAMP_UNIQUE} if a
+     *            federation-wide unique timestamp will be generated by the
+     *            server.
+     * 
+     * @return The result of an atomic read on the post-update state of the
+     *         logical row. Only the most current bindings will be present for
+     *         each property.
+     */
+    public Map<String, Object> write(final Schema schema,
+            final Map<String, Object> propertySet, final long writeTime) {
+
+        return write(schema, propertySet, writeTime, null/* filter */, null/* precondition */)
+                .asMap();
+        
+    }
+
+    /**
+     * Atomic write with atomic read of the then current post-condition state of
+     * the logical row.
+     * <p>
+     * Note: In order to cause a column value for row to be deleted you MUST
+     * specify a <code>null</code> column value for that column. A
+     * <code>null</code> will be written under the key for the column value
+     * with a new timestamp. This is interpreted as a deleted property value
+     * when the row is simplified as a {@link Map}. If you examine the
+     * {@link ITPS} you can see the {@link ITPV} with the <code>null</code>
+     * value and the timestamp of the delete.
+     * <p>
+     * Note: the value of the <i>primaryKey</i> is written each time the
+     * logical row is updated and timestamp associate with the value for the
+     * <i>primaryKey</i> property tells you the timestamp of each row revision.
+     * <p>
+     * Note: If the caller specified a <i>timestamp</i>, then that timestamp is
+     * used by the atomic read. If the timestamp was assigned by the server,
+     * then the server assigned timestamp is used by the atomic read.
+     * <p>
+     * Note: You can verify pre-conditions for the logical row on the server.
+     * Among other things this could be used to reject an update if someone has
+     * modified the logical row since you last read some value.
+     * 
+     * @param schema
+     *            The {@link Schema} governing the logical row.
+     * @param propertySet
+     *            The column names and values for that row. The primaryKey as
+     *            identified by the {@link Schema} MUST be present in the
+     *            <i>propertySet</i>.
+     * @param writeTime
+     *            The timestamp to use for the row -or-
+     *            {@link IRowStoreConstants#AUTO_TIMESTAMP} if the timestamp
+     *            will be generated by the server -or-
+     *            {@link IRowStoreConstants#AUTO_TIMESTAMP_UNIQUE} if a
+     *            federation-wide unique timestamp will be generated by the
+     *            server.
+     * @param filter
+     *            An optional filter used to select the property values that
+     *            will be returned (this has no effect on the atomic write).
+     * @param precondition
+     *            When present, the pre-condition state of the row will be read
+     *            and offered to the {@link IPrecondition}. If the
+     *            {@link IPrecondition} fails, then the atomic write will NOT be
+     *            performed and the pre-condition state of the row will be
+     *            returned. If the {@link IPrecondition} succeeds, then the
+     *            atomic write will be performed and the post-condition state of
+     *            the row will be returned. Use {@link TPS#isPreconditionOk()}
+     *            to determine whether or not the write was performed.
+     * 
+     * @return The result of an atomic read on the post-update state of the
+     *         logical row -or- <code>null</code> iff there is no data for the
+     *         <i>primaryKey</i> (per the contract for an atomic read).
+     *         <p>
+     *         If an optional {@link IPrecondition} was specified and the
+     *         {@link IPrecondition} was NOT satisified, then the write
+     *         operation was NOT performed and the result is the pre-condition
+     *         state of the logical row (which, again, will be <code>null</code>
+     *         IFF there is NO data for the <i>primaryKey</i>).
+     * 
+     * @see ITPS#getWriteTimestamp()
+     */
+    public TPS write(final Schema schema,
+            final Map<String, Object> propertySet, final long writeTime,
+            final INameFilter filter, final IPrecondition precondition) {
+
+        return write(schema, propertySet, MIN_TIMESTAMP, CURRENT_ROW,
+                writeTime, filter, precondition);
+
+    }
+    
+    /**
+     * Atomic write with atomic read of the post-condition state of the logical
      * row.
      * <p>
      * Note: In order to cause a column value for row to be deleted you MUST
@@ -438,21 +654,30 @@ public class SparseRowStore {
      * 
      * @param schema
      *            The {@link Schema} governing the logical row.
-     * 
      * @param propertySet
      *            The column names and values for that row. The primaryKey as
      *            identified by the {@link Schema} MUST be present in the
      *            <i>propertySet</i>.
-     * 
-     * @param timestamp
+     * @param fromTime
+     *            <em>During pre-condition and post-condition reads</em>, the
+     *            first timestamp for which timestamped property values will be
+     *            accepted.
+     * @param toTime
+     *            <em>During pre-condition and post-condition reads</em>, the
+     *            first timestamp for which timestamped property values will NOT
+     *            be accepted -or- {@link IRowStoreConstants#CURRENT_ROW} to
+     *            accept only the most current binding whose timestamp is GTE
+     *            <i>fromTime</i>.
+     * @param writeTime
      *            The timestamp to use for the row -or-
-     *            <code>#AUTO_TIMESTAMP</code> if the timestamp will be
-     *            auto-generated by the data service.
-     * 
+     *            {@link IRowStoreConstants#AUTO_TIMESTAMP} if the timestamp
+     *            will be generated by the server -or-
+     *            {@link IRowStoreConstants#AUTO_TIMESTAMP_UNIQUE} if a
+     *            federation-wide unique timestamp will be generated by the
+     *            server.
      * @param filter
      *            An optional filter used to select the property values that
      *            will be returned (this has no effect on the atomic write).
-     * 
      * @param precondition
      *            When present, the pre-condition state of the row will be read
      *            and offered to the {@link IPrecondition}. If the
@@ -464,14 +689,24 @@ public class SparseRowStore {
      *            to determine whether or not the write was performed.
      * 
      * @return The result of an atomic read on the post-update state of the
-     *         logical row -or- <code>null</code> iff there is no data for the
-     *         <i>primaryKey</i>. If an optional {@link IPrecondition} was
-     *         specified and the {@link IPrecondition} was NOT satisified, then
-     *         the write operation was NOT performed and the result is the
-     *         pre-condition state of the logical row (which will be
-     *         <code>null</code> iff there is no data for the <i>primaryKey</i>).
+     *         logical row, which will be <code>null</code> IFF there is NO
+     *         data for the <i>primaryKey</i>.
+     *         <p>
+     *         If an optional {@link IPrecondition} was specified and the
+     *         {@link IPrecondition} was NOT satisified, then the write
+     *         operation was NOT performed and the result is the pre-condition
+     *         state of the logical row (which, again, will be <code>null</code>
+     *         IFF there is NO data for the <i>primaryKey</i>).
      * 
-     * @see ITPS#getTimestamp()
+     * @throws UnsupportedOperationException
+     *             if a property has an auto-increment type and the
+     *             {@link ValueType} of the property does not support
+     *             auto-increment.
+     * @throws UnsupportedOperationException
+     *             if a property has an auto-increment type but there is no
+     *             successor in the value space of that property.
+     * 
+     * @see ITPS#getWriteTimestamp()
      * 
      * @todo the atomic read back may be overkill. When you need the data is
      *       means that you only do one RPC rather than two. When you do not
@@ -479,7 +714,7 @@ public class SparseRowStore {
      *       in this method signature. You can get pretty much the same result
      *       by doing an atomic read after the fact using the timestamp assigned
      *       by the server to the row (pretty much in the sense that it is
-     *       possible for another write to explictly specify the same timestamp
+     *       possible for another write to explicitly specify the same timestamp
      *       and hence overwrite your data).
      * 
      * @todo the timestamp could be an {@link ITimestampService} with an
@@ -492,21 +727,35 @@ public class SparseRowStore {
      *       by the {@link Schema} and therefore factored out of this method
      *       signature.
      */
-    public TPS write(Schema schema, Map<String, Object> propertySet,
-            long timestamp, INameFilter filter, IPrecondition precondition) {
+    public TPS write(final Schema schema,
+            final Map<String, Object> propertySet, final long fromTime,
+            final long toTime, final long writeTime, final INameFilter filter,
+            final IPrecondition precondition) {
         
+        // check before extracting the primary key.
+        if (schema == null)
+            throw new IllegalArgumentException();
+
+        // check before extracting the primary key.
+        if (propertySet == null)
+            throw new IllegalArgumentException();
+
+        // extract the primary key.
         final Object primaryKey = propertySet.get(schema.getPrimaryKeyName());
 
+        // verify args.
+        assertArgs(schema, primaryKey, fromTime, toTime);
+        
         if (INFO)
             log.info("schema=" + schema.getName() + ", primaryKey="
-                    + primaryKey + ", timestamp=" + timestamp + ", filter="
+                    + primaryKey + ", timestamp=" + writeTime + ", filter="
                     + (filter == null ? "N/A" : filter.getClass().getName())+
                     ", precondition="
                     + (precondition == null ? "N/A" : precondition.getClass()
                             .getName()));
 
         final AtomicRowWriteRead proc = new AtomicRowWriteRead(schema,
-                propertySet, timestamp, filter, precondition);
+                propertySet, fromTime, toTime, writeTime, filter, precondition);
 
         final byte[] key = schema.fromKey(
                 ndx.getIndexMetadata().getKeyBuilder(), primaryKey).getKey();
@@ -516,7 +765,7 @@ public class SparseRowStore {
     }
 
     /**
-     * Atomic delete of all property values for the logical row.
+     * Atomic delete of all property values for the current logical row.
      * 
      * @param schema
      *            The schema.
@@ -527,47 +776,64 @@ public class SparseRowStore {
      */
     public ITPS delete(Schema schema, Object primaryKey) {
 
-        return delete(schema, primaryKey, AUTO_TIMESTAMP, null/* filter */);
+        return delete(schema, primaryKey, MIN_TIMESTAMP, CURRENT_ROW,
+                AUTO_TIMESTAMP_UNIQUE, null/* filter */);
         
     }
     
     /**
-     * Atomic delete of all property values for the logical row.
+     * Atomic delete of all property values for the logical row. The property
+     * values are read atomically, each property value that is read is then
+     * overwritten with a <code>null</code>, and the read property values are
+     * returned.
      * 
      * @param schema
      *            The schema.
      * @param primaryKey
      *            The primary key for the logical row.
-     * @param timestamp
+     * @param fromTime
+     *            <em>During pre-condition and post-condition reads</em>, the
+     *            first timestamp for which timestamped property values will be
+     *            accepted.
+     * @param toTime
+     *            <em>During pre-condition and post-condition reads</em>, the
+     *            first timestamp for which timestamped property values will NOT
+     *            be accepted -or- {@link IRowStoreConstants#CURRENT_ROW} to
+     *            accept only the most current binding whose timestamp is GTE
+     *            <i>fromTime</i>.
+     * @param writeTime
      *            The timestamp that will be written into the "deleted" entries
-     *            for the row -or- <code>#AUTO_TIMESTAMP</code> if the
-     *            timestamp will be auto-generated by the data service.
+     *            -or- {@link IRowStoreConstants#AUTO_TIMESTAMP} if the
+     *            timestamp will be generated by the server -or-
+     *            {@link IRowStoreConstants#AUTO_TIMESTAMP_UNIQUE} if a
+     *            federation-wide unique timestamp will be generated by the
+     *            server.
      * @param filter
      *            An optional filter used to select the property values that
      *            will be deleted.
      * 
-     * @return The deleted property values.
+     * @return The property values that were read from the store before they
+     *         were deleted. The {@link ITPS#getWriteTimestamp()} will report
+     *         the timestamp assigned to the deleted entries used to overwrite
+     *         these property values in the store.
      * 
      * @todo add optional {@link IPrecondition}.
      * 
      * @todo unit tests.
      */
-    public ITPS delete(Schema schema, Object primaryKey, long timestamp,
-            INameFilter filter) {
+    public ITPS delete(final Schema schema, Object primaryKey,
+            final long fromTime, final long toTime, final long writeTime,
+            final INameFilter filter) {
 
-        if (schema == null)
-            throw new IllegalArgumentException();
-        
-        if (primaryKey == null)
-            throw new IllegalArgumentException();
+        assertArgs(schema, primaryKey, fromTime, toTime);
         
         if (INFO)
             log.info("schema=" + schema + ", primaryKey=" + primaryKey
-                    + ", timestamp=" + timestamp + ", filter="
+                    + ", timestamp=" + writeTime + ", filter="
                     + (filter == null ? "N/A" : filter.getClass().getName()));
             
         final AtomicRowDelete proc = new AtomicRowDelete(schema, primaryKey,
-                timestamp, filter);
+                fromTime, toTime, writeTime, filter);
         
         final byte[] key = schema.fromKey(
                 ndx.getIndexMetadata().getKeyBuilder(), primaryKey).getKey();
@@ -577,9 +843,75 @@ public class SparseRowStore {
     }
     
     /**
-     * A logical row scan. Each logical row will be read atomically. More than
-     * one logical row MAY be read in a single atomic operation but that is not
-     * guarenteed.
+     * A logical row scan. Each logical row will be read atomically. Only the
+     * current bindings for property values will be returned.
+     * 
+     * @param schema
+     *            The {@link Schema} governing the logical row.
+     * 
+     * @return An iterator visiting each logical row in the specified key range.
+     */
+    public Iterator<? extends ITPS> rangeIterator(final Schema schema) {
+
+        return rangeIterator(schema, null/* fromKey */, null/* toKey */,
+                0/* capacity */, MIN_TIMESTAMP, CURRENT_ROW, null/* filter */);
+
+    }
+
+    /**
+     * A logical row scan. Each logical row will be read atomically. Only the
+     * current bindings for property values will be returned.
+     * 
+     * @param schema
+     *            The {@link Schema} governing the logical row.
+     * @param fromKey
+     *            The value of the primary key for lower bound (inclusive) of
+     *            the key range -or- <code>null</code> iff there is no lower
+     *            bound.
+     * @param toKey
+     *            The value of the primary key for upper bound (exclusive) of
+     *            the key range -or- <code>null</code> iff there is no lower
+     *            bound.
+     * 
+     * @return An iterator visiting each logical row in the specified key range.
+     */
+    public Iterator<? extends ITPS> rangeIterator(final Schema schema,
+            final Object fromKey, final Object toKey) {
+
+        return rangeIterator(schema, fromKey, toKey, 0/* capacity */,
+                MIN_TIMESTAMP, CURRENT_ROW, null/* filter */);
+
+    }
+
+    /**
+     * A logical row scan. Each logical row will be read atomically. Only the
+     * current bindings for property values will be returned.
+     * 
+     * @param schema
+     *            The {@link Schema} governing the logical row.
+     * @param fromKey
+     *            The value of the primary key for lower bound (inclusive) of
+     *            the key range -or- <code>null</code> iff there is no lower
+     *            bound.
+     * @param toKey
+     *            The value of the primary key for upper bound (exclusive) of
+     *            the key range -or- <code>null</code> iff there is no lower
+     *            bound.
+     * @param filter
+     *            An optional filter.
+     * 
+     * @return An iterator visiting each logical row in the specified key range.
+     */
+    public Iterator<? extends ITPS> rangeIterator(final Schema schema,
+            final Object fromKey, final Object toKey, final INameFilter filter) {
+
+        return rangeIterator(schema, fromKey, toKey, 0/* capacity */,
+                MIN_TIMESTAMP, CURRENT_ROW, filter);
+
+    }
+
+    /**
+     * A logical row scan. Each logical row will be read atomically.
      * 
      * @param schema
      *            The {@link Schema} governing the logical row.
@@ -596,19 +928,25 @@ public class SparseRowStore {
      *            be read atomically. This is only an upper bound. The actual
      *            #of logical rows in an atomic read depends on a variety of
      *            factors.
-     * @param timestamp
-     *            The property values whose timestamp is larger than this value
-     *            will be ignored (i.e., the maximum timestamp that will be
-     *            returned for a property value). Use {@link #MAX_TIMESTAMP} to
-     *            obtain all values for a property, including the most recent.
+     * @param fromTime
+     *            The first timestamp for which timestamped property values will
+     *            be accepted.
+     * @param toTime
+     *            The first timestamp for which timestamped property values will
+     *            NOT be accepted -or- {@link IRowStoreConstants#CURRENT_ROW} to
+     *            accept only the most current binding whose timestamp is GTE
+     *            <i>fromTime</i>.
      * @param nameFilter
      *            An optional filter used to select the property(s) of interest.
      * 
      * @return An iterator visiting each logical row in the specified key range.
      */
-    public Iterator<? extends ITPS> rangeQuery(Schema schema,
-            Object fromKey, Object toKey, int capacity, long timestamp,
-            INameFilter nameFilter) {
+    @SuppressWarnings("unchecked")
+    public Iterator<? extends ITPS> rangeIterator(final Schema schema,
+            Object fromKey, Object toKey, final int capacity,
+            final long fromTime, final long toTime, final INameFilter nameFilter) {
+
+        assertArgs(schema, Boolean.TRUE/* fake */, fromTime, toTime);
         
         if (INFO)
             log.info("schema="
@@ -619,8 +957,10 @@ public class SparseRowStore {
                     + toKey
                     + ", capacity="
                     + capacity
-                    + ", timestamp="
-                    + timestamp
+                    + ", fromTime="
+                    + fromTime
+                    + ", toTime="
+                    + toTime
                     + ", filter="
                     + (nameFilter == null ? "N/A" : nameFilter.getClass()
                             .getName()));
@@ -629,53 +969,57 @@ public class SparseRowStore {
 
         if (fromKey != null) {
 
-           // convert to an unsigned byte[].
+            // convert to an unsigned byte[].
             fromKey = schema.fromKey(keyBuilder, fromKey).getKey();
+            
         }
 
         if (toKey != null) {
 
             // convert to an unsigned byte[].
             toKey = schema.fromKey(keyBuilder, toKey).getKey();
-            
+
         }
 
-        return new Striterator(ndx.rangeIterator((byte[]) fromKey, (byte[]) toKey, capacity,
-                IRangeQuery.DEFAULT,
-                new FilterConstructor<ITPV>()
-                        .addFilter(new AtomicRowFilter(schema, timestamp,
-                                nameFilter)))).addFilter(new Resolver(){
-                                    @Override
-                                    protected Object resolve(Object obj) {
-                                        return ((ITuple<TPS>)obj).getObject();
-                                    }});
+        /*
+         * If the primary key type has a fixed length (int, long, etc), then the
+         * successor for continuation queries must be formed by adding one to
+         * the last key visited. Otherwise an unsigned nul byte is appended
+         * (ASCII, Unicode).
+         */
+        final boolean fixedLengthSuccessor = schema.getPrimaryKeyType().isFixedLength();
         
-    }
-
-    /**
-     * A logical row scan. Each logical row will be read atomically. More than
-     * one logical row MAY be read in a single atomic operation but that is not
-     * guarenteed.
-     * 
-     * @param schema
-     *            The {@link Schema} governing the logical row.
-     * @param fromKey
-     *            The value of the primary key for lower bound (inclusive) of
-     *            the key range -or- <code>null</code> iff there is no lower
-     *            bound.
-     * @param toKey
-     *            The value of the primary key for upper bound (exclusive) of
-     *            the key range -or- <code>null</code> iff there is no lower
-     *            bound.
-     * 
-     * @return An iterator visiting each logical row in the specified key range.
-     */
-    public Iterator<? extends ITPS> rangeQuery(Schema schema, Object fromKey,
-            Object toKey) {
-
-        return rangeQuery(schema, fromKey, toKey, 0/* capacity */,
-                MAX_TIMESTAMP, null/* filter */);
-
+        final int flags = IRangeQuery.DEFAULT
+                | IRangeQuery.READONLY
+                | (fixedLengthSuccessor ? IRangeQuery.FIXED_LENGTH_SUCCESSOR
+                        : 0);
+        
+        /*
+         * Setup an iterator that visits the timestamp-property-value tuples and
+         * a filter that aggregates logical rows into chunks.
+         */
+        
+        return new Striterator(ndx.rangeIterator(//
+                (byte[]) fromKey, //
+                (byte[]) toKey, //
+                capacity, // max #of rows to fetch at a time.
+                flags, // 
+                new FilterConstructor<ITPV>()
+                        .addFilter(new AtomicRowFilter(
+                        schema, fromTime, toTime, nameFilter))))
+                .addFilter(new Resolver() {
+                    private static final long serialVersionUID = 1L;
+                    @Override
+                    protected Object resolve(Object obj) {
+                        // resolve visited TPS from tuple.
+                        final ITuple<TPS> tuple = (ITuple<TPS>) obj;
+                        if (INFO) {
+                            log.info("resolving TPS: " + tuple.getVisitCount());
+                        }
+                        return tuple.getObject();
+                    }
+                });
+        
     }
 
 }

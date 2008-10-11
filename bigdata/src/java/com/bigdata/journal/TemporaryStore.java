@@ -307,9 +307,10 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
                 
             }
             
-            final BTree btree = BTree.load(this, checkpointAddr);
+            final BTree btree = BTree
+                    .load(this, checkpointAddr, true/*readOnly*/);
             
-            btree.setReadOnly(true);
+//            btree.setReadOnly(true);
             
             return btree;
             

@@ -7,6 +7,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 
+import com.bigdata.sparse.IRowStoreConstants;
 import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.ITPV;
 
@@ -53,8 +54,8 @@ public class RepositoryDocumentImpl implements DocumentHeader, Document
      *            The logical row describing the metadata for some file in
      *            the repository.
      */
-    public RepositoryDocumentImpl(BigdataFileSystem repo, String id,
-            ITPS tps) {
+    public RepositoryDocumentImpl(final BigdataFileSystem repo, final String id,
+            final ITPS tps) {
         
         if (repo == null)
             throw new IllegalArgumentException();
@@ -141,22 +142,21 @@ public class RepositoryDocumentImpl implements DocumentHeader, Document
      * @param id
      *            The file identifier.
      */
-    public RepositoryDocumentImpl(BigdataFileSystem repo,String id)
-    {
-        
-        this(repo, id, repo.getMetadataIndex()
-                .read(BigdataFileSystem.metadataSchema, id, Long.MAX_VALUE,
-                        null/* filter */));
-        
+    public RepositoryDocumentImpl(final BigdataFileSystem repo, final String id) {
+
+        this(repo, id, repo.getMetadataIndex().read(
+                BigdataFileSystem.metadataSchema, id,
+                IRowStoreConstants.MIN_TIMESTAMP,
+                IRowStoreConstants.CURRENT_ROW, null/* filter */));
+
     }
 
     /**
-     * Assert that a version of the file existed when this view was
-     * constructed.
+     * Assert that a version of the file existed when this view was constructed.
      * 
      * @throws IllegalStateException
-     *             unless a version of the file existed at the time that
-     *             this view was constructed.
+     *             unless a version of the file existed at the time that this
+     *             view was constructed.
      */
     final protected void assertExists() {
 

@@ -31,6 +31,7 @@ package com.bigdata.journal;
 import java.nio.ByteBuffer;
 import java.util.Properties;
 import java.util.Random;
+import java.util.concurrent.Callable;
 
 import junit.framework.TestCase;
 import junit.framework.TestCase2;
@@ -323,6 +324,52 @@ public abstract class AbstractIndexManagerTestCase<S extends IIndexManager> exte
         r.nextBytes(bytes);
         
         return ByteBuffer.wrap(bytes);
+        
+    }
+    
+    /**
+     * Test helper evaluates a {@link Callable} and fails unless the expected
+     * exception is thrown. This is typically used to perform correct rejection
+     * tests for methods.
+     * 
+     * @param c
+     *            The {@link Callable}.
+     * @param expected
+     *            The expected exception.
+     * 
+     * @todo refactor into junit-ext.
+     */
+    protected void fail(final Callable c,
+            final Class<? extends Throwable> expected) {
+        
+        if (c == null)
+            throw new IllegalArgumentException();
+
+        if (expected == null)
+            throw new IllegalArgumentException();
+        
+        try {
+            
+            c.call();
+            
+        } catch (Throwable t) {
+            
+            if (t.getClass().isAssignableFrom(expected)) {
+            
+                if (INFO)
+                    log.info("Ignoring expected exception: " + t);
+                
+                return;
+            
+            } else {
+        
+                fail("Expecting: " + expected + ", not " + t, t);
+                
+            }
+
+        }
+
+        fail("Expecting: " + expected);
         
     }
     

@@ -28,10 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.sparse;
 
-import com.bigdata.btree.AbstractBTree;
+import java.io.IOException;
+
+import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.ILocalTransactionManager;
+import com.bigdata.journal.ITimestampService;
 import com.bigdata.sparse.TPS.TPV;
 
 /**
@@ -41,51 +44,86 @@ import com.bigdata.sparse.TPS.TPV;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TimestampChooser {
+public class TimestampChooser implements IRowStoreConstants {
 
     /**
-     * Choose the timestamp for new {@link TPV} tuples written on the sparse row
-     * store. When <i>timestamp</> is {@link SparseRowStore#AUTO_TIMESTAMP} the
-     * timestamp is just the local system time. When <i>timestamp</i> is
-     * {@link SparseRowStore#AUTO_TIMESTAMP_UNIQUE} the timestamp is assigned by
-     * the {@link ILocalTransactionManager}. Otherwise the caller's
-     * <i>timestamp</i> is returned.
+     * Choose the timestamp for {@link TPV} tuples to written on the sparse row
+     * store.
      * <p>
      * Note: Revisions written with the same timestamp as a pre-existing column
-     * value will overwrite the existing column value rather that causing new
+     * value will overwrite the existing column value rather than causing new
      * revisions with their own distinct timestamp to be written. There is
      * therefore a choice for "auto" vs "auto-unique" for timestamps.
+     * <p>
+     * Note: Timestamps generated locally on the server will be consistent
+     * within a row, and all revisions of column values for the same row will
+     * always be in the same index partition and hence on the same server. This
+     * means that we can use locally assigned timestamp as unique timestamps.
+     * However, time could go backwards if there is a failover to another server
+     * for the partition and the other server has a different clock time. This
+     * is resolved by choosing a timestamp assigned by the global
+     * {@link ITimestampService}.
      * 
-     * @todo Timestamps can be locally generated on the server since they must
-     *       be consistent solely within a row, and all revisions of column
-     *       values for the same row will always be in the same index partition
-     *       and hence on the same server.
-     *       <P>
-     *       The only way in which time could go backward is if there is a
-     *       failover to another server for the partition and the other server
-     *       has a different clock time. If the server clocks are kept
-     *       synchronized then this should not be a problem.
+     * @param timestamp
+     *            When <i>timestamp</> is {@link IRowStoreConstants#AUTO_TIMESTAMP}
+     *            the timestamp is the local system time. When <i>timestamp</i>
+     *            is {@link IRowStoreConstants#AUTO_TIMESTAMP_UNIQUE} a federation
+     *            wide unique timestamp is assigned by the
+     *            {@link ITimestampService}. Otherwise the caller's
+     *            <i>timestamp</i> is returned.
      */
-    static public long chooseTimestamp(IIndex ndx, long timestamp) {
+    static public long chooseTimestamp(final IIndex ndx, final long timestamp) {
 
-        if (timestamp == SparseRowStore.AUTO_TIMESTAMP) {
+        if (timestamp == AUTO_TIMESTAMP) {
 
-            timestamp = System.currentTimeMillis();
+            return System.currentTimeMillis();
 
-        } else if (timestamp == SparseRowStore.AUTO_TIMESTAMP_UNIQUE) {
+        } else if (timestamp == AUTO_TIMESTAMP_UNIQUE) {
 
-            final AbstractJournal journal = ((AbstractJournal) ((AbstractBTree) ndx)
-                    .getStore());
+            /*
+             * The BTree that is absorbing writes.
+             */
+            final BTree mutableBTree = ((ILocalBTreeView) ndx)
+                    .getMutableBTree();
 
-            final ILocalTransactionManager transactionManager = journal
-                    .getLocalTransactionManager();
+            /*
+             * The backing store will be some kind of AbstractJournal - either
+             * a Journal or a ManagedJournal.
+             */
+            
+            final AbstractJournal journal = (AbstractJournal) mutableBTree
+                    .getStore();
 
-            timestamp = transactionManager.nextTimestampRobust();
+            /*
+             * This will be locally unique for a Journal and federation-wide
+             * unique for a ManagedJournal. In the former case the timestamp is
+             * assigned locally. In the latter case it will use a robust method
+             * to discover the timestamp service and obtain a federation-wide
+             * unique timestamp.
+             */
 
+            try {
+
+                return journal.nextTimestamp();
+                
+            } catch(IOException ex) {
+                
+                /*
+                 * Note: Declared for RMI interoperability.
+                 */
+                
+                throw new RuntimeException(ex);
+                
+            }
+            
+
+        } else {
+    
+            // return the caller's value.
+            return timestamp;
+            
         }
 
-        return timestamp;
-
     }
-
+    
 }

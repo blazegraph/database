@@ -35,8 +35,8 @@ import java.util.UUID;
 
 import org.CognitiveWeb.extser.LongPacker;
 
-import com.bigdata.btree.ImmutableKeyBuffer.SimplePrefixSerializer;
 import com.bigdata.btree.compression.IDataSerializer;
+import com.bigdata.btree.compression.PrefixSerializer;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.io.SerializerUtil;
@@ -659,8 +659,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
          */
         this.addrSer = AddressSerializer.INSTANCE;
         
-        this.nodeKeySer = SimplePrefixSerializer.INSTANCE;
-//        this.nodeKeySer = PrefixSerializer.INSTANCE;
+//        this.nodeKeySer = SimplePrefixSerializer.INSTANCE;
+        this.nodeKeySer = PrefixSerializer.INSTANCE;
         
         this.tupleSer = DefaultTupleSerializer.newInstance();
 
@@ -1081,24 +1081,30 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
     }
 
     /**
+     * <p>
      * Factory for thread-safe {@link IKeyBuilder} objects for use by
      * {@link ITupleSerializer#serializeKey(Object)} and possibly others.
+     * </p>
      * <p>
      * Note: A mutable B+Tree is always single-threaded. However, read-only
-     * B+Trees allow concurrent readers. Therefore, thread-safety requirement
-     * for this {@link IKeyBuilderFactory} is
-     * <em>safe for either a single writers -or-
-     * for concurrent readers</em>.
+     * B+Trees allow concurrent readers. Therefore, thread-safety requirement is
+     * <em>safe for either a single writers -or- for concurrent readers</em>.
+     * </p>
+     * <p>
+     * Note: If you change this value in a manner that is not backward
+     * compatable once entries have been written on the index then you may be
+     * unable to any read data already written.
+     * </p>
      * <p>
      * Note: This method delegates to {@link ITupleSerializer#getKeyBuilder()}.
-     * <p>
-     * Note: This {@link IKeyBuilder} SHOULD be used to form all keys for
-     * <i>this</i> index. This is critical for indices that have Unicode data
-     * in their application keys as the formation of Unicode sort keys from
-     * Unicode data depends on the {@link IKeyBuilderFactory}. If you use the
-     * locally configured {@link IKeyBuilder} then your Unicode keys will be
-     * encoded based on the {@link Locale} configured for the JVM NOT the
-     * factory specified for <i>this</i> index.
+     * This {@link IKeyBuilder} SHOULD be used to form all keys for <i>this</i>
+     * index. This is critical for indices that have Unicode data in their
+     * application keys as the formation of Unicode sort keys from Unicode data
+     * depends on the {@link IKeyBuilderFactory}. If you use a locally
+     * configured {@link IKeyBuilder} then your Unicode keys will be encoded
+     * based on the {@link Locale} configured for the JVM NOT the factory
+     * specified for <i>this</i> index.
+     * </p>
      */
     public IKeyBuilder getKeyBuilder() {
 
