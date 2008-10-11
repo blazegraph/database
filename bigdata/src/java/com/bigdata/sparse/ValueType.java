@@ -70,10 +70,14 @@ public enum ValueType {
     ByteArray(7),
     /**
      * A 32-bit auto-incremental counter.
+     * 
+     * @see AutoIncIntegerCounter
      */
     AutoIncInteger(8),
     /**
      * A 64-bit auto-incremental counter.
+     * 
+     * @see AutoIncLongCounter
      */
     AutoIncLong(9),
     /**
@@ -338,46 +342,6 @@ public enum ValueType {
 
             throw new RuntimeException(ex);
 
-        }
-        
-    }
-
-    /**
-     * A singleton object that causes the associated property value to be
-     * assigned the next higher 32-bit integer value when it is written on the
-     * {@link SparseRowStore}.
-     * 
-     * @todo This mechanism should be replaced by something more elegant.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class AutoIncIntegerCounter {
-
-        public static final AutoIncIntegerCounter INSTANCE = new AutoIncIntegerCounter();
-        
-        private AutoIncIntegerCounter() {
-            
-        }
-        
-    }
-    
-    /**
-     * A singleton object that causes the associated property value to be
-     * assigned the next higher 64-bit integer value when it is written on the
-     * {@link SparseRowStore}.
-     * 
-     * @todo This mechanism should be replaced by something more elegant.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class AutoIncLongCounter {
-
-        public static final AutoIncLongCounter INSTANCE = new AutoIncLongCounter();
-        
-        private AutoIncLongCounter() {
-            
         }
         
     }

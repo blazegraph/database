@@ -65,13 +65,11 @@ public class TestLDS extends
 //        properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient
 //                .toString());
 
-        String dir = getName();
-
-        if (dir == null)
-            dir = "test";
+//        log.error("\ndataDir="+dataDir+", exists="+dataDir.exists());
         
         // when the data are persistent use the test to name the data directory.
-        properties.setProperty(LocalDataServiceClient.Options.DATA_DIR, dir);
+        properties.setProperty(LocalDataServiceClient.Options.DATA_DIR, dataDir
+                .toString());
         
         // Don't collect statistics from the OS.
         properties.setProperty(
@@ -88,66 +86,73 @@ public class TestLDS extends
         
     }
 
-//    private File dataDir;
-//    
-//    /**
-//     * Data files are placed into a directory named by the test. If the
-//     * directory exists, then it is removed before the federation is set up.
-//     */
-//    public void setUp() throws Exception {
-//      
-//        dataDir = new File( getName() );
-//        
-//        if(dataDir.exists() && dataDir.isDirectory()) {
-//
-//            recursiveDelete( dataDir );
-//            
-//        }
-//
-//    }
-//    
-//    public void tearDown() throws Exception {
-//        
-//        /*
-//         * Optional cleanup after the test runs, but sometimes its helpful to be
-//         * able to see what was created in the file system.
-//         */
-//        
-//        if(true && dataDir.exists() && dataDir.isDirectory()) {
-//
-//            recursiveDelete( dataDir );
-//            
-//        }
-//        
-//    }
-//    
-//    /**
-//     * Recursively removes any files and subdirectories and then removes the
-//     * file (or directory) itself.
-//     * 
-//     * @param f
-//     *            A file or directory.
-//     */
-//    private void recursiveDelete(File f) {
-//        
-//        if(f.isDirectory()) {
-//            
-//            File[] children = f.listFiles();
-//            
-//            for(int i=0; i<children.length; i++) {
-//                
-//                recursiveDelete( children[i] );
-//                
-//            }
-//            
-//        }
-//        
-//        System.err.println("Removing: "+f);
-//        
-//        if (!f.delete())
-//            throw new RuntimeException("Could not remove: " + f);
-//
-//    }
+    private File dataDir;
+    
+    /**
+     * Data files are placed into a directory named by the test. If the
+     * directory exists, then it is removed before the federation is set up.
+     */
+    public void setUp(ProxyTestCase testCase) throws Exception {
+      
+        final String name = testCase.getName();
+        
+        assert name != null;
+
+        dataDir = new File(name);
+
+//        log.error("dataDir="+dataDir);
+        
+        if(dataDir.exists() && dataDir.isDirectory()) {
+
+            log.info("\ndeleting directory: "+dataDir);
+            
+            recursiveDelete( dataDir );
+            
+        }
+
+    }
+    
+    /**
+     * Optional cleanup after the test runs, but sometimes its helpful to be
+     * able to see what was created in the file system.
+     */
+    public void tearDown(ProxyTestCase testCase) throws Exception {
+        
+        if(true && dataDir.exists() && dataDir.isDirectory()) {
+
+            recursiveDelete( dataDir );
+            
+        }
+        
+    }
+    
+    /**
+     * Recursively removes any files and subdirectories and then removes the
+     * file (or directory) itself.
+     * 
+     * @param f
+     *            A file or directory.
+     */
+    private void recursiveDelete(File f) {
+        
+        if(f.isDirectory()) {
+            
+            final File[] children = f.listFiles();
+
+            for (int i = 0; i < children.length; i++) {
+
+                recursiveDelete(children[i]);
+                
+            }
+            
+        }
+        
+        System.err.println("Removing: "+f);
+        
+        if (!f.delete())
+            throw new RuntimeException("Could not remove: " + f);
+
+    }
 
     @Override
     protected LocalDataServiceFederation getStore(Properties properties) {

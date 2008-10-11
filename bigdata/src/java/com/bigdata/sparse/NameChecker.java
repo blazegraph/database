@@ -66,7 +66,7 @@ public class NameChecker {
         if (s.indexOf('\0') != -1)
             throw new IllegalArgumentException(); 
 
-        Matcher m = pattern_name.matcher(s);
+        final Matcher m = pattern_name.matcher(s);
         
         if(!m.matches()) throw new IllegalArgumentException();
         
@@ -95,7 +95,7 @@ public class NameChecker {
         if (s.indexOf('\0') != -1)
             throw new IllegalArgumentException();
 
-        Matcher m = pattern_name.matcher(s);
+        final Matcher m = pattern_name.matcher(s);
 
         if (!m.matches())
             throw new IllegalArgumentException();

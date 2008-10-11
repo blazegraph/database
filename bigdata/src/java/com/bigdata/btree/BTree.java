@@ -333,8 +333,8 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
      * @param metadata
      *            The metadata record for that {@link BTree}.
      * 
-     * @see #create(IRawStore, IndexMetadata)
-     * @see #load(IRawStore, long)
+     * @see BTree#create(IRawStore, IndexMetadata)
+     * @see BTree#load(IRawStore, long, boolean)
      */
     public BTree(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata) {
 
@@ -380,7 +380,11 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
          */
         assert writeRetentionQueue.capacity() >= MINIMUM_WRITE_RETENTION_QUEUE_CAPACITY;
 
-        reopen();
+        /*
+         * Note: Re-open is deferred so that we can mark the BTree as read-only
+         * before we read the root node.
+         */
+//        reopen();
         
     }
     
@@ -1149,6 +1153,40 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
      */
     public static BTree load(final IRawStore store, final long addrCheckpoint) {
 
+        return load(store, addrCheckpoint, false/* readOnly */);
+        
+    }
+    
+    /**
+     * Load an instance of a {@link BTree} or derived class from the store. The
+     * {@link BTree} or derived class MUST declare a constructor with the
+     * following signature: <code>
+     * 
+     * <i>className</i>(IRawStore store, BTreeMetadata metadata)
+     * 
+     * </code>
+     * 
+     * @param store
+     *            The store.
+     * 
+     * @param addrCheckpoint
+     *            The address of a {@link Checkpoint} record for the index.
+     * @param readOnly
+     *            When <code>true</code> the {@link BTree} will be marked as
+     *            read-only. Marking the {@link BTree} as read-only here rather
+     *            than with {@link BTree#setReadOnly(boolean)} has some
+     *            advantages relating to the locking scheme used by
+     *            {@link Node#getChild(int)} since the root node is known to be
+     *            read-only at the time that it is allocated as per-child
+     *            locking is therefore in place for all nodes in the read-only
+     *            {@link BTree}.
+     * 
+     * @return The {@link BTree} or derived class loaded from that
+     *         {@link Checkpoint} record.
+     */
+    public static BTree load(final IRawStore store, final long addrCheckpoint,
+            final boolean readOnly) {
+
         /*
          * Read checkpoint record from store.
          */
@@ -1193,6 +1231,15 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
                     checkpoint, //
                     metadata //
                     });
+
+            if(readOnly) {
+                
+                btree.setReadOnly(true);
+                
+            }
+            
+            // read the root node.
+            btree.reopen();
             
             return btree;
             

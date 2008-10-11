@@ -9,8 +9,6 @@ import java.util.TreeMap;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.sparse.ValueType.AutoIncIntegerCounter;
-import com.bigdata.sparse.ValueType.AutoIncLongCounter;
 
 /**
  * Atomic write on a logical row. All property values written will have the
@@ -29,6 +27,8 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
      */
     private static final long serialVersionUID = 7481235291210326044L;
 
+    private long writeTime;
+    
     private IPrecondition precondition;
     
     private Map<String,Object> propertySet;
@@ -53,48 +53,43 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
      *            The schema governing the property set.
      * @param propertySet
      *            The property set. An entry bound to a <code>null</code>
-     *            value will cause the corresponding binding to be "deleted"
-     *            in the index.
-     * @param timestamp
+     *            value will cause the corresponding binding to be "deleted" in
+     *            the index.
+     * @param fromTime
+     *            <em>During pre-condition and post-condition reads</em>, the
+     *            first timestamp for which timestamped property values will be
+     *            accepted.
+     * @param toTime
+     *            <em>During pre-condition and post-condition reads</em>, the
+     *            first timestamp for which timestamped property values will NOT
+     *            be accepted -or- {@link IRowStoreConstants#CURRENT_ROW} to
+     *            accept only the most current binding whose timestamp is GTE
+     *            <i>fromTime</i>.
+     * @param writeTime
      *            The timestamp to be assigned to the property values by an
-     *            atomic write -or- either
-     *            {@link SparseRowStore#AUTO_TIMESTAMP} or
-     *            {@link SparseRowStore#AUTO_TIMESTAMP_UNIQUE} if the
+     *            atomic write -or- {@link IRowStoreConstants#AUTO_TIMESTAMP} if the
+     *            timestamp will be assigned by the server -or-
+     *            {@link IRowStoreConstants#AUTO_TIMESTAMP_UNIQUE} if a unique
      *            timestamp will be assigned by the server.
      * @param filter
-     *            An optional filter used to restrict the property values
-     *            that will be returned.
-     *            @param precondition
+     *            An optional filter used to restrict the property values that
+     *            will be returned.
+     * @param precondition
      */
-    public AtomicRowWriteRead(Schema schema, Map<String, Object> propertySet,
-            long timestamp, INameFilter filter, IPrecondition precondition) {
+    public AtomicRowWriteRead(final Schema schema,
+            final Map<String, Object> propertySet, final long fromTime,
+            final long toTime, final long writeTime, final INameFilter filter,
+            final IPrecondition precondition) {
         
-        super(schema, propertySet.get(schema.getPrimaryKeyName()), timestamp,
-                filter);
+        super(schema, propertySet.get(schema.getPrimaryKeyName()), fromTime,
+                toTime, filter);
 
-        if (propertySet.get(schema.getPrimaryKeyName()) == null) {
-
-            throw new IllegalArgumentException(
-                    "No value for primary key: name="
-                            + schema.getPrimaryKeyName());
-
-        }
-
-        /*
-         * Validate the column name productions.
-         */
-
-        final Iterator<String> itr = propertySet.keySet().iterator();
-
-        while (itr.hasNext()) {
-
-            final String col = itr.next();
-
-            // validate the column name production.
-            NameChecker.assertColumnName(col);
-
-        }
-
+        SparseRowStore.assertWriteTime(writeTime);
+        
+        SparseRowStore.assertPropertyNames(propertySet);
+        
+        this.writeTime = writeTime;
+        
         this.precondition = precondition;
         
         this.propertySet = propertySet;
@@ -112,11 +107,11 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
      */
     public TPS apply(final IIndex ndx) {
 
-        final IKeyBuilder keyBuilder = getKeyBuilder(ndx);
-
-        // choose the timestamp for any writes.
-        final long timestamp = TimestampChooser.chooseTimestamp(ndx,
-                this.timestamp);
+        /*
+         * Choose the write time.
+         */ 
+        final long writeTime = TimestampChooser.chooseTimestamp(ndx,
+                this.writeTime);
         
         /*
          * Precondition test.
@@ -128,12 +123,12 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
              * Apply the optional precondition test.
              */
             
-            final TPS tps = atomicRead(keyBuilder, ndx, schema, propertySet.get(schema
-                    .getPrimaryKeyName()), timestamp, filter);
+            final TPS tps = atomicRead(ndx, schema, primaryKey, fromTime,
+                    toTime, writeTime, filter);
 
             if(!precondition.accept(tps)) {
 
-                if(log.isInfoEnabled()) {
+                if(INFO) {
 
                     log.info("precondition failed: "+tps);
                     
@@ -153,32 +148,31 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
          * Atomic write.
          */
         
-        atomicWrite(ndx, schema, primaryKey, propertySet, timestamp);
+        atomicWrite(ndx, schema, primaryKey, propertySet, writeTime);
 
         /*
-         * Atomic read
+         * Atomic read of the logical row.
          * 
-         * Note: the task hold a lock throughout so the pre-condition test, the
-         * atomic write, and the atomic read are atomic as a unit.
-         * 
-         * Note: Read uses whatever timestamp was selected above!
+         * Note: the task hold a lock on the unisolated index (partition)
+         * throughout so the pre-condition test, the atomic write, and the
+         * atomic read are atomic as a unit.
          */
 
-        return atomicRead(getKeyBuilder(ndx), ndx, schema, propertySet
-                .get(schema.getPrimaryKeyName()), timestamp, filter);
+        return atomicRead(ndx, schema, primaryKey, fromTime, toTime, writeTime,
+                filter);
         
     }
 
-    protected void atomicWrite(IIndex ndx, Schema schema,
-            Object primaryKey, Map<String, Object> propertySet,
-            long timestamp) {
+    protected void atomicWrite(final IIndex ndx, final Schema schema,
+            final Object primaryKey, final Map<String, Object> propertySet,
+            final long writeTime) {
 
-        if(log.isInfoEnabled())
-        log.info("Schema=" + schema + ", primaryKey="
-                + schema.getPrimaryKeyName() + ", value=" + primaryKey
-                + ", ntuples=" + propertySet.size());
+        if (INFO)
+            log.info("Schema=" + schema + ", primaryKey="
+                    + schema.getPrimaryKeyName() + ", value=" + primaryKey
+                    + ", ntuples=" + propertySet.size());
         
-        final IKeyBuilder keyBuilder = getKeyBuilder(ndx);
+        final IKeyBuilder keyBuilder = ndx.getIndexMetadata().getKeyBuilder();
 
         final Iterator<Map.Entry<String, Object>> itr = propertySet
                 .entrySet().iterator();
@@ -193,11 +187,12 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
             
             if (value instanceof AutoIncIntegerCounter) {
 
-                final long counter = inc(ndx, schema, primaryKey, timestamp, col);
+                final long counter = inc(ndx, schema, primaryKey, writeTime, col);
                 
                 if (counter == Integer.MAX_VALUE + 1L) {
                     
-                    throw new RuntimeException("Counter would overflow: "+col);
+                    throw new UnsupportedOperationException("No Successor: "
+                            + col);
                     
                 }
                 
@@ -205,14 +200,14 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
                 
             } else if (value instanceof AutoIncLongCounter) {
 
-                final long counter = inc(ndx, schema, primaryKey, timestamp, col);
+                final long counter = inc(ndx, schema, primaryKey, writeTime, col);
                 
                 value = Long.valueOf( counter );
 
             }
 
             // encode the key.
-            final byte[] key = schema.getKey(keyBuilder, primaryKey, col, timestamp);
+            final byte[] key = schema.getKey(keyBuilder, primaryKey, col, writeTime);
             
             // encode the value.
             final byte[] val = ValueType.encode( value );
@@ -225,7 +220,7 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
              */
             ndx.insert(key, val);
 
-            if(log.isDebugEnabled()) {
+            if(DEBUG) {
                 
                 log.debug("col=" + col + ", value=" + value);
                 
@@ -236,62 +231,64 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
     }
     
     /**
-     * This is a bit heavy weight, but what it does is read the current
-     * state of the logical row so that we can find the previous value(s)
-     * for the counter column.
+     * Return the increment of the named property value. Note that
+     * auto-increment is only defined for {@link ValueType#Integer} and
+     * {@link ValueType#Long}.
+     * 
+     * @throws UnsupportedOperationException
+     *             if a property has an auto-increment type and the
+     *             {@link ValueType} of the property does not support
+     *             auto-increment.
+     * @throws UnsupportedOperationException
+     *             if there is no successor for the property value.
      */
-    protected long inc(IIndex ndx, Schema schema, Object primaryKey,
-            long timestamp, final String col) {
-        
-        final TPS tps = atomicRead(getKeyBuilder(ndx), ndx, schema, primaryKey,
-                timestamp, new SingleColumnFilter(col));
-        
+    protected long inc(final IIndex ndx, final Schema schema,
+            final Object primaryKey, final long timestamp, final String col) {
+
         /*
-         * Locate the previous non-null value for the counter column and
-         * then add one to that value. If there is no previous non-null
-         * value then we start the counter at zero(0).
+         * Read the current binding (we don't need historical values) for the
+         * named property value of the logical row so that we can find the
+         * previous value for the counter column. Note that the caller has a
+         * lock on the unisolated index so the entire read-write-inc-read
+         * operation is atomic.
+         * 
+         * Locate the previous non-null value for the counter column and then
+         * add one to that value. If there is no previous non-null value then we
+         * start the counter at zero(0).
          */
         
         long counter = 0;
-        
-        {
 
-            final Iterator<ITPV> vals = tps.iterator();
+        final ITPV tpv = getCurrentValue(ndx, schema, primaryKey, col);
 
-            while (vals.hasNext()) {
-                
-                final ITPV val = vals.next();
-                
-                if (val.getValue() != null) {
-                    
-                    try {
+        if (tpv != null) {
 
-                        counter = ((Number) val.getValue()).longValue();
-                        
-                        if(log.isInfoEnabled())
-                        log.info("Previous value: name=" + col
-                                + ", counter=" + counter + ", timestamp="
-                                + val.getTimestamp());
-                        
-                        counter++;
-                        
-                    } catch(ClassCastException ex) {
-                        
-                        log.warn("Non-Integer value: schema="+schema+", name="+col);
+            final Object tmp = tpv.getValue();
 
-                        continue;
-                        
-                    }
-                    
-                }
-                
+            if (!(tmp instanceof Integer) && !(tmp instanceof Long)) {
+
+                throw new UnsupportedOperationException(
+                        "Unsupported value type: schema=" + schema + ", name="
+                                + col + ", class=" + tmp.getClass());
+
             }
 
+            counter = ((Number) tmp).longValue();
+
+            if (counter == Long.MAX_VALUE) {
+             
+                throw new UnsupportedOperationException("No successor: " + col);
+                
+            }
+            
+            counter++;
+
         }
-    
+        
         // outcome of the auto-inc counter.
         
-        log.info("Auto-increment: name="+col+", counter="+counter);
+        if (INFO)
+            log.info("Auto-increment: name=" + col + ", counter=" + counter);
         
         return counter;
 
@@ -301,12 +298,9 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
         
         super.readExternal(in);
         
-        final short version = in.readShort();
+        writeTime = in.readLong();
         
-        if (version != VERSION0)
-            throw new IOException("Unknown version=" + version);
-
-        precondition = (IPrecondition)in.readObject();
+        precondition = (IPrecondition) in.readObject();
         
         /*
          * De-serialize into a property set using a tree map so that the
@@ -314,61 +308,56 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
          */
         
         propertySet = new TreeMap<String, Object>();
-            
+
         // #of property values.
         final int n = in.readInt();
 
-        if(log.isInfoEnabled())
-        log.info("Reading "+n+" property values");
+        if (INFO)
+            log.info("Reading " + n + " property values");
 
-        for(int i=0; i<n; i++) {
+        for (int i = 0; i < n; i++) {
 
             final String name = in.readUTF();
-            
+
             final Object value = in.readObject();
 
-            propertySet.put(name,value);
-            
-            if(log.isInfoEnabled())
-            log.info("name=" + name + ", value=" + value);
-            
+            propertySet.put(name, value);
+
+            if (INFO)
+                log.info("name=" + name + ", value=" + value);
+
         }
-        
+
     }
-    
+
     public void writeExternal(ObjectOutput out) throws IOException {
 
         super.writeExternal(out);
-        
-        // serialization version.
-        out.writeShort(VERSION0);
+
+        out.writeLong(writeTime);
         
         out.writeObject(precondition);
-        
+
         // #of property values
         out.writeInt(propertySet.size());
-        
+
         /*
          * write property values
          */
-        
-        Iterator<Map.Entry<String,Object>> itr = propertySet.entrySet().iterator();
-        
-        while(itr.hasNext()) {
-            
-            Map.Entry<String,Object> entry = itr.next();
-            
-            out.writeUTF(entry.getKey());
-            
-            out.writeObject(entry.getValue());
-                            
-        }
-        
-    }
 
-    /**
-     * 
-     */
-    private static final short VERSION0 = 0x0;
+        final Iterator<Map.Entry<String, Object>> itr = propertySet.entrySet()
+                .iterator();
+
+        while (itr.hasNext()) {
+
+            final Map.Entry<String, Object> entry = itr.next();
+
+            out.writeUTF(entry.getKey());
+
+            out.writeObject(entry.getValue());
+
+        }
+
+    }
 
 }

@@ -32,6 +32,7 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Counters;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ReadCommittedView;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
@@ -1508,15 +1509,19 @@ public class ConcurrencyManager implements IConcurrencyManager {
             
             c = ((AbstractBTree)ndx).counters;
             
+        } else if(ndx instanceof ReadCommittedView) {
+            
+            c = ((ReadCommittedView)ndx).getBTreeCounters();
+            
         } else {
             
-            FusedView view = (FusedView)ndx;
+            final FusedView view = (FusedView)ndx;
             
-            AbstractBTree[] sources = view.getSources();
+            final AbstractBTree[] sources = view.getSources();
             
             c = new Counters();
             
-            for(int i=0; i<sources.length; i++) {
+            for (int i = 0; i < sources.length; i++) {
                 
                 c.add(sources[i].counters);
                 

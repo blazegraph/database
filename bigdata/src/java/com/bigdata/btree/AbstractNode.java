@@ -525,7 +525,8 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
                 assert parent == null;
 
                 // Update the root node on the btree.
-                log.info("Copy-on-write : replaced root node on btree.");
+                if(INFO)
+                    log.info("Copy-on-write : replaced root node on btree.");
 
                 final boolean wasDirty = btree.root.dirty;
                 

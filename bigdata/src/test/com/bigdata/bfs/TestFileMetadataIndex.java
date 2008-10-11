@@ -254,9 +254,9 @@ public class TestFileMetadataIndex extends AbstractRepositoryTestCase {
             
             version1 = repo.update( doc1 );
             
-            metadata.put(FileMetadataSchema.VERSION, Integer.valueOf(version1));
-
             assertEquals("version", 1, version1);
+
+            metadata.put(FileMetadataSchema.VERSION, Integer.valueOf(version1));
 
             RepositoryDocumentImpl doc = (RepositoryDocumentImpl) repo.read(id);
 

@@ -32,6 +32,7 @@ import java.util.UUID;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
@@ -575,8 +576,10 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
 
                 }
 
-                // update to the next key to be copied.
-                fromKey = rset.successor();
+                /*
+                 * Update to the next key to be copied.
+                 */
+                fromKey = BytesUtil.successor(rset.getLastKey());
                 
             }
 

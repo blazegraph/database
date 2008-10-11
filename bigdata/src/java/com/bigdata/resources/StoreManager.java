@@ -50,7 +50,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.commons.io.FileSystemUtils;
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bfs.BigdataFileSystem;

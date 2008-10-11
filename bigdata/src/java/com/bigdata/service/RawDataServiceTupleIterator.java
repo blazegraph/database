@@ -59,10 +59,10 @@ import com.bigdata.rawstore.IBlock;
  */
 public class RawDataServiceTupleIterator<E> extends AbstractChunkedTupleIterator<E> {
     
-    protected static final transient Logger log = Logger
-            .getLogger(RawDataServiceTupleIterator.class);
-
-    protected static final boolean INFO = log.isInfoEnabled();
+//    protected static final transient Logger log = Logger
+//            .getLogger(RawDataServiceTupleIterator.class);
+//
+//    protected static final boolean INFO = log.isInfoEnabled();
     
     /**
      * Error message used by {@link #getKey()} when the iterator was not
@@ -139,9 +139,11 @@ public class RawDataServiceTupleIterator<E> extends AbstractChunkedTupleIterator
      * @param flags
      * @param filter
      */
-    public RawDataServiceTupleIterator(IDataService dataService, String name,
-            long timestamp, boolean readConsistent, byte[] fromKey,
-            byte[] toKey, int capacity, int flags, IFilterConstructor filter) {
+    public RawDataServiceTupleIterator(final IDataService dataService,
+            final String name, final long timestamp,
+            final boolean readConsistent, final byte[] fromKey,
+            final byte[] toKey, final int capacity, final int flags,
+            final IFilterConstructor filter) {
 
         super(fromKey, toKey, capacity, flags, filter);
         
@@ -189,8 +191,9 @@ public class RawDataServiceTupleIterator<E> extends AbstractChunkedTupleIterator
      * {@link ITx#READ_COMMITTED} operations.
      */
     @Override
-    protected ResultSet getResultSet(long timestamp, byte[] fromKey, byte[] toKey, int capacity,
-            int flags, IFilterConstructor filter) {
+    protected ResultSet getResultSet(final long timestamp,
+            final byte[] fromKey, final byte[] toKey, final int capacity,
+            final int flags, final IFilterConstructor filter) {
 
         if (INFO)
             log.info("name=" + name + ", fromKey="

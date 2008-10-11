@@ -174,7 +174,7 @@ public class Schema implements Externalizable {
      */
     final protected IKeyBuilder appendPrimaryKey(IKeyBuilder keyBuilder, Object v, boolean successor) {
         
-        KeyType keyType = getPrimaryKeyType();
+        final KeyType keyType = getPrimaryKeyType();
         
         if (successor) {
             
@@ -237,7 +237,7 @@ public class Schema implements Externalizable {
      */
     final private Object successor(IKeyBuilder keyBuilder,Object v) {
         
-        KeyType keyType = getPrimaryKeyType();
+        final KeyType keyType = getPrimaryKeyType();
         
         switch(keyType) {
 

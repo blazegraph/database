@@ -23,50 +23,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Aug 27, 2008
+ * Created on Oct 10, 2008
  */
 
 package com.bigdata.sparse;
 
 /**
- * Filter for a specific column name.
+ * Marker interface for auto-incremental types.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SingleColumnFilter implements INameFilter {
+public interface IAutoIncrementCounter {
 
-    private static final long serialVersionUID = 3070828654283555268L;
-    
-    final private String name;
-
-    /**
-     * 
-     * @param name
-     *            The column name that you want.
-     * 
-     * @throws IllegalArgumentException
-     *             if <i>name</i> is <code>null</code>.
-     */
-    public SingleColumnFilter(String name) {
-
-        if (name == null)
-            throw new IllegalArgumentException();
-
-        this.name = name;
-
-    }
-
-    public boolean accept(String name) {
-
-        return this.name.equals(name);
-
-    }
-
-    public String toString() {
-        
-        return getClass().getName() + "{name=" + name + "}";
-        
-    }
-    
 }

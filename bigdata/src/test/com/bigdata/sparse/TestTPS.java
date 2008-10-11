@@ -47,14 +47,10 @@ import com.bigdata.sparse.TPS.TPV;
  * 
  * @todo write tests for {@link TPS#asMap(long, com.bigdata.sparse.TPS.INameFilter)}
  * 
- * @todo test construction from index read.
- * 
- * @todo test index write from TPS.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestTPS extends TestCase2 {
+public class TestTPS extends TestCase2 implements IRowStoreConstants {
 
     /**
      * 
@@ -71,7 +67,7 @@ public class TestTPS extends TestCase2 {
 
     final Schema schema = new Schema("testSchema", "pkey", KeyType.Unicode);
     
-    final TPS tps = new TPS(schema);
+    final TPS tps = new TPS(schema,0L/*timestamp*/);
     
     final long t0 = 0L;
     final long t1 = 10L;
@@ -341,6 +337,129 @@ public class TestTPS extends TestCase2 {
 
     }
 
+    /**
+     * Unit tests for {@link TPS#currentRow(INameFilter)} 
+     */
+    public void test_currentRow() {
+
+        // verify when all property values pass the filter.
+        {
+
+            final TPS expected = new TPS(schema, 0L/* writeTime */);
+
+            expected.set("foo", 1L, "bar");
+            expected.set("goo", 2L, "baz");
+
+            assertEquals(expected, expected.currentRow());
+            
+        }
+ 
+        // verify when a property value gets filtered out by a later binding.
+        {
+
+            final TPS tmp = new TPS(schema, 0L/* writeTime */);
+
+            tmp.set("foo", 1L, "bar"); // will be filtered out.
+            tmp.set("foo", 2L, "bat");
+            tmp.set("goo", 2L, "baz");
+
+            final TPS expected = new TPS(schema, 0L/* writeTime */);
+
+            expected.set("foo", 2L, "bat");
+            expected.set("goo", 2L, "baz");
+
+            assertEquals(expected, tmp.currentRow());
+
+        }
+        
+        /*
+         * verify when a property is filtered out by name.
+         */
+        {
+
+            final TPS tmp = new TPS(schema, 0L/* writeTime */);
+
+            tmp.set("foo", 1L, "bar");
+            tmp.set("foo", 2L, "bat"); 
+            tmp.set("goo", 2L, "baz"); // will be filtered out.
+
+            final TPS expected = new TPS(schema, 0L/* writeTime */);
+
+            expected.set("foo", 2L, "bat"); 
+
+            assertEquals(expected, tmp.currentRow(new SingleColumnFilter("foo")));
+
+        }
+        
+    }
+    
+    /**
+     * Unit tests for {@link TPS#filter(long, long, INameFilter)}
+     */
+    public void test_filter() {
+
+        // verify when an earlier property value gets filtered out by [fromTime].
+        {
+
+            final TPS tmp = new TPS(schema, 0L/* writeTime */);
+
+            tmp.set("foo", 1L, "bar"); // will be filtered out.
+            tmp.set("foo", 2L, "bat");
+            tmp.set("goo", 2L, "baz");
+
+            final TPS expected = new TPS(schema, 0L/* writeTime */);
+
+            expected.set("foo", 2L, "bat");
+            expected.set("goo", 2L, "baz");
+
+            assertEquals(expected, tmp
+                    .filter(2L/* fromTime */, MAX_TIMESTAMP/*toTime*/));
+
+        }
+
+        /*
+         * verify when a later property value is filter out because it is GTE
+         * the [toTime].
+         */
+        {
+
+            final TPS tmp = new TPS(schema, 0L/* writeTime */);
+
+            tmp.set("foo", 1L, "bar");
+            tmp.set("foo", 2L, "bat"); // will be filtered out.
+            tmp.set("goo", 2L, "baz"); // will be filtered out.
+
+            final TPS expected = new TPS(schema, 0L/* writeTime */);
+
+            expected.set("foo", 1L, "bar");
+
+            assertEquals(expected, tmp
+                    .filter(MIN_TIMESTAMP/* fromTime */, 2L/* toTime */));
+
+        }
+
+        /*
+         * verify when a property is filtered out by name.
+         */
+        {
+
+            final TPS tmp = new TPS(schema, 0L/* writeTime */);
+
+            tmp.set("foo", 1L, "bar");
+            tmp.set("foo", 2L, "bat"); 
+            tmp.set("goo", 2L, "baz"); // will be filtered out.
+
+            final TPS expected = new TPS(schema, 0L/* writeTime */);
+
+            expected.set("foo", 1L, "bar");
+            expected.set("foo", 2L, "bat"); 
+
+            assertEquals(expected, tmp.filter(new SingleColumnFilter("foo")));
+
+        }
+
+    }
+    
     /**
      * Test helper for (de-)serialization tests.
      * 

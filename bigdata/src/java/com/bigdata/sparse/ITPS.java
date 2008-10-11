@@ -63,7 +63,7 @@ public interface ITPS {
      * @throws IllegalStateException
      *             if no timestamp has been assigned.
      */
-    public long getTimestamp();
+    public long getWriteTimestamp();
     
     /**
      * The #of tuples - each tuple is an {@link ITPV}.
@@ -77,10 +77,7 @@ public interface ITPS {
      * @param name
      *            The property name.
      * @param timestamp
-     *            A timestamp to obtain the value for the named property whose
-     *            timestamp does not exceed <i>timestamp</i> -or-
-     *            {@link SparseRowStore#MAX_TIMESTAMP} to obtain the most recent
-     *            value for the property.
+     *            The timestamp.
      * 
      * @return An object representing value of the property as of the indicated
      *         timestamp and never <code>null</code>.

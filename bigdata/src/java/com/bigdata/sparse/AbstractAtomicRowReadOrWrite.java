@@ -33,14 +33,13 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.btree.proc.AbstractIndexProcedure;
 import com.bigdata.btree.proc.ISimpleIndexProcedure;
@@ -53,29 +52,28 @@ import com.bigdata.btree.proc.ISimpleIndexProcedure;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractAtomicRowReadOrWrite extends AbstractIndexProcedure implements
-        ISimpleIndexProcedure, Externalizable {
+abstract public class AbstractAtomicRowReadOrWrite extends
+        AbstractIndexProcedure implements ISimpleIndexProcedure,
+        IRowStoreConstants, Externalizable {
 
     protected static final Logger log = Logger.getLogger(AbstractAtomicRowReadOrWrite.class);
     
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    protected final boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-                .toInt();
+    protected final static boolean INFO = log.isInfoEnabled();
     
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    protected final boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-                .toInt();
+    protected final static boolean DEBUG = log.isDebugEnabled();
     
     protected Schema schema;
     protected Object primaryKey;
-    protected long timestamp;
+    protected long fromTime;
+    protected long toTime;
     protected INameFilter filter;
-
-
+    
     /**
      * De-serialization ctor.
      */
@@ -91,31 +89,33 @@ abstract public class AbstractAtomicRowReadOrWrite extends AbstractIndexProcedur
      * @param schema
      *            The schema governing the property set.
      * @param primaryKey
-     *            The value of the primary key (identifies the logical row
-     *            to be read).
-     * @param timestamp
-     *            A timestamp to obtain the value for the named property
-     *            whose timestamp does not exceed <i>timestamp</i> -or-
-     *            {@link SparseRowStore#MAX_TIMESTAMP} to obtain the most
-     *            recent value for the property.
+     *            The value of the primary key (identifies the logical row to be
+     *            read).
+     * @param fromTime
+     *            The first timestamp for which timestamped property values will
+     *            be accepted.
+     * @param toTime
+     *            The first timestamp for which timestamped property values will
+     *            NOT be accepted -or- {@link IRowStoreConstants#CURRENT_ROW} to
+     *            accept only the most current binding whose timestamp is GTE
+     *            <i>fromTime</i>.
      * @param filter
-     *            An optional filter used to restrict the property values
-     *            that will be returned.
+     *            An optional filter used to restrict the property values that
+     *            will be returned.
      */
-    protected AbstractAtomicRowReadOrWrite(Schema schema, Object primaryKey, long timestamp,
-            INameFilter filter) {
-        
-        if (schema == null)
-            throw new IllegalArgumentException("No schema");
+    protected AbstractAtomicRowReadOrWrite(final Schema schema,
+            final Object primaryKey, final long fromTime, final long toTime,
+            final INameFilter filter) {
 
-        if (primaryKey == null)
-            throw new IllegalArgumentException("No primary key");
+        SparseRowStore.assertArgs(schema, primaryKey, fromTime, toTime);
 
         this.schema = schema;
         
         this.primaryKey = primaryKey;
         
-        this.timestamp = timestamp;
+        this.fromTime = fromTime;
+        
+        this.toTime = toTime;
 
         this.filter = filter;
         
@@ -130,11 +130,17 @@ abstract public class AbstractAtomicRowReadOrWrite extends AbstractIndexProcedur
      *            The schema governing the row.
      * @param primaryKey
      *            The primary key identifies the logical row of interest.
-     * @param timestamp
-     *            A timestamp to obtain the value for the named property whose
-     *            timestamp does not exceed <i>timestamp</i> -or-
-     *            {@link SparseRowStore#MAX_TIMESTAMP} to obtain the most recent
-     *            value for the property.
+     * @param fromTime
+     *            The first timestamp for which timestamped property values will
+     *            be accepted.
+     * @param toTime
+     *            The first timestamp for which timestamped property values will
+     *            NOT be accepted -or- {@link IRowStoreConstants#CURRENT_ROW} to
+     *            accept only the most current binding whose timestamp is GTE
+     *            <i>fromTime</i>.
+     * @param writeTime
+     *            The resolved timestamp for an atomic write operation -or- ZERO
+     *            (0L) IFF the operation is NOT a write.
      * @param filter
      *            An optional filter used to select the values for property
      *            names accepted by that filter.
@@ -142,39 +148,25 @@ abstract public class AbstractAtomicRowReadOrWrite extends AbstractIndexProcedur
      * @return The logical row for that primary key -or- <code>null</code> iff
      *         there is no data for the <i>primaryKey</i>.
      */
-    protected static TPS atomicRead(IKeyBuilder keyBuilder, IIndex ndx,
-            Schema schema, Object primaryKey, long timestamp, INameFilter filter) {
+    protected static TPS atomicRead(final IIndex ndx, final Schema schema,
+            final Object primaryKey, final long fromTime, final long toTime,
+            final long writeTime, final INameFilter filter) {
 
-        final byte[] fromKey = schema.getPrefix(keyBuilder, primaryKey);
+        final byte[] fromKey = schema.getPrefix(ndx.getIndexMetadata()
+                .getKeyBuilder(), primaryKey);
 
-        // final byte[] toKey = schema.toKey(keyBuilder,primaryKey).getKey();
-
-        final TPS tps = atomicRead(ndx, fromKey, schema, timestamp, filter);
+        final TPS tps = atomicRead(ndx, fromKey, schema, fromTime, toTime,
+                filter, new TPS(schema, writeTime));
 
         if (tps == null) {
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("No data for primaryKey: " + primaryKey);
 
         }
     
         return tps;
     
-    }
-
-    /**
-     * Atomic read.
-     * 
-     * @return A {@link TPS} instance containing the selected data from the
-     *         logical row identified by the {@link #primaryKey} -or-
-     *         <code>null</code> iff the primary key was NOT FOUND in the
-     *         index. I.e., iff there are NO entries for that primary key
-     *         regardless of whether or not they were selected.
-     */
-    public TPS apply(final IIndex ndx) {
-    
-        return atomicRead(getKeyBuilder(ndx), ndx, schema, primaryKey, timestamp, filter);
-        
     }
 
     /**
@@ -185,15 +177,29 @@ abstract public class AbstractAtomicRowReadOrWrite extends AbstractIndexProcedur
      * @param fromKey
      * @param ndx
      * @param schema
-     * @param timestamp
+     * @param fromTime
+     * @param toTime
      * @param filter
+     * @param tps
+     *            The object into which the timestamped property values will be
+     *            read.
      * 
-     * @return {@link TPS} -or- <code>null</code> iff there is no data for the
-     *         logical row.
+     * @return The {@link TPS} -or- <code>null</code> iff there is no data for
+     *         the logical row which satisified the various criteria (the
+     *         schema, fromTime, toTime, and filter).
      */
     protected static TPS atomicRead(final IIndex ndx, final byte[] fromKey,
-            final Schema schema, final long timestamp, final INameFilter filter) {
-    
+            final Schema schema, final long fromTime, final long toTime,
+            final INameFilter filter, final TPS tps) {
+
+        assert ndx != null;
+
+        assert schema != null;
+        
+        assert fromKey != null;
+        
+        assert tps != null;
+
         /*
          * Scan all entries within the fromKey/toKey range populating [tps] as
          * we go.
@@ -201,15 +207,43 @@ abstract public class AbstractAtomicRowReadOrWrite extends AbstractIndexProcedur
     
         final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
     
-        if (log.isInfoEnabled()) {
-            log.info("read: fromKey=" + BytesUtil.toString(fromKey));
-            log.info("read:   toKey=" + BytesUtil.toString(toKey));
+        if (INFO) {
+            log.info("read: fromKey=" + BytesUtil.toString(fromKey)+"\n"+
+                     "read:   toKey=" + BytesUtil.toString(toKey));
         }
     
-        final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey);
-    
-        // Result set object.
-        final TPS tps = new TPS(schema, timestamp);
+//        /*
+//         * Note: If we are only going to accept the most recent bindings then we
+//         * read in reverse order. This allows us to efficiently ignore property
+//         * values for which we already have a binding in our TPS.
+//         */
+//        
+//        final boolean reverseScan = toTime == CURRENT_ROW; 
+//        
+//        if (reverseScan) {
+//
+//            if(INFO)
+//                log.info("reverseScan: fromTime=" + fromTime);
+//            
+//        }
+//        
+//        final int flags = IRangeQuery.DEFAULT | IRangeQuery.READONLY
+//                | (reverseScan ? IRangeQuery.REVERSE : 0);
+
+        final int flags = IRangeQuery.DEFAULT | IRangeQuery.READONLY;
+        
+//        /*
+//         * Used during reverse scans when the [toTime] is [CURRENT_ROW] to track
+//         * which properties have bound values, including when a "deleted" entry
+//         * is observed for a property.
+//         */
+//
+//        final Set<String/* name */> bound = (reverseScan ? new HashSet<String>()
+//                : null);
+        
+        // iterator scanning tuples encoding timestamped property values.
+        final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey,
+                0/* capacity */, flags, null/* filter */);
     
         // #of entries scanned for that primary key.
         int nscanned = 0;
@@ -219,18 +253,10 @@ abstract public class AbstractAtomicRowReadOrWrite extends AbstractIndexProcedur
             final ITuple tuple = itr.next();
             
             final byte[] key = tuple.getKey();
-    
-            final byte[] val = tuple.getValue();
             
             nscanned++;
             
-            /*
-             * Decode the key so that we can get the column name. We have the
-             * advantage of knowing the last byte in the primary key. Since the
-             * fromKey was formed as [schema][primaryKey], the length of the
-             * fromKey is the index of the 1st byte in the column name.
-             */
-    
+            // Decode the key so that we can get the column name.
             final KeyDecoder keyDecoder = new KeyDecoder(key);
     
             // The column name.
@@ -240,9 +266,9 @@ abstract public class AbstractAtomicRowReadOrWrite extends AbstractIndexProcedur
     
                 // Skip property names that have been filtered out.
     
-                if (log.isDebugEnabled()) {
+                if (DEBUG) {
     
-                    log.debug("Skipping property: name=" + col);
+                    log.debug("Skipping property: name=" + col + " (filtered)");
                     
                 }
     
@@ -250,43 +276,85 @@ abstract public class AbstractAtomicRowReadOrWrite extends AbstractIndexProcedur
     
             }
     
+//            if (toTime == CURRENT_ROW) {
+//
+//                /*
+//                 * This relies on the fact that we traverse the tuples in reverse
+//                 * index order when we only want to collect the current bindings.
+//                 * Therefore we simply ignore any property value if we already have
+//                 * a binding for that property. [bound] is used to quickly detect
+//                 * property values for which we have already collected a binding,
+//                 * even if that binding was a "deleted" property marker.
+//                 */
+//
+//                if (bound.contains(col)) {
+//
+//                    if (DEBUG) {
+//
+//                        log.debug("Skipping property: name=" + col
+//                                + " (already bound)");
+//
+//                    }
+//
+//                    continue;
+//
+//                }
+//
+//                bound.add(col);
+//
+//            }
+
             /*
-             * Skip column values having a timestamp strictly greater than the
-             * given value.
+             * Skip column values whose timestamp lies outside of the specified
+             * half-open range.
              */
+           
             final long columnValueTimestamp = keyDecoder.getTimestamp();
-            {
-    
-                if (columnValueTimestamp > timestamp) {
-    
-                    if (log.isDebugEnabled()) {
-    
-                        log.debug("Ignoring newer revision: col=" + col
-                                + ", timestamp=" + columnValueTimestamp);
-                        
-                    }
-                    
-                    continue;
-    
+            
+            if (columnValueTimestamp < fromTime) {
+
+                if (DEBUG) {
+
+                    log.debug("Ignoring earlier revision: col=" + col
+                            + ", fromTime=" + fromTime + ", timestamp="
+                            + columnValueTimestamp);
+
                 }
-    
+
+                continue;
+
             }
-            
+
+            if (toTime != CURRENT_ROW && columnValueTimestamp >= toTime) {
+
+                if (DEBUG) {
+
+                    log.debug("Ignoring later revision: col=" + col
+                            + ", toTime=" + toTime + ", timestamp="
+                            + columnValueTimestamp);
+
+                }
+
+                continue;
+
+            }
+
             /*
-             * Decode the value. A [null] indicates a deleted property
-             * value.
+             * Decode the value. A [null] indicates a deleted property value.
              */
-            
+
+            final byte[] val = tuple.getValue();
+
             final Object v = ValueType.decode(val);
-            
+
             /*
-             * Add to the representation of the row.
+             * Add this timestamped property value to the collection.
              */
-    
+
             tps.set(col, columnValueTimestamp, v);
-    
-            if (log.isInfoEnabled())
-                log.info("Read: name=" + col + ", timestamp="
+
+            if (INFO)
+                log.info("Accept: name=" + col + ", timestamp="
                         + columnValueTimestamp + ", value=" + v);
     
         }
@@ -303,42 +371,85 @@ abstract public class AbstractAtomicRowReadOrWrite extends AbstractIndexProcedur
     
         }
     
+        if (toTime == CURRENT_ROW) {
+
+            return tps.currentRow();
+            
+        }
+        
         return tps;
         
     }
 
-    private static final transient short VERSION0 = 0x0;
+    /**
+     * Return the current binding for the named property.
+     * 
+     * @param schema
+     *            The schema.
+     * @param primaryKey
+     *            The primary key.
+     * @param name
+     *            The property name.
+     * 
+     * @return The current binding -or- <code>null</code> iff there is no
+     *         current binding.
+     * 
+     * @todo this can be optimized by including the encoded column name in the
+     *       generated [fromKey] and [toKey] so that we scan less data from the
+     *       index and by using a reverse traversal iterator to read the most
+     *       recent value in the key range first. This is especially important
+     *       if timeseries data are being stored.
+     */
+    protected static ITPV getCurrentValue(final IIndex ndx,
+            final Schema schema, final Object primaryKey, final String name) {
 
-    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-        
-        final short version = in.readShort();
-        
-        if(version!=VERSION0) {
-            
-            throw new IOException("Unknown version="+version);
+        final TPS tps = atomicRead(ndx, schema, primaryKey, MIN_TIMESTAMP,
+                CURRENT_ROW, 0L/* writeTime */, new SingleColumnFilter(name));
+
+        if (tps == null) {
+
+            // never bound.
+            return null;
             
         }
-    
+        
+        final ITPV tpv = tps.get(name);
+
+        if(tpv.getValue() == null) {
+            
+            // deleted property value.
+            return null;
+            
+        }
+        
+        return tpv;
+
+    }
+
+    public void readExternal(ObjectInput in) throws IOException,
+            ClassNotFoundException {
+        
         schema = (Schema) in.readObject();
         
         primaryKey = in.readObject();
         
-        timestamp = in.readLong();
+        fromTime = in.readLong();
+
+        toTime = in.readLong();
         
         filter = (INameFilter) in.readObject();
-        
         
     }
 
     public void writeExternal(ObjectOutput out) throws IOException {
-    
-        out.writeShort(VERSION0);
         
         out.writeObject(schema);
         
         out.writeObject(primaryKey);
         
-        out.writeLong(timestamp);
+        out.writeLong(fromTime);
+        
+        out.writeLong(toTime);
         
         out.writeObject(filter);
         

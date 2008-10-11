@@ -216,6 +216,23 @@ public interface IRangeQuery {
     public static final int REVERSE = 1 << 6;
     
     /**
+     * There are two ways in which the successor of an unsigned byte[] key may
+     * be computed. The default is to append an unsigned zero byte to the key.
+     * This forms the next possible key for the natural unsigned byte[] sort
+     * order.
+     * <p>
+     * The other choice is to treat the unsigned byte[] as a fixed length bit
+     * string and to add ONE (1) with rollover. This works in some special
+     * circumstances, primarily because you are actually seeking to skip over
+     * all keys that have a given key as their prefix and continue the iterator
+     * at the next possible prefix having the same length.
+     * <p>
+     * Note: This option is applied by {@link AbstractChunkedTupleIterator},
+     * which is responsible for issuing continuation queries.
+     */
+    public static final int FIXED_LENGTH_SUCCESSOR = 1 << 7;
+    
+    /**
      * Visits all tuples in key order. This is identical to
      * 
      * <pre>

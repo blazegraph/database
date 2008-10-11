@@ -34,8 +34,8 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -49,9 +49,13 @@ import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TPS implements ITPS, Externalizable {
+public class TPS implements ITPS, Externalizable, IRowStoreConstants {
 
     protected static final transient Logger log = Logger.getLogger(TPS.class);
+    
+    protected static final transient boolean INFO = log.isInfoEnabled();
+
+    protected static final transient boolean DEBUG = log.isDebugEnabled();
     
     /**
      * 
@@ -60,7 +64,7 @@ public class TPS implements ITPS, Externalizable {
     
     private Schema schema;
     
-    private long timestamp;
+    private long writeTime;
     
     /**
      * The {schema,property,timestamp,value} tuples.
@@ -100,28 +104,19 @@ public class TPS implements ITPS, Externalizable {
     }
 
     /**
-     * @param schema
-     *            The schema.
-     */
-    public TPS(Schema schema) {
-
-        this(schema,0L);
-        
-    }
-    
-    /**
      * 
      * @param schema
      *            The schema.
      * @param timestamp
-     *            The timestamp used as the basis for the read. When the data
-     *            were read back as part of an atomic write, then this MUST be
-     *            the timestamp of the atomic write. That can be either a caller
-     *            given timestamp or a server assigned timestamp. Regardless the
-     *            value will be returned by {@link #getTimestamp()}.
+     *            When the data were read back as part of an atomic write, then
+     *            this MUST be the timestamp of the atomic write. That can be
+     *            either a caller given timestamp or a server assigned
+     *            timestamp. Regardless the value will be returned by
+     *            {@link #getWriteTimestamp()}. When the operation was an atomic
+     *            read, then the timestamp MUST be ZERO (0L).
      */
-    public TPS(Schema schema,long timestamp) {
-        
+    public TPS(final Schema schema, final long timestamp) {
+
         if (schema == null)
             throw new IllegalArgumentException();
 
@@ -129,7 +124,7 @@ public class TPS implements ITPS, Externalizable {
         
         this.tuples = new TreeMap<TP,ITPV>();
         
-        this.timestamp = timestamp;
+        this.writeTime = timestamp;
         
     }
     
@@ -149,12 +144,12 @@ public class TPS implements ITPS, Externalizable {
         
     }
 
-    public long getTimestamp() {
+    public long getWriteTimestamp() {
 
-        if (timestamp == 0L)
+        if (writeTime == 0L)
             throw new IllegalStateException();
 
-        return timestamp;
+        return writeTime;
 
     }
 
@@ -164,6 +159,37 @@ public class TPS implements ITPS, Externalizable {
         
     }
     
+//    /**
+//     * Remove all existing bindings for that property regardless of the
+//     * associated timestamp.
+//     * 
+//     * @param name
+//     *            The property name.
+//    * 
+//    * @todo This is not wildly efficient since the map is in order by timestamp
+//    *       not name. It is currently used by the {@link AtomicRowFilter}, so
+//    *       that is not going to be wildly efficient when only the current row
+//    *       is desired if the #of tuples in that row is even modestly large. We
+//    *       would do better to post-filter.
+//     */
+//    void removeAll(String name) {
+//
+//        final Iterator<Map.Entry<TP, ITPV>> itr = tuples.entrySet().iterator();
+//
+//        while (itr.hasNext()) {
+//
+//            final Map.Entry<TP, ITPV> entry = itr.next();
+//
+//            if (name.equals(entry.getKey().name)) {
+//
+//                itr.remove();
+//
+//            }
+//
+//        }
+//
+//    }
+
     /**
      * Set the value of the named property as of the specified timestamp.
      * 
@@ -172,7 +198,8 @@ public class TPS implements ITPS, Externalizable {
      * @param timestamp
      *            The timestamp.
      * @param value
-     *            The value.
+     *            The property value -or- <code>null</code> if the property
+     *            was deleted as of the given timestamp.
      */
     public void set(String name, long timestamp, Object value) {
         
@@ -188,16 +215,16 @@ public class TPS implements ITPS, Externalizable {
          * the one that we want and we can return it directly.
          */
         {
-            
-            final TPV tpv = (TPV)tuples.get(new TP(name, timestamp));
+
+            final TPV tpv = (TPV) tuples.get(new TP(name, timestamp));
 
             if (tpv != null) {
 
-                if(log.isInfoEnabled())
-                log.info("Exact timestamp match: name="
-                        + name
-                        + (timestamp == Long.MAX_VALUE ? ", current value"
-                                : ", timestamp=" + timestamp));
+                if (INFO)
+                    log.info("Exact timestamp match: name="
+                            + name
+                            + (timestamp == Long.MAX_VALUE ? ", current value"
+                                    : ", timestamp=" + timestamp));
                 
                 return tpv;
 
@@ -206,8 +233,11 @@ public class TPS implements ITPS, Externalizable {
         }
 
         /*
-         * Scan for the tuple having the largest timestamp not greater than
-         * the given timestamp.
+         * Scan for the tuple having the largest timestamp not greater than the
+         * given timestamp.
+         * 
+         * @todo this would be more efficient as a reverse scan starting from
+         * the successor of the timestamp.
          */
         
         final Iterator<ITPV> itr = tuples.values().iterator();
@@ -220,7 +250,7 @@ public class TPS implements ITPS, Externalizable {
         
         while(itr.hasNext()) {
             
-            TPV tmp = (TPV)itr.next();
+            final TPV tmp = (TPV)itr.next();
             
             if(tmp.name.equals(name)) {
                 
@@ -241,27 +271,35 @@ public class TPS implements ITPS, Externalizable {
              * encountered by the iterator.
              */
 
-            if(log.isInfoEnabled())
-            log.info("No match: name="
-                    + name
-                    + (timestamp == Long.MAX_VALUE ? ", current value"
-                            : ", timestamp=" + timestamp));
+            if (INFO)
+                log.info("No match: name=" + name);
 
             return new TPV(schema, name, 0L, null);
 
         }
 
-        if(log.isInfoEnabled())
-        log.info("Most recent match: name="
-                + name
-                + (timestamp == Long.MAX_VALUE ? ", current value"
-                        : ", timestamp=" + timestamp) + " @ timestamp="
-                + last.timestamp);
+        if (INFO)
+            log.info("Most recent match: name=" + name + ", value="
+                    + last.value + ", timestamp=" + last.timestamp);
 
         return last;
         
     }
 
+// /**
+//     * Return <code>true</code> if there are any bindings for the property.
+//     * 
+//     * @param name
+//     *            The property name.
+//     *            
+//     * @return <code>true</code> iff there is a binding for that property.
+//     */
+//    public boolean contains(String name) {
+//        
+//        return get(name).getTimestamp() != 0L;
+//        
+//    }
+    
     public ITPV get(String name) {
 
         return get(name, Long.MAX_VALUE);
@@ -279,6 +317,204 @@ public class TPS implements ITPS, Externalizable {
         return Collections.unmodifiableCollection(tuples.values()).iterator();
 
     }
+
+    /**
+     * Filters for the current row (most recent bindings)
+     */
+    public TPS currentRow() {
+
+        return currentRow(null/* filter */);
+        
+    }
+    
+    /**
+     * Filters for the current row (most recent bindings)
+     * 
+     * @param filter
+     *            An optional property name filter.
+     */
+    public TPS currentRow(final INameFilter filter) {
+        
+        if(DEBUG) {
+            
+            log.debug("filter=" + filter + ", preFilter=" + this);
+            
+        }
+        
+        // note: maintains the original map order and has fast iterator.
+        final LinkedHashMap<String, TPV> m = new LinkedHashMap<String, TPV>();
+
+        final Iterator<ITPV> itr = tuples.values().iterator();
+
+        while (itr.hasNext()) {
+
+            final TPV tpv = (TPV) itr.next();
+
+            if (filter != null && !filter.accept(tpv.name)) {
+
+                if(DEBUG) {
+                    
+                    log.debug("rejecting on filter: "+tpv);
+                    
+                }
+                
+                continue;
+                
+            }
+
+            if (tpv.value == null) {
+
+                // remove binding.
+                final TPV old = m.remove(tpv.name);
+                
+                if (DEBUG && old != null) {
+                    
+                    log.debug("removed binding: " + old);
+                    
+                }
+                
+            } else {
+                
+                // (over)write binding.
+                final TPV old = m.put(tpv.name, tpv);
+
+                if (DEBUG && old != null) {
+
+                    log.debug("overwrote: \nold=" + old + "\nnew=" + tpv);
+                    
+                }
+                
+            }
+            
+        }
+        
+        /*
+         * At this point we have only the most recent property values of
+         * interest in [m].
+         * 
+         * Now we generate another TPS using the same TPV instances and
+         * [writeTime] as this TPS.
+         */
+        
+        final TPS tps = new TPS(this.schema, this.writeTime);
+        
+        for(Map.Entry<String, TPV> entry : m.entrySet()) {
+
+            final String name = entry.getKey();
+            
+            final TPV tpv = entry.getValue();
+            
+            tps.tuples.put(new TP(name, tpv.timestamp), tpv);
+            
+        }
+        
+        if(DEBUG) {
+            
+            log.debug("postFilter: "+tps);
+            
+        }
+        
+        return tps;
+        
+    }
+
+    /**
+     * Filters for only those bindings whose timestamp is GTE to the given
+     * timestamp.
+     */
+    public TPS filter(final long fromTime, final long toTime) {
+
+        return filter(fromTime, toTime, null/* filter */);
+
+    }
+
+    /**
+     * Filters for only those bindings that satisify the given filter.
+     * 
+     * @param filter
+     *            An optional filter.
+     */
+    public TPS filter(final INameFilter filter) {
+
+        return filter(MIN_TIMESTAMP, MAX_TIMESTAMP, filter);
+
+    }
+    
+    /**
+     * Filters for only those bindings whose timestamp is GTE to the given
+     * timestamp and which satisify the optional property name filter.
+     */
+    public TPS filter(final long fromTime, final long toTime,
+            final INameFilter filter) {
+
+        if (fromTime < MIN_TIMESTAMP)
+            throw new IllegalArgumentException();
+        
+        if (toTime <= fromTime)
+            throw new IllegalArgumentException();
+        
+        if(DEBUG) {
+            
+            log.debug("fromTime=" + fromTime + ", toTime=" + toTime
+                    + ", filter=" + filter + ", preFilter=" + this);
+            
+        }
+        
+        /*
+         * Generate another TPS using the same TPV instances and [writeTime] as
+         * this TPS.
+         */
+        
+        final TPS tps = new TPS(this.schema, this.writeTime);
+        
+        final Iterator<Map.Entry<TP,ITPV>> itr = tuples.entrySet().iterator();
+
+        while (itr.hasNext()) {
+
+            final Map.Entry<TP,ITPV> entry = itr.next();
+            
+            final TP tp = entry.getKey();
+
+            if (tp.timestamp < fromTime || tp.timestamp >= toTime) {
+
+                // Outside of the half-open range.
+
+                if (DEBUG) {
+
+                    log.debug("rejecting on timestamp: " + tp);
+
+                }
+
+                continue;
+
+            }
+
+            if (filter != null && !filter.accept(tp.name)) {
+
+                if (DEBUG) {
+
+                    log.debug("rejecting on filter: " + tp);
+
+                }
+                
+                continue;
+                
+            }
+
+            // copy the entry.
+            tps.tuples.put(tp, entry.getValue());
+            
+        }
+        
+        if(DEBUG) {
+            
+            log.debug("postFilter: "+tps);
+            
+        }
+        
+        return tps;
+        
+    }
     
     public Map<String,Object> asMap() {
         
@@ -292,11 +528,16 @@ public class TPS implements ITPS, Externalizable {
 
     }
 
-    public Map<String, Object> asMap(long timestamp, INameFilter filter) {
+    /**
+     * Note: A {@link LinkedHashMap} is returned to reduce the overhead with
+     * iterators while preserving the ordering imposed by {@link #tuples}.
+     */
+    public LinkedHashMap<String, Object> asMap(final long timestamp,
+            final INameFilter filter) {
 
-        final Map<String, Object> m = new HashMap<String, Object>();
+        final LinkedHashMap<String, Object> m = new LinkedHashMap<String, Object>();
 
-        final Iterator<ITPV> itr = iterator();
+        final Iterator<ITPV> itr = tuples.values().iterator();
         
         while (itr.hasNext()) {
 
@@ -306,7 +547,7 @@ public class TPS implements ITPS, Externalizable {
 
                 // Exceeded timestamp of interest.
                 
-                break;
+                continue;
                 
             }
             
@@ -316,7 +557,7 @@ public class TPS implements ITPS, Externalizable {
                 
             }
 
-            if(tpv.value==null) {
+            if (tpv.value == null) {
                 
                 m.remove(tpv.name);
                 
@@ -336,73 +577,73 @@ public class TPS implements ITPS, Externalizable {
      * Externalizable support.
      */
     
-    private final transient Integer ONE = Integer.valueOf(1);
-    
-    /**
-     * Return a frequency distribution for the distinct timestamps.
-     */
-    protected HashMap<Long,Integer> timestamps() {
-
-        HashMap<Long,Integer> fd = new HashMap<Long,Integer>();
-        
-        Iterator<ITPV> itr = tuples.values().iterator();
-
-        while(itr.hasNext()) {
-            
-            TPV tpv = (TPV)itr.next();
-            
-            Long ts = tpv.timestamp;
-            
-            Integer freq = fd.get(ts);
-            
-            if(freq==null) {
-                
-                fd.put(ts, ONE);
-                
-            } else {
-                
-                fd.put(ts, Integer.valueOf(freq.intValue() + 1));
-                
-            }
-            
-        }
-        
-        return fd;
-        
-    }
-    
-    /**
-     * Return a frequency distribution for the distinct property names.
-     */
-    protected HashMap<String,Integer> names() {
-
-        HashMap<String,Integer> fd = new HashMap<String,Integer>();
-        
-        Iterator<ITPV> itr = tuples.values().iterator();
-
-        while(itr.hasNext()) {
-            
-            TPV tpv = (TPV)itr.next();
-            
-            String name = tpv.name;
-            
-            Integer freq = fd.get(name);
-            
-            if(freq==null) {
-                
-                fd.put(name, ONE);
-                
-            } else {
-                
-                fd.put(name, Integer.valueOf(freq.intValue() + 1));
-                
-            }
-            
-        }
-        
-        return fd;
-        
-    }
+//    private final transient Integer ONE = Integer.valueOf(1);
+//    
+//    /**
+//     * Return a frequency distribution for the distinct timestamps.
+//     */
+//    private HashMap<Long,Integer> timestamps() {
+//
+//        final HashMap<Long,Integer> fd = new HashMap<Long,Integer>();
+//        
+//        final Iterator<ITPV> itr = tuples.values().iterator();
+//
+//        while(itr.hasNext()) {
+//            
+//            final TPV tpv = (TPV)itr.next();
+//            
+//            final Long ts = tpv.timestamp;
+//            
+//            final Integer freq = fd.get(ts);
+//            
+//            if (freq == null) {
+//                
+//                fd.put(ts, ONE);
+//
+//            } else {
+//
+//                fd.put(ts, Integer.valueOf(freq.intValue() + 1));
+//
+//            }
+//            
+//        }
+//        
+//        return fd;
+//        
+//    }
+//    
+//    /**
+//     * Return a frequency distribution for the distinct property names.
+//     */
+//    private LinkedHashMap<String,Integer> names() {
+//
+//        final LinkedHashMap<String,Integer> fd = new LinkedHashMap<String,Integer>();
+//        
+//        final Iterator<ITPV> itr = tuples.values().iterator();
+//
+//        while(itr.hasNext()) {
+//            
+//            final TPV tpv = (TPV)itr.next();
+//            
+//            final String name = tpv.name;
+//            
+//            final Integer freq = fd.get(name);
+//            
+//            if (freq == null) {
+//                
+//                fd.put(name, ONE);
+//                
+//            } else {
+//                
+//                fd.put(name, Integer.valueOf(freq.intValue() + 1));
+//                
+//            }
+//            
+//        }
+//        
+//        return fd;
+//        
+//    }
     
     /**
      * 
@@ -420,7 +661,7 @@ public class TPS implements ITPS, Externalizable {
         // the schema.
         out.writeObject(schema);
 
-        out.writeLong(timestamp);
+        out.writeLong(writeTime);
         
         /*
          * Setup bit stream.
@@ -448,29 +689,29 @@ public class TPS implements ITPS, Externalizable {
          * write tuples.
          */
         
-        Iterator<ITPV> itr = tuples.values().iterator();
+        final Iterator<ITPV> itr = tuples.values().iterator();
         
         while(itr.hasNext()) {
             
-            TPV tpv = (TPV)itr.next();
+            final TPV tpv = (TPV)itr.next();
             
             out.writeUTF(tpv.name);
             
             out.writeLong(tpv.timestamp);
-            
-            final byte[] val = ValueType.encode(tpv.value);
-            
-            out.writeInt(val == null ? 0 : val.length + 1); // #of bytes + 1
-            
-            if(val!=null) {
 
-                out.write( val ); // encoded value.
-                
+            final byte[] val = ValueType.encode(tpv.value);
+
+            out.writeInt(val == null ? 0 : val.length + 1); // #of bytes + 1
+
+            if (val != null) {
+
+                out.write(val); // encoded value.
+
             }
             
         }
 
-//        obs.flush();
+// obs.flush();
 //        if(baos!=null) {
 //            out.write(baos.toByteArray());
 //        }
@@ -486,7 +727,7 @@ public class TPS implements ITPS, Externalizable {
 
         this.schema = (Schema)in.readObject();
 
-        this.timestamp = in.readLong();
+        this.writeTime = in.readLong();
         
         this.tuples = new TreeMap<TP,ITPV>();
 
@@ -495,10 +736,10 @@ public class TPS implements ITPS, Externalizable {
         // #of tuples.
         final int n = in.readInt();
 
-        if(log.isInfoEnabled())
-        log.info("Reading "+n+" tuples: schema="+schema);
+        if (INFO)
+            log.info("n=" + n + ", schema=" + schema);
 
-        for(int i=0; i<n; i++) {
+        for (int i = 0; i < n; i++) {
 
             final String name = in.readUTF();
             
@@ -520,10 +761,10 @@ public class TPS implements ITPS, Externalizable {
             
             tuples.put(new TP(name, timestamp), tpv);
             
-            if(log.isInfoEnabled())
-            log.info("tuple: name=" + name + ", timestamp=" + timestamp
-                    + ", value=" + value);
-            
+            if (INFO)
+                log.info("tuple: name=" + name + ", timestamp=" + timestamp
+                        + ", value=" + value);
+
         }
         
     }
@@ -545,10 +786,11 @@ public class TPS implements ITPS, Externalizable {
 
         public final long timestamp;
         
-        public TP(String name,long timestamp) {
-            
-            if(name==null) throw new IllegalArgumentException();
-            
+        public TP(String name, long timestamp) {
+
+            if (name == null)
+                throw new IllegalArgumentException();
+
             this.name = name;
             
             this.timestamp = timestamp;
@@ -568,7 +810,6 @@ public class TPS implements ITPS, Externalizable {
             int ret = timestamp < o.timestamp ? -1
                     : timestamp > o.timestamp ? 1 : 0;
 
-
             if (ret == 0) {
 
                 ret = name.compareTo(o.name);
@@ -579,6 +820,12 @@ public class TPS implements ITPS, Externalizable {
 
         }
 
+        public String toString() {
+            
+            return "TP{name="+name+", timestamp="+timestamp+"}";
+            
+        }
+        
     }
     
     /**
@@ -591,12 +838,23 @@ public class TPS implements ITPS, Externalizable {
 
         private static final long serialVersionUID = -3301002622055086380L;
 
-//        private TPS tps;
         private Schema schema;
         private String name;
         private long timestamp;
         private Object value;
         
+        /**
+         * 
+         * @param schema
+         *            The schema.
+         * @param name
+         *            The property name.
+         * @param timestamp
+         *            The timestamp.
+         * @param value
+         *            The property value -or- <code>null</code> if the
+         *            property was deleted as of the given timestamp.
+         */
         public TPV(Schema schema, String name, long timestamp, Object value) {
 
             if (schema == null)
@@ -668,7 +926,8 @@ public class TPS implements ITPS, Externalizable {
             if (o1 == o2)
                 return 0;
 
-            int ret = o1.getSchema().getName().compareTo(o2.getSchema().getName());
+            int ret = o1.getSchema().getName().compareTo(
+                    o2.getSchema().getName());
 
             if (ret == 0) {
 
@@ -691,7 +950,32 @@ public class TPS implements ITPS, Externalizable {
     
     public String toString() {
         
-        return "TPS{schema="+schema+",timestamp="+timestamp+",tuples="+tuples+"}";
+        final StringBuilder sb = new StringBuilder();
+        
+        sb.append("TPS{schema=" + schema + ", timestamp=" + writeTime
+                + ", tuples={");
+        
+        final int n = 0;
+        
+        for(ITPV tpv : tuples.values()) {
+            
+            if(n>0) {
+
+                sb.append(",\n");
+                
+            } else {
+                
+                sb.append("\n");
+                
+            }
+            
+            sb.append(tpv.toString());
+            
+        }
+        
+        sb.append("}}");
+        
+        return sb.toString();
         
     }
     

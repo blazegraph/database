@@ -42,6 +42,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.compression.IRandomAccessByteArray;
 import com.bigdata.btree.compression.RandomAccessByteArray;
 import com.bigdata.btree.filter.ITupleFilter;
+import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.service.IDataService;
@@ -60,8 +61,12 @@ public class ResultSet implements Externalizable {
 
     private static final long serialVersionUID = -390738836663476282L;
 
-    protected static final Logger log = Logger.getLogger(ResultSet.class);
+    protected transient static final Logger log = Logger.getLogger(ResultSet.class);
 
+    protected transient static final boolean INFO = log.isInfoEnabled();
+
+    protected transient static final boolean DEBUG = log.isDebugEnabled();
+    
     /** true iff keys were requested. */
     private boolean sendKeys;
 
@@ -140,26 +145,27 @@ public class ResultSet implements Externalizable {
         
     }
 
-    /**
-     * The next key that should be used to retrieve keys and/or values starting
-     * from the first possible successor of the {@link #getLastKey()} visited by
-     * the iterator in this operation (the successor is formed by appending a
-     * <code>nul</code> byte to the {@link #getLastKey()}).
-     * 
-     * @return The successor of {@link #getLastKey()} -or- <code>null</code>
-     *         iff the iterator exhausted the available keys.
-     * 
-     * @exception UnsupportedOperationException
-     *                if the {@link #lastKey} is <code>null</code>.
-     */
-    final public byte[] successor() {
-
-        if (lastKey == null)
-            throw new UnsupportedOperationException();
-
-        return BytesUtil.successor(lastKey);
-
-    }
+//    /**
+//     * The next key that should be used to retrieve keys and/or values starting
+//     * from the first possible successor of the {@link #getLastKey()} visited by
+//     * the iterator in this operation (the successor is formed by appending a
+//     * <code>nul</code> byte to the {@link #getLastKey()}).
+//     * 
+//     * @return The successor of {@link #getLastKey()} -or- <code>null</code>
+//     *         iff the iterator exhausted the available keys.
+//     * 
+//     * @exception UnsupportedOperationException
+//     *                if the {@link #lastKey} is <code>null</code>.
+//     */
+//    final public byte[] successor() {
+//
+//        if (lastKey == null)
+//            throw new UnsupportedOperationException();
+//
+////        return SuccessorUtil.successor(lastKey.clone());
+//        return BytesUtil.successor(lastKey);
+//
+//    }
 
     /**
      * The {@link ITupleSerializer} that should be used to de-serialize the
@@ -387,6 +393,14 @@ public class ResultSet implements Externalizable {
         // @todo byte[] presumes #sources in view <= 127, which it SHOULD be (not checked).
         sourceIndices = sources.length > 1 ? new byte[limit] : null;
 
+        if (INFO) {
+            log.info("limit=" + limit + ", sendKeys=" + sendKeys
+                    + ", sendVals=" + sendVals + ", deleteMarkers="
+                    + (deleteMarkers != null ? true : false) + ", timestamps="
+                    + (versionTimestamps != null ? true : false)
+                    + ", #sources=" + sources.length);
+        }
+        
     }
     private boolean init = false;
     
@@ -405,7 +419,7 @@ public class ResultSet implements Externalizable {
         if (limit < 0)
             limit = -limit;
 
-        if (log.isInfoEnabled()) {
+        if (INFO) {
 
             log.info("resizing buffers: ntuples=" + ntuples + ", new limit="
                     + limit);
@@ -514,13 +528,14 @@ public class ResultSet implements Externalizable {
         
         this.lastKey = lastKey;
         
-        if(log.isInfoEnabled())
-        log.info("ntuples=" + ntuples // + ", capacity=" + capacity
-                + ", exhausted=" + exhausted + ", sendKeys=" + sendKeys
-                + ", sendVals=" + sendVals + ", deleteMarkers="
-                + (deleteMarkers != null ? true : false) + ", timestamps="
-                + (versionTimestamps != null ? true : false) + ", commitTime="
-                + commitTime);
+        if (INFO)
+            log.info("ntuples=" + ntuples + ", exhausted=" + exhausted
+                    + ", sendKeys=" + sendKeys + ", sendVals=" + sendVals
+                    + ", deleteMarkers="
+                    + (deleteMarkers != null ? true : false) + ", timestamps="
+                    + (versionTimestamps != null ? true : false)
+                    + ", commitTime=" + commitTime + ", lastKey="
+                    + BytesUtil.toString(lastKey));
 
     }
     private boolean done = false;

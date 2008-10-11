@@ -156,8 +156,6 @@ import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IClientIndex;
 import com.bigdata.service.IDataService;
-import com.bigdata.sparse.ITPS;
-import com.bigdata.sparse.SingleColumnFilter;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ChunkedConvertingIterator;
 import com.bigdata.striterator.DelegateChunkedIterator;
@@ -1428,17 +1426,14 @@ abstract public class AbstractTripleStore extends
 
                 if (axioms == null) {
 
-                    // read from the global row store.
-                    final ITPS tps = getIndexManager().getGlobalRowStore().read(
-                                    RelationSchema.INSTANCE,
-                                    getNamespace(),
-                                    Long.MAX_VALUE,
-                                    new SingleColumnFilter(
-                                            TripleStoreSchema.AXIOMS));
+                    /*
+                     * Extract the de-serialized axiom model from the global row
+                     * store.
+                     */
                     
-                    // extract the de-serialized axiom model.
-                    axioms = (Axioms) tps.get(TripleStoreSchema.AXIOMS)
-                            .getValue();
+                    axioms = (Axioms) getIndexManager().getGlobalRowStore()
+                            .get(RelationSchema.INSTANCE, getNamespace(),
+                                    TripleStoreSchema.AXIOMS);
 
                     if (axioms == null)
                         throw new RuntimeException("No axioms defined? : "
@@ -1475,25 +1470,21 @@ abstract public class AbstractTripleStore extends
 
         if (!lexicon)
             throw new IllegalStateException();
-        
-        if(vocab == null) {
-            
+
+        if (vocab == null) {
+
             synchronized (this) {
 
                 if (vocab == null) {
 
-                    // read from the global row store.
-                    final ITPS tps = getIndexManager().getGlobalRowStore()
-                            .read(
-                                    RelationSchema.INSTANCE,
-                                    getNamespace(),
-                                    Long.MAX_VALUE,
-                                    new SingleColumnFilter(
-                                            TripleStoreSchema.VOCABULARY));
+                    /*
+                     * Extract the de-serialized vocabulary from the global row
+                     * store.
+                     */
 
-                    // extract the de-serialized vocabulary.
-                    vocab = (Vocabulary) tps.get(TripleStoreSchema.VOCABULARY)
-                            .getValue();
+                    vocab = (Vocabulary) getIndexManager().getGlobalRowStore().get(
+                            RelationSchema.INSTANCE, getNamespace(),
+                            TripleStoreSchema.VOCABULARY);
 
                     if (vocab == null)
                         throw new RuntimeException("No vocabulary defined? : "

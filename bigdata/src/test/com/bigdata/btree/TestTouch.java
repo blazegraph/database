@@ -130,7 +130,7 @@ public class TestTouch extends AbstractBTreeTestCase {
          * verify the initial conditions - the root leaf is on the queue and
          * its reference counter is one (1).
          */
-        final Leaf a = (Leaf)btree.root;
+        final Leaf a = (Leaf)btree.getRoot();
 
         assertEquals(1,a.referenceCount);
         
@@ -236,7 +236,7 @@ public class TestTouch extends AbstractBTreeTestCase {
          * verify the initial conditions - the root leaf is on the queue and
          * its reference counter is one (1).
          */
-        final Leaf a = (Leaf)btree.root;
+        final Leaf a = (Leaf)btree.getRoot();
 
         assertEquals(1,a.referenceCount);
         
@@ -342,7 +342,7 @@ public class TestTouch extends AbstractBTreeTestCase {
          * verify the initial conditions - the root leaf is on the queue and
          * its reference counter is one (1).
          */
-        final Leaf a = (Leaf)btree.root;
+        final Leaf a = (Leaf)btree.getRoot();
 
         assertEquals(1,a.referenceCount);
         
@@ -361,8 +361,8 @@ public class TestTouch extends AbstractBTreeTestCase {
         btree.insert(KeyBuilder.asSortKey(5),v5);
         btree.insert(KeyBuilder.asSortKey(7),v7);
         btree.insert(KeyBuilder.asSortKey(9),v9);
-        assertNotSame(a,btree.root);
-        final Node c = (Node) btree.root;
+        assertNotSame(a,btree.getRoot());
+        final Node c = (Node) btree.getRoot();
         assertKeys(new int[]{7},c);
         assertEquals(a,c.getChild(0));
         final Leaf b = (Leaf) c.getChild(1);

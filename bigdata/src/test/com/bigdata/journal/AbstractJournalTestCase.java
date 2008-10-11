@@ -28,9 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.io.File;
-import java.nio.ByteBuffer;
 import java.util.Properties;
-import java.util.Random;
 
 import junit.framework.TestCase;
 
@@ -222,13 +220,13 @@ abstract public class AbstractJournalTestCase
         }
         
         // Note: clone to avoid modifying!!!
-        Properties properties = (Properties)getProperties().clone();
+        final Properties properties = (Properties)getProperties().clone();
         
         // Turn this off now since we want to re-open the same store.
         properties.setProperty(Options.CREATE_TEMP_FILE,"false");
         
         // The backing file that we need to re-open.
-        File file = store.getFile();
+        final File file = store.getFile();
         
         assertNotNull(file);
         

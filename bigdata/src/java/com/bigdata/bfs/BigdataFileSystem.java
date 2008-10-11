@@ -19,7 +19,6 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.Vector;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndex;
@@ -45,12 +44,13 @@ import com.bigdata.relation.locator.RelationSchema;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
+import com.bigdata.sparse.AutoIncIntegerCounter;
+import com.bigdata.sparse.IRowStoreConstants;
 import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.ITPV;
 import com.bigdata.sparse.Schema;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.sparse.TPS.TPV;
-import com.bigdata.sparse.ValueType.AutoIncIntegerCounter;
 
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
@@ -205,7 +205,7 @@ import cutthecrap.utils.striterators.Striterator;
  */
 public class BigdataFileSystem extends
         AbstractResource<IDatabase<BigdataFileSystem>> implements
-        IContentRepository {
+        IContentRepository, IRowStoreConstants {
 
     final protected static Logger log = Logger.getLogger(BigdataFileSystem.class);
     
@@ -316,9 +316,6 @@ public class BigdataFileSystem extends
     
     private IIndex dataIndex;
     
-    // @todo unique or not?
-    final protected long AUTO_TIMESTAMP = SparseRowStore.AUTO_TIMESTAMP_UNIQUE;
-        
     protected static void assertString(Map<String, Object> properties, String name) {
 
         Object val = properties.get(name);
@@ -541,7 +538,7 @@ public class BigdataFileSystem extends
         
         // write the metadata (atomic operation).
         final ITPS tps = getMetadataIndex().write(metadataSchema, metadata,
-                AUTO_TIMESTAMP, null/* filter */, null/*precondition*/);
+                AUTO_TIMESTAMP_UNIQUE, null/* filter */, null/*precondition*/);
 
         final int version = (Integer) tps.get(FileMetadataSchema.VERSION).getValue();
 
@@ -631,10 +628,11 @@ public class BigdataFileSystem extends
      * @see ITPS
      * @see SparseRowStore#read(Schema, Object, long, com.bigdata.sparse.INameFilter)
      */
-    public ITPS readMetadata(String id, long timestamp) {
+    public ITPS readMetadata(final String id, final long timestamp) {
 
         return getMetadataIndex()
-                .read(metadataSchema, id, timestamp, null/* filter */);
+                .read(metadataSchema, id, timestamp/* fromTime */,
+                        timestamp + 1/* toTime */, null/* filter */);
 
     }
     
@@ -664,7 +662,7 @@ public class BigdataFileSystem extends
         metadata.remove(FileMetadataSchema.VERSION);
         
         return getMetadataIndex().write(metadataSchema, metadata,
-                AUTO_TIMESTAMP, null/* filter */,null/*precondition*/).asMap();
+                AUTO_TIMESTAMP_UNIQUE, null/* filter */,null/*precondition*/).asMap();
         
     }
     
@@ -680,7 +678,7 @@ public class BigdataFileSystem extends
      */
     public int update(Document doc) {
         
-        Map<String,Object> metadata = doc.asMap();
+        final Map<String,Object> metadata = doc.asMap();
         
         final String id = (String) metadata.get(FileMetadataSchema.ID); 
         
@@ -738,7 +736,7 @@ public class BigdataFileSystem extends
             // delete marker.
             metadata.put(FileMetadataSchema.VERSION, null);
 
-            getMetadataIndex().write(metadataSchema, metadata, AUTO_TIMESTAMP,
+            getMetadataIndex().write(metadataSchema, metadata, AUTO_TIMESTAMP_UNIQUE,
                     null/* filter */, null/*precondition*/);
             
         }
@@ -891,19 +889,18 @@ public class BigdataFileSystem extends
     public Iterator<? extends DocumentHeader> getDocumentHeaders(String fromId,
             String toId) {
 
-        return new Striterator(getMetadataIndex().rangeQuery(
-                metadataSchema, fromId, toId, 0/* capacity */,
-                Long.MAX_VALUE/* timestamp */, null/* filter */))
-                .addFilter(new Resolver() {
+        return new Striterator(getMetadataIndex().rangeIterator(metadataSchema,
+                fromId, toId)).addFilter(new Resolver() {
 
                     private static final long serialVersionUID = 1L;
 
                     @Override
                     protected Object resolve(Object arg0) {
                         
-                        ITPS tps = (ITPS) arg0;
+                        final ITPS tps = (ITPS) arg0;
                         
-                        String id = (String) tps.get(FileMetadataSchema.ID).getValue();
+                        final String id = (String) tps.get(
+                                FileMetadataSchema.ID).getValue();
                         
                         return new RepositoryDocumentImpl(
                                 BigdataFileSystem.this, id, tps);
@@ -950,7 +947,7 @@ public class BigdataFileSystem extends
                     IRangeQuery.CURSOR,
                     new FilterConstructor<TPV>()
                             .addFilter(new FileVersionDeleter(
-                                    SparseRowStore.AUTO_TIMESTAMP_UNIQUE)));
+                                    IRowStoreConstants.AUTO_TIMESTAMP_UNIQUE)));
             
         }
         
