@@ -30,8 +30,10 @@ package com.bigdata.relation.rule.eval;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -667,7 +669,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      *            object is NOT thread-safe.
      */
     protected void runSubQueries(final int orderIndex, final Object[] chunk,
-            final IBindingSet bindingSet, IBuffer<ISolution> buffer)
+            final IBindingSet bindingSet, final IBuffer<ISolution> buffer)
             throws InterruptedException {
         
         /*
@@ -780,21 +782,24 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 
             ruleStats.elementCount[tailIndex]++;
 
-            /*
-             * Then bind this statement, which propagates bindings to the next
-             * predicate (if the bindings are rejected then the solution would
-             * violate the constaints on the JOIN).
-             */
+            // clone as alternative to clearing the downstream bindings.
+            final IBindingSet bset = bindingSet.clone();
+            
+//            /*
+//             * Then bind this statement, which propagates bindings to the next
+//             * predicate (if the bindings are rejected then the solution would
+//             * violate the constaints on the JOIN).
+//             */
+//
+//            ruleState.clearDownstreamBindings(orderIndex + 1, bindingSet);
 
-            ruleState.clearDownstreamBindings(orderIndex + 1, bindingSet);
-
-            if (ruleState.bind(tailIndex, e, bindingSet)) {
+            if (ruleState.bind(tailIndex, e, bset)) {
 
                 // run the subquery.
 
                 ruleStats.subqueryCount[tailIndex]++;
 
-                apply(orderIndex + 1, bindingSet, buffer);
+                apply(orderIndex + 1, bset, buffer);
 
             }
 
@@ -943,6 +948,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
         }
         
         boolean interrupted = false;
+        List<ExecutionException> causes = null;
         final List<Future<Void>> futures;
         try {
 
@@ -952,7 +958,18 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
             for(Future<Void> f : futures) {
                 
                 // verify that no task failed.
-                f.get();
+                try {
+                    f.get();
+                } catch(InterruptedException ex) {
+                    interrupted = true;
+                } catch(CancellationException ex) {
+                    interrupted = true;
+                } catch(ExecutionException ex) {
+                    if(causes==null) {
+                        causes = new LinkedList<ExecutionException>();
+                    }
+                    causes.add(ex);
+                }
                 
             }
             
@@ -967,11 +984,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
              */
             
             interrupted = true;
-
-        } catch (ExecutionException ex) {
-
-            throw new RuntimeException("Join failed: " + ex, ex);
-
+            
         } catch(RejectedExecutionException ex) {
             
             if (joinService.isShutdown()) {
@@ -987,17 +1000,25 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
                  * of the executor service.
                  */
 
-                throw new InterruptedException("Terminated by shutdown");
+                interrupted = true;
+                
+            } else {
+
+                throw ex;
                 
             }
-            
-            throw ex;
             
         }
 
         if(interrupted) {
 
             throw new InterruptedException("Terminated by interrupt");
+            
+        }
+        
+        if (causes != null) {
+            
+            throw new RuntimeException("JOIN Error(s): " + causes.toString());
             
         }
         

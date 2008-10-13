@@ -253,10 +253,12 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
                                 : capacity, null/* keyOrder */, filter)//
         );
 
-        if (!inf.forwardChainRdfTypeRdfsResource) {
+        if (database.getAxioms().isRdfSchema()
+                && !inf.forwardChainRdfTypeRdfsResource) {
             
             /*
-             * Backchain (x rdf:type rdfs:Resource ).
+             * Backchain (x rdf:type rdfs:Resource ), which is an entailment
+             * declared for RDFS Schema.
              * 
              * @todo pass the filter in here also.
              */

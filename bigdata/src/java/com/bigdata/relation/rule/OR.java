@@ -35,12 +35,12 @@ public class OR implements IConstraint {
     /**
      * 
      */
-    private static final long serialVersionUID = -1L;
+    private static final long serialVersionUID = 7750833040265209718L;
     
     private final IConstraint x;
     private final IConstraint y;
     
-    public OR(IConstraint x, IConstraint y) {
+    public OR(final IConstraint x, final IConstraint y) {
         
         if (x == null || y == null)
             throw new IllegalArgumentException();
@@ -54,7 +54,7 @@ public class OR implements IConstraint {
         
     }
     
-    public boolean accept(IBindingSet s) {
+    public boolean accept(final IBindingSet s) {
 
         return x.accept(s) || y.accept(s);
 

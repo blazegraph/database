@@ -2,9 +2,11 @@ package com.bigdata.rdf.sail;
 
 import info.aduna.iteration.CloseableIteration;
 import info.aduna.iteration.EmptyIteration;
+
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
+
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
@@ -26,6 +28,7 @@ import org.openrdf.query.algebra.Var;
 import org.openrdf.query.algebra.Compare.CompareOp;
 import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
 import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
+
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
@@ -42,6 +45,7 @@ import com.bigdata.rdf.store.FullTextIndexAccessPath;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.EQ;
 import com.bigdata.relation.rule.EQConstant;
@@ -674,11 +678,23 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             }
         }
         
+        /*
+         * This applies a filter to the access path to remove any inferred
+         * triples when [includeInferred] is false.
+         * 
+         * @todo In order to rotate additional constraints onto an access path
+         * we would need to either change IPredicate and AbstractAccessPath to
+         * process an IConstraint[] or write a delegation pattern that let's us
+         * wrap one filter inside of another.
+         */
+        final IElementFilter<ISPO> filter = !tripleSource.includeInferred ? ExplicitSPOFilter.INSTANCE
+                : null;
+        
         return new SPOPredicate(
                 new String[] { database.getSPORelation().getNamespace() },//
                 s, p, o, c, //
                 false, // optional
-                !tripleSource.includeInferred ? ExplicitSPOFilter.INSTANCE : null,
+                filter, // filter on elements visited by the access path.
                 expander
                 );
     }
@@ -802,12 +818,17 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             final TupleExpr tupleExpr, final IRule rule)
             throws QueryEvaluationException {
 
+        final boolean backchain = //
+                   tripleSource.getDatabase().getAxioms().isRdfSchema() 
+                && tripleSource.includeInferred
+                && tripleSource.conn.isQueryTimeExpander();
+
         if (INFO) {
 
             log.info("Running tupleExpr as native rule:\n" + tupleExpr + ",\n"
                     + rule);
 
-            log.info("backchain: " + (tripleSource.includeInferred&&tripleSource.conn.isQueryTimeExpander()));
+            log.info("backchain: " + backchain);
             
         }
 
@@ -822,8 +843,8 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                             ActionEnum.Query, IJoinNexus.BINDINGS,
                             null, // filter
                             false, // justify 
-                            tripleSource.includeInferred&&tripleSource.conn.isQueryTimeExpander(), // backchain
-                            planFactory
+                            backchain, //
+                            planFactory//
                             );
 
             final IJoinNexus joinNexus = joinNexusFactory.newInstance(database

@@ -495,69 +495,69 @@ public class RuleState {
 
     }
 
-    /**
-     * Clear downstream bindings in the evaluation {@link #order}[]. If a
-     * variable in a downstream predicate was 1st bound by an upstream predicate
-     * as identified by {@link #depends} then its value is NOT cleared.
-     * <p>
-     * Note: You MUST {@link #clearDownstreamBindings(int, IBindingSet)} before
-     * you (re-)evaluate a subquery. Failure to do so will leave stale bindings
-     * in place which will cause {@link #getAccessPath(int)} to identify the
-     * wrong access path, and hence select the wrong data.
-     * <p>
-     * Note: We only clear downstream bindings in order to get the access path
-     * right for the next subquery. We DO NOT clear the old bindings before
-     * copying in the new bindings from the next element. In that case the new
-     * bindings are just blasted over the old bindings.
-     * 
-     * @param index
-     *            The index of the predicate whose values you intend to
-     *            {@link #bind(IBindingSet,int, Object)}.
-     */
-    protected void clearDownstreamBindings(final int index, final IBindingSet bindingSet) {
-
-        if (DEBUG) {
-
-            log.debug("index=" + index + ", bindingSet=" + bindingSet);
-
-        }
-
-        final int tailCount = rule.getTailCount();
-
-        for (int i = index; i < tailCount; i++) {
-
-            final IPredicate pred = rule.getTail(order[index]);
-
-            final int arity = pred.arity();
-
-            for (int j = 0; j < arity; j++) {
-
-                final IVariableOrConstant t = pred.get(j);
-
-                if (t.isVar()) {
-
-                    final int k = depends.get((Var) t);
-
-                    if (k >= index) {
-
-                        if(DEBUG) {
-                            
-                            log.debug("Clearing: "+t);
-                            
-                        }
-                        
-                        bindingSet.clear((Var)t);
-//                        set((Var) t, null, bindingSet);
-
-                    }
-
-                }
-
-            }
-
-        }
-
-    }
+//    /**
+//     * Clear downstream bindings in the evaluation {@link #order}[]. If a
+//     * variable in a downstream predicate was 1st bound by an upstream predicate
+//     * as identified by {@link #depends} then its value is NOT cleared.
+//     * <p>
+//     * Note: You MUST {@link #clearDownstreamBindings(int, IBindingSet)} before
+//     * you (re-)evaluate a subquery. Failure to do so will leave stale bindings
+//     * in place which will cause {@link #getAccessPath(int)} to identify the
+//     * wrong access path, and hence select the wrong data.
+//     * <p>
+//     * Note: We only clear downstream bindings in order to get the access path
+//     * right for the next subquery. We DO NOT clear the old bindings before
+//     * copying in the new bindings from the next element. In that case the new
+//     * bindings are just blasted over the old bindings.
+//     * 
+//     * @param index
+//     *            The index of the predicate whose values you intend to
+//     *            {@link #bind(IBindingSet,int, Object)}.
+//     */
+//    protected void clearDownstreamBindings(final int index, final IBindingSet bindingSet) {
+//
+//        if (DEBUG) {
+//
+//            log.debug("index=" + index + ", bindingSet=" + bindingSet);
+//
+//        }
+//
+//        final int tailCount = rule.getTailCount();
+//
+//        for (int i = index; i < tailCount; i++) {
+//
+//            final IPredicate pred = rule.getTail(order[index]);
+//
+//            final int arity = pred.arity();
+//
+//            for (int j = 0; j < arity; j++) {
+//
+//                final IVariableOrConstant t = pred.get(j);
+//
+//                if (t.isVar()) {
+//
+//                    final int k = depends.get((Var) t);
+//
+//                    if (k >= index) {
+//
+//                        if(DEBUG) {
+//                            
+//                            log.debug("Clearing: "+t);
+//                            
+//                        }
+//                        
+//                        bindingSet.clear((Var)t);
+////                        set((Var) t, null, bindingSet);
+//
+//                    }
+//
+//                }
+//
+//            }
+//
+//        }
+//
+//    }
 
 //    /**
 //     * Return the {@link IAccessPath} that would be used to read from the

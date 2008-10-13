@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.rule;
 
+import java.util.Arrays;
+
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -71,14 +73,14 @@ public class QueryOptions implements IQueryOptions {
      *             specified with a non-zero offset and/or a non-{@link Long#MAX_VALUE}
      *             limit
      */
-    public QueryOptions(boolean distinct, boolean stable,
-            ISortOrder[] orderBy, ISlice slice) {
+    public QueryOptions(final boolean distinct, final boolean stable,
+            final ISortOrder[] orderBy, final ISlice slice) {
 
         this.distinct = distinct;
 
         this.stable = stable;
         
-        // MAY be null.
+        // MAY be null.  @todo check elements not null when orderBy not null.
         this.orderBy = orderBy;
         
         // MAY be null.
@@ -94,28 +96,39 @@ public class QueryOptions implements IQueryOptions {
         
     }
 
-    public boolean isDistinct() {
+    final public boolean isDistinct() {
         
         return distinct;
         
     }
 
-    public boolean isStable() {
+    final public boolean isStable() {
         
         return stable;
         
     }
 
-    public ISortOrder[] getOrderBy() {
+    final public ISortOrder[] getOrderBy() {
         
         return orderBy;
         
     }
 
-    public ISlice getSlice() {
+    final public ISlice getSlice() {
 
         return slice;
         
     }
 
+    public String toString() {
+
+        return "QueryOptions" + //
+            "{ distinct=" + distinct + //
+            ", stable=" + stable + //
+            ", orderBy=" + (orderBy == null ? "N/A" : Arrays.toString(orderBy)) + //
+            ", slice=" + slice + //
+            "}";
+
+    }
+    
 }

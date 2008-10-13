@@ -731,7 +731,7 @@ public class RDFJoinNexus implements IJoinNexus {
         // find the best access path for the predicate for that relation.
         IAccessPath accessPath = relation.getAccessPath(predicate);
 
-        ISolutionExpander expander = predicate.getSolutionExpander();
+        final ISolutionExpander expander = predicate.getSolutionExpander();
         
         if (expander != null) {
             

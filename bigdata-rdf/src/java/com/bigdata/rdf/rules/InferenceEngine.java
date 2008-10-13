@@ -25,9 +25,9 @@ package com.bigdata.rdf.rules;
 
 import java.util.Properties;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.axioms.RdfsAxioms;
 import com.bigdata.rdf.inf.BackchainTypeResourceIterator;
@@ -68,19 +68,17 @@ import com.bigdata.relation.rule.eval.IJoinNexusFactory;
  */
 public class InferenceEngine {
 
-    final static public Logger log = Logger.getLogger(InferenceEngine.class);
+    final static protected Logger log = Logger.getLogger(InferenceEngine.class);
 
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final static public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final static protected boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final static public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final static protected boolean DEBUG = log.isDebugEnabled();
 
     /**
      * The database whose closure is being maintained.
@@ -244,11 +242,13 @@ public class InferenceEngine {
                 .getProperty(Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE,
                         Options.DEFAULT_FORWARD_RDF_TYPE_RDFS_RESOURCE));
 
+        if(INFO)
         log.info(Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE + "="
                 + forwardChainRdfTypeRdfsResource);
 
-        final boolean rdfsOnly = database.getAxioms().isRdfSchema()
-                && !database.getAxioms().isOwlSameAs();
+        final Axioms axioms = database.getAxioms();
+        
+        final boolean rdfsOnly = axioms.isRdfSchema() && !axioms.isOwlSameAs();
 
         if (rdfsOnly) {
             
@@ -265,6 +265,7 @@ public class InferenceEngine {
                     .getProperty(Options.FORWARD_CHAIN_OWL_SAMEAS_CLOSURE,
                             Options.DEFAULT_FORWARD_CHAIN_OWL_SAMEAS_CLOSURE));
 
+            if(INFO)
             log.info(Options.FORWARD_CHAIN_OWL_SAMEAS_CLOSURE + "="
                     + forwardChainOwlSameAsClosure);
 
@@ -280,6 +281,7 @@ public class InferenceEngine {
                 
             }
 
+            if(INFO)
             log.info(Options.FORWARD_CHAIN_OWL_SAMEAS_CLOSURE + "="
                     + forwardChainOwlSameAsClosure);
 
@@ -289,6 +291,7 @@ public class InferenceEngine {
                                     Options.FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY,
                                     Options.DEFAULT_FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY));
 
+            if(INFO)
             log.info(Options.FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY + "="
                     + forwardChainOwlEquivalentProperty);
 
@@ -297,6 +300,7 @@ public class InferenceEngine {
                             Options.FORWARD_CHAIN_OWL_EQUIVALENT_CLASS,
                             Options.DEFAULT_FORWARD_CHAIN_OWL_EQUIVALENT_CLASS));
 
+            if(INFO)
             log.info(Options.FORWARD_CHAIN_OWL_EQUIVALENT_CLASS + "="
                     + forwardChainOwlEquivalentClass);
 
@@ -304,7 +308,8 @@ public class InferenceEngine {
                     .parseBoolean(properties.getProperty(
                             Options.FORWARD_CHAIN_OWL_INVERSE_OF,
                             Options.DEFAULT_FORWARD_CHAIN_OWL_INVERSE_OF));
-        
+
+            if(INFO)
             log.info(Options.FORWARD_CHAIN_OWL_INVERSE_OF + "="
                     + forwardChainOwlInverseOf);
 
@@ -313,6 +318,7 @@ public class InferenceEngine {
                             Options.FORWARD_CHAIN_OWL_TRANSITIVE_PROPERY,
                             Options.DEFAULT_FORWARD_CHAIN_OWL_TRANSITIVE_PROPERY));
             
+            if(INFO)
             log.info(Options.FORWARD_CHAIN_OWL_TRANSITIVE_PROPERY + "="
                     + forwardChainOwlTransitiveProperty);
 
@@ -472,7 +478,7 @@ public class InferenceEngine {
                         .getNamespace()) //
                 );
 
-        if(log.isInfoEnabled()) {
+        if(INFO) {
             
             log.info("\n\nforwardClosure=" + baseClosure.getClass().getName()
                     + ", program=" + program);
@@ -484,8 +490,9 @@ public class InferenceEngine {
             final long begin = System.currentTimeMillis();
 
             /*
-             * FIXME remove IJoinNexus.RULE once we no longer need the rule to
-             * generate the justifications (esp. for scale-out).
+             * FIXME remove IJoinNexus.RULE once we we can generate the
+             * justifications from just the bindings and no longer need the rule
+             * to generate the justifications (esp. for scale-out).
              */
             final int solutionFlags = IJoinNexus.ELEMENT//
                     | (justify ? IJoinNexus.RULE | IJoinNexus.BINDINGS : 0)//

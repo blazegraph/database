@@ -56,6 +56,8 @@ public class DefaultRangeCountFactory implements IRangeCountFactory {
     protected static final transient Logger log = Logger
             .getLogger(DefaultRangeCountFactory.class);
     
+    protected static final transient boolean DEBUG = log.isDebugEnabled();
+    
     private final IJoinNexus joinNexus;
     
     public DefaultRangeCountFactory(IJoinNexus joinNexus) {
@@ -84,7 +86,7 @@ public class DefaultRangeCountFactory implements IRangeCountFactory {
 
         final long rangeCount = accessPath.rangeCount(false/* exact */);
 
-        if (log.isDebugEnabled()) {
+        if (DEBUG) {
 
             /*
              * @todo trace total time in range counts while generating the plan
