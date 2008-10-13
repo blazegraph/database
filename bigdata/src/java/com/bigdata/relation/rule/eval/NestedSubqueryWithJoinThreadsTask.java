@@ -35,6 +35,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -971,6 +972,27 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 
             throw new RuntimeException("Join failed: " + ex, ex);
 
+        } catch(RejectedExecutionException ex) {
+            
+            if (joinService.isShutdown()) {
+
+                /*
+                 * Asynchronous shutdown of the executor service.
+                 * 
+                 * Note: When normal shutdown of the service is requested it is
+                 * common that the main thread will be in a state in which it
+                 * attempts to schedule more task(s). This results in a
+                 * RejectedExecutionException. We treat this just like an
+                 * interrupt since the join can not progress due to the shutdown
+                 * of the executor service.
+                 */
+
+                throw new InterruptedException("Terminated by shutdown");
+                
+            }
+            
+            throw ex;
+            
         }
 
         if(interrupted) {
