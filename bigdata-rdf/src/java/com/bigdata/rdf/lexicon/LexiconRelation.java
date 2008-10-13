@@ -154,7 +154,13 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
             
             /*
              * Explicitly disable overwrite for the full text index associated
-             * with the lexicon.
+             * with the lexicon. By default, the full text index will replace
+             * the existing tuple for a key. We turn this property off because
+             * the RDF values are immutable as is the mapping from an RDF value
+             * to a term identifier. Hence if we observe the same key there is
+             * no need to update the index entry - it will only cause the
+             * journal size to grow but will not add any information to the
+             * index.
              */
             properties.setProperty(Options.OVERWRITE, "false");
 

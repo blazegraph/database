@@ -28,7 +28,7 @@ public class BigdataTripleSource implements TripleSource {
     
     public final boolean includeInferred;
     
-    BigdataTripleSource(BigdataSailConnection conn, boolean includeInferred) {
+    BigdataTripleSource(final BigdataSailConnection conn, final boolean includeInferred) {
         
         this.conn = conn;
         

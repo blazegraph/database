@@ -122,6 +122,7 @@ import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.InferredSPOFilter;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOAccessPath;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractLocalTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -1735,9 +1736,11 @@ public class BigdataSail extends SailBase implements Sail {
              */
             
             final IChunkedOrderedIterator<ISPO> src;
+
+            final boolean backchain = database.getAxioms().isRdfSchema()
+                    && includeInferred && isQueryTimeExpander(); 
             
-            if (/* getTruthMaintenance() && */includeInferred
-                    && isQueryTimeExpander()) {
+            if (backchain) {
 
                 /*
                  * Obtain an iterator that will generate any missing entailments
@@ -1833,6 +1836,14 @@ public class BigdataSail extends SailBase implements Sail {
          */
         
         /**
+         * Note: The <i>includeInferred</i> argument is applied in two ways.
+         * First, inferences are stripped out of the {@link SPOAccessPath}.
+         * Second, query time expansion of
+         * <code>foo rdf:type rdfs:Resource</code>, owl:sameAs, etc.
+         * <p>
+         * Note: Query time expansion can be disabled independently using
+         * {@link Options#QUERY_TIME_EXPANDER}, but not on a per-query basis.
+         * 
          * @todo the {@link Dataset} is the RDF merge of graphs. How does that
          *       interact with inference? It looks like the
          *       {@link StatementPattern} is evaluated against either the entire

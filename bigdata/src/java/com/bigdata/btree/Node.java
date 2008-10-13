@@ -2264,7 +2264,11 @@ public class Node extends AbstractNode<Node> implements INodeData {
      */
     static private final Object[] newChildLocks(final AbstractBTree btree) {
         
-//        if(true) return null;
+        /*
+         * Note: Uncommenting this has the effect of disabling per-child
+         * locking.
+         */
+        // if(true) return null;
         
         if(!btree.isReadOnly()) return null;
         
