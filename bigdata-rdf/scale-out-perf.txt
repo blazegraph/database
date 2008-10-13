@@ -90,6 +90,29 @@ Notes on store level record checksums and record compression.
     public final boolean getUseChecksum() {return useChecksum;}
 
 ============================================================
+Consider block storage / NAS deployment scenario.
+
+  In this scenario we use robust remote storage with a large block
+  size (64M+).  The backing store could be HFS or NAS.  Only large
+  chunks are read at a time.  Index store writes are also large
+  chunks.  Commit point writes will require partial chunk updates
+  unless we stream to the failover services at the commit point and
+  only write to the remote store when we close the journal for writes.
+
+  Use a direct buffer for the live journal, no write cache.
+
+  Use resource lock manager (ala zookeeper) to allocate journal files
+  on the block store.  Commit points write through so that commits are
+  visible to failover services (or are streamed through to those
+  services).  The initial allocation is for the entire target extent.
+  Avoid the need to extent by eager overflow as coordinated with the
+  write executor service.
+
+  Use resource lock manager when obtaining an historical journal or
+  index segment store.  Copy the entire thing to local disk and manage
+  the data locally that will be used by the server.
+
+============================================================
 Consider a RW store variant.
 
   A read-write store would be useful for scale-up deployments where
@@ -124,6 +147,9 @@ Consider a RW store variant.
 
   The root block could just hold the addr of the allocation block
   chains record.  
+
+  Is it possible to efficiently persist only the incremental change to
+  a bit vector?  If the changes are from a specific offset on?
 
 ============================================================
 
@@ -242,44 +268,123 @@ based on -Djrockit.lockprofiling=true.
    method.  I don't see anyway to improve on this off hand.
 
 ============================================================
+Sparse Row Store (SRS)
 
-    - Distributed file repository
+  - Extract IRowStore interface.
 
-         - handle overflow of blocks to the index segments during MOVE
+  - Optimize get(Schema,name) in SparseRowStore and
+    AtomicRowWriteRead.
 
-	 - provide streaming socket api on data service for reading
-           blocks (low level in the DiskOnlyStrategy - if in the write cache
-           then return directly else return buffered input stream reading on
-           the disk file and interrupt if journal is closed).
+  - AutoIncrement semantics:
 
-	 - range delete
+    - You can't use an autoinc counter for a primary key.  However,
+      this could be done if we use the maximum value for the auto-inc
+      counter to form the fromKey, which would direct the procedure to
+      the correct index partition.  We would need to notice that the
+      property value was an auto-increment counter and the fromKey
+      would then have to be regenerated on the index partition. We
+      would then lookup the current value for that counter and write
+      its successor into the row store.
 
-	 - logical row scan for headers of documents in a key range.
+      The inability to use auto-inc for the primary key is really
+      quite limiting.
 
-         - Write test for forward and reverse scans starting at the
-           fence posts around a partition boundary.
+    - Since we have all these successor semantics, we should be able
+      to support auto-increment for more than just int and long.  A
+      better way to form the successor is to pass along an
+      IAutoIncrement method and let it form the successor.  That
+      allows all kinds of interesting patterns.
 
-    - (**) Map/Reduce demo jobs.
+  - JSON API
 
-      - Rework the map/reduce implementation to use local writes and
-        distributed gathers.
+     - Add a web application that let's people easily write on or read
+       from the sparse row store using JSON or the like.
+    
+     - It should be easy to view and modify the data in the global row
+       store, which is where locatable resources store their
+       configuration metadata.
 
-      - Download, prepare, extract.
+     - The JSON API should be compatible to the extent possible with
+       HBASE and GAE.
 
-      - Concurrent RDF data load as a map/reduce job.
+     - This web application will have to be distributed in order to
+       eliminate bottlenecks.  One approach is to re-direct HTTP
+       clients to an embedded web service co-located with the data
+       service on which the row resides.  HTTP clients can continue to
+       address that server until they receive a redirect.
 
-    - Tune network IO
+   - (On reflection, I have decided NOT to go this route.) Add a BLOB
+     reference column type.  There are at least two design options for
+     this.  I think that we should support at least (1) and (2).
 
-      - huffman encoding is appropriate for network IO, but hu-tucker
-        is not required since we have to decompress keys to get them
-        inserted into the btree.
+       (1) the blocks are stored locally and hence are always
+           available from the same data service as the BLOB reference
+           column value - this might limit the maximum effective blob
+           size (in bytes) since the data will have to fit in the same
+           index partition and hence be co-located on a single host.
+           In fact, the blocks will be in the same index segment as
+           the column value once the journal overflows.  One advantage
+           of this approach is the block updates can be atomic with
+           block metadata updates - a feature that is not otherwise
+           available without full transactions.
+       
+       (2) the blob reference includes the name of the scale-out index
+           on which the blocks for that blob are stored - in this
+           model the blocks can reside anywhere and splits of the
+           blocks will have no relevance to splits of the metadata.
+           This also makes it easier to locate the partitions of the
+           index containing the blocks on data services that are
+           specifically provisioned for large data blocks.
 
-      - tokenization needs to be specified for RDF Value types for the
-        purposes of compression.  In fact, we are guarenteed that
-        values are NOT duplicated in a given batch so tokenization
-        needs to uncover common symbols.  This is easy for URIs but
-        less so for literals and impossible for BNodes (which do not
-        really need to be in the lexicon anyway).
+       (3) the blob reference contains the primary key for the blob
+           and the blob is stored either in the same index or in
+           another index.  I am not sure that this variant adds value
+           over (1) and (2).
+
+     - Refactor the BigdataRepository to use the BLOB reference type.
+
+============================================================
+Bigdata File System (BFS)
+
+  - (***) Test failures remain for TestFileMetadataIndex.  It seems as
+    if the logic was bad previously.  If we delete the file Version
+    then how can we increment it and get a different answer?  Maybe we
+    should delete the Id since that would leave the version alone?
+    No, that does not work since all property values will be
+    overwritten.  How about either writing a "deleted" flag or doing
+    some fancy steps to find the most recent non-deleted version and
+    then increment that?
+
+    Bug fix for create/delete/update interaction with Version counter
+    in the row store.
+
+    - test_delete failure
+    
+    - test_createUpdate failure
+
+  - handle overflow of blocks to the index segments during MOVE
+
+  - provide streaming socket api on data service for reading blocks
+    (low level in the DiskOnlyStrategy - if in the write cache then
+    return directly else return buffered input stream reading on the
+    disk file and interrupt if journal is closed).
+
+  - range delete
+
+  - logical row scan for headers of documents in a key range.
+
+  - Write test for forward and reverse scans starting at the fence
+    posts around a partition boundary.
+
+============================================================
+Map/Reduce demos (**)
+
+    - Rework the map/reduce implementation to use local writes and
+      distributed gathers.
+
+    - Download, prepare, extract.
+
+    - Concurrent RDF data load as a map/reduce job.
 
     - Try jini federation using only the terms index to assign
       consistent term identifiers, bulk loading into local SPO-only
@@ -289,6 +394,23 @@ based on -Djrockit.lockprofiling=true.
       should be applied such that each "host" loads only the files
       that hash MOD N to that host.  (note that only AddTerms and
       AddIds go across the network API in this case.)
+
+============================================================
+Tune network IO
+
+    - huffman encoding is appropriate for network IO, but hu-tucker is
+      not required since we have to decompress keys to get them
+      inserted into the btree.
+
+    - tokenization needs to be specified for RDF Value types for the
+      purposes of compression.  In fact, we are guarenteed that values
+      are NOT duplicated in a given batch so tokenization needs to
+      uncover common symbols.  This is easy for URIs but less so for
+      literals and impossible for BNodes (which do not really need to
+      be in the lexicon anyway).
+
+============================================================
+TripleStore
 
     - The temp triple store supports concurrent read only but not
       concurrent write, so it is not appropriate for a concurrent bulk
@@ -661,55 +783,6 @@ Short term tasks:
 
      - Offer commands to force overflow of a data service.
 
-   - Sparse row store support.
-
-     - JSON API
-
-       - Add a web application that let's people easily write on or
-         read from the sparse row store using JSON or the like.
-    
-       - It should be easy to view and modify the data in the global
-         row store, which is where locatable resources store their
-         configuration metadata.
-
-       - The JSON API should be compatible to the extent possible with
-         HBASE and GAE.
-
-       - This web application will have to be distributed in order to
-         eliminate bottlenecks.  One approach is to re-direct HTTP
-         clients to an embedded web service co-located with the data
-         service on which the row resides.  HTTP clients can continue
-         to address that server until they receive a redirect.
-
-     - Add a BLOB reference column type.  There are at least two
-       design options for this.  I think that we should support at
-       least (1) and (2).
-
-       (1) the blocks are stored locally and hence are always
-           available from the same data service as the BLOB reference
-           column value - this might limit the maximum effective blob
-           size (in bytes) since the data will have to fit in the same
-           index partition and hence be co-located on a single host.
-           In fact, the blocks will be in the same index segment as
-           the column value once the journal overflows.  One advantage
-           of this approach is the block updates can be atomic with
-           block metadata updates - a feature that is not otherwise
-           available without full transactions.
-       
-       (2) the blob reference includes the name of the scale-out index
-           on which the blocks for that blob are stored - in this
-           model the blocks can reside anywhere and splits of the
-           blocks will have no relevance to splits of the metadata.
-           This also makes it easier to locate the partitions of the
-           index containing the blocks on data services that are
-           specifically provisioned for large data blocks.
-
-       (3) the blob reference contains the primary key for the blob
-           and the blob is stored either in the same index or in
-           another index.  I am not sure that this variant adds value
-           over (1) and (2).
-
-     - Refactor the BigdataRepository to use the BLOB reference type.
 
    - IndexSegment
 
@@ -763,6 +836,11 @@ Short term tasks:
        IRawStore, put those methods on that interface, and then declare
        that interface on TemporaryRawStore in order to be able to
        access these methods.
+
+     - Explore efficient branching factor sizes for the index
+       segments.  This will vary as a function of (a) the application
+       and query demands; and (b) the compression options in use for
+       the indices.
 
    - DiskOnlyStrategy
 
@@ -2571,9 +2649,6 @@ New priorities:
 
 ============================================================ 
 
-  - Re-run JDS {1,2,3} with Prefix+Prefix+Fast @m=256.  Try LTS with
-    those same settings on {1 or 2} and see what we get.
-
     - A run with TERM2ID on NAS is taking a MAJOR IOWAIT penalty - up
       to 20% in the 1st hour.  I am going to restart and see how the
       indices are distributed and what impact that has.
@@ -2583,8 +2658,6 @@ New priorities:
       partition this index then we could distribute that cost across
       all of the hardware rather than centralizing it on a single
       machine.
-
-    - Get the full performance curves for the most recent JDS run.
 
     - Try a performance curve for a single-host run.
 
@@ -2627,9 +2700,6 @@ Configuration:
   as well as for the client thread pools.  If the task is an
   AbstractTask then we need to report the breakdown by the concrete
   class, but relly that is always the case.
-
-- The sparse row store continuation query iterator is failing for LDS.
-  Test under EDS also and figure out why it is failing.
 
 ============================================================
 Sesame extended LUBM benchmark:
@@ -2694,7 +2764,7 @@ Logging
 ============================================================
 Performance
 
-  - Done. Recheck lubm query perf: LDS, JDS.  
+  - Done. Recheck lubm query perf: LDS, JDS.
 
     LTS.U5: I am not seeing all of the elapsed time reported for the
     closure.  Only 6 seconds, but the actual run time was 31 seconds.
@@ -2705,70 +2775,11 @@ Performance
     JOINs for LTS seem fine, but the JDS case appears to be much
     slower - especially for Q8 (13 vs 2 secs) and Q9 (8.5 vs 2 secs).
 
-    * DefaultResourceLocator should use the timestamp when reading
-      from the global row store.
+  - Apply a performance analyzer again to both LDS and JDS and see
+    what I can do to trim down costs further.  When done tuning,
+    revalidate at scale to verify Ok past 1B.
 
-    * Now that I have the read-committed issue resolved, apply a
-      performance analyzer again to both LDS and JDS and see what I
-      can do to trim down costs further.
-
-  - Finish the TestDefaultResourceLocator
-
-  - DefaultResourceLocator.  modify to use read-historical views of
-    the sparse row store and verify that it is aggresively caching
-    views.
-
-============================================================
-
-- SteveC/DavidL
-
-  - Trace of 1B+ 3 machine run.
-
-  - EC2 worksheet
-
-  - 1.1B load slides to SteveC, BradB, DavidL.  Include comparison
-    with 2 server run.  Note single server rate or re-run the one
-    server run.
-
-  - Possible visit, combined with BradB.
-
-  - mac fix: http://www.apple.com/support/osfamily/
-
-============================================================
-
-Done. Modified DefaultResourceLocator to test the cache without a
-named lock.  On a miss it acquires the named lock and then verifies
-that there is still no entry in the cache once it holds the lock.  If
-the resource has not been concurrently located, then it is located and
-placed into the cache and the lock is released.  This addresses a hot
-spot where acquiring the named lock was too expensive.
-
-Done. Modified Node#getChild(int) do not declare itself as
-[synchronized] and instead use a double-checked locking pattern.
-Node#childRefs was marked as [volatile] in support of that change.
-This addresses an what appears to be a hot spot in Node#getChild(int)
-where the self-time was higher than could be accounted for by the code
-in the method, leading me to believe that the synchronized keyword was
-causing contention for access to the method for Node instances.
-
-Done. Modified SPORelation to check the access path cache first, then
-synchronize on a lock object iff there was a cache miss and do the
-access path factory behavior and update the cache while synchronized
-on that lock object.
-
-Done. Each child in the B+Tree has its own weak reference to the
-parent.  If we put a weak reference on the parent to itself then the
-child could reuse the same weak reference object.  This would cut down
-on the #of weak reference instances drammatically and that might help
-the garbage collector.
-
-** Retest on EOSSYS data using appropriate chunkCapacity (100) for
-   queries.
-
-Done. Modified InputBitStream and OutputBitStream to have ctor
-variants that avoid a reflection test on the underlying stream.  This
-was causing approximately 5000 MethodNotFoundException instances to be
-thrown per second.  Introduced a new lgpl-utils jar for this change.
+  * Finish the TestDefaultResourceLocator
 
 ** There is a lot of reading on the globalRowStore.  This is all
    related to locating the TripleStore resource and its contained
@@ -2794,3 +2805,82 @@ thrown per second.  Introduced a new lgpl-utils jar for this change.
 
   (d) Defer. We should recognize unknown properties, much like log4j.
 
+** LUBM 2,4,10, and 12 are not using a lot of CPU.  What's wrong with
+   this picture?  (This appears to be the same problem for LTS and
+   JDS.)
+
+   - Recollect query performance data for U1, EOSSYS where the
+     variables are: chunkCapacity, maxParallel, per-child locks in
+     Node#getChild(int).  The previous results can't be trusted due to
+     issues with failing to correctly overwrite/readback properties in
+     the sparse row store.
+
+   - Perhaps LDS and others should prefer to run in the callers thread
+     rather than on the thread pool is there is only a single split?
+     However that will lead to underreporting of tasks, but it could
+     be faster since there is no hand off to a worker.  Test it out.
+
+   - maxParallel should be counted against the then current thread
+     pool size (expensive since requires enumeration of workers) or
+     against a counter maintained by the rule or the thread
+     pool. subqueries should be parallelized if the #of queries would
+     not exceed max parallel.
+
+   - Optimize the chunkCapacity for the synchronized solution buffer
+     based on the data.  Note that we have both chunks and chunks of
+     chunks for query, where the chunks are the unsynchronized
+     solution buffers and the chunks of chunks are the
+     BlockingBuffers.
+
+   - Report the joinCardinality in the RuleStats (cache and expose it
+     in EvaluationPlan2).
+
+   - if RuleState#clearDownStreamBindings is not required then drop
+     it.
+
+   - Optimize the chunkCapacity for the unsynchronized solution buffer
+     based on the data.
+
+     - The buffer is used for all solutions generated within the same
+       thread, so once we decide to run in the caller's thread it is
+       locked to whatever the max cardinality is for the remaining
+       subqueries.
+
+       If we will run the task on the thread pool then the chunk
+       capacity should still be the max cardinality of the remaining
+       subqueries.
+
+       The chunkCapacity for a fully bound pattern is known to be one.
+
+       The chunkCapacity for the iterator any given asBound join is
+       the range count for the subjoin iterator.
+
+============================================================
+
+- SteveC/DavidL
+
+  - Trace of 1B+ 3 machine run.
+
+  - Explore clusterondemand option.
+
+  - Explore playstation3 option.
+
+  - 1.1B load slides to SteveC, BradB, DavidL.  Include comparison
+    with 2 server run.  Note single server rate or re-run the one
+    server run.
+
+  - Possible visit, combined with BradB.
+
+============================================================
+
+- MikeP
+
+  - Access to the computed and cached join cardinality values.
+
+- BryanT
+
+  - Performance tuning
+
+  - Try testing a hard reference list of the 10 most recently used SPO
+    access paths before testing the cache.  This should be faster (no
+    hashing), but it is still single threaded.
