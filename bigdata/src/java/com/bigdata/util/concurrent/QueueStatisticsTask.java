@@ -1,4 +1,4 @@
-package com.bigdata.journal;
+package com.bigdata.util.concurrent;
 
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -8,6 +8,9 @@ import org.apache.log4j.Logger;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterHierarchy;
 import com.bigdata.counters.Instrument;
+import com.bigdata.journal.AbstractTask;
+import com.bigdata.journal.ITx;
+import com.bigdata.journal.WriteExecutorService;
 
 /**
  * Helper class maintains the moving average of the length of a queue.

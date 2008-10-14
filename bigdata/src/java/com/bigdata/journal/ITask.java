@@ -33,6 +33,7 @@ import java.util.concurrent.Callable;
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.AbstractTask.InnerWriteServiceCallable;
 import com.bigdata.resources.StaleLocatorException;
+import com.bigdata.util.concurrent.TaskCounters;
 
 /**
  * Interface available to tasks running under the {@link ConcurrencyManager}.
