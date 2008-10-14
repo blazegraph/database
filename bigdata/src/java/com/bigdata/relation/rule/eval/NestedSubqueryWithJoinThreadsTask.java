@@ -30,14 +30,11 @@ package com.bigdata.relation.rule.eval;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -61,6 +58,7 @@ import com.bigdata.service.ClientIndexView;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 import com.bigdata.util.InnerCause;
+import com.bigdata.util.concurrent.ExecutionHelper;
 
 /**
  * Evaluation of an {@link IRule} using nested subquery (one or more JOINs plus
@@ -197,7 +195,12 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
     /**
      * The {@link ExecutorService} to which parallel subqueries are submitted.
      */
-    protected final ThreadPoolExecutor joinService;
+//    protected final ThreadPoolExecutor joinService;
+    
+    /**
+     * The object that helps us to execute the queries on that service.
+     */
+    protected final ExecutionHelper<Void> joinHelper;
     
     /**
      * 
@@ -256,8 +259,11 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
         this.maxParallelSubqueries = stable ? 0 : joinNexus
                 .getMaxParallelSubqueries();
         
-        this.joinService = (ThreadPoolExecutor) (maxParallelSubqueries == 0 ? null
+        final ExecutorService joinService = (ThreadPoolExecutor) (maxParallelSubqueries == 0 ? null
                 : joinNexus.getIndexManager().getExecutorService());
+        
+        this.joinHelper = joinService == null ? null
+                : new ExecutionHelper<Void>(joinService);
         
     }
     
@@ -713,7 +719,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
          * Those subqueries are just run in the caller's thread.
          */
         
-        if (maxParallelSubqueries==0 || joinService==null || orderIndex > 0 || chunk.length <= 1
+        if (maxParallelSubqueries==0 || joinHelper==null || orderIndex > 0 || chunk.length <= 1
 //                || !useJoinService
 //                || (orderIndex > 2 || joinService.getQueue().size() > 100)
                 ) {
@@ -906,7 +912,11 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 
                 if (tasks.size() == maxParallelSubqueries) {
 
-                    submitTasks(tasks);
+                    try {
+                        joinHelper.submitTasks(tasks);
+                    } catch(ExecutionException ex) {
+                        throw new RuntimeException(ex);
+                    }
 
                     tasks = null;
                     
@@ -926,103 +936,106 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
         if (tasks != null) {
 
             // submit any remaining tasks.
-
-            submitTasks(tasks);
+            try {
+                joinHelper.submitTasks(tasks);
+            } catch(ExecutionException ex) {
+                throw new RuntimeException(ex);
+            }
             
         }
 
     }
     
-    /**
-     * Submit subquery tasks, wait until they are done, and verify that all
-     * tasks were executed without error.
-     */
-    protected void submitTasks(final List<Callable<Void>> tasks)
-            throws InterruptedException {
-        
-        if (tasks.isEmpty()) {
-            
-            // No tasks.
-            return;
-            
-        }
-        
-        boolean interrupted = false;
-        List<ExecutionException> causes = null;
-        final List<Future<Void>> futures;
-        try {
-
-            // submit tasks and await completion of those tasks.
-            futures = joinService.invokeAll(tasks);
-            
-            for(Future<Void> f : futures) {
-                
-                // verify that no task failed.
-                try {
-                    f.get();
-                } catch(InterruptedException ex) {
-                    interrupted = true;
-                } catch(CancellationException ex) {
-                    interrupted = true;
-                } catch(ExecutionException ex) {
-                    if(causes==null) {
-                        causes = new LinkedList<ExecutionException>();
-                    }
-                    causes.add(ex);
-                }
-                
-            }
-            
-        } catch (InterruptedException ex) {
-
-            /*
-             * The task writing on the buffer was interrupted. For query, this
-             * is how we eagerly terminate rule evaluation, e.g., when a
-             * high-level iterator is closed without fully materializing the
-             * solutions that are (or are being) computed. A LIMIT clause on a
-             * rule can have this effect.
-             */
-            
-            interrupted = true;
-            
-        } catch(RejectedExecutionException ex) {
-            
-            if (joinService.isShutdown()) {
-
-                /*
-                 * Asynchronous shutdown of the executor service.
-                 * 
-                 * Note: When normal shutdown of the service is requested it is
-                 * common that the main thread will be in a state in which it
-                 * attempts to schedule more task(s). This results in a
-                 * RejectedExecutionException. We treat this just like an
-                 * interrupt since the join can not progress due to the shutdown
-                 * of the executor service.
-                 */
-
-                interrupted = true;
-                
-            } else {
-
-                throw ex;
-                
-            }
-            
-        }
-
-        if(interrupted) {
-
-            throw new InterruptedException("Terminated by interrupt");
-            
-        }
-        
-        if (causes != null) {
-            
-            throw new RuntimeException("JOIN Error(s): " + causes.toString());
-            
-        }
-        
-    }
+//    /**
+//     * Submit subquery tasks, wait until they are done, and verify that all
+//     * tasks were executed without error.
+//     */
+//    protected void submitTasks(final List<Callable<Void>> tasks)
+//            throws InterruptedException {
+//        
+//        if (tasks.isEmpty()) {
+//            
+//            // No tasks.
+//            return;
+//            
+//        }
+//        
+//        boolean interrupted = false;
+//        List<ExecutionException> causes = null;
+//        final List<Future<Void>> futures;
+//        try {
+//
+//            // submit tasks and await completion of those tasks.
+//            futures = joinService.invokeAll(tasks);
+//            
+//            for(Future<Void> f : futures) {
+//                
+//                // verify that no task failed.
+//                try {
+//                    f.get();
+//                } catch(InterruptedException ex) {
+//                    interrupted = true;
+//                } catch(CancellationException ex) {
+//                    interrupted = true;
+//                } catch(ExecutionException ex) {
+//                    if(causes==null) {
+//                        causes = new LinkedList<ExecutionException>();
+//                    }
+//                    causes.add(ex);
+//                }
+//                
+//            }
+//            
+//        } catch (InterruptedException ex) {
+//
+//            /*
+//             * The task writing on the buffer was interrupted. For query, this
+//             * is how we eagerly terminate rule evaluation, e.g., when a
+//             * high-level iterator is closed without fully materializing the
+//             * solutions that are (or are being) computed. A LIMIT clause on a
+//             * rule can have this effect.
+//             */
+//            
+//            interrupted = true;
+//            
+//        } catch(RejectedExecutionException ex) {
+//            
+//            if (joinService.isShutdown()) {
+//
+//                /*
+//                 * Asynchronous shutdown of the executor service.
+//                 * 
+//                 * Note: When normal shutdown of the service is requested it is
+//                 * common that the main thread will be in a state in which it
+//                 * attempts to schedule more task(s). This results in a
+//                 * RejectedExecutionException. We treat this just like an
+//                 * interrupt since the join can not progress due to the shutdown
+//                 * of the executor service.
+//                 */
+//
+//                interrupted = true;
+//                
+//            } else {
+//
+//                throw ex;
+//                
+//            }
+//            
+//        }
+//
+//        if(interrupted) {
+//
+//            throw new InterruptedException("Terminated by interrupt");
+//            
+//        }
+//        
+//        if (causes != null) {
+//            
+//            throw new RuntimeException("JOIN Error(s): " + causes.toString());
+//            
+//        }
+//        
+//    }
     
     /**
      * This class is used when we want to evaluate the subqueries in parallel.

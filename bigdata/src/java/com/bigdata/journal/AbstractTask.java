@@ -69,6 +69,7 @@ import com.bigdata.resources.StaleLocatorReason;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.InnerCause;
+import com.bigdata.util.concurrent.TaskCounters;
 
 /**
  * Abstract base class for tasks that may be submitted to the

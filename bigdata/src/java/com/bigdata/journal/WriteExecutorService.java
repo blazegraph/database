@@ -53,6 +53,7 @@ import com.bigdata.resources.OverflowManager;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.util.InnerCause;
+import com.bigdata.util.concurrent.TaskCounters;
 
 /**
  * A custom {@link ThreadPoolExecutor} used by the {@link ConcurrencyManager} to

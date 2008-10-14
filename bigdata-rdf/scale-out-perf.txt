@@ -2884,3 +2884,7 @@ Performance
   - Try testing a hard reference list of the 10 most recently used SPO
     access paths before testing the cache.  This should be faster (no
     hashing), but it is still single threaded.
+
+  - Modify ClientIndexView to use the ExecutionHelper.
+
+  - Modify AbstractStepTask to use the ExecutionHelper.

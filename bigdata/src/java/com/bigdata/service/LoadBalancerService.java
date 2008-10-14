@@ -36,10 +36,10 @@ import com.bigdata.counters.IHostCounters;
 import com.bigdata.counters.IRequiredHostCounters;
 import com.bigdata.counters.ICounterSet.IInstrumentFactory;
 import com.bigdata.journal.ConcurrencyManager.IConcurrencyManagerCounters;
-import com.bigdata.journal.QueueStatisticsTask.IQueueCounters;
 import com.bigdata.service.DataService.IDataServiceCounters;
 import com.bigdata.service.mapred.IMapService;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.concurrent.QueueStatisticsTask.IQueueCounters;
 
 /**
  * The {@link LoadBalancerService} collects a variety of performance counters

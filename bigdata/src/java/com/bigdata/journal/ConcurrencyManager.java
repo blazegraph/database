@@ -46,6 +46,8 @@ import com.bigdata.resources.StoreManager;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.concurrent.QueueStatisticsTask;
+import com.bigdata.util.concurrent.TaskCounters;
 
 /**
  * Supports concurrent operations against named indices. Historical read and

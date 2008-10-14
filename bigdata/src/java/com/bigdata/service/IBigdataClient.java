@@ -35,13 +35,13 @@ import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.QueueStatisticsTask;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.rule.eval.NestedSubqueryWithJoinThreadsTask;
 import com.bigdata.relation.rule.eval.ProgramTask;
 import com.bigdata.resources.StaleLocatorException;
+import com.bigdata.util.concurrent.QueueStatisticsTask;
 
 /**
  * Interface for clients of a {@link IBigdataFederation}.

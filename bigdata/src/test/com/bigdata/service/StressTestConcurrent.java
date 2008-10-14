@@ -60,7 +60,6 @@ import com.bigdata.journal.BasicExperimentConditions;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.QueueStatisticsTask;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.ValidationError;
@@ -74,6 +73,7 @@ import com.bigdata.test.ExperimentDriver.IComparisonTest;
 import com.bigdata.test.ExperimentDriver.Result;
 import com.bigdata.util.NV;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.concurrent.QueueStatisticsTask;
 
 /**
  * Test suite for concurrent operations on a {@link DataService}. A federation

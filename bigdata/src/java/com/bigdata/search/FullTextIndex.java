@@ -44,8 +44,6 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
@@ -88,6 +86,7 @@ import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.util.concurrent.ExecutionHelper;
 
 /**
  * Full text indexing and search support.
@@ -326,7 +325,10 @@ public class FullTextIndex extends AbstractRelation {
         /**
          * The maximum time in milliseconds that the search engine will await
          * completion of the tasks reading on each of the query terms (default
-         * {@value #DEFAULT_INDEXER_TIMEOUT}).
+         * {@value #DEFAULT_INDEXER_TIMEOUT}). A value of ZERO (0) means NO
+         * timeout and is equivalent to a value of {@link Long#MAX_VALUE}. If
+         * the timeout expires before all tasks complete then the search results
+         * will only reflect partial information.
          */
         String INDEXER_TIMEOUT = "indexer.timeout";
         
@@ -1086,8 +1088,8 @@ public class FullTextIndex extends AbstractRelation {
     
     /**
      * Performs a full text search against indexed documents returning a hit
-     * list using a default minCosine of <code>0.4</code> and a default
-     * maxRank of <code>10,000</code>.
+     * list using a default minCosine of <code>0.4</code>, a default maxRank
+     * of <code>10,000</code>, and the configured default timeout.
      * 
      * @param query
      *            The query (it will be parsed into tokens).
@@ -1098,13 +1100,18 @@ public class FullTextIndex extends AbstractRelation {
      * 
      * @return A {@link Iterator} which may be used to traverse the search
      *         results in order of decreasing relevance to the query.
+     * 
+     * @see Options#INDEXER_TIMEOUT
      */
     public Hiterator search(String query, String languageCode) {
 
         return search(query, languageCode, false/* prefixMatch */);
         
     }
-    
+
+    /*
+     * FIXME [prefixMatch] has not been implemented yet.
+     */
     public Hiterator search(String query, String languageCode,
             boolean prefixMatch) {
 
@@ -1113,11 +1120,40 @@ public class FullTextIndex extends AbstractRelation {
                 languageCode,//
                 prefixMatch,//
                 .4, // minCosine
-                10000 // maxRank
+                10000, // maxRank
+                this.timeout,//
+                TimeUnit.MILLISECONDS//
                 );
     
     }
     
+    /**
+     * Performs a full text search against indexed documents returning a hit
+     * list using the configured default timeout.
+     * 
+     * @param query
+     *            The query (it will be parsed into tokens).
+     * @param languageCode
+     *            The language code that should be used when tokenizing the
+     *            query -or- <code>null</code> to use the default
+     *            {@link Locale}).
+     * @param minCosine
+     *            The minimum cosine that will be returned.
+     * @param maxRank
+     *            The upper bound on the #of hits in the result set.
+     * 
+     * @return The hit list.
+     * 
+     * @see Options#INDEXER_TIMEOUT
+     */
+    public Hiterator search(String query, String languageCode,
+            double minCosine, int maxRank) {
+        
+        return search(query, languageCode, false/* prefixMatch */, minCosine,
+                maxRank, this.timeout, TimeUnit.MILLISECONDS);
+
+    }
+
     /**
      * Performs a full text search against indexed documents returning a hit
      * list.
@@ -1154,6 +1190,13 @@ public class FullTextIndex extends AbstractRelation {
      *            The minimum cosine that will be returned.
      * @param maxRank
      *            The upper bound on the #of hits in the result set.
+     * @param prefixMatch
+     *            <strong>Option is not implemented yet</strong>
+     * @param timeout
+     *            The timeout -or- ZERO (0) for NO timeout (this is equivalent
+     *            to using {@link Long#MAX_VALUE}).
+     * @param unit
+     *            The unit in which the timeout is expressed.
      * 
      * @return The hit list.
      * 
@@ -1176,16 +1219,9 @@ public class FullTextIndex extends AbstractRelation {
      *       iterator that is sent to the data service such that the search
      *       terms are visited only when they occur in the matching field(s).
      */
-    public Hiterator search(String query, String languageCode,
-            double minCosine, int maxRank) {
-        
-        return search(query, languageCode, false/* prefixMatch */, minCosine,
-                maxRank);
-        
-    }
-
-    public Hiterator search(String query, String languageCode,
-            boolean prefixMatch, double minCosine, int maxRank) {
+    public Hiterator search(final String query, final String languageCode,
+            final boolean prefixMatch, final double minCosine,
+            final int maxRank, long timeout, final TimeUnit unit) {
 
         final long begin = System.currentTimeMillis();
         
@@ -1201,29 +1237,46 @@ public class FullTextIndex extends AbstractRelation {
         if (maxRank <= 0)
             throw new IllegalArgumentException();
 
+        if (timeout < 0L)
+            throw new IllegalArgumentException();
+        
+        if (unit == null)
+            throw new IllegalArgumentException();
+        
         if (INFO)
-            log.info("languageCode=[" + languageCode + "], text=[" + query + "]");
+            log.info("languageCode=[" + languageCode + "], text=[" + query
+                    + "], minCosine=" + minCosine + ", maxRank=" + maxRank
+                    + ", timeout=" + timeout + ", unit=" + unit);
 
+        if (timeout == 0L) {
+
+            // treat ZERO as eqivalent to MAX_LONG.
+            timeout = Long.MAX_VALUE;
+            
+        }
+        
         // tokenize the query.
         final TermFrequencyData qdata;
         {
             
             final TokenBuffer buffer = new TokenBuffer(1, this);
             
-            index(buffer, 0L/*docId*/, 0/*fieldId*/, languageCode, new StringReader(query));
-            
+            index(buffer, 0L/*docId*/, 0/*fieldId*/, languageCode,
+                    new StringReader(query));
+
             if (buffer.size() == 0) {
-                
+
                 /*
                  * There were no terms after stopword extration.
                  */
-                
-                log.warn("No terms after stopword extraction: query="+query);
-                
+
+                log.warn("No terms after stopword extraction: query=" + query);
+
                 final long elapsed = System.currentTimeMillis() - begin;
-                
-                return new Hiterator<Hit>(Arrays.asList(new Hit[]{}), elapsed, minCosine, maxRank);
-                
+
+                return new Hiterator<Hit>(Arrays.asList(new Hit[] {}), elapsed,
+                        minCosine, maxRank);
+
             }
             
             qdata = buffer.get(0);
@@ -1242,44 +1295,38 @@ public class FullTextIndex extends AbstractRelation {
             
         }
 
-        final List<Callable<Object>> tasks = new ArrayList<Callable<Object>>(qdata.distinctTermCount());
-        
-        for(TermMetadata md : qdata.terms.values()) {
-            
-            tasks.add(new ReadIndexTask(md.termText(), prefixMatch, md.localTermWeight, this,
-                            hits));
-            
-        }
+        // run the queries.
+        {
 
-        final ExecutorService executorService = getExecutorService();
+            final List<Callable<Object>> tasks = new ArrayList<Callable<Object>>(
+                    qdata.distinctTermCount());
 
-        try {
-            
-            // run on the client's thread pool.
-            final List<Future<Object>> futures = executorService.invokeAll(
-                    tasks, timeout, TimeUnit.MILLISECONDS);
-            
-            // check for execution errors.
-            for (Future f : futures) {
+            for (TermMetadata md : qdata.terms.values()) {
 
-                try {
-                    
-                    f.get();
-                    
-                } catch(ExecutionException ex) {
-                    
-                    throw new RuntimeException(ex);
-                    
-                }
+                tasks.add(new ReadIndexTask(md.termText(), prefixMatch,
+                        md.localTermWeight, this, hits));
+
+            }
+
+            final ExecutionHelper<Object> executionHelper = new ExecutionHelper<Object>(
+                    getExecutorService(), timeout, unit);
+
+            try {
+
+                executionHelper.submitTasks(tasks);
+                
+            } catch (InterruptedException ex) {
+                
+                log.warn("Interrupted - only partial results will be returned.");
+                
+            } catch (ExecutionException ex) {
+
+                throw new RuntimeException(ex);
                 
             }
-            
-        } catch (InterruptedException e) {
-            
-            log.warn("Interrupted - only partial results will be returned.");
-            
-        }
 
+        }
+        
         // #of hits.
         final int nhits = hits.size();
         

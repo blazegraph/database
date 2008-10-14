@@ -1,7 +1,11 @@
-package com.bigdata.journal;
+package com.bigdata.util.concurrent;
 
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.bigdata.journal.AbstractTask;
+import com.bigdata.journal.ConcurrencyManager;
+import com.bigdata.journal.ITx;
+import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.IDataService;
 

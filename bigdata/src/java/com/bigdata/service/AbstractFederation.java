@@ -56,8 +56,6 @@ import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.IServiceCounters;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
-import com.bigdata.journal.QueueStatisticsTask;
-import com.bigdata.journal.TaskCounters;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.TemporaryStoreFactory;
 import com.bigdata.rawstore.Bytes;
@@ -66,6 +64,8 @@ import com.bigdata.service.IBigdataClient.Options;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.concurrent.QueueStatisticsTask;
+import com.bigdata.util.concurrent.TaskCounters;
 import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**

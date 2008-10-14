@@ -74,7 +74,6 @@ import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.TaskCounters;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.IResourceMetadata;
@@ -84,6 +83,7 @@ import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.IBigdataClient.Options;
 import com.bigdata.util.InnerCause;
+import com.bigdata.util.concurrent.TaskCounters;
 
 /**
  * <p>

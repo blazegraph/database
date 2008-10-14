@@ -58,8 +58,6 @@ import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
-import com.bigdata.journal.QueueStatisticsTask;
-import com.bigdata.journal.TaskCounters;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.StatementEnum;
@@ -77,6 +75,8 @@ import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.concurrent.QueueStatisticsTask;
+import com.bigdata.util.concurrent.TaskCounters;
 
 /**
  * This is a utility class designed for concurrent load of recursively processed
