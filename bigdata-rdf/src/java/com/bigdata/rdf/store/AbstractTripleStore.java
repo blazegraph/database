@@ -204,17 +204,17 @@ abstract public class AbstractTripleStore extends
         AbstractResource<IDatabase<AbstractTripleStore>> implements ITripleStore,
         IRawTripleStore, IMutableDatabase<AbstractTripleStore> {
 
-    static protected transient final Logger log = Logger.getLogger(ITripleStore.class);
+    final static protected Logger log = Logger.getLogger(ITripleStore.class);
 
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final boolean INFO = log.isInfoEnabled();
+    final static protected boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final boolean DEBUG = log.isDebugEnabled();
+    final static protected boolean DEBUG = log.isDebugEnabled();
 
     /**
      * This is used to conditionally enable the logic to retract justifications
@@ -1770,7 +1770,7 @@ abstract public class AbstractTripleStore extends
 
             while (itr.hasNext()) {
 
-                ISPO[] chunk = itr.nextChunk();
+                final ISPO[] chunk = itr.nextChunk();
 
                 n += chunk.length;
 
@@ -1816,14 +1816,14 @@ abstract public class AbstractTripleStore extends
 
     final public long getTermCount() {
 
-        byte[] fromKey = new byte[] { KeyBuilder
+        final byte[] fromKey = new byte[] { KeyBuilder
                 .encodeByte(ITermIndexCodes.TERM_CODE_URI) };
 
         /*
          * Note: the term count deliberately excludes the statement identifiers
          * which follow the bnodes in the lexicon.
          */
-        byte[] toKey = new byte[] { KeyBuilder
+        final byte[] toKey = new byte[] { KeyBuilder
                 .encodeByte((byte) (ITermIndexCodes.TERM_CODE_BND + 1)) };
 
         return getTerm2IdIndex().rangeCount(fromKey, toKey);
@@ -1832,10 +1832,10 @@ abstract public class AbstractTripleStore extends
 
     final public long getURICount() {
 
-        byte[] fromKey = new byte[] { KeyBuilder
+        final byte[] fromKey = new byte[] { KeyBuilder
                 .encodeByte(ITermIndexCodes.TERM_CODE_URI) };
 
-        byte[] toKey = new byte[] { KeyBuilder
+        final byte[] toKey = new byte[] { KeyBuilder
                 .encodeByte((byte) (ITermIndexCodes.TERM_CODE_URI + 1)) };
 
         return getTerm2IdIndex().rangeCount(fromKey, toKey);
@@ -1845,11 +1845,11 @@ abstract public class AbstractTripleStore extends
     final public long getLiteralCount() {
 
         // Note: the first of the kinds of literals (plain).
-        byte[] fromKey = new byte[] { KeyBuilder
+        final byte[] fromKey = new byte[] { KeyBuilder
                 .encodeByte(ITermIndexCodes.TERM_CODE_LIT) };
 
         // Note: spans the last of the kinds of literals.
-        byte[] toKey = new byte[] { KeyBuilder
+        final byte[] toKey = new byte[] { KeyBuilder
                 .encodeByte((byte) (ITermIndexCodes.TERM_CODE_DTL + 1)) };
 
         return getTerm2IdIndex().rangeCount(fromKey, toKey);
@@ -1862,10 +1862,10 @@ abstract public class AbstractTripleStore extends
      */
     final public long getBNodeCount() {
         
-        byte[] fromKey = new byte[] { KeyBuilder
+        final byte[] fromKey = new byte[] { KeyBuilder
                 .encodeByte(ITermIndexCodes.TERM_CODE_BND) };
 
-        byte[] toKey = new byte[] { KeyBuilder
+        final byte[] toKey = new byte[] { KeyBuilder
                 .encodeByte((byte) (ITermIndexCodes.TERM_CODE_BND + 1)) };
 
         return getTerm2IdIndex().rangeCount(fromKey, toKey);
@@ -2026,7 +2026,7 @@ abstract public class AbstractTripleStore extends
 
             final boolean found = ndx.contains(key);
 
-            if(log.isDebugEnabled()) {
+            if(DEBUG) {
                 
                 log.debug(spo + " : found=" + found + ", key="
                         + BytesUtil.toString(key));
@@ -2073,7 +2073,7 @@ abstract public class AbstractTripleStore extends
 
         if (_s == NULL && s != null) {
          
-            if(log.isDebugEnabled())
+            if(DEBUG)
                 log.debug("Subject not in kb: "+s);
             
             return false;
@@ -2084,7 +2084,7 @@ abstract public class AbstractTripleStore extends
 
         if (_p == NULL && p != null) {
 
-            if(log.isDebugEnabled())
+            if(DEBUG)
                 log.debug("Predicate not in kb: "+s);            
             
             return false;
@@ -2095,7 +2095,7 @@ abstract public class AbstractTripleStore extends
 
         if (_o == NULL && o != null) {
 
-            if(log.isDebugEnabled())
+            if(DEBUG)
                 log.debug("Object not in kb: "+s);
             
             return false;
@@ -2104,7 +2104,7 @@ abstract public class AbstractTripleStore extends
 
         final boolean found = hasStatement(_s, _p, _o);
         
-        if(log.isDebugEnabled()) {
+        if(DEBUG) {
             
             log.debug("<" + s + "," + p + "," + o + "> : found=" + found);
             
@@ -2393,12 +2393,12 @@ abstract public class AbstractTripleStore extends
     final public String getNamespace(String prefix) {
 
         // Note: this is not an efficient operation.
-        Iterator<Map.Entry<String/* namespace */, String/* prefix */>> itr = uriToPrefix
+        final Iterator<Map.Entry<String/* namespace */, String/* prefix */>> itr = uriToPrefix
                 .entrySet().iterator();
 
         while (itr.hasNext()) {
 
-            Map.Entry<String/* namespace */, String/* prefix */> entry = itr
+            final Map.Entry<String/* namespace */, String/* prefix */> entry = itr
                     .next();
 
             if (entry.getValue().equals(prefix)) {
@@ -2423,12 +2423,12 @@ abstract public class AbstractTripleStore extends
      */
     final public String removeNamespace(String prefix) {
 
-        Iterator<Map.Entry<String/* namespace */, String/* prefix */>> itr = uriToPrefix
+        final Iterator<Map.Entry<String/* namespace */, String/* prefix */>> itr = uriToPrefix
                 .entrySet().iterator();
 
         while (itr.hasNext()) {
 
-            Map.Entry<String/* namespace */, String/* prefix */> entry = itr
+            final Map.Entry<String/* namespace */, String/* prefix */> entry = itr
                     .next();
 
             if (entry.getValue().equals(prefix)) {
@@ -3518,7 +3518,8 @@ abstract public class AbstractTripleStore extends
             // note: count will be exact.
             statementCount1 = tempStore.getStatementCount();
 
-            log.warn("Finished " + nrounds + " rounds: statementBefore="
+            if(INFO)
+            log.info("Finished " + nrounds + " rounds: statementBefore="
                     + statementCount0 + ", statementsAfter=" + statementCount1);
             
         } while (statementCount0 < statementCount1);
