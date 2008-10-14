@@ -2762,7 +2762,7 @@ Logging
   - Remove code in com.bigdata.Banner that defaults the log level.
 
 ============================================================
-Performance
+Performance tuning
 
   - Done. Recheck lubm query perf: LDS, JDS.
 
@@ -2809,16 +2809,35 @@ Performance
    this picture?  (This appears to be the same problem for LTS and
    JDS.)
 
-   - Recollect query performance data for U1, EOSSYS where the
-     variables are: chunkCapacity, maxParallel, per-child locks in
-     Node#getChild(int).  The previous results can't be trusted due to
-     issues with failing to correctly overwrite/readback properties in
-     the sparse row store.
+   - Look into a lock-free ring buffer impl derived from
+     HardReferenceQueue for use with the ConcurrentWeakValueCache.
+
+   - Try adjusting the synchronous iterator threashold: 100, 1000,
+     10000?  Also try adjusting the CHUNK_CAPACITY for the JDS case.
 
    - Perhaps LDS and others should prefer to run in the callers thread
      rather than on the thread pool is there is only a single split?
      However that will lead to underreporting of tasks, but it could
      be faster since there is no hand off to a worker.  Test it out.
+
+   * JDS performance may be something that needs to be assessed in a
+     distributed server environment rather than on a laptop.  Try EDS
+     and look for costs and then try measuring performance for closure
+     and high-level query on a distributed platform.  Break down the
+     JDS behavior into a set of test harnesses that can be used to
+     test various assumptions about the sources of latency in a model
+     having similar characteristics to the bigdata RDF closure/query
+     application.
+
+   * EOSSYS 50M data set load
+
+   * It is difficult to modify the properties for the JDS runs for
+     query performance analysis.  Modify the BigdataSailHelper accept
+     the IndexManager, namespace and timestamp so that we can make
+     changes to the JDS based triple stores.  Add a variant ctor that
+     accepts a filename, namespace, and timestamp and opens a SAIL
+     based on a Journal.  Also add a ctor variant for the JDSTest case
+     and for the JDS case.
 
    - maxParallel should be counted against the then current thread
      pool size (expensive since requires enumeration of workers) or
@@ -2834,9 +2853,6 @@ Performance
 
    - Report the joinCardinality in the RuleStats (cache and expose it
      in EvaluationPlan2).
-
-   - if RuleState#clearDownStreamBindings is not required then drop
-     it.
 
    - Optimize the chunkCapacity for the unsynchronized solution buffer
      based on the data.
@@ -2855,11 +2871,11 @@ Performance
        The chunkCapacity for the iterator any given asBound join is
        the range count for the subjoin iterator.
 
+  - Modify ClientIndexView to use the ExecutionHelper.
+
+  - Modify AbstractStepTask to use the ExecutionHelper.
+
 ============================================================
-
-- SteveC/DavidL
-
-  - Trace of 1B+ 3 machine run.
 
   - Explore clusterondemand option.
 
@@ -2876,15 +2892,3 @@ Performance
 - MikeP
 
   - Access to the computed and cached join cardinality values.
-
-- BryanT
-
-  - Performance tuning
-
-  - Try testing a hard reference list of the 10 most recently used SPO
-    access paths before testing the cache.  This should be faster (no
-    hashing), but it is still single threaded.
-
-  - Modify ClientIndexView to use the ExecutionHelper.
-
-  - Modify AbstractStepTask to use the ExecutionHelper.

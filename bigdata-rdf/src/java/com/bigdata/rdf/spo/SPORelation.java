@@ -57,8 +57,7 @@ import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.BatchRemove;
 import com.bigdata.btree.proc.LongAggregator;
-import com.bigdata.cache.LRUCache;
-import com.bigdata.cache.WeakValueCache;
+import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
@@ -728,6 +727,10 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * context position is to already have an {@link SPO} on hand. There is no
      * index which can be used to look up an {@link SPO} by its context and the
      * context is always a blank node.
+     * <p>
+     * Note: This method is a hot spot, especially when the maximum parallelism
+     * for subqueries is large. A variety of caching techniques are being
+     * evaluated to address this.
      * 
      * @param pred
      *            The predicate.
@@ -739,80 +742,94 @@ public class SPORelation extends AbstractRelation<ISPO> {
         if (predicate == null)
             throw new IllegalArgumentException();
         
-        IAccessPath<ISPO> accessPath = accessPathCache.get(predicate);
+        final SPOPredicate pred = (SPOPredicate) predicate;
+        
+        // test cache for access path.
+        SPOAccessPath accessPath = cache.get(pred);
 
         if (accessPath != null) {
-
-            // cache hit.
+        
             return accessPath;
             
         }
 
-        synchronized (accessPathCacheLock) {
-
-            accessPath = accessPathCache.get(predicate);
-
-            if (accessPath != null) {
-
-                // cache hit after synchronization.
-                return accessPath;
-                
-            }
-            
-            final long s = predicate.get(0).isVar() ? NULL : (Long) predicate.get(0).get();
-            final long p = predicate.get(1).isVar() ? NULL : (Long) predicate.get(1).get();
-            final long o = predicate.get(2).isVar() ? NULL : (Long) predicate.get(2).get();
-            // Note: Context is ignored!
-    
-            if (s != NULL && p != NULL && o != NULL) {
-    
-                accessPath = getAccessPath(SPOKeyOrder.SPO, predicate);
-    
-            } else if (s != NULL && p != NULL) {
-    
-                accessPath = getAccessPath(SPOKeyOrder.SPO, predicate);
-    
-            } else if (s != NULL && o != NULL) {
-    
-                accessPath = getAccessPath(SPOKeyOrder.OSP, predicate);
-    
-            } else if (p != NULL && o != NULL) {
-    
-                accessPath = getAccessPath(SPOKeyOrder.POS, predicate);
-    
-            } else if (s != NULL) {
-    
-                accessPath = getAccessPath(SPOKeyOrder.SPO, predicate);
-    
-            } else if (p != NULL) {
-    
-                accessPath = getAccessPath(SPOKeyOrder.POS, predicate);
-    
-            } else if (o != NULL) {
-    
-                accessPath = getAccessPath(SPOKeyOrder.OSP, predicate);
-    
-            } else {
-    
-                accessPath = getAccessPath(SPOKeyOrder.SPO, predicate);
-    
-            }
-            
-            if (DEBUG)
-                log.debug(accessPath.toString());
-
-            accessPathCache.put(predicate, accessPath, false/* dirty */);
-            
-        }
+        // create an access path instance for that predicate.
+        accessPath = _getAccessPath(pred);
+        
+        // add to cache.
+        cache.put(pred, accessPath);
         
         return accessPath;
         
     }
-    final private Object accessPathCacheLock = new Object();
-    // @todo config cache capacity.
-    final private WeakValueCache<IPredicate<ISPO>, IAccessPath<ISPO>> accessPathCache = new WeakValueCache<IPredicate<ISPO>, IAccessPath<ISPO>>(
-            new LRUCache<IPredicate<ISPO>, IAccessPath<ISPO>>(100));
 
+    /**
+     * {@link SPOAccessPath} cache.
+     * 
+     * @todo config cache capacity.
+     * 
+     * @todo config concurrency level, e.g., based on maxParallelSubqueries.
+     */
+    final private ConcurrentWeakValueCache<SPOPredicate, SPOAccessPath> cache = new ConcurrentWeakValueCache<SPOPredicate, SPOAccessPath>(
+            100/* queueCapacity */, 0.75f/* loadFactor */, 50/* concurrencyLevel */);
+    
+    /**
+     * Isolates the logic for selecting the {@link SPOKeyOrder} from the
+     * {@link SPOPredicate} and then delegates to
+     * {@link #getAccessPath(IKeyOrder, IPredicate)}.
+     */
+    final private SPOAccessPath _getAccessPath(final IPredicate<ISPO> predicate) {
+
+        final long s = predicate.get(0).isVar() ? NULL : (Long) predicate.get(0).get();
+        final long p = predicate.get(1).isVar() ? NULL : (Long) predicate.get(1).get();
+        final long o = predicate.get(2).isVar() ? NULL : (Long) predicate.get(2).get();
+        // Note: Context is ignored!
+
+        final SPOAccessPath accessPath;
+
+        if (s != NULL && p != NULL && o != NULL) {
+
+            accessPath = getAccessPath(SPOKeyOrder.SPO, predicate);
+
+        } else if (s != NULL && p != NULL) {
+
+            accessPath = getAccessPath(SPOKeyOrder.SPO, predicate);
+
+        } else if (s != NULL && o != NULL) {
+
+            accessPath = getAccessPath(SPOKeyOrder.OSP, predicate);
+
+        } else if (p != NULL && o != NULL) {
+
+            accessPath = getAccessPath(SPOKeyOrder.POS, predicate);
+
+        } else if (s != NULL) {
+
+            accessPath = getAccessPath(SPOKeyOrder.SPO, predicate);
+
+        } else if (p != NULL) {
+
+            accessPath = getAccessPath(SPOKeyOrder.POS, predicate);
+
+        } else if (o != NULL) {
+
+            accessPath = getAccessPath(SPOKeyOrder.OSP, predicate);
+
+        } else {
+
+            accessPath = getAccessPath(SPOKeyOrder.SPO, predicate);
+
+        }
+        
+        if (DEBUG)
+            log.debug(accessPath.toString());
+
+        //            System.err.println("new access path: pred="+predicate);
+
+        return accessPath;
+
+    }
+    
     /**
      * Core impl.
      * 
@@ -824,8 +841,8 @@ public class SPORelation extends AbstractRelation<ISPO> {
      *            path.
      * @return The access path.
      */
-    public SPOAccessPath getAccessPath(IKeyOrder<ISPO> keyOrder,
-            IPredicate<ISPO> predicate) {
+    public SPOAccessPath getAccessPath(final IKeyOrder<ISPO> keyOrder,
+            final IPredicate<ISPO> predicate) {
 
         if (keyOrder == null)
             throw new IllegalArgumentException();

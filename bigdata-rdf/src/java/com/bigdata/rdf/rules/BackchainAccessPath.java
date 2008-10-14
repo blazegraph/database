@@ -34,6 +34,7 @@ import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.inf.BackchainTypeResourceIterator;
 import com.bigdata.rdf.inf.OwlSameAsPropertiesExpandingIterator;
 import com.bigdata.rdf.spo.ISPO;
@@ -176,7 +177,8 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
      * Visits elements in the source {@link IAccessPath} plus all entailments
      * licensed by the {@link InferenceEngine} as configured.
      */
-    public IChunkedOrderedIterator<ISPO> iterator(int limit, int capacity) {
+    public IChunkedOrderedIterator<ISPO> iterator(final int limit,
+            final int capacity) {
 
         if (INFO) {
 
@@ -186,28 +188,24 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
         
         final IPredicate<ISPO> predicate = accessPath.getPredicate();
 
-        final SPO spo = new SPO(predicate);
-
         final InferenceEngine inf = database.getInferenceEngine();
         
         final Vocabulary vocab = database.getVocabulary();
         
-        final long rdfType = vocab.get(RDF.TYPE);
-
-        final long rdfsResource = vocab.get(RDFS.RESOURCE);
-        
-        final long owlSameAs = vocab.get(OWL.SAMEAS);
+        final Axioms axioms = database.getAxioms();
         
         final IChunkedOrderedIterator<ISPO> owlSameAsItr;
 
-        if (!database.getAxioms().isOwlSameAs()) {
+        if (!axioms.isOwlSameAs()) {
             
             // no owl:sameAs entailments.
             owlSameAsItr = null;
         
         } else if(inf.forwardChainOwlSameAsClosure && !inf.forwardChainOwlSameAsProperties) {
             
-            if (inf.database.getAccessPath(NULL, owlSameAs, NULL).isEmpty()) {
+            final long owlSameAs = vocab.get(OWL.SAMEAS);
+            
+            if (database.getAccessPath(NULL, owlSameAs, NULL).isEmpty()) {
 
                 /*
                  * No owl:sameAs assertions in the KB, so we do not need to
@@ -217,6 +215,8 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
                 owlSameAsItr = null;
 
             } else {
+
+                final SPO spo = new SPO(predicate);
 
                 owlSameAsItr = new OwlSameAsPropertiesExpandingIterator(
                         spo.s, spo.p, spo.o,
@@ -253,8 +253,11 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
                                 : capacity, null/* keyOrder */, filter)//
         );
 
-        if (database.getAxioms().isRdfSchema()
-                && !inf.forwardChainRdfTypeRdfsResource) {
+        if (axioms.isRdfSchema() && !inf.forwardChainRdfTypeRdfsResource) {
+            
+            final long rdfType = vocab.get(RDF.TYPE);
+
+            final long rdfsResource = vocab.get(RDFS.RESOURCE);
             
             /*
              * Backchain (x rdf:type rdfs:Resource ), which is an entailment

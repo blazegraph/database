@@ -32,6 +32,7 @@ import java.lang.ref.WeakReference;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.util.NT;
@@ -50,7 +51,7 @@ abstract public class AbstractCachingResourceLocator<T extends ILocatableResourc
     
     protected static final boolean INFO = log.isInfoEnabled();
     
-    private transient WeakValueCache<NT, T> cache;
+    private transient ConcurrentWeakValueCache<NT, T> cache;
 
     private int capacity;
     
@@ -79,7 +80,9 @@ abstract public class AbstractCachingResourceLocator<T extends ILocatableResourc
 
         this.capacity = capacity;
         
-        this.cache = new WeakValueCache<NT, T>(new LRUCache<NT, T>(capacity));
+//        this.cache = new WeakValueCache<NT, T>(new LRUCache<NT, T>(capacity));
+
+        this.cache = new ConcurrentWeakValueCache<NT, T>(capacity);
 
     }
 
@@ -149,7 +152,10 @@ abstract public class AbstractCachingResourceLocator<T extends ILocatableResourc
 
         }
 
-        cache.put(new NT(namespace, timestamp), resource, false/* dirty */);
+
+        cache.put(new NT(namespace, timestamp), resource);
+
+//        cache.put(new NT(namespace, timestamp), resource, false/* dirty */);
 
     }
 

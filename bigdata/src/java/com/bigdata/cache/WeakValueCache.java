@@ -32,7 +32,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
@@ -97,12 +96,12 @@ final public class WeakValueCache<K,T>
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    protected static final boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO.toInt();
+    protected static final boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    protected static final boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG.toInt();
+    protected static final boolean DEBUG = log.isDebugEnabled();
 
     /**
      * Default value for the initial capacity (1000).
@@ -393,7 +392,7 @@ final public class WeakValueCache<K,T>
         
         IWeakRefCacheEntry<K,T> entry = _cache.get( oid );
         
-        Object value = ( entry == null ? null : entry.getObject() );
+        final Object value = ( entry == null ? null : entry.getObject() );
 
         if( value == null ) {
 
@@ -425,7 +424,7 @@ final public class WeakValueCache<K,T>
 
         }
         
-        int size = _cache.size();
+        final int size = _cache.size();
         
         if( size > _highTide ) {
             
@@ -450,7 +449,7 @@ final public class WeakValueCache<K,T>
             
         } else {
             
-            IWeakRefCacheEntry<K,T> entry = _cache.get
+            final IWeakRefCacheEntry<K,T> entry = _cache.get
                ( oid 
                  );
             

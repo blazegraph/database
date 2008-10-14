@@ -2146,6 +2146,10 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         if (child == null) {
 
+            /*
+             * The child needs to be read from the backing store.
+             */
+            
             if (!btree.isReadOnly()) {
             
                 /*
@@ -2159,19 +2163,22 @@ public class Node extends AbstractNode<Node> implements INodeData {
             }
             
             /*
-             * This case handles synchronization for concurrent readers. We use
-             * a per-child index position lock in order to allow the greatest
-             * possible concurrency and to reduce the possibility of lock
-             * contention as much as possible.
+             * This case handles synchronization for concurrent readers. 
              */
             
             if (childLocks != null) {
             
                 /*
                  * Synchronize on a per-child lock.
+                 * 
+                 * Note: We use a per-child index position lock in order to
+                 * allow the greatest possible concurrency and to reduce the
+                 * possibility of lock contention as much as possible.
                  */
                 
-                synchronized (childLocks[index]) {
+                final Object lock = childLocks[index];
+                
+                synchronized ( lock ) {
 
                     return _getChild(index);
                     
@@ -2253,12 +2260,17 @@ public class Node extends AbstractNode<Node> implements INodeData {
     
     /**
      * Static helper method allocates the per-child lock objects.
+     * <p>
+     * Note that the mutable {@link BTree} imposes a single-threaded constraint
+     * on its API so we do not need to do any locking for that case and this
+     * method will therefore return <code>null</code> if the owning B+Tree is
+     * mutable.
      * 
      * @param btree
      *            The owning B+Tree.
      * 
      * @return The array of lock objects -or- <code>null</code> if the btree
-     *         is not read-only.
+     *         is mutable.
      * 
      * @see #childLocks
      */
@@ -2270,7 +2282,17 @@ public class Node extends AbstractNode<Node> implements INodeData {
          */
         // if(true) return null;
         
-        if(!btree.isReadOnly()) return null;
+        if(!btree.isReadOnly()) {
+            
+            /*
+             * The mutable B+Tree has a single threaded constraint so we do not
+             * need to do any locking for that case and therefore we do not
+             * allocate the per-child locks here.
+             */
+            
+            return null;
+            
+        }
         
         /*
          * Note: The array is dimensioned to [branchingFactor] and not

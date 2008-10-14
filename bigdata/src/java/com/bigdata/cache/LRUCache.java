@@ -56,6 +56,8 @@ public class LRUCache<K,T> implements ICachePolicy<K,T>
  
     protected static final Logger log = Logger.getLogger(LRUCache.class);
     
+    protected static final boolean INFO = log.isInfoEnabled();
+    
     /**
      * The maximum capacity of the cache.
      */
@@ -224,7 +226,7 @@ public class LRUCache<K,T> implements ICachePolicy<K,T>
     protected void finalize() throws Throwable
     {
     
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info(getStatistics());
         
     }

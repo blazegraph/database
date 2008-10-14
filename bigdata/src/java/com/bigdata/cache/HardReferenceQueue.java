@@ -112,7 +112,7 @@ public class HardReferenceQueue<T> {
     
     /**
      * @param listener
-     *            The listener on which cache evictions are reported.
+     *            The listener on which cache evictions are reported (optional).
      * @param capacity
      *            The maximum #of references that can be stored on the cache.
      *            There is no guarentee that all stored references are distinct.
@@ -124,14 +124,17 @@ public class HardReferenceQueue<T> {
      *            #of reference tests trads off against the latency of adding a
      *            reference to the cache.
      */
-    public HardReferenceQueue(HardReferenceQueueEvictionListener<T> listener,
-            int capacity, int nscan) {
-        
-        if( listener == null ) throw new IllegalArgumentException();
-        
-        if( capacity <= 0 ) throw new IllegalArgumentException();
+    public HardReferenceQueue(final HardReferenceQueueEvictionListener<T> listener,
+            final int capacity, final int nscan) {
 
-        if( nscan < 0 || nscan > capacity) throw new IllegalArgumentException();
+//        if (listener == null)
+//            throw new IllegalArgumentException();
+
+        if (capacity <= 0)
+            throw new IllegalArgumentException();
+
+        if (nscan < 0 || nscan > capacity)
+            throw new IllegalArgumentException();
         
         this.listener = listener;
         
@@ -270,7 +273,8 @@ public class HardReferenceQueue<T> {
         tail = (tail + 1) % capacity; // update tail.
 
         // report eviction notice to listener.
-        listener.evicted(this, ref);
+        if (listener != null)
+            listener.evicted(this, ref);
         
         return true;
         
@@ -354,7 +358,8 @@ public class HardReferenceQueue<T> {
                 tail = (tail + 1) % capacity; // update tail.
 
                 // report eviction notice to listener.
-                listener.evicted(this, ref);
+                if (listener != null)
+                    listener.evicted(this, ref);
                 
             }
             
