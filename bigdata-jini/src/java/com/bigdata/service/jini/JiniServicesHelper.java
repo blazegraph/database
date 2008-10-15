@@ -16,6 +16,13 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * This is used when testing, but NOT for benchmarking performance. For
  * benchmarking you MUST connect to an existing federation, ideally one deployed
  * over a cluster of machines!
+ * <p>
+ * Note: You MUST specify a sufficiently lax security policy. Also, you
+ * typically will want to enable NIO. For example
+ * 
+ * <pre>
+ * -Djava.security.policy=policy.all -Dcom.sun.jini.jeri.tcp.useNIO=true
+ * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -53,7 +60,8 @@ public class JiniServicesHelper {
      * </ul>
      * 
      * @param path
-     *            The path to the configuration files.
+     *            The path to the configuration files.  The path must include
+     *            a trailing separator character.
      */
     public JiniServicesHelper(String path) {
 

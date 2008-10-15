@@ -29,6 +29,8 @@ abstract public class Advancer<E> implements ITupleFilter<E> {
 
     protected transient static final Logger log = Logger.getLogger(Advancer.class);
 
+    protected transient static final boolean INFO = log.isInfoEnabled();
+
     /**
      * Set by {@link #filter(ITupleCursor)}.
      */
@@ -102,7 +104,7 @@ abstract public class Advancer<E> implements ITupleFilter<E> {
 
             final ITuple<E> tuple = src.next();
 
-            if (log.isInfoEnabled()) {
+            if (INFO) {
 
                 log.info("next: " + tuple);
 
@@ -122,7 +124,7 @@ abstract public class Advancer<E> implements ITupleFilter<E> {
 
             final byte[] key = this.kbuf.toByteArray();
 
-            if (log.isInfoEnabled()) {
+            if (INFO) {
 
                 log.info("key=" + BytesUtil.toString(key));
 

@@ -80,7 +80,9 @@ public class ExperimentDriver {
     /**
      * Logger.
      */
-    public static final Logger log = Logger.getLogger(ExperimentDriver.class);
+    protected static final Logger log = Logger.getLogger(ExperimentDriver.class);
+    
+    protected static final boolean INFO = log.isInfoEnabled();
 
     /**
      * Interface for a result, which is a set of ordered name-value pairs.
@@ -1026,12 +1028,12 @@ public class ExperimentDriver {
                 String baseURI, String systemId) throws SAXException,
                 IOException {
 
-            log.info("resolveEntity(name=" + name + ", publicId=" + publicId
+            if(INFO) log.info("resolveEntity(name=" + name + ", publicId=" + publicId
                     + ", baseURI=" + baseURI + ", systemId=" + systemId);
             
             if (publicId.equals(PUBLIC_EXPERIMENT_0_1)) {
             
-                log.info("Resolving DTD using PUBLIC identifier: " + publicId);
+                if(INFO) log.info("Resolving DTD using PUBLIC identifier: " + publicId);
                 
                 InputStream is = getClass().getResourceAsStream(
                         SYSTEM_EXPERIMENT_FILENAME_0_1);
@@ -1050,7 +1052,7 @@ public class ExperimentDriver {
                 
                 // use the default behaviour
                 
-                log.info("Using default resolver behavior.");
+                if(INFO) log.info("Using default resolver behavior.");
                 
                 return super.resolveEntity(name, publicId, baseURI, systemId);
                 

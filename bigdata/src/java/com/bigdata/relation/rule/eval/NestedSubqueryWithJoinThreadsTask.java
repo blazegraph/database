@@ -90,6 +90,8 @@ import com.bigdata.util.concurrent.ExecutionHelper;
  *       generalization of the binding set and its serialization and a mix up of
  *       that with the iterators on the {@link IAccessPath}.
  * 
+ * @todo support foreign key joins.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -415,7 +417,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      *             and the caller will get whatever {@link ISolution}s are
      *             already in the {@link BlockingBuffer}.
      */
-    protected void apply(final int orderIndex, IBindingSet bindingSet)
+    protected void apply(final int orderIndex, final IBindingSet bindingSet)
             throws InterruptedException {
         
         /*
@@ -841,7 +843,10 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      *       threads overall. We need that pattern here for better sustained
      *       throughput and in the map/reduce system as well (it exists there
      *       but needs to be refactored and aligned with the simpler thread pool
-     *       exposed by the {@link IIndexManager}).
+     *       exposed by the {@link IIndexManager}). The pattern is similar to
+     *       one in the RDF concurrent data loader and in the map/reduce
+     *       package.  It should be encapsulated by the {@link ExecutionHelper}
+     *       along with the submitOne() and submitSequence() methods.
      */
     protected void runSubQueriesOnThreadPool(final int orderIndex,
             final Object[] chunk, final IBindingSet bindingSet)
@@ -945,97 +950,6 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
         }
 
     }
-    
-//    /**
-//     * Submit subquery tasks, wait until they are done, and verify that all
-//     * tasks were executed without error.
-//     */
-//    protected void submitTasks(final List<Callable<Void>> tasks)
-//            throws InterruptedException {
-//        
-//        if (tasks.isEmpty()) {
-//            
-//            // No tasks.
-//            return;
-//            
-//        }
-//        
-//        boolean interrupted = false;
-//        List<ExecutionException> causes = null;
-//        final List<Future<Void>> futures;
-//        try {
-//
-//            // submit tasks and await completion of those tasks.
-//            futures = joinService.invokeAll(tasks);
-//            
-//            for(Future<Void> f : futures) {
-//                
-//                // verify that no task failed.
-//                try {
-//                    f.get();
-//                } catch(InterruptedException ex) {
-//                    interrupted = true;
-//                } catch(CancellationException ex) {
-//                    interrupted = true;
-//                } catch(ExecutionException ex) {
-//                    if(causes==null) {
-//                        causes = new LinkedList<ExecutionException>();
-//                    }
-//                    causes.add(ex);
-//                }
-//                
-//            }
-//            
-//        } catch (InterruptedException ex) {
-//
-//            /*
-//             * The task writing on the buffer was interrupted. For query, this
-//             * is how we eagerly terminate rule evaluation, e.g., when a
-//             * high-level iterator is closed without fully materializing the
-//             * solutions that are (or are being) computed. A LIMIT clause on a
-//             * rule can have this effect.
-//             */
-//            
-//            interrupted = true;
-//            
-//        } catch(RejectedExecutionException ex) {
-//            
-//            if (joinService.isShutdown()) {
-//
-//                /*
-//                 * Asynchronous shutdown of the executor service.
-//                 * 
-//                 * Note: When normal shutdown of the service is requested it is
-//                 * common that the main thread will be in a state in which it
-//                 * attempts to schedule more task(s). This results in a
-//                 * RejectedExecutionException. We treat this just like an
-//                 * interrupt since the join can not progress due to the shutdown
-//                 * of the executor service.
-//                 */
-//
-//                interrupted = true;
-//                
-//            } else {
-//
-//                throw ex;
-//                
-//            }
-//            
-//        }
-//
-//        if(interrupted) {
-//
-//            throw new InterruptedException("Terminated by interrupt");
-//            
-//        }
-//        
-//        if (causes != null) {
-//            
-//            throw new RuntimeException("JOIN Error(s): " + causes.toString());
-//            
-//        }
-//        
-//    }
     
     /**
      * This class is used when we want to evaluate the subqueries in parallel.
@@ -1185,49 +1099,87 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 //     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
 //     * @version $Id$
 //     */
-//    protected static class JoinAdvancer<E> extends Advancer<E> {
+//    protected class JoinAdvancer<E> extends Advancer<E> {
 //
-//        private final NestedSubqueryWithJoinThreadsTask task;
 //        private final E[] chunk;
 //        private final int orderIndex;
-//        
-//        public JoinAdvancer(NestedSubqueryWithJoinThreadsTask task, E[] chunk, int orderIndex) {
+//        private final IBindingSet bindingSet;
+//
+//        /**
+//         * Create a filter that will perform subquery joins.
+//         *  
+//         * @param orderIndex
+//         *            The index of the current join dimension in the evaluation
+//         *            order.
+//         * @param bindingSet
+//         *            The set of bindings for the subquery joins.
+//         * @param chunk
+//         *            A chunk of elements materialized for the current join
+//         *            dimension.
+//         */
+//        public JoinAdvancer(final int orderIndex, final IBindingSet bindingSet,
+//                final E[] chunk) {
+//
+//            if (bindingSet == null) {
+//
+//                throw new IllegalArgumentException();
+//                
+//            }
 //            
-//            this.task = task;
-//            this.chunk = chunk;
+//            if (chunk == null || chunk.length <= 1) {
+//                
+//                throw new IllegalArgumentException();
+//
+//            }
+//            
 //            this.orderIndex = orderIndex;
+//
+//            this.bindingSet = bindingSet;
+//            
+//            this.chunk = chunk;
 //            
 //        }
 //        
 //        @Override
 //        protected void advance(ITuple tuple) {
 //            
+//            final int tailIndex = getTailIndex(orderIndex);
+//
 //            for (Object e : chunk) {
 //
-//                if (log.isDebugEnabled()) {
+//                if (DEBUG) {
 //                    log.debug("Considering: " + e.toString()
 //                            + ", tailIndex=" + orderIndex + ", rule="
 //                            + rule.getName());
 //                }
 //
-//                ruleStats.elementCount[order]++;
+//                ruleStats.elementCount[tailIndex]++;
 //
-//                /*
-//                 * Then bind this statement, which propagates bindings
-//                 * to the next predicate (if the bindings are rejected
-//                 * then the solution would violate the constaints on the
-//                 * JOIN).
-//                 */
-//
-//                ruleState.clearDownstreamBindings(orderIndex + 1, bindingSet);
+//                final IBindingSet bset = bindingSet.clone();
 //                
-//                if (ruleState.bind(order, e, bindingSet)) {
+//                if (ruleState.bind(tailIndex, e, bset)) {
 //
 //                    // run the subquery.
 //                    
-//                    ruleStats.subqueryCount[order]++;
+//                    ruleStats.subqueryCount[tailIndex]++;
 //
-//                    NestedSubqueryWithAdvancerTask.this.apply(orderIndex + 1);
+//                    try {
+//
+//                        apply(orderIndex + 1, bset); // vs buffer?
+//                        
+//                    } catch(InterruptedException ex) {
+//
+//                        /*
+//                         * Stop processing if the task is interrupted.
+//                         */
+//                        
+//                        if(DEBUG)
+//                            log.debug("Interrupted: "+ex);
+//                        
+//                        // stop processing.
+//                        break;
+//                        
+//                    }
 //                    
 //                }
 //
