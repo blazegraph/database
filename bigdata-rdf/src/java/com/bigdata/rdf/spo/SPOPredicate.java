@@ -467,9 +467,31 @@ public class SPOPredicate implements IPredicate<ISPO> {
         
         sb.append(")");
 
-        if(isOptional()) {
+        if (optional || constraint != null || expander != null) {
             
-            sb.append("[optional]");
+            boolean first = true;
+            
+            sb.append("[");
+            
+            if(optional) {
+                if(!first) sb.append(", ");
+                sb.append("optional");
+                first = false;
+            }
+
+            if(constraint!=null) {
+                if(!first) sb.append(", ");
+                sb.append(constraint.toString());
+                first = false;
+            }
+            
+            if(expander!=null) {
+                if(!first) sb.append(", ");
+                sb.append(expander.toString());
+                first = false;
+            }
+            
+            sb.append("]");
             
         }
         
