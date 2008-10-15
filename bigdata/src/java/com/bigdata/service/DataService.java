@@ -499,6 +499,18 @@ abstract public class DataService extends AbstractService
                         "The ServiceUUID is not available yet");
 
             }
+            
+            if(!service.isOpen()) {
+                
+                /*
+                 * The service has already been closed.
+                 */
+                
+                log.warn("Service is not open.");
+                
+                return;
+                
+            }
 
             /*
              * Service specific counters.
