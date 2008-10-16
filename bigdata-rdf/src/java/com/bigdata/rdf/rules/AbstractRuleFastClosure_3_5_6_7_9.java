@@ -243,7 +243,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 
         public RuleStats call() {
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("running: rule=" + rule.getName() + ", propertyId="
                         + propertyId);
             
@@ -329,7 +329,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 
                         stats.elementCount[0] += chunk.length;
                         
-                        if (log.isDebugEnabled()) {
+                        if (DEBUG) {
 
                             log.debug("stmts1: chunk=" + chunk.length + "\n"
                                     + Arrays.toString(chunk));
@@ -350,14 +350,18 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
                              * as well.
                              * 
                              * @todo so, filter out explicit and axioms?
+                             * 
+                             * @todo clone the bindingSet first?
                              */
 
                             assert spo.p() == p;
 
-                            joinNexus.copyValues(spo, rule.getTail(0),
-                                    bindingSet);
-
-                            if (rule.isConsistent(bindingSet)) {
+                            if(joinNexus.bind(rule, 0, spo, bindingSet)) {
+  
+//                            joinNexus.copyValues(spo, rule.getTail(0),
+//                                    bindingSet);
+//
+//                            if (rule.isConsistent(bindingSet)) {
 
                                 tmp.add(joinNexus.newSolution(rule,
                                         bindingSet));
@@ -754,7 +758,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 
                         boolean added = tmp.add(spo.s());
 
-                        if (log.isDebugEnabled())
+                        if (DEBUG)
                             log.debug(spo.toString(/* database */)
                                     + ", added subject=" + added);
 

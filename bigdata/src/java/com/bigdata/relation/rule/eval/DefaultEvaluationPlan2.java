@@ -52,23 +52,27 @@ import com.bigdata.relation.rule.IVariableOrConstant;
  */
 public class DefaultEvaluationPlan2 implements IEvaluationPlan {
 
-    protected static final Logger log = Logger.getLogger(DefaultEvaluationPlan2.class);
+    protected static final transient Logger log = Logger.getLogger(DefaultEvaluationPlan2.class);
     
-    protected static final boolean DEBUG = log.isDebugEnabled();
+    protected static final transient boolean DEBUG = log.isDebugEnabled();
     
-    protected static final boolean INFO = log.isDebugEnabled();
+    protected static final transient boolean INFO = log.isInfoEnabled();
     
+    /**
+     * @todo not serializable but used by {@link #rangeCount(int)}, which is a
+     *       problem.
+     */
     private final IJoinNexus joinNexus;
 
     private final IRule rule;
 
     private final int tailCount;
     
-    private final long BOTH_OPTIONAL = Long.MAX_VALUE-1;
+    private static final transient long BOTH_OPTIONAL = Long.MAX_VALUE-1;
     
-    private final long ONE_OPTIONAL = Long.MAX_VALUE-2;
+    private static final transient long ONE_OPTIONAL = Long.MAX_VALUE-2;
     
-    private final long NO_SHARED_VARS = Long.MAX_VALUE-3;
+    private static final transient long NO_SHARED_VARS = Long.MAX_VALUE-3;
     
     /**
      * The computed evaluation order. The elements in this array are the order
@@ -80,8 +84,18 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
     private int[/* order */] order;
 
     public int[] getOrder() {
-        
-        calc();
+
+        if (order == null) {
+         
+            /*
+             * This will happen if you try to use toString() during the ctor
+             * before the order has been computed.
+             */
+
+            throw new IllegalStateException();
+            
+        }
+//        calc();
         
         return order;
         
@@ -106,15 +120,19 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
      * Keeps track of which tails have been used already and which still need
      * to be evaluated.
      */
-    private boolean[/*tailIndex*/] used;
+    private transient boolean[/*tailIndex*/] used;
     
     /**
      * <code>true</code> iff the rule was proven to have no solutions.
+     * 
+     * @todo this is not being computed.
      */
     private boolean empty = false;
     
     public boolean isEmpty() {
+        
         return empty;
+        
     }
     
     /**
@@ -145,11 +163,11 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
             
         }
         
-        calc();
+        calc(rule);
         
         if (DEBUG) {
             for (int i = 0; i < tailCount; i++) {
-                log.info(order[i]);
+                log.debug(order[i]);
             }
         }
         
@@ -158,7 +176,7 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
     /**
      * Compute the evaluation order.
      */
-    protected void calc() {
+    private void calc(IRule rule) {
 
         if (order != null)
             return;

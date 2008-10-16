@@ -7,6 +7,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
+import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.cache.ICacheEntry;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
@@ -39,6 +40,9 @@ abstract public class AbstractIndexCache<T extends IRangeQuery> {
      * <p>
      * Note: The "dirty" flag associated with the object in this cache is
      * ignored.
+     * 
+     * FIXME modify to use {@link ConcurrentWeakValueCache} which will impose
+     * less lock contention.
      */
     final private WeakValueCache<NT, T> indexCache;
 
@@ -92,6 +96,15 @@ abstract public class AbstractIndexCache<T extends IRangeQuery> {
 
         final NT nt = new NT(name, timestamp);
 
+        // test cache before synchronization.
+        T ndx = indexCache.get(nt);
+        
+        if (ndx != null) {
+
+            return ndx;
+            
+        }
+
         /*
          * Acquire a lock for the index name and timestamp. This allows
          * concurrent resolution of views of the same index and views of other
@@ -100,8 +113,8 @@ abstract public class AbstractIndexCache<T extends IRangeQuery> {
         final Lock lock = indexCacheLock.acquireLock(nt);
 
         try {
-
-            T ndx = indexCache.get(nt);
+            
+            ndx = indexCache.get(nt);
 
             if (ndx == null) {
 

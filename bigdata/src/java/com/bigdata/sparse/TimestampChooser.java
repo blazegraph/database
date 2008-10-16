@@ -35,7 +35,9 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ITimestampService;
+import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.sparse.TPS.TPV;
+import com.bigdata.util.MillisecondTimestampFactory;
 
 /**
  * Utility class for choosing timestamps for the {@link SparseRowStore} on the
@@ -86,11 +88,22 @@ public class TimestampChooser implements IRowStoreConstants {
             final BTree mutableBTree = ((ILocalBTreeView) ndx)
                     .getMutableBTree();
 
+            if(mutableBTree.getStore() instanceof TemporaryRawStore) {
+                
+                /*
+                 * Use a unique timestamp for the local machine since a
+                 * temporary store is not visible outside of that context.
+                 */
+
+                return MillisecondTimestampFactory.nextMillis();
+                
+            }
+            
             /*
              * The backing store will be some kind of AbstractJournal - either
              * a Journal or a ManagedJournal.
              */
-            
+
             final AbstractJournal journal = (AbstractJournal) mutableBTree
                     .getStore();
 

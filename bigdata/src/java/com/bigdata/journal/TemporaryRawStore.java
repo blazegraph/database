@@ -64,6 +64,8 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
 
     protected static final Logger log = Logger.getLogger(TemporaryRawStore.class);
 
+    protected static final boolean INFO = log.isInfoEnabled();
+    
     /**
      * Note: various things must be synchronized on {@link #buf} in order to
      * serialize reads, writes, etc. This is because it is {@link #buf} on which
@@ -167,7 +169,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
         
         super(offsetBits);
         
-        if(log.isInfoEnabled()) {
+        if(INFO) {
             
             log.info("offsetBits="+offsetBits+", file="+file
 //            ,new RuntimeException()
@@ -247,7 +249,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
             
                 if (buf.isOpen()) {
 
-                    if (log.isInfoEnabled())
+                    if (INFO)
                         log.info("Finalizing temp store");
 
                     close();
@@ -285,7 +287,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
 
         synchronized (buf) {
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("Closing temp store");
             
             try {

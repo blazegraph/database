@@ -29,16 +29,27 @@
 package com.bigdata.service;
 
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ILinearList;
+import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.ResultSet;
+import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITransactionManager;
+import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.service.AbstractScaleOutClient.MetadataIndexCachePolicy;
 import com.bigdata.service.AbstractScaleOutClient.Options;
+
+import cutthecrap.utils.striterators.Resolver;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * Abstract base class for federation implementations using the scale-out index
@@ -209,6 +220,134 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
          
     }
     
+    /**
+     * Returns an iterator that will visit the {@link PartitionLocator}s for
+     * the specified scale-out index key range.
+     * <p>
+     * The method fetches a chunk of locators at a time from the metadata index.
+     * Unless the #of index partitions spanned is very large, this will be an
+     * atomic read of locators from the metadata index. When the #of index
+     * partitions spanned is very large, then this will allow a chunked
+     * approach.
+     * <p>
+     * Note: It is possible that a split or join could occur during the process
+     * of mapping the procedure across the index partitions. When the view is
+     * {@link ITx#UNISOLATED} or {@link ITx#READ_COMMITTED} this could make the
+     * set of mapped index partitions inconsistent in the sense that it might
+     * double count some parts of the key range or that it might skip some parts
+     * of the key range. In order to avoid this problem the locator scan MUST
+     * use <em>read-consistent</em> semantics and issue continuation queries
+     * with respect to the commitTime for which the first locator
+     * {@link ResultSet} was materialized. It is the responsibility of the
+     * caller to choose <i>timestamp</i> so as to provide read-consistent
+     * semantics for the locator scan.
+     * 
+     * @param name
+     *            The name of the scale-out index.
+     * @param timestamp
+     *            The timestamp of the view. The iterator uses a read-consistent
+     *            view of the MDI as of the caller specified timestamp. In
+     *            general, the timestamp is the value returned by
+     *            {@link #getTimestamp()} unless the index is
+     *            {@link ITx#UNISOLATED} or {@link ITx#READ_COMMITTED}, in
+     *            which case you might use
+     *            {@link IIndexStore#getLastCommitTime()} for a globally
+     *            consistent read.
+     * @param fromKey
+     *            The scale-out index first key that will be visited
+     *            (inclusive). When <code>null</code> there is no lower bound.
+     * @param toKey
+     *            The first scale-out index key that will NOT be visited
+     *            (exclusive). When <code>null</code> there is no upper bound.
+     * @param reverseScan
+     *            <code>true</code> if you need to visit the index partitions
+     *            in reverse key order (this is done when the partitioned
+     *            iterator is scanning backwards).
+     * 
+     * @return The iterator.
+     */
+    @SuppressWarnings("unchecked")
+    public Iterator<PartitionLocator> locatorScan(final String name,
+            final long timestamp, final byte[] fromKey, final byte[] toKey,
+            final boolean reverseScan) {
+        
+        if (INFO)
+            log.info("Querying metadata index: name=" + name + ", timestamp="
+                    + timestamp + ", reverseScan=" + reverseScan + ", fromKey="
+                    + BytesUtil.toString(fromKey) + ", toKey="
+                    + BytesUtil.toString(toKey));
+        
+        /*
+         * The iterator uses a read-consistent view of the MDI as of the
+         * caller specified timestamp.
+         */
+        final IMetadataIndex mdi = getMetadataIndex(name, timestamp);
+        
+        final ITupleIterator<PartitionLocator> itr;
+
+        // the values are the locators (keys are not required).
+        final int flags = IRangeQuery.VALS;
+        
+        if (reverseScan) {
+         
+            /*
+             * Reverse locator scan.
+             * 
+             * The first locator visited will be the first index partition whose
+             * leftSeparator is LT the optional toKey. (If the toKey falls on an
+             * index partition boundary then we use the prior index partition).
+             */
+
+            itr = mdi.rangeIterator(//
+                    fromKey,//
+                    toKey, //
+                    0, // capacity
+                    flags | IRangeQuery.REVERSE,
+                    null // filter
+                    );
+
+        } else {
+            
+            /*
+             * Forward locator scan.
+             * 
+             * Note: The scan on the metadata index needs to start at the index
+             * partition in which the fromKey would be located. Therefore, when
+             * the fromKey is specified, we replace it with the leftSeparator of
+             * the index partition which would contain that fromKey.
+             */
+
+            final byte[] _fromKey = fromKey == null //
+                ? null //
+                : mdi.find(fromKey).getLeftSeparatorKey()//
+                ;
+
+            itr = mdi.rangeIterator(//
+                    _fromKey,//
+                    toKey, //
+                    0, // capacity
+                    flags,//
+                    null // filter
+                    );
+
+        }
+
+        return new Striterator(itr).addFilter(new Resolver(){
+
+            private static final long serialVersionUID = 7874887729130530971L;
+
+            @Override
+            protected Object resolve(Object obj) {
+             
+                final ITuple<PartitionLocator> tuple = (ITuple<PartitionLocator>) obj;
+                
+                return tuple.getObject();
+                
+            }
+        });
+        
+    }
+        
     /**
      * Return <code>true</code>.
      */
