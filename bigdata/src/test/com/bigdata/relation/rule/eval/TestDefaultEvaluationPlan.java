@@ -30,6 +30,7 @@ package com.bigdata.relation.rule.eval;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 import junit.framework.TestCase2;
@@ -37,6 +38,7 @@ import junit.framework.TestCase2;
 import com.bigdata.btree.keys.ISortKeyBuilder;
 import com.bigdata.io.ISerializer;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -54,6 +56,7 @@ import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.Predicate;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.Var;
+import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
@@ -231,9 +234,16 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
             
         }
         
-        public void copyValues(Object e, IPredicate predicate, IBindingSet bindingSet) {
-
+        public boolean bind(final IRule rule, final int index, final Object e,
+                final IBindingSet bindings) {
+       
+            return false;
+            
         }
+       
+//        public void copyValues(Object e, IPredicate predicate, IBindingSet bindingSet) {
+//
+//        }
 
         public boolean forceSerialExecution() {
 
@@ -382,6 +392,11 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
         }
 
         public ISortKeyBuilder<IBindingSet> newBindingSetSortKeyBuilder(IRule rule) {
+            return null;
+        }
+
+        public Iterator<PartitionLocator> locatorScan(AbstractScaleOutFederation fed, IPredicate predicate) {
+            // TODO Auto-generated method stub
             return null;
         }
 

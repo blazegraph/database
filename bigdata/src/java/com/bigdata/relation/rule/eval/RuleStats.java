@@ -138,7 +138,8 @@ public class RuleStats {
      *            evaluation plan (the indices are correlated with the tail
      *            predicate index, not the evaluation order index).
      */
-    public RuleStats(IRule rule, IEvaluationPlan plan, IKeyOrder[] keyOrder) {
+    public RuleStats(final IRule rule, final IEvaluationPlan plan,
+            final IKeyOrder[] keyOrder) {
         
         this(rule);
         

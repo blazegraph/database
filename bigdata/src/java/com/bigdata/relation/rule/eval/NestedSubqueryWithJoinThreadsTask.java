@@ -40,7 +40,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.proc.BatchContains;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -72,18 +71,7 @@ import com.bigdata.util.concurrent.ExecutionHelper;
  * @todo Scale-out joins should be distributed. A scale-out join run with this
  *       task will use {@link ClientIndexView}s. All work (other than the
  *       iterator scan) will be performed on the client running the join.
- * 
- * @todo Once all variables are bound the remaining joins are just point tests
- *       and can be more effectively expressed as {@link BatchContains}s
- *       operations. In order to make those batch contains tests effective we
- *       need to have a chunk on which to operate. This may require
- *       concentrating join threads back together or reducing their spread. This
- *       is also a variant on "bushy" joins -- where more than two join
- *       dimensions can be evaluated at once.
- *       <p>
- *       Add the #of unbound variables for each predicate in the eval order to
- *       the {@link RuleStats}.
- * 
+ *
  * @todo modify access path to allow us to select specific fields from the
  *       relation to be returned to the join since not all will be used - we
  *       only need those that will be bound. this will require more
@@ -651,7 +639,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
         if (DEBUG) {
 
             log.debug("orderIndex=" + orderIndex + ", tailIndex=" + tailIndex
-                    + ", tail=" + ruleState.rule.getTail(tailIndex)
+                    + ", tail=" + rule.getTail(tailIndex)
                     + ", bindingSet=" + bindingSet + ", accessPath="
                     + accessPath);
 
@@ -790,23 +778,21 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 
             ruleStats.elementCount[tailIndex]++;
 
-            // clone as alternative to clearing the downstream bindings.
+            /*
+             * Then bind this statement, which propagates bindings to the next
+             * predicate (if the bindings are rejected then the solution would
+             * violate the constaints on the JOIN).
+             */
+
+            // clone binding set.
             final IBindingSet bset = bindingSet.clone();
             
-//            /*
-//             * Then bind this statement, which propagates bindings to the next
-//             * predicate (if the bindings are rejected then the solution would
-//             * violate the constaints on the JOIN).
-//             */
-//
-//            ruleState.clearDownstreamBindings(orderIndex + 1, bindingSet);
-
-            if (ruleState.bind(tailIndex, e, bset)) {
-
-                // run the subquery.
+            // bind element to propagate bindings.
+            if (joinNexus.bind(rule, tailIndex, e, bset)) {
 
                 ruleStats.subqueryCount[tailIndex]++;
 
+                // run the subquery.
                 apply(orderIndex + 1, bset, buffer);
 
             }
@@ -893,10 +879,8 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
             // clone the binding set.
             final IBindingSet bset = bindingSet.clone();
             
-            // Note: not necessary since we are cloning the bindingset.
-//            ruleState.clearDownstreamBindings(orderIndex + 1, bindingSet);
-
-            if (ruleState.bind(tailIndex, e, bset)) {
+            // propagate bindings.
+            if (joinNexus.bind(rule, tailIndex, e, bset)) {
 
                 // we will run this subquery.
                 ruleStats.subqueryCount[tailIndex]++;
@@ -1017,7 +1001,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
             ruleStats.elementCount[tailIndex]++;
 
             // bind variables from the current element.
-            if (ruleState.bind(tailIndex, e, bindingSet)) {
+            if (joinNexus.bind(rule, tailIndex, e, bindingSet)) {
 
                 /*
                  * emit entailment

@@ -58,7 +58,11 @@ import com.bigdata.relation.rule.IVariableOrConstant;
  */
 public class DefaultEvaluationPlan implements IEvaluationPlan {
 
-    protected static final Logger log = Logger.getLogger(DefaultEvaluationPlan.class);
+    protected static final transient Logger log = Logger.getLogger(DefaultEvaluationPlan.class);
+    
+    protected static final transient boolean INFO = log.isInfoEnabled();
+
+    protected static final transient boolean DEBUG = log.isDebugEnabled();
     
     private final IJoinNexus joinNexus;
 
@@ -371,7 +375,7 @@ public class DefaultEvaluationPlan implements IEvaluationPlan {
          */
         for (int evalOrder = 0; evalOrder < tailCount; evalOrder++) {
 
-            if (log.isDebugEnabled())
+            if (DEBUG)
                 log.debug("Choosing predicate to evaluate next: evalOrder="
                         + evalOrder + ", order=" + Arrays.toString(order));
             
@@ -392,7 +396,7 @@ public class DefaultEvaluationPlan implements IEvaluationPlan {
                 final int varCount = rule.getTail(j).asBound(bindingSet)
                         .getVariableCount();
 
-                if (log.isDebugEnabled())
+                if (DEBUG)
                     log.debug("j=" + j + ", tailIndex=" + tailIndex
                             + ", varCount=" + varCount + ", bindingSet="
                             + bindingSet);
@@ -424,7 +428,7 @@ public class DefaultEvaluationPlan implements IEvaluationPlan {
                 
                 if (varCount < minVarCount) {
 
-                    if(log.isDebugEnabled()) {
+                    if(DEBUG) {
 
                         log.debug("j=" + j + ", tailIndex=" + tailIndex
                                 + ", varCount=" + varCount + ", minVarCount="
@@ -464,7 +468,7 @@ public class DefaultEvaluationPlan implements IEvaluationPlan {
                     // range count of the current best choice (cached).
                     final long minRangeCount = rangeCount(tailIndex);
 
-                    if (log.isDebugEnabled()) {
+                    if (DEBUG) {
 
                         log.debug("j=" + j + ", tailIndex=" + tailIndex
                                 + ", varCount=" + varCount + ", minVarCount="
@@ -505,7 +509,7 @@ public class DefaultEvaluationPlan implements IEvaluationPlan {
 
             order[evalOrder] = tailIndex;
             
-            if (log.isDebugEnabled()) {
+            if (DEBUG) {
 
                 log.debug("choose tailIndex=" + tailIndex + " : minVarCount="
                         + minVarCount + ", rangeCount=" + rangeCount(tailIndex)
@@ -549,7 +553,7 @@ public class DefaultEvaluationPlan implements IEvaluationPlan {
 
                     if (v.isVar() && !bindingSet.isBound((IVariable)v)) {
 
-                        if (log.isDebugEnabled())
+                        if (DEBUG)
                             log.debug("binding: var=" + v + ", tailIndex="
                                     + tailIndex + ", bindingSet=" + bindingSet);
                         
@@ -565,7 +569,7 @@ public class DefaultEvaluationPlan implements IEvaluationPlan {
             
         } // choose the tail predicate for the next position in the evaluation order.
 
-        if (log.isInfoEnabled()) {
+        if (INFO) {
 
             log.info(toString());
             

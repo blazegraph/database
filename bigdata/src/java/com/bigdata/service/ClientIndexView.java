@@ -662,8 +662,8 @@ public class ClientIndexView implements IClientIndex {
      *       until the caller uses first(), last(), seek(), hasNext(), or
      *       hasPrior().
      */
-    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, IFilterConstructor filter ) {
+    public ITupleIterator rangeIterator(final byte[] fromKey, final byte[] toKey,
+            int capacity, int flags, final IFilterConstructor filter ) {
 
         if (capacity == 0) {
 
@@ -746,115 +746,94 @@ public class ClientIndexView implements IClientIndex {
     /**
      * Returns an iterator that will visit the {@link PartitionLocator}s for
      * the specified scale-out index key range.
-     * <p>
-     * The method fetches a chunk of locators at a time from the metadata index.
-     * Unless the #of index partitions spanned is very large, this will be an
-     * atomic read of locators from the metadata index. When the #of index
-     * partitions spanned is very large, then this will allow a chunked
-     * approach.
-     * <p>
-     * Note: It is possible that a split or join could occur during the process
-     * of mapping the procedure across the index partitions. When the view is
-     * {@link ITx#UNISOLATED} or {@link ITx#READ_COMMITTED} this could make the
-     * set of mapped index partitions inconsistent in the sense that it might
-     * double count some parts of the key range or that it might skip some parts
-     * of the key range. In order to avoid this problem the locator scan MUST
-     * use <em>read-consistent</em> semantics and issue continuation queries
-     * with respect to the commitTime for which the first locator
-     * {@link ResultSet} was materialized.
      * 
-     * @param reverseScan
-     *            <code>true</code> if you need to visit the index partitions
-     *            in reverse key order (this is done when the partitioned
-     *            iterator is scanning backwards).
+     * @see AbstractScaleOutFederation#locatorScan(String, long, byte[], byte[], boolean)
+     * 
      * @param timestamp
-     *            The iterator uses a read-consistent view of the MDI as of the
-     *            caller specified timestamp. In general, the timestamp is the
-     *            value returned by {@link #getTimestamp()} unless the index is
-     *            {@link ITx#UNISOLATED} or {@link ITx#READ_COMMITTED}, in
-     *            which case you might use
-     *            {@link IIndexStore#getLastCommitTime()} for a globally
-     *            consistent read.
+     *            The timestamp of the view.
      * @param fromKey
      *            The scale-out index first key that will be visited
      *            (inclusive). When <code>null</code> there is no lower bound.
      * @param toKey
      *            The first scale-out index key that will NOT be visited
      *            (exclusive). When <code>null</code> there is no upper bound.
+     * @param reverseScan
+     *            <code>true</code> if you need to visit the index partitions
+     *            in reverse key order (this is done when the partitioned
+     *            iterator is scanning backwards).
      * 
      * @return The iterator. The value returned by {@link ITuple#getValue()}
      *         will be a serialized {@link PartitionLocator} object.
-     * 
-     * @todo we could use a different capacity for the locator scans. does it
-     *       matter?
      */
     @SuppressWarnings("unchecked")
-    public ITupleIterator<PartitionLocator> locatorScan(boolean reverseScan,
-            long timestamp, final byte[] fromKey, final byte[] toKey) {
+    public Iterator<PartitionLocator> locatorScan(long timestamp,
+            final byte[] fromKey, final byte[] toKey, boolean reverseScan) {
         
-        if (INFO)
-            log.info("Querying metadata index: name=" + name + ", timestamp="
-                    + timestamp + ", reverseScan=" + reverseScan + ", fromKey="
-                    + BytesUtil.toString(fromKey) + ", toKey="
-                    + BytesUtil.toString(toKey) + ", capacity=" + capacity);
+        return fed.locatorScan(name, timestamp, fromKey, toKey, reverseScan);
         
-        /*
-         * The iterator uses a read-consistent view of the MDI as of the
-         * caller specified timestamp.
-         */
-        final IMetadataIndex mdi = timestamp == getTimestamp() ? getMetadataIndex()
-                : fed.getMetadataIndex(name, timestamp);
-        
-        final ITupleIterator<PartitionLocator> itr;
-
-        // the values are the locators (keys are not required).
-        final int flags = IRangeQuery.VALS;
-        
-        if (reverseScan) {
-         
-            /*
-             * Reverse locator scan.
-             * 
-             * The first locator visited will be the first index partition whose
-             * leftSeparator is LT the optional toKey. (If the toKey falls on an
-             * index partition boundary then we use the prior index partition).
-             */
-
-            itr = mdi.rangeIterator(//
-                    fromKey,//
-                    toKey, //
-                    0, // capacity
-                    flags | IRangeQuery.REVERSE,
-                    null // filter
-                    );
-
-        } else {
-            
-            /*
-             * Forward locator scan.
-             * 
-             * Note: The scan on the metadata index needs to start at the index
-             * partition in which the fromKey would be located. Therefore, when
-             * the fromKey is specified, we replace it with the leftSeparator of
-             * the index partition which would contain that fromKey.
-             */
-
-            final byte[] _fromKey = fromKey == null //
-                ? null //
-                : mdi.find(fromKey).getLeftSeparatorKey()//
-                ;
-
-            itr = mdi.rangeIterator(//
-                    _fromKey,//
-                    toKey, //
-                    0, // capacity
-                    flags,//
-                    null // filter
-                    );
-
-        }
-
-        return itr;
+//        if (INFO)
+//            log.info("Querying metadata index: name=" + name + ", timestamp="
+//                    + timestamp + ", reverseScan=" + reverseScan + ", fromKey="
+//                    + BytesUtil.toString(fromKey) + ", toKey="
+//                    + BytesUtil.toString(toKey) + ", capacity=" + capacity);
+//        
+//        /*
+//         * The iterator uses a read-consistent view of the MDI as of the
+//         * caller specified timestamp.
+//         */
+//        final IMetadataIndex mdi = timestamp == getTimestamp() ? getMetadataIndex()
+//                : fed.getMetadataIndex(name, timestamp);
+//        
+//        final ITupleIterator<PartitionLocator> itr;
+//
+//        // the values are the locators (keys are not required).
+//        final int flags = IRangeQuery.VALS;
+//        
+//        if (reverseScan) {
+//         
+//            /*
+//             * Reverse locator scan.
+//             * 
+//             * The first locator visited will be the first index partition whose
+//             * leftSeparator is LT the optional toKey. (If the toKey falls on an
+//             * index partition boundary then we use the prior index partition).
+//             */
+//
+//            itr = mdi.rangeIterator(//
+//                    fromKey,//
+//                    toKey, //
+//                    0, // capacity
+//                    flags | IRangeQuery.REVERSE,
+//                    null // filter
+//                    );
+//
+//        } else {
+//            
+//            /*
+//             * Forward locator scan.
+//             * 
+//             * Note: The scan on the metadata index needs to start at the index
+//             * partition in which the fromKey would be located. Therefore, when
+//             * the fromKey is specified, we replace it with the leftSeparator of
+//             * the index partition which would contain that fromKey.
+//             */
+//
+//            final byte[] _fromKey = fromKey == null //
+//                ? null //
+//                : mdi.find(fromKey).getLeftSeparatorKey()//
+//                ;
+//
+//            itr = mdi.rangeIterator(//
+//                    _fromKey,//
+//                    toKey, //
+//                    0, // capacity
+//                    flags,//
+//                    null // filter
+//                    );
+//
+//        }
+//
+//        return itr;
         
     }
     
@@ -869,7 +848,7 @@ public class ClientIndexView implements IClientIndex {
      * When the task is not parallelizable the tasks will be submitted to the
      * corresponding index partitions at a time and in key order.
      */
-    public void submit(byte[] fromKey, byte[] toKey,
+    public void submit(final byte[] fromKey, final byte[] toKey,
             final IKeyRangeIndexProcedure proc, final IResultHandler resultHandler) {
 
         if (proc == null)
@@ -903,8 +882,8 @@ public class ClientIndexView implements IClientIndex {
                 : getTimestamp(); 
         
         // scan visits index partition locators in key order.
-        final ITupleIterator<PartitionLocator> itr = locatorScan(
-                false/* reverseScan */, timestamp, fromKey, toKey);
+        final Iterator<PartitionLocator> itr = locatorScan(timestamp,
+                fromKey, toKey, false/* reverseScan */);
         
         long nparts = 0;
         
@@ -927,7 +906,7 @@ public class ClientIndexView implements IClientIndex {
             
             for(int i=0; i<maxTasks && itr.hasNext(); i++) {
                 
-                final PartitionLocator locator = itr.next().getObject();
+                final PartitionLocator locator = itr.next();
 
                 final Split split = new Split(locator, 0/* fromIndex */, 0/* toIndex */);                
 

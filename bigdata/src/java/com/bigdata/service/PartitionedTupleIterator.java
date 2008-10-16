@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.service;
 
+import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 import org.apache.log4j.Logger;
@@ -68,7 +69,7 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
     /**
      * Iterator traversing the index partition locators spanned by the query.
      */
-    private ITupleIterator<PartitionLocator> locatorItr;
+    private Iterator<PartitionLocator> locatorItr;
     
     /**
      * The timestamp from the ctor.
@@ -262,8 +263,8 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
         this.reverseScan = (flags & IRangeQuery.REVERSE) != 0;
 
         // start locator scan
-        this.locatorItr = ndx.locatorScan(reverseScan, timestamp, fromKey,
-                toKey);
+        this.locatorItr = ndx.locatorScan(timestamp, fromKey, toKey,
+                reverseScan);
 
     }
 
@@ -355,8 +356,8 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
                 locator = null;
                 
                 // Re-start the locator scan.
-                locatorItr = ndx.locatorScan(reverseScan, timestamp,
-                        currentFromKey, currentToKey);
+                locatorItr = ndx.locatorScan(timestamp, currentFromKey,
+                        currentToKey, reverseScan);
                 
                 // Recursive query.
                 return hasNext();
@@ -417,7 +418,7 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
             
         }
        
-        locator = locatorItr.next().getObject();
+        locator = locatorItr.next();
         
         if (INFO)
             log.info("locator=" + locator);

@@ -33,7 +33,6 @@ import java.util.Properties;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.RuleContextEnum;
-import com.bigdata.rdf.rules.InferenceEngine.Options;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -47,7 +46,6 @@ import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.NE;
-import com.bigdata.relation.rule.Predicate;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.Var;
 import com.bigdata.relation.rule.eval.ActionEnum;
@@ -133,7 +131,7 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
 
     }
     
-    protected static class P<E> extends Predicate<E> {
+    protected static class P extends SPOPredicate {
 
         /**
          * @param relation
@@ -144,7 +142,7 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
         public P(String relation, IVariableOrConstant<Long> s,
                 IVariableOrConstant<Long> p, IVariableOrConstant<Long> o) {
 
-            super(relation, new IVariableOrConstant[] { s, p, o });
+            super(relation, s, p, o );
             
         }
         
@@ -182,10 +180,7 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
 
                 final IRule rule = new TestRuleRdfs9(relationIdentifier);
 
-                final RuleState ruleState = new RuleState(rule, joinNexus);
-
-                final IBindingSet bindingSet = ruleState.getJoinNexus()
-                        .newBindingSet(rule);
+                final IBindingSet bindingSet = joinNexus.newBindingSet(rule);
 
                 // (u rdfs:subClassOf x)
                 assertEquals(SPOKeyOrder.POS, joinNexus.getTailAccessPath(
@@ -213,10 +208,7 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
                         // constraints
                         new IConstraint[] {});
 
-                final RuleState ruleState = new RuleState(rule, joinNexus);
-
-                final IBindingSet bindingSet = ruleState.getJoinNexus()
-                        .newBindingSet(rule);
+                final IBindingSet bindingSet = joinNexus.newBindingSet(rule);
 
                 // (x y z)
                 assertEquals(SPOKeyOrder.SPO,
@@ -246,10 +238,7 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
                         // constraints
                         new IConstraint[] {});
 
-                final RuleState ruleState = new RuleState(rule, joinNexus);
-
-                final IBindingSet bindingSet = ruleState.getJoinNexus()
-                        .newBindingSet(rule);
+                final IBindingSet bindingSet = joinNexus.newBindingSet(rule);
 
                 // (1L y z)
                 assertEquals(SPOKeyOrder.SPO,
@@ -343,10 +332,7 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
              */
             {
 
-                final RuleState ruleState = new RuleState(rule, joinNexus);
-
-                final IBindingSet bindingSet = ruleState.getJoinNexus()
-                        .newBindingSet(rule);
+                final IBindingSet bindingSet = joinNexus.newBindingSet(rule);
 
                 for (int i = 0; i < rule.getTailCount(); i++) {
 
@@ -503,7 +489,9 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
         final Properties properties = super.getProperties();
         
         // override the default axiom model.
-        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        properties.setProperty(
+                com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
+                NoAxioms.class.getName());
         
         final AbstractTripleStore store = getStore(properties);
 

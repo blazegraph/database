@@ -45,10 +45,13 @@ import com.bigdata.btree.keys.ISortKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.ISerializer;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
+import com.bigdata.mdi.IMetadataIndex;
+import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
@@ -60,6 +63,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.RelationFusedView;
+import com.bigdata.relation.accesspath.AbstractAccessPath;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
@@ -100,10 +104,14 @@ import com.bigdata.relation.rule.eval.RuleStats;
 import com.bigdata.relation.rule.eval.Solution;
 import com.bigdata.relation.rule.eval.SolutionFilter;
 import com.bigdata.service.AbstractDistributedFederation;
+import com.bigdata.service.AbstractScaleOutFederation;
+import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.DataService;
 import com.bigdata.service.EmbeddedFederation;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IClientIndex;
+import com.bigdata.service.IDataService;
+import com.bigdata.service.IDataServiceAwareProcedure;
 import com.bigdata.service.LocalDataServiceFederation;
 import com.bigdata.service.LocalDataServiceFederation.LocalDataServiceImpl;
 import com.bigdata.striterator.ChunkedArrayIterator;
@@ -758,6 +766,38 @@ public class RDFJoinNexus implements IJoinNexus {
 
     }
     
+    public Iterator<PartitionLocator> locatorScan(
+            final AbstractScaleOutFederation fed, final IPredicate predicate) {
+
+        final long timestamp = getReadTimestamp();
+
+        // Note: assumes that we are NOT using a view of two relations.
+        final IRelation relation = (IRelation) fed.getResourceLocator().locate(
+                predicate.getOnlyRelationName(), timestamp);
+
+        /*
+         * Find the best access path for the predicate for that relation.
+         * 
+         * Note: All we really want is the [fromKey] and [toKey] for that
+         * predicate and index, however it is the access path that knows how to
+         * create keys from a predicate.
+         * 
+         * Note: This MUST NOT layer on expander or backchain access path
+         * overlays. Those add overhead during construction and make the
+         * layering also hides the [fromKey] and [toKey].
+         */
+        final AbstractAccessPath accessPath = (AbstractAccessPath) relation
+                .getAccessPath(predicate);
+
+        // Note: assumes scale-out (EDS or JDS).
+        final ClientIndexView ndx = (ClientIndexView) accessPath.getIndex();
+
+        return fed
+                .locatorScan(ndx.getIndexMetadata().getName(), timestamp,
+                        accessPath.getFromKey(), accessPath.getToKey(), false/* reverse */);
+
+    }
+    
     public IIndexManager getIndexManager() {
         
         return indexManager;
@@ -765,7 +805,19 @@ public class RDFJoinNexus implements IJoinNexus {
     }
     
     @SuppressWarnings("unchecked")
-    public void copyValues(final Object e, final IPredicate predicate,
+    public boolean bind(final IRule rule, final int index, final Object e,
+            final IBindingSet bindings) {
+
+        // propagate bindings from the visited object into the binding set.
+        copyValues(e, rule.getTail(index), bindings);
+
+        // verify constraints.
+        return rule.isConsistent(bindings);
+
+    }
+    
+    @SuppressWarnings("unchecked")
+    private void copyValues(final Object e, final IPredicate predicate,
             final IBindingSet bindingSet) {
 
         if (e == null)
@@ -858,50 +910,6 @@ public class RDFJoinNexus implements IJoinNexus {
 
     private static transient IConstant<Long> fakeTermId = new Constant<Long>(-1L);
     
-    /*
-     * Note: This finds "non-problems". In fact, we only clear downstream
-     * bindings in order to get the access path right for the next subquery. We
-     * DO NOT clear the old bindings before copying in the new bindings from the
-     * next element.
-     */
-//    
-//    /**
-//     * Throws an {@link AssertionError} if the variable is already bound to a
-//     * different value.
-//     * 
-//     * @param var
-//     *            The variable.
-//     * @param newval
-//     *            The new value.
-//     * @param e
-//     *            From {@link #copyValues(Object, IPredicate, IBindingSet)}
-//     * @param predicate
-//     *            From {@link #copyValues(Object, IPredicate, IBindingSet)}
-//     * @param bindingSet
-//     *            From {@link #copyValues(Object, IPredicate, IBindingSet)}
-//     *            
-//     * @return <code>true</code>
-//     */
-//    private boolean assertConsistentBinding(IVariable<Long> var,
-//            IConstant<Long> newval, Object e, IPredicate predicate,
-//            IBindingSet bindingSet) {
-//
-//        assert !bindingSet.isBound(var) || bindingSet.get(var).equals(newval) : "already bound to different value: var="
-//                + var
-//                + ", newval="
-//                + newval
-//                + ", oldval="
-//                + bindingSet.get(var)
-//                + ", e="
-//                + e
-//                + ", pred="
-//                + predicate
-//                + ", bindingSet=" + bindingSet;
-//
-//        return true;
-//
-//    }
-//    
     public ISolution newSolution(IRule rule, IBindingSet bindingSet) {
 
         final Solution solution = new Solution(this, rule, bindingSet);

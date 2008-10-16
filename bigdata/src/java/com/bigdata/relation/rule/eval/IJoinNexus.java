@@ -29,14 +29,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.relation.rule.eval;
 
 import java.io.Serializable;
+import java.util.Iterator;
 import java.util.concurrent.ExecutorService;
 
 import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.btree.keys.ISortKeyBuilder;
 import com.bigdata.io.ISerializer;
+import com.bigdata.journal.AbstractTask;
+import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
+import com.bigdata.mdi.IMetadataIndex;
+import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.RelationFusedView;
@@ -48,12 +53,17 @@ import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IConstant;
+import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IRuleTaskFactory;
 import com.bigdata.relation.rule.IStep;
+import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.Var;
+import com.bigdata.service.AbstractScaleOutFederation;
+import com.bigdata.service.IDataService;
+import com.bigdata.service.IDataServiceAwareProcedure;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 
@@ -141,24 +151,57 @@ public interface IJoinNexus {
     int getFullyBufferedReadThreshold();
     
     /**
-     * Copy values the values from the visited element corresponding to the
-     * given predicate into the binding set.
+     * Binds variables from a visited element.
+     * <p>
+     * Note: The bindings are propagated before the constraints are verified so
+     * this method will have a side-effect on the bindings even if the
+     * constraints were not satisified. Therefore you should clone the bindings
+     * before calling this method.
      * 
+     * @param rule
+     *            The rule.
+     * @param index
+     *            The index of the {@link IPredicate} in the body of the
+     *            {@link Rule}.
      * @param e
-     *            An element visited for the <i>predicate</i> using some
-     *            {@link IAccessPath}.
-     * @param predicate
-     *            The {@link IPredicate} providing the {@link IAccessPath}
-     *            constraint.
+     *            An element materialized by the {@link IAccessPath} for that
+     *            {@link IPredicate}.
      * @param bindingSet
-     *            A set of bindings. The bindings for the predicate will be
-     *            copied from the element and set on this {@link IBindingSet} as
-     *            a side-effect.
-     *            
-     * @throws IllegalArgumentException
-     *             if any parameter is <code>null</code>.
+     *            the bindings to which new bindings from the element will be
+     *            applied.
+     * 
+     * @return <code>true</code> unless the new bindings would violate any of
+     *         the {@link IConstraint}s declared for the {@link Rule}).
+     * 
+     * @throws NullPointerException
+     *             if an argument is <code>null</code>.
+     * @throws IndexOutOfBoundsException
+     *             if the <i>index</i> is out of bounds.
      */
-    void copyValues(Object e, IPredicate predicate, IBindingSet bindingSet);
+    boolean bind(final IRule rule, final int index, final Object e,
+            final IBindingSet bindings);
+
+//    /**
+//     * Copy values the values from the visited element corresponding to the
+//     * given predicate into the binding set.
+//     * 
+//     * @param e
+//     *            An element visited for the <i>predicate</i> using some
+//     *            {@link IAccessPath}.
+//     * @param predicate
+//     *            The {@link IPredicate} providing the {@link IAccessPath}
+//     *            constraint.
+//     * @param bindingSet
+//     *            A set of bindings. The bindings for the predicate will be
+//     *            copied from the element and set on this {@link IBindingSet} as
+//     *            a side-effect.
+//     * 
+//     * @throws IllegalArgumentException
+//     *             if any parameter is <code>null</code>.
+//     * 
+//     * @deprecated by {@link #bind(IRule,int, Object, IBindingSet)}
+//     */
+//    void copyValues(Object e, IPredicate predicate, IBindingSet bindingSet);
 
     /**
      * Return a 'fake' binding for the given variable in the specified
@@ -370,6 +413,29 @@ public interface IJoinNexus {
 	 * @return The access path.
 	 */
     IAccessPath getTailAccessPath(IPredicate pred);
+    
+    /**
+     * Return an iterator visiting the {@link PartitionLocator} for the index
+     * partitions from which an {@link IAccessPath} must read in order to
+     * materialize all elements which would be visited for that predicate.
+     * <p>
+     * Note: You can use an {@link IDataServiceAwareProcedure} to obtain the
+     * reference of the {@link IDataService} and pass that into your
+     * {@link AbstractTask} in order to have the federation reference available
+     * when running under the {@link ConcurrencyManager}.
+     * 
+     * @param predicate
+     *            The predicate, with whatever bindings already applied.
+     * @param fed
+     *            The federation, which is required in order to access the
+     *            {@link IMetadataIndex} for a scale-out index.
+     * @param joinNexus
+     *            The {@link IJoinNexus}.
+     * 
+     * @return The iterator.
+     */
+    Iterator<PartitionLocator> locatorScan(
+            final AbstractScaleOutFederation fed, final IPredicate predicate);
     
     /**
      * Used to locate indices, relations and relation containers.
