@@ -86,6 +86,7 @@ public interface IAsynchronousIterator<E> extends ICloseableIterator<E> {
      *            element to appear.
      * @param unit
      *            The units in which the <i>timeout</i> is expressed.
+     *            
      * @return <code>true</code> iff there is an element available.
      * 
      * @throws RuntimeException

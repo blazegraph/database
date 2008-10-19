@@ -53,6 +53,7 @@ import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IQueryOptions;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.ISlice;
+import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
@@ -67,11 +68,13 @@ import com.bigdata.util.concurrent.ExecutionHelper;
  * parallelism is limited by the #of elements visited in a chunk for the first
  * join dimension, as only those subqueries will be parallelized. Subqueries for
  * 2nd+ join dimensions are run in the caller's thread to ensure liveness.
+ * <p>
+ * Note: This join strategy is not very efficient for scale-out joins. If
+ * executed one an {@link AbstractScaleOutFederation}, this task will wind up
+ * using {@link ClientIndexView}s rather than directly using the local index
+ * objects. This means that all work (other than the iterator scan) will be
+ * performed on the client running the join.
  * 
- * @todo Scale-out joins should be distributed. A scale-out join run with this
- *       task will use {@link ClientIndexView}s. All work (other than the
- *       iterator scan) will be performed on the client running the join.
- *
  * @todo modify access path to allow us to select specific fields from the
  *       relation to be returned to the join since not all will be used - we
  *       only need those that will be bound. this will require more
@@ -79,6 +82,8 @@ import com.bigdata.util.concurrent.ExecutionHelper;
  *       that with the iterators on the {@link IAccessPath}.
  * 
  * @todo support foreign key joins.
+ * 
+ * @see JoinMasterTask, which is designed for scale-out federations.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -739,6 +744,16 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
     /**
      * Determines whether we will sort the elements in a chunk into the natural
      * order for the index for the target join dimension.
+     * 
+     * @todo Is there any advantage to re-order the chunk into the key order for
+     *       the next join dimension?  Test with and without.
+     *       <p>
+     *       What we really need is to re-order the generated bindings and the
+     *       next join dimension should be doing that, not this one. In order to
+     *       do that we need to process a chunk of binding sets at a time for
+     *       the next join dimension.
+     *       <p>
+     *       See {@link JoinMasterTask} which does this.
      */
     private static final boolean reorderChunkToTargetOrder = true;
         
@@ -1055,30 +1070,6 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 //     * inner loop by the bindings selected in the outer loop for a given chunk. A
 //     * large chunk size for the outer loop is also effective since the reads are
 //     * local and this reduces the #of times that we will unroll the inner loop.
-//     * 
-//     * @todo handle key-range partitions and optimize when only one split.
-//     * 
-//     * @todo does jini avoid RMI when the proxy target is local? If not, consider
-//     *       breaking the elements for a split into sub-chunks and parallelizing
-//     *       them.
-//     * 
-//     * @todo This algorithm will work on either a local or a distributed federation.
-//     *       it should be efficient for a local federation.
-//     *       <p>
-//     *       For a distributed federation, the {@link IAccessPath}s uses
-//     *       {@link ClientIndexView}s. The {@link Advancer} pattern sends data from
-//     *       the current chunk along with the iterator to each relevant index and
-//     *       evaluates the intersection on the {@link DataService} hosting that
-//     *       index partition, but all results flow back to the client executing the
-//     *       rules.
-//     *       <p>
-//     *       A more fully distributed join could be accomplished by passing along
-//     *       the buffer on which we are writing the join results to each nested
-//     *       join. This would require that the buffer was an RMI proxy for a buffer
-//     *       on the client executing the program. It would also require that the
-//     *       task executing each join step was decomposed by join index and by chunk
-//     *       such that we in fact run many tasks distributed over the cluster. This
-//     *       should have greater effective parallelism.
 //     * 
 //     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
 //     * @version $Id$

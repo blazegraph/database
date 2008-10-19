@@ -42,7 +42,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.journal.AbstractTask;
@@ -73,14 +72,12 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    protected static final boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    protected static final boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    protected static final boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    protected static final boolean DEBUG = log.isDebugEnabled();
 
     protected final ActionEnum action;
     protected final IJoinNexusFactory joinNexusFactory;

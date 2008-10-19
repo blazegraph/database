@@ -30,6 +30,7 @@ package com.bigdata.relation.rule.eval;
 
 import java.io.IOException;
 import java.rmi.Remote;
+import java.util.UUID;
 
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.eval.JoinMasterTask.JoinStats;
@@ -42,6 +43,15 @@ import com.bigdata.relation.rule.eval.JoinMasterTask.JoinTask;
  * @version $Id$
  */
 public interface IJoinMaster extends Remote {
+    
+    /**
+     * Return a unique identifier for the {@link JoinMasterTask} instance. This
+     * is used to concentrate all {@link JoinTask} that target the same tail
+     * predicate and index partition onto the same {@link JoinTask} sink.
+     * 
+     * @return The unique identifer.
+     */
+    UUID getUUID() throws IOException;
     
     /**
      * A proxy for the buffer on which the last {@link JoinTask} must write its

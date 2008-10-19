@@ -590,7 +590,46 @@ public class JiniFederation extends AbstractDistributedFederation implements
         
     }
     
+    /**
+     * Note: The invocation layer factory is reused for each exported proxy (but
+     * the exporter itself is paired 1:1 with the exported proxy).
+     */
     private InvocationLayerFactory invocationLayerFactory = new BasicILFactory();
+    
+    /**
+     * Return an {@link Exporter} for a single object that implements one or
+     * more {@link Remote} interfaces.
+     * <p>
+     * Note: This uses TCP Server sockets.
+     * <p>
+     * Note: This uses [port := 0], which means a random port is assigned.
+     * <p>
+     * Note: The VM WILL NOT be kept alive by the exported proxy (keepAlive is
+     * <code>false</code>).
+     * 
+     * @param enableDGC
+     *            if distributed garbage collection should be used for the
+     *            object to be exported.
+     * 
+     * @return The {@link Exporter}.
+     */
+    protected Exporter getExporter(final boolean enableDGC) {
+        
+        /*
+         * Setup the Exporter for the iterator.
+         * 
+         * Note: Distributed garbage collection is enabled since the proxied
+         * future CAN become locally weakly reachable sooner than the client can
+         * get() the result. Distributed garbage collection handles this for us
+         * and automatically unexports the proxied iterator once it is no longer
+         * strongly referenced by the client.
+         */
+        
+        return new BasicJeriExporter(TcpServerEndpoint
+                .getInstance(0/* port */), invocationLayerFactory, enableDGC,
+                false/* keepAlive */);
+        
+    }
     
     /**
      * Export and return a proxy object. The client will have to wrap the proxy
@@ -626,7 +665,7 @@ public class JiniFederation extends AbstractDistributedFederation implements
 //            
 //            /*
 //             * @todo If the producer is done we can materialize all of the data
-//             * in a ResultSet or RemoteChunk and send that back.
+//             * in a thick iterator, ResultSet or RemoteChunk and send that back.
 //             */
 //            
 //            log.warn("Async iterator is done: modify code to send back fully materialized chunk.");
@@ -638,25 +677,14 @@ public class JiniFederation extends AbstractDistributedFederation implements
         /*
          * Setup the Exporter for the iterator.
          * 
-         * Note: This uses TCP Server sockets.
-         * 
-         * Note: This uses [port := 0], which means a random port is assigned.
-         * 
          * Note: Distributed garbage collection is enabled since the proxied
          * iterator CAN become locally weakly reachable sooner than the client
          * can close() the iterator (or perhaps even consume the iterator!)
          * Distributed garbage collection handles this for us and automatically
          * unexports the proxied iterator once it is no longer strongly
          * referenced by the client.
-         * 
-         * Note: The VM WILL NOT be kept alive by the exported proxy.
-         * 
-         * Note: The invocation layer factory is reused for each exported proxy
-         * (but the exporter itself is paired 1:1 with the exported proxy).
          */
-        final Exporter exporter = new BasicJeriExporter(TcpServerEndpoint
-                .getInstance(0/* port */), invocationLayerFactory,
-                true/* enableDCG */, false/*keepAlive*/);
+        final Exporter exporter = getExporter(true/* enableDCG */);
         
         // wrap the iterator with an exportable object.
         final RemoteChunkedIterator impl = new RemoteChunkedIterator(
@@ -704,29 +732,18 @@ public class JiniFederation extends AbstractDistributedFederation implements
      * @return A proxy for that {@link Future} that masquerades any RMI
      *         exceptions.
      */
-    public Future<? extends Object> getProxy(Future<? extends Object> future) {
+    public Future<? extends Object> getProxy(final Future<? extends Object> future) {
         
         /*
-         * Setup the Exporter for the iterator.
-         * 
-         * Note: This uses TCP Server sockets.
-         * 
-         * Note: This uses [port := 0], which means a random port is assigned.
+         * Setup the Exporter for the Future.
          * 
          * Note: Distributed garbage collection is enabled since the proxied
          * future CAN become locally weakly reachable sooner than the client can
          * get() the result. Distributed garbage collection handles this for us
          * and automatically unexports the proxied iterator once it is no longer
          * strongly referenced by the client.
-         * 
-         * Note: The VM WILL NOT be kept alive by the exported proxy.
-         * 
-         * Note: The invocation layer factory is reused for each exported proxy
-         * (but the exporter itself is paired 1:1 with the exported proxy).
          */
-        final Exporter exporter = new BasicJeriExporter(TcpServerEndpoint
-                .getInstance(0/* port */), invocationLayerFactory,
-                true/* enableDCG */, false/*keepAlive*/);
+        final Exporter exporter = getExporter(true/* enableDGC */);
         
         // wrap the future in a proxyable object.
         final RemoteFuture impl = new RemoteFutureImpl(future);
@@ -758,6 +775,12 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
     }
 
+    public Object getProxy(final Object obj, final boolean enableDGC) {
+
+        return getExporter(enableDGC).equals((Remote)obj);
+        
+    }
+    
     /**
      * Invokes {@link #serviceJoin(com.bigdata.service.IService, UUID, String)}
      */

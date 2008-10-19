@@ -23,7 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.service;
 
-import java.io.Serializable;
 import java.util.concurrent.Future;
 
 import com.bigdata.io.ISerializer;
@@ -123,4 +122,17 @@ abstract public class AbstractDistributedFederation extends AbstractScaleOutFede
     public abstract Future<? extends Object> getProxy(
             Future<? extends Object> future);
 
+    /**
+     * Return a proxy for an object.
+     * 
+     * @param obj
+     *            The object.
+     * @param enableDGC
+     *            If distributed garbage collection should be used for the
+     *            object.
+     *            
+     * @return The proxy.
+     */
+    public abstract Object getProxy(Object obj, boolean enableDGC);
+    
 }
