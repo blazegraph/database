@@ -299,7 +299,7 @@ public interface IBigdataFederation extends IIndexManager {
 
     /**
      * Return the last commit time for the federation (the timestamp of the most
-     * recent <em>completed</em> commit).
+     * recent commit point across all {@link IDataService}s).
      * <p>
      * This is useful for {@link ITx#READ_COMMITTED} operations that need to use
      * a consistent timestamp across a series of {@link DataService}s or a

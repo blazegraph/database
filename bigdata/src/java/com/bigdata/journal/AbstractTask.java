@@ -113,14 +113,12 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    static final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    static final protected boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    static final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    static final protected boolean DEBUG = log.isDebugEnabled();
 
     /**
      * Used to protect against re-submission of the same task object.

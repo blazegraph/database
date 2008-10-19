@@ -100,19 +100,17 @@ import com.bigdata.util.concurrent.TaskCounters;
  */
 public class ConcurrencyManager implements IConcurrencyManager {
 
-    protected static final Logger log = Logger.getLogger(ConcurrencyManager.class);
+    final protected static Logger log = Logger.getLogger(ConcurrencyManager.class);
     
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final protected static boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final protected static boolean DEBUG = log.isDebugEnabled();
     
     /**
      * Options for the {@link ConcurrentManager}.
@@ -395,7 +393,8 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
         open = false;
         
-        log.info("begin");
+        if (INFO)
+            log.info("begin");
 
         // time when shutdown begins.
         final long begin = System.currentTimeMillis();
@@ -421,9 +420,9 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
         try {
 
-            log.info("Awaiting transaction service termination");
+            if (INFO) log.info("Awaiting transaction service termination");
             
-            long elapsed = System.currentTimeMillis() - begin;
+            final long elapsed = System.currentTimeMillis() - begin;
             
             if(!txWriteService.awaitTermination(shutdownTimeout-elapsed, unit)) {
                 
@@ -439,9 +438,10 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
         try {
 
-            log.info("Awaiting read service termination");
+            if (INFO)
+                log.info("Awaiting read service termination");
 
-            long elapsed = System.currentTimeMillis() - begin;
+            final long elapsed = System.currentTimeMillis() - begin;
             
             if(!readService.awaitTermination(shutdownTimeout-elapsed, unit)) {
                 
@@ -457,9 +457,9 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
         try {
 
-            long elapsed = System.currentTimeMillis() - begin;
+            final long elapsed = System.currentTimeMillis() - begin;
             
-            long timeout = shutdownTimeout-elapsed;
+            final long timeout = shutdownTimeout-elapsed;
 
             if (INFO)
                 log.info("Awaiting write service termination: will wait "
@@ -496,7 +496,8 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
         open = false;
         
-        log.info("begin");
+        if (INFO)
+            log.info("begin");
         
         final long begin = System.currentTimeMillis();
         
@@ -1024,9 +1025,10 @@ public class ConcurrencyManager implements IConcurrencyManager {
              * committed state of the index.
              */
 
-            if(log.isInfoEnabled()) log.info("Submitted to the read service: "
-                    + task.getClass().getName() + ", timestamp="
-                    + task.timestamp);
+            if (INFO)
+                log.info("Submitted to the read service: "
+                        + task.getClass().getName() + ", timestamp="
+                        + task.timestamp);
 
             return submitWithDynamicLatency(task, readService, countersHR);
 
@@ -1041,9 +1043,10 @@ public class ConcurrencyManager implements IConcurrencyManager {
                  * not for the reads against the historical data.
                  */
 
-                if(log.isInfoEnabled()) log.info("Submitted to the transaction service: "
-                        + task.getClass().getName() + ", timestamp="
-                        + task.timestamp);
+                if (INFO)
+                    log.info("Submitted to the transaction service: "
+                            + task.getClass().getName() + ", timestamp="
+                            + task.timestamp);
 
                 return submitWithDynamicLatency(task, txWriteService, countersTX);
 
@@ -1056,9 +1059,10 @@ public class ConcurrencyManager implements IConcurrencyManager {
                  * never more than one task with access to a given live index.
                  */
 
-                if(log.isInfoEnabled()) log.info("Submitted to the write service: "
-                        + task.getClass().getName() + ", timestamp="
-                        + task.timestamp);
+                if (INFO)
+                    log.info("Submitted to the write service: "
+                            + task.getClass().getName() + ", timestamp="
+                            + task.timestamp);
 
                 return submitWithDynamicLatency(task, writeService, countersUN);
 

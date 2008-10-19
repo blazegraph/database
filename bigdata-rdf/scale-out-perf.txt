@@ -2095,90 +2095,6 @@ x. Resource lock manager
 
 ============================================================
 
-Probable concurrency problem.  I suspect that the iterator needs to
-re-seek since there has been an intervening writer on the B+Tree.
-
-Caused by: java.lang.RuntimeException: De-serialization problem: addr={nbytes=232,offset=9492165} from store=C:\DOCUME~1\BRYANT~1\LOCALS~1\Temp\bigdata44921.tmp : cause=java.lang.RuntimeException: Child is not persistent: index=6
-	at com.bigdata.btree.AbstractBTree.readNodeOrLeaf(AbstractBTree.java:2460)
-	at com.bigdata.btree.Node.getChild(Node.java:2116)
-	at com.bigdata.btree.ChildIterator.next(ChildIterator.java:163)
-	at com.bigdata.btree.ChildIterator.next(ChildIterator.java:1)
-	at cutthecrap.utils.striterators.Expanderator.hasNext(Expanderator.java:59)
-	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
-	at cutthecrap.utils.striterators.Appenderator.hasNext(Appenderator.java:52)
-	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
-	at cutthecrap.utils.striterators.Expanderator.hasNext(Expanderator.java:56)
-	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
-	at cutthecrap.utils.striterators.Appenderator.hasNext(Appenderator.java:52)
-	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
-	at cutthecrap.utils.striterators.Expanderator.hasNext(Expanderator.java:56)
-	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
-	at cutthecrap.utils.striterators.Appenderator.hasNext(Appenderator.java:52)
-	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
-	at cutthecrap.utils.striterators.Expanderator.hasNext(Expanderator.java:58)
-	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
-	at com.bigdata.btree.AbstractNode$PostOrderEntryIterator.hasNext(AbstractNode.java:657)
-	at com.bigdata.btree.ResultSet.<init>(ResultSet.java:896)
-	at com.bigdata.btree.filter.ChunkedLocalRangeIterator.getResultSet(ChunkedLocalRangeIterator.java:123)
-	at com.bigdata.btree.UnisolatedReadWriteIndex$ChunkedIterator.getResultSet(UnisolatedReadWriteIndex.java:700)
-	at com.bigdata.btree.filter.AbstractChunkedTupleIterator.rangeQuery(AbstractChunkedTupleIterator.java:305)
-	at com.bigdata.btree.filter.AbstractChunkedTupleIterator.hasNext(AbstractChunkedTupleIterator.java:461)
-	at com.bigdata.btree.FusedTupleIterator.hasNext(FusedTupleIterator.java:197)
-	at cutthecrap.utils.striterators.Resolverator.hasNext(Resolverator.java:48)
-	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
-	at com.bigdata.striterator.ChunkedWrappedIterator.hasNext(ChunkedWrappedIterator.java:162)
-	at com.bigdata.relation.rule.eval.LocalNestedSubqueryEvaluator.apply1(LocalNestedSubqueryEvaluator.java:189)
-	at com.bigdata.relation.rule.eval.LocalNestedSubqueryEvaluator.call(LocalNestedSubqueryEvaluator.java:136)
-	at com.bigdata.relation.rule.eval.RunRuleAndFlushBufferTask.call(RunRuleAndFlushBufferTask.java:47)
-	at com.bigdata.relation.rule.eval.RunRuleAndFlushBufferTask.call(RunRuleAndFlushBufferTask.java:1)
-	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:269)
-	at java.util.concurrent.FutureTask.run(FutureTask.java:123)
-	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:650)
-	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:675)
-Caused by: java.lang.RuntimeException: Child is not persistent: index=6
-	at com.bigdata.btree.AddressSerializer.putChildAddresses(AddressSerializer.java:70)
-	at com.bigdata.btree.NodeSerializer.putNode2(NodeSerializer.java:517)
-	at com.bigdata.btree.NodeSerializer.putNode(NodeSerializer.java:475)
-	at com.bigdata.btree.AbstractBTree.writeNodeOrLeaf(AbstractBTree.java:2345)
-	at com.bigdata.btree.AbstractBTree.writeNodeRecursive(AbstractBTree.java:2235)
-	at com.bigdata.btree.DefaultEvictionListener.evicted(DefaultEvictionListener.java:111)
-	at com.bigdata.btree.DefaultEvictionListener.evicted(DefaultEvictionListener.java:1)
-	at com.bigdata.cache.HardReferenceQueue.evict(HardReferenceQueue.java:273)
-	at com.bigdata.cache.HardReferenceQueue.append(HardReferenceQueue.java:235)
-	at com.bigdata.btree.AbstractBTree.touch(AbstractBTree.java:2122)
-	at com.bigdata.btree.AbstractNode.<init>(AbstractNode.java:321)
-	at com.bigdata.btree.Leaf.<init>(Leaf.java:159)
-	at com.bigdata.btree.BTree$NodeFactory.allocLeaf(BTree.java:1197)
-	at com.bigdata.btree.NodeSerializer.getLeaf(NodeSerializer.java:930)
-	at com.bigdata.btree.NodeSerializer.getNodeOrLeaf(NodeSerializer.java:415)
-	at com.bigdata.btree.AbstractBTree.readNodeOrLeaf(AbstractBTree.java:2456)
-	at com.bigdata.btree.Node.getChild(Node.java:2116)
-	at com.bigdata.btree.ChildIterator.next(ChildIterator.java:163)
-	at com.bigdata.btree.ChildIterator.next(ChildIterator.java:1)
-	at cutthecrap.utils.striterators.Expanderator.hasNext(Expanderator.java:59)
-	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
-	at cutthecrap.utils.striterators.Appenderator.hasNext(Appenderator.java:52)
-	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
-	at cutthecrap.utils.striterators.Expanderator.hasNext(Expanderator.java:56)
-	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
-	at cutthecrap.utils.striterators.Appenderator.hasNext(Appenderator.java:52)
-	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
-	at cutthecrap.utils.striterators.Expanderator.hasNext(Expanderator.java:56)
-	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
-	at cutthecrap.utils.striterators.Appenderator.hasNext(Appenderator.java:52)
-	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
-	at cutthecrap.utils.striterators.Expanderator.hasNext(Expanderator.java:58)
-	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
-	at com.bigdata.btree.AbstractNode$PostOrderEntryIterator.hasNext(AbstractNode.java:657)
-	at com.bigdata.btree.ResultSet.<init>(ResultSet.java:896)
-	at com.bigdata.btree.filter.ChunkedLocalRangeIterator.getResultSet(ChunkedLocalRangeIterator.java:123)
-	at com.bigdata.btree.UnisolatedReadWriteIndex$ChunkedIterator.getResultSet(UnisolatedReadWriteIndex.java:700)
-	at com.bigdata.btree.filter.AbstractChunkedTupleIterator.rangeQuery(AbstractChunkedTupleIterator.java:305)
-	at com.bigdata.btree.filter.AbstractChunkedTupleIterator.hasNext(AbstractChunkedTupleIterator.java:461)
-
-
-------
-
   - bigdata-sail/TestSearchQuery#test_restart() is failing?!?
 
   * Re-compare performance of fast vs full and serial vs parallel
@@ -2199,11 +2115,6 @@ Caused by: java.lang.RuntimeException: Child is not persistent: index=6
     this but it needs to be refactored for more general reuse.  Other
     users include closure of a rule set and parallel subquery
     evaluation for joins.
-
-  - Is there a small variation in the exact statement count for U10
-    between runs with parallel subquery evaluation enabled!?!
-
-     exactStatementCount 1598981 vs 1598986.
     
 *** LUBM 50
 
@@ -2273,62 +2184,33 @@ x. *** Get 1-2B scaling numbers on the DPP cluster for DaveL and post
 
        * Running U8000 (1B) or U50000 (7B) will require either a
          machine with a lot of (local preferred) disk or a larger
-         closure and more join optimizations (for JDS closure and
-         query).
+         closure and more 
 
-       * Setup on Amazon E2C: http://aws.amazon.com/ec2/
+       - Defer. Setup on Amazon E2C: http://aws.amazon.com/ec2/
 
        * Setup on clusterondemand: http://www.clusterondemand.com/
 
-       * Increase the journal chunk size (config files) and split
-         point (done).
+       - RDFS++ closure for LUBM on cluster and collect LUBM benchmark
+         results, perhaps without queries 8 and 9 since those may take
+         a very long time to evaluate.
+           
+	   - Requires join optimizations (for JDS closure and query).
 
-       * Initially, disable overflow for EDS, JDS.
+	   - Without overflow processing the triple store will take up
+             more space due to the WORM nature of the store.
 
-       - Note the time writing on the statement indices during closure
-         and compare it with the time reading on those indices.  What
-         takes more time?  For which rules?  Enable the load balancer
-         and httpd reporting for at least shakedown runs.
-
-       - First, load lubm with RDFS++ closure.
-
-	    - Without overflow processing the triple store will take
-              up more space due to the WORM nature of the store.
-
-       - Then run LUBM benchmarks
-
-       Do this for U100, U1000, and U8000 on one machine and then for
-       the same data sets on three machines using MONOLITHIC indices.
-       Put the statement indices on one host (make sure that optimized
-       joins are enabled) and the lexicon on another.  The full text
-       index can be on a third.  Read the source data from NFS.
-
-      * EDS/JDS - Support an option to constrain the placement of the
+      - EDS/JDS - Support an option to constrain the placement of the
         SPO indices onto a specific data service and run with (much
         of) the same efficiency as the LTS or LDS.  Overflow can be
         allowed for this condition IF index partition MOVEs are
         disabled.
 
-      * The LDS should be able to run the entire closure program as a
+      - The LDS should be able to run the entire closure program as a
 	single task on the concurrency manager -- refactor until it
 	does!
-	
-	LDS U10 Load rate w/o closure on d620 with 10 threads and 100k
-	statement buffer.  Not bad.
 
-	Database: #terms=315059, #stmts=1272953, rate=12355.0 in 103031 ms.
-
-       - Once I have these numbers, go back and try again to work
-         through dynamic partitioning, load balancing.
-
-       - Compute the database-at-once closure once the data are safely
-         loaded (verify!) using dynamic partitioning, run some LUBM
-         benchmarks.  (This will force validation of the scale-out
-         joins, including serialization, the async iterator, and
-         efficiency).
-
-       - Then run the LUBM benchmarks again against the distributed,
-         key-range partitioned indices.
+       - Do again with dynamic partitioning and load balancing and
+         then run the LUBM benchmarks.
 
    - Modify SerializerUtil to optionally collect a histogram of
      serialization size/time by class.  That will be useful for
@@ -2356,33 +2238,14 @@ x. *** Get 1-2B scaling numbers on the DPP cluster for DaveL and post
    - A scale-out system may well choose to disable the (x type
      resource) expander, or at least the all unbound variant.
 
-   * Get numbers for LTS (1B, not enough disk) and JDS (3 servers,
-     let us do ~1B).
+   - LTS on U8000 using NAS (only the 10m load rate intervals will be
+     reported) and then get LUBM benchmark results.
 
-   - Bulk loads on the DPP (U100, U1000, U8000) and LUBM query tests.
+   - LDS on U8000 using NAS (gives us the post-mortem analysis) and
+     then get LUBM benchmark results.
 
-      - Test w/ Sesame 2 custom lubm benchmarking extensions - look
-        for other places where we can boost performance.
-
-      * EDS, JDS
-
-        - Either verify overflow or disable overflow for EDS, JDS.
-
-	- During verification of scale-out data load (JDS U10)
-
-Caused by: java.lang.IllegalStateException
-	at com.bigdata.rdf.spo.SPO.setStatementType(SPO.java:653)
-	at com.bigdata.rdf.spo.BulkCompleteConverter.convert(BulkCompleteConverter.java:135)
-	at com.bigdata.rdf.spo.SPOConvertingIterator.convert(SPOConvertingIterator.java:59)
-	at com.bigdata.rdf.spo.SPOConvertingIterator.hasNext(SPOConvertingIterator.java:93)
-	at com.bigdata.rdf.store.ConcurrentDataLoader$VerifyStatementBuffer.incrementalWrite(ConcurrentDataLoader.java:1637)
-	at com.bigdata.rdf.rio.StatementBuffer.flush(StatementBuffer.java:377)
-	at com.bigdata.rdf.rio.PresortRioLoader.success(PresortRioLoader.java:71)
-	at com.bigdata.rdf.rio.BasicRioLoader.loadRdf2(BasicRioLoader.java:214)
-	at com.bigdata.rdf.rio.BasicRioLoader.loadRdf(BasicRioLoader.java:145)
-	at com.bigdata.rdf.store.ConcurrentDataLoader$ReaderTask.readData(ConcurrentDataLoader.java:1493)
-	at com.bigdata.rdf.store.ConcurrentDataLoader$ReaderTask.run(ConcurrentDataLoader.java:1404)
-
+   - Test w/ Sesame 2 custom lubm benchmarking extensions - look for
+     other places where we can boost performance.
 
 ============================================================
 
@@ -2511,25 +2374,11 @@ Reduce GC drivers for U1000
   for packed addresses.  Also, review the code for anything else that
   might write out store addresses.    
 
-- Done. Run 3 machines w/ one on NAS.
-
-  - Analyze run and decide how to statically place the indices so as
-    to avoid one machine becoming a bottleneck.  Try that run (but we
-    are running out of disk anyway).
-
-  - Try a run w/ dynamic partitioning, but I will need to also do
-    incremental builds for that to be effecient.
-
 ============================================================
 
 - Seeing "Ignoring sample WAY out of timestamp order" messages in the
   load balancer log.  This is probably a parsing / format error for
   the sysstat package.
-
-- Done (The problem was that the MetadataServer0 instance had not been
-  killed so there was an attempt to connect to an old instance; kill
-  -9 fixed this).  Seeing "object not in table" errors during
-  concurrent data load.  This causes the load to fail.
 
 - bigdata-rdf/embedded federation test suite has errors.  Mostly can't
   find 'testXX' lexicon.  This appears to be a test harness issue or
@@ -2541,14 +2390,8 @@ Reduce GC drivers for U1000
 
 New priorities:
 
-    - improve JDS closure and query performance (latency, per above;
-      serialization costs; etc).
-
-      - Try jrockit for RMI in scale-out runs.
-
-      - Examine impact of RemoteChunkedIterator#finalize() for
-        scale-out runs.  It's possible that this has been driving GC
-        costs.
+    - Examine impact of RemoteChunkedIterator#finalize() for scale-out
+      runs.  It's possible that this has been driving GC costs.
 
     - Generalize rule evaluation for foreign key joins.
 
@@ -2813,7 +2656,12 @@ Performance tuning
      HardReferenceQueue for use with the ConcurrentWeakValueCache.
 
    - Try adjusting the synchronous iterator threashold: 100, 1000,
-     10000?  Also try adjusting the CHUNK_CAPACITY for the JDS case.
+     10000?
+
+     Try adjusting the CHUNK_CAPACITY for the JDS case.
+
+     Consider breaking CHUNK_CAPACITY into one value for bulk writes
+     and another for high-level query.
 
    - Perhaps LDS and others should prefer to run in the callers thread
      rather than on the thread pool is there is only a single split?
@@ -2829,7 +2677,42 @@ Performance tuning
      having similar characteristics to the bigdata RDF closure/query
      application.
 
+   * JDS join options
+
+     - review slam joins, jive joins, semi-joins, join queues, etc.
+
+     - could open process on each index service and feed solutions to
+       that process.  the on-index (partition) task would queue,
+       chunk, and order bindings for more efficient reads and could
+       handle point queries (which are common) in ordered lookups.
+
+     - A join master sends chunks to data services for processing.
+     
+       This basically corresponds to the subquery operation.  This can
+       be viewed as a map/reduce model where the mapped operations are
+       the subquery tasks together with their binding sets.  This will
+       use more resources in a cluster since the master can farm out
+       the effort to more machines and thereby use more worker threads
+       in more thread pools.
+
+       For limit/offset, we can only accept solutions after the offset
+       and up to limit solutions beyond the offset.  We could move the
+       limit/offset computation into the buffer itself and use a proxy
+       for the buffer.  Once the slice was satisified the buffer would
+       be closed and its proxies would notify the tasks that no more
+       solutions were being accepted.  Of course, using limit / offset
+       for slicing through a result set requires a stable program and
+       a distributed JOIN is NOT stable.
+
+     - An advancer pattern send chunks to the target that has the
+       index for the next join dimension.
+
+       This has the advantage that it reduces the #of subqueries while
+       also distributing the effort among the services in a cluster.
+
    * EOSSYS 50M data set load
+
+     and test query performance/correctness.
 
    * It is difficult to modify the properties for the JDS runs for
      query performance analysis.  Modify the BigdataSailHelper accept
@@ -2875,6 +2758,12 @@ Performance tuning
 
   - Modify AbstractStepTask to use the ExecutionHelper.
 
+  - Modify AbstractIndexCache to use ConcurrentWeakValueCache.  This
+    is necessary in order for the move of the locator scan out of the
+    ClientIndexView to not cause an undesirable contention for access
+    to a resource that used to be a local hard reference (for most
+    cases).
+
 ============================================================
 
   - Explore clusterondemand option.
@@ -2892,3 +2781,68 @@ Performance tuning
 - MikeP
 
   - Access to the computed and cached join cardinality values.
+
+============================================================
+Query execution hints
+
+Hi Bryan,
+
+I looked at some of the methods used by rdbms's. Oracle and MySQL can
+use hints that are specified in a special form of comments. The main
+advantage is that it allows a query to be spec compliant even when such
+hints are included. MS SQL Server uses OPTION clauses that are more
+readable, but clearly break query portability.
+
+Some references:
+http://www.dba-oracle.com/art_otn_cbo_p7.htm
+http://www.petefreitag.com/item/613.cfm
+http://technet.microsoft.com/en-us/library/ms190322.aspx
+
+For the query syntax, I'd prefer the comments approach taken by Oracle
+and Mysql. The hints could then be included in the query algebra, or be
+supplied to Sail.evaluate() as a seperate map of key-value pairs.
+
+Comments?
+
+Arjohn
+============================================================
+
+Some test failures related to the changes to the read-committed index.
+
+junit.framework.AssertionFailedError
+	at junit.framework.Assert.fail(Assert.java:47)
+	at junit.framework.Assert.assertTrue(Assert.java:20)
+	at junit.framework.Assert.assertNull(Assert.java:233)
+	at junit.framework.Assert.assertNull(Assert.java:226)
+	at com.bigdata.journal.TestReadCommittedTx.test_readComittedIsolation(TestReadCommittedTx.java:179)
+
+junit.framework.AssertionFailedError: Not expecting: java.util.concurrent.ExecutionException: java.lang.NullPointerException
+	at junit.framework.TestCase2.fail(TestCase2.java:118)
+	at com.bigdata.journal.TestAddDropIndexTask.test_addDropIndex(TestAddDropIndexTask.java:290)
+Caused by: java.util.concurrent.ExecutionException: java.lang.NullPointerException
+	at java.util.concurrent.FutureTask$Sync.innerGet(FutureTask.java:205)
+	at java.util.concurrent.FutureTask.get(FutureTask.java:80)
+	at com.bigdata.journal.TestAddDropIndexTask.test_addDropIndex(TestAddDropIndexTask.java:273)
+	at jrockit.reflect.VirtualNativeMethodInvoker.invoke(Ljava.lang.Object;[Ljava.lang.Object;)Ljava.lang.Object;(Unknown Source)
+Caused by: java.lang.NullPointerException
+	at com.bigdata.btree.ReadCommittedView.getIndex(ReadCommittedView.java:148)
+	at com.bigdata.btree.ReadCommittedView.getBTreeCounters(ReadCommittedView.java:326)
+	at com.bigdata.journal.ConcurrencyManager.addIndexCounters(ConcurrencyManager.java:1516)
+	at com.bigdata.journal.AbstractTask.clearIndexCache(AbstractTask.java:446)
+	at com.bigdata.journal.AbstractTask.call2(AbstractTask.java:1572)
+	at com.bigdata.journal.AbstractTask.call(AbstractTask.java:1464)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:269)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:123)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:650)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:675)
+	at java.lang.Thread.run()V(Unknown Source)
+
+
+A test failure that has been going on for a while now: index partition move.
+
+junit.framework.AssertionFailedError: #dataService0 expected:<1> but was:<2>
+	at junit.framework.Assert.fail(Assert.java:47)
+	at junit.framework.Assert.failNotEquals(Assert.java:282)
+	at junit.framework.Assert.assertEquals(Assert.java:64)
+	at junit.framework.Assert.assertEquals(Assert.java:201)
+	at com.bigdata.service.TestIndexPartitionMove.test_move(TestIndexPartitionMove.java:441)
