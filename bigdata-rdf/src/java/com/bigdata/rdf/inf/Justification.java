@@ -38,7 +38,6 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
-import com.bigdata.rdf.rules.TestJustifications;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.JustificationTupleSerializer;
 import com.bigdata.rdf.spo.SPO;
