@@ -700,6 +700,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         
         return new SPOPredicate(
                 new String[] { database.getSPORelation().getNamespace() },//
+                -1, // partitionId
                 s, p, o, c, //
                 false, // optional
                 filter, // filter on elements visited by the access path.
