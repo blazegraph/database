@@ -60,8 +60,9 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
     /**
      * 
      */
-    protected AbstractRelation(IIndexManager indexManager, String namespace,
-            Long timestamp, Properties properties) {
+    protected AbstractRelation(final IIndexManager indexManager,
+            final String namespace, final Long timestamp,
+            final Properties properties) {
 
         super(indexManager, namespace, timestamp, properties);
 

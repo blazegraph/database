@@ -40,6 +40,7 @@ public class MatchRule extends Rule<SPO> {
                 new SPOPredicate(relationName, var("s"), var("p"), lit),
                 //
                 new SPOPredicate(new String[] { relationName },
+                                -1, // partitionId
                                 var("s"), //
                                 vocab.getConstant(RDF.TYPE),//
                                 var("t"), //

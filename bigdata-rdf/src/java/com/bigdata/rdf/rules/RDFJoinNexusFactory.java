@@ -86,7 +86,7 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
     final RuleContextEnum ruleContext;
     final ActionEnum action;
     final long writeTimestamp;
-    final long readTimestamp;
+    /*final*/ long readTimestamp;
     final boolean justify;
     final boolean backchain;
     final boolean forceSerialExecution;
@@ -287,6 +287,26 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
     public long getReadTimestamp() {
         
         return readTimestamp;
+        
+    }
+
+    public void setReadTimestamp(final long readTimestamp) {
+
+        if (this.readTimestamp == readTimestamp) {
+
+            // NOP.
+            return;
+
+        }
+        
+        synchronized(joinNexusCache) {
+            
+            // discard cache since advancing the readTimestamp.
+            joinNexusCache.clear();
+            
+            this.readTimestamp = readTimestamp; 
+            
+        }
         
     }
 

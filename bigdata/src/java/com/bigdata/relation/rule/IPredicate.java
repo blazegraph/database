@@ -30,13 +30,18 @@ package com.bigdata.relation.rule;
 
 import java.io.Serializable;
 
+import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
+import com.bigdata.relation.accesspath.AbstractAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.IEvaluationPlan;
 import com.bigdata.relation.rule.eval.ISolution;
+import com.bigdata.relation.rule.eval.JoinMasterTask;
+import com.bigdata.service.AbstractScaleOutFederation;
+import com.bigdata.service.DataService;
 
 /**
  * An immutable constraint on the elements visited using an {@link IAccessPath}.
@@ -85,6 +90,53 @@ public interface IPredicate<E> extends Cloneable, Serializable {
      * The #of elements in the relation view.
      */
     public int getRelationCount();
+    
+    /**
+     * The index partition identifier and <code>-1</code> if no partition
+     * identifier was specified.
+     * <p>
+     * Note: The ability to specify an index partition identifier for a
+     * predicate is provided in support of scale-out JOIN strategies. The
+     * {@link AbstractAccessPath} and the {@link JoinMasterTask} are both aware
+     * of this property. The {@link JoinMasterTask} sets the partition
+     * identifier in order to request an access path backed by the name of the
+     * local index object on a {@link DataService} rather than the name of the
+     * scale-out index.
+     * <p>
+     * The index partition can not be specified until a choice has been made
+     * concerning which {@link IAccessPath} to use for a predicate without an
+     * index partition constraint. The {@link IAccessPath} choice is therefore
+     * made by the {@link IEvaluationPlan} using the scale-out index view and an
+     * {@link AbstractScaleOutFederation#locatorScan(String, long, byte[], byte[], boolean)}
+     * is used to identify the index partitions on which the {@link IAccessPath}
+     * will read. The index partition is then set on a constrained
+     * {@link IPredicate} for each target index partition and the JOINs are then
+     * distributed to the {@link DataService}s on which those index partitions
+     * reside.
+     * 
+     * @return The index partition identifier -or- <code>-1</code> if the
+     *         predicate is not locked to a specific index partition.
+     * 
+     * @see PartitionLocator
+     * @see AbstractAccessPath
+     * @see JoinMasterTask
+     */
+    public int getPartitionId();
+    
+    /**
+     * Sets the index partition identifier constraint.
+     * 
+     * @param partitionId
+     *            The index partition identifier.
+     *            
+     * @return The constrained {@link IPredicate}.
+     * 
+     * @throws IllegalArgumentException
+     *             if the index partition identified is a negative integer.
+     * @throws IllegalStateException
+     *             if the index partition identifier was already specified.
+     */
+    public IPredicate<E> setPartitionId(int partitionId);
     
     /**
      * <code>true</code> iff the predicate is optional when evaluated as the

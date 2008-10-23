@@ -5,9 +5,7 @@ import java.io.Serializable;
 import org.apache.log4j.Logger;
 
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.IRuleTaskFactory;
 
 /**
  * Helper class is used for sequential {@link IRule} step execution. It runs
@@ -21,6 +19,8 @@ import com.bigdata.relation.rule.IRuleTaskFactory;
 public class RunRuleAndFlushBufferTask implements IStepTask, Serializable {
 
     protected static final Logger log = Logger.getLogger(RunRuleAndFlushBufferTask.class);
+    
+    protected static final boolean DEBUG = log.isDebugEnabled();
     
     /**
      * 
@@ -58,7 +58,7 @@ public class RunRuleAndFlushBufferTask implements IStepTask, Serializable {
         // run the rule.
         final RuleStats ruleStats = stepTask.call();
 
-        if (log.isDebugEnabled()) {
+        if (DEBUG) {
 
             log.debug("Flushing buffer: size=" + buffer.size() + ", class="
                     + buffer.getClass().getName());
@@ -81,7 +81,7 @@ public class RunRuleAndFlushBufferTask implements IStepTask, Serializable {
 //            
 //        }
 
-        if(log.isDebugEnabled()) {
+        if(DEBUG) {
             
             log.debug("Flushed buffer: mutationCount=" + mutationCount);
 //            + ", stats=" + ruleStats);

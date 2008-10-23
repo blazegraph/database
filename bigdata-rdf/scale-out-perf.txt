@@ -192,6 +192,10 @@ Consider a RW store variant.
 
     - BTree
 
+     - Per-child locks : try using the childRef for this.  Add
+       synchronized(node) to ensure that the childRef[i] is non-null
+       and then synchronized(childRef[i]) for the lock itself.
+
      - The RecordCompressor as utilized by the NodeSerializer is NOT
        thread-safe as it relies on a single cbuf field.  Either the
        static buffer pool (if direct buffers are performant for this),
@@ -2846,3 +2850,255 @@ junit.framework.AssertionFailedError: #dataService0 expected:<1> but was:<2>
 	at junit.framework.Assert.assertEquals(Assert.java:64)
 	at junit.framework.Assert.assertEquals(Assert.java:201)
 	at com.bigdata.service.TestIndexPartitionMove.test_move(TestIndexPartitionMove.java:441)
+
+============================================================
+JOIN optimzations:
+
+  - JoinMaster
+ 
+    - Done. {@link IPredicate} needs to be modified to accept an
+      optional index partition identifier. When provided, {@link
+      IJoinNexus#getTailRelationView(IPredicate)} and {@link
+      IJoinNexus#getTailAccessPath(IPredicate)} must both use the
+      specified index partition, rather than attempting to use the
+      scale-out index view. The {@link IJoinNexus} also needs to be
+      able to deliver the name of the indices that would be used by
+      the {@link IJoinNexus#getTailAccessPath(IPredicate)} so those
+      indices may be declared. Of course, during execution the {@link
+      IJoinNexus} must be using the local {@link IIndexManager} rather
+      than the {@link IBigdataFederation} for this to succeed.
+
+    - Modify RDFJoinNexus to execute the ProgramTask on the client.    
+
+    - Modify ProgramTask to create the JoinMasterTask on the client.
+      The JoinMasterTask will then create the JoinTasks on the data
+      service hosting each index partition on which the query will
+      read.
+
+    - Handle SLICE at the query buffer.
+
+    - Consider whether it is possible to reduce the costs associated
+      with a SLICE, which is forced to interrupt() the join tasks.
+      For example, we could modify the JoinTaskFactoryTask to return a
+      proxy for the JoinTask rather than its Future we are able to
+      close() the JoinTask without having to interrupt it.  However,
+      note that IO operations will not be interrupted by an
+      application level protocol, just be interrupt() so this might
+      not be a win.
+
+    - Done. Modify ProgramTask to advance the read-historical
+      timestamp at the start of each closure round.
+
+    - Modify owl:sameAs  expansion to be a  rule rewrite so  it can be
+      distributed just  like any other rule.   Each {@link IPredicate}
+      is  expanded into  3 predicates  with the  appropriate anonymous
+      variables since  otherwise we  will be in  a position  where the
+      index partition for the stated  predicate is local but the index
+      partitions for the owl:sameAs expansion are distributed.
+
+    - Free text search should probably be a foreign key join, but the
+      key needs to be tokenized by the search engine and it then runs
+      the per-keyword searches in parallel against the distributed
+      indices. Its really quite a challenge to do this where the
+      search terms become bound in a join and then applied.
+
+      Note: The easy way to handle this when the search terms are
+      bound first is to generate one rule per query result and then
+      run those rules as a program.
+
+    - Revisit handling of (foo type resource) expansion.  The
+      expansion needs to be done at the query buffer level since it
+      requires access to the scale-out index view, not the local index
+      partition.  Note that there will also be an interaction with
+      SLICE.
+
+    - Modify the distributed federation to return an
+      IAsynchronousIterator using the approach that we are already
+      using for Future so that the interface is preserved (the
+      returned proxy does not declare the IOExceptions).
+
+  - NestedSubqueryJoin
+
+    - Modify ProgramTask so that LDS runs the entire program on the
+      data service.
+
+============================================================
+CLOSURE CORRECTNESS
+
+This is looking for a problem that I introduced while making changes
+to the closure execution to support the new scale-out JOINs.  The
+symptom was one dropped result on LUBM Q13. ntriples should be 139762
+after closure, but we are only getting 134258 when using
+lastCommitTime.
+
+READ_COMMITTED LTS:
+Loaded data files: loadTime(ms)=6453, loadRate(tps)=15631, toldTriples=100868, #terms=26598
+nextOffset: 11412393
+statementCount	101044
+closure: ClosureStats{mutationCount=26647, elapsed=3938ms}; nextOffset: 18875214
+Net: tps=12907, ntriples=139762, elapsed=10828ms
+
+READ_CONSISTENT from lastCommitTime with LTS:
+2008
+Loaded data files: loadTime(ms)=6390, loadRate(tps)=15785, toldTriples=100868, #terms=26598
+nextOffset: 11412424
+class	com.bigdata.rdf.store.LocalTripleStore
+indexManager	com.bigdata.journal.Journal
+exactStatementCount	101044
+statementCount	101044
+termCount	26636
+uriCount	17310
+literalCount	9326
+bnodeCount	0
+
+Computing closure: now=Wed Oct 22 11:25:56 EDT 2008
+closure: ClosureStats{mutationCount=25177, elapsed=2954ms}
+exactStatementCount	134258
+statementCount	134258
+termCount	26636
+uriCount	17310
+literalCount	9326
+bnodeCount	0
+Net: tps=13726, ntriples=134258, elapsed=9781ms
+
+
+Suspects and places of interest:
+
+AbstractTripleStore
+	
+	-newJoinNexus : choice of the readTimestamp.
+
+RDFJoinNexusFactory
+
+	- indexManager:joinNexus cache.
+
+	- setReadTimestamp(timestamp)
+
+RDFJoinNexus
+	
+	- runDistributedProgram(IStep)
+
+ProgramTask
+
+   Whether or not they advance the readTimestamp before/after flushing
+   the buffer.  Ideally, each rule will read from the [lastCommitTime]
+   (expressed as a read-consistent timestamp).
+
+	executeMutation()
+
+	executeClosure()
+	
+Future<RuleStats> AbstractStepTask:submitToConcurrencyManager()
+
+   Chooses the timestamp for the AbstractTask.
+
+   Note: mutation tasks run with the writeTimestamp since they would
+   otherwise block when the buffer was full and needed to be flushed.
+   
+   However, this should be done differently for the JoinMaster since
+   the JoinTask will be read-only and writes will be unisolated.
+
+   It seems like this is only one of several ways in which the best
+   approach for LTS/LDS does not generalize nicely to EDS/JDS.  Maybe
+   these should be factored apart?
+
+DefaultRuleTaskFactory
+
+   Responsible for using either the JoinMasterTask or the
+   NestedSubqueryWithJoinThreadsTask.
+
+============================================================
+
+This appears occasionally when loading and closing U1.  The exception
+is probably related to the change to obtain the lastCommitTime when
+computing each round of the closure.  Note that there are also
+warnings for "Unknown transactions" - those are probably the last
+commit time on the store, but the timestamp is being interpreted as a
+transaction identifier.	  
+
+Computing closure: now=Wed Oct 22 10:59:29 EDT 2008
+WARN : 8860 pool-1-thread-6         com.bigdata.journal.Journal.getIndex(Journal.java:393): Unknown transaction: name=kb.spo.SPO, tx=1224687569078
+Exception in thread "Main Thread" WARN : 8860 pool-1-thread-6         com.bigdata.journal.Journal.getIndex(Journal.java:393): Unknown transaction: name=kb.spo.POS, tx=1224687569078
+WARN : 8860 pool-1-thread-6         com.bigdata.journal.Journal.getIndex(Journal.java:393): Unknown transaction: name=kb.spo.OSP, tx=1224687569078
+java.lang.RuntimeException: java.util.concurrent.ExecutionException: java.lang.IllegalStateException
+	at com.bigdata.rdf.rules.InferenceEngine.computeClosure(InferenceEngine.java:524)
+	at com.bigdata.rdf.rules.InferenceEngine.computeClosure(InferenceEngine.java:438)
+	at edu.lehigh.swat.bench.ubt.bigdata.BigdataRepository.load(BigdataRepository.java:545)
+	at edu.lehigh.swat.bench.ubt.Test.doTestLoading(Test.java:217)
+	at edu.lehigh.swat.bench.ubt.Test.testLoad(Test.java:129)
+	at edu.lehigh.swat.bench.ubt.Test.main(Test.java:107)
+Caused by: java.util.concurrent.ExecutionException: java.lang.IllegalStateException
+	at java.util.concurrent.FutureTask$Sync.innerGet(FutureTask.java:205)
+	at java.util.concurrent.FutureTask.get(FutureTask.java:80)
+	at com.bigdata.relation.rule.eval.ProgramTask.executeMutation(ProgramTask.java:472)
+	at com.bigdata.relation.rule.eval.ProgramTask.executeProgramWithEmbeddedClosure(ProgramTask.java:678)
+	at com.bigdata.relation.rule.eval.ProgramTask.call(ProgramTask.java:270)
+	at com.bigdata.rdf.rules.RDFJoinNexus.runLocalProgram(RDFJoinNexus.java:1619)
+	at com.bigdata.rdf.rules.RDFJoinNexus.runProgram(RDFJoinNexus.java:1590)
+	at com.bigdata.rdf.rules.RDFJoinNexus.runMutation(RDFJoinNexus.java:1516)
+	at com.bigdata.rdf.rules.InferenceEngine.computeClosure(InferenceEngine.java:516)
+	... 5 more
+Caused by: java.lang.IllegalStateException
+	at com.bigdata.rdf.spo.SPORelation.getSPOIndex(SPORelation.java:519)
+	at com.bigdata.rdf.spo.SPORelation.getIndex(SPORelation.java:498)
+	at com.bigdata.rdf.spo.SPORelation.getAccessPath(SPORelation.java:892)
+	at com.bigdata.rdf.spo.SPORelation._getAccessPath(SPORelation.java:792)
+	at com.bigdata.rdf.spo.SPORelation.getAccessPath(SPORelation.java:764)
+	at com.bigdata.rdf.rules.RDFJoinNexus.getTailAccessPath(RDFJoinNexus.java:793)
+	at com.bigdata.relation.rule.eval.DefaultRangeCountFactory.rangeCount(DefaultRangeCountFactory.java:85)
+	at com.bigdata.relation.rule.eval.DefaultEvaluationPlan2.rangeCount(DefaultEvaluationPlan2.java:401)
+	at com.bigdata.relation.rule.eval.DefaultEvaluationPlan2.getFirstJoin(DefaultEvaluationPlan2.java:294)
+	at com.bigdata.relation.rule.eval.DefaultEvaluationPlan2.calc(DefaultEvaluationPlan2.java:260)
+	at com.bigdata.relation.rule.eval.DefaultEvaluationPlan2.<init>(DefaultEvaluationPlan2.java:166)
+	at com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2.newPlan(DefaultEvaluationPlanFactory2.java:19)
+	at com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2.newPlan(DefaultEvaluationPlanFactory2.java:1)
+	at com.bigdata.relation.rule.eval.RuleState.<init>(RuleState.java:79)
+	at com.bigdata.relation.rule.eval.NestedSubqueryWithJoinThreadsTask.<init>(NestedSubqueryWithJoinThreadsTask.java:228)
+	at com.bigdata.relation.rule.eval.DefaultRuleTaskFactory.newTask(DefaultRuleTaskFactory.java:41)
+	at com.bigdata.relation.rule.eval.MutationTask.newMutationTasks(MutationTask.java:347)
+	at com.bigdata.relation.rule.eval.MutationTask.call(MutationTask.java:110)
+	at com.bigdata.relation.rule.eval.MutationTask.call(MutationTask.java:1)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:269)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:123)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:650)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:675)
+	at java.lang.Thread.run()V(Unknown Source)
+
+============================================================
+EOSSYS
+
+  - Examine periodic latency on the order of 250ms for query.
+
+  - Examine query performance.  How can we improve performance
+    relative to the other stores?
+
+  - Try with COLLATOR=ASCII.
+
+  - Try with native JNI library.
+
+  - Try with the fieldId elided for the full text index.
+
+  - Look for further performance tuning, heap cost reduction, etc.
+
+  - Try w/ queue statistics collection turned off and make sure that
+    sampling does not impose much of a burden, including by requiring
+    locks to report the queue size, etc. (do we even collect these
+    statistics for LTS?)
+
+  - 250ms latency and sometimes zero latency may simply be a
+    side-effect of thread scheduling.  If a thread yields, there can
+    be a wait before it runs again.  Variations could easily arise
+    from this behavior.
+
+  - Try with performance analyzer and look for places where we are
+    waiting to obtain a lock.  Could also use the jrockit console and
+    look at lock contention, but a thread yielding is not going to
+    show up under lock contention.  Maybe there is another statistic
+    for that?
+
+============================================================
+Conferences and papers:
+
+http://www.semantic-conference.com/2009/cfptopics/, proposals due Nov
+24th.
+

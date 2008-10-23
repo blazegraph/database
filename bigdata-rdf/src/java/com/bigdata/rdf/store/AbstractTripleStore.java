@@ -75,6 +75,7 @@ import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.axioms.BaseAxioms;
@@ -2334,6 +2335,7 @@ abstract public class AbstractTripleStore extends
         
         final SPOPredicate p = new SPOPredicate(//
                 new String[] { r.getNamespace() },//
+                -1, // partitionId
                 Var.var("s"),//
                 Var.var("p"),//
                 Var.var("o"),//
@@ -2343,8 +2345,8 @@ abstract public class AbstractTripleStore extends
                 null // expander
         );
 
-        return getSPORelation().getAccessPath(keyOrder, p);
-
+        return getSPORelation().getAccessPath(keyOrder,p);
+        
     }
 
     /*
@@ -3637,12 +3639,24 @@ abstract public class AbstractTripleStore extends
                 && getIndexManager() instanceof IBigdataFederation) {
            
             /*
-             * We reading against a federation we use the READ_COMMITTED view in
-             * order to permit higher concurrency (writers will obtain a lock on
-             * the unisolated view, but readers will not block if they are
-             * reading from the read-committed view).
+             * Note: Use a read-only view for the data source(s) in order to
+             * permit higher concurrency (writers will obtain a lock on the
+             * unisolated view, but readers will not block if they are reading
+             * from the read-committed view).
+             * 
+             * Note: [READ_COMMITTED] ensures that we always see the results of
+             * (committed) writes, but index partition split/join/moves can
+             * cause locators to become stale so this is not recommended for
+             * mutation operations (including closure) for scale-out
+             * deployments.
+             * 
+             * Note: [lastCommitTime] gives us read-consistent semantics and is
+             * safe in the face of concurrent split/join/moves of index
+             * partitions during a mutation operation.
              */
-            
+
+//            readTimestamp = TimestampUtility.asHistoricalRead(getIndexManager()
+//                    .getLastCommitTime());
             readTimestamp = ITx.READ_COMMITTED;
 //            readTimestamp = getTimestamp();
             

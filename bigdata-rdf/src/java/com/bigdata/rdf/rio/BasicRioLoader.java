@@ -102,6 +102,8 @@ public class BasicRioLoader implements IRioLoader {
     
     final protected void notifyListeners() {
         
+        if(listeners==null) return;
+        
         RioLoaderEvent e = new RioLoaderEvent
             ( stmtsAdded,
               System.currentTimeMillis() - insertStart

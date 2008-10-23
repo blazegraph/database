@@ -74,6 +74,11 @@ public interface ITx {
      * very-long running read must be performed on the database. Since a
      * read-committed transaction does not allow writes, the commit and abort
      * protocols are identical.
+     * <p>
+     * However, split/join/move operations can cause locators to become invalid
+     * for read-committed (and unisolated) operations. For this reason, it is
+     * often better to specify "read-consistent" semantics by giving the
+     * lastCommitTime for the {@link IIndexStore}.
      * 
      * @todo define another constant for "read consistent" semantics. it would
      *       read from the last globally committed state consistently for each

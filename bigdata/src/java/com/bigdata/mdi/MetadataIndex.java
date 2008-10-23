@@ -160,8 +160,10 @@ public class MetadataIndex extends BTree implements IMetadataIndex {
                 managedIndexMetadata.getName(), indexUUID, managedIndexMetadata);
 
         /*
-         * Note: the metadata index should probably delete markers so that we
-         * can do compacting merges on it.
+         * @todo the metadata index should use probably delete markers so that
+         * we can do compacting merges on it, but that is really moot until we
+         * support overflow of the metadataService and partitioning of the
+         * metadata index.
          */
         
         metadata.setDeleteMarkers(true);

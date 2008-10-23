@@ -40,7 +40,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.Vector;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -229,51 +228,31 @@ import com.bigdata.util.InnerCause;
  *       {@link JoinTask} until all downstream {@link JoinTask}s complete.
  *       <p>
  * 
+ * @todo Closure computation by this class is not correct since the
+ *       {@link ProgramTask} is not correctly advancing the read-consistent
+ *       timestamp after writes / before reads, however it appears to do a fair
+ *       job at query.
+ * 
+ * @todo Slice should be enforced by the solution buffer for query. This change
+ *       could be made to the LTS/LDS case as well.
+ * 
+ * @todo We are not seeing the totals when a SLICE is used. I believe that the
+ *       test harness is simply exiting once it gets its N results and the
+ *       daemon threads for the workers are not keeping the JVM alive. Ideally
+ *       either the JoinMasterTask the last JoinTask would notice that the
+ *       solution buffer was closed and would use that information to halt the
+ *       ongoing {@link JoinTask}s.
+ * 
+ * @todo Support bns:search through a rule rewrite rather than an expander.
+ * 
+ * @todo move the locator scan out of the inner loop per the notes in the code.
+ * 
  * @todo Evaluate performance for a variant of this design for LTS and LDS.
  *       <p>
  *       The potential advantages of this approach for those cases are that it
  *       allows more concurrency in the processing of the different join
  *       dimensions and that it reorders the index scans within each join
  *       dimension in order to maximize the locality of index reads.
- * 
- * FIXME The triple store specifies READ_COMMITTED for closure operations when
- * using a federation. The rule execution logic needs to be changed to actually
- * advance the readTimestamp such that we use read-historical views for each
- * round of closure reading from the lastCommitTime for the federation (it
- * should also do this when evaluating a single rule mutation operation, even if
- * it is not to fixed point). Until this is fixed a split/join/move during a
- * mutation operation will cause the {@link JoinMasterTask} to fail.
- * 
- * FIXME The RDFJoinNexus needs to be modified to use this join technique when
- * {@link IBigdataFederation#isScaleOut()} is <code>true</code> (unless
- * optional or slice is being used until I work those out).
- * <p>
- * Work through with MikeP how this interacts with the owl:sameAs and free text
- * search "expanders".
- * <p>
- * I expect that owl:sameAs expansion will have to be modified to be a rewrite
- * of the rule in which each {@link IPredicate} is expanded into 3 predicates
- * with the appropriate anonymous variables since otherwise we will be in a
- * position where the index partition for the stated predicate is local but the
- * index partitions for the owl:sameAs expansion are distributed.
- * <p>
- * Free text search should probably be a foreign key join, but the key needs to
- * be tokenized by the search engine and it then runs the per-keyword searches
- * in parallel against the distributed indices. Its really quite a challenge to
- * do this where the search terms become bound in a join and then applied. The
- * easy way to handle this when the search terms are bound first is to generate
- * one rule per query result and then run those rules as a program.
- * 
- * FIXME {@link IPredicate} needs to be modified to accept an optional index
- * partition identifier. When provided,
- * {@link IJoinNexus#getTailRelationView(IPredicate)} and
- * {@link IJoinNexus#getTailAccessPath(IPredicate)} must both use the specified
- * index partition, rather than attempting to use the scale-out index view. The
- * {@link IJoinNexus} also needs to be able to deliver the name of the indices
- * that would be used by the {@link IJoinNexus#getTailAccessPath(IPredicate)} so
- * those indices may be declared. Of course, during execution the
- * {@link IJoinNexus} must be using the local {@link IIndexManager} rather than
- * the {@link IBigdataFederation} for this to succeed.
  */
 public class JoinMasterTask implements IStepTask, IJoinMaster {
 
@@ -303,10 +282,11 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
     protected final RuleStats ruleStats;
 
     /**
-     * Per join dimension statistics aggregated across the {@link JoinTask}s
-     * for each join dimension.
+     * Statistics on {@link JoinTask} behavior for each {@link IPredicate} in
+     * the tail of the rule. These statistics are reported by each
+     * {@link JoinTask} and then aggregated for each join dimension.
      * <p>
-     * Note: index is the evaluation order of the predicates.
+     * Note: The index into this array is the evaluation order of the predicate.
      */
     protected final JoinStats[] joinStats;
 
@@ -350,7 +330,9 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
 
         this.tailCount = rule.getTailCount();
 
-        if (!(joinNexus.getIndexManager() instanceof AbstractScaleOutFederation)) {
+        if (!(joinNexus.getIndexManager() instanceof IBigdataFederation)
+                || !(((IBigdataFederation) joinNexus.getIndexManager())
+                        .isScaleOut())) {
             
             /*
              * Either not running in a scale-out deployment or executed in a
@@ -382,11 +364,18 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
         this.ruleStats = joinNexus.getRuleStatisticsFactory().newInstance(rule,
                 ruleState.plan, ruleState.keyOrder);
 
-        this.joinStats = new JoinStats[tailCount - 1];
+        /*
+         * Note: Nothing will be reported got joinStats[0] since we do not
+         * run a JoinTask for the first access path.
+         */
+        {
+            this.joinStats = new JoinStats[tailCount];
 
-        for (int orderIndex = 0; orderIndex < tailCount - 1; orderIndex++) {
+            for (int orderIndex = 0; orderIndex < tailCount; orderIndex++) {
 
-            this.joinStats[orderIndex] = new JoinStats(orderIndex);
+                this.joinStats[orderIndex] = new JoinStats(orderIndex);
+
+            }
 
         }
 
@@ -395,6 +384,7 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
         
         if (joinNexus.getAction().isMutation()) {
 
+            solutionBuffer = null;
             solutionBufferProxy = null;
 
         } else {
@@ -404,11 +394,13 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
              * some API pain here for RMI IOExceptions.
              */
 
-            solutionBufferProxy = joinNexus.newQueryBuffer();
+            solutionBuffer = (BlockingBuffer<ISolution[]>)buffer;
+            solutionBufferProxy = solutionBuffer;
             
         }
 
     }
+    private final BlockingBuffer<ISolution[]> solutionBuffer;
     private final IBuffer<ISolution[]> solutionBufferProxy;
     private final IJoinMaster masterProxy;
 
@@ -489,6 +481,8 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
 
             } else {
 
+                log.error(t, t);
+                
                 // something else, something unexpected.
                 throw new RuntimeException(t);
 
@@ -498,15 +492,16 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
 
         ruleStats.elapsed += System.currentTimeMillis() - begin;
 
-        // aggregate statistics from each join dimension. 
-        combineJoinStats();
+        /*
+         * Aggregate statistics from each join dimension and log anything that
+         * is interesting.
+         */ 
         
-        if (INFO) {
+        combineJoinStats();
 
-            log.info("done:" + "\nruleState=" + ruleState + ruleStats);
-
-        }
-
+        if (DEBUG)
+            log.debug("Done");
+        
         return ruleStats;
 
     }
@@ -524,72 +519,109 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
      */
     final protected void apply() throws Exception {
         
-        // the initial bindings (might not be empty since constants can be bound).
-        final IBindingSet initialBindingSet = joinNexus.newBindingSet(rule);
-        
-        /*
-         * The first predicate in the evaluation order with the initial
-         * bindings applied.
-         */
-        final IPredicate predicate = rule.getTail(ruleState.order[0])
-                .asBound(initialBindingSet);
-
-        final AbstractScaleOutFederation fed = (AbstractScaleOutFederation) joinNexus
-                .getIndexManager();
-
-        // @todo might not work for some layered access paths.
-        final String scaleOutIndexName = joinNexus.getTailAccessPath(predicate)
-                .getIndex().getIndexMetadata().getName();
-        
-        final Iterator<PartitionLocator> itr = joinNexus.locatorScan(fed,
-                predicate);
-        
-        final List<Future> futures = new LinkedList<Future>();
-
-        while (itr.hasNext()) {
-
-            final PartitionLocator locator = itr.next();
-
-            final int partitionId = locator.getPartitionId();
-
-            // the join task will read from this buffer.
-            final BlockingBuffer<IBindingSet[]> buffer = new BlockingBuffer<IBindingSet[]>(
-                    1/* capacity */);
-
-            // add the initial binding set to the buffer.
-            buffer.add(new IBindingSet[] { initialBindingSet });
+        try {
 
             /*
-             * @todo JDS export buffer.iterator() or just send a serializable
-             * thick object since there is only a single binding set!
+             * The initial bindingSet.
+             * 
+             * Note: This bindingSet might not be empty since constants can be
+             * bound before the rule is evaluated.
              */
-            final IAsynchronousIterator<IBindingSet[]> sourceItr = buffer
-                    .iterator();
-            
-            final JoinTaskFactoryTask factoryTask = new JoinTaskFactoryTask(
-                    scaleOutIndexName, rule, joinNexus.getJoinNexusFactory(),
-                    ruleState.order, 0/* orderIndex */, partitionId,
-                    masterProxy, sourceItr);
-
-            final IDataService dataService = fed.getDataService(locator
-                    .getDataServices()[0]);
+            final IBindingSet initialBindingSet = joinNexus.newBindingSet(rule);
 
             /*
-             * Submit the join task. it will immediately begin to execute and
-             * will consume the [initialBindingSet].
+             * The first predicate in the evaluation order with the initial
+             * bindings applied.
              */
-            final Future f = dataService.submit(factoryTask);
+            final IPredicate predicate = rule.getTail(ruleState.order[0])
+                    .asBound(initialBindingSet);
+
+            final AbstractScaleOutFederation fed = (AbstractScaleOutFederation) joinNexus
+                    .getIndexManager();
+
+            // @todo might not work for some layered access paths.
+            final String scaleOutIndexName = joinNexus.getTailAccessPath(
+                    predicate).getIndex().getIndexMetadata().getName();
+
+            final Iterator<PartitionLocator> itr = joinNexus.locatorScan(fed,
+                    predicate);
+
+            final List<Future> futures = new LinkedList<Future>();
+
+            while (itr.hasNext()) {
+
+                final PartitionLocator locator = itr.next();
+
+                final int partitionId = locator.getPartitionId();
+
+                if (DEBUG)
+                    log.debug("Will submit JoinTask: partitionId="
+                            + partitionId);
+
+                // the join task will read from this buffer.
+                final BlockingBuffer<IBindingSet[]> buffer = new BlockingBuffer<IBindingSet[]>(
+                        1/* capacity */);
+
+                // add the initial binding set to the buffer.
+                buffer.add(new IBindingSet[] { initialBindingSet });
+
+                /*
+                 * Nothing more will be added to the buffer, but the iterator
+                 * will visit what is already in the buffer.
+                 */
+                buffer.close();
+
+                /*
+                 * @todo JDS export buffer.iterator() or just send a
+                 * serializable thick object since there is only a single
+                 * binding set!
+                 */
+                final IAsynchronousIterator<IBindingSet[]> sourceItr = buffer
+                        .iterator();
+
+                final JoinTaskFactoryTask factoryTask = new JoinTaskFactoryTask(
+                        scaleOutIndexName, rule, joinNexus
+                                .getJoinNexusFactory(), ruleState.order,
+                        0/* orderIndex */, partitionId, masterProxy, sourceItr);
+
+                final IDataService dataService = fed.getDataService(locator
+                        .getDataServices()[0]);
+
+                /*
+                 * Submit the JoinTask. It will begin to execute when it is
+                 * scheduled by the ConcurrencyManager. When it executes it will
+                 * consume the [initialBindingSet]. We wait on its future to
+                 * complete below.
+                 */
+                final Future f = dataService.submit(factoryTask);
+
+                /*
+                 * Add to the list of futures that we need to await.
+                 */
+                futures.add(f);
+
+            }
+
+            // await all futures.
+            awaitFutures(futures);
+
+        } finally {
 
             /*
-             * Add to the list of futures that we need to await.
+             * Note: We DO NOT want to close the solution buffer ourselves! This
+             * will prevent multiple rules writing on the same solution buffer.
              */
-            futures.add( f );
-            
+//            if (solutionBuffer != null) {
+//
+//                if (DEBUG)
+//                    log.debug("Closing solutionBuffer");
+//
+//                solutionBuffer.close();
+//
+//            }
+
         }
 
-        // await all futures.
-        awaitFutures(futures);
-        
     }
 
     /**
@@ -606,34 +638,69 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
     protected void awaitFutures(final List<Future> futures)
             throws InterruptedException, ExecutionException {
 
-        int ndone = 0;
-        
         final int size = futures.size();
 
+        if (DEBUG) {
+
+            log.debug("#futures="+size);
+
+        }
+        
+        int ndone = 0;
+        
         final Iterator<Future> itr = futures.iterator();
 
         while (itr.hasNext()) {
 
-            final Future f = itr.next();
+            /*
+             * Note: The Future of the JoinFactoryTask is the Future of the
+             * JoinTask.
+             */
 
-            f.get();
+            // future for the JoinTaskFactoryTask.
+            final Future factoryTaskFuture = itr.next();
+
+            if (DEBUG)
+                log.debug("Waiting for factoryTask");
+
+            // wait for the JoinTaskFactoryTask to finish.
+            final Future joinTaskFuture = (Future) factoryTaskFuture.get();
+
+            if (DEBUG)
+                log.debug("Waiting for joinTask");
+
+            // wait for the JoinTask to finish.
+            joinTaskFuture.get();
 
             ndone++;
             
-            if (INFO) {
+            if (DEBUG) {
 
-                log.info("ndone=" + ndone + " of " + size);
+                log.debug("ndone=" + ndone + " of " + size);
 
             }
             
         }
-
+        
+        if(DEBUG)
+            log.debug("All done: #futures="+size);
+        
     }
 
     /**
-     * Aggregates statistics from each join dimension onto {@link #ruleStats}.
+     * Aggregates statistics each {@link JoinTask} onto {@link #ruleStats}.
+     * There are N {@link JoinTask}s per {@link IPredicate} in the tail of the
+     * rule, where N is the #of index partitions on which we must read to
+     * evaluate the {@link IRule} for a given {@link IPredicate} in the tail (N
+     * is per {@link IPredicate}, not the same for each {@link IPredicate}).
      */
     protected void combineJoinStats() {
+        
+        if (solutionBuffer != null) {
+
+            ruleStats.solutionCount.addAndGet(solutionBuffer.getElementCount());
+
+        }
         
         for (int tailIndex = 0; tailIndex < tailCount; tailIndex++) {
 
@@ -643,6 +710,23 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
             
             ruleStats.elementCount[tailIndex] += o.elementCount;
             
+        }
+    
+        if(INFO) {
+            
+            log.info("\n" + ruleState);
+
+            log.info("\n" + ruleStats);
+            
+            /*
+             * Note: This provides more detail on this join algorithm than the
+             * RuleStats view, however the per-predicate pre-index partition
+             * details are not available since these data aggregate across all
+             * index partitions for a given tail predicate.
+             */
+            
+            log.info("\n"+JoinStats.toString(rule, ruleState.order, joinStats));
+        
         }
         
     }
@@ -655,10 +739,9 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
      */
     public void report(final JoinStats joinStats) {
 
-        if (INFO) {
+        if (DEBUG) {
 
-            log.info("joinStats: orderIndex=" + joinStats.orderIndex
-                    + ", partitionId=" + joinStats.partitionId);
+            log.debug("\n"+joinStats.toString());
             
         }
         
@@ -741,6 +824,13 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
         /**
          * The #of {@link IBindingSet}s written onto the next join dimension
          * (aka the #of solutions written iff this is the last join dimension).
+         * <p>
+         * Note: An {@link IBindingSet} can be written onto more than one index
+         * partition for the next join dimension, so one generated
+         * {@link IBindingSet} MAY result in N GTE ONE "binding sets out". This
+         * occurs when the {@link IAccessPath} required to read on the next
+         * {@link IPredicate} in the evaluation order spans more than one index
+         * partition.
          */
         public long bindingSetsOut;
 
@@ -805,6 +895,86 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
 
         }
 
+        public String toString() {
+            
+            final StringBuilder sb = new StringBuilder("JoinStats");
+            
+            sb.append("{ orderIndex="+orderIndex);
+            
+            sb.append(", partitionId="+partitionId);
+            
+            sb.append(", fanIn="+fanIn);
+            
+            sb.append(", fanOut="+fanOut);
+            
+            sb.append(", bindingSetChunksIn="+bindingSetChunksIn);
+            
+            sb.append(", bindingSetsIn="+bindingSetsIn);
+            
+            sb.append(", accessPathCount="+accessPathCount);
+            
+            sb.append(", chunkCount="+chunkCount);
+            
+            sb.append(", elementCount="+elementCount);
+            
+            sb.append(", bindingSetsOut="+bindingSetsOut);
+
+            sb.append(", bindingSetChunksOut="+bindingSetChunksOut);
+            
+            sb.append("}");
+            
+            return sb.toString();
+            
+        }
+
+        /**
+         * Formats the array of {@link JoinStats} into a CSV table view.
+         * 
+         * @param rule
+         *            The {@link IRule} whose {@link JoinStats} are being
+         *            reported.
+         * @param order
+         *            The execution order for the {@link IPredicate}s in the
+         *            tail of the <i>rule</i>.
+         * @param a
+         *            The {@link JoinStats}.
+         * 
+         * @return The table view.
+         */
+        public static StringBuilder toString(final IRule rule,
+                final int[] order, final JoinStats[] a) {
+            
+            final StringBuilder sb = new StringBuilder();
+            
+            sb.append("orderIndex, partitionId, fanIn, fanOut, bindingSetChunksIn, bindingSetsIn, accessPathCount, chunkCount, elementCount, bindingSetsOut, bindingSetChunksOut, tailIndex, tailPredicate");
+            
+            sb.append("\n");
+            
+            int i = 0;
+            for(JoinStats s : a) {
+
+                final int tailIndex = order[i++];
+                
+                sb.append(Integer.toString(s.orderIndex)+", ");
+                sb.append(Integer.toString(s.partitionId)+", ");
+                sb.append(Integer.toString(s.fanIn)+", ");
+                sb.append(Integer.toString(s.fanOut)+", ");
+                sb.append(Long.toString(s.bindingSetChunksIn)+", ");
+                sb.append(Long.toString(s.bindingSetsIn)+", ");
+                sb.append(Long.toString(s.accessPathCount)+", ");
+                sb.append(Long.toString(s.chunkCount)+", ");
+                sb.append(Long.toString(s.elementCount)+", ");
+                sb.append(Long.toString(s.bindingSetsOut)+", ");
+                sb.append(Long.toString(s.bindingSetChunksOut)+", ");
+                sb.append(Integer.toString(tailIndex)+", ");
+                sb.append(rule.getTail(tailIndex).toString().replace(",", "")+"\n");
+                
+            }
+            
+            return sb;
+            
+        }
+        
     }
 
     /**
@@ -815,6 +985,18 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
      * @version $Id$
      */
     public static class JoinTaskSink {
+
+        protected static final Logger log = Logger.getLogger(JoinTaskSink.class);
+
+        /**
+         * True iff the {@link #log} level is INFO or less.
+         */
+        protected static final boolean INFO = log.isInfoEnabled();
+
+        /**
+         * True iff the {@link #log} level is DEBUG or less.
+         */
+        protected static final boolean DEBUG = log.isDebugEnabled();
 
         /**
          * The future may be used to cancel or interrupt the downstream
@@ -842,8 +1024,17 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
             
             this.future = f;
             
+            if(DEBUG)
+                log.debug("sinkOrderIndex=" + sinkOrderIndex
+                        + ", sinkPartitionId=" + locator.getPartitionId());
+            
         }
 
+        /**
+         * The orderIndex for the sink {@link JoinTask}.
+         */
+        final int sinkOrderIndex;
+        
         /**
          * The index partition that is served by the sink.
          */
@@ -863,6 +1054,13 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
          */
         final BlockingBuffer<IBindingSet[]> blockingBuffer;
 
+        public String toString() {
+            
+            return "JoinSinkTask{ sinkOrderIndex=" + sinkOrderIndex
+                    + ", sinkPartitionId=" + locator.getPartitionId() + "}";
+            
+        }
+        
         /**
          * Setups up the local buffers for a downstream {@link JoinTask}.
          * <p>
@@ -874,11 +1072,11 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
          *            The federation.
          * @param locator
          *            The locator for the index partition.
-         * @param self
+         * @param sourceJoinTask
          *            The current join dimension.
          */
         public JoinTaskSink(final IBigdataFederation fed,
-                final PartitionLocator locator, final JoinTask self) {
+                final PartitionLocator locator, final JoinTask sourceJoinTask) {
 
             if (fed == null)
                 throw new IllegalArgumentException();
@@ -886,13 +1084,15 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
             if (locator == null)
                 throw new IllegalArgumentException();
             
-            if (self == null)
+            if (sourceJoinTask == null)
                 throw new IllegalArgumentException();
             
             this.locator = locator;
 
-            final IJoinNexus joinNexus = self.joinNexus;
+            final IJoinNexus joinNexus = sourceJoinTask.joinNexus;
 
+            this.sinkOrderIndex = sourceJoinTask.orderIndex + 1;
+            
             /*
              * The sink JoinTask will read from the asynchronous iterator
              * drawing on the [blockingBuffer]. When we first create the sink
@@ -930,12 +1130,46 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
      * partition.
      * <p>
      * This class is NOT serializable.
+     * <p>
+     * For a rule with 2 predicates, there will be two {@link JoinTask}s. The
+     * {@link #orderIndex} is ZERO (0) for the first {@link JoinTask} and ONE
+     * (1) for the second {@link JoinTask}. The first {@link JoinTask} will
+     * have a single initialBinding from the {@link JoinMasterTask} and will
+     * read on the {@link IAccessPath} for the first {@link IPredicate} in the
+     * evaluation {@link #order}. The second {@link JoinTask} will read chunks
+     * of {@link IBindingSet}s containing partial solutions from the first
+     * {@link JoinTask} and will obtain and read on an {@link IAccessPath} for
+     * the second predicate in the evaluation order for every partial solution.
+     * Since there are only two {@link IPredicate}s in the {@link IRule}, the
+     * second and last {@link JoinTask} will write on the {@link ISolution}
+     * buffer obtained from {@link JoinMasterTask#getSolutionBuffer()}. Each
+     * {@link JoinTask} will report its {@link JoinStats} to the master, which
+     * aggregates those statistics.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
+     * 
+     * @todo it may be worthwhile to allow the access paths to be consumed in
+     *       parallel. this could be handled by assigning each chunk of bindings
+     *       read from the source to a worker task with its own per-sink
+     *       unsynchronized buffer, which would then overflow onto the per-sink
+     *       synchronized buffer. this would let us use more threads for join
+     *       dimensions that had to test more binding sets.
      */
     static public class JoinTask extends AbstractTask {
 
+        static protected final Logger log = Logger.getLogger(JoinTask.class);
+
+        /**
+         * True iff the {@link #log} level is INFO or less.
+         */
+        static final protected boolean INFO = log.isInfoEnabled();
+
+        /**
+         * True iff the {@link #log} level is DEBUG or less.
+         */
+        static final protected boolean DEBUG = log.isDebugEnabled();
+        
         /** The rule that is being evaluated. */
         final IRule rule;
 
@@ -1054,6 +1288,8 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
 
             if (sink == null) {
 
+                final int nextOrderIndex = orderIndex + 1;
+
                 /*
                  * Allocate JoinTask on the target data service and obtain a
                  * sink reference for its future and buffers.
@@ -1062,8 +1298,8 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
                  * first join dimension.
                  */
 
-                if (INFO)
-                    log.info("Creating join task: orderIndex=" + orderIndex
+                if (DEBUG)
+                    log.debug("Creating join task: nextOrderIndex=" + nextOrderIndex
                             + ", indexName=" + nextScaleOutIndexName
                             + ", partitionId=" + locator.getPartitionId());
                 
@@ -1084,7 +1320,7 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
                     factoryFuture = dataService.submit(new JoinTaskFactoryTask(
                             nextScaleOutIndexName, rule, joinNexus
                                     .getJoinNexusFactory(), order,
-                            orderIndex + 1, locator.getPartitionId(),
+                            nextOrderIndex, locator.getPartitionId(),
                             masterProxy, sourceItr));
                     
                 } catch (IOException ex) {
@@ -1102,6 +1338,8 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
                 sink.setFuture( (Future) factoryFuture.get() );
                 
                 stats.fanOut++;
+                
+                sinkCache.put(locator, sink);
                
             }
 
@@ -1183,6 +1421,8 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
          */
         final protected int getTailIndex(int orderIndex) {
 
+            assert order != null;
+            
             final int tailIndex = order[orderIndex];
 
             assert orderIndex >= 0 && orderIndex < tailCount : "orderIndex="
@@ -1221,21 +1461,38 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
             super(concurrencyManager, joinNexus.getReadTimestamp(), DataService
                     .getIndexPartitionName(scaleOutIndexName, partitionId));
             
-            // @todo test args.
+            if (rule == null)
+                throw new IllegalArgumentException();
+            if (joinNexus == null)
+                throw new IllegalArgumentException();
+            final int tailCount = rule.getTailCount();
+            if (order == null)
+                throw new IllegalArgumentException();
+            if (order.length != tailCount)
+                throw new IllegalArgumentException();
+            if (orderIndex < 0 || orderIndex >= tailCount)
+                throw new IllegalArgumentException();
+            if (fed == null)
+                throw new IllegalArgumentException();
+            if (master == null)
+                throw new IllegalArgumentException();
+            if (src == null)
+                throw new IllegalArgumentException();
 
             this.rule = rule;
             this.partitionId = partitionId;
-            this.tailCount = rule.getTailCount();
+            this.tailCount = tailCount;
             this.orderIndex = orderIndex;
+            this.joinNexus = joinNexus;
+            this.order = order; // note: assign before using getTailIndex()
             this.tailIndex = getTailIndex(orderIndex);
             this.lastJoin = ((orderIndex + 1) == tailCount);
             this.predicate = rule.getTail(tailIndex);
-            this.joinNexus = joinNexus;
-            this.order = order;
             this.stats = new JoinStats(partitionId, orderIndex);
             this.fed = fed;
             this.masterProxy = master;
-            this.sources.add(src);
+
+            addSource( src );
             
             if (!lastJoin) {
 
@@ -1250,35 +1507,44 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
                 
             }
 
-            if (INFO) {
-                log.info("orderIndex=" + orderIndex + ", partitionId="
+            if (DEBUG)
+                log.debug("orderIndex=" + orderIndex + ", partitionId="
                         + partitionId);
-            }
 
         }
 
         public Object doTask() throws Exception {
 
-            if (INFO) {
-                log.info("orderIndex=" + orderIndex + ", partitionId="
+            if (DEBUG)
+                log.debug("orderIndex=" + orderIndex + ", partitionId="
                         + partitionId);
-            }
 
             try {
 
                 // until cancelled, interrupted, or all sources are exhausted.
                 while (true) {
-
+                    
                     // get a chunk from one or more sources.
                     final IBindingSet[] chunk = combineSourceChunks();
                     
                     if (chunk == null) {
 
                         // all sources are exhausted.
+                        
+                        if (DEBUG)
+                            log.debug("All source(s) exhausted: orderIndex="
+                                    + orderIndex + ", partitionId="
+                                    + partitionId);
+                        
                         break;
                         
                     }
 
+                    if (DEBUG)
+                        log.debug("Read chunk of bindings: chunkSize="
+                                + chunk.length + ", orderIndex=" + orderIndex
+                                + ", partitionId=" + partitionId);
+                    
                     // generate and reorded tasks for each source bindingset.
                     final AccessPathTask [] tasks = getAccessPathTasks(chunk);
                     
@@ -1287,7 +1553,7 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
                     
                     for(AccessPathTask task : tasks) {
                     
-                        if(task.equals(lastTask)) {
+                        if (lastTask != null && task.equals(lastTask)) {
                             
                             if (DEBUG)
                                 log.debug("Eliminated duplicate task");
@@ -1296,7 +1562,7 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
                             
                         }
                         
-                        // execute join for a source binding set.
+                        // execute join for a source bindingSet.
                         task.call();
                         
                         lastTask = task;
@@ -1310,7 +1576,11 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
                  * complete.
                  */
                 
-                closeBuffersAndAwaitSinks();
+                flushAndCloseBuffersAndAwaitSinks();
+                
+                if (DEBUG)
+                    log.debug("JoinTask done: orderIndex=" + orderIndex
+                            + ", partitionId=" + partitionId);
                 
                 return null;
 
@@ -1326,10 +1596,18 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
                  * proxy could return the #of solutions added so far so that we
                  * can halt each join task on the last join dimension in a
                  * relatively timely manner producing no more than one chunk too
-                 * many.
+                 * many (actually, it might not be that timely since some index
+                 * partitions might not produce any solutions; this suggests
+                 * that the master might need a fatter API than a Future so that
+                 * it can directly notify the JoinTasks for the first predicate
+                 * and they can propagate that notice downstream to their
+                 * sinks).
                  */
                 
                 cancelSinks();
+            
+                if (INFO)
+                    log.info(t,t);
                 
                 throw new RuntimeException(t);
                 
@@ -1341,6 +1619,22 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
 
         }
 
+        public void addSource(IAsynchronousIterator<IBindingSet[]> src) {
+            
+            if (src == null)
+                throw new IllegalArgumentException();
+            
+            sources.add(src);
+            
+            stats.fanIn++;
+
+            if (DEBUG)
+                log.debug("orderIndex=" + orderIndex + ", partitionId="
+                        + partitionId + ", fanIn=" + stats.fanIn + ", fanOut="
+                        + stats.fanOut);
+            
+        }
+        
         /**
          * Returns a chunk of {@link IBindingSet}s by combining chunks from the
          * various source {@link JoinTask}s.
@@ -1350,8 +1644,12 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
          */
         protected IBindingSet[] combineSourceChunks() {
 
-            // #of elements in the combined chunk.
-            int nbindings = 0;
+            if(DEBUG)
+                log.debug("Reading chunk of bindings from source(s): orderIndex="
+                                + orderIndex + ", partitionId=" + partitionId);
+            
+            // #of elements in the combined chunk(s)
+            int bindingSetCount = 0;
 
             // source chunks read so far.
             final List<IBindingSet[]> chunks = new LinkedList<IBindingSet[]>();
@@ -1359,36 +1657,73 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
             /*
              * Assemble a chunk of suitable size
              * 
-             * @todo don't wait too long.
+             * @todo don't wait too long. if we have some data then it is
+             * probably better to process that data rather than waiting beyond a
+             * timeout for a full chunk. also, make sure that we are neither
+             * yielding nor spinning too long in this loop. However, the loop
+             * must wait if there is nothing available and the sources are not
+             * yet exhausted.
              * 
              * @todo we need a different capacity here than the one used for
-             * batch index operations.  on the order of 100 works well.
+             * batch index operations. on the order of 100 should work well.
              */
-            final int chunkCapacity = 100;// joinNexus.getChunkCapacity();
-            while (nbindings < chunkCapacity) {
 
+            final int chunkCapacity = 100;// joinNexus.getChunkCapacity();
+
+            final int nsources = sources.size();
+
+            while (nsources > 0 && bindingSetCount < chunkCapacity) {
+
+                if (DEBUG)
+                    log.debug("Testing " + nsources + " sources: orderIndex="
+                            + orderIndex + ", partitionId=" + partitionId);
+                
                 // clone to avoid concurrent modification of sources during traversal.
-                final IAsynchronousIterator<IBindingSet[]>[] sources = (IAsynchronousIterator<IBindingSet[]>[]) this.sources
-                        .toArray();
+                final IAsynchronousIterator<IBindingSet[]>[] sources = 
+                    (IAsynchronousIterator<IBindingSet[]>[]) this.sources.toArray(new IAsynchronousIterator[]{});
 
                 // #of sources that are exhausted.
                 int nexhausted = 0;
-                
-                for (IAsynchronousIterator<IBindingSet[]> src : sources) {
+
+                for (int i = 0; i < sources.length; i++) {
+
+                    if (DEBUG)
+                        log.debug("Testing sources[" + i + "]: nsources="
+                                + nsources + ", bindingSetCount="
+                                + bindingSetCount + ", nexhausted="
+                                + nexhausted);
+
+                    final IAsynchronousIterator<IBindingSet[]> src = sources[i];
 
                     // if there is something read on that source.
                     if (src.hasNext(1L, TimeUnit.MILLISECONDS)) {
+
+                        if (DEBUG)
+                            log.debug("Reading chunk from source: sources[" + i
+                                    + "], orderIndex=" + orderIndex
+                                    + ", partitionId=" + partitionId);
 
                         // read the chunk.
                         final IBindingSet[] chunk = src.next();
 
                         chunks.add(chunk);
-                        
-                    } else if(src.isExhausted()) {
-                        
+
+                        bindingSetCount += chunk.length;
+
+                        if (DEBUG)
+                            log.debug("Read chunk from source: sources[" + i
+                                    + "], chunkSize=" + chunk.length
+                                    + ", orderIndex=" + orderIndex
+                                    + ", partitionId=" + partitionId);
+
+                    } else if (src.isExhausted()) {
+
                         nexhausted++;
 
-                        // no longer consider an exhausted source.
+                        if (DEBUG)
+                            log.debug("Source is exhausted: nexhausted="+nexhausted);
+                        
+                        // no longer consider an exhausted source : @todo define src.equals()?
                         this.sources.remove(src);
                         
                     }
@@ -1412,9 +1747,9 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
              * Combine the chunks.
              */
 
-            final int nchunks = chunks.size();
+            final int chunkCount = chunks.size();
 
-            if( nchunks == 0) {
+            if( chunkCount == 0) {
                 
                 /*
                  * Termination condition: we did not get any data from any
@@ -1424,8 +1759,8 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
                  * logic above.
                  */
 
-                if (INFO)
-                    log.info("Done: orderIndex=" + orderIndex
+                if (DEBUG)
+                    log.debug("Sources are exhausted: orderIndex=" + orderIndex
                             + ", partitionId=" + partitionId);
                 
                 return null;
@@ -1434,7 +1769,7 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
 
             final IBindingSet[] chunk;
 
-            if (nchunks == 1) {
+            if (chunkCount == 1) {
 
                 // Only one chunk is available.
 
@@ -1444,7 +1779,7 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
 
                 // Combine 2 or more chunks.
 
-                chunk = new IBindingSet[nbindings];
+                chunk = new IBindingSet[bindingSetCount];
 
                 final Iterator<IBindingSet[]> itr = chunks.iterator();
 
@@ -1464,11 +1799,14 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
             
             if(DEBUG) {
             
-                log.debug("Read chunk(s): nchunks=" + nchunks
+                log.debug("Read chunk(s): nchunks=" + chunkCount
                         + ", #bindingSets=" + chunk.length + ", orderIndex="
                         + orderIndex + ", partitionId=" + partitionId);
             }
 
+            stats.bindingSetChunksIn += chunkCount;
+            stats.bindingSetsIn += bindingSetCount;
+            
             return chunk;
 
         }
@@ -1483,8 +1821,13 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
          * @throws InterruptedException
          *             if interrupted while awaiting the future for a sink.
          */
-        protected void closeBuffersAndAwaitSinks() throws InterruptedException {
+        protected void flushAndCloseBuffersAndAwaitSinks()
+                throws InterruptedException, ExecutionException {
 
+            if (DEBUG)
+                log.debug("orderIndex=" + orderIndex + ", partitionId="
+                        + partitionId+", sinkCount="+sinkCache.size());
+            
             // close all sinks.
             {
 
@@ -1495,6 +1838,24 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
 
                     final JoinTaskSink sink = itr.next();
 
+                    if (DEBUG)
+                        log.debug("Closing sink: sink=" + sink
+                                + ", unsyncBufferSize="
+                                + sink.unsyncBuffer.size()
+                                + ", blockingBufferSize="
+                                + sink.blockingBuffer.size());
+                    
+                    // flush to the blockingBuffer.
+                    if(!sink.unsyncBuffer.isEmpty()) {
+
+                        sink.unsyncBuffer.flush();
+                        
+                        // another chunk out for this sink.
+                        stats.bindingSetChunksOut++;
+                        
+                    }
+                    
+                    // close the blockingBuffer.
                     sink.blockingBuffer.close();
 
                 }
@@ -1513,27 +1874,18 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
 
                     final Future f = sink.future;
 
-//                    if (!f.isDone()) {
-
-                        try {
-
-                            f.get();
-
-                        } catch (ExecutionException ex) {
-
-                            // ignore.
-
-                        } catch (CancellationException ex) {
-
-                            // ignore.
-
-                        }
-
-//                    }
+                    if (DEBUG)
+                        log.debug("Waiting for Future: sink=" + sink);
+                    
+                    f.get();
 
                 }
 
             }
+
+            if (DEBUG)
+                log.debug("Done: orderIndex=" + orderIndex + ", partitionId="
+                        + partitionId + ", sinkCount=" + sinkCache.size());
 
         }
 
@@ -1542,6 +1894,10 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
          * {@link JoinTask}.
          */
         protected void cancelSinks() {
+
+            if (DEBUG)
+                log.debug("orderIndex=" + orderIndex + ", partitionId="
+                        + partitionId + ", sinkCount=" + sinkCache.size());
 
             final Iterator<JoinTaskSink> itr = sinkCache.values().iterator();
 
@@ -1553,6 +1909,10 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
                 
             }
             
+            if (DEBUG)
+                log.debug("Done: orderIndex=" + orderIndex + ", partitionId="
+                        + partitionId + ", sinkCount=" + sinkCache.size());
+
         }
 
         /**
@@ -1572,12 +1932,16 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
          * 
          * @throws Exception
          */
-        protected AccessPathTask[] getAccessPathTasks(IBindingSet[] chunk) { 
+        protected AccessPathTask[] getAccessPathTasks(final IBindingSet[] chunk) { 
 
+            if(DEBUG)
+                log.debug("chunkSize="+chunk.length);
+            
             final AccessPathTask[] tasks = new AccessPathTask[chunk.length];
             
-            int i = 0;
-            for (IBindingSet bindingSet : chunk) {
+            for(int i = 0; i<chunk.length; i++) {
+            
+                final IBindingSet bindingSet = chunk[i];
 
                 tasks[i] = new AccessPathTask(bindingSet);
 
@@ -1611,42 +1975,27 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
 
             final int tailIndex = getTailIndex(orderIndex);
 
+            // constrain the predicate to the desired index partition.
             final IPredicate predicate = rule.getTail(tailIndex).asBound(
-                    bindingSet);
+                    bindingSet).setPartitionId(partitionId);
 
-            if (true) {
+            /*
+             * Note: this needs to obtain the access path for the local index
+             * partition. We handle this by (a) constraining the predicate to
+             * the desired index partition; (b) using an IJoinNexus that is
+             * initialized once the JoinTask starts to execute inside of the
+             * ConcurrencyManager; (c) declaring; and (d) using the index
+             * partition name NOT the scale-out index.
+             */
 
-                /*
-                 * FIXME this needs to obtain the access path for the local
-                 * index partition.
-                 * 
-                 * It not only needs to be using a joinNexus that is initialized
-                 * once the JoinTask starts to execute inside of the
-                 * ConcurrencyManager, but it also needs to declare (we do) and
-                 * use (that's the problem) the index partition name NOT the
-                 * scale-out index (which is what getTailAccessPath() is doing).
-                 * 
-                 * The selection of the access path is made by the IRelation.
-                 * Perhaps we need to add the [partitionId] to the predicate,
-                 * use [-1] when the scale-out access path view is desired and
-                 * the the local index name when the partitionId is specified?
-                 */
-
-                throw new UnsupportedOperationException();
-                
-            }
-            
             final IAccessPath accessPath = joinNexus
                     .getTailAccessPath(predicate);
 
-            if (DEBUG) {
-
+            if (DEBUG) 
                 log.debug("orderIndex=" + orderIndex + ", tailIndex="
                         + tailIndex + ", tail=" + rule.getTail(tailIndex)
                         + ", bindingSet=" + bindingSet + ", accessPath="
                         + accessPath);
-
-            }
 
             return accessPath;
 
@@ -1707,8 +2056,14 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
              * @param bindingSet
              *            The bindings from the prior join(s) (if any).
              */
-            public AccessPathTask(IBindingSet bindingSet) {
+            public AccessPathTask(final IBindingSet bindingSet) {
 
+                if (bindingSet == null)
+                    throw new IllegalArgumentException();
+                
+                if(DEBUG)
+                    log.debug("bindingSet="+bindingSet);
+                
                 this.bindingSet = bindingSet;
 
                 this.accessPath = getAccessPath(orderIndex, bindingSet);
@@ -1720,9 +2075,11 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
              */
             public Object call() throws Exception {
 
+                stats.accessPathCount++;
+                
                 // Obtain the iterator for the current join dimension.
                 final IChunkedOrderedIterator itr = accessPath.iterator();
-
+                
                 try {
 
                     while (itr.hasNext()) {
@@ -1732,7 +2089,7 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
                         stats.chunkCount++;
 
                         // process the chunk.
-                        new ChunkTask(bindingSet, chunk).run();
+                        new ChunkTask(bindingSet, chunk).call();
 
                     } // while
                     
@@ -1774,7 +2131,7 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
          *         Thompson</a>
          * @version $Id$
          */
-        class ChunkTask implements Runnable {
+        class ChunkTask implements Callable {
 
             /**
              * The index of the predicate for the access path that is being
@@ -1829,16 +2186,12 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
 
             }
 
-            public void run() {
+            public Object call() throws Exception {
 
                 for (Object e : chunk) {
 
-                    if (DEBUG) {
-                        log.debug("Considering: " + e.toString()
-                                + ", tailIndex=" + orderIndex + ", rule="
-                                + rule.getName());
-                    }
-
+                    boolean ok = false;
+                    
                     stats.elementCount++;
 
                     // clone the binding set.
@@ -1850,45 +2203,44 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
                         // accept this binding set.
                         accepted[naccepted++] = bset;
 
+                        ok = true;
+                        
                     }
 
+                    if (DEBUG)
+                        log.debug((ok ? "Accepted" : "Rejected") + ": "
+                                + e.toString() + ", orderIndex=" + orderIndex
+                                + ", lastJoin=" + lastJoin + ", rule="
+                                + rule.getName());
                 }
 
-                if (lastJoin) {
+                if (naccepted > 0) {
+                 
+                    if (lastJoin) {
 
-                    /*
-                     * Generate solutions for accepted binding sets and flush
-                     * them to the solution buffer for the rule evaluation as a
-                     * whole.
-                     */
+                        /*
+                         * Generate solutions for accepted binding sets and
+                         * flush them to the solution buffer for the rule
+                         * evaluation as a whole.
+                         */
 
-                    flushToSolutionBuffer();
+                        flushToSolutionBuffer();
 
-                } else {
+                    } else {
 
-                    /*
-                     * Identify the target JoinTask for each binding set and add
-                     * the binding set to the JoinTaskSink for that JoinTask.
-                     */
+                        /*
+                         * Identify the target JoinTask for each binding set and
+                         * add the binding set to the JoinTaskSink for that
+                         * JoinTask.
+                         */
 
-                    try {
-                        
                         flushToJoinTaskSinks();
-                        
-                    } catch (InterruptedException ex) {
-                        
-                        if (INFO)
-                            log.info("Interrupted: " + ex);
-                        
-                    } catch (ExecutionException ex) {
 
-                        log.error(ex);
-                        
-                        throw new RuntimeException(ex);
-                        
                     }
 
                 }
+                
+                return null;
 
             }
 
@@ -1899,11 +2251,11 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
              * gives us nice sized chunks in the
              * {@link UnsynchronizedArrayBuffer}. The
              * {@link UnsynchronizedArrayBuffer} will overflow onto the
-             * {@link ISolution} buffer for the rule. For query, that will be an
-             * (exported proxy for) the {@link IJoinNexus#newQueryBuffer()}
-             * created by the {@link JoinMasterTask}. For mutation, that will
-             * be a buffer created for the {@link JoinTask} instance (this
-             * avoids have all data for mutation flow through the master).
+             * {@link ISolution} buffer for the rule. For query, that will be a
+             * (proxy for) the {@link IJoinNexus#newQueryBuffer()} created by
+             * the {@link JoinMasterTask}. For mutation, that will be a buffer
+             * created for the {@link JoinTask} instance (this avoids have all
+             * data for mutation flow through the master).
              */
             protected void flushToSolutionBuffer() {
 
@@ -1911,6 +2263,9 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
                         getSolutionBuffer(), naccepted);
 
                 for (int i = 0; i < naccepted; i++) {
+
+                    // an accepted binding set.
+                    final IBindingSet bindingSet = accepted[i];
 
                     final ISolution solution = joinNexus.newSolution(rule,
                             bindingSet);
@@ -1928,9 +2283,9 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
 
             /**
              * Add each accepted {@link IBindingSet} to the input buffer for the
-             * {@link JoinTaskSink}(s) target index partition(s) for the
-             * {@link IAccessPath} that the downstream {@link JoinTask}(s) will
-             * use to process those bindings.
+             * {@link JoinTaskSink}(s) for the target index partition(s) for
+             * the {@link IAccessPath} which the downstream {@link JoinTask}(s)
+             * will use to join those bindings.
              * <p>
              * Note: The caller is assumed to be single-threaded!
              * 
@@ -1940,8 +2295,12 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
             protected void flushToJoinTaskSinks() throws InterruptedException,
                     ExecutionException {
 
+                int bindingSetsOut = 0;
+                
+                final int nextOrderIndex = orderIndex + 1;
+                
                 // the tailIndex of the next predicate to be evaluated.
-                final int nextTailIndex = getTailIndex(orderIndex + 1);
+                final int nextTailIndex = getTailIndex(nextOrderIndex);
 
                 // the next predicate to be evaluated.
                 final IPredicate nextPred = rule.getTail(nextTailIndex);
@@ -1951,7 +2310,33 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
                     // an accepted binding set.
                     final IBindingSet bindingSet = accepted[i];
 
-                    // locator scan for the index partitions for that predicate as bound.
+                    /*
+                     * Locator scan for the index partitions for that predicate
+                     * as bound.
+                     * 
+                     * FIXME Try to raise this out of the loop. failing that,
+                     * caching here will be extremely important. Luckily we
+                     * always use a read-consistent view for the join evaluation
+                     * so we are permitted to cache the locators just as much as
+                     * we like.
+                     * 
+                     * One way to move this out of the loop is to make the
+                     * unsync buffer per (thread) running an access path. When
+                     * that buffer gets full, we can generate the asBound()
+                     * predicates, SORT them by their [fromKey] (or its
+                     * predicate level equivalence), and process the sorted
+                     * asBound predicates. Since they are sorted and since they
+                     * are all for the same predicate pattern (not necessarily
+                     * true for optionals) we know that the first partitionId is
+                     * GE to the last partitionId of the last asBound predicate.
+                     * We can test the rightSeparatorKey on the PartitionLocator
+                     * and immediately determine whether the asBound predicate
+                     * in fact starts and (and possibly ends) within the same
+                     * index partition. We only need to do a locatorScan when
+                     * the asBound predicate actually crosses into the next
+                     * index partition, which could also be handled by an
+                     * MDI#find(key).
+                     */
                     final Iterator<PartitionLocator> itr = joinNexus
                             .locatorScan(fed, nextPred.asBound(bindingSet));
 
@@ -1959,14 +2344,32 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
 
                         final PartitionLocator locator = itr.next();
 
+                        if (DEBUG)
+                            log.debug("adding bindingSet to buffer: nextOrderIndex="
+                                            + nextOrderIndex
+                                            + ", partitionId="
+                                            + locator.getPartitionId()
+                                            + ", bindingSet=" + bindingSet);                        
+                        
+                        // obtain sink JoinTask from cache or dataService. 
+                        final JoinTaskSink sink = getSink(locator);
+                        
                         // add binding set to the sink.
-                        getSink(locator).unsyncBuffer.add(bindingSet);
+                        if(sink.unsyncBuffer.add2(bindingSet)) {
+                            
+                            // another chunk out to this sink.
+                            stats.bindingSetChunksOut++;
+                            
+                        }
 
+                        // #of bindingSets out across all sinks for this join task.
+                        bindingSetsOut++;
+                        
                     }
 
                 }
 
-                stats.bindingSetsOut += naccepted;
+                stats.bindingSetsOut += bindingSetsOut;
 
             }
 
@@ -1993,6 +2396,9 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
      * or errors it must make sure that the entry is removed from the session.
      * This could also interupt/cancel the remaining {@link JoinTask}s for the
      * same {masterInstance}, but we are already doing that in a different way.
+     * <p>
+     * This should not be a problem for a single index partition since fan-in ==
+     * fan-out == 1, but it will be a problem for larger fan-in/outs.
      */
     public static class JoinTaskFactoryTask implements Callable<Future>,
             IDataServiceAwareProcedure, Serializable {
@@ -2002,6 +2408,18 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
          */
         private static final long serialVersionUID = -2637166803787195001L;
         
+        protected static final Logger log = Logger.getLogger(JoinTaskFactoryTask.class);
+
+        /**
+         * True iff the {@link #log} level is INFO or less.
+         */
+        protected static final boolean INFO = log.isInfoEnabled();
+
+        /**
+         * True iff the {@link #log} level is DEBUG or less.
+         */
+        protected static final boolean DEBUG = log.isDebugEnabled();
+
         final String scaleOutIndexName;
         
         final IRule rule;
@@ -2055,7 +2473,24 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
                 final IJoinMaster masterProxy,
                 final IAsynchronousIterator<IBindingSet[]> sourceItrProxy) {
             
-            //@todo check args.
+            if (scaleOutIndexName == null)
+                throw new IllegalArgumentException();
+            if (rule == null)
+                throw new IllegalArgumentException();
+            final int tailCount = rule.getTailCount();
+            if (joinNexusFactory == null)
+                throw new IllegalArgumentException();
+            if (order == null)
+                throw new IllegalArgumentException();
+            if (order.length != tailCount)
+                throw new IllegalArgumentException();
+            if (orderIndex < 0 || orderIndex >= tailCount)
+                throw new IllegalArgumentException();
+            if (partitionId < 0)
+                throw new IllegalArgumentException();
+            if (sourceItrProxy == null)
+                throw new IllegalArgumentException();
+
             this.scaleOutIndexName = scaleOutIndexName;
             this.rule = rule;
             this.joinNexusFactory = joinNexusFactory;
@@ -2079,6 +2514,11 @@ public class JoinMasterTask implements IStepTask, IJoinMaster {
                     .getConcurrencyManager(), scaleOutIndexName, rule,
                     joinNexusFactory.newInstance(fed), order, orderIndex,
                     partitionId, fed, masterProxy, sourceItrProxy);
+
+            if (DEBUG) // @todo new vs locating existing JoinTask in session.
+                log.debug("Submitting new JoinTask: orderIndex=" + orderIndex
+                        + ", partitionId=" + partitionId + ", indexName="
+                        + scaleOutIndexName);
 
             final Future f = dataService.getConcurrencyManager().submit(task);
 

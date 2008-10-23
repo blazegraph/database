@@ -323,6 +323,40 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         
     }
     
+    /**
+     * The #of chunks {@link #add(Object)ed} to the buffer. This will be ZERO
+     * unless the generic type of the buffer is an array type.
+     */
+    private long chunkCount = 0L;
+
+    /**
+     * The #of chunks {@link #add(Object)ed} to the buffer. This will be ZERO
+     * unless the generic type of the buffer is an array type.
+     */
+    public long getChunkCount() {
+        
+        return chunkCount;
+        
+    }
+
+    /**
+     * The #of elements {@link #add(Object)ed} to the buffer. When the generic
+     * type of the buffer is an array type, this will be the sum of the length
+     * of the arrays {@link #add(Object)ed} to the buffer.
+     */
+    private long elementCount = 0L;
+
+    /**
+     * The #of elements {@link #add(Object)ed} to the buffer. When the generic
+     * type of the buffer is an array type, this will be the sum of the length
+     * of the arrays {@link #add(Object)ed} to the buffer.
+     */
+    public long getElementCount() {
+        
+        return elementCount;
+        
+    }
+
     public void add(E e) {
 
         assertOpen();
@@ -373,6 +407,16 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             
             // item now on the queue.
 
+            if(e.getClass().getComponentType() != null) {
+                
+                chunkCount++;
+                elementCount += ((Object[]) e).length;
+                
+            } else {
+                
+                elementCount++;
+                
+            }
             if (DEBUG)
                 log.debug("added: " + e.toString());
             
@@ -463,12 +507,12 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         private E nextE = null;
 
         /**
-         * The #of chunks delivered so far.
+         * The #of chunks read so far.
          */
         private long nchunks = 0L;
         
         /**
-         * The #of elements delivered so far.
+         * The #of elements read so far.
          */
         private long nelements = 0L;
         
@@ -675,11 +719,12 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
              * more elements in the queue.
              */
             int ntries = 0;
-            // initial delay before the 1st log message.
-            long initialLogDelay = 250;
+            // the timeout until the next log message.
+            long logTimeout = 2000;
             // maximum delay between log messages (NOT the wait time).
             final long maxLogDelay = 10000;
-            while (BlockingBuffer.this.open || nextE != null
+            // note: tests are in order of _speed_ (isEmpty acquires a lock)
+            while (nextE != null || BlockingBuffer.this.open
                     || !queue.isEmpty()) {
 
                 /*
@@ -736,9 +781,17 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                      * sleep() here then ANY timeout can introduce an
                      * unacceptable latency since many queries can be evaluated
                      * in LT 10ms !
+                     * 
+                     * Note: Even with poll(timeout,unit), a modest timeout will
+                     * result in the thread yielding and a drammatic performance
+                     * hit. We are better off using a short timeout so that we
+                     * can continue to test the other conditions, specifically
+                     * whether the buffer was closed asynchronously. Otherwise a
+                     * client that writes nothing on the buffer will wind up
+                     * hitting the timeout inside of poll(timeout,unit).
                      */
 
-                    if ((nextE = queue.poll(initialLogDelay, TimeUnit.MILLISECONDS)) != null) {
+                    if ((nextE = queue.poll(1L, TimeUnit.MILLISECONDS)) != null) {
                         
                         if (DEBUG)
                             log.debug("next: " + nextE);
@@ -763,23 +816,24 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                  * Nothing available yet on the queue.
                  */
 
-                // increase the timeout.
-                initialLogDelay = Math.min(maxLogDelay, initialLogDelay *= 2);
-
                 ntries++;
-
-                /*
-                 * This could be a variety of things such as waiting on a mutex
-                 * that is already held, e.g., an index lock, that results in a
-                 * deadlock between the process writing on the buffer and the
-                 * process reading from the buffer. If you are careful with who
-                 * gets the unisolated view then this should not be a problem.
-                 */
-
+                
                 final long elapsed = TimeUnit.MILLISECONDS.convert(
                         (now - begin), TimeUnit.NANOSECONDS);
 
-                if (elapsed > 2000/* ms */) {
+                if (elapsed > logTimeout) {
+
+                    /*
+                     * This could be a variety of things such as waiting on a
+                     * mutex that is already held, e.g., an index lock, that
+                     * results in a deadlock between the process writing on the
+                     * buffer and the process reading from the buffer. If you
+                     * are careful with who gets the unisolated view then this
+                     * should not be a problem.
+                     */
+
+                    // increase timeout until the next log message.
+                    logTimeout = Math.min(maxLogDelay, logTimeout *= 2);
 
                     if (future == null) {
 
@@ -802,7 +856,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                     }
 
                 }
-
+                
                 // loop again.
                 continue;
                 
@@ -908,7 +962,16 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
             nextE = null;
             
-            nelements++;
+            if(e.getClass().getComponentType() != null) {
+
+                nchunks++;
+                nelements+= ((Object[])e).length;
+                
+            } else {
+                
+                nelements++;
+                
+            }
             
             return e;
 

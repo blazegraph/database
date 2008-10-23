@@ -31,6 +31,7 @@ package com.bigdata.relation.rule.eval;
 import java.io.Serializable;
 
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IIndexStore;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.service.DataService;
@@ -61,6 +62,13 @@ public interface IJoinNexusFactory extends Serializable {
      * The timestamp for the read view of the relation(s).
      */
     long getReadTimestamp();
+    
+    /**
+     * Used by fix point closure operations to advance the read timestamp to the
+     * {@link IIndexStore#getLastCommitTime()} at the start of each round of
+     * closure.
+     */
+    void setReadTimestamp(long readTimestamp);
     
     /**
      * Singleton factory for an {@link IJoinNexus} instance for the given

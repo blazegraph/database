@@ -75,8 +75,9 @@ abstract public class AbstractResource<E> implements IMutableResource<E>{
     /**
      * 
      */
-    protected AbstractResource(IIndexManager indexManager, String namespace,
-            Long timestamp, Properties properties) {
+    protected AbstractResource(final IIndexManager indexManager,
+            final String namespace, final Long timestamp,
+            final Properties properties) {
 
         if (indexManager == null)
             throw new IllegalArgumentException();
@@ -125,7 +126,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E>{
         
     }
 
-    public String getContainerNamespace() {
+    public final String getContainerNamespace() {
         
         return containerNamespace;
         
@@ -146,7 +147,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E>{
 
                     if (getContainerNamespace() != null) {
 
-                        if (log.isInfoEnabled()) {
+                        if (INFO) {
 
                             log.info("resolving container: "
                                     + getContainerNamespace());

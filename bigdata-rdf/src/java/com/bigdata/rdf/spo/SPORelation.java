@@ -133,8 +133,9 @@ public class SPORelation extends AbstractRelation<ISPO> {
     
     private final Set<String> indexNames;
     
-    public SPORelation(IIndexManager indexManager,
-            String namespace, Long timestamp, Properties properties) {
+    public SPORelation(final IIndexManager indexManager,
+            final String namespace, final Long timestamp,
+            final Properties properties) {
 
         super(indexManager, namespace, timestamp, properties);
 
@@ -702,7 +703,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
      */
     @SuppressWarnings("unchecked")
     public IAccessPath<ISPO> getAccessPath(final long s, final long p,
-            final long o, IElementFilter<ISPO> filter) {
+            final long o, final IElementFilter<ISPO> filter) {
 
         final IVariableOrConstant<Long> S = (s == NULL ? Var.var("s")
                 : new Constant<Long>(s));
@@ -714,7 +715,13 @@ public class SPORelation extends AbstractRelation<ISPO> {
                 : new Constant<Long>(o));
         
         return getAccessPath(new SPOPredicate(new String[] { getNamespace() },
-                S, P, O, null/* context */, false/* optional */, filter, null/* expander */));
+                -1, // partitionId
+                S, P, O,
+                null, // context
+                false, // optional
+                filter,//
+                null // expander
+                ));
         
     }
 
@@ -780,47 +787,10 @@ public class SPORelation extends AbstractRelation<ISPO> {
      */
     final private SPOAccessPath _getAccessPath(final IPredicate<ISPO> predicate) {
 
-        final long s = predicate.get(0).isVar() ? NULL : (Long) predicate.get(0).get();
-        final long p = predicate.get(1).isVar() ? NULL : (Long) predicate.get(1).get();
-        final long o = predicate.get(2).isVar() ? NULL : (Long) predicate.get(2).get();
-        // Note: Context is ignored!
-
-        final SPOAccessPath accessPath;
-
-        if (s != NULL && p != NULL && o != NULL) {
-
-            accessPath = getAccessPath(SPOKeyOrder.SPO, predicate);
-
-        } else if (s != NULL && p != NULL) {
-
-            accessPath = getAccessPath(SPOKeyOrder.SPO, predicate);
-
-        } else if (s != NULL && o != NULL) {
-
-            accessPath = getAccessPath(SPOKeyOrder.OSP, predicate);
-
-        } else if (p != NULL && o != NULL) {
-
-            accessPath = getAccessPath(SPOKeyOrder.POS, predicate);
-
-        } else if (s != NULL) {
-
-            accessPath = getAccessPath(SPOKeyOrder.SPO, predicate);
-
-        } else if (p != NULL) {
-
-            accessPath = getAccessPath(SPOKeyOrder.POS, predicate);
-
-        } else if (o != NULL) {
-
-            accessPath = getAccessPath(SPOKeyOrder.OSP, predicate);
-
-        } else {
-
-            accessPath = getAccessPath(SPOKeyOrder.SPO, predicate);
-
-        }
+        final SPOKeyOrder keyOrder = getKeyOrder(predicate);
         
+        final SPOAccessPath accessPath = getAccessPath(keyOrder, predicate);
+
         if (DEBUG)
             log.debug(accessPath.toString());
 
@@ -829,9 +799,62 @@ public class SPORelation extends AbstractRelation<ISPO> {
         return accessPath;
 
     }
+
+    /**
+     * Return the {@link SPOKeyOrder} for the given predicate.
+     * 
+     * @param predicate
+     *            The predicate.
+     *            
+     * @return The {@link SPOKeyOrder}
+     */
+    static public SPOKeyOrder getKeyOrder(final IPredicate<ISPO> predicate) {
+
+        final long s = predicate.get(0).isVar() ? NULL : (Long) predicate.get(0).get();
+        final long p = predicate.get(1).isVar() ? NULL : (Long) predicate.get(1).get();
+        final long o = predicate.get(2).isVar() ? NULL : (Long) predicate.get(2).get();
+        // Note: Context is ignored!
+
+        if (s != NULL && p != NULL && o != NULL) {
+
+            return SPOKeyOrder.SPO;
+
+        } else if (s != NULL && p != NULL) {
+
+            return SPOKeyOrder.SPO;
+
+        } else if (s != NULL && o != NULL) {
+
+            return SPOKeyOrder.OSP;
+
+        } else if (p != NULL && o != NULL) {
+
+            return SPOKeyOrder.POS;
+
+        } else if (s != NULL) {
+
+            return SPOKeyOrder.SPO;
+
+        } else if (p != NULL) {
+
+            return SPOKeyOrder.POS;
+
+        } else if (o != NULL) {
+
+            return SPOKeyOrder.OSP;
+
+        } else {
+
+            return SPOKeyOrder.SPO;
+
+        }
+
+    }
     
     /**
      * Core impl.
+     * <p>
+     * Note: This method is NOT cached. See {@link #getAccessPath(IPredicate)}.
      * 
      * @param keyOrder
      *            The natural order of the selected index (this identifies the
@@ -839,7 +862,23 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * @param predicate
      *            The predicate specifying the query constraint on the access
      *            path.
+     * 
      * @return The access path.
+     * 
+     * FIXME This does not touch the cache. Track down the callers. I imagine
+     * that these are mostly SPO access path scans, but they could also be scans
+     * on the POS or OSP indices. What we really want is a method with the
+     * signature <code>getAccessPath(keyOrder,filter)</code>, where the
+     * filter is optional. This method should cache by the keyOrder, which
+     * implies that we want to either verify or layer on the filter if we will
+     * be reusing the cached access path with different filter values.
+     * <p>
+     * The application SHOULD NOT specify both the predicate and the keyOrder
+     * since they are less likely to make the right choice, but it is reasonable
+     * to specify the keyOrder for bulk copy, dump, and some other modestly low
+     * level things and when only a single access path is used, then of course
+     * we need to specify that access path (several things use a temporary
+     * triple store with only the SPO access path).
      */
     public SPOAccessPath getAccessPath(final IKeyOrder<ISPO> keyOrder,
             final IPredicate<ISPO> predicate) {
@@ -976,7 +1015,8 @@ public class SPORelation extends AbstractRelation<ISPO> {
                 
     }
     
-    public SPO newElement(final IPredicate<ISPO> predicate, final IBindingSet bindingSet) {
+    public SPO newElement(final IPredicate<ISPO> predicate,
+            final IBindingSet bindingSet) {
 
         if (predicate == null)
             throw new IllegalArgumentException();
@@ -1013,7 +1053,8 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * @return The bound value.
      */
     @SuppressWarnings("unchecked")
-    private long asBound(IPredicate<ISPO> pred, int index, IBindingSet bindingSet) {
+    private long asBound(final IPredicate<ISPO> pred, final int index,
+            final IBindingSet bindingSet) {
 
         final IVariableOrConstant<Long> t = pred.get(index);
 

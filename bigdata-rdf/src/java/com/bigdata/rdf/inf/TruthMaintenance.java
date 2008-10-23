@@ -49,7 +49,6 @@ package com.bigdata.rdf.inf;
 
 import java.util.Properties;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
@@ -106,19 +105,17 @@ public class TruthMaintenance {
     /**
      * Logger.
      */
-    public static final Logger log = Logger.getLogger(TruthMaintenance.class);
+    final static protected Logger log = Logger.getLogger(TruthMaintenance.class);
     
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final static protected boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final static protected boolean DEBUG = log.isDebugEnabled();
     
     /**
      * The target database.
@@ -225,7 +222,8 @@ public class TruthMaintenance {
     static public int applyExistingStatements(AbstractTripleStore focusStore,
             AbstractTripleStore database, IElementFilter<ISPO> filter) {
         
-        log.info("Filtering statements already known to the database");
+        if(INFO) 
+            log.info("Filtering statements already known to the database");
 
         final long begin = System.currentTimeMillis();
         

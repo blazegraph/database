@@ -35,12 +35,14 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IIndexStore;
+import com.bigdata.journal.ITx;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.accesspath.ChunkConsumerIterator;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
@@ -105,14 +107,12 @@ public class ProgramTask implements IProgramTask,
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    protected static final boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    protected static final boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    protected static final boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    protected static final boolean DEBUG = log.isDebugEnabled();
 
     private final ActionEnum action;
     
@@ -430,6 +430,11 @@ public class ProgramTask implements IProgramTask,
 
     /**
      * Run a mutation {@link IStep}. The {@link IStep} may consist of many sub-{@link IStep}s.
+     * <p>
+     * Note: If you specify {@link ITx#READ_COMMITTED} for mutation operations
+     * when using a federation then concurrent split/join/move can cause the
+     * operation to fail. It is safer to use read-consistent semantics by
+     * specifying {@link IIndexStore#getLastCommitTime()} instead.
      * 
      * @param step
      *            The {@link IStep}.
@@ -449,6 +454,13 @@ public class ProgramTask implements IProgramTask,
         if (!action.isMutation())
             throw new IllegalArgumentException();
         
+//        /*
+//         * Advance the read-consistent timestamp so that any writes from
+//         * the previous rules or the last round are now visible.
+//         */
+//        joinNexusFactory.setReadTimestamp(TimestampUtility
+//                .asHistoricalRead(indexManager.getLastCommitTime()));
+
         final MutationTask mutationTask = new MutationTask(action, joinNexusFactory,
                 step, indexManager, dataService );
 
@@ -535,6 +547,18 @@ public class ProgramTask implements IProgramTask,
                 log.debug("round=" + round + ", mutationCount(before)="
                         + mutationCount0);
 
+//            if (round > 1) {
+//
+//                /*
+//                 * Advance the read-consistent timestamp so that any writes from
+//                 * the previous rules or the last round are now visible.
+//                 */
+//
+//                joinNexusFactory.setReadTimestamp(TimestampUtility
+//                        .asHistoricalRead(indexManager.getLastCommitTime()));
+//                
+//            }
+            
             // execute the program.
             final RuleStats tmp = executeMutation(program);
 
