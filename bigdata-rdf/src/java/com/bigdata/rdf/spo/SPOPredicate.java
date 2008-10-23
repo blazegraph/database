@@ -48,6 +48,8 @@ public class SPOPredicate implements IPredicate<ISPO> {
     private static final long serialVersionUID = 1396017399712849975L;
 
     private final String[] relationName;
+
+    private final int partitionId;
     
     private final IVariableOrConstant<Long> s;
 
@@ -79,12 +81,18 @@ public class SPOPredicate implements IPredicate<ISPO> {
         
     }
     
-    public int getRelationCount() {
+    final public int getRelationCount() {
         
         return relationName.length;
         
     }
 
+    final public int getPartitionId() {
+        
+        return partitionId;
+        
+    }
+    
     /**
      * The arity is 3 unless the context position was given (as either a
      * variable or bound to a constant) in which case it is 4.
@@ -108,14 +116,14 @@ public class SPOPredicate implements IPredicate<ISPO> {
     public SPOPredicate(String relationName, IVariableOrConstant<Long> s,
             IVariableOrConstant<Long> p, IVariableOrConstant<Long> o) {
 
-        this(new String[] { relationName }, s, p, o, null/* c */,
-                false/* optional */, null/* constraint */, null/* expander */);
-        
+        this(new String[] { relationName }, -1/* partitionId */, s, p, o,
+                null/* c */, false/* optional */, null/* constraint */, null/* expander */);
+
     }
-    
+
     /**
-     * Partly specified ctor. The context will be <code>null</code>. 
-     * No constraint is specified. No expander is specified.
+     * Partly specified ctor. The context will be <code>null</code>. No
+     * constraint is specified. No expander is specified.
      * 
      * @param relationName
      * @param s
@@ -124,17 +132,17 @@ public class SPOPredicate implements IPredicate<ISPO> {
      * @param optional
      */
     public SPOPredicate(String relationName, IVariableOrConstant<Long> s,
-            IVariableOrConstant<Long> p, IVariableOrConstant<Long> o, 
+            IVariableOrConstant<Long> p, IVariableOrConstant<Long> o,
             final boolean optional) {
 
-        this(new String[] { relationName }, s, p, o, null/* c */,
-                optional, null/* constraint */, null/* expander */);
-        
+        this(new String[] { relationName }, -1/* partitionId */, s, p, o,
+                null/* c */, optional, null/* constraint */, null/* expander */);
+
     }
-    
+
     /**
-     * Partly specified ctor. The context will be <code>null</code>. 
-     * No constraint is specified. No expander is specified.
+     * Partly specified ctor. The context will be <code>null</code>. No
+     * constraint is specified. No expander is specified.
      * 
      * @param relationName
      * @param s
@@ -147,14 +155,15 @@ public class SPOPredicate implements IPredicate<ISPO> {
             IVariableOrConstant<Long> p, IVariableOrConstant<Long> o, 
             ISolutionExpander<ISPO> expander) {
 
-        this(new String[] { relationName }, s, p, o, null/* c */,
-                false/* optional */, null/* constraint */, expander);
-        
+        this(new String[] { relationName }, -1/* partitionId */, s, p, o,
+                null/* c */, false/* optional */, null/* constraint */,
+                expander);
+
     }
-    
+
     /**
-     * Partly specified ctor. The context will be <code>null</code>. 
-     * No constraint is specified. 
+     * Partly specified ctor. The context will be <code>null</code>. No
+     * constraint is specified.
      * 
      * @param relationName
      * @param s
@@ -165,11 +174,11 @@ public class SPOPredicate implements IPredicate<ISPO> {
      *            MAY be <code>null</code>.
      */
     public SPOPredicate(String relationName, IVariableOrConstant<Long> s,
-            IVariableOrConstant<Long> p, IVariableOrConstant<Long> o, 
+            IVariableOrConstant<Long> p, IVariableOrConstant<Long> o,
             final boolean optional, ISolutionExpander<ISPO> expander) {
 
-        this(new String[] { relationName }, s, p, o, null/* c */,
-                optional, null/* constraint */, expander);
+        this(new String[] { relationName }, -1/* partitionId */, s, p, o,
+                null/* c */, optional, null/* constraint */, expander);
         
     }
     
@@ -177,6 +186,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
      * Fully specified ctor.
      * 
      * @param relationName
+     * @param partitionId
      * @param s
      * @param p
      * @param o
@@ -187,14 +197,15 @@ public class SPOPredicate implements IPredicate<ISPO> {
      * @param expander
      *            MAY be <code>null</code>.
      */
-    public SPOPredicate(String[] relationName,
+    public SPOPredicate(String[] relationName, //
+            final int partitionId, //
             IVariableOrConstant<Long> s,//
             IVariableOrConstant<Long> p,//
             IVariableOrConstant<Long> o,//
             IVariableOrConstant<Long> c,//
-            final boolean optional,
+            final boolean optional, //
             IElementFilter<ISPO> constraint,//
-            ISolutionExpander<ISPO> expander
+            ISolutionExpander<ISPO> expander//
             ) {
         
         if (relationName == null)
@@ -210,6 +221,9 @@ public class SPOPredicate implements IPredicate<ISPO> {
         if (relationName.length == 0)
             throw new IllegalArgumentException();
         
+        if (partitionId < -1)
+            throw new IllegalArgumentException();
+        
         if (s == null)
             throw new IllegalArgumentException();
         
@@ -220,6 +234,8 @@ public class SPOPredicate implements IPredicate<ISPO> {
             throw new IllegalArgumentException();
         
         this.relationName = relationName;
+        
+        this.partitionId = partitionId;
         
         this.s = s;
         this.p = p;
@@ -255,6 +271,8 @@ public class SPOPredicate implements IPredicate<ISPO> {
         if (relationName.length == 0)
             throw new IllegalArgumentException();
  
+        this.partitionId = src.partitionId;
+        
         this.s = src.s;
         this.p = src.p;
         this.o = src.o;
@@ -262,6 +280,49 @@ public class SPOPredicate implements IPredicate<ISPO> {
         
         this.relationName = relationName; // override.
      
+        this.optional = src.optional;
+        
+        this.constraint = src.constraint;
+        
+        this.expander = src.expander;
+        
+    }
+
+    /**
+     * Copy constructor sets the index partition identifier.
+     * 
+     * @param partitionId
+     *            The index partition identifier.
+     *            
+     * @throws IllegalArgumentException
+     *             if the index partition identified is a negative integer.
+     * @throws IllegalStateException
+     *             if the index partition identifier was already specified.
+     */
+    protected SPOPredicate(final SPOPredicate src, final int partitionId) {
+
+        //@todo uncomment the other half of this test to make it less paranoid.
+        if (src.partitionId != -1 ) {//&& this.partitionId != partitionId) {
+            
+            throw new IllegalStateException();
+
+        }
+
+        if (partitionId < 0) {
+
+            throw new IllegalArgumentException();
+
+        }
+
+        this.relationName = src.relationName;
+        
+        this.partitionId = src.partitionId;
+        
+        this.s = src.s;
+        this.p = src.p;
+        this.o = src.o;
+        this.c = src.c;
+        
         this.optional = src.optional;
         
         this.constraint = src.constraint;
@@ -412,8 +473,8 @@ public class SPOPredicate implements IPredicate<ISPO> {
             }
         }
         
-        return new SPOPredicate(relationName, s, p, o, c, optional, constraint,
-                expander);
+        return new SPOPredicate(relationName, partitionId, s, p, o, c,
+                optional, constraint, expander);
         
     }
 
@@ -423,6 +484,12 @@ public class SPOPredicate implements IPredicate<ISPO> {
         
     }
     
+    public SPOPredicate setPartitionId(int partitionId) {
+
+        return new SPOPredicate(this, partitionId);
+
+    }
+
     public String toString() {
 
         return toString(null);
@@ -488,6 +555,12 @@ public class SPOPredicate implements IPredicate<ISPO> {
             if(expander!=null) {
                 if(!first) sb.append(", ");
                 sb.append(expander.toString());
+                first = false;
+            }
+            
+            if(partitionId!=-1) {
+                if(!first) sb.append(", ");
+                sb.append("partitionId="+partitionId);
                 first = false;
             }
             

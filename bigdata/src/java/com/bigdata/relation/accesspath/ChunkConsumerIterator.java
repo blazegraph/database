@@ -3,7 +3,6 @@ package com.bigdata.relation.accesspath;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -26,14 +25,12 @@ public class ChunkConsumerIterator<E> implements IChunkedOrderedIterator<E> {
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final protected static boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final protected static boolean DEBUG = log.isDebugEnabled();
     
     /** The source iterator. */
     private final ICloseableIterator<E[]> src;

@@ -60,6 +60,8 @@ public class Predicate<E> implements IPredicate<E> {
 
     private final ISolutionExpander<E> expander;
     
+    private final int partitionId;
+
     /**
      * Copy constructor creates a new instance of this class with any unbound
      * variables overriden by their bindings from the given binding set (if
@@ -83,6 +85,8 @@ public class Predicate<E> implements IPredicate<E> {
         this.constraint = src.constraint;
 
         this.expander = src.expander;
+        
+        this.partitionId = src.partitionId;
         
         /*
          * Now override any unbound variables for which we were giving bindings.
@@ -152,7 +156,55 @@ public class Predicate<E> implements IPredicate<E> {
         this.constraint = src.constraint;
         
         this.expander = src.expander;
+     
+        this.partitionId = src.partitionId;
         
+    }
+    
+    /**
+     * Copy constructor creates a new instance of this class in which the index
+     * partition constraint as specified.
+     * 
+     * @param src
+     *            The source predicate.
+     * @param partitionId
+     *            The index partition constraint.
+     * 
+     * @throws IllegalArgumentException
+     *             if the index partition identified is a negative integer.
+     * @throws IllegalStateException
+     *             if the index partition identifier was already specified.
+     */
+    protected Predicate(Predicate<E> src, int partitionId) {
+
+        if (this.partitionId != -1) {
+            
+            throw new IllegalStateException();
+
+        }
+
+        if (partitionId < 0) {
+
+            throw new IllegalArgumentException();
+
+        }
+
+        this.arity = src.arity;
+
+        this.nvars = src.nvars;
+
+        this.relationName = src.relationName;
+
+        this.partitionId = partitionId; // override.
+
+        this.values = src.values;
+
+        this.optional = src.optional;
+
+        this.constraint = src.constraint;
+
+        this.expander = src.expander;
+     
     }
     
     /**
@@ -165,8 +217,8 @@ public class Predicate<E> implements IPredicate<E> {
      */
     public Predicate(String relationName, IVariableOrConstant[] values) {
         
-        this(new String[] { relationName }, values, false/* optional */,
-                null/* constraint */, null/*expander*/);
+        this(new String[] { relationName }, -1/* partitionId */, values,
+                false/* optional */, null/* constraint */, null/* expander */);
         
     }
 
@@ -175,6 +227,9 @@ public class Predicate<E> implements IPredicate<E> {
      * 
      * @param relationName
      *            Identifies the relation(s) in the view.
+     * @param partitionId
+     *            The index partition constraint -or- <code>-1</code> if there
+     *            is no index partition constraint.
      * @param values
      *            The values (order is important!).
      * @param optional
@@ -184,17 +239,22 @@ public class Predicate<E> implements IPredicate<E> {
      * @param expander
      *            Allows selective override of the predicate evaluation.
      */
-    public Predicate(String[] relationName, IVariableOrConstant[] values,
-            boolean optional, IElementFilter<E> constraint,
-            ISolutionExpander<E> expander) {
+    public Predicate(String[] relationName, int partitionId,
+            IVariableOrConstant[] values, boolean optional,
+            IElementFilter<E> constraint, ISolutionExpander<E> expander) {
 
         if (relationName == null)
+            throw new IllegalArgumentException();
+
+        if (partitionId < -1)
             throw new IllegalArgumentException();
 
         if (values == null)
             throw new IllegalArgumentException();
 
         this.relationName = relationName;
+
+        this.partitionId = partitionId;
         
         this.arity = values.length;
 
@@ -236,6 +296,12 @@ public class Predicate<E> implements IPredicate<E> {
     public String getRelationName(int index) {
         
         return relationName[index];
+        
+    }
+
+    public int getPartitionId() {
+        
+        return partitionId;
         
     }
     
@@ -330,10 +396,16 @@ public class Predicate<E> implements IPredicate<E> {
         
     }
 
-    public IPredicate<E> setRelationName(String[] relationName) {
+    public Predicate<E> setRelationName(String[] relationName) {
     
         return new Predicate<E>(this, relationName);
         
+    }
+
+    public Predicate<E> setPartitionId(int partitionId) {
+
+        return new Predicate<E>(this, partitionId);
+
     }
     
     public String toString() {

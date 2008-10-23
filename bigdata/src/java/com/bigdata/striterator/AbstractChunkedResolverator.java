@@ -28,7 +28,6 @@ import java.util.NoSuchElementException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.relation.accesspath.BlockingBuffer;
@@ -55,14 +54,12 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final protected static boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final protected static boolean DEBUG = log.isDebugEnabled();
     
     /**
      * The source iterator.
@@ -133,7 +130,7 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
      *            The service on which the task will be executed.
      */
     public AbstractChunkedResolverator<E, F, S> start(ExecutorService service) {
-
+        
         /*
          * Create and run a task which reads chunks from the source iterator and
          * writes resolved chunks on the buffer.

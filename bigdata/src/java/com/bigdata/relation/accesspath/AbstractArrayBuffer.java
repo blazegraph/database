@@ -41,6 +41,10 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
 
     protected static final Logger log = Logger.getLogger(AbstractArrayBuffer.class);
     
+    protected static final boolean INFO = log.isInfoEnabled();
+
+    protected static final boolean DEBUG = log.isDebugEnabled();
+    
     protected final int capacity;
     protected final IElementFilter<E> filter;
     
@@ -103,7 +107,7 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
                 
                 // rejected by the filter.
                 
-                if(log.isDebugEnabled()) {
+                if(DEBUG) {
                     
                     log.debug("rejected: element="+e+", filter="+filter);
                     
@@ -125,7 +129,7 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
         if (e == null)
             throw new IllegalArgumentException();
 
-        if(log.isDebugEnabled()) {
+        if(DEBUG) {
             
             log.debug("element="+e);
             
@@ -158,7 +162,7 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
 
         if (size > 0) {
 
-            if (log.isInfoEnabled()) {
+            if (INFO) {
 
                 log.info("flushing buffer with " + size + " elements");
                 
@@ -168,7 +172,7 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
             
             counter += nwritten;
             
-            if (log.isInfoEnabled()) {
+            if (INFO) {
 
                 log.info("wrote " + nwritten + " elements, cumulative total="
                         + counter);
@@ -187,7 +191,7 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
     
     synchronized public void reset() {
         
-        if(log.isInfoEnabled()) {
+        if(INFO) {
             
             log.info("Resetting buffer state and counter.");
             

@@ -43,7 +43,9 @@ import com.bigdata.btree.filter.FilterConstructor;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.filter.ITupleFilter;
 import com.bigdata.btree.filter.TupleFilter;
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.service.IDataService;
@@ -64,19 +66,40 @@ import cutthecrap.utils.striterators.Striterator;
  * @param R
  *            The generic type of the [R]elation elements of the
  *            {@link IRelation}.
+ * 
+ * @todo This needs to be more generalized so that you can use a index that is
+ *       best without being optimal by specifying a low-level filter to be
+ *       applied to the index. That requires a means to dynamically filter out
+ *       the elements we do not want from the key-range scan - the filtering
+ *       should of course be done at the {@link IDataService}.
  */
 abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
-    protected static final Logger log = Logger.getLogger(IAccessPath.class);
+    static final protected Logger log = Logger.getLogger(IAccessPath.class);
     
     final static protected boolean INFO = log.isInfoEnabled();
 
     final static protected boolean DEBUG = log.isDebugEnabled();
 
-    protected final IRelation<R> relation;
+    /** Access to the index, resource locator, executor service, etc. */
+    protected final IIndexManager indexManager;
+
+    /** Timestamp of the view. */
+    protected final long timestamp;
+
+    /** Predicate (the resource name on the predicate is the relation namespace). */
     protected final IPredicate<R> predicate;
+
+    /**
+     * Index order (the relation namespace plus the index order and the option
+     * partitionId constraint on the predicate identify the index).
+     */
     protected final IKeyOrder<R> keyOrder;
+
+    /** The index. */
     protected final IIndex ndx;
+
+    /** Iterator flags. */
     protected final int flags;
     private final int chunkOfChunksCapacity;
     private final int chunkCapacity;
@@ -181,8 +204,11 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
     }
     
     /**
-     * 
-     * @param relation
+     * @param indexManager
+     *            Access to the indices, resource locators, executor service,
+     *            etc.
+     * @param timestamp
+     *            The timestamp of the index view.
      * @param predicate
      *            The constraints on the access path.
      * @param keyOrder
@@ -207,15 +233,10 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
      *            {@link #iterator(long, long, int)} is LTE this threshold then
      *            we will do a fully buffered (synchronous) read. Otherwise we
      *            will do an asynchronous read.
-     * 
-     * @todo This needs to be more generalized so that you can use a index that
-     *       is best without being optimal by specifying a low-level filter to
-     *       be applied to the index. That requires a means to dynamically
-     *       filter out the elements we do not want from the key-range scan -
-     *       the filtering should of course be done at the {@link IDataService}.
      */
     protected AbstractAccessPath(//
-            final IRelation<R> relation,  // 
+            final IIndexManager indexManager,  //
+            final long timestamp,//
             final IPredicate<R> predicate,//
             final IKeyOrder<R> keyOrder,  //
             final IIndex ndx,//
@@ -225,9 +246,9 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
             final int fullyBufferedReadThreshold
             ) {
 
-        if (relation == null)
+        if (indexManager == null)
             throw new IllegalArgumentException();
-
+        
         if (predicate == null)
             throw new IllegalArgumentException();
 
@@ -237,7 +258,33 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         if (ndx == null)
             throw new IllegalArgumentException();
 
-        this.relation = relation;
+        final int partitionId = predicate.getPartitionId();
+        
+        if (partitionId != -1) {
+            
+            /*
+             * An index partition constraint was specified, so verify that we
+             * were given a local index object and that the index object is for
+             * the correct index partition.
+             */
+            
+            final LocalPartitionMetadata pmd = ndx.getIndexMetadata().getPartitionMetadata();
+
+            if (pmd == null)
+                throw new IllegalArgumentException("Not an index partition");
+        
+            if (pmd.getPartitionId() != partitionId) {
+                
+                throw new IllegalArgumentException("Expecting partitionId="
+                        + partitionId + ", but have " + pmd.getPartitionId());
+                
+            }
+            
+        }
+
+        this.indexManager = indexManager;
+        
+        this.timestamp = timestamp;
         
         this.predicate = predicate;
 
@@ -253,7 +300,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
         this.fullyBufferedReadThreshold = fullyBufferedReadThreshold;
         
-        this.historicalRead = TimestampUtility.isHistoricalRead(relation.getTimestamp());
+        this.historicalRead = TimestampUtility.isHistoricalRead(timestamp);
         
         final IElementFilter<R> constraint = predicate.getConstraint();
 
@@ -361,12 +408,15 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         
     }
     
-    /** 
-     * The return type SHOULD be strengthened by impls.
-     */
-    public IRelation<R> getRelation() {
+    public IIndexManager getIndexManager() {
         
-        return relation;
+        return indexManager;
+        
+    }
+
+    public long getTimestamp() {
+        
+        return timestamp;
         
     }
     
@@ -768,7 +818,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         final BlockingBuffer<R[]> buffer = new BlockingBuffer<R[]>(
                 chunkOfChunksCapacity);
         
-        final Future<Void> future = getRelation().getExecutorService().submit(new Callable<Void>(){
+        final Future<Void> future = indexManager.getExecutorService().submit(new Callable<Void>(){
         
             public Void call() {
                 

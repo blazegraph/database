@@ -39,6 +39,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.keys.DelegateSortKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.ISortKeyBuilder;
@@ -55,6 +57,7 @@ import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOAccessPath;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.spo.SPOSortKeyBuilder;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -155,30 +158,8 @@ import com.bigdata.striterator.WrappedRemoteChunkedIterator;
  * thread-safe and that is designed to store a single chunk of elements, e.g.,
  * in an array E[N]).
  * 
- * @todo We can already run a LDS program (IStep) on a DataService.
- *       <P>
- *       This capability should be generalized so that we can easily run an
- *       IStep on any DataService in a cluster, thereby parallelizing the
- *       execution of rules in a massive fix point closure operation across a
- *       cluster.
- *       <p>
- *       While all JOINs for a given rule will begin their evaluation on the
- *       DataService (or client) choosen to evaluate the rule, but subqueries
- *       MAY be distributed to other DataServices for execution. Therefore, the
- *       subquery JOIN capability should be generalized so that we can easily
- *       run a JOIN subquery on any DataService.
- *       <p>
- *       For LDS, of course, we will always choose to run the program inside of
- *       the DataService as an AbstractTask since there are no additional
- *       computational resources to be leveraged.
- *       <p>
- *       However, we can disable the LDS "smart" program execution and test
- *       distributed execution of parallel rules and JOIN subqueries. We can
- *       test the same thing with EDS and JDS, but there will be additional
- *       overhead involved.
- * 
  * @todo Factor out an abstract base class for general purpose rule execution
- *       over arbitrary relations.
+ *       over arbitrary relations with foreign key joins.
  * 
  * @todo add an {@link IBindingSet} serializer and drive through with the
  *       {@link IAsynchronousIterator}.
@@ -632,7 +613,7 @@ public class RDFJoinNexus implements IJoinNexus {
 	 * The head relation is what we write on for mutation operations and is also
 	 * responsible for minting new elements from computed {@link ISolution}s.
 	 */
-    public IRelation getHeadRelationView(IPredicate pred) {
+    public IRelation getHeadRelationView(final IPredicate pred) {
         
         if (pred == null)
             throw new IllegalArgumentException();
@@ -661,7 +642,8 @@ public class RDFJoinNexus implements IJoinNexus {
     /**
      * The tail relations are the views from which we read.
      */
-    public IRelation getTailRelationView(IPredicate pred) {
+    @SuppressWarnings("unchecked")
+    public IRelation getTailRelationView(final IPredicate pred) {
 
         if (pred == null)
             throw new IllegalArgumentException();
@@ -689,13 +671,13 @@ public class RDFJoinNexus implements IJoinNexus {
 
             final long timestamp1 = getReadTimestamp(/*relationName1*/);
 
-            final SPORelation relation0 = (SPORelation) getIndexManager()
+            final IRelation relation0 = (IRelation) getIndexManager()
                     .getResourceLocator().locate(relationName0, timestamp0);
 
-            final SPORelation relation1 = (SPORelation) getIndexManager()
+            final IRelation relation1 = (IRelation) getIndexManager()
                     .getResourceLocator().locate(relationName1, timestamp1);
 
-            relation = new RelationFusedView<ISPO>(relation0, relation1);
+            relation = new RelationFusedView(relation0, relation1);
 
         } else {
 
@@ -727,8 +709,61 @@ public class RDFJoinNexus implements IJoinNexus {
      *       make it slightly harder to write the unit tests for the
      *       {@link IEvaluationPlanFactory}
      */
-    public IAccessPath getTailAccessPath(IPredicate predicate) {
-    	
+    public IAccessPath getTailAccessPath(final IPredicate predicate) {
+
+        if (predicate.getPartitionId() != -1) {
+
+            /*
+             * This handles a request for an access path that is restricted to a
+             * specific index partition.
+             * 
+             * Note: This path is used with the scale-out JOIN strategy, which
+             * distributes join tasks onto each index partition from which it
+             * needs to read. Those tasks constrain the predicate to only read
+             * from the index partition which is being serviced by that join
+             * task.
+             * 
+             * Note: Since the relation may materialize the index views for its
+             * various access paths, and since we are restricted to a single
+             * index partition and (presumably) an index manager that only sees
+             * the index partitions local to a specific data service, we create
+             * an access path view for an index partition without forcing the
+             * relation to be materialized.
+             * 
+             * @todo caching for the access path?
+             */
+            
+            final String namespace = predicate.getOnlyRelationName();
+
+            /*
+             * Find the best access path for that predicate.
+             * 
+             * @todo hardcoded to the SPORelation.
+             */
+            final IKeyOrder keyOrder = SPORelation.getKeyOrder(predicate);
+
+            final String name = DataService.getIndexPartitionName(namespace
+                    + keyOrder.getIndexName(), predicate.getPartitionId());
+            
+            /*
+             * @todo whether or not we need both keys and values depends on the
+             * specific index/predicate.
+             * 
+             * Note: We can specify READ_ONLY here since the tail predicates are
+             * not mutable for rule execution.
+             */
+            final int flags = IRangeQuery.KEYS | IRangeQuery.VALS | IRangeQuery.READONLY;
+
+            final long timestamp = getReadTimestamp();
+            
+            final IIndex ndx = indexManager.getIndex(name, timestamp);
+            
+            return new SPOAccessPath(indexManager, timestamp, predicate,
+                    keyOrder, ndx, flags, getChunkOfChunksCapacity(),
+                    getChunkCapacity(), getFullyBufferedReadThreshold());
+            
+        }
+        
         // Resolve the relation name to the IRelation object.
         final IRelation relation = getTailRelationView(predicate);
         
@@ -904,7 +939,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
     }
 
-    private static transient IConstant<Long> fakeTermId = new Constant<Long>(-1L);
+    final private static transient IConstant<Long> fakeTermId = new Constant<Long>(-1L);
     
     public ISolution newSolution(IRule rule, IBindingSet bindingSet) {
 
@@ -1024,7 +1059,8 @@ public class RDFJoinNexus implements IJoinNexus {
         
     }
 
-    public IRuleTaskFactory getRuleTaskFactory(boolean parallel, IRule rule) {
+    public IRuleTaskFactory getRuleTaskFactory(final boolean parallel,
+            final IRule rule) {
 
         if (rule == null)
             throw new IllegalArgumentException();
@@ -1073,7 +1109,7 @@ public class RDFJoinNexus implements IJoinNexus {
     }
 
     public IBuffer<ISolution> newUnsynchronizedBuffer(
-            IBuffer<ISolution[]> targetBuffer, int chunkCapacity) {
+            final IBuffer<ISolution[]> targetBuffer, final int chunkCapacity) {
 
         // MAY be null.
         final IElementFilter<ISolution> filter = getSolutionFilter();
@@ -1087,9 +1123,6 @@ public class RDFJoinNexus implements IJoinNexus {
      * Note: {@link ISolution} (not relation elements) will be written on the
      * buffer concurrently by different rules so there is no natural order for
      * the elements in the buffer.
-     * <p>
-     * Note: the {@link BlockingBuffer} can not deliver a chunk larger than its
-     * internal queue capacity.
      */
     public IBlockingBuffer<ISolution[]> newQueryBuffer() {
 
@@ -1097,11 +1130,7 @@ public class RDFJoinNexus implements IJoinNexus {
             throw new IllegalStateException();
         
         return new BlockingBuffer<ISolution[]>(chunkOfChunksCapacity,
-                chunkCapacity,chunkTimeout,chunkTimeoutUnit);
-        
-//        return new BlockingBuffer<ISolution>(queryBufferCapacity,
-//                null/* keyOrder */, filter == null ? null
-//                        : new SolutionFilter(filter));
+                chunkCapacity, chunkTimeout, chunkTimeoutUnit);
         
     }
     
@@ -1165,7 +1194,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
             final int n = chunk.length;
             
-            if(log.isDebugEnabled()) 
+            if(DEBUG) 
                 log.debug("chunkSize="+n);
             
             final long begin = System.currentTimeMillis();
@@ -1176,7 +1205,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
             for(int i=0; i<chunk.length; i++) {
                 
-                if(log.isDebugEnabled()) {
+                if(DEBUG) {
                     
                     log.debug("chunk["+i+"] = "+chunk[i]);
                     
@@ -1247,7 +1276,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
             final long elapsed = System.currentTimeMillis() - begin;
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("Wrote " + mutationCount
                                 + " statements and justifications in "
                                 + elapsed + "ms");
@@ -1485,15 +1514,6 @@ public class RDFJoinNexus implements IJoinNexus {
      * 
      * @return Either an {@link IChunkedOrderedIterator} (query) or {@link Long}
      *         (mutation count).
-     * 
-     * FIXME It is possible to locate monolithic indices for a distributed
-     * database such that certain JOINs (especially, the {@link SPORelation}
-     * self-JOINs required for inference and most query answering) are purely
-     * local.
-     * <p>
-     * Make it easy (a) to deploy under this configuration, (b) to detect when
-     * that deployment exists, and (c) then submit the rules to the
-     * {@link DataService} on which the {@link SPORelation}'s indices reside.
      */
     protected Object runProgram(ActionEnum action, IStep step)
             throws Exception {
@@ -1510,34 +1530,22 @@ public class RDFJoinNexus implements IJoinNexus {
 
             final IBigdataFederation fed = (IBigdataFederation) indexManager;
 
-            if (fed instanceof LocalDataServiceFederation) {
-                if(false) {
-                    /*
-                     * FIXME Make sure that this is disabled except for testing!
-                     * 
-                     * Note: This can be used to examine performance penalties
-                     * due to rules executed against (rather than on) a
-                     * DataService. This is an easy way to track down many of
-                     * the costs associated with the scale-out model. The only
-                     * costs that you will not see this way are those
-                     * specifically associated with the ClientIndexView or the
-                     * the index partition locators (use EDS for that).
-                     */ 
-                    log.warn("LDS is using distributed program execution!!!");
-                    return runDistributedProgram(fed, action, step);
+            if (fed.isScaleOut()) {
 
-                }
+                // distributed program execution.
+                return runDistributedProgram(fed, action, step);
+                
+            } else {
+                
+                // local data service.
                 final DataService dataService = ((LocalDataServiceFederation) fed)
                         .getDataService();
 
                 // single data service program execution.
                 return runDataServiceProgram(dataService, action, step);
-
+                
             }
 
-            // distributed program execution.
-            return runDistributedProgram(fed, action, step);
-            
         } else {
             
             // local Journal or TemporaryStore execution.

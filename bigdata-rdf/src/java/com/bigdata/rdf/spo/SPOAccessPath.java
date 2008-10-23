@@ -1,6 +1,7 @@
 package com.bigdata.rdf.spo;
 
 import com.bigdata.btree.IIndex;
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.AbstractAccessPath;
@@ -22,6 +23,9 @@ public class SPOAccessPath extends AbstractAccessPath<ISPO> {
 
     private SPOTupleSerializer tupleSer;
     
+    /** Relation (resolved lazily if not specified to the ctor). */
+    private SPORelation relation;
+
     /**
      * Set by the ctor to the term identifier appearing in the subject position
      * or {@link IRawTripleStore#NULL} if the subject position is unbound.
@@ -42,9 +46,11 @@ public class SPOAccessPath extends AbstractAccessPath<ISPO> {
     public final long o;
 
     /**
+     * Variant when the {@link SPORelation} has already been materialized.
+     * <p>
      * Note: Filters should be specified when the {@link IAccessPath} is
-     * constructed so that they will be evalated on the data service rather than
-     * materializing the elements and then filtering then. This can be
+     * constructed so that they will be evaluated on the data service rather
+     * than materializing the elements and then filtering them. This can be
      * accomplished by adding the filter as a constraint on the predicate when
      * specifying the access path.
      * 
@@ -54,12 +60,43 @@ public class SPOAccessPath extends AbstractAccessPath<ISPO> {
      * @param flags
      */
     @SuppressWarnings("unchecked")
-    public SPOAccessPath(SPORelation relation, IPredicate<ISPO> predicate,
-            IKeyOrder<ISPO> keyOrder, IIndex ndx, int flags,
-            int chunkOfChunksCapacity, int chunkCapacity, int fullyBufferedReadThreshold) {
+    public SPOAccessPath(final SPORelation relation,
+            final IPredicate<ISPO> predicate, final IKeyOrder<ISPO> keyOrder,
+            final IIndex ndx, final int flags, final int chunkOfChunksCapacity,
+            final int chunkCapacity, final int fullyBufferedReadThreshold) {
 
-        super(relation, predicate, keyOrder, ndx, flags, chunkOfChunksCapacity,
-                chunkCapacity, fullyBufferedReadThreshold);
+        this(relation.getIndexManager(), relation.getTimestamp(), predicate,
+                keyOrder, ndx, flags, chunkOfChunksCapacity, chunkCapacity,
+                fullyBufferedReadThreshold);
+
+        this.relation = relation;
+        
+    }
+
+    /**
+     * Variant does not require the {@link SPORelation} to have been
+     * materialized. This is useful when you want an {@link IAccessPath} for a
+     * specific index partition.
+     * 
+     * @param indexManager
+     * @param timestamp
+     * @param predicate
+     * @param keyOrder
+     * @param ndx
+     * @param flags
+     * @param chunkOfChunksCapacity
+     * @param chunkCapacity
+     * @param fullyBufferedReadThreshold
+     */
+    public SPOAccessPath(final IIndexManager indexManager,
+            final long timestamp, final IPredicate<ISPO> predicate,
+            final IKeyOrder<ISPO> keyOrder, final IIndex ndx, final int flags,
+            final int chunkOfChunksCapacity, final int chunkCapacity,
+            final int fullyBufferedReadThreshold) {
+
+        super(indexManager, timestamp, predicate, keyOrder, ndx, flags,
+                chunkOfChunksCapacity, chunkCapacity,
+                fullyBufferedReadThreshold);
 
         {
 
@@ -198,14 +235,22 @@ public class SPOAccessPath extends AbstractAccessPath<ISPO> {
     }
 
     /**
-     * Strenghened return type.
+     * Resolved lazily if not specified to the ctor.
      */
+    synchronized
     public SPORelation getRelation() {
         
-        return (SPORelation) super.getRelation();
-        
+        if (relation == null) {
+            
+            relation = (SPORelation) indexManager.getResourceLocator().locate(
+                    predicate.getOnlyRelationName(), timestamp);
+
+        }
+
+        return relation;
+            
     }
-    
+
     /**
      * Overriden to delegate to
      * {@link AbstractTripleStore#removeStatements(IChunkedOrderedIterator)} in

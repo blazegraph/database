@@ -30,8 +30,6 @@ package com.bigdata.relation.rule.eval;
 
 import java.util.Iterator;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IStep;
 
@@ -43,7 +41,7 @@ import com.bigdata.relation.rule.IStep;
  */
 public class ProgramUtility {
     
-    protected static Logger log = Logger.getLogger(ProgramUtility.class);
+//    final protected static Logger log = Logger.getLogger(ProgramUtility.class);
 
 //    private final IResourceLocator resourceLocator;
 //    private final long readTimestamp;

@@ -166,8 +166,24 @@ public class UnsynchronizedArrayBuffer<E> implements IBuffer<E> {
     /**
      * <strong>Not thread-safe.</strong>
      */
+    final public void add(E e) {
+        
+        add2(e);
+        
+    }
+    
+    /**
+     * Adds an element to the buffer.
+     * 
+     * <strong>Not thread-safe.</strong>
+     * 
+     * @param e An element.
+     * 
+     * @return <code>true</code> iff adding the element caused the buffer to
+     *         {@link #overflow()}
+     */
     @SuppressWarnings("unchecked")
-    public void add(E e) {
+    public boolean add2(E e) {
 
         if (e == null)
             throw new IllegalArgumentException();
@@ -177,10 +193,12 @@ public class UnsynchronizedArrayBuffer<E> implements IBuffer<E> {
             if (DEBUG)
                 log.debug("reject: " + e.toString());
 
-            return;
+            return false;
 
         }
 
+        boolean overflow = false;
+        
         if (buffer == null) {
 
             // re-allocate on demand.
@@ -202,6 +220,8 @@ public class UnsynchronizedArrayBuffer<E> implements IBuffer<E> {
             
             size = 0;
             
+            overflow = true;
+            
         }
 
         if(DEBUG) {
@@ -211,6 +231,8 @@ public class UnsynchronizedArrayBuffer<E> implements IBuffer<E> {
         }
 
         buffer[size++] = e;
+
+        return overflow;
         
     }
     

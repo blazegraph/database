@@ -467,6 +467,12 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
             final IBindingSet bindingSet, final IBuffer<ISolution> buffer)
             throws InterruptedException {
 
+        /*
+         * Handles non-optionals and optionals with solutions in the
+         * data.
+         */
+        final long solutionsBefore = ruleStats.solutionCount.get();
+        
         // Obtain the iterator for the current join dimension.
         final IChunkedOrderedIterator itr = getAccessPath(orderIndex,
                 bindingSet).iterator();
@@ -474,14 +480,6 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
         try {
 
             final int tailIndex = getTailIndex(orderIndex);
-
-            /*
-             * Handles non-optionals and optionals with solutions in the
-             * data.
-             */
-            
-            final long solutionsBefore = ruleStats.solutionCount.get();
-            
             while (itr.hasNext()) {
 
                 if (last > 0 && ruleStats.solutionCount.get() > last) {
@@ -547,20 +545,20 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 
             } // while
 
-            final long nsolutions = ruleStats.solutionCount.get() - solutionsBefore;
-            
-            if (nsolutions == 0L) {
-                
-                applyOptional(orderIndex, bindingSet, buffer);
-                
-            }
-            
         } finally {
 
             itr.close();
 
         }
 
+        final long nsolutions = ruleStats.solutionCount.get() - solutionsBefore;
+        
+        if (nsolutions == 0L) {
+            
+            applyOptional(orderIndex, bindingSet, buffer);
+            
+        }
+        
     }
 
     /**
