@@ -22,6 +22,7 @@ import org.openrdf.query.algebra.Or;
 import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
+import org.openrdf.query.algebra.Union;
 import org.openrdf.query.algebra.ValueConstant;
 import org.openrdf.query.algebra.ValueExpr;
 import org.openrdf.query.algebra.Var;
@@ -480,10 +481,8 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
     {
 
         if (!nativeJoins) {
-
             // Use Sesame 2 evaluation for JOINs.
             return super.evaluate(join, bindings);
-            
         }
        
         if (INFO)
@@ -492,7 +491,14 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         Collection<StatementPattern> stmtPatterns = 
             new LinkedList<StatementPattern>();
         Collection<Filter> filters = new LinkedList<Filter>();
-        collectStatementPatterns(join, stmtPatterns, filters);
+        
+        try {
+            collectStatementPatterns(join, stmtPatterns, filters);
+        } catch (EncounteredUnionException ex) {
+            // Use Sesame 2 evaluation for JOINs with unions.
+            log.warn("we should really implement native Unions");
+            return super.evaluate(join, bindings);
+        }
         
         if (INFO) {
             for (StatementPattern stmtPattern : stmtPatterns) {
@@ -607,6 +613,8 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             TupleExpr right = join.getRightArg();
             collectStatementPatterns(left, stmtPatterns, filters);
             collectStatementPatterns(right, stmtPatterns, filters);
+        } else if (tupleExpr instanceof Union) {
+            throw new EncounteredUnionException();
         } else {
             throw new RuntimeException("encountered unexpected TupleExpr: "
                     + tupleExpr.getClass());
@@ -867,6 +875,10 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                 new BigdataSolutionResolverator(database, itr1).start(database
                         .getExecutorService()));
         
+    }
+    
+    @SuppressWarnings("serial")
+    private class EncounteredUnionException extends RuntimeException {
     }
 
 }
