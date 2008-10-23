@@ -2006,7 +2006,8 @@ public class BigdataSail extends SailBase implements Sail {
                              * not known to the kb.
                              */
                             
-                            log.warn("Not in knowledge base: " + val2);
+                            if(INFO)
+                                log.info("Not in knowledge base: " + val2);
                             
                         }
                         
