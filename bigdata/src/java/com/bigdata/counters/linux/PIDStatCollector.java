@@ -36,9 +36,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
-
 import com.bigdata.counters.AbstractProcessCollector;
 import com.bigdata.counters.AbstractProcessReader;
 import com.bigdata.counters.ActiveProcess;
@@ -66,19 +63,17 @@ import com.bigdata.rawstore.Bytes;
 public class PIDStatCollector extends AbstractProcessCollector implements
         ICounterHierarchy, IProcessCounters {
 
-    static protected final Logger log = Logger.getLogger(PIDStatCollector.class);
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
-
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+//    static protected final Logger log = Logger.getLogger(PIDStatCollector.class);
+//
+//    /**
+//     * True iff the {@link #log} level is DEBUG or less.
+//     */
+//    final protected static boolean DEBUG = log.isDebugEnabled();
+//
+//    /**
+//     * True iff the {@link #log} level is INFO or less.
+//     */
+//    final protected static boolean INFO = log.isInfoEnabled();
 
     /** process to be monitored. */
     protected final int pid;
@@ -414,17 +409,20 @@ public class PIDStatCollector extends AbstractProcessCollector implements
          */
         protected void readProcess() throws IOException, InterruptedException {
 
-            log.info("begin");
+            if(INFO)
+                log.info("begin");
             
             for(int i=0; i<10 && !getActiveProcess().isAlive(); i++) {
 
-                log.info("waiting for the readerFuture to be set.");
+                if(INFO)
+                    log.info("waiting for the readerFuture to be set.");
 
                 Thread.sleep(100/*ms*/);
                 
             }
 
-            log.info("running");
+            if(INFO)
+                log.info("running");
             
         // skip banner.
         final String banner = readLine();
