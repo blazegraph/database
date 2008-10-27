@@ -400,7 +400,7 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
 
             while (itr.hasNext()) {
 
-                itr.hasNext();
+                itr.next();
 
                 n++;
 
