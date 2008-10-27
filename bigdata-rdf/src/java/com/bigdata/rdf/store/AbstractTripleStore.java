@@ -2208,7 +2208,8 @@ abstract public class AbstractTripleStore extends
 
     public BigdataStatementIterator asStatementIterator(IChunkedOrderedIterator<ISPO> src) {
 
-        return new BigdataStatementIteratorImpl(this, src).start(getExecutorService());
+        return new BigdataStatementIteratorImpl(this, src)
+                .start(getExecutorService());
 
     }
 
@@ -2218,7 +2219,8 @@ abstract public class AbstractTripleStore extends
         
     }
     
-    public IAccessPath<ISPO> getAccessPath(Resource s, URI p, Value o,IElementFilter<ISPO> filter) {
+    public IAccessPath<ISPO> getAccessPath(final Resource s, final URI p,
+            final Value o, final IElementFilter<ISPO> filter) {
 
         /*
          * convert other Value object types to our object types.
@@ -2300,20 +2302,21 @@ abstract public class AbstractTripleStore extends
 
     }
 
-    final public IAccessPath<ISPO> getAccessPath(long s, long p, long o) {
-    
-        return getSPORelation().getAccessPath(s, p, o, null/*filter*/);
-        
+    final public IAccessPath<ISPO> getAccessPath(final long s, final long p,
+            final long o) {
+
+        return getSPORelation().getAccessPath(s, p, o, null/* filter */);
+
     }
-    
-    final public IAccessPath<ISPO> getAccessPath(long s, long p, long o,
-            IElementFilter<ISPO> filter) {
+
+    final public IAccessPath<ISPO> getAccessPath(final long s, final long p,
+            final long o, final IElementFilter<ISPO> filter) {
 
         return getSPORelation().getAccessPath(s, p, o, filter);
 
     }
 
-    final public IAccessPath<ISPO> getAccessPath(IKeyOrder<ISPO> keyOrder) {
+    final public IAccessPath<ISPO> getAccessPath(final IKeyOrder<ISPO> keyOrder) {
 
         return getAccessPath(keyOrder, null/*filter*/);
         
