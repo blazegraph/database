@@ -71,8 +71,10 @@ import com.bigdata.rawstore.Bytes;
  */
 public class CSVReader implements Iterator<Map<String, Object>> {
 
-    public static Logger log = Logger.getLogger(CSVReader.class);
+    protected static final Logger log = Logger.getLogger(CSVReader.class);
 
+    protected static final boolean INFO = log.isInfoEnabled();
+    
     /**
      * The #of characters to buffer in the reader.
      */
@@ -404,13 +406,19 @@ public class CSVReader implements Iterator<Map<String, Object>> {
             
         }
 
+        final Thread currentThread = Thread.currentThread();
+        
         try {
 
             while (true) {
 
-                if(Thread.currentThread().isInterrupted()) {
-                    log.warn("Interrupted");
+                if(currentThread.isInterrupted()) {
+
+                    if(INFO)
+                        log.info("Interrupted");
+                    
                     return false;
+                    
                 }
                 
                 while (tailDelayMillis != 0L && !r.ready()) {
