@@ -1529,16 +1529,18 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
         final long begin = System.currentTimeMillis();
         
+        final Thread currentThread = Thread.currentThread();
+        
         try {
 
             if (INFO)
                 log.info("begin");
 
-            if(Thread.currentThread().isInterrupted()) return null;
+            if(currentThread.isInterrupted()) return null;
             
             tmpStore = new TemporaryRawStore();
             
-            if(Thread.currentThread().isInterrupted()) return null;
+            if(currentThread.isInterrupted()) return null;
             
             if(INFO) {
                 
@@ -1549,11 +1551,11 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 
             }
             
-            if(Thread.currentThread().isInterrupted()) return null;
+            if(currentThread.isInterrupted()) return null;
             
             final List<AbstractTask> tasks = chooseTasks();
             
-            if(Thread.currentThread().isInterrupted()) return null;
+            if(currentThread.isInterrupted()) return null;
             
             // runTasks()
             {
@@ -1572,7 +1574,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                                 resourceManager.overflowTimeout,
                                 TimeUnit.MILLISECONDS);
 
-                if(Thread.currentThread().isInterrupted()) return null;
+                if(currentThread.isInterrupted()) return null;
 
                 // Note: list is 1:1 correlated with [futures].
                 final Iterator<AbstractTask> titr = tasks.iterator();
@@ -1591,7 +1593,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                      */
                     try {
 
-                        if(Thread.currentThread().isInterrupted()) return null;
+                        if(currentThread.isInterrupted()) return null;
                         
                         /*
                          * Note: Don't wait long - we already gave the tasks a
@@ -1633,7 +1635,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
             }
             
-            if(Thread.currentThread().isInterrupted()) return null;
+            if(currentThread.isInterrupted()) return null;
             
             if(!resourceManager.isRunning()) {
                 
