@@ -84,9 +84,11 @@ public abstract class ProcessReaderHelper extends
      */
     public String readLine() throws IOException, InterruptedException {
         
+        final Thread t = Thread.currentThread();
+        
         while(getActiveProcess().isAlive()) {
             
-            if(Thread.currentThread().isInterrupted()) {
+            if(t.isInterrupted()) {
                 
                 throw new InterruptedException();
                 
@@ -124,7 +126,8 @@ public abstract class ProcessReaderHelper extends
             
         } catch (InterruptedException e) {
             
-            log.info("Interrupted - will halt.");
+            if(INFO)
+                log.info("Interrupted - will halt.");
             
         } catch (Exception e) {
             

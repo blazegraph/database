@@ -40,7 +40,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.AbstractProcessCollector;
@@ -72,16 +71,14 @@ public class TypeperfCollector extends AbstractProcessCollector {
     static protected final Logger log = Logger.getLogger(TypeperfCollector.class);
 
     /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
-
-    /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final protected static boolean INFO = log.isInfoEnabled();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final protected static boolean DEBUG = log.isDebugEnabled();
 
     /**
      * Updated each time a new row of data is read from the process and reported
@@ -295,7 +292,8 @@ public class TypeperfCollector extends AbstractProcessCollector {
 
         public void run() {
 
-            log.info("");
+            if(INFO)
+                log.info("");
             
             try {
 
@@ -305,7 +303,8 @@ public class TypeperfCollector extends AbstractProcessCollector {
             } catch (InterruptedException e) {
 
                 // Note: This is a normal exit.
-                log.info("Interrupted - will terminate");
+                if(INFO)
+                    log.info("Interrupted - will terminate");
 
             } catch (Exception e) {
 
@@ -314,13 +313,15 @@ public class TypeperfCollector extends AbstractProcessCollector {
 
             }
 
-            log.info("Terminated");
+            if(INFO)
+                log.info("Terminated");
 
         }
 
         private void read() throws Exception {
 
-            log.info("");
+            if(INFO)
+                log.info("");
 
             long nsamples = 0;
 
@@ -354,7 +355,8 @@ public class TypeperfCollector extends AbstractProcessCollector {
                 if (!Thread.currentThread().isInterrupted())
                     throw ex;
                 
-                log.info("Interrupted - done.");
+                if(INFO)
+                    log.info("Interrupted - done.");
                 
             }
 
@@ -382,7 +384,8 @@ public class TypeperfCollector extends AbstractProcessCollector {
              */
             {
                 
-                log.info("setting up headers.");
+                if(INFO)
+                    log.info("setting up headers.");
 
                 int i = 1;
 
@@ -400,10 +403,12 @@ public class TypeperfCollector extends AbstractProcessCollector {
 
             }
 
-            log.info("starting row reads");
+            if(INFO)
+                log.info("starting row reads");
 
-            while (!Thread.currentThread().isInterrupted()
-                    && csvReader.hasNext()) {
+            final Thread t = Thread.currentThread();
+            
+            while (!t.isInterrupted() && csvReader.hasNext()) {
 
                 try {
                     
@@ -424,7 +429,8 @@ public class TypeperfCollector extends AbstractProcessCollector {
 
                         final String value = "" + entry.getValue();
 
-                        log.debug(path + "=" + value);
+                        if(DEBUG)
+                            log.debug(path + "=" + value);
 
                         // update the value from which the counter reads.
                         vals.put(path, Double.parseDouble(value));
@@ -433,9 +439,9 @@ public class TypeperfCollector extends AbstractProcessCollector {
 
                     nsamples++;
 
-                } catch (Throwable t) {
+                } catch (Throwable ex) {
 
-                    log.warn(t.getMessage(), t);
+                    log.warn(ex.getMessage(), ex);
 
                     continue;
 
@@ -443,7 +449,8 @@ public class TypeperfCollector extends AbstractProcessCollector {
 
             }
             
-            log.info("done.");
+            if(INFO)
+                log.info("done.");
 
         }
 

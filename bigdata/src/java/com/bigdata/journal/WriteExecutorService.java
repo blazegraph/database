@@ -773,7 +773,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      */
     public String toString() {
         
-        StringBuilder sb = new StringBuilder();
+        final StringBuilder sb = new StringBuilder();
         
         sb.append("WriteExecutorService");
 
@@ -898,12 +898,15 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      */
     private boolean groupCommit(){
 
-        log.debug("begin");
+        if(DEBUG)
+            log.debug("begin");
 
         assert lock.isHeldByCurrentThread();
 
+        final Thread currentThread = Thread.currentThread();
+        
         // the task that invoked this method.
-        final ITask r = active.get(Thread.currentThread());
+        final ITask r = active.get(currentThread);
         
         /*
          * If an abort is in progress then throw an exception.
@@ -939,7 +942,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * commit.
              */
 
-            log.debug("Already executing in another thread");
+            if(DEBUG)
+                log.debug("Already executing in another thread");
 
             /*
              * Notify the thread running the group commit that this thread will
@@ -969,7 +973,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 log.warn("Task interrupted awaiting group commit: " + r);
 
                 // Set the interrupt flag again.
-                Thread.currentThread().interrupt();
+                currentThread.interrupt();
 
                 return false;
 
@@ -998,7 +1002,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
             if (INFO)
                 log.info("This thread will run group commit: "
-                        + Thread.currentThread() + " : " + r);
+                        + currentThread + " : " + r);
 
             /*
              * Note: Synchronous overflow processing has a stronger
@@ -1020,7 +1024,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             waitForRunningTasks(shouldOverflow /* pauseWriteService */);
 
             // Note: this clears the interrupt flag!
-            if(Thread.currentThread().isInterrupted()) {
+            if(currentThread.isInterrupted()) {
                 
                 log.warn("Interrupted awaiting other tasks to join the group commit.");
                 
@@ -1729,6 +1733,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         // Note: set true iff this thread gets interrupted.
         boolean interrupted = false;
         
+        final Thread thread = Thread.currentThread();
+        
         try {
 
             /*
@@ -1754,7 +1760,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 
                 // interrupt the thread running the task (do not interrupt this thread).
                 
-                if (Thread.currentThread() != entry.getKey()) {
+                if (thread != entry.getKey()) {
                     
                     entry.getKey().interrupt();
                     
@@ -1861,7 +1867,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         if(interrupted) {
             
             // Set the interrupt flag now that we are done with the abort.
-            Thread.currentThread().interrupt();
+            thread.interrupt();
             
         }
         
