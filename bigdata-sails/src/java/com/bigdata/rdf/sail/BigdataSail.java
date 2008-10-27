@@ -545,7 +545,9 @@ public class BigdataSail extends SailBase implements Sail {
         if (open)
             throw new IllegalStateException();
         
-        // NOP (nothing to invoke in the SailBase).
+        /*
+         * NOP (nothing to invoke in the SailBase).
+         */
         
         if(INFO) {
             
@@ -709,7 +711,7 @@ public class BigdataSail extends SailBase implements Sail {
      * One way to handle this is to obtain a {@link BigdataSail} subclass that
      * operates as a factory for those views.
      */
-    public BigdataSailConnection getReadHistoricalView(long commitTime) {
+    public BigdataSailConnection getReadHistoricalView(final long commitTime) {
        
         AbstractTripleStore tmp = (AbstractTripleStore) database
                 .getIndexManager().getResourceLocator().locate(
@@ -1740,6 +1742,14 @@ public class BigdataSail extends SailBase implements Sail {
             final boolean backchain = database.getAxioms().isRdfSchema()
                     && includeInferred && isQueryTimeExpander(); 
             
+//            System.err.println("s=" + s + ", p=" + p + ", o=" + o
+//                    + ",\nincludeInferred=" + includeInferred + ", backchain="
+//                    + backchain
+//                    + ",\nrawAccessPath="
+//                    + accessPath
+//                    + "\nrangeCount(exact)="
+//                    + accessPath.rangeCount(true/*exact*/));
+  
             if (backchain) {
 
                 /*
@@ -1749,7 +1759,12 @@ public class BigdataSail extends SailBase implements Sail {
                  */
                 
                 src = new BackchainAccessPath(database, accessPath).iterator();
-                
+
+//                System.err.print("backchainAccessPath");
+//                System.err.println(": rangeCount="
+//                        + new BackchainAccessPath(database, accessPath)
+//                                .rangeCount(true/* exact */));
+
             } else {
 
                 /*
