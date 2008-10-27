@@ -1607,20 +1607,21 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
         // lock manager.
         final LockManager<String> lockManager = concurrencyManager.getWriteService().getLockManager();
 
-        // resource(s) to lock (exclusive locks are used).
+        final Thread t = Thread.currentThread();
+        
+        if(INFO)
+            log.info("Unisolated write task: " + this + ", thread=" + t);
 
-        if(INFO) log.info("Unisolated write task: "+this+", thread="+Thread.currentThread());
-
-        // declare resource(s).
+        // declare resource(s) to lock (exclusive locks are used).
         lockManager.addResource(resource);
 
         // delegate will handle lock acquisition and invoke doTask().
-        LockManagerTask<String> delegate = new LockManagerTask<String>(lockManager,
+        final LockManagerTask<String> delegate = new LockManagerTask<String>(lockManager,
                 resource, new InnerWriteServiceCallable(this));
         
         final WriteExecutorService writeService = concurrencyManager.getWriteService();
 
-        writeService.beforeTask(Thread.currentThread(), this);
+        writeService.beforeTask(t, this);
 
         boolean ran = false;
 
@@ -1676,15 +1677,16 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
             return ret;
 
-        } catch (Throwable t) {
+        } catch (Throwable t2) {
 
             if (!ran) {
 
                 // Do not re-invoke it afterTask failed above.
 
-                if(INFO) log.info("Task failed: class="+this+" : "+t);
+                if (INFO)
+                    log.info("Task failed: class=" + this + " : " + t2);
                 
-                writeService.afterTask(this, t);
+                writeService.afterTask(this, t2);
 
             }
 
@@ -1693,10 +1695,10 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
              * if it craps out).
              */
             
-            if (t instanceof Exception)
-                throw (Exception) t;
+            if (t2 instanceof Exception)
+                throw (Exception) t2;
 
-            throw new RuntimeException(t);
+            throw new RuntimeException(t2);
 
         } finally {
             
