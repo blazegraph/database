@@ -552,22 +552,27 @@ public class FullTextIndex extends AbstractRelation {
      */
     protected Analyzer getAnalyzer(String languageCode) {
 
+        final IKeyBuilder keyBuilder = getKeyBuilder();
+
         Map<String, AnalyzerConstructor> map = getAnalyzers();
         
         AnalyzerConstructor ctor = null;
         
-        if(languageCode==null) {
+        if (languageCode == null) {
         
-            final IKeyBuilder keyBuilder = getKeyBuilder();
+            if (keyBuilder.isUnicodeSupported()) {
 
-            // The configured local for the database.
-            final Locale locale = ((KeyBuilder) keyBuilder).getSortKeyGenerator()
-                    .getLocale();
+                // The configured local for the database.
+                final Locale locale = ((KeyBuilder) keyBuilder)
+                        .getSortKeyGenerator().getLocale();
 
-            // The analyzer for that locale.
-            Analyzer a = getAnalyzer(locale.getLanguage());
+                // The analyzer for that locale.
+                Analyzer a = getAnalyzer(locale.getLanguage());
+
+                if (a != null)
+                    return a;
             
-            if(a != null) return a;
+            }
             
             // fall through
             
