@@ -35,7 +35,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.cache.WeakValueCache;
@@ -82,19 +81,17 @@ import com.bigdata.counters.Instrument;
  */
 public class LockManager</*T,*/R extends Comparable<R>> {
 
-    protected static final Logger log = Logger.getLogger(LockManager.class);
+    final protected static Logger log = Logger.getLogger(LockManager.class);
 
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final protected boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final protected boolean DEBUG = log.isDebugEnabled();
 
     /**
      * Each resource that can be locked has an associated {@link ResourceQueue}.
@@ -459,7 +456,7 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
         //            try {
 
-        Thread tx = Thread.currentThread();
+        final Thread tx = Thread.currentThread();
 
         // synchronize before possible modification.
         synchronized (resourceQueues) {
@@ -672,19 +669,21 @@ public class LockManager</*T,*/R extends Comparable<R>> {
      */
     void releaseLocks(boolean waiting) {
 
+        if (INFO)
+            log.info("Releasing locks");
+
         //            resourceManagementLock.lock();
 
         final Thread tx = Thread.currentThread();
 
         try {
 
-            log.info("Releasing locks");
-
             final Collection<R> resources = lockedResources.remove(tx);
 
             if (resources == null) {
 
-                if(INFO) log.info("No locks: " + tx);
+                if (INFO)
+                    log.info("No locks: " + tx);
 
                 return;
 
