@@ -242,7 +242,7 @@ public class RDFJoinNexus implements IJoinNexus {
     /**
      * The default factory for rule evaluation.
      */
-    private final IRuleTaskFactory defaultTaskFactory;
+//    private final IRuleTaskFactory defaultTaskFactory;
 
     /**
      * The factory for rule evaluation plans.
@@ -453,7 +453,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
         this.filter = joinNexusFactory.filter;
         
-        this.defaultTaskFactory = new DefaultRuleTaskFactory();
+//        this.defaultTaskFactory = new DefaultRuleTaskFactory();
         
         this.planFactory = joinNexusFactory.planFactory;
    
@@ -785,8 +785,10 @@ public class RDFJoinNexus implements IJoinNexus {
             
                 final SPORelation spoRelation = (SPORelation)relation;
             
-                accessPath = new BackchainAccessPath(spoRelation.getContainer(),
-                    accessPath);
+                accessPath = new BackchainAccessPath(
+                        spoRelation.getContainer(), accessPath,
+                        joinNexusFactory.isOwlSameAsUsed ? Boolean.TRUE
+                                : Boolean.FALSE);
                 
             }
             
@@ -1071,7 +1073,7 @@ public class RDFJoinNexus implements IJoinNexus {
         if (taskFactory == null) {
 
             // no, use the default factory.
-            taskFactory = defaultTaskFactory;
+            taskFactory = joinNexusFactory.defaultRuleTaskFactory;
 
         }
         

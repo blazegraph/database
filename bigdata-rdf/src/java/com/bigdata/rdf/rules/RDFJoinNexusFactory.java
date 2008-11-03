@@ -54,6 +54,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
 
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.accesspath.BlockingBuffer;
@@ -63,12 +64,14 @@ import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.IRuleTaskFactory;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.IEvaluationPlan;
 import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 import com.bigdata.relation.rule.eval.ISolution;
+import com.bigdata.relation.rule.eval.IStepTask;
 
 /**
  * Factory for {@link RDFJoinNexus} objects.
@@ -89,6 +92,7 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
     /*final*/ long readTimestamp;
     final boolean justify;
     final boolean backchain;
+    final boolean isOwlSameAsUsed;
     final boolean forceSerialExecution;
     final int maxParallelSubqueries;
     final int chunkOfChunksCapacity;
@@ -99,6 +103,7 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
     @SuppressWarnings("unchecked")
 	final IElementFilter filter;
     final IEvaluationPlanFactory planFactory;
+    final IRuleTaskFactory defaultRuleTaskFactory;
 
     public String toString() {
         
@@ -118,6 +123,8 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
         
         sb.append(", backchain="+backchain);
         
+        sb.append(", isOwlSameAsUsed="+isOwlSameAsUsed);
+        
         sb.append(", forceSerialExecution="+forceSerialExecution);
         
         sb.append(", maxParallelSubqueries="+maxParallelSubqueries);
@@ -135,6 +142,9 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
         sb.append(", filter="+(filter==null?"N/A":filter.getClass().getName()));
 
         sb.append(", planFactory="+planFactory.getClass().getName());
+
+        sb.append(", defaultRuleTaskFactory="
+                + defaultRuleTaskFactory.getClass().getName());
 
         sb.append("}");
         
@@ -172,6 +182,9 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
      *            are included when reading on an {@link IAccessPath} for the
      *            {@link SPORelation} using the {@link InferenceEngine} to
      *            "backchain" any necessary entailments.
+     * @param isOwlSameAsUsed
+     *            <code>true</code> iff {@link Axioms#isOwlSameAs()} AND
+     *            <code>(x owl:sameAs y)</code> is not empty in the data.
      * @param chunkOfChunksCapacity
      *            The capacity of the thread-safe {@link IBuffer}s used to
      *            buffer chunks of {@link ISolution}s, often from concurrent
@@ -201,14 +214,21 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
      * @param planFactory
      *            The factory used to generate {@link IEvaluationPlan}s for
      *            {@link IRule}s.
+     * @param defaultRuleTaskFactory
+     *            The factory that will be used to generate the
+     *            {@link IStepTask} to execute an {@link IRule} unless the
+     *            {@link IRule} explictly specifies a factory object using
+     *            {@link IRule#getTaskFactory()}.
      */
 	public RDFJoinNexusFactory(RuleContextEnum ruleContext, ActionEnum action,
             long writeTimestamp, long readTimestamp,//
             boolean forceSerialExecution, int maxParallelSubqueries,//
-            boolean justify, boolean backchain, int chunkOfChunksCapacity,
-            int chunkCapacity, long chunkTimeout, int fullyBufferedReadThreshold,
+            boolean justify, boolean backchain, boolean isOwlSameAsUsed, 
+            int chunkOfChunksCapacity, int chunkCapacity, long chunkTimeout,
+            int fullyBufferedReadThreshold,
             int solutionFlags, IElementFilter filter,
-            IEvaluationPlanFactory planFactory) {
+            IEvaluationPlanFactory planFactory,
+            IRuleTaskFactory defaultRuleTaskFactory) {
 
         if (ruleContext == null)
             throw new IllegalArgumentException();
@@ -236,6 +256,8 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
 //                : false;
 
         this.backchain = backchain;
+
+        this.isOwlSameAsUsed = isOwlSameAsUsed;
         
         this.forceSerialExecution = forceSerialExecution;
         
@@ -254,6 +276,8 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
         this.filter = filter;
         
         this.planFactory = planFactory;
+        
+        this.defaultRuleTaskFactory = defaultRuleTaskFactory;
 
     }
 

@@ -76,9 +76,16 @@ public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
         
         private Hiterator<IHit> getHiterator() {
             if (hiterator == null) {
+                assert database!=null;
+                assert query != null;
+                if (database.getSearchEngine() == null)
+                    throw new UnsupportedOperationException(
+                            "No free text index?");
                 hiterator = database.getSearchEngine().search
-                    ( query.getLabel(), query.getLanguage(), 
-                      0d/* minCosine */, 10000/* maxRank */
+                    ( query.getLabel(),
+                      query.getLanguage(), 
+                      0d/* minCosine */,
+                      10000/* maxRank */
                       );                
             }
             return hiterator;

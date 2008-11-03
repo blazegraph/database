@@ -42,6 +42,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.BlockingBuffer;
+import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBuffer;
@@ -56,7 +57,6 @@ import com.bigdata.relation.rule.ISlice;
 import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.striterator.IChunkedOrderedIterator;
-import com.bigdata.striterator.IKeyOrder;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.ExecutionHelper;
 
@@ -294,7 +294,8 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
         } catch (Throwable t) {
 
             if (InnerCause.isInnerCause(t, InterruptedException.class)||
-                InnerCause.isInnerCause(t, ClosedByInterruptException.class)) {
+                InnerCause.isInnerCause(t, ClosedByInterruptException.class) ||
+                InnerCause.isInnerCause(t, BufferClosedException.class)) {
                 
                 /*
                  * The root cause was the asynchronous close of the buffer that
@@ -480,6 +481,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
         try {
 
             final int tailIndex = getTailIndex(orderIndex);
+            
             while (itr.hasNext()) {
 
                 if (last > 0 && ruleStats.solutionCount.get() > last) {
@@ -489,56 +491,21 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
                     
                 }
                 
+                // Next chunk of results from the current access path.
+                final Object[] chunk = itr.nextChunk();
+                
+                ruleStats.chunkCount[tailIndex]++;
+
+                ChunkTrace.chunk(orderIndex, chunk);
+                
                 if (orderIndex + 1 < tailCount) {
 
-                    // Nested subquery.
-
-                    final Object[] chunk;
-                    if (reorderChunkToTargetOrder) {
-                        
-                        /*
-                         * Re-order the chunk into the target order for the
-                         * _next_ access path.
-                         * 
-                         * FIXME This imples that we also know the set of
-                         * indices on which we need to read for a rule before we
-                         * execute the rule. That knowledge should be captured
-                         * and fed into the LDS and EDS/JDS rule execution logic
-                         * in order to optimize JOINs.
-                         */
-                        
-                        // target chunk order.
-                        final IKeyOrder targetKeyOrder = ruleState.keyOrder[getTailIndex(orderIndex + 1)];
-
-                        // Next chunk of results from the current access path.
-                        chunk = itr.nextChunk(targetKeyOrder);
-                        
-                    } else {
-                        
-                        // Next chunk of results from the current access path.
-                        chunk = itr.nextChunk();
-                        
-                    }
-
-                    ruleStats.chunkCount[tailIndex]++;
-
-                    // Issue the nested subquery.
+                    // Issue nested subquery.
                     runSubQueries(orderIndex, chunk, bindingSet, buffer);
 
                 } else {
 
-                    // bottomed out.
-                    
-                    /*
-                     * Next chunk of results from that access path. The order of
-                     * the elements in this chunk does not matter since this is
-                     * the last join dimension.
-                     */
-                    final Object[] chunk = itr.nextChunk();
-
-                    ruleStats.chunkCount[tailIndex]++;
-
-                    // evaluate the chunk and emit any solutions.
+                    // Bottomed out. Evaluate the chunk and emit solution(s).
                     emitSolutions(orderIndex, chunk, bindingSet, buffer);
                     
                 }
@@ -578,7 +545,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      *            object is NOT thread-safe.
      */
     protected void applyOptional(final int orderIndex,
-            final IBindingSet bindingSet, IBuffer<ISolution> buffer)
+            final IBindingSet bindingSet, final IBuffer<ISolution> buffer)
             throws InterruptedException {
 
         final int tailIndex = getTailIndex(orderIndex);
@@ -738,23 +705,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
         }
 
     }
-
-    /**
-     * Determines whether we will sort the elements in a chunk into the natural
-     * order for the index for the target join dimension.
-     * 
-     * @todo Is there any advantage to re-order the chunk into the key order for
-     *       the next join dimension?  Test with and without.
-     *       <p>
-     *       What we really need is to re-order the generated bindings and the
-     *       next join dimension should be doing that, not this one. In order to
-     *       do that we need to process a chunk of binding sets at a time for
-     *       the next join dimension.
-     *       <p>
-     *       See {@link JoinMasterTask} which does this.
-     */
-    private static final boolean reorderChunkToTargetOrder = true;
-        
+    
     /**
      * Runs the subquery in the caller's thread (this was the original
      * behavior).

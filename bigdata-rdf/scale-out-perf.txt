@@ -467,7 +467,20 @@ TripleStore
        the DirectBufferStrategy.  This could show up as a concurrency
        problem with the indices when the store is used in a mode that
        is in fact concurrent and an overflow is triggered.
+------------------------------------------------------------
+LexiconRelation:
 
+  - The termCache is currently disabled for the LexiconRelation.  Does
+    this have any positive effect on data load or query when it is
+    enabled?  (It does not help for dataset + query combinations such
+    as LUBM Q6 which have very little reuse of terms within the query
+    or across queries, but it might help for other scenarios.)
+
+  - Performance tuning.
+
+  - Better (de-)serialization of RDF Values?
+
+------------------------------------------------------------
 Short term tasks:
 
    - (*) Builds and releases.
@@ -1083,6 +1096,9 @@ Short term tasks:
          the cache itself is always dense in terms of the bytes
          written on the address space.
 
+============================================================
+Full text index.
+
    - Done. Full text indexing for KB.
 
        - Done. Analyzers are not thread-safe.
@@ -1131,6 +1147,13 @@ per-query basis.
 
        - Try out an mg4j integration for an alternative text indexer
          and search.
+
+       - Try with native JNI library.
+
+       - Try with the fieldId elided for the full text index (for the
+         KB).
+
+============================================================
 
    - Done.  Either never retry an error task when the queue is likely
      to be full or make the retry itself robust.  Otherwise the CDL
@@ -2852,7 +2875,7 @@ junit.framework.AssertionFailedError: #dataService0 expected:<1> but was:<2>
 	at com.bigdata.service.TestIndexPartitionMove.test_move(TestIndexPartitionMove.java:441)
 
 ============================================================
-JOIN optimzations:
+JOIN optimizations:
 
   - JoinMaster
  
@@ -2889,11 +2912,11 @@ JOIN optimzations:
     - Done. Modify ProgramTask to advance the read-historical
       timestamp at the start of each closure round.
 
-    - Modify owl:sameAs  expansion to be a  rule rewrite so  it can be
-      distributed just  like any other rule.   Each {@link IPredicate}
-      is  expanded into  3 predicates  with the  appropriate anonymous
-      variables since  otherwise we  will be in  a position  where the
-      index partition for the stated  predicate is local but the index
+    - Modify owl:sameAs expansion to be a rule rewrite so it can be
+      distributed just like any other rule.  Each {@link IPredicate}
+      is expanded into 3 predicates with the appropriate anonymous
+      variables since otherwise we will be in a position where the
+      index partition for the stated predicate is local but the index
       partitions for the owl:sameAs expansion are distributed.
 
     - Free text search should probably be a foreign key join, but the
@@ -2921,6 +2944,84 @@ JOIN optimzations:
 
     - Modify ProgramTask so that LDS runs the entire program on the
       data service.
+
+  - Look for further performance tuning, heap cost reduction, etc.
+
+  - 1/2 of the cost of query evaluation right now appears to be
+    converting Sesame Values to BigdataValues.  The cost is mostly
+    resolving the lexicon using the sparse row store.  This could be
+    addressed by some of the issues that I have noted before
+    concerning the resource locator, most notably using a logical row
+    scan to recover all property values for the resources in the
+    tripleStore container.
+
+    Query performance for test harnesses such as LUBM would be better
+    if we obtain the Sail for the [lastCommitTime] directly rather
+    than for the UNISOLATED view first.  That would move the cost of
+    resolving those resources outside of the timed issueQuery() call.
+
+  * LUBM U50/Q9 can show unacceptable performance for the first trial.
+    This appears to be work Ok for some specific (but difficult to
+    identify) BlockingBuffer constants.  The problem appears with both
+    the nexted and the pipeline join strategies, at least for LTS.
+
+  - LUBM LTS Q8 is slower with the pipeline join.
+
+  - (***) LUBM Q9 is inconsistent (!?!) with the pipeline join.
+
+    Also, I have seen some +1/-1 differences in the #of elements
+    visited for an access path in LUBM Q8, so maybe the problem is
+    more common but not as readily observable for some queries because
+    fewer binding sets are propagated from one join dimension to the
+    next?
+
+  * Make sure that we have unit tests which cover both nested subquery
+    and pipeline joins for all deployments (LTS, LDS, EDS, JDS) for
+    (closure vs query) and (full text search, optionals) and any other
+    rule features that need testing (DISTINCT, ORDER BY, SLICE, etc).
+
+  - Try LUBM U5 Q9 with chunkCapacity=1000 and with
+    maxParallelSubqueries=0, 5, 10, 50.
+
+  - Experiment with differing values for chunkTimeout.  1000ms seems a
+    long time for the consumer to be willing to wait when they could
+    get moving sooner on a smaller chunk.  Also try with
+    chunkTimeout=0, which disables the chunk combiner.
+
+  - Turn off the query time expanders for scale-out joins.  This will
+    disable both (x type resource) and owl:sameAs expansion. We will
+    need to handle owl:sameAs by rule rewrites.  (x type resource) is
+    won't be supported since it requires access to the scale-out index
+    for each join task, which is not supported when the join itself is
+    distributed across the index partitions.  Note that this will not
+    disable full text search support since that is handled as part of
+    the BigdataEvaluationStrategyImpl.
+
+- Pipeline join text search (LTS,EDS).
+
+  - LTS should just work.
+
+  - EDS/JDS: If the predicate defines an IExpander then DO NOT map the
+    predicate.  Instead, use getTailAccessPath() and evaluate the
+    expander in process.  This will force it to use the scale-out
+    index (IClientIndexView) if the expander touches the index.
+
+    There can be more than one bns#search predicate, but they will all
+    be ordered first by the evaluation plan.  This means that the
+    DistributedJoinMaster needs to consume predicates until it finds
+    the first predicate that does NOT use an expander and then map
+    that predicate across the index partitions.
+
+  - (***) EOSSYS R9 is underproducing with the new join algorithm (2
+    vs 10) and is failing to terminate when using the regex variant of
+    R9!  The regex variant is also not reporting the bindingSets out
+    and related JoinStats data for the last predicate in the
+    evaluation order.
+
+- NestedSubqueryJoin
+  
+  - Modify so that maxParallelSubqueries is applied per join
+    dimension.  See if that improves throughput on LUBM and EOSSYS.
 
 ============================================================
 CLOSURE CORRECTNESS
@@ -3008,97 +3109,14 @@ DefaultRuleTaskFactory
    NestedSubqueryWithJoinThreadsTask.
 
 ============================================================
-
-This appears occasionally when loading and closing U1.  The exception
-is probably related to the change to obtain the lastCommitTime when
-computing each round of the closure.  Note that there are also
-warnings for "Unknown transactions" - those are probably the last
-commit time on the store, but the timestamp is being interpreted as a
-transaction identifier.	  
-
-Computing closure: now=Wed Oct 22 10:59:29 EDT 2008
-WARN : 8860 pool-1-thread-6         com.bigdata.journal.Journal.getIndex(Journal.java:393): Unknown transaction: name=kb.spo.SPO, tx=1224687569078
-Exception in thread "Main Thread" WARN : 8860 pool-1-thread-6         com.bigdata.journal.Journal.getIndex(Journal.java:393): Unknown transaction: name=kb.spo.POS, tx=1224687569078
-WARN : 8860 pool-1-thread-6         com.bigdata.journal.Journal.getIndex(Journal.java:393): Unknown transaction: name=kb.spo.OSP, tx=1224687569078
-java.lang.RuntimeException: java.util.concurrent.ExecutionException: java.lang.IllegalStateException
-	at com.bigdata.rdf.rules.InferenceEngine.computeClosure(InferenceEngine.java:524)
-	at com.bigdata.rdf.rules.InferenceEngine.computeClosure(InferenceEngine.java:438)
-	at edu.lehigh.swat.bench.ubt.bigdata.BigdataRepository.load(BigdataRepository.java:545)
-	at edu.lehigh.swat.bench.ubt.Test.doTestLoading(Test.java:217)
-	at edu.lehigh.swat.bench.ubt.Test.testLoad(Test.java:129)
-	at edu.lehigh.swat.bench.ubt.Test.main(Test.java:107)
-Caused by: java.util.concurrent.ExecutionException: java.lang.IllegalStateException
-	at java.util.concurrent.FutureTask$Sync.innerGet(FutureTask.java:205)
-	at java.util.concurrent.FutureTask.get(FutureTask.java:80)
-	at com.bigdata.relation.rule.eval.ProgramTask.executeMutation(ProgramTask.java:472)
-	at com.bigdata.relation.rule.eval.ProgramTask.executeProgramWithEmbeddedClosure(ProgramTask.java:678)
-	at com.bigdata.relation.rule.eval.ProgramTask.call(ProgramTask.java:270)
-	at com.bigdata.rdf.rules.RDFJoinNexus.runLocalProgram(RDFJoinNexus.java:1619)
-	at com.bigdata.rdf.rules.RDFJoinNexus.runProgram(RDFJoinNexus.java:1590)
-	at com.bigdata.rdf.rules.RDFJoinNexus.runMutation(RDFJoinNexus.java:1516)
-	at com.bigdata.rdf.rules.InferenceEngine.computeClosure(InferenceEngine.java:516)
-	... 5 more
-Caused by: java.lang.IllegalStateException
-	at com.bigdata.rdf.spo.SPORelation.getSPOIndex(SPORelation.java:519)
-	at com.bigdata.rdf.spo.SPORelation.getIndex(SPORelation.java:498)
-	at com.bigdata.rdf.spo.SPORelation.getAccessPath(SPORelation.java:892)
-	at com.bigdata.rdf.spo.SPORelation._getAccessPath(SPORelation.java:792)
-	at com.bigdata.rdf.spo.SPORelation.getAccessPath(SPORelation.java:764)
-	at com.bigdata.rdf.rules.RDFJoinNexus.getTailAccessPath(RDFJoinNexus.java:793)
-	at com.bigdata.relation.rule.eval.DefaultRangeCountFactory.rangeCount(DefaultRangeCountFactory.java:85)
-	at com.bigdata.relation.rule.eval.DefaultEvaluationPlan2.rangeCount(DefaultEvaluationPlan2.java:401)
-	at com.bigdata.relation.rule.eval.DefaultEvaluationPlan2.getFirstJoin(DefaultEvaluationPlan2.java:294)
-	at com.bigdata.relation.rule.eval.DefaultEvaluationPlan2.calc(DefaultEvaluationPlan2.java:260)
-	at com.bigdata.relation.rule.eval.DefaultEvaluationPlan2.<init>(DefaultEvaluationPlan2.java:166)
-	at com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2.newPlan(DefaultEvaluationPlanFactory2.java:19)
-	at com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2.newPlan(DefaultEvaluationPlanFactory2.java:1)
-	at com.bigdata.relation.rule.eval.RuleState.<init>(RuleState.java:79)
-	at com.bigdata.relation.rule.eval.NestedSubqueryWithJoinThreadsTask.<init>(NestedSubqueryWithJoinThreadsTask.java:228)
-	at com.bigdata.relation.rule.eval.DefaultRuleTaskFactory.newTask(DefaultRuleTaskFactory.java:41)
-	at com.bigdata.relation.rule.eval.MutationTask.newMutationTasks(MutationTask.java:347)
-	at com.bigdata.relation.rule.eval.MutationTask.call(MutationTask.java:110)
-	at com.bigdata.relation.rule.eval.MutationTask.call(MutationTask.java:1)
-	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:269)
-	at java.util.concurrent.FutureTask.run(FutureTask.java:123)
-	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:650)
-	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:675)
-	at java.lang.Thread.run()V(Unknown Source)
-
-============================================================
-EOSSYS
-
-  - Examine periodic latency on the order of 250ms for query.
-
-  - Examine query performance.  How can we improve performance
-    relative to the other stores?
-
-  - Try with COLLATOR=ASCII.
-
-  - Try with native JNI library.
-
-  - Try with the fieldId elided for the full text index.
-
-  - Look for further performance tuning, heap cost reduction, etc.
-
-  - Try w/ queue statistics collection turned off and make sure that
-    sampling does not impose much of a burden, including by requiring
-    locks to report the queue size, etc. (do we even collect these
-    statistics for LTS?)
-
-  - 250ms latency and sometimes zero latency may simply be a
-    side-effect of thread scheduling.  If a thread yields, there can
-    be a wait before it runs again.  Variations could easily arise
-    from this behavior.
-
-  - Try with performance analyzer and look for places where we are
-    waiting to obtain a lock.  Could also use the jrockit console and
-    look at lock contention, but a thread yielding is not going to
-    show up under lock contention.  Maybe there is another statistic
-    for that?
-
-============================================================
 Conferences and papers:
 
 http://www.semantic-conference.com/2009/cfptopics/, proposals due Nov
 24th.
 
+
+-Xmx500m -server -Xrunjavaperf:cg -Dlog4j.configuration=file:src/resources/logging/log4j.properties -Djava.security.policy=policy.all -cp "bigdata-lubm.jar;lib/ctc_utils-5-4-2005.jar;lib/cweb-commons-1.1-b2-dev.jar;lib/cweb-extser-0.1-b2-dev.jar;lib/cweb-junit-ext-1.1-b3-dev.jar;lib/junit-3.8.1.jar;lib/lgpl-utils-1.0-b3-dev.jar;lib/log4j-1.2.8.jar;lib/apache/commons-io-1.4.jar;lib/icu/icu4j-3_6.jar;lib/lucene/lucene-analyzers-2.2.0.jar;lib/lucene/lucene-core-2.2.0.jar;lib/unimi/colt-1.2.0.jar;lib/unimi/fastutil-5.1.4.jar;lib/slf4j-api-1.4.3.jar;lib/slf4j-log4j12-1.4.3.jar;lib/openrdf-sesame-2.2-onejar.jar;lib/jini/classserver.jar;lib/jini/jini-core.jar;lib/jini/jini-ext.jar;lib/jini/jsk-lib.jar;lib/jini/jsk-platform.jar;lib/jini/jsk-resources.jar;lib/jini/reggie.jar;lib/jini/start.jar;lib/jini/sun-util.jar;lib/jini/tools.jar" edu.lehigh.swat.bench.ubt.Test query src/java/edu/lehigh/swat/bench/ubt/bigdata/config.kb.bigdata src/java/edu/lehigh/swat/bench/ubt/bigdata/config.query.sparql
+
+-Xmx500m -server -Xrunjavaperf:cg -Dlog4j.configuration=file:src/resources/logging/log4j.properties -Djava.security.policy=policy.all -cp "bigdata-lubm.jar;lib/ctc_utils-5-4-2005.jar;lib/cweb-commons-1.1-b2-dev.jar;lib/cweb-extser-0.1-b2-dev.jar;lib/cweb-junit-ext-1.1-b3-dev.jar;lib/junit-3.8.1.jar;lib/lgpl-utils-1.0-b3-dev.jar;lib/log4j-1.2.8.jar;lib/apache/commons-io-1.4.jar;lib/icu/icu4j-3_6.jar;lib/lucene/lucene-analyzers-2.2.0.jar;lib/lucene/lucene-core-2.2.0.jar;lib/unimi/colt-1.2.0.jar;lib/unimi/fastutil-5.1.4.jar;lib/slf4j-api-1.4.3.jar;lib/slf4j-log4j12-1.4.3.jar;lib/openrdf-sesame-2.2-onejar.jar;lib/jini/classserver.jar;lib/jini/jini-core.jar;lib/jini/jini-ext.jar;lib/jini/jsk-lib.jar;lib/jini/jsk-platform.jar;lib/jini/jsk-resources.jar;lib/jini/reggie.jar;lib/jini/start.jar;lib/jini/sun-util.jar;lib/jini/tools.jar" edu.lehigh.swat.bench.ubt.Test query src/java/edu/lehigh/swat/bench/ubt/bigdata/config.kb.eossys src/java/edu/lehigh/swat/bench/ubt/bigdata/config.query.eossys
+
+------------------------------------------------------------

@@ -61,7 +61,7 @@ public class BigdataSolutionResolverator
      * {@link IBindingSet}s in which term identifiers have been resolved to
      * {@link BigdataValue}s.
      */
-    protected IBindingSet[] resolveNextChunk(final ISolution[] chunk) {
+    protected IBindingSet[] resolveChunk(final ISolution[] chunk) {
 
         if (INFO)
             log.info("Fetched chunk: size=" + chunk.length);

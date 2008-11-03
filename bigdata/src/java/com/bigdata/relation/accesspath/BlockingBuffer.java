@@ -29,6 +29,7 @@ package com.bigdata.relation.accesspath;
 
 import java.nio.channels.FileChannel;
 import java.util.NoSuchElementException;
+import java.util.Queue;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
@@ -85,6 +86,45 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     protected static final boolean DEBUG = log.isDebugEnabled();
 
     /**
+     * The initial delay before we will log a warning for {@link #add(Object)}
+     * and {@link BlockingBuffer.BlockingIterator#hasNext(long, TimeUnit)}.
+     */
+    private static final long initialLogTimeout = TimeUnit.NANOSECONDS.convert(
+            2000L, TimeUnit.MILLISECONDS);
+
+    /**
+     * The maximum timeout before we log the next warning for
+     * {@link #add(Object)} and
+     * {@link BlockingBuffer.BlockingIterator#hasNext(long, TimeUnit)}.
+     * The log timeout will double after each warning logged up to this maximum.
+     */
+    private static final long maxLogTimeout = TimeUnit.NANOSECONDS
+            .convert(10000L, TimeUnit.MILLISECONDS);
+    
+    /**
+     * The #of times that we will use {@link BlockingQueue#offer(Object)} or
+     * {@link Queue#poll()} before converting to the variants of those methods
+     * which accept a timeout. The timeouts are used to reduce the contention
+     * for the queue if either the producer or the consumer is lagging.
+     */
+    private static final int NSPIN = 100;
+    
+    /**
+     * The timeout for offer() or poll() as a function of the #of tries that
+     * have already been made to {@link #add(Object)} or read a chunk.
+     * 
+     * @param ntries
+     *            The #of tries.
+     *            
+     * @return The timeout (milliseconds).
+     */
+    private static final long getTimeout(final int ntries) {
+        
+        return ntries < 500 ? 10L : ntries < 1000 ? 100L : 250L;
+        
+    }
+
+    /**
      * <code>true</code> until the buffer is {@link #close()}ed.
      */
     private volatile boolean open = true;
@@ -102,19 +142,29 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     private final IAsynchronousIterator<E> iterator;
     
     /**
-     * The default capacity for the internal buffer. Chunks can not be larger
-     * than this.
+     * The default capacity for the internal {@link Queue} on which elements (or
+     * chunks of elements) are buffered.
      */
     protected static transient final int DEFAULT_CAPACITY = 5000;
 
+    /**
+     * The default target chunk size for
+     * {@link BlockingBuffer.BlockingIterator#next()}.
+     */
     protected static transient final int DEFAULT_CHUNK_SIZE = 10000;
 
-    protected static transient final long DEFAULT_CHUNK_TIMEOUT = 1000;
+    /**
+     * The default timeout in milliseconds during which chunks of elements may
+     * be combined by {@link BlockingBuffer.BlockingIterator#next()}.
+     */
+    protected static transient final long DEFAULT_CHUNK_TIMEOUT = 20;
 
     protected static transient final TimeUnit DEFAULT_CHUNK_TIMEOUT_UNIT = TimeUnit.MILLISECONDS;
 
     /**
      * The target chunk size for the chunk combiner.
+     * 
+     * @see #DEFAULT_CHUNK_SIZE
      */
     private final int chunkCapacity;
 
@@ -122,6 +172,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      * The maximum time to wait in nanoseconds for another chunk to come along
      * so that we can combine it with the current chunk for {@link #next()}. A
      * value of ZERO(0) disables chunk combiner.
+     * 
+     * @see #DEFAULT_CHUNK_TIMEOUT
      */
     private final long chunkTimeout;
 
@@ -244,12 +296,45 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         
         this.iterator = new BlockingIterator();
 
+        /*
+         * The stack frame in which the buffer was allocated. This gives you a
+         * clue about who is the producer that will write on the buffer.
+         * 
+         * Note: This is only allocated for debugging purposes. Otherwise the
+         * stack frame should not be taken.
+         */
+//        this.stackFrame = new RuntimeException("Buffer Allocation Stack Frame");
+        
+    }
+
+    private RuntimeException stackFrame;
+
+    public String toString() {
+
+        final StringBuilder sb = new StringBuilder();
+
+        sb.append("BlockingBuffer");
+
+        sb.append("{ open=" + open);
+
+        sb.append(", hasFuture=" + future != null);
+
+        sb.append(", elementCount=" + elementCount);
+
+        sb.append(", chunkCount=" + chunkCount);
+
+        if (cause != null)
+            sb.append(", cause=" + cause);
+
+        sb.append("}");
+
+        return sb.toString();
+
     }
 
     /**
-     * @throws IllegalStateException
-     *             if the buffer is not open. The cause of that
-     *             IllegalStateException will be set if
+     * @throws BufferClosedException
+     *             if the buffer is not open. The cause will be set if
      *             {@link #abort(Throwable)} was used.
      */
     private void assertOpen() {
@@ -258,11 +343,11 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         
             if (cause != null) {
 
-                throw new IllegalStateException(cause);
+                throw new BufferClosedException(cause);
                 
             }
             
-            throw new IllegalStateException();
+            throw new BufferClosedException();
             
         }
         
@@ -288,14 +373,30 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      */
     public void close() {
     
+        if (open) {
+         
+            if (INFO)
+                log.info("closed.");
+            
+            if (stackFrame != null) {
+
+                /*
+                 * Purely for debugging.
+                 */
+                
+                log.warn("closing buffer at", new RuntimeException());
+
+                log.warn("buffer allocated at", stackFrame);
+                
+            }
+            
+        }
+        
         this.open = false;
 
-        if (INFO)
-            log.info("closed.");
-        
     }
 
-    public void abort(Throwable cause) {
+    public void abort(final Throwable cause) {
 
         if (cause == null)
             throw new IllegalArgumentException();
@@ -357,71 +458,105 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         
     }
 
+    /**
+     * @throws BufferClosedException
+     *             if the buffer has been {@link #close()}d.
+     */
     public void add(E e) {
 
         assertOpen();
 
-        final long begin = System.currentTimeMillis();
+        final long begin = System.nanoTime();
         
         // wait if the queue is full.
         int ntries = 0;
         // initial delay before the 1st log message.
-        long timeout = 100;
-        // Note: controls time between log messages NOT the wait time.
-        final long maxTimeout = 10000;
+        long logTimeout = initialLogTimeout;
 
         while (true) {
 
-            try {
+            /*
+             * Note: While not the only explanation, a timeout here can occur if
+             * you have nested JOINs. The outer JOIN can timeout waiting on the
+             * inner JOINs to consume the current tuple. If there are a lot of
+             * tuples being evaluated in the inner JOINs, then a timeout is
+             * becomes more likely.
+             * 
+             * Note: This is basically a spin lock, though offer(e) does acquire
+             * a lock internally. If we have spun enough times, then we will use
+             * staged timeouts for subsequent offer()s. This allows the consumer
+             * to catch up with less contention for the queue.
+             */
 
-                if (!queue.offer(e, timeout, TimeUnit.MILLISECONDS)) {
+            final boolean added;
 
-                    /*
-                     * Note: While not the only explanation, a timeout here can
-                     * occur if you have nested JOINs. The outer JOIN can
-                     * timeout waiting on the inner JOINs to consume the current
-                     * tuple. If there are a lot of tuples being evaluated in
-                     * the inner JOINs, then a timeout is becomes more likely.
-                     */
-                    
-                    ntries++;
-                    
-                    final long elapsed = System.currentTimeMillis() - begin;
+            if (ntries < NSPIN) {
 
-                    timeout = Math.min(maxTimeout, timeout *= 2);
-                    
-                    log.warn("waiting - queue is full: ntries=" + ntries
-                            + ", elapsed=" + elapsed + ", timeout=" + timeout);
+                // offer (non-blocking).
+                added = queue.offer(e);
 
-                    continue;
-                    
+            } else {
+
+                final long timeout = getTimeout(ntries);
+
+                try {
+
+                    // offer (staged timeout).
+                    added = queue.offer(e, timeout, TimeUnit.MILLISECONDS);
+
+                } catch (InterruptedException ex) {
+
+                    abort(ex);
+
+                    throw new RuntimeException("Buffer closed by interrupt", ex);
+
                 }
-                
-            } catch (InterruptedException ex) {
 
-                abort(ex);
-
-                throw new RuntimeException("Buffer closed by interrupt", ex);
-                
             }
-            
+
+            if (!added) {
+
+                ntries++;
+
+                final long elapsed = System.nanoTime() - begin;
+
+                if (elapsed >= logTimeout) {
+
+                    logTimeout += Math.min(maxLogTimeout, logTimeout);
+
+                    log.warn("waiting - queue is full: ntries="
+                            + ntries
+                            + ", elapsed="
+                            + TimeUnit.MILLISECONDS.convert(elapsed,
+                                    TimeUnit.NANOSECONDS)
+                            + ", timeout="
+                            + TimeUnit.MILLISECONDS.convert(logTimeout,
+                                    TimeUnit.NANOSECONDS));
+
+                }
+
+                // try to add the element again.
+                continue;
+
+            }
+
             // item now on the queue.
 
-            if(e.getClass().getComponentType() != null) {
-                
+            if (e.getClass().getComponentType() != null) {
+
                 chunkCount++;
                 elementCount += ((Object[]) e).length;
-                
+
             } else {
-                
+
                 elementCount++;
-                
+
             }
             if (DEBUG)
                 log.debug("added: " + e.toString());
-            
+
             return;
-            
+
         }
         
     }
@@ -493,6 +628,10 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
          * and there are no more elements in the buffer then the iterator is
          * exhausted since there is nothing left that it can visit and nothing
          * new will enter into the buffer.
+         * <p>
+         * Note: This is NOT <code>volatile</code> since it is set by the
+         * consumer using {@link #close()} and the consumer is supposed to be
+         * single-threaded.
          */
         private boolean open = true;
 
@@ -526,20 +665,20 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             
         }
        
-        /**
-         * @throws IllegalStateException
-         *             if the {@link BlockingBuffer#abort(Throwable)} was
-         *             invoked asynchronously.
-         */
-        private void assertNotAborted() {
-
-            if (cause != null) {
-
-                throw new IllegalStateException(cause);
-
-            }
-                
-        }
+//        /**
+//         * @throws IllegalStateException
+//         *             if the {@link BlockingBuffer#abort(Throwable)} was
+//         *             invoked asynchronously.
+//         */
+//        final private void assertNotAborted() {
+//
+//            if (cause != null) {
+//
+//                throw new IllegalStateException(cause);
+//
+//            }
+//                
+//        }
 
         /**
          * Notes that the iterator is closed and hence may no longer be read.
@@ -573,38 +712,57 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
             open = false;
 
-            if (future != null && !future.isDone()) {
+            if (future == null) {
 
-                if(DEBUG) {
-                    
-                    log.debug("will cancel future: "+future);
-                    
-                }
-                
+                log.warn("Future not set");
+
+            } else if (!future.isDone()) {
+
+                if (DEBUG)
+                    log.debug("will cancel future: " + future);
+
                 future.cancel(true/* mayInterruptIfRunning */);
-                
-                if(DEBUG) {
-                    
-                    log.debug("did cancel future: "+future);
-                    
-                }
+
+                if (DEBUG)
+                    log.debug("did cancel future: " + future);
 
             }
 
         }
 
+//        /**
+//         * <code>true</code> iff the {@link Future} has been set and
+//         * {@link Future#isDone()} returns <code>true</code>.
+//         */
+//        public boolean isFutureDone() {
+//            
+//            return futureIsDone;
+//            
+//        }
+        
         /**
-         * <code>true</code> iff the {@link Future} has been set and
-         * {@link Future#isDone()} returns <code>true</code>.
+         * Checks the {@link BlockingBuffer#future} to see if it (a) is done;
+         * and (b) has completed successfully. The first time this method checks
+         * the {@link Future} and discovers that {@link Future#isDone()} returns
+         * <code>true</code> it {@link BlockingBuffer#close()}s the
+         * {@link BlockingBuffer}. This is done in case the producer fails to
+         * close the {@link BlockingBuffer} themselves. If this method tests the
+         * {@link Future} and discovers an exception, then it will wrap and
+         * re-throw that exception such that it becomes visible to the consumer.
+         * <p>
+         * Note: {@link #hasNext()} WILL NOT return <code>false</code> until
+         * the {@link BlockingBuffer} is closed. Therefore, this method MUST be
+         * invoked MUST be invoked periodically. We do this if the iterator
+         * appears to not be progressing since failure by the producer to close
+         * the {@link BlockingBuffer} will lead to an iterator that appears to
+         * be stalled. However, we also must invoke {@link #checkFuture()} no
+         * later than when {@link #hasNext(long, TimeUnit)} returns
+         * <code>false</code> in order for the consumer to be guarenteed to
+         * see any exception thrown by the producer.
+         * <p>
+         * Note: Once the {@link BlockingBuffer} is closed (except for aborts),
+         * the consumer still needs to drain the {@link BlockingBuffer#queue}.
          */
-        public boolean isFutureDone() {
-            
-            return futureIsDone;
-            
-        }
-        
-        private volatile boolean futureIsDone = false;
-        
         private final void checkFuture() {
 
             if (!futureIsDone && future != null && future.isDone()) {
@@ -647,13 +805,23 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
                 }
 
-                /*
-                 * Fall through. If there is anything in the queue then we still
-                 * need to drain it!
-                 */
+            }
+
+        }
+        private boolean futureIsDone = false;
+
+        public boolean isExhausted() {
+            
+            if (!BlockingBuffer.this.open && nextE == null && queue.isEmpty()) {
+
+                // iterator is known to be exhausted.
+                return true;
 
             }
 
+            // iterator might visit more elements (might not also).
+            return false;
+            
         }
 
         /**
@@ -674,20 +842,6 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             
         }
         
-        public boolean isExhausted() {
-            
-            if (!BlockingBuffer.this.open && nextE == null && queue.isEmpty()) {
-
-                // iterator is known to be exhausted.
-                return true;
-
-            }
-
-            // iterator might visit more elements (might not also).
-            return false;
-            
-        }
-
         public boolean hasNext(final long timeout, final TimeUnit unit) {
             
             if (nextE != null) {
@@ -697,15 +851,50 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                 
             }
 
-            if (DEBUG)
-                log.debug("begin");
+            /*
+             * core impl.
+             */
+            
+            final long nanos = unit.toNanos(timeout);
+
+//            final boolean hasNext = _hasNext(nanos);
+//            
+//            if(!hasNext) {
+//                
+//                /*
+//                 * Note: We call checkFuture() no later than when hasNext()
+//                 * would return false so that the consumer will see any
+//                 * exception thrown by the producer's Future.
+//                 */
+//                
+//                checkFuture();
+//                
+//            }
+            
+            return _hasNext(nanos);
+
+        }
+        
+        /**
+         * 
+         * @param nanos
+         *            The number of nanos seconds remaining until timeout. This
+         *            value is decremented until LTE ZERO (0L), at which point
+         *            {@link #_hasNext(long)} will timeout.
+         * 
+         * @return iff an element is available before the timeout has expired.
+         */
+        private boolean _hasNext(long nanos) {
 
             final long begin = System.nanoTime();
 
-            // note: timeout when nanos <= 0.
-            long nanos = unit.toNanos(timeout);
+            long lastTime = begin;
 
-            long lastTime = System.nanoTime();
+            // #of times that we poll() the queue.
+            int ntries = 0;
+
+            // the timeout until the next log message.
+            long logTimeout = initialLogTimeout;
 
             /*
              * Loop while the BlockingBuffer is open -or- there is an element
@@ -717,36 +906,52 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
              * This re-tests whether or not the buffer is open after a timeout
              * and continues to loop until the buffer is closed AND there are no
              * more elements in the queue.
+             * 
+             * Note: These tests are in order of _speed_. poll() and isEmpty()
+             * both acquire a lock, so they are the slowest. BlockingBuffer.open
+             * is volatile. nextE is just a local field.
              */
-            int ntries = 0;
-            // the timeout until the next log message.
-            long logTimeout = 2000;
-            // maximum delay between log messages (NOT the wait time).
-            final long maxLogDelay = 10000;
-            // note: tests are in order of _speed_ (isEmpty acquires a lock)
             while (nextE != null || BlockingBuffer.this.open
-                    || !queue.isEmpty()) {
+                    || ((nextE = queue.poll()) != null)) {
 
+                if (nextE != null) {
+
+                    /*
+                     * Either nextE was already bound or the queue was not empty
+                     * and we took the head of the queue using the non-blocking
+                     * poll().
+                     * 
+                     * Note: poll() is no more expensive than size(). However,
+                     * it both tests whether or not the queue is empty and takes
+                     * the head of the queue iff it is not empty. Note that we
+                     * DO NOT poll unless [nextE] is [null] since that would
+                     * cause us to loose the value in [nextE].
+                     */
+                    return true;
+
+                }
+                
                 /*
                  * Perform some checks to decide whether the iterator is still
-                 * valid. These checks are tested before we check the timeout
-                 * which is a preference for finding (a) a problem with the
-                 * iterator; or (b) that we already have the next element.
+                 * valid.
                  */
                 
-                checkFuture();
-                
-                assertNotAborted();
-
                 if(!open) {
                     
                     if (INFO)
                         log.info("iterator is closed");
+
+                    // check before returning a strong [false] (vs timeout).
+                    checkFuture();
                     
                     return false;
                     
                 }
-                
+
+                // Note: tests volatile field.
+                if (cause != null)
+                    throw new IllegalStateException(cause);
+
                 /*
                  * Now that we have those checks out of the way, update the time
                  * remaining and see if we have a timeout.
@@ -763,35 +968,38 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
                     if (INFO)
                         log.info("Timeout");
-                    
+
+                    // weak false (timeout).
                     return false;
                     
                 }
                 
-                try {
+                /*
+                 * Poll the queue.
+                 * 
+                 * Note: DO NOT sleep() here. Polling will use a Condition to
+                 * wake up when there is something in the queue. If you sleep()
+                 * here then ANY timeout can introduce an unacceptable latency
+                 * since many queries can be evaluated in LT 10ms !
+                 * 
+                 * Note: Even with poll(timeout,unit), a modest timeout will
+                 * result in the thread yielding and a drammatic performance
+                 * hit. We are better off using a short timeout so that we can
+                 * continue to test the other conditions, specifically whether
+                 * the buffer was closed asynchronously. Otherwise a client that
+                 * writes nothing on the buffer will wind up hitting the timeout
+                 * inside of poll(timeout,unit).
+                 */
+
+                if (ntries < NSPIN) {
 
                     /*
-                     * Poll the queue with a timeout. If there is nothing on the
-                     * queue, then increase the timeout and retry from the top
-                     * (this will re-check whether or not the buffer has been
-                     * closed asynchronously).
-                     * 
-                     * Note: DO NOT sleep() here. Polling will use a Condition
-                     * to wake up when there is something in the queue. If you
-                     * sleep() here then ANY timeout can introduce an
-                     * unacceptable latency since many queries can be evaluated
-                     * in LT 10ms !
-                     * 
-                     * Note: Even with poll(timeout,unit), a modest timeout will
-                     * result in the thread yielding and a drammatic performance
-                     * hit. We are better off using a short timeout so that we
-                     * can continue to test the other conditions, specifically
-                     * whether the buffer was closed asynchronously. Otherwise a
-                     * client that writes nothing on the buffer will wind up
-                     * hitting the timeout inside of poll(timeout,unit).
+                     * This is basically a spin lock (it can spin without
+                     * yielding if there is no contention for the queue because
+                     * the producer is lagging).
                      */
-
-                    if ((nextE = queue.poll(1L, TimeUnit.MILLISECONDS)) != null) {
+                    
+                    if ((nextE = queue.poll()) != null) {
                         
                         if (DEBUG)
                             log.debug("next: " + nextE);
@@ -800,28 +1008,56 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
                     }
                     
-                } catch (InterruptedException ex) {
-
-                    if (INFO)
-                        log.info(ex.getMessage());
-
-                    // itr will not deliver any more elements.
-                    close();
+                } else {
                     
-                    return false;
+                    /*
+                     * Here we are willing to be put to sleep for a bit. This
+                     * can free a CPU that was otherwise caught in a spin on
+                     * poll() to run the producer so that we have something to
+                     * read.
+                     */
                     
+                    try {
+
+                        final long timeout = getTimeout(ntries);
+                        
+                        if ((nextE = queue.poll(timeout, TimeUnit.MILLISECONDS)) != null) {
+
+                            if (DEBUG)
+                                log.debug("next: " + nextE);
+
+                            return true;
+
+                        }
+                    
+                    } catch (InterruptedException ex) {
+
+                        if (INFO)
+                            log.info(ex.getMessage());
+
+                        // itr will not deliver any more elements.
+                        close();
+
+                        // strong false (interrupted, so itr is closed).
+                        checkFuture();
+                        
+                        return false;
+
+                    }
+
                 }
                 
                 /*
                  * Nothing available yet on the queue.
                  */
 
+                assert nextE == null;
+                
                 ntries++;
                 
-                final long elapsed = TimeUnit.MILLISECONDS.convert(
-                        (now - begin), TimeUnit.NANOSECONDS);
+                final long elapsedNanos = (now - begin);
 
-                if (elapsed > logTimeout) {
+                if (elapsedNanos >= logTimeout) {
 
                     /*
                      * This could be a variety of things such as waiting on a
@@ -833,7 +1069,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                      */
 
                     // increase timeout until the next log message.
-                    logTimeout = Math.min(maxLogDelay, logTimeout *= 2);
+                    logTimeout += Math.min(maxLogTimeout, logTimeout);
 
                     if (future == null) {
 
@@ -846,13 +1082,27 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                          * will show up.
                          */
 
-                        log.error("Future not set on buffer");
+                        log.error("Future not set on buffer.");
 
                     } else {
 
+                        /*
+                         * check future : if there is an error in the producer
+                         * task and the producer fails to close() the blocking
+                         * buffer then the iterator will appear to be stalled.
+                         */
+                        
+                        checkFuture();
+                        
                         log.warn("Iterator is not progressing: ntries="
-                                + ntries + ", elapsed=" + elapsed);
-
+                                + ntries
+                                + ", elapsed="
+                                + TimeUnit.MILLISECONDS.convert(elapsedNanos,
+                                        TimeUnit.NANOSECONDS) + "ms"
+//                                        , stackFrame // shows where it was allocated.
+//                                        , new RuntimeException() // shows where it is being consumed.
+                                );
+                        
                     }
 
                 }
@@ -865,15 +1115,16 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             if (INFO)
                 log.info("Exhausted");
 
-            assert !BlockingBuffer.this.open;
-
-            assert nextE == null;
+            assert isExhausted();
+            
+            // strong false - the iterator is exhausted.
+            checkFuture();
             
             return false;
 
         }
 
-        public E next(long timeout, TimeUnit unit) {
+        public E next(final long timeout, final TimeUnit unit) {
 
             final long startTime = System.nanoTime();
             
@@ -903,17 +1154,24 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             }
 
             final E e = _next();
-
-            // remaining nanos until timeout.
-            nanos = System.nanoTime() - startTime;
             
-            if (nanos > 0 && e.getClass().getComponentType() != null) {
+            if (e.getClass().getComponentType() != null) {
                 
                 /*
-                 * Combine chunk(s).
+                 * Combine chunk(s)?
                  */
-                
-                return combineChunks(e, 1/* nchunks */, System.nanoTime(), nanos);
+
+                final long now = System.nanoTime();
+
+                // remaining nanos until timeout.
+                nanos = now - startTime;
+
+                if (nanos > 0) {
+
+                    // combine chunks.
+                    return combineChunks(e, 1/* nchunks */, now, nanos);
+
+                }
                 
             }
 
