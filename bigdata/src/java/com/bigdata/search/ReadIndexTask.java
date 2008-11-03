@@ -3,7 +3,6 @@ package com.bigdata.search;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
@@ -13,6 +12,7 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.rawstore.Bytes;
 
@@ -40,14 +40,12 @@ public class ReadIndexTask implements Callable<Object> {
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final protected static boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final protected static boolean DEBUG = log.isDebugEnabled();
 
     private final String queryTerm;
     private final boolean prefixMatch;
@@ -159,9 +157,11 @@ public class ReadIndexTask implements Callable<Object> {
             log.debug("queryTerm=" + queryTerm + ", termWeight="
                     + queryTermWeight);
 
+        final Thread t = Thread.currentThread();
+        
         while (itr.hasNext()) {
 
-            if (Thread.currentThread().isInterrupted()) {
+            if (t.isInterrupted()) {
 
                 if (INFO)
                     log.info("Interrupted: queryTerm=" + queryTerm + ", nhits="
@@ -175,10 +175,16 @@ public class ReadIndexTask implements Callable<Object> {
             final ITuple tuple = itr.next();
             
             // key is {term,docId,fieldId}
-            final byte[] key = tuple.getKey();
+//            final byte[] key = tuple.getKey();
+//            
+//            // decode the document identifier.
+//            final long docId = KeyBuilder.decodeLong(key, key.length
+//                    - Bytes.SIZEOF_LONG /*docId*/ - Bytes.SIZEOF_INT/*fieldId*/);
+
+            final ByteArrayBuffer kbuf = tuple.getKeyBuffer();
             
             // decode the document identifier.
-            final long docId = KeyBuilder.decodeLong(key, key.length
+            final long docId = KeyBuilder.decodeLong(kbuf.array(), kbuf.limit()
                     - Bytes.SIZEOF_LONG /*docId*/ - Bytes.SIZEOF_INT/*fieldId*/);
 
             /*

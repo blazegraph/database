@@ -75,6 +75,33 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
 
     final private AbstractTripleStore database;
     final private IAccessPath<ISPO> accessPath;
+    
+    /**
+     * Message thread related to the introduction of this property and possible
+     * side-effects when computing closure.
+     * <p>
+     * I have refactored to allow the joinNexus(Factory) to pass along
+     * [isOwlSameAsUsed]. it is true iff the axiom model supports sameAs AND
+     * there is an owl:sameAs assertion in the data. It is evaluated once per
+     * program by AbstractTripleStore#newJoinNexusFactory(...).
+     * <p>
+     * I have one question. Can a closure rule entail an owl:sameAs assertion if
+     * there are none in the data? I.e., are there scenarios under which
+     * [isOwlSameAsUsed] would evaluate to [false] if tested before closure and
+     * to [true] if evaluated after closure. I don't think that it matters
+     * either way since we don''t use the sameAs backchainer during closure
+     * itself, but I wanted to run it past you anyway. -bryan
+     * <p>
+     * The only way that could happen is if there were a property that was a
+     * subproperty of owl:sameAs and that subproperty was used in the data. I’ve
+     * never seen anything like that, but it is technically possible. -mike
+     * <p>
+     * Ok. But still, it is not a problem since we are not using the backchainer
+     * during closure, right? -bryan
+     * <p>
+     * We do not use the backchainer during closure, correct. -mike
+     */
+    private Boolean isOwlSameAsUsed;
 
     /**
      * 
@@ -86,6 +113,28 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
     public BackchainAccessPath(AbstractTripleStore database,
             IAccessPath<ISPO> accessPath) {
 
+        this(database, accessPath, null);
+
+    }
+
+    /**
+     * 
+     * @param database
+     *            The database whose entailments will be backchained.
+     * @param accessPath
+     *            The source {@link IAccessPath}.
+     * @param isOwlSameAsUsed
+     *            When non-<code>null</code>, this {@link Boolean} indicates
+     *            whether the statement pattern <code>(x owl:sameAs y)</code>
+     *            is known to be empty in the data. Specify <code>null</code>
+     *            if you do not know this up front. This parameter is used to
+     *            factor out the test for this statement pattern, but that test
+     *            is only performed if {@link Axioms#isOwlSameAs()} is
+     *            <code>true</code>.
+     */
+    public BackchainAccessPath(AbstractTripleStore database,
+            IAccessPath<ISPO> accessPath, Boolean isOwlSameAsUsed) {
+
         if (database == null)
             throw new IllegalArgumentException();
 
@@ -96,8 +145,11 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
         
         this.accessPath = accessPath;
         
+        // MAY be null
+        this.isOwlSameAsUsed = isOwlSameAsUsed;
+        
     }
-
+    
     /**
      * The source {@link IAccessPath}.
      */
@@ -198,30 +250,60 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
 
         if (!axioms.isOwlSameAs()) {
             
-            // no owl:sameAs entailments.
+            /*
+             * No owl:sameAs entailments.
+             */
+            
             owlSameAsItr = null;
         
         } else if(inf.forwardChainOwlSameAsClosure && !inf.forwardChainOwlSameAsProperties) {
-            
-            final long owlSameAs = vocab.get(OWL.SAMEAS);
-            
-            if (database.getAccessPath(NULL, owlSameAs, NULL).isEmpty()) {
 
+            if(isOwlSameAsUsed != null && !isOwlSameAsUsed.booleanValue()) {
+                
                 /*
-                 * No owl:sameAs assertions in the KB, so we do not need to
-                 * backchain owl:sameAs.
+                 * The caller asserted that no owl:sameAs assertions exist in
+                 * the KB, so we do not need to backchain owl:sameAs.
                  */
                 
                 owlSameAsItr = null;
 
             } else {
+            
+                final long owlSameAs = vocab.get(OWL.SAMEAS);
 
-                final SPO spo = new SPO(predicate);
+                if (isOwlSameAsUsed == null) {
 
-                owlSameAsItr = new OwlSameAsPropertiesExpandingIterator(
-                        spo.s, spo.p, spo.o,
-                        database, owlSameAs, accessPath.getKeyOrder());
-                
+                    /*
+                     * The caller did not specify whether or not there are
+                     * owl:sameAs assertions in the data so we have to test the
+                     * data ourselves.
+                     */
+                    
+                    isOwlSameAsUsed = database.getAccessPath(NULL, owlSameAs,
+                            NULL).isEmpty();
+
+                }
+
+                if (isOwlSameAsUsed.booleanValue()) {
+
+                    /*
+                     * No owl:sameAs assertions in the KB, so we do not need to
+                     * backchain owl:sameAs.
+                     */
+                    
+                    owlSameAsItr = null;
+
+                } else {
+
+                    // There is at least one owl:sameAs assertion in the data.
+                    final SPO spo = new SPO(predicate);
+
+                    owlSameAsItr = new OwlSameAsPropertiesExpandingIterator(
+                            spo.s, spo.p, spo.o, database, owlSameAs,
+                            accessPath.getKeyOrder());
+                    
+                }
+
             }
             
         } else {

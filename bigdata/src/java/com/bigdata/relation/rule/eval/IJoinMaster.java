@@ -34,7 +34,7 @@ import java.util.UUID;
 
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.eval.JoinMasterTask.JoinStats;
-import com.bigdata.relation.rule.eval.JoinMasterTask.JoinTask;
+import com.bigdata.relation.rule.eval.JoinMasterTask.DistributedJoinTask;
 
 /**
  * Interface exported by the {@link JoinMasterTask}.
@@ -46,15 +46,15 @@ public interface IJoinMaster extends Remote {
     
     /**
      * Return a unique identifier for the {@link JoinMasterTask} instance. This
-     * is used to concentrate all {@link JoinTask} that target the same tail
-     * predicate and index partition onto the same {@link JoinTask} sink.
+     * is used to concentrate all {@link DistributedJoinTask} that target the same tail
+     * predicate and index partition onto the same {@link DistributedJoinTask} sink.
      * 
      * @return The unique identifer.
      */
     UUID getUUID() throws IOException;
     
     /**
-     * A proxy for the buffer on which the last {@link JoinTask} must write its
+     * A proxy for the buffer on which the last {@link DistributedJoinTask} must write its
      * <em>query</em> solutions. Note that mutation operations DO NOT use this
      * buffer in order to avoid sending all data through the master.
      * 

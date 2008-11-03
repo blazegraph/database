@@ -44,19 +44,19 @@ import com.bigdata.striterator.ICloseableIterator;
  */
 public interface IAsynchronousIterator<E> extends ICloseableIterator<E> {
 
-    /**
-     * Return <code>true</code> if the {@link Future} that is writing on the
-     * {@link IBlockingBuffer} has been set and is done. This indicates that all
-     * results are materialized on the queue and will be visited without waiting
-     * on the {@link Future}. It does NOT indicate whether or not the
-     * {@link Future} completely successfully. This method may be used to decide
-     * whether or not {@link Iterator#hasNext()} would block. When this method
-     * returns <code>true</code> {@link Iterator#hasNext()} should not block
-     * because no more elements will be added to the {@link BlockingBuffer}.
-     * 
-     * @return <code>true</code> iff the producer is done.
-     */
-    public boolean isFutureDone();
+//    /**
+//     * Return <code>true</code> if the {@link Future} that is writing on the
+//     * {@link IBlockingBuffer} has been set and is done. This indicates that all
+//     * results are materialized on the queue and will be visited without waiting
+//     * on the {@link Future}. It does NOT indicate whether or not the
+//     * {@link Future} completely successfully. This method may be used to decide
+//     * whether or not {@link Iterator#hasNext()} would block. When this method
+//     * returns <code>true</code> {@link Iterator#hasNext()} should not block
+//     * because no more elements will be added to the {@link BlockingBuffer}.
+//     * 
+//     * @return <code>true</code> iff the producer is done.
+//     */
+//    public boolean isFutureDone();
 
     /**
      * Return <code>true</code> iff this iterator will not visit any more

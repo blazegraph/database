@@ -1,7 +1,7 @@
 package com.bigdata.rdf.store;
 
 import java.util.Collection;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -30,6 +30,18 @@ public class BigdataStatementIteratorImpl
         extends
         AbstractChunkedResolverator<ISPO, BigdataStatement, AbstractTripleStore>
         implements BigdataStatementIterator {
+
+//    final protected static Logger log = Logger.getLogger(BigdataStatementIteratorImpl.class);
+//
+//    /**
+//     * True iff the {@link #log} level is INFO or less.
+//     */
+//    final protected static boolean INFO = log.isInfoEnabled();
+//
+//    /**
+//     * True iff the {@link #log} level is DEBUG or less.
+//     */
+//    final protected static boolean DEBUG = log.isDebugEnabled();
 
     /**
      * 
@@ -62,10 +74,10 @@ public class BigdataStatementIteratorImpl
      * Resolve a chunk of {@link ISPO}s into a chunk of
      * {@link BigdataStatement}s.
      */
-    protected BigdataStatement[] resolveNextChunk(final ISPO[] chunk) {
+    protected BigdataStatement[] resolveChunk(final ISPO[] chunk) {
 
-        if (INFO)
-            log.info("chunkSize=" + chunk.length);
+        if (DEBUG)
+            log.debug("chunkSize=" + chunk.length);
 
         /*
          * Create a collection of the distinct term identifiers used in this
@@ -74,7 +86,7 @@ public class BigdataStatementIteratorImpl
 
 //        LongOpenHashSet ids = new LongOpenHashSet(chunk.length*4);
         
-        final Collection<Long> ids = new HashSet<Long>(chunk.length * 4);
+        final Collection<Long> ids = new LinkedHashSet<Long>(chunk.length * 4);
 
         for (ISPO spo : chunk) {
 
@@ -92,8 +104,8 @@ public class BigdataStatementIteratorImpl
 
         }
 
-        if (INFO)
-            log.info("Resolving " + ids.size() + " term identifiers");
+        if (DEBUG)
+            log.debug("Resolving " + ids.size() + " term identifiers");
         
         /*
          * Batch resolve term identifiers to BigdataValues, obtaining the

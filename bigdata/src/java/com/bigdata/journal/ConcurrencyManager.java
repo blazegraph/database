@@ -23,7 +23,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractBTree;
@@ -1083,8 +1082,9 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * 
      * @return The {@link Future}.
      */
-    private Future<? extends Object> submitWithDynamicLatency(AbstractTask task,
-            ExecutorService service, TaskCounters taskCounters) {
+    private Future<? extends Object> submitWithDynamicLatency(
+            final AbstractTask task, final ExecutorService service,
+            final TaskCounters taskCounters) {
 
         taskCounters.taskSubmitCount.incrementAndGet();
         
@@ -1193,11 +1193,11 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * @exception RejectedExecutionException
      *                if any task cannot be scheduled for execution
      */
-    public List<Future<? extends Object>> invokeAll(Collection<AbstractTask> tasks)
-            throws InterruptedException {
+    public List<Future<? extends Object>> invokeAll(
+            final Collection<AbstractTask> tasks) throws InterruptedException {
 
         assertOpen();
-        
+
         final List<Future<? extends Object>> futures = new LinkedList<Future<? extends Object>>();
 
         boolean done = false;
@@ -1289,8 +1289,9 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * @exception RejectedExecutionException
      *                if any task cannot be scheduled for execution
      */
-    public List<Future<? extends Object>> invokeAll(Collection<AbstractTask> tasks,
-            long timeout, TimeUnit unit) throws InterruptedException {
+    public List<Future<? extends Object>> invokeAll(
+            final Collection<AbstractTask> tasks, final long timeout,
+            final TimeUnit unit) throws InterruptedException {
 
         assertOpen();
         

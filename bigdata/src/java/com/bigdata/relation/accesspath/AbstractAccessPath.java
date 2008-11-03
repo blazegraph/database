@@ -818,53 +818,83 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         final BlockingBuffer<R[]> buffer = new BlockingBuffer<R[]>(
                 chunkOfChunksCapacity);
         
-        final Future<Void> future = indexManager.getExecutorService().submit(new Callable<Void>(){
-        
-            public Void call() {
-                
-                /*
-                 * Chunked iterator reading from the ITupleIterator. The filter
-                 * was already applied by the ITupleIterator so we do not use it
-                 * here.
-                 */
-                final IChunkedOrderedIterator<R> itr = new ChunkedWrappedIterator<R>(
-                                src, chunkCapacity, keyOrder, null/*filter*/);
-                
-                try {
-                    
-                    while(src.hasNext()) {
-                     
-                        /*
-                         * Note: The chunk size is determined by the source
-                         * iterator.
-                         */
-                        final R[] chunk = itr.nextChunk();
-                        
-                        buffer.add( chunk );
-                        
-                    }
-                    
-                } finally {
-        
-                    if (DEBUG)
-                        log.debug("Closing buffer: " + AbstractAccessPath.this);
-                    
-                    buffer.close();
-                    
-                    itr.close();
-                    
-                }
-                
-                return null;
-                
-            }
-            
-        });
+        final Future<Void> future = indexManager.getExecutorService().submit(
+                new ChunkConsumerTask(src, buffer));
 
         buffer.setFuture(future);
         
         return new ChunkConsumerIterator<R>(buffer.iterator(), keyOrder);
             
+    }
+    
+    /**
+     * Consumes elements from the source iterator, converting them into chunks
+     * on a {@link BlockingBuffer}. The consumer will drain the chunks from the
+     * buffer.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private class ChunkConsumerTask implements Callable<Void> {
+        
+        final Iterator<R> src;
+        final BlockingBuffer<R[]> buffer;
+        
+        /**
+         * 
+         * @param src
+         *            The source iterator visiting elements read from the
+         *            relation.
+         * @param buffer
+         *            The buffer onto which chunks of those elements will be
+         *            written.
+         */
+        public ChunkConsumerTask(final Iterator<R> src,
+                final BlockingBuffer<R[]> buffer) {
+        
+            this.src =src;
+            this.buffer = buffer;
+
+        }
+            
+        public Void call() throws Exception {
+
+            /*
+             * Chunked iterator reading from the ITupleIterator. The filter was
+             * already applied by the ITupleIterator so we do not use it here.
+             */
+            final IChunkedOrderedIterator<R> itr = new ChunkedWrappedIterator<R>(
+                    src, chunkCapacity, keyOrder, null/* filter */);
+
+            try {
+
+                while (src.hasNext()) {
+
+                    /*
+                     * Note: The chunk size is determined by the source
+                     * iterator.
+                     */
+                    final R[] chunk = itr.nextChunk();
+
+                    buffer.add(chunk);
+
+                }
+
+            } finally {
+
+                if (DEBUG)
+                    log.debug("Closing buffer: " + AbstractAccessPath.this);
+
+                buffer.close();
+
+                itr.close();
+
+            }
+
+            return null;
+
+        }
+
     }
 
     final public long rangeCount(boolean exact) {
@@ -876,16 +906,16 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         if(exact) {
         
             n = ndx.rangeCountExact(fromKey, toKey);
-            
+
         } else {
 
             if (historicalRead) {
 
                 // cachable.
-                n = historicalRangeCount(fromKey,toKey);
-                
+                n = historicalRangeCount(fromKey, toKey);
+
             } else {
-                
+
                 // not cachable.
                 n = ndx.rangeCount(fromKey, toKey);
                 

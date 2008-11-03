@@ -55,7 +55,11 @@ import com.bigdata.btree.keys.KeyBuilder.StrengthEnum;
 public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializable {
 
     protected static final transient Logger log = Logger.getLogger(DefaultKeyBuilderFactory.class);
-        
+    
+    protected static final transient boolean INFO = log.isInfoEnabled();
+
+    protected static final transient boolean DEBUG = log.isDebugEnabled();
+    
     /**
      * 
      */
@@ -214,7 +218,7 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
 
         }
 
-        if(log.isDebugEnabled()) {
+        if(DEBUG) {
             
             log.debug("name=" + key + ",val=" + val);
             
@@ -258,7 +262,7 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
         
         icu_avail = isICUAvailable();
 
-        if(log.isInfoEnabled()) {
+        if(INFO) {
 
             log.info("ICU library is" + (icu_avail ? "" : " not") + " available.");
             
@@ -288,7 +292,7 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
                  * by a property.
                  */
 
-                if (log.isInfoEnabled()) {
+                if (INFO) {
 
                     log.info("Defaulting: " + Options.COLLATOR + "="
                             + collator);
@@ -333,7 +337,7 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
 
             }
 
-            if (log.isInfoEnabled()) {
+            if (INFO) {
 
                 log.info("Using default locale: " + locale.getDisplayName());
 
@@ -365,7 +369,7 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
 
             }
             
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info(Options.STRENGTH + "=" + strength);
 
             /*
@@ -389,7 +393,7 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
                 mode = DecompositionEnum.valueOf(getProperty(properties,
                         Options.DECOMPOSITION));
 
-                if (log.isInfoEnabled())
+                if (INFO)
                     log.info(Options.DECOMPOSITION + "=" + mode);
 
             }
@@ -402,7 +406,7 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
 
         }
 
-        if(log.isInfoEnabled()) {
+        if(INFO) {
             
             log.info(toString());
             
@@ -412,7 +416,7 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
 
     public IKeyBuilder getKeyBuilder() {
 
-        if(log.isDebugEnabled()) {
+        if(DEBUG) {
             
             log.debug(toString());
             

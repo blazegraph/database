@@ -7,6 +7,7 @@ package com.bigdata.rdf.lexicon;
 import java.io.IOException;
 import java.io.StringReader;
 import java.lang.ref.SoftReference;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -1533,9 +1534,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      *         term identifier was not resolved then the map will not contain an
      *         entry for that term identifier.
      * 
-     * FIXME write unit tests getTerms(ids) - it's mainly used by the
-     * {@link BigdataStatementIteratorImpl} and
-     * {@link BigdataSolutionResolverator}.
+     * @todo write unit tests getTerms(ids) - it's mainly used by the
+     *       {@link BigdataStatementIteratorImpl} and
+     *       {@link BigdataSolutionResolverator}.
+     * 
+     * @todo performance tuning for statement pattern scans with resolution to
+     *       terms, e.g., LUBM Q6.
      */
     final public Map<Long,BigdataValue> getTerms(final Collection<Long> ids) {
 
@@ -1607,7 +1611,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
             final byte[][] keys = new byte[numNotFound][];
 
-            for(int i=0; i<numNotFound; i++) {
+            for (int i = 0; i < numNotFound; i++) {
 
                 // Note: shortcut for keyBuilder.id2key(id)
                 keys[i] = keyBuilder.reset().append(notFound[i]).getKey();
@@ -1617,7 +1621,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
             // the id:term index.
             final IIndex ndx = getId2TermIndex();
 
-            final int MAX_CHUNK = 5000;
+            /*
+             * Note: This parameter is not terribly sensitive.
+             */
+            final int MAX_CHUNK = 4000;
             if (numNotFound < MAX_CHUNK) {
 
                 /*
@@ -1633,24 +1640,41 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                  * Break it down into multiple chunks and resolve those chunks
                  * in parallel.
                  */
+
+                // #of elements.
+                final int N = numNotFound;
+                // target maximum #of elements per chunk.
+                final int M = MAX_CHUNK;
+                // #of chunks
+                final int nchunks = (int) Math.ceil((double)N / M);
+                // #of elements per chunk, with any remainder in the last chunk.
+                final int perChunk = N / nchunks;
                 
-                final LinkedList tasks = new LinkedList<Callable>();
+//                System.err.println("N="+N+", M="+M+", nchunks="+nchunks+", perChunk="+perChunk);
+                
+                final List tasks = new ArrayList<Callable>(nchunks);
 
                 int fromIndex = 0;
                 int remaining = numNotFound;
 
-                while (remaining > 0) {
+                for(int i=0; i<nchunks; i++) {
 
-                    final int chunkSize = Math.min(MAX_CHUNK, remaining);
+                    final boolean lastChunk = i + 1 == nchunks;
+                    
+                    final int chunkSize = lastChunk ? remaining : perChunk;
 
                     final int toIndex = fromIndex + chunkSize;
 
+                    remaining -= chunkSize;
+                    
+//                    System.err.println("chunkSize=" + chunkSize
+//                            + ", fromIndex=" + fromIndex + ", toIndex="
+//                            + toIndex + ", remaining=" + remaining);
+                    
                     tasks.add(new ResolveTermTask(ndx, fromIndex, toIndex,
                             keys, notFound, ret));
 
                     fromIndex = toIndex;
-
-                    remaining -= chunkSize;
                     
                 }
                 
@@ -1739,7 +1763,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         }
 
         public Void call() {
-
+            
             // aggregates results if lookup split across index partitions.
             final ResultBufferHandler resultHandler = new ResultBufferHandler(
                     toIndex, ndx.getIndexMetadata().getTupleSerializer()

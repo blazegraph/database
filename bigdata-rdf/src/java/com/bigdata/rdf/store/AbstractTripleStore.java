@@ -75,7 +75,6 @@ import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.axioms.BaseAxioms;
@@ -138,12 +137,14 @@ import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.IRuleTaskFactory;
 import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.Program;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.Var;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
+import com.bigdata.relation.rule.eval.DefaultRuleTaskFactory;
 import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
@@ -2014,7 +2015,7 @@ abstract public class AbstractTripleStore extends
      * @param p
      * @param o
      */
-    final public boolean hasStatement(long s, long p, long o) {
+    final public boolean hasStatement(final long s, final long p, final long o) {
 
         if (s != NULL && p != NULL && o != NULL) {
 
@@ -3672,14 +3673,29 @@ abstract public class AbstractTripleStore extends
             readTimestamp = getTimestamp();
             
         }
+
+        /*
+         * true iff owl:sameAs is (a) supported by the axiom model; and (b)
+         * there is at least one owl:sameAs assertion in the database.
+         */
+        final boolean isOwlSameAsUsed = getAxioms().isOwlSameAs()
+                && !getAccessPath(NULL, getVocabulary().get(OWL.SAMEAS), NULL)
+                        .isEmpty();
+        
+        /*
+         * @todo configuration property or always use the pipeline for scale-out
+         * (EDS, JDS) and nested subquery for LTS and LDS.
+         */ 
+        final IRuleTaskFactory defaultRuleTaskFactory = DefaultRuleTaskFactory.SUBQUERY;
+//        final IRuleTaskFactory defaultRuleTaskFactory = DefaultRuleTaskFactory.PIPELINE;
         
         return new RDFJoinNexusFactory(ruleContext, action, //
                 writeTimestamp, readTimestamp, //
                 forceSerialExecution, maxParallelSubqueries, //
-                justify, backchain,
+                justify, backchain, isOwlSameAsUsed,
                 chunkOfChunksCapacity, chunkCapacity, chunkTimeout,
                 fullyBufferedReadThreshold, solutionFlags,
-                filter, planFactory);
+                filter, planFactory, defaultRuleTaskFactory);
         
     }
     

@@ -86,6 +86,20 @@ public interface IBlockingBuffer<E> extends IBuffer<E> {
      * @return The iterator.
      */
     public IAsynchronousIterator<E> iterator();
+
+    /**
+     * Add an element to the buffer.
+     * <p>
+     * Note: This method is constrained to throw the specified exception if the
+     * buffer has been {@link #close()}d.
+     * 
+     * @param e
+     *            The element
+     * 
+     * @throws BufferClosedException
+     *             if the buffer has been {@link #close()}d.
+     */
+    public void add(E e);
     
     /**
      * Signal that no more data will be written on this buffer (this is required

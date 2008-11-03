@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.striterator;
 
 import java.util.NoSuchElementException;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
@@ -82,10 +83,10 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
      */
     private F[] chunk = null;
 
-    /**
-     * Total elapsed time for the iterator instance.
-     */
-    private long elapsed = 0L;
+//    /**
+//     * Total elapsed time for the iterator instance.
+//     */
+//    private long elapsed = 0L;
     
     /**
      * 
@@ -131,6 +132,9 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
      */
     public AbstractChunkedResolverator<E, F, S> start(ExecutorService service) {
         
+        if (resolvedItr != null)
+            throw new IllegalStateException();
+        
         /*
          * Create and run a task which reads chunks from the source iterator and
          * writes resolved chunks on the buffer.
@@ -171,37 +175,56 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private class ChunkConsumerTask implements Runnable {
+    private class ChunkConsumerTask implements Callable<Long> {
 
         public ChunkConsumerTask() {
             
         }
         
-        public void run() {
+        /**
+         * @return The #of elements (not chunks) that were converted.
+         * 
+         * @throws Exception
+         */
+        public Long call() throws Exception {
 
             try {
 
-                if (INFO)
-                    log.info("Start");
+                if (DEBUG)
+                    log.debug("Start");
 
                 final long begin = System.currentTimeMillis();
+
+                long nchunks = 0;
+                long nelements = 0;
                 
                 while (src.hasNext()) {
 
                     // fetch the next chunk.
                     final E[] chunk = src.nextChunk();
 
-                    buffer.add(resolveNextChunk(chunk));
-                        
-                    if (INFO)
-                        log.info("resolved: elapsed="
-                                + (System.currentTimeMillis() - begin) + "ms");
+                    final F[] converted = resolveChunk(chunk);
+                    
+                    assert converted.length == chunk.length;
+                    
+                    buffer.add(converted);
+
+                    nchunks++;
+                    nelements += chunk.length;
+                    
+                    if (DEBUG)
+                        log.debug("nchunks="+nchunks+", chunkSize="+chunk.length);
 
                 }
 
+                final long elapsed = (System.currentTimeMillis() - begin);
+                    
                 if (INFO)
-                    log.info("Finished: elapsed=" + elapsed);
+                    log.info("Finished: nchunks=" + nchunks + ", nelements="
+                            + nelements + ", elapsed=" + elapsed + "ms");
 
+                return nelements;
+                
             } finally {
 
                 src.close();
@@ -215,16 +238,18 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
     }
     
     /**
-     * Fetches the next chunk from the source iterator and resolves the term
-     * identifiers, producing a chunk of resolved elements. This method is
-     * invoked by the {@link ChunkConsumerTask} which runs asynchronously.
+     * Resolves the elements in a source chunk, returning a chunk of resolved
+     * elements.
+     * <p>
+     * Note: This method is invoked by the {@link ChunkConsumerTask} which runs
+     * asynchronously.
      * 
      * @param chunk
      *            The next chunk from the source iterator.
      * 
      * @return The resolved chunk.
      */
-    abstract protected F[] resolveNextChunk(final E[] chunk);
+    abstract protected F[] resolveChunk(final E[] chunk);
 
     /**
      * @throws IllegalStateException
@@ -233,7 +258,9 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
     public boolean hasNext() {
 
         if (resolvedItr == null) {
+            
             throw new IllegalStateException();
+
         }
         
         if (lastIndex != -1 && lastIndex + 1 < chunk.length) {
@@ -249,7 +276,7 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
 
     public F next() {
 
-        final long begin = System.currentTimeMillis();
+//        final long begin = System.currentTimeMillis();
         
         if (!hasNext())
             throw new NoSuchElementException();
@@ -262,20 +289,21 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
             // reset the index.
             lastIndex = -1;
 
-            if (INFO)
-                log.info("nextChunk ready: time="
-                        + (System.currentTimeMillis() - begin) + "ms");
+//            final long now = System.currentTimeMillis();
+            
+//            elapsed += (now - begin);
 
+            if (DEBUG)
+                log.debug("nextChunk ready");
+            
         }
 
-        // the next resolved statement.
+        // the next resolved element.
         final F f = chunk[++lastIndex];
             
         if (DEBUG)
             log.debug("lastIndex=" + lastIndex + ", chunk.length="
                     + chunk.length + ", stmt=" + f);
-
-        elapsed += (System.currentTimeMillis() - begin);
 
         return f;
 
@@ -293,7 +321,8 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
     public void close() {
 
         if (INFO)
-            log.info("elapsed=" + elapsed);
+            log.info("lastIndex=" + lastIndex + ", chunkSize="
+                    + (chunk != null ? "" + chunk.length : "N/A"));
 
         // asynchronous close by the consumer of the producer's buffer.
         buffer.close();

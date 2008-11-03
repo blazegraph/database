@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.util.concurrent;
 
-import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -209,42 +208,10 @@ public class ExecutionHelper<T> {
         
         if (causes != null) {
 
-            throw new ExecutionExceptions("Task error(s)", causes);
+            throw new ExecutionExceptions(causes);
 
         }
 
-    }
-
-    /**
-     * Class enumerates all {@link ExecutionException}s thrown for a set of
-     * tasks.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static final class ExecutionExceptions extends ExecutionException {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = -9141020515037822837L;
-        
-        private final List<ExecutionException> causes;
-
-        public List<ExecutionException> causes() {
-            
-            return Collections.unmodifiableList(causes);
-            
-        }
-        
-        protected ExecutionExceptions(String message, List<ExecutionException> causes) {
-            
-            super( message + causes.toString() );
-            
-            this.causes = causes;
-            
-        }
-        
     }
     
 }
