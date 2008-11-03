@@ -345,19 +345,31 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         return this;
         
     }
-    
-    /*
-     * ILocalTransactionManager
-     */
 
-//    public int getActiveTxCount() {
-//        return transactionManager.getActiveTxCount();
-//    }
-//    
-//    public int getPreparedTxCount() {
-//        return transactionManager.getPreparedTxCount();
-//    }
-    
+    /**
+     * Compacts the named indices found on this journal as of the most recent
+     * commit point, writing their view onto a new Journal. This method MAY be
+     * used concurrently with the {@link Journal} but writes after the selected
+     * commit point WILL NOT be reflected in the output file. Typical uses are
+     * to reduce the space required by the backing store, to improve locality in
+     * the backing store, and to make a backup of the most recent commit point.
+     * 
+     * @param outFile
+     *            The file on which the new journal will be created.
+     * 
+     * @return The {@link Future} on which you must {@link Future#get() wait}
+     *         for the {@link CompactTask} to complete. The already open journal
+     *         is accessible using {@link Future#get()}. If you are backing up
+     *         data, then be sure to shutdown the returned {@link Journal} so
+     *         that it can release its resources.
+     */
+    public Future<Journal> compact(final File outFile) {
+
+        return executorService.submit(new CompactTask(this, outFile,
+                getLastCommitTime()));
+        
+    }
+
     public void activateTx(ITx tx) throws IllegalStateException {
         localTransactionManager.activateTx(tx);
     }

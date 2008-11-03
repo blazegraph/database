@@ -132,14 +132,12 @@ abstract public class OverflowManager extends IndexManager {
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final protected static boolean DEBUG = log.isDebugEnabled();
 
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final protected static boolean INFO = log.isInfoEnabled();
 
     /**
      * Set based on {@link Options#COPY_INDEX_THRESHOLD}.

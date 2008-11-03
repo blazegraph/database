@@ -72,16 +72,16 @@ public class TestDiskJournal extends AbstractJournalTestCase {
         suite.addTestSuite(TestDiskJournal.class);
 
         // test suite for the IRawStore api.
-        suite.addTestSuite( TestRawStore.class );
+        suite.addTestSuite(TestRawStore.class);
 
         // test suite for handling asynchronous close of the file channel.
-        suite.addTestSuite( TestInterrupts.class );
+        suite.addTestSuite(TestInterrupts.class);
 
         // test suite for MROW correctness.
         suite.addTestSuite( TestMROW.class );
 
         // test suite for MRMW correctness.
-        suite.addTestSuite( TestMRMW.class );
+        suite.addTestSuite(TestMRMW.class);
 
         /*
          * Pickup the basic journal test suite. This is a proxied test suite, so
