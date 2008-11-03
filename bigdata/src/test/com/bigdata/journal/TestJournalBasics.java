@@ -80,6 +80,9 @@ public class TestJournalBasics extends TestCase {
         // tests the ability to recover and find historical commit records.
         suite.addTestSuite( TestCommitHistory.class );
         
+        // test compacting merge of a Journal.
+        suite.addTestSuite(TestCompactJournal.class);
+        
         /*
          * tests of transaction support.
          */
@@ -129,7 +132,7 @@ public class TestJournalBasics extends TestCase {
         /*
          * Test suite for low-level data replication.
          */
-        suite.addTestSuite( TestReplicatedStore.class);
+        suite.addTestSuite(TestReplicatedStore.class);
         
         return suite;
         
