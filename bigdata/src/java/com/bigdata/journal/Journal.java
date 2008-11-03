@@ -33,6 +33,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import com.bigdata.bfs.BigdataFileSystem;
@@ -581,31 +582,48 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     }
     
     /**
-     * Note: The {@link IConcurrencyManager} is shutdown first, then the
-     * {@link ITransactionManager} and finally the {@link IResourceManager}.
+     * Note: The {@link #executorService} is shutdown first, then the
+     * {@link IConcurrencyManager}, the {@link ITransactionManager} and finally
+     * the {@link IResourceManager}.
      */
     synchronized public void shutdown() {
         
         if (!isOpen())
             return;
 
+        // start time for service shutdown.
+        final long begin = System.currentTimeMillis();
+
+        // request normal service shutdown.
         executorService.shutdown();
 
         try {
 
-            final long shutdownTimeout = 2;
+            // ms until we log a warning.
+            final long logTimeout = 1000; // ms
 
-            final TimeUnit unit = TimeUnit.SECONDS;
+            while (true) {
+                
+                // elapsed ms.
+                final long elapsed = System.currentTimeMillis() - begin;
 
-            final long begin = System.currentTimeMillis();
+                if (executorService.awaitTermination(logTimeout,
+                        TimeUnit.MILLISECONDS)) {
 
-            long elapsed = System.currentTimeMillis() - begin;
+                    // service terminated so break out of loop.
+                    break;
 
-            if (!executorService.awaitTermination(shutdownTimeout - elapsed,
-                    unit)) {
+                }
 
-                log.warn("timeout: elapsed=" + elapsed);
+                // log warning since logTimeout has expired.
+                log.warn("Waiting on task(s): elapsed="
+                        + elapsed
+                        + ", #active="
+                        + ((ThreadPoolExecutor) executorService)
+                                .getActiveCount());
 
+                // wait again until service is shutdown.
+                
             }
 
         } catch (InterruptedException ex) {
