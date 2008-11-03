@@ -151,6 +151,8 @@ public class CompactJournalUtility {
                 
         } catch (Throwable t) {
 
+            t.printStackTrace(System.err);
+            
             sourceJournal.shutdownNow();
 
         }
