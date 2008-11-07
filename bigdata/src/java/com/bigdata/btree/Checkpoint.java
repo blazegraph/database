@@ -43,6 +43,9 @@ public class Checkpoint implements Externalizable {
     private int nentries;
     private long counter;
 
+    /** Note: added in {@link #VERSION1} and presumed 0L in earlier versions. */
+    private long addrBloomFilter;
+
     /**
      * The address used to read this {@link Checkpoint} record from the
      * store.
@@ -86,7 +89,19 @@ public class Checkpoint implements Externalizable {
         return addrRoot;
         
     }
-
+    
+    /**
+     * Address of the {@link IBloomFilter}.
+     * 
+     * @return The address of the bloom filter -or- <code>0L</code> iff the
+     *         btree does not have a bloom filter.
+     */
+    final public long getBloomFilterAddr() {
+        
+        return addrBloomFilter;
+        
+    }
+    
     /**
      * The height of the tree - ZERO(0) means just a root leaf. Values
      * greater than zero give the #of levels of abstract nodes. There is
@@ -149,6 +164,7 @@ public class Checkpoint implements Externalizable {
                 ",counter=" + counter + //
                 ",addrRoot=" + addrRoot + //
                 ",addrMetadata=" + addrMetadata + //
+                ",addrBloomFilter=" + addrBloomFilter + //
                 ",addrCheckpoint=" + addrCheckpoint + //
                 "}";
         
@@ -171,11 +187,12 @@ public class Checkpoint implements Externalizable {
      * @param metadata
      *            The index metadata record.
      */
-    public Checkpoint(IndexMetadata metadata ) {
+    public Checkpoint(final IndexMetadata metadata ) {
 
         this( //
                 metadata.getMetadataAddr(), //
                 0L,// No root yet.
+                0L,// No bloom filter yet.
                 0, // height 
                 0, // nnodes
                 0, // nleaves
@@ -187,20 +204,23 @@ public class Checkpoint implements Externalizable {
 
     /**
      * Create the first checkpoint record for an existing {@link BTree} when it
-     * is propagated on overflow onto a new backing {@link IRawStore}.
+     * is propagated on overflow onto a new backing {@link IRawStore}. The
+     * {@link #counter} is propagated to the new {@link Checkpoint} but
+     * otherwise the initialization is as if for an empty {@link BTree}.
      * 
      * @param metadata
      *            The index metadata record.
      * @param oldCheckpoint
      *            The last {@link Checkpoint} for the index on the old backing
-     *            store.  The {@link Checkpoint#counter} is propagated to the
-     *            new {@link Checkpoint} record.
+     *            store. The {@link Checkpoint#counter} is propagated to the new
+     *            {@link Checkpoint} record.
      */
-    public Checkpoint(IndexMetadata metadata, Checkpoint oldCheckpoint ) {
+    public Checkpoint(final IndexMetadata metadata, final Checkpoint oldCheckpoint ) {
 
         this( //
                 metadata.getMetadataAddr(), //
                 0L,// No root yet.
+                0L,// No bloom filter yet.
                 0, // height 
                 0, // nnodes
                 0, // nleaves
@@ -216,7 +236,8 @@ public class Checkpoint implements Externalizable {
      * Pre-conditions:
      * <ul>
      * <li>The root is clean.</li>
-     * <li>The metadata record is clean (</li>
+     * <li>The metadata record is clean.</li>
+     * <li>The optional bloom filter is clean if it is defined.</li>
      * </ul>
      * Note: if the root is <code>null</code> then the root is assumed to be
      * clean and the root address from the last {@link Checkpoint} record is
@@ -229,8 +250,30 @@ public class Checkpoint implements Externalizable {
     public Checkpoint(final BTree btree) {
         
         this(btree.metadata.getMetadataAddr(),//
+                /*
+                 * root node or leaf.
+                 * 
+                 * Note: if the [root] reference is not defined then we use the
+                 * address in the last checkpoint record. if that is 0L then
+                 * there is no root and a new root leaf will be created on
+                 * demand.
+                 */
                 (btree.root == null ? btree.getCheckpoint().getRootAddr()
                         : btree.root.getIdentity()),//
+                /*
+                 * optional bloom filter.
+                 * 
+                 * Note: if the [bloomFilter] reference is not defined then we
+                 * use the address in the last checkpoint record. if that is 0L
+                 * then there is no bloom filter. If the [bloomFilter] reference
+                 * is defined but the bloom filter has been disabled, then we
+                 * also write a 0L so that the bloom filter is no longer
+                 * reachable from the new checkpoint.
+                 */
+                (btree.bloomFilter == null ? btree.getCheckpoint()
+                        .getBloomFilterAddr()
+                        : btree.bloomFilter.isEnabled() ? btree.bloomFilter
+                                .getAddr() : 0L),//
                 btree.height,//
                 btree.nnodes,//
                 btree.nleaves,//
@@ -240,15 +283,25 @@ public class Checkpoint implements Externalizable {
            
     }
 
-    private Checkpoint(long addrMetadata, long addrRoot, int height,
-            int nnodes, int nleaves, int nentries, long counter) {
+    private Checkpoint(final long addrMetadata, final long addrRoot,
+            final long addrBloomFilter, final int height, final int nnodes,
+            final int nleaves, final int nentries, final long counter) {
 
         assert addrMetadata != 0L;
 
-        this.addrMetadata = addrMetadata; // MUST be valid addr.
+        // MUST be valid addr.
+        this.addrMetadata = addrMetadata;
 
-        this.addrRoot = addrRoot; // MAY be 0L (tree initially has no root)
+        // MAY be 0L (tree initially has no root)
+        this.addrRoot = addrRoot;
 
+        /*
+         * MAY be 0L (bloom filter is optional and an new bloom filter is clear,
+         * so it will not be written out until something is written on the
+         * index).
+         */
+        this.addrBloomFilter = addrBloomFilter;
+        
         this.height = height;
 
         this.nnodes = nnodes;
@@ -261,7 +314,18 @@ public class Checkpoint implements Externalizable {
         
     }
     
+    /**
+     * Initial serialization version.
+     */
     private static transient final int VERSION0 = 0x0;
+
+    /**
+     * This serialization version adds the field recording the address of the
+     * optional bloom filter. That address defaults to zero (0L) for earlier
+     * versions, indicating that no bloom filter is stored for the
+     * {@link Checkpoint}.
+     */
+    private static transient final int VERSION1 = 0x1;
 
     /**
      * Write the {@link Checkpoint} record on the store, setting
@@ -313,13 +377,23 @@ public class Checkpoint implements Externalizable {
         
         final int version = (int) LongPacker.unpackLong(in);
 
-        if (version != 0)
+        if (version != VERSION0 && version != VERSION1)
             throw new IOException("Unknown version: " + version);
 
         this.addrMetadata = in.readLong();
 
         this.addrRoot = in.readLong();
 
+        if (version == VERSION1) {
+
+            this.addrBloomFilter = in.readLong();
+
+        } else {
+
+            this.addrBloomFilter = 0L;
+
+        }
+        
         this.height = (int) LongPacker.unpackLong(in);
 
         this.nnodes = (int) LongPacker.unpackLong(in);
@@ -334,11 +408,14 @@ public class Checkpoint implements Externalizable {
 
     public void writeExternal(ObjectOutput out) throws IOException {
 
-        LongPacker.packLong(out, VERSION0);
+        LongPacker.packLong(out, VERSION1);
 
         out.writeLong(addrMetadata);
 
         out.writeLong(addrRoot);
+        
+        // Note: added in VERSION1.
+        out.writeLong(addrBloomFilter);
 
         LongPacker.packLong(out, height);
 
@@ -349,7 +426,7 @@ public class Checkpoint implements Externalizable {
         LongPacker.packLong(out, nentries);
 
         LongPacker.packLong(out, counter);
-
+        
     }
 
 }

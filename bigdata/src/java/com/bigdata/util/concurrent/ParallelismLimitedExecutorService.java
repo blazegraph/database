@@ -42,6 +42,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -51,6 +52,10 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
+
+import com.bigdata.journal.CompactTask;
+import com.bigdata.relation.rule.eval.JoinMasterTask;
+import com.bigdata.service.DataService;
 
 /**
  * A lightweight class that may be used to impose a parallelism limit on tasks
@@ -90,6 +95,36 @@ import org.apache.log4j.Logger;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * FIXME There are incompatable API changes for {@link ExecutorService} as of
+ * java 6. In order to work for both Java 5 and java 6 we need to write
+ * {@link #invokeAll(Collection)} and friends using the raw type (no generics).
+ * However, changes to {@link AbstractExecutorService} (factory methods that can
+ * be override in the subclass) and {@link RunnableFuture} (nice for proxying)
+ * mean that we will probably lock in on Java 6 in any case. This means that
+ * code which relies on the {@link ParallelismLimitedExecutorService} will not
+ * compile/execute under java 5 going foward. Currently, this is restricted to
+ * the {@link CompactTask} and the {@link JoinMasterTask} so there is really no
+ * hinderance for people stuck in Java 5 -- for now.
+ * 
+ * @see http://osdir.com/ml/java.jsr.166-concurrency/2007-06/msg00030.html
+ * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6267833
+ * 
+ * @todo Refactor or write a variant that is capable of single-threaded
+ *       execution when the executor is a remote service, e.g., a
+ *       {@link DataService}. For this context, something that plays the same
+ *       role as {@link FutureTask} needs to be proxied and sent to the
+ *       {@link DataService} (or we need to unbundle the task and its future and
+ *       send both, which is essentially what {@link FutureTask} is doing
+ *       anyway). This means that the client exports the {@link Future} and that
+ *       the {@link DataService} will notify the client when the {@link Future}
+ *       is complete and use the proxy to set the result on the future as well.
+ *       This means that the Future on the client can signal the
+ *       {@link SubmitTask} when its future is ready, perhaps placing its
+ *       {@link Future} onto a queue of futures that have been completed. This
+ *       design will allow the {@link ParallelismLimitedExecutorService} to be
+ *       used for map/reduce style processing. A client should be able to manage
+ *       1000s of concurrent tasks without trouble.
  */
 public class ParallelismLimitedExecutorService extends AbstractExecutorService {
 
@@ -1113,13 +1148,39 @@ public class ParallelismLimitedExecutorService extends AbstractExecutorService {
         
     }
 
+//    /**
+//     * Returns a RunnableFuture for the given callable task.
+//     * 
+//     * @since 1.6
+//     */
+//    protected <T> RunnableFuture<T> newTaskFor(Callable<T> callable) {
+//
+//        return super.newTaskFor(callable);
+//        
+//    }
+//
+//    /**
+//     * Returns a RunnableFuture for the given runnable and default value.
+//     * 
+//     * @since 1.6
+//     */
+//    protected <T> RunnableFuture<T> newTaskFor(Runnable runnable, T value) {
+//
+//        return super.newTaskFor(runnable, value);
+//        
+//    }
+
     /**
      * {@link FutureTask} factory.
      * 
      * @param task
      *            A task.
-     *            
+     * 
      * @return A {@link FutureTask} for that task.
+     * 
+     * 
+     * FIXME replace in 1.6 with {@link #newTaskFor(Callable)}. Also includes
+     * the {@link RunnableFuture} abstraction which will make life much easier.
      */
     protected <T> FutureTask<T> newFuture(final Callable<T> task) {
         
@@ -1129,7 +1190,7 @@ public class ParallelismLimitedExecutorService extends AbstractExecutorService {
         return new QueueingFuture<T>(task);
         
     }
-
+    
     /**
      * {@link FutureTask} factory.
      * 
@@ -1139,6 +1200,8 @@ public class ParallelismLimitedExecutorService extends AbstractExecutorService {
      *            The result for that tas.
      * 
      * @return A {@link FutureTask} for that task.
+     * 
+     * FIXME replace in 1.6 with {@link #newTaskFor(Runnable, Object)}.
      */
     protected <T> FutureTask<T> newFuture(Runnable task, T result) {
 
@@ -1234,8 +1297,26 @@ public class ParallelismLimitedExecutorService extends AbstractExecutorService {
         
     }
     
+    /**
+     * FIXME As of Java 1.6 the method signature is changed and you need to
+     * modify the method signature here in the source code to use
+     * 
+     * <pre>
+     * Collection&lt;? extends Callable&lt;T&gt;&gt; tasks
+     * </pre>
+     * 
+     * rather than
+     * 
+     * <pre>
+     * Collection &lt; Callable &lt; T &gt;&gt; tasks
+     * </pre>
+     * 
+     * I love generics.
+     * 
+     * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6267833
+     */
     @Override
-    public <T> List<Future<T>> invokeAll(final Collection<Callable<T>> tasks)
+    public <T> List<Future<T>> invokeAll(final Collection<? extends Callable<T>> tasks)
             throws InterruptedException {
         
         final List<Future<T>> futures = new LinkedList<Future<T>>();
@@ -1306,9 +1387,26 @@ public class ParallelismLimitedExecutorService extends AbstractExecutorService {
      * This is just a variant of the method above but we also have to count down
      * the nanos remaining and then cancel any tasks which are not yet complete
      * if there is a timeout.
+     * 
+     * FIXME As of Java 1.6 the method signature is changed and you need to
+     * modify the method signature here in the source code to use
+     * 
+     * <pre>
+     * Collection&lt;? extends Callable&lt;T&gt;&gt; tasks
+     * </pre>
+     * 
+     * rather than
+     * 
+     * <pre>
+     * Collection &lt; Callable &lt; T &gt;&gt; tasks
+     * </pre>
+     * 
+     * I love generics.
+     * 
+     * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6267833
      */
     @Override
-    public <T> List<Future<T>> invokeAll(final Collection<Callable<T>> tasks,
+    public <T> List<Future<T>> invokeAll(final Collection<? extends Callable<T>> tasks,
             final long timeout, final TimeUnit unit)
             throws InterruptedException {
 

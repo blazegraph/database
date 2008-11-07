@@ -57,11 +57,13 @@ import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.journal.AbstractTask;
+import com.bigdata.journal.CompactTask;
 import com.bigdata.journal.IAtomicStore;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.resources.OverflowManager;
 import com.bigdata.service.Split;
 
 /**
@@ -196,6 +198,105 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
      */
     protected volatile AbstractNode root;
 
+    /**
+     * An optional bloom filter that will be used to filter point tests against
+     * <i>this</i> {@link AbstractBTree}. A bloom filter provides a strong
+     * guarentee when it reports that a key was not found, but only a weak
+     * guarentee when it reports that a key was found. Therefore a positive
+     * report by the bloom filter MUST be confirmed by testing against the index
+     * to verify that the key was in fact present in the index. Since bloom
+     * filters do not support removal of keys, any key that is deleted from the
+     * index will remain "present" in the bloom filter but a read against the
+     * index will serve to disprove the existence of the key. The bloom filter
+     * is enabled by specifying a non-zero value for the
+     * {@link IndexMetadata#getErrorRate()}.
+     * <p>
+     * Note: The bloom filter is read with the root node when the index is
+     * {@link #reopen()}ed and is discarded when the index is {@link #close()}ed.
+     * While we do not use double-checked locking on the {@link #bloomFilter},
+     * it is assigned from within the same code that assigns the {@link #root}.
+     * For historical reasons this is handled somewhat differently by the
+     * {@link BTree} and the {@link IndexSegment}.
+     * <p>
+     * Note: Not <code>private</code> since {@link Checkpoint} reads this
+     * field.
+     */
+    /*private*/ volatile BloomFilter bloomFilter;
+
+//    /**
+//     * Return <code>true</code> iff the optional bloom filter is enabled for
+//     * this {@link AbstractBTree} and the bloom filter has NOT been disabled.
+//     * Note that a bloom filter will be disabled if #of index entries exceeds
+//     * the threshold at which the bloom filter would exceed its maximum expected
+//     * error rate.
+//     * 
+//     * @see BloomFilterFactory
+//     * @see IndexMetadata#getBloomFilterFactory()
+//     */
+//    abstract public boolean isBloomFilter();
+//
+//    /**
+//     * Disable the bloom filter.
+//     * 
+//     * @throws UnsupportedOperationException
+//     *             if the bloom filter was not enabled.
+//     * @throws UnsupportedOperationException
+//     *             if the index is not mutable.
+//     */
+//    abstract protected void disableBloomFilter();
+    
+//    /**
+//     * Method used by subclasses to establish the bloom filter from within their
+//     * {@link #_reopen()} implementation.
+//     * <p>
+//     * Note: It is possible to (re-)establish a bloom filter on an existing
+//     * index simply by re-adding each key in the index to the bloom filter.
+//     * However, you MUST NOT set a bloom filter that lacks keys that exist in
+//     * the index since that would cause <em>false negatives</em>, which is in
+//     * violation of the bloom filter contract. One way to do this is there to
+//     * obtain exclusive write access for the index, create a new bloom filter
+//     * and set it on this class, then use a iterator ({@link IRangeQuery#CURSOR}
+//     * will be required since you will be writing on the btree concurrent with
+//     * the iterator traversal) and adding each key visited by the iterator to
+//     * the index.
+//     * 
+//     * @param bloomFilter
+//     *            The bloom filter.
+//     * 
+//     * @throws IllegalArgumentException
+//     *             if the <i>bloomFilter</i> is <code>null</code>.
+//     * @throws IllegalStateException
+//     *             if the bloom filter is already set.
+//     * @throws UnsupportedOperationException
+//     *             if support for the optional bloom filter was not enabled when
+//     *             the {@link AbstractBTree} was created.
+//     */
+//    protected void setBloomFilter(final BloomFilter bloomFilter) {
+//
+//        if (bloomFilter == null)
+//            throw new IllegalArgumentException();
+//
+////        if (!isBloomFilter())
+////            throw new UnsupportedOperationException();
+//
+//        if (this.bloomFilter != null)
+//            throw new IllegalStateException();
+//
+//        this.bloomFilter = bloomFilter;
+//        
+//    }
+    
+    /**
+     * Return the optional {@link IBloomFilter}, transparently
+     * {@link #reopen()}ing the index if necessary.
+     * 
+     * @return The bloom filter -or- <code>null</code> if there is no bloom
+     *         filter (including the case where there is a bloom filter but it
+     *         has been disabled since the {@link BTree} has grown too large and
+     *         the expected error rate of the bloom filter would be too high).
+     */
+    abstract public BloomFilter getBloomFilter();
+    
 //    /**
 //     * The finger is a trial feature. The purpose is to remember the last
 //     * leaf(s) in the tree that was visited by a search operation and to
@@ -546,7 +647,9 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
      * dirty index MUST discard writes rather than flushing them to the store
      * and MUST NOT update its {@link Checkpoint} record - ({@link #close()} is
      * used to discard indices with partial writes when an {@link AbstractTask}
-     * fails).
+     * fails). If you are seeking to {@link #close()} a mutable {@link BTree}
+     * that it state can be recovered by {@link #reopen()} then you MUST write a
+     * new {@link Checkpoint} record before closing the index.
      * <p>
      * This implementation clears the hard reference queue (releasing all node
      * references), releases the hard reference to the root node, and releases
@@ -607,21 +710,65 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
          */
         root = null;
 
+        // release the optional bloom filter.
+        bloomFilter = null;
+        
     }
 
     /**
      * This is part of a {@link #close()}/{@link #reopen()} protocol that may
      * be used to reduce the resource burden of an {@link AbstractBTree}. The
-     * implementation must reload the root node of the tree iff {@link #root} is
-     * <code>null</code> (indicating that the index has been closed). This
-     * method is automatically invoked by a variety of methods that need to
-     * ensure that the index is available for use.
+     * method delegates to {@link #_reopen()} if double-checked locking
+     * demonstrates that the {@link #root} is <code>null</code> (indicating
+     * that the index has been closed). This method is automatically invoked by
+     * a variety of methods that need to ensure that the index is available for
+     * use.
      * 
      * @see #close()
      * @see #isOpen()
      * @see #getRoot()
      */
-    abstract protected void reopen();
+    final protected void reopen() {
+
+        if (root == null) {
+
+            /*
+             * reload the root node.
+             * 
+             * Note: This is synchronized to avoid race conditions when
+             * re-opening the index from the backing store.
+             * 
+             * Note: [root] MUST be marked as [volatile] to guarentee correct
+             * semantics.
+             * 
+             * See http://en.wikipedia.org/wiki/Double-checked_locking
+             */
+
+            synchronized(this) {
+            
+                if (root == null) {
+
+                    // invoke with lock on [this].
+                    _reopen();
+                    
+                }
+                
+            }
+
+        }
+
+    }
+
+    /**
+     * This method is responsible for setting up the root leaf (either new or
+     * read from the store), the bloom filter, etc. It is invoked by
+     * {@link #reopen()} once {@link #root} has been show to be
+     * <code>null</code> with double-checked locking. When invoked in this
+     * context, the caller is guarenteed to hold a lock on <i>this</i>. This is
+     * done to ensure that at most one thread gets to re-open the index from the
+     * backing store.
+     */
+    abstract protected void _reopen();
 
     /**
      * An "open" index has its buffers and root node in place rather than having
@@ -907,8 +1054,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
 
     /**
      * The #of entries (aka values) in the {@link AbstractBTree}. This is zero
-     * (0) for a new B+Tree. Note that this value is tracked explicitly requires
-     * no IOs.
+     * (0) for a new B+Tree. Note that this value is tracked explicitly so it
+     * requires no IOs.
      * 
      * @todo this could be re-defined as the exact entry count if we tracked the
      *       #of deleted index entries and subtracted that from the total #of
@@ -1027,6 +1174,28 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
 //        return getRoot();
 
     }
+
+//    /*
+//     * bloom filter support.
+//     */
+//
+//    /**
+//     * Returns true if the optional bloom filter reports that the key exists.
+//     * 
+//     * @param key
+//     *            The key.
+//     * 
+//     * @return <code>true</code> if the bloom filter believes that the key is
+//     *         present in the index. When <code>true</code>, you MUST still
+//     *         test the key to verify that it is, in fact, present in the index.
+//     *         When <code>false</code>, you SHOULD NOT test the index since a
+//     *         <code>false</code> response is conclusive.
+//     */
+//    final protected boolean containsKey(byte[] key) {
+//
+//        return getBloomFilter().contains(key);
+//
+//    }
 
     /**
      * Private instance used for mutation operations (insert, remove) which are
@@ -1148,8 +1317,53 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
 
         counters.ninserts++;
         
-        return getRootOrFinger(key)
-                .insert(key, value, delete, timestamp, tuple);
+        final Tuple oldTuple = getRootOrFinger(key).insert(key, value, delete,
+                timestamp, tuple);
+
+        if (oldTuple == null) {
+
+            final BloomFilter filter = getBloomFilter();
+
+            if (bloomFilter != null) {
+
+                if (getEntryCount() > filter.getMaxN()) {
+
+                    /*
+                     * Disable the filter since the index has exceeded the
+                     * maximum #of index entries for which the bloom filter will
+                     * have an acceptable error rate.
+                     */
+                    
+                    filter.disable();
+                    
+                    // @todo change to WARN
+                    log
+                            .error("Maximum error rate would be exceeded: bloom filter disabled: entryCount="
+                                    + getEntryCount()
+                                    + ", factory="
+                                    + getIndexMetadata()
+                                            .getBloomFilterFactory());
+
+                } else {
+
+                    /*
+                     * Add the key to the bloom filter.
+                     * 
+                     * Note: While this will be invoked when the sequence is
+                     * insert(key), remove(key), followed by insert(key) again,
+                     * it does prevent update of the bloom filter when there was
+                     * already an index entry for that key.
+                     */
+
+                    filter.add(key);
+
+                }
+
+            }
+
+        }
+
+        return oldTuple;
 
     }
 
@@ -1209,6 +1423,18 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
      * uses {@link #insert(byte[], byte[], boolean, long, Tuple)} instead of
      * this method to mark the index entry as deleted when delete markers are
      * being maintained.
+     * <p>
+     * Note: removing a key has no effect on the optional bloom filter. If a key
+     * is removed from the index by this method then the bloom filter will
+     * report a <em>false positive</em> for that key, which will be detected
+     * when we test the index itself. This works out fine in the scale-out
+     * design since the bloom filter is per {@link AbstractBTree} instance and
+     * split/join/move operations all result in new mutable {@link BTree}s with
+     * new bloom filters to absorb new writes. For a non-scale-out deployement,
+     * this can cause the performance of the bloom filter to degrade if you are
+     * removing a lot of keys. However, in the special case of a {@link BTree}
+     * that does NOT use delete markers, {@link BTree#removeAll()} will create a
+     * new root leaf and a new (empty) bloom filter as well.
      * 
      * @param key
      *            The search key.
@@ -1243,7 +1469,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
         counters.nremoves++;
 
         return getRootOrFinger(key).remove(key, tuple);
-
+        
     }
 
     /**
@@ -1286,7 +1512,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
      * Core method for retrieving a value under a key. This method allows you to
      * differentiate an index entry whose value is <code>null</code> from a
      * missing index entry or (when delete markers are enabled) from a deleted
-     * index entry.
+     * index entry. Applies the optional bloom filter if it exists. If the bloom
+     * filter exists and reports <code>true</code>, then looks up the value
+     * for the key in the index (note that the key might not exist in the index
+     * since a bloom filter allows false positives, further the key might exist
+     * for a deleted entry).
      * 
      * @param key
      *            The search key.
@@ -1297,7 +1527,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
      * @return <i>tuple</i> or <code>null</code> if there is no entry in the
      *         index under the key.
      */
-    public Tuple lookup(final byte[] key, final Tuple tuple) {
+    public Tuple lookup(final byte[] key, Tuple tuple) {
 
         if (key == null)
             throw new IllegalArgumentException();
@@ -1311,9 +1541,44 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
         // conditional range check on the key.
         assert rangeCheck(key, false);
 
+        boolean bloomHit = false;
+
+        final BloomFilter filter = getBloomFilter(); 
+        
+        if (filter != null) {
+
+            if (!filter.contains(key)) {
+
+                // rejected by the bloom filter.
+                
+                return null;
+
+            }
+
+            bloomHit = true;
+            
+            /*
+             * Fall through.
+             * 
+             * Note: Lookup against the index since this may be a false positive
+             * or may be paired to a deleted entry and we need the tuple paired
+             * to the key in any case.
+             */
+
+        }
+
         counters.nfinds++;
 
-        return getRootOrFinger(key).lookup(key,tuple);
+        tuple = getRootOrFinger(key).lookup(key, tuple);
+        
+        if (bloomHit && (tuple == null || tuple.isDeletedVersion())) {
+
+            if (bloomHit)
+                filter.falsePos();
+
+        }
+
+        return tuple;
 
     }
 
@@ -1327,14 +1592,17 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
 
     /**
      * Core method to decide whether the index has a (non-deleted) entry under a
-     * key.
-     * <p>
-     * True iff the key does not exist. Or, if the btree supports isolation, if
-     * the key exists but it is marked as "deleted".
+     * key. Applies the optional bloom filter if it exists. If the bloom filter
+     * reports <code>true</code>, then verifies that the key does in fact
+     * exist in the index.
+     * 
+     * @return <code>true</code> iff the key does not exist. Or, if the btree
+     *         supports isolation, if the key exists but it is marked as
+     *         "deleted".
      * 
      * @todo add unit test to btree suite w/ and w/o delete markers.
      */
-    public boolean contains(byte[] key) {
+    public boolean contains(final byte[] key) {
 
         if (key == null)
             throw new IllegalArgumentException();
@@ -1342,9 +1610,34 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
         // conditional range check on the key.
         assert rangeCheck(key,false);
 
+        boolean bloomHit = false;
+
+        final BloomFilter filter = getBloomFilter();
+        
+        if (filter != null) {
+            
+            if (!filter.contains(key)) {
+                
+                // rejected by the bloom filter.
+                return false;
+
+            }
+
+            bloomHit = true;
+            
+            /*
+             * Fall through (we have to test for a false positive by reading on
+             * the index).
+             */
+            
+        }
+
         final ITuple tuple = getRootOrFinger(key).lookup(key, containsTuple.get());
         
         if(tuple == null || tuple.isDeletedVersion()) {
+            
+            if (bloomHit)
+                filter.falsePos();
             
             return false;
             
@@ -1623,6 +1916,44 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
         }
 
         /*
+         * Note: this does not work out since it is not so easy to determine when
+         * the iterator is a point test as toKey is the exclusive upper bound.
+         */
+//        * Note: this method will automatically apply the optional bloom filter to
+//        * reject range iterator requests that correspond to a point test. However
+//        * this can only be done when the fromKey and toKey are both non-null and
+//        * equals and further when the iterator was not requested with any options
+//        * that would permit concurrent modification of the index.
+//        if (isBloomFilter()
+//                && fromKey != null
+//                && toKey != null
+//                && (readOnly || (((flags & REMOVEALL) == 0) && ((flags & CURSOR) == 0)))
+//                && BytesUtil.bytesEqual(fromKey, toKey)) {
+//
+//            /*
+//             * Do a fast rejection test using the bloom filter.
+//             */
+//            if(!getBloomFilter().contains(fromKey)) {
+//                
+//                /*
+//                 * The key is known to not be in the index so return an empty
+//                 * iterator.
+//                 */
+//                return EmptyTupleIterator.INSTANCE;
+//                
+//            }
+//            
+//            /*
+//             * Since the bloom filter accepts the key we fall through into the
+//             * normal iterator logic. Using this code path is still possible
+//             * that the filter gave us a false positive and that the key is not
+//             * (in fact) in the index. Either way, the logic below will sort
+//             * things out.
+//             */
+//            
+//        }
+        
+        /*
          * Figure out what base iterator implementation to use.  We will layer
          * on the optional filter(s) below. 
          */
@@ -1766,6 +2097,13 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
      *             setting for {@link IndexMetadata#getVersionTimestamps()}
      * 
      * @return The #of index entries that were copied.
+     * 
+     * @see CompactTask
+     * @see OverflowManager
+     * 
+     * @todo this would be more efficient if we could reuse the same buffer for
+     *       keys and values in and out. As it stands it does a lot of byte[]
+     *       allocation.
      * 
      * @todo write tests for all variations (delete markers, timestamps,
      *       overflow handler, etc).

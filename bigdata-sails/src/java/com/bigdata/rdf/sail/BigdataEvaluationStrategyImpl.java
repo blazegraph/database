@@ -68,6 +68,7 @@ import com.bigdata.relation.rule.QueryOptions;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
+import com.bigdata.relation.rule.eval.FixedEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
@@ -846,7 +847,18 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         try {
 
             final IEvaluationPlanFactory planFactory = DefaultEvaluationPlanFactory2.INSTANCE;
-            
+
+            /*
+             * alternative evaluation orders for LUBM Q9 (default is 1 4, 2, 3,
+             * 0, 5).  All three evaluation orders are roughly as good as one 
+             * another.  Note that tail[2] (z rdf:type ...) is entailed by the
+             * ontology and could be dropped from evaluation.
+             */
+//            final IEvaluationPlanFactory planFactory = new FixedEvaluationPlanFactory(
+////                    new int[] { 1, 4, 3, 0, 5, 2 } good
+////                    new int[] { 1,  3, 0, 4, 5, 2 } good
+//                    );
+
             final IJoinNexusFactory joinNexusFactory = database
                     .newJoinNexusFactory(RuleContextEnum.HighLevelQuery,
                             ActionEnum.Query, IJoinNexus.BINDINGS,

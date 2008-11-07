@@ -58,8 +58,10 @@ public class Counters {
     public void add(Counters o) {
         
         // IKeySearch
+//        nbloomTest += o.nbloomTest;
+//        nbloomRejects += o.nbloomRejects;
+//        nbloomFalsePos += o.nbloomFalsePos;
         nfinds += o.nfinds;
-        nbloomRejects += o.nbloomRejects;
         ninserts += o.ninserts;
         nremoves += o.nremoves;
         // ILinearList
@@ -94,8 +96,18 @@ public class Counters {
     }
     
     // IKeySearch
-    int nfinds = 0; // #of keys looked up in the tree by lookup(key).
-    int nbloomRejects = 0; // #of keys rejected by the bloom filter in lookup(key).
+//    /** #of keys tested by the bloom filter in contains/lookup(key). */
+//    public int nbloomTest = 0;
+//    /** #of keys rejected by the bloom filter in contains/lookup(key). */
+//    public int nbloomRejects = 0;
+//    /** #of false positives from the bloom filter in contains/lookup(key). */
+//    public int nbloomFalsePos = 0;
+    /**
+     * #of keys looked up in the tree by contains/lookup(key) (does not count
+     * those rejected by the bloom filter before they are tested against the
+     * B+Tree).
+     */
+    int nfinds = 0;
     int ninserts = 0;
     int nremoves = 0;
     // ILinearList
@@ -221,6 +233,25 @@ public class Counters {
         
     }
 
+//    /**
+//     * The effective error rate (false positive rate) for the bloom filter and
+//     * ZERO (0d) if the bloom filter is not enabled. A false positive is an
+//     * instance where the bloom filter reports that the key is in the index but
+//     * a read against the index demonstrates that the key does not exist in the
+//     * index. False positives are in the nature of bloom filters and arise
+//     * because keys may be hash equivalent for the bloom filter.
+//     * 
+//     * @return The bloom filter error rate.
+//     */
+//    final public double getBloomErrorRate() {
+//
+//        if (nbloomTest == 0)
+//            return 0d;
+//
+//        return (nbloomFalsePos / (double) nbloomTest);
+//
+//    }
+
     /**
      * Return a {@link CounterSet} reporting on the various counters tracked in
      * the instance fields of this class.
@@ -237,17 +268,36 @@ public class Counters {
              * @todo instrument key search time.
              */
             {
+                
                 final CounterSet tmp = counterSet.makePath("keySearch");
+
+//                tmp.addCounter("#bloomTest", new Instrument<Integer>() {
+//                    protected void sample() {
+//                        setValue(nbloomTest);
+//                    }
+//                });
+//
+//                tmp.addCounter("#bloomReject", new Instrument<Integer>() {
+//                    protected void sample() {
+//                        setValue(nbloomRejects);
+//                    }
+//                });
+//
+//                tmp.addCounter("#bloomFalsePos", new Instrument<Integer>() {
+//                    protected void sample() {
+//                        setValue(nbloomFalsePos);
+//                    }
+//                });
+//
+//                tmp.addCounter("bloomErrorRate", new Instrument<Double>() {
+//                    protected void sample() {
+//                        setValue(getBloomErrorRate());
+//                    }
+//                });
 
                 tmp.addCounter("#find", new Instrument<Integer>() {
                     protected void sample() {
                         setValue(nfinds);
-                    }
-                });
-
-                tmp.addCounter("#bloomReject", new Instrument<Integer>() {
-                    protected void sample() {
-                        setValue(nbloomRejects);
                     }
                 });
 
@@ -519,87 +569,19 @@ public class Counters {
         
     }
 
-//    public String toString() {
+//    /**
+//     * shows the effective bloom filter error rate to date (or at
+//     * least since the index object was last read from the store).
+//     * 
+//     * @todo remove - this is for testing.
+//     */
+//    public String getBloomFilterPerformance() {
 //
-//        /*
-//         * store read/write times.
-//         */
-//        final double readSecs = (readNanos / 1000000000.);
-//
-//        final String bytesReadPerSec = (readSecs == 0L ? "N/A" : ""
-//                + commaFormat.format(bytesRead / readSecs));
-//
-//        final double writeTimeSecs = (writeNanos / 1000000000.);
-//
-//        final String bytesWrittenPerSec = (writeTimeSecs == 0. ? "N/A"
-//                : ""+ commaFormat.format(bytesWritten
-//                                / writeTimeSecs));
-//        
-//        /*
-//         * node/leaf (de-)serialization times.
-//         */
-//        final double serializeSecs = (serializeNanos / 1000000000.);
-//
-//        final String serializePerSec = (serializeSecs == 0L ? "N/A" : ""
-//                + commaFormat.format((nodesWritten+leavesWritten)/ serializeSecs));
-//
-//        final double deserializeSecs = (deserializeNanos / 1000000000.);
-//
-//        final String deserializePerSec = (deserializeSecs == 0. ? "N/A"
-//                : ""+ commaFormat.format((nodesRead+leavesRead)
-//                                / deserializeSecs));
-//
-//        // plain text.
-//        return 
-//        "\n#find="+nfinds+
-//        ", #bloomRejects="+nbloomRejects+
-//        ", #insert="+ninserts+
-//        ", #remove="+nremoves+
-//        ", #indexOf="+nindexOf+
-//        ", #getKey="+ngetKey+
-//        ", #getValue="+ngetValue+
-//        ", #rangeCount="+nrangeCount+
-//        ", #rangeIterator="+nrangeIterator+
-//        "\n#roots split="+rootsSplit+
-//        ", #roots joined="+rootsJoined+
-//        ", #nodes split="+nodesSplit+
-//        ", #nodes joined="+nodesJoined+
-//        ", #leaves split="+leavesSplit+
-//        ", #leaves joined="+leavesJoined+
-//        ", #nodes copyOnWrite="+nodesCopyOnWrite+
-//        ", #leaves copyOnWrite="+leavesCopyOnWrite+
-//        "\nread ("
-//                + nodesRead + " nodes, " + leavesRead + " leaves, "
-//                + commaFormat.format(bytesRead) + " bytes" + ", readSeconds="
-//                + secondsFormat.format(readSecs) + ", bytes/sec="
-//                + bytesReadPerSec + ", deserializeSeconds="
-//                + secondsFormat.format(deserializeSecs)
-//                + ", deserialized/sec=" + deserializePerSec + ")" +
-//        "\nwrote ("
-//                + nodesWritten + " nodes, " + leavesWritten + " leaves, "
-//                + commaFormat.format(bytesWritten) + " bytes"
-//                + ", writeSeconds=" + secondsFormat.format(writeTimeSecs)
-//                + ", bytes/sec=" + bytesWrittenPerSec + ", serializeSeconds="
-//                + secondsFormat.format(serializeSecs) + ", serialized/sec="
-//                + serializePerSec + ")" +
-//        "\n"
-//        ;
+//        return "nfind=" + nfinds + ", bloom filter: ntest="
+//                + nbloomTest + ", nreject=" + nbloomRejects + ", nfalsePos="
+//                + nbloomFalsePos + ", effective error rate="
+//                + getBloomErrorRate();
 //        
 //    }
-
-//    static private final NumberFormat commaFormat = NumberFormat.getInstance();
-//    static private final NumberFormat secondsFormat = NumberFormat.getInstance();
-////  static private final NumberFormat percentFormat = NumberFormat.getPercentInstance();
-//    
-//    static
-//    {
-//
-//        commaFormat.setGroupingUsed(true);
-//        commaFormat.setMaximumFractionDigits(0);
-//        
-//        secondsFormat.setMinimumFractionDigits(3);
-//        secondsFormat.setMaximumFractionDigits(3);
-//        
-//    }
-
+    
 }

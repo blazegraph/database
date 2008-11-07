@@ -290,8 +290,11 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
 
     protected final int tailCount;
 
-    protected final RuleState ruleState;
+    protected final IRuleState ruleState;
 
+    /** The evaluation order. */
+    protected final int[] order;
+    
     protected final RuleStats ruleStats;
 
     /**
@@ -345,9 +348,12 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
         // computes the eval order.
         this.ruleState = new RuleState(rule, joinNexus);
 
+        // the evaluation order.
+        this.order = ruleState.getPlan().getOrder();
+
         // note: evaluation order is fixed by now.
-        this.ruleStats = joinNexus.getRuleStatisticsFactory().newInstance(rule,
-                ruleState.plan, ruleState.keyOrder);
+        this.ruleStats = joinNexus.getRuleStatisticsFactory().newInstance(
+                ruleState);
 
         {
 
@@ -385,7 +391,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
      */
     public RuleStats call() throws Exception {
 
-        if (ruleState.plan.isEmpty()) {
+        if (ruleState.getPlan().isEmpty()) {
 
             if (INFO)
                 log.info("Rule proven to have no solutions.");
@@ -685,9 +691,11 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
 
         }
         
+        final int[] order = ruleState.getPlan().getOrder();
+        
         for (int tailIndex = 0; tailIndex < tailCount; tailIndex++) {
 
-            final JoinStats o = joinStats[ruleState.order[tailIndex]];
+            final JoinStats o = joinStats[order[tailIndex]];
             
             ruleStats.chunkCount[tailIndex] += o.chunkCount;
             
@@ -708,7 +716,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
              * index partitions for a given tail predicate.
              */
             
-            log.info("\n"+JoinStats.toString(rule, ruleState.order, joinStats));
+            log.info("\n"+JoinStats.toString(rule, order, joinStats));
         
         }
         
@@ -825,7 +833,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
                 // create the local join task.
                 final LocalJoinTask joinTask = new LocalJoinTask(
                         concurrencyManager, indexName, rule, joinNexus,
-                        ruleState.order, orderIndex, this/* master */, src);
+                        order, orderIndex, this/* master */, src);
 
                 if (!lastJoin) {
 
@@ -1022,8 +1030,8 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
              * The first predicate in the evaluation order with the initial
              * bindings applied.
              */
-            final IPredicate predicate = rule.getTail(ruleState.order[0])
-                    .asBound(bindingSet);
+            final IPredicate predicate = rule.getTail(order[0]).asBound(
+                    bindingSet);
 
             final AbstractScaleOutFederation fed = (AbstractScaleOutFederation) joinNexus
                     .getIndexManager();
@@ -1055,7 +1063,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
 
                 final JoinTaskFactoryTask factoryTask = new JoinTaskFactoryTask(
                         scaleOutIndexName, rule, joinNexus
-                                .getJoinNexusFactory(), ruleState.order,
+                                .getJoinNexusFactory(), order,
                         0/* orderIndex */, partitionId, masterProxy, sourceItr);
 
                 final IDataService dataService = fed.getDataService(locator

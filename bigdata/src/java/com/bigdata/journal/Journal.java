@@ -56,6 +56,7 @@ import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.MillisecondTimestampFactory;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.concurrent.ShutdownHelper;
 
 /**
  * Concrete implementation suitable for a local and unpartitioned database.
@@ -603,44 +604,33 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         if (!isOpen())
             return;
 
-        // start time for service shutdown.
-        final long begin = System.currentTimeMillis();
-
-        // request normal service shutdown.
-        executorService.shutdown();
-
         try {
 
-            // ms until we log a warning.
-            final long logTimeout = 1000; // ms
+            // shutdown service and await termination.
+            new ShutdownHelper(executorService, 1000/* logTimeout */,
+                    TimeUnit.MILLISECONDS) {
+               
+                protected void logTimeout() {
 
-            while (true) {
-                
-                // elapsed ms.
-                final long elapsed = System.currentTimeMillis() - begin;
-
-                if (executorService.awaitTermination(logTimeout,
-                        TimeUnit.MILLISECONDS)) {
-
-                    // service terminated so break out of loop.
-                    break;
-
+                    log.warn("Waiting on task(s)"
+                            + ": elapsed="
+                            + TimeUnit.NANOSECONDS.toMillis(elapsed())
+                            + "ms, #active="
+                            + ((ThreadPoolExecutor) executorService)
+                                    .getActiveCount());
+                    
                 }
 
-                // log warning since logTimeout has expired.
-                log.warn("Waiting on task(s): elapsed="
-                        + elapsed
-                        + ", #active="
-                        + ((ThreadPoolExecutor) executorService)
-                                .getActiveCount());
-
-                // wait again until service is shutdown.
-                
-            }
+            };
 
         } catch (InterruptedException ex) {
 
-            log.warn("Awaiting executor service: "+ex);
+            log.warn("Immediate shutdown: "+ex);
+            
+            // convert to immediate shutdown.
+            shutdownNow();
+            
+            return;
 
         }
 

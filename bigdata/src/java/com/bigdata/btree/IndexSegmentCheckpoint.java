@@ -63,6 +63,8 @@ public class IndexSegmentCheckpoint {
      */
     protected static final Logger log = Logger
             .getLogger(IndexSegmentCheckpoint.class);
+    
+    protected static final boolean INFO = log.isInfoEnabled();
 
     static final int SIZEOF_MAGIC = Bytes.SIZEOF_INT;
     static final int SIZEOF_VERSION = Bytes.SIZEOF_INT;
@@ -429,7 +431,7 @@ public class IndexSegmentCheckpoint {
         buf.rewind();
         this.buf = buf.asReadOnlyBuffer();
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info(this.toString());
 
     }
@@ -524,7 +526,7 @@ public class IndexSegmentCheckpoint {
         
         buf = createView();
         
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info(this.toString());
         
     }
@@ -801,7 +803,7 @@ public class IndexSegmentCheckpoint {
 
         FileChannelUtility.writeAll(raf.getChannel(), asReadOnlyBuffer(), 0L);
 
-        if (log.isInfoEnabled()) {
+        if (INFO) {
 
             log.info("wrote checkpoint record: " + this);
             

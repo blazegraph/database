@@ -23,30 +23,51 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on May 30, 2008
+ * Created on Jun 26, 2008
  */
 
-package com.bigdata.btree;
+package com.bigdata.striterator;
+
 
 /**
- * Interface indicates that the index is either an {@link AbstractBTree} or a
- * {@link FusedView} of {@link AbstractBTree}s.
+ * An iterator that will visit a single value.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ILocalBTreeView extends IIndex {
+public class SingleValueChunkedIterator<E> extends ChunkedArrayIterator<E> {
 
     /**
-     * The {@link BTree} that is absorbing writes for the view.
+     * @param e
+     *            The value to be visited.
      */
-    public BTree getMutableBTree();
+    public SingleValueChunkedIterator(E e) {
+
+        this(e, null/* keyOrder */);
+
+    }
 
     /**
-     * Teturn the bloom filter.
-     * 
-     * @return The bloom filter if one exists and otherwise <code>null</code>.
+     * @param e
+     *            The value to be visited (MAY not be <code>null</code>).
+     * @param keyOrder
+     *            The natural sort order (MAY be <code>null</code>).
      */
-    public IBloomFilter getBloomFilter();
+    public SingleValueChunkedIterator(final E e, final IKeyOrder<E> keyOrder) {
 
+        super( 1, alloc(e), keyOrder);
+        
+    }
+    
+    @SuppressWarnings("unchecked")
+    static private <E> E[] alloc(E e) {
+        
+        if (e == null)
+            throw new IllegalArgumentException();
+        
+        return (E[]) java.lang.reflect.Array.newInstance(e.getClass()
+                .getComponentType(), 1);
+        
+    }
+    
 }

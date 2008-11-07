@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import it.unimi.dsi.mg4j.util.BloomFilter;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
@@ -98,38 +96,17 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
      * 
      * @return The btree.
      */
-    public BTree getBTree(int branchingFactor, double errorRate) {
+    public BTree getBTree(int branchingFactor, BloomFilterFactory bloomFilterFactory) {
 
-        Properties properties = getProperties();
-
-        String filename = properties.getProperty(Options.FILE);
-
-        if (filename != null) {
-
-            File file = new File(filename);
-
-            if (file.exists() && !file.delete()) {
-
-                throw new RuntimeException("Could not delete file: "
-                        + file.getAbsoluteFile());
-
-            }
-
-        }
-
-        System.err.println("Opening journal: " + filename);
-        
         IRawStore store = new SimpleMemoryRawStore(); 
 
         IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
         
         metadata.setBranchingFactor(branchingFactor);
         
-        metadata.setErrorRate(errorRate);
+        metadata.setBloomFilterFactory(bloomFilterFactory);
         
         BTree btree = BTree.create(store, metadata);
-
-//                BTree btree = new BTree(journal, branchingFactor, UUID.randomUUID());
 
         return btree;
 
@@ -158,17 +135,24 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
      */
     public void test_randomDenseKeys() throws Exception {
 
+        final double p = 1/64d;// error rate
+        final double maxP = p*10; // max error rate
+
         for(int i=0; i<branchingFactors.length; i++) {
             
-            int m = branchingFactors[i];
+            final int m = branchingFactors[i];
             
-            double errorRate = 1/64d;
-            
-            doBuildIndexSegmentAndCompare( doSplitWithRandomDenseKeySequence( getBTree(m,errorRate), m, m ) );
-            
-            doBuildIndexSegmentAndCompare( doSplitWithRandomDenseKeySequence( getBTree(m,errorRate), m, m*m ) );
+            doBuildIndexSegmentAndCompare(doSplitWithRandomDenseKeySequence(
+                    getBTree(m, new BloomFilterFactory(m/* n */, p, maxP)), m,
+                    m));
 
-            doBuildIndexSegmentAndCompare( doSplitWithRandomDenseKeySequence( getBTree(m,errorRate), m, m*m*m ) );
+            doBuildIndexSegmentAndCompare(doSplitWithRandomDenseKeySequence(
+                    getBTree(m, new BloomFilterFactory(m * m/* n */, p, maxP)),
+                    m, m * m));
+
+            doBuildIndexSegmentAndCompare(doSplitWithRandomDenseKeySequence(
+                    getBTree(m, new BloomFilterFactory(m * m * m/* n */, p,
+                            maxP)), m, m * m * m));
 
             // @todo overflows the initial journal extent.
 //            doBuildIndexSegmentAndCompare( doSplitWithRandomDenseKeySequence( getBTree(m,errorRate), m, m*m*m*m ) );
@@ -216,9 +200,8 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
 
         final int m = 3; // for input and output trees.
         
-        final double errorRate = 1/64d;
-        
-        final BTree btree = getBTree(m,errorRate);
+        final BTree btree = getBTree(m, new BloomFilterFactory(100, 1 / 64d,
+                1 / 32d));
         
         SimpleEntry v3 = new SimpleEntry(3);
         SimpleEntry v5 = new SimpleEntry(5);
@@ -255,7 +238,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
 //                tmpDir, btree, m, 1/64.);
 
         // the bloom filter instance before serialization.
-        BloomFilter bloomFilter = builder2.bloomFilter;
+        IBloomFilter bloomFilter = builder2.bloomFilter;
         
         // false positive tests (should succeed with resonable errorRate).
         assertTrue("3",bloomFilter.contains(i2k(3)));
@@ -282,7 +265,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
         assertSameBTree(btree, seg2);
 
         // the bloom filter instance that was de-serialized.
-        bloomFilter = seg2.bloomFilter;
+        bloomFilter = seg2.getBloomFilter();
         
         // false positive tests (should succeed with resonable errorRate).
         assertTrue("3",bloomFilter.contains(i2k(3)));
@@ -354,7 +337,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
                 
                 IndexMetadata metadata = btree.getIndexMetadata().clone();
                 
-                metadata.setErrorRate(0.0);
+                metadata.setBloomFilterFactory(null/*disable*/);
 
                 new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(),
                         btree.rangeIterator(), m, metadata, commitTime).call();
@@ -372,7 +355,13 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
             
                 IndexMetadata metadata = btree.getIndexMetadata().clone();
                 
-                metadata.setErrorRate(1/64d);
+                /*
+                 * Note: Since we know the exact #of index entries in an index
+                 * segment, both [n] and [maxP] will be ignored when it comes
+                 * time to create the bloom filter for the index segment.
+                 */
+                metadata.setBloomFilterFactory(new BloomFilterFactory(
+                        1/* n */, 1 / 64d/* p */, 1 / 32d/* maxP */));
                 
                 builder2 = new IndexSegmentBuilder(outFile2, tmpDir, btree
                         .getEntryCount(), btree.rangeIterator(), m, metadata,
@@ -424,7 +413,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
              * vet the bloom filter on the loaded index segment
              * (post-serialization).
              */
-            doBloomFilterTest("pre-serialization", seg2.bloomFilter, keys);
+            doBloomFilterTest("pre-serialization", seg2.getBloomFilter(), keys);
 
             /*
              * Verify index segments against the source btree and against one
@@ -471,9 +460,9 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
      *            The ground truth keys that were inserted into the bloom
      *            filter.
      */
-    protected void doBloomFilterTest(String label, BloomFilter bloomFilter, byte[][] keys) {
+    protected void doBloomFilterTest(String label, IBloomFilter bloomFilter, byte[][] keys) {
         
-        System.err.println("\ncondition: "+label+", size="+bloomFilter.size());
+        System.err.println("\ncondition: "+label);//+", size="+bloomFilter.size());
         
         int[] order = getRandomOrder(keys.length);
 

@@ -108,9 +108,14 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
     protected final IRule rule;
     protected final IJoinNexus joinNexus;
     protected final IBuffer<ISolution[]> buffer;
-    protected final RuleState ruleState;
+    protected final IRuleState ruleState;
     protected final RuleStats ruleStats;
     protected final int tailCount;
+    
+    /**
+     * The evaluation order.
+     */
+    protected final int[] order;
     
     /**
      * The offset first computed solution that will be inserted into the
@@ -227,9 +232,11 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 
         this.ruleState = new RuleState(rule, joinNexus);
 
+        this.order = ruleState.getPlan().getOrder();
+        
         // note: evaluation order is fixed by now.
-        this.ruleStats = joinNexus.getRuleStatisticsFactory().newInstance(rule,
-                ruleState.plan, ruleState.keyOrder);
+        this.ruleStats = joinNexus.getRuleStatisticsFactory().newInstance(
+                ruleState);
         
         this.tailCount = rule.getTailCount();
         
@@ -270,11 +277,11 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
         if(INFO) {
             
             log.info("begin:\nruleState=" + ruleState + "\nplan="
-                    + ruleState.plan);
+                    + ruleState.getPlan());
             
         }
 
-        if (ruleState.plan.isEmpty()) {
+        if (ruleState.getPlan().isEmpty()) {
 
             if (INFO)
                 log.info("Rule proven to have no solutions.");
@@ -371,12 +378,13 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      * 
      * @param orderIndex
      *            The evaluation order index.
+     *            
      * @return The tail index to be evaluated at that index in the evaluation
      *         order.
      */
-    final protected int getTailIndex(int orderIndex) {
+    final protected int getTailIndex(final int orderIndex) {
         
-        final int tailIndex = ruleState.order[orderIndex];
+        final int tailIndex = order[orderIndex];
         
         assert orderIndex >= 0 && orderIndex < tailCount : "orderIndex="
                 + orderIndex + ", rule=" + rule;
