@@ -46,7 +46,7 @@ import com.bigdata.rawstore.IRawStore;
  * constraint arises from the requirement to support a copy-on-write policy.
  * </p>
  * <p>
- * Note: No mechanism is exposed for recovering a node or leaf of the tree other
+ * Note: No mechanism is exposed for fetching a node or leaf of the tree other
  * than the root by its key. This is because the parent reference on the node
  * (or leaf) can only be set when it is read from the store in context by its
  * parent node.
@@ -59,14 +59,10 @@ import com.bigdata.rawstore.IRawStore;
  * providing isolation for the object index.
  * </p>
  * <p>
- * Note: This implementation is NOT thread-safe. The index is intended for use
- * within a single-threaded context.
- * </p>
- * <p>
- * Note: This iterators exposed by this implementation do NOT support concurrent
- * structural modification. Concurrent inserts or removals of keys MAY produce
- * incoherent traversal whether or not they result in addition or removal of
- * nodes in the tree.
+ * Note: This implementation is thread-safe for concurent readers BUT NOT for
+ * concurrent writers. If a writer has access to a {@link BTree} then there MUST
+ * NOT be any other reader -or- writer operating on the {@link BTree} at the
+ * same time.
  * </p>
  * 
  * @todo consider also tracking the #of deleted entries in a key range (parallel
@@ -203,7 +199,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
      * Note: There is an interaction with the branching factor which should be
      * neutralized by a dynamic policy.
      */
-    static public final int DEFAULT_READ_RETENTION_QUEUE_CAPACITY = 0;
+    static public final int DEFAULT_READ_RETENTION_QUEUE_CAPACITY = 10000;
 
     /**
      * The #of entries on the hard reference queue that will be scanned for a
@@ -410,7 +406,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
         this.counter = new AtomicLong( checkpoint.getCounter() );
 
     }
-    
+
     /**
      * Creates and sets new root {@link Leaf} on the B+Tree and (re)sets the
      * various counters to be consistent with that root.  This is used both
@@ -435,6 +431,23 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
         // Note: Counter is unchanged!
 //        counter = new AtomicLong( 0L );
 
+        if (metadata.getBloomFilterFactory() != null) {
+
+            /*
+             * Note: Allocate a new bloom filter since the btree is now empty
+             * and set its reference on the BTree. We need to do this here in
+             * order to (a) overwrite the old reference when we are replacing
+             * the root, e.g., for removeAll(); and (b) to make sure that the
+             * bloomFilter reference is defined since the checkpoint will not
+             * have its address until the next time we call writeCheckpoint()
+             * and therefore readBloomFilter() would fail if we did not create
+             * and assign the bloom filter here.
+             */
+            
+            bloomFilter = metadata.getBloomFilterFactory().newBloomFilter();
+            
+        }
+        
         /*
          * Note: a new root leaf is created when an empty btree is (re-)opened.
          * However, if the BTree is marked as read-only then do not fire off a
@@ -447,6 +460,27 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
         }
         
     }
+
+//    /**
+//     * A field that is set by the ctor if the B+Tree is using a bloom filter and
+//     * cleared iff the bloom filter becomes disabled. This is used to determine
+//     * whether or not we must maintain and test the bloom filter.
+//     * <p>
+//     * Note: You can not simply test <code>bloomFilter!=null</code> since the
+//     * {@link #bloomFilter} reference is discarded by {@link #close()} and is
+//     * not created until the root leaf is created (or reopened). Hence this
+//     * field, which helps to avoid those pitfalls.
+//     */
+//    private boolean isBloomFilter;
+//
+//    @Override
+//    final public boolean isBloomFilter() {
+//
+//        reopen();
+//
+//        return isBloomFilter;
+//
+//    }
 
 //    /**
 //     * Uses {@link #handleCommit()} to flush any dirty nodes to the store and
@@ -470,59 +504,122 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
 //        
 //    }
     
-    /**
-     * Reloads the root node iff it is <code>null</code> (indicating a closed
-     * index).
-     * 
-     * @see #close()
-     */
-    protected void reopen() {
-
-        if (root == null) {
+    @Override
+    protected void _reopen() {
+        
+        if (checkpoint.getRootAddr() == 0L) {
 
             /*
-             * reload the root node.
+             * Create the root leaf.
              * 
-             * Note: This is synchronized to avoid race conditions when
-             * re-opening the index from the backing store.
-             * 
-             * Note: [root] MUST be marked as [volatile] to guarentee correct
-             * semantics.
-             * 
-             * See http://en.wikipedia.org/wiki/Double-checked_locking
+             * Note: if there is an optional bloom filter, then it is created
+             * now.
              */
-
-            synchronized(this) {
             
-                if (root == null) {
-                    
-                    /*
-                     * Setup the root leaf.
-                     */
-                    if (checkpoint.getRootAddr() == 0L) {
-    
-                        /*
-                         * Create the root leaf.
-                         */
-                        newRootLeaf();
-                        
-                    } else {
-                        
-                        /*
-                         * Read the root node of the btree.
-                         */
-                        root = readNodeOrLeaf(checkpoint.getRootAddr());
-                        
-                    }
-                
-                }
-                
-            }
+            newRootLeaf();
+            
+        } else {
+            
+            /*
+             * Read the root node of the btree.
+             */
+            root = readNodeOrLeaf(checkpoint.getRootAddr());
 
+            // Note: The optional bloom filter will be read lazily. 
+            
         }
 
     }
 
+    /**
+     * Lazily reads the bloom filter from the backing store if it exists and is
+     * not already in memory.
+     */
+    @Override
+    final public BloomFilter getBloomFilter() {
+
+        // make sure the index is open.
+        reopen();
+        
+        if (bloomFilter == null) {
+
+            if (checkpoint.getBloomFilterAddr() == 0L) {
+
+                // No bloom filter.
+                
+                return null;
+                
+            }
+
+            synchronized(this) {
+                
+                if (bloomFilter == null) {
+
+                    bloomFilter = readBloomFilter();
+                    
+                }
+                
+            }
+            
+        }
+
+        if (bloomFilter != null && !bloomFilter.isEnabled()) {
+            
+            /*
+             * Do NOT return the reference if the bloom filter has been
+             * disabled. This simplifies things for the caller. The only code
+             * that needs the reference regardless of whether it is enabled is
+             * writeCheckpoint() and Checkpoint and those bits use the reference
+             * directly.
+             */
+            
+            return null;
+            
+        }
+        
+        // Note: will be null if there is no bloom filter!
+        return bloomFilter;
+        
+    }
+
+    /**
+     * Read the bloom filter from the backing store using the address stored in
+     * the last {@link #checkpoint} record. This method will be invoked by
+     * {@link #getBloomFilter()} when the bloom filter reference is
+     * <code>null</code> but the bloom filter is known to exist and the bloom
+     * filter object is requested.
+     * <p>
+     * Note: A bloom filter can be relatively large. The bit length of a bloom
+     * filter is approximately one byte per index entry, so a filter for an
+     * index with 10M index entries will be on the order of 10mb. Therefore this
+     * method will typically have high latency.
+     * <p>
+     * Note: the {@link Checkpoint} record initially stores <code>0L</code>
+     * for the bloom filter address. {@link #newRootLeaf()} is responsible for
+     * allocating the bloom filter (if one is to be used) when the root leaf is
+     * (re-)created. The address then gets stored in the {@link Checkpoint}
+     * record by {@link #writeCheckpoint()} (if invoked and once the bloom
+     * filter is dirty).
+     * 
+     * @throws IllegalStateException
+     *             if the bloom filter does not exist (the caller should check
+     *             this first to avoid obtaining a lock).
+     */
+    final protected BloomFilter readBloomFilter() {
+        
+        final long bloomFilterAddr = checkpoint.getBloomFilterAddr();
+        
+        if (bloomFilterAddr == 0L) {
+         
+            // No bloom filter.
+            throw new IllegalStateException();
+            
+        }
+            
+        return BloomFilter.read(store, bloomFilterAddr);
+            
+    }
+    
     final public boolean isReadOnly() {
      
         return readOnly;
@@ -684,6 +781,10 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
     /**
      * Flush the nodes of the {@link BTree} to the backing store. After invoking
      * this method the root of the {@link BTree} will be clean.
+     * <p>
+     * Note: This does NOT flush all persistent state. See
+     * {@link #writeCheckpoint()} which also handles the optional bloom filter,
+     * the {@link IndexMetadata}, and the {@link Checkpoint} record itself.
      * 
      * @return <code>true</code> if anything was written.
      */
@@ -741,6 +842,36 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
         // pre-condition: all nodes in the tree are clean.
         assert root == null || !root.dirty;
 
+        {
+            /*
+             * Note: Use the [AbstractBtree#bloomFilter] reference here!!!
+             * 
+             * If that reference is [null] then the bloom filter is either
+             * clean, disabled, or was not configured. For any of those (3)
+             * conditions we will use the address of the bloom filter from the
+             * last checkpoint record. If the bloom filter is clean, then we
+             * will just carry forward its old address. Otherwise the address in
+             * the last checkpoint record will be 0L and that will be carried
+             * forward.
+             */
+            final BloomFilter filter = this.bloomFilter;
+
+            if (filter != null && filter.isDirty() && filter.isEnabled()) {
+
+                /*
+                 * The bloom filter is enabled, is loaded and is dirty, so write
+                 * it on the store now.
+                 */
+
+                filter.write(store);
+
+                if (INFO)
+                    log.info("wrote updated bloom filter record.");
+
+            }
+            
+        }
+        
         if (metadata.getMetadataAddr() == 0L) {
             
             /*
@@ -748,11 +879,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
              * metadata record on the store.
              */
             
-            // write the metadata record.
             metadata.write(store);
-            
-//            // note the address of the new metadata record.
-//            lastMetadataAddr = metadata.getMetadataAddr();
             
             if(INFO)
                 log.info("wrote updated metadata record");
@@ -1113,7 +1240,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
          * a side-effect on the metadata object.
          */
         metadata.write(store);
-        
+
         /*
          * Create checkpoint for the new B+Tree.
          */

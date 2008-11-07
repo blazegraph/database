@@ -18,7 +18,7 @@ import com.bigdata.striterator.IKeyOrder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RuleState {
+public class RuleState implements IRuleState {
 
     protected static final transient Logger log = Logger.getLogger(RuleState.class);
 
@@ -40,13 +40,16 @@ public class RuleState {
     /**
      * The plan (data from which the evaluation order was selected).
      */
-    final protected IEvaluationPlan plan;
+    final private IEvaluationPlan plan;
     
     /**
-     * The evaluation order for the predicates in the tail of the {@link Rule}.
+     * The #of unbound variables for the predicates in the tail of the
+     * {@link Rule} given the {@link #plan evaluation plan}. The array is
+     * correlated with the predicates index in the tail of the rule NOT with its
+     * evaluation order.
      */
-    final protected int[] order;
-
+    final private int[] nvars;
+    
     /**
      * An array of the {@link IKeyOrder} that will be used for each predicate in
      * the tail of the rule. The array is correlated with the predicates index
@@ -56,7 +59,31 @@ public class RuleState {
      * reads are used by the subqueries for any given chunk on some join
      * dimension.
      */
-    final protected IKeyOrder[] keyOrder;
+    final private IKeyOrder[] keyOrder;
+    
+    public IRule getRule() {
+
+        return rule;
+        
+    }
+    
+    public IEvaluationPlan getPlan() {
+        
+        return plan;
+        
+    }
+    
+    public int[] getNVars() {
+        
+        return nvars;
+        
+    }
+    
+    public IKeyOrder[] getKeyOrder() {
+        
+        return keyOrder;
+        
+    }
     
     /**
      * 
@@ -78,11 +105,13 @@ public class RuleState {
         // The plan (data from which the evaluation order was selected).
         this.plan = joinNexus.getPlanFactory().newPlan(joinNexus, rule);
         
-        // The evaluation order.
-        this.order = plan.getOrder();
-
+//        // The evaluation order.
+//        this.order = plan.getOrder();
+        
+        this.nvars = new int[rule.getTailCount()];
+        
         // The key order that will be used for each join dimension.
-        this.keyOrder = computeKeyOrderForEachTail(rule, joinNexus, order);
+        this.keyOrder = computeKeyOrderForEachTail(rule, joinNexus, plan.getOrder(), nvars);
         
     }
 
@@ -107,8 +136,9 @@ public class RuleState {
     public String toString(IBindingSet bindingSet) {
 
         return rule.toString(bindingSet)+ " order="
-                + Arrays.toString(order) + ", keyOrder="
-                + Arrays.toString(keyOrder);
+                + Arrays.toString(plan.getOrder()) + ", keyOrder="
+                + Arrays.toString(keyOrder) + ", nvars="
+                + Arrays.toString(nvars);
 
     }
 
@@ -121,13 +151,16 @@ public class RuleState {
      * 
      * @param order
      *            The evaluation order.
+     * @param nvars
+     *            The #of unbound variables for each tail predicate is assigned
+     *            by side-effect.
      * 
      * @return An array of the {@link IKeyOrder}s for each tail predicate. The
      *         array is correlated with the predicates index in the tail of the
      *         rule NOT its evaluation order.
      */
     protected IKeyOrder[] computeKeyOrderForEachTail(final IRule rule,
-            final IJoinNexus joinNexus, final int[] order) {
+            final IJoinNexus joinNexus, final int[] order, final int[] nvars) {
 
         if (order == null)
             throw new IllegalArgumentException();
@@ -147,16 +180,19 @@ public class RuleState {
 
             final IPredicate pred = rule.getTail(tailIndex);
 
+            final IPredicate asBound = pred.asBound(bindingSet);
+            
             final IKeyOrder keyOrder = joinNexus.getTailAccessPath(
-                    pred.asBound(bindingSet)).getKeyOrder();
+                    asBound).getKeyOrder();
 
             if (DEBUG)
                 log.debug("keyOrder=" + keyOrder + ", orderIndex=" + orderIndex
                         + ", tailIndex=" + orderIndex + ", pred=" + pred
                         + ", bindingSet=" + bindingSet + ", rule=" + rule);
 
-            // save it.
+            // save results.
             a[tailIndex] = keyOrder;
+            nvars[tailIndex] = asBound.getVariableCount();
             
             final int arity = pred.arity();
 
@@ -186,7 +222,8 @@ public class RuleState {
 
         if (DEBUG) {
 
-            log.debug("keyOrder[]=" + Arrays.toString(a) + ", rule=" + rule);
+            log.debug("keyOrder[]=" + Arrays.toString(a) + ", nvars="
+                    + Arrays.toString(nvars) + ", rule=" + rule);
 
         }
 

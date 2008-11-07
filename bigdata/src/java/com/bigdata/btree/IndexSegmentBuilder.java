@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import it.unimi.dsi.mg4j.util.BloomFilter;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -118,7 +116,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected static boolean DEBUG = log.isInfoEnabled();
+    final protected static boolean DEBUG = log.isDebugEnabled();
     
     /**
      * The file mode used to open the file on which the {@link IndexSegment} is
@@ -201,7 +199,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
     /**
      * The bloom filter iff we build one (errorRate != 0.0).
      */
-    final BloomFilter bloomFilter;
+    final IBloomFilter bloomFilter;
     
     /**
      * The file on which the {@link IndexSegment} is written. The file is closed
@@ -546,28 +544,23 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
             /*
              * Setup optional bloom filter.
+             * 
+             * Note: For read-only {@link IndexSegment} we always know the #of
+             * keys exactly at the time that we provision the bloom filter. This
+             * makes it easy for us to tune the filter for a desired false
+             * positive rate.
              */
-            {
-             
-                final double errorRate = metadata.getErrorRate();
+            if (metadata.getBloomFilterFactory() != null) {
 
-                if (errorRate < 0.0 || errorRate > 1.0) {
+                // the desired error rate for the bloom filter.
+                final double p = metadata.getBloomFilterFactory().p;
 
-                    throw new IllegalArgumentException(
-                            "errorRate must be in [0:1], not " + errorRate);
+                // create the bloom filter.
+                bloomFilter = new BloomFilter(plan.nentries, p);
 
-                }
-
-                if (errorRate == 0.0) {
-
-                    bloomFilter = null;
-
-                } else {
-
-                    // @todo compute [d] based on the error rate.
-                    bloomFilter = new BloomFilter(plan.nentries);
-
-                }
+            } else {
+                
+                bloomFilter = null;
                 
             }
 

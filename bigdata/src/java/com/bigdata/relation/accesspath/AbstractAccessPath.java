@@ -35,7 +35,9 @@ import java.util.concurrent.Future;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.IBloomFilter;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -554,6 +556,9 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
                     + capacity + ", accessPath=" + this);
         
         final boolean fullyBufferedRead;
+
+        // true iff a point test is a hit on the bloom filter.
+        boolean bloomHit = false;
         
         if(predicate.isFullyBound()) {
 
@@ -578,6 +583,43 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
             limit = 1L;
             
             fullyBufferedRead = true;
+            
+            /*
+             * Note: Since this is a point test, we apply the bloom filter for
+             * fast rejection. However, we can only apply the bloom filter if
+             * (a) you are using the local index object (either a BTree or a
+             * FusedView); and (b) the bloom filter exists (and is enabled).
+             * 
+             * Note: The scale-out case is dealt with by pipelining the
+             * intermediate binding sets to the data service on which the index
+             * partition resides, at which point we again can apply the local
+             * bloom filter efficiently.
+             */
+            
+            if(ndx instanceof ILocalBTreeView) {
+                
+                final IBloomFilter filter = ((ILocalBTreeView)ndx).getBloomFilter();
+                
+                if (filter != null) {
+                    
+                    if(!filter.contains(fromKey)) {
+
+                        // proven to not exist.
+                        return new EmptyChunkedIterator<R>(keyOrder);
+                        
+                    }
+                    
+                    bloomHit = true;
+                    
+                    // fall through
+                    
+                }
+                
+                // fall through
+                
+            }
+            
+            // fall through
             
         } else if (limit > 0L) {
 
@@ -688,7 +730,21 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
              * Synchronous fully buffered read of no more than [limit] elements.
              */
 
-            return synchronousIterator(offset, limit, src);
+            final IChunkedOrderedIterator<R> tmp = synchronousIterator(offset,
+                    limit, src);
+            
+            if(bloomHit) {
+                
+                if(!tmp.hasNext()) {
+
+                    // notify filter of a false positive.
+                    ((ILocalBTreeView)ndx).getBloomFilter().falsePos();
+                    
+                }
+                
+            }
+            
+            return tmp;
 
         } else {
 

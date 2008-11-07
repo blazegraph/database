@@ -150,6 +150,13 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestReopen.class);
 
         /*
+         * Test bloom filters for a BTree (vs an IndexSegment, which is handled
+         * below).
+         */
+        suite.addTestSuite(TestBloomFilter.class);
+        suite.addTestSuite(TestBTreeWithBloomFilter.class);
+
+        /*
          * test index segment builds.
          * 
          * Note: the fast forward and fast reverse leaf scans are

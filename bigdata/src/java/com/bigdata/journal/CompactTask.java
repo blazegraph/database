@@ -26,6 +26,9 @@ package com.bigdata.journal;
 import java.io.File;
 import java.util.Properties;
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
 
@@ -42,6 +45,8 @@ import com.bigdata.journal.Journal.Options;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.resources.OverflowManager;
+import com.bigdata.util.concurrent.ParallelismLimitedExecutorService;
+import com.bigdata.util.concurrent.ShutdownHelper;
 
 /**
  * Task compacts the journal state onto a caller specified file. This may be
@@ -69,6 +74,12 @@ import com.bigdata.resources.OverflowManager;
  * 
  * @todo it would be easy enough to change the branching factor during this
  *       task.
+ * 
+ * @todo add listener api for start/end notice (and perhaps error).
+ * 
+ * @todo add export task that builds index segments from the indices on a
+ *       journal and work this into {@link CompactJournalUtility} or a similar
+ *       utility class.
  */
 public class CompactTask implements Callable<Journal> {
 
@@ -82,7 +93,7 @@ public class CompactTask implements Callable<Journal> {
     final static protected boolean DEBUG = log.isDebugEnabled();
 
     /** The source {@link Journal}. */
-    final protected AbstractJournal oldJournal;
+    final protected Journal oldJournal;
 
     /** The output {@link File}. */
     final protected File outFile;
@@ -90,6 +101,15 @@ public class CompactTask implements Callable<Journal> {
     /** The caller specified commit time. */
     final protected long commitTime;
 
+    // cause from first task to error.
+    final protected AtomicReference<Throwable> firstCause = new AtomicReference<Throwable>();
+    
+    // #of tasks started.
+    final protected AtomicInteger startCount = new AtomicInteger(0);
+    
+    // #of tasks completed successfully.
+    final protected AtomicInteger doneCount = new AtomicInteger(0);
+    
     /**
      * The task reads the state of each named index as of the given
      * commitTime and writes the index data in order on the output journal.
@@ -109,7 +129,7 @@ public class CompactTask implements Callable<Journal> {
      *            output file (the first commit point whose commit time is
      *            LTE to the given commit time will be used).
      */
-    public CompactTask(final AbstractJournal src, final File outFile,
+    public CompactTask(final Journal src, final File outFile,
             final long commitTime) {
 
         if (src == null)
@@ -244,6 +264,18 @@ public class CompactTask implements Callable<Journal> {
         final ITupleIterator itr = oldJournal.getName2Addr(commitTime)
                 .rangeIterator(null, null);
 
+        /*
+         * This service will limit the #of indices that we process in parallel.
+         * 
+         * Note: Based on some (limited) experimentation, the store file is
+         * reduced by the same amount regardless of parallel vs serial
+         * processing of the index files.
+         * 
+         * Note: Too much parallelism here appears to slow things down.
+         */
+        final ParallelismLimitedExecutorService service = new ParallelismLimitedExecutorService(
+                oldJournal.getExecutorService(), 3/* maxParallel */, 20/* queueCapacity */);
+        
         while (itr.hasNext()) {
 
             final ITuple tuple = itr.next();
@@ -251,15 +283,40 @@ public class CompactTask implements Callable<Journal> {
             final Entry entry = EntrySerializer.INSTANCE
                     .deserialize(new DataInputBuffer(tuple.getValue()));
 
-            /*
-             * Note: index copy is serialized to improve locality of
-             * reference in the new journal.
-             */
-
-            copyIndex(newJournal, entry);
+            // Submit task to copy the index to the new journal.
+            service.submit(new CopyIndexTask(newJournal, entry));
 
         }
 
+        try {
+
+            // shutdown the service and await termination.
+            new ShutdownHelper(service, 60L/* logTimeout */, TimeUnit.SECONDS) {
+
+                protected void logTimeout() {
+
+                    if(INFO)
+                    log.info("Waiting on task(s)" + ": elapsed="
+                            + TimeUnit.NANOSECONDS.toMillis(elapsed())
+                            + "ms, #active=" + service.getActiveCount());
+                    
+                }
+
+            };
+
+        } catch (InterruptedException e) {
+
+            /*
+             * Interrupted awaiting task completion. shutdown the service
+             * immediately and rethrow the exception.
+             */
+
+            service.shutdownNow();
+            
+            throw new RuntimeException(e);
+
+        }
+        
         final long elapsed = System.currentTimeMillis() - begin;
 
         if (INFO)
@@ -269,92 +326,146 @@ public class CompactTask implements Callable<Journal> {
 
     /**
      * Copy an index to the new journal.
-     *  
-     * @param newJournal
-     *            The new journal.
-     * @param entry
-     *            An {@link Entry} from the {@link Name2Addr} index for an
-     *            index defined on the {@link #oldJournal}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
      */
-    protected void copyIndex(final Journal newJournal, final Entry entry) {
+    protected class CopyIndexTask implements Callable<Void> {
+        
+        /** The new journal. */
+        protected final Journal newJournal;
 
-        // source index.
-        final BTree oldBTree = oldJournal.getIndex(entry.checkpointAddr);
-
-        // #of index entries on the old index.
-        final long entryCount = oldBTree.rangeCount();
-
-        // clone index metadata.
-        final IndexMetadata indexMetadata = oldBTree.getIndexMetadata().clone();
-
-        /*
-         * Create and register the index on the new journal.
-         * 
-         * Note: This is essentially a variant of BTree#create() where we
-         * need to propagate the counter from the old BTree to the new
-         * BTree.
+        /**
+         * An {@link Entry} from the {@link Name2Addr} index for an index
+         * defined on the {@link #oldJournal}.
          */
+        protected final Entry entry;
 
-        /*
-         * Write metadata record on store. The address of that record is set
-         * as a side-effect on the metadata object.
+        /**
+         * @param newJournal
+         *            The new journal.
+         * @param entry
+         *            An {@link Entry} from the {@link Name2Addr} index for an
+         *            index defined on the {@link #oldJournal}.
          */
-        indexMetadata.write(newJournal);
+        public CopyIndexTask(final Journal newJournal, final Entry entry) {
 
-        // note the current counter value.
-        final long oldCounter = oldBTree.getCounter().get();
+            if (newJournal == null)
+                throw new IllegalArgumentException();
+            if (entry == null)
+                throw new IllegalArgumentException();
 
-        if (INFO)
-            log.info("name=" + entry.name //
-                    + ", entryCount=" + entryCount//
-                    + ", checkpoint=" + oldBTree.getCheckpoint()//
+            this.newJournal = newJournal;
+
+            this.entry = entry;
+
+        }
+
+        /**
+         * Creates and index on the {@link #newJournal}, copies the data from
+         * the index on the old journal, and then registers the new index on the
+         * {@link #newJournal}.
+         */
+        public Void call() throws Exception {
+
+            try {
+
+                startCount.incrementAndGet();
+
+                if (INFO)
+                    log.info("Start: name=" + entry.name);
+                
+                // source index.
+                final BTree oldBTree = oldJournal
+                        .getIndex(entry.checkpointAddr);
+
+                // #of index entries on the old index.
+                final long entryCount = oldBTree.rangeCount();
+
+                // clone index metadata.
+                final IndexMetadata indexMetadata = oldBTree.getIndexMetadata()
+                        .clone();
+
+                /*
+                 * Create and register the index on the new journal.
+                 * 
+                 * Note: This is essentially a variant of BTree#create() where
+                 * we need to propagate the counter from the old BTree to the
+                 * new BTree.
+                 */
+
+                /*
+                 * Write metadata record on store. The address of that record is
+                 * set as a side-effect on the metadata object.
+                 */
+                indexMetadata.write(newJournal);
+
+                // note the current counter value.
+                final long oldCounter = oldBTree.getCounter().get();
+
+                if (INFO)
+                    log.info("name=" + entry.name //
+                            + ", entryCount=" + entryCount//
+                            + ", checkpoint=" + oldBTree.getCheckpoint()//
                     );
 
-        // Create checkpoint for the new B+Tree.
-        final Checkpoint overflowCheckpoint = indexMetadata
-                .overflowCheckpoint(oldBTree.getCheckpoint());
+                // Create checkpoint for the new B+Tree.
+                final Checkpoint overflowCheckpoint = indexMetadata
+                        .overflowCheckpoint(oldBTree.getCheckpoint());
 
-        /*
-         * Write the checkpoint record on the store. The address of the
-         * checkpoint record is set on the object as a side effect.
-         */
-        overflowCheckpoint.write(newJournal);
+                /*
+                 * Write the checkpoint record on the store. The address of the
+                 * checkpoint record is set on the object as a side effect.
+                 */
+                overflowCheckpoint.write(newJournal);
 
-        /*
-         * Load the B+Tree from the store using that checkpoint record.
-         */
-        final BTree newBTree = BTree.load(newJournal, overflowCheckpoint
-                .getCheckpointAddr());
+                /*
+                 * Load the B+Tree from the store using that checkpoint record.
+                 */
+                final BTree newBTree = BTree.load(newJournal,
+                        overflowCheckpoint.getCheckpointAddr());
 
-        // Note the counter value on the new BTree.
-        final long newCounter = newBTree.getCounter().get();
+                // Note the counter value on the new BTree.
+                final long newCounter = newBTree.getCounter().get();
 
-        // Verify the counter was propagated to the new BTree.
-        assert newCounter == oldCounter : "expected oldCounter=" + oldCounter
-                + ", but found newCounter=" + newCounter;
+                // Verify the counter was propagated to the new BTree.
+                assert newCounter == oldCounter : "expected oldCounter="
+                        + oldCounter + ", but found newCounter=" + newCounter;
 
-        /*
-         * Copy the data from the B+Tree on the old journal into the B+Tree
-         * on the new journal.
-         * 
-         * Note: [overflow := true] since we are copying from the old
-         * journal onto the new journal.
-         */
+                /*
+                 * Copy the data from the B+Tree on the old journal into the
+                 * B+Tree on the new journal.
+                 * 
+                 * Note: [overflow := true] since we are copying from the old
+                 * journal onto the new journal.
+                 */
 
-        if (DEBUG)
-            log.debug("Copying data to new journal: name=" + entry.name
-                    + ", entryCount=" + entryCount);
+                if (DEBUG)
+                    log.debug("Copying data to new journal: name=" + entry.name
+                            + ", entryCount=" + entryCount);
 
-        newBTree.rangeCopy(oldBTree, null, null, true/* overflow */);
+                newBTree.rangeCopy(oldBTree, null, null, true/* overflow */);
 
-        /*
-         * Register the new B+Tree on the new journal.
-         */
-        newJournal.registerIndex(entry.name, newBTree);
+                /*
+                 * Register the new B+Tree on the new journal.
+                 */
+                newJournal.registerIndex(entry.name, newBTree);
 
-        if(DEBUG)
-            log.debug("Done with index: name=" + entry.name);
-        
-    } // copyIndex
+                if (DEBUG)
+                    log.debug("Done with index: name=" + entry.name);
+
+                doneCount.incrementAndGet();
+
+            } catch (Throwable t) {
+
+                firstCause.compareAndSet(null/* expect */, t);
+
+            }
+
+            return null;
+
+        }
+
+    }
 
 }

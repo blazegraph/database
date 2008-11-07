@@ -23,8 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
-import it.unimi.dsi.mg4j.util.BloomFilter;
-
 import com.bigdata.btree.AbstractBTreeTupleCursor.AbstractCursorPosition;
 import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
 import com.bigdata.btree.IndexSegmentStore.Options;
@@ -52,14 +50,6 @@ public class IndexSegment extends AbstractBTree {
      * Type safe reference to the backing store.
      */
     private final IndexSegmentStore fileStore;
-
-    /**
-     * An optional bloom filter that will be used to filter point tests. Since
-     * bloom filters do not support removal of keys the option to use a filter
-     * is restricted to {@link IndexSegment}s since they are read-only data
-     * structures.
-     */
-    protected BloomFilter bloomFilter;
 
     /**
      * An LRU for {@link ImmutableLeaf}s. This cache takes advantage of the
@@ -132,7 +122,7 @@ public class IndexSegment extends AbstractBTree {
         // Type-safe reference to the backing store.
         this.fileStore = (IndexSegmentStore) fileStore;
 
-        _open();
+        _reopen();
 
     }
 
@@ -143,15 +133,15 @@ public class IndexSegment extends AbstractBTree {
 
         if (root == null) {
 
-            throw new IllegalStateException("Already closed.");
+            throw new IllegalStateException(ERROR_CLOSED);
 
         }
 
         // close the backing file (can be re-opened).
         fileStore.close();
 
-        // release the optional bloom filter.
-        bloomFilter = null;
+//        // release the optional bloom filter.
+//        bloomFilter = null;
         
         // release the leaf cache.
         leafCache.clear();
@@ -165,45 +155,45 @@ public class IndexSegment extends AbstractBTree {
 
     }
 
-    /**
-     * Re-opens the backing file.
-     */
-    protected void reopen() {
-
-        if (root == null) {
-
-            /*
-             * reload the root node.
-             * 
-             * Note: This is synchronized to avoid race conditions when
-             * re-opening the index from the backing store.
-             * 
-             * Note: [root] MUST be marked as [volatile] to guarentee correct
-             * semantics.
-             * 
-             * See http://en.wikipedia.org/wiki/Double-checked_locking
-             */
-            
-            synchronized (this) {
-
-                if (root == null) {
-
-                    if (!fileStore.isOpen()) {
-
-                        // reopen the store.
-                        fileStore.reopen();
-                        
-                    }
-
-                    _open();
-
-                }
-
-            }
-
-        }
-
-    }
+//    /**
+//     * Re-opens the backing file.
+//     */
+//    protected void reopen() {
+//
+//        if (root == null) {
+//
+//            /*
+//             * reload the root node.
+//             * 
+//             * Note: This is synchronized to avoid race conditions when
+//             * re-opening the index from the backing store.
+//             * 
+//             * Note: [root] MUST be marked as [volatile] to guarentee correct
+//             * semantics.
+//             * 
+//             * See http://en.wikipedia.org/wiki/Double-checked_locking
+//             */
+//            
+//            synchronized (this) {
+//
+//                if (root == null) {
+//
+//                    if (!fileStore.isOpen()) {
+//
+//                        // reopen the store.
+//                        fileStore.reopen();
+//                        
+//                    }
+//
+//                    _open();
+//
+//                }
+//
+//            }
+//
+//        }
+//
+//    }
 
     /**
      * Overriden to a more constrained type.
@@ -214,11 +204,15 @@ public class IndexSegment extends AbstractBTree {
         
     }
     
-    /**
-     * Note: This caller MUST be synchronized to ensure that at most one thread
-     * gets to re-open the index from its backing store.
-     */
-    private void _open() {
+    @Override
+    protected void _reopen() {
+
+        if (!fileStore.isOpen()) {
+
+            // reopen the store.
+            fileStore.reopen();
+            
+        }
 
         final int leafCacheSize = Integer.parseInt(fileStore.getProperties()
                 .getProperty(Options.LEAF_CACHE_SIZE,
@@ -230,13 +224,31 @@ public class IndexSegment extends AbstractBTree {
         // Read the root node.
         this.root = readNodeOrLeaf(fileStore.getCheckpoint().addrRoot);
 
-        // Save reference to the optional bloom filter.
-        this.bloomFilter = fileStore.getBloomFilter();
+        /*
+         * Save reference to the optional bloom filter (it is read when the file
+         * is opened).
+         */
+        bloomFilter = fileStore.getBloomFilter();
         
         // report on the event.
         ResourceManager.openIndexSegment(null/* name */, fileStore.getFile()
                 .toString(), fileStore.size());
 
+    }
+    
+    @Override
+    final public BloomFilter getBloomFilter() {
+        
+        // make sure the index is open.
+        reopen();
+        
+        /*
+         * return the reference. The bloom filter is read when the file is
+         * (re-)opened. if the reference is null then there is no bloom filter.
+         */
+        
+        return bloomFilter;
+        
     }
 
     final public boolean isReadOnly() {
@@ -255,34 +267,6 @@ public class IndexSegment extends AbstractBTree {
     }
     
     /*
-     * bloom filter support.
-     */
-
-    /**
-     * Returns true if the optional bloom filter reports that the key exists.
-     * 
-     * @param key
-     *            The key.
-     * 
-     * @return <code>true</code> if the bloom filter believes that the key is
-     *         present in the index. When true, you MUST still test the key to
-     *         verify that it is, in fact, present in the index. When false, you
-     *         SHOULD NOT test the index.
-     * 
-     * @todo examine the #of weights in use by the bloom filter and its impact
-     *       on false positives for character data.
-     */
-    final protected boolean containsKey(byte[] key) {
-
-        reopen();
-
-        assert bloomFilter != null;
-
-        return bloomFilter.contains(key);
-
-    }
-
-    /*
      * ISimpleBTree (disallows mutation operations, applies the optional bloom
      * filter when present).
      */
@@ -297,65 +281,6 @@ public class IndexSegment extends AbstractBTree {
         
     }
     
-    /**
-     * Applies the optional bloom filter if it exists. If the bloom filter
-     * reports true, then verifies that the key does in fact exist in the index.
-     */
-    public boolean contains(byte[] key) {
-
-        reopen();
-
-        if (bloomFilter != null) {
-
-            if (!containsKey(key)) {
-
-                // rejected by the bloom filter.
-                return false;
-
-            }
-
-            // fall through.
-            
-        }
-
-        // test the index.
-        return super.contains(key);
-
-    }
-
-    /**
-     * Applies the optional bloom filter if it exists. If the bloom filter
-     * exists and reports true, then looks up the value for the key in the index
-     * (note that the key might not exist in the index since a bloom filter
-     * allows false positives, further the key might exist for a deleted entry).
-     */
-    public Tuple lookup(byte[] key, Tuple tuple) {
-
-        reopen();
-
-        if (bloomFilter != null) {
-
-            if (!containsKey(key)) {
-
-                // rejected by the bloom filter.
-
-                return null;
-
-            }
-
-            // fall through.
-
-        }
-        
-        /*
-         * Lookup against the index (may be a false positive, may be paired to a
-         * deleted entry, and we need the tuple paired to the key in any case).
-         */
-        
-        return super.lookup(key, tuple);
-
-    }
-
     /**
      * @throws UnsupportedOperationException
      *             always.

@@ -31,7 +31,6 @@ package com.bigdata.btree;
 import java.util.Arrays;
 import java.util.UUID;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.filter.IFilterConstructor;
@@ -45,6 +44,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.isolation.IsolatedFusedView;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.relation.accesspath.AbstractAccessPath;
 import com.bigdata.service.Split;
 
 /**
@@ -73,14 +73,12 @@ public class FusedView implements IIndex, ILocalBTreeView {
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final protected boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final protected boolean DEBUG = log.isDebugEnabled();
 
     /**
      * Holds the various btrees that are the sources for the view.
@@ -274,6 +272,24 @@ public class FusedView implements IIndex, ILocalBTreeView {
         return srcs[0].getIndexMetadata();
         
     }
+    
+    public IBloomFilter getBloomFilter() {
+        
+        // double checked locking.
+        if (bloomFilter == null) {
+
+            synchronized (this) {
+
+                bloomFilter = new FusedBloomFilter();
+                
+            }
+            
+        }
+
+        return bloomFilter;
+        
+    }
+    private volatile IBloomFilter bloomFilter = null;
     
     synchronized final public ICounterSet getCounters() {
 
@@ -868,6 +884,74 @@ public class FusedView implements IIndex, ILocalBTreeView {
 
             aggregator.aggregate(result, new Split(null, fromIndex, toIndex));
 
+        }
+        
+    }
+
+    /**
+     * Inner class providing a fused view of the optional bloom filters
+     * associated with each of the source indices.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected class FusedBloomFilter implements IBloomFilter {
+
+        /**
+         * Unsupported operation.
+         * 
+         * @throws UnsupportedOperationException
+         *             always.
+         */
+        public boolean add(byte[] key) {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+
+        /**
+         * Applies the {@link IBloomFilter} for each source index in turn and
+         * returns <code>true</code> if ANY of the component index filters
+         * return <code>true</code> (if any filters say that their index has
+         * data for that key then you need to read the index).
+         */
+        public boolean contains(final byte[] key) {
+
+            for (int i = 0; i < srcs.length; i++) {
+
+                final IBloomFilter filter = srcs[i].getBloomFilter();
+
+                if (filter != null && filter.contains(key)) {
+
+                    return true;
+                    
+                }
+
+            }
+
+            return false;
+
+        }
+
+        /**
+         * This implementation notifies the bloom filter for the first source
+         * index (if it exists). Normally false positives will be reported
+         * directly to the specific bloom filter instance by the contains() or
+         * lookup() method for that index. However, the
+         * {@link AbstractAccessPath} also tests the bloom filter and needs a
+         * means to report false positives. It should be the only one that calls
+         * this method on this implementation class.
+         */
+        public void falsePos() {
+
+            final IBloomFilter filter = srcs[0].getBloomFilter();
+
+            if (filter != null) {
+
+                filter.falsePos();
+
+            }
+            
         }
         
     }

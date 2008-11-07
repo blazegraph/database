@@ -23,8 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
-import it.unimi.dsi.mg4j.util.BloomFilter;
-
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.File;
@@ -65,6 +63,10 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
      */
     protected static final Logger log = Logger
             .getLogger(IndexSegmentStore.class);
+    
+    protected static final boolean INFO = log.isInfoEnabled();
+
+    protected static final boolean DEBUG = log.isDebugEnabled();
 
     /**
      * A clone of the properties specified to the ctor.
@@ -365,7 +367,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
                     .getName(), metadata.getPartitionMetadata()
                     .getPartitionId());
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("Closing index segment store: " + name + ", file="
                         + getFile());
             
@@ -430,7 +432,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             // read the checkpoint record from the file.
             this.checkpoint = new IndexSegmentCheckpoint(raf);
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info(checkpoint.toString());
 
             // handles transparent decoding of offsets within regions.
@@ -572,7 +574,8 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
      */
     synchronized public void close() {
 
-        log.info("");
+        if(INFO)
+            log.info(file.toString());
         
         assertOpen();
      
@@ -814,7 +817,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
          */
         final boolean isNodeAddr = addressManager.isNodeAddr(addr);
         
-        if (log.isDebugEnabled()) {
+        if (DEBUG) {
 
             log.debug("addr=" + addr + "(" + addressManager.toString(addr)
                     + "), isNodeAddr="+isNodeAddr);
@@ -952,7 +955,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             buf_nodes = DirectBufferPool.INSTANCE.acquire(100/* ms */,
                     TimeUnit.MILLISECONDS);
             
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("Buffering nodes: #nodes=" + checkpoint.nnodes
                         + ", #bytes=" + checkpoint.extentNodes + ", file=" + file);
 
@@ -1019,7 +1022,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             
         }
         
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("reading bloom filter: "+addressManager.toString(addr));
         
         final long off = addressManager.getOffset(addr);
@@ -1053,10 +1056,8 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
 
         final BloomFilter bloomFilter = (BloomFilter) SerializerUtil.deserialize(buf);
 
-        if (log.isInfoEnabled())
-            log.info("Read bloom filter: minKeys=" + bloomFilter.size()
-                    + ", entryCount=" + checkpoint.nentries + ", bytesOnDisk="
-                    + len + ", errorRate=" + metadata.getErrorRate());
+        if (INFO)
+            log.info("Read bloom filter: bytesOnDisk=" + len );
 
         return bloomFilter;
 
@@ -1071,7 +1072,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         
         assert addr != 0L;
         
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("reading metadata: "+addressManager.toString(addr));
         
         final long off = addressManager.getOffset(addr);
@@ -1107,7 +1108,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         final IndexMetadata md = (IndexMetadata) SerializerUtil
                 .deserialize(buf);
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("Read metadata: " + md);
 
         return md;

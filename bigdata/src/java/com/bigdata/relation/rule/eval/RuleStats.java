@@ -38,6 +38,7 @@ import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.ISlice;
 import com.bigdata.relation.rule.IStep;
+import com.bigdata.relation.rule.Rule;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.striterator.IKeyOrder;
 
@@ -89,7 +90,9 @@ public class RuleStats {
             this.permutation = new int[tailCount];
 
             this.keyOrder = new IKeyOrder[tailCount];
-            
+
+            this.nvars = new int[tailCount];
+
             this.chunkCount = new long[tailCount];
 
             this.subqueryCount = new int[tailCount];
@@ -105,6 +108,8 @@ public class RuleStats {
             this.permutation = null;
             
             this.keyOrder = null;
+            
+            this.nvars = null;
             
             this.chunkCount = null;
             
@@ -138,18 +143,21 @@ public class RuleStats {
      *            evaluation plan (the indices are correlated with the tail
      *            predicate index, not the evaluation order index).
      */
-    public RuleStats(final IRule rule, final IEvaluationPlan plan,
-            final IKeyOrder[] keyOrder) {
+    public RuleStats(final IRuleState ruleState) {
         
-        this(rule);
+        this(ruleState.getRule());
+        
+        final IRule rule = ruleState.getRule();
+        
+        final IEvaluationPlan plan = ruleState.getPlan();
         
         final int tailCount = rule.getTailCount();
         
-        final int[] order = plan.getOrder();
-        
-        System.arraycopy(order, 0, evalOrder, 0, tailCount);
+        System.arraycopy(ruleState.getNVars(), 0, this.nvars, 0, tailCount);
 
-        System.arraycopy(keyOrder, 0, this.keyOrder, 0, tailCount);
+        System.arraycopy(plan.getOrder(), 0, this.evalOrder, 0, tailCount);
+
+        System.arraycopy(ruleState.getKeyOrder(), 0, this.keyOrder, 0, tailCount);
 
         /*
          * Construct the permutation of the tail index order for the rule that
@@ -254,6 +262,14 @@ public class RuleStats {
     /*
      * The following are only available for the execution of a single rule.
      */
+
+    /**
+     * The #of unbound variables for the predicates in the tail of the
+     * {@link Rule} (only available at the detail level of a single rule
+     * instance execution). The array is correlated with the predicates index in
+     * the tail of the rule NOT with its evaluation order.
+     */
+    public final int[] nvars;
     
     /**
      * The order of execution of the predicates in the body of a rule (only
@@ -343,6 +359,9 @@ public class RuleStats {
      * <dt>keyOrder</dt>
      * <dd>The {@link IKeyOrder} for the predicate(s) in the rule. Basically,
      * this tells you which index was used for each predicate.</dd>
+     * <dt>nvars</dt>
+     * <dd>The #of variables that will be unbound in the predicate when it is
+     * evaluated (this is a function of the selected evaluation plan).</dd>
      * <dt>rangeCount</dt>
      * <dd>The #of elements predicated for each tail predicate in the rule by
      * the {@link IRangeCountFactory} on behalf of the {@link IEvaluationPlan}.</dd>
@@ -382,7 +401,7 @@ public class RuleStats {
      
         return "rule, elapsed"
                 + ", solutionCount, solutions/sec, mutationCount, mutations/sec"
-                + ", evalOrder, keyOrder, rangeCount, chunkCount, elementCount, subqueryCount"
+                + ", evalOrder, keyOrder, nvars, rangeCount, chunkCount, elementCount, subqueryCount"
                 + ", tailIndex, tailPredicate"
         ;
         
@@ -451,6 +470,7 @@ public class RuleStats {
             
             sb.append(", "+(titles?"evalOrder=":"")+q+toString(evalOrder)+q);
             sb.append(", "+(titles?"keyOrder=":"")+q+toString(keyOrder)+q);
+            sb.append(", "+(titles?"nvars=":"")+q+toString(nvars)+q);
             sb.append(", "+(titles?"rangeCount=":"")+q+ toString(rangeCount)+q);
             sb.append(", "+(titles?"chunkCount=":"")+q+ toString(chunkCount)+q);
             sb.append(", "+(titles?"elementCount=":"")+q+ toString(elementCount)+q);
@@ -473,6 +493,7 @@ public class RuleStats {
                     sb.append(", "+orderIndex);
                     
                     sb.append(", "+keyOrder[i]);
+                    sb.append(", "+nvars[i]);
                     sb.append(", "+rangeCount[i]);
                     sb.append(", "+chunkCount[i]);
                     sb.append(", "+elementCount[i]);
@@ -699,7 +720,9 @@ public class RuleStats {
 
             for (int i = 0; i < elementCount.length; i++) {
 
-                // Note: order[] is NOT aggregated.
+                // Note: order[]    is NOT aggregated.
+                // Note: keyOrder[] is NOT aggregated.
+                // Note: nvars[]    is NOT aggregated.
 
                 rangeCount[i] += o.rangeCount[i];
 

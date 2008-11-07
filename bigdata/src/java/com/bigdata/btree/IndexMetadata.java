@@ -242,7 +242,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
     private IConflictResolver conflictResolver;
     private boolean deleteMarkers;
     private boolean versionTimestamps;
-    private double errorRate;
+//    private double errorRate;
+    private BloomFilterFactory bloomFilterFactory;
     private IOverflowHandler overflowHandler;
     private ISplitHandler splitHandler;
 //    private Object historyPolicy;
@@ -525,29 +526,80 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
         
     }
 
+//    /**
+//     * A value in [0:1] that is interpreted as an allowable false positive error
+//     * rate for an optional bloom filter. When zero (0.0), the bloom filter is
+//     * not constructed. The bloom filter provides efficient fast rejection of
+//     * keys that are not in the index. If the bloom filter reports that a key is
+//     * in the index then the index MUST be tested to verify that the result is
+//     * not a false positive. Bloom filters are great if you have a lot of point
+//     * tests to perform but they are not used if you are doing range scans.
+//     * <p>
+//     * Maintaing a bloom filter is fairly expensive and this option should only
+//     * be enabled if you know that point access tests are a hotspot for an
+//     * index.
+//     * 
+//     * @todo consider changing this to a boolean flag and then computing a
+//     *       suitable capacity for the bloom filter based on a reasonable
+//     *       expectation of the #of index entries that might be observed.
+//     */
+//    public double getErrorRate() {
+//        
+//        return errorRate;
+//        
+//    }
+//    
+//    public void setErrorRate(final double errorRate) {
+//
+//        if (errorRate < 0d || errorRate > 1d)
+//            throw new IllegalArgumentException();
+//        
+//        this.errorRate = errorRate;
+//        
+//    }
+
     /**
-     * A value in [0:1] that is interpreted as an allowable false positive error
-     * rate for an optional bloom filter. When zero (0.0), the bloom filter is
-     * not constructed. The bloom filter provides efficient fast rejection of
-     * keys that are not in the index. If the bloom filter reports that a key is
-     * in the index then the index MUST be tested to verify that the result is
-     * not a false positive. Bloom filters are great if you have a lot of point
-     * tests to perform but they are not used if you are doing range scans.
+     * Return the bloom filter factory.
      * <p>
-     * Generating the bloom filter is fairly expensive and this option should
-     * only be enabled if you know that point access tests are a hotspot for an
-     * index.
+     * Bloom filters provide fast rejection for point tests in a space efficient
+     * manner with a configurable probability of a false positive. Since the
+     * bloom filter does not give positive results with 100% certainity, the
+     * index is tested iff the bloom filter states that the key exists.
+     * <p>
+     * Note: Bloom filters are NOT enabled by default since point tests are not
+     * a bottleneck (or even used) for some indices. Also, when multiple indices
+     * represent different access paths for the same information, you only need
+     * a bloom filter on one of those indices.
+     * 
+     * @return Return the object that will be used to configure an optional
+     *         bloom filter for a {@link BTree} or {@link IndexSegment}. When
+     *         <code>null</code> the index WILL NOT use a bloom filter.
+     * 
+     * @see BloomFilterFactory
+     * @see BloomFilterFactory#DEFAULT
      */
-    public double getErrorRate() {
-        return errorRate;
+    public BloomFilterFactory getBloomFilterFactory() {
+        
+        return bloomFilterFactory;
+        
     }
     
-    public void setErrorRate(double errorRate) {
-
-        if (errorRate < 0d || errorRate > 1d)
-            throw new IllegalArgumentException();
+    /**
+     * Set the bloom filter factory.
+     * <p>
+     * Bloom filters provide fast rejection for point tests in a space efficient
+     * manner with a configurable probability of a false positive. Since the
+     * bloom filter does not give positive results with 100% certainity, the
+     * index is tested iff the bloom filter states that the key exists.
+     * 
+     * @param bloomFilterFactory
+     *            The new value (may be null).
+     * 
+     * @see BloomFilterFactory#DEFAULT
+     */
+    public void setBloomFilterFactory(BloomFilterFactory bloomFilterFactory) {
         
-        this.errorRate = errorRate;
+        this.bloomFilterFactory = bloomFilterFactory;
         
     }
     
@@ -670,7 +722,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
         
         this.versionTimestamps = false;
         
-        this.errorRate = 0.0;
+//        this.errorRate = 0.0;
+        this.bloomFilterFactory = null;
   
         this.overflowHandler = null;
         
@@ -716,7 +769,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
      *             constructor rather than one of the constructor variants that
      *             accept the required UUID parameter.
      */
-    public void write(IRawStore store) {
+    public void write(final IRawStore store) {
 
         if (addrMetadata != 0L) {
 
@@ -747,9 +800,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
      * @return the metadata record. The address from which it was loaded is set
      *         on the metadata record as a side-effect.
      */
-    public static IndexMetadata read(IRawStore store, long addr) {
+    public static IndexMetadata read(final IRawStore store, final long addr) {
         
-        IndexMetadata metadata = (IndexMetadata) SerializerUtil
+        final IndexMetadata metadata = (IndexMetadata) SerializerUtil
                 .deserialize(store.read(addr));
         
         // save the address from which the metadata record was loaded.
@@ -786,7 +839,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
         sb.append(", deleteMarkers=" + deleteMarkers);
         sb.append(", versionTimestamps=" + versionTimestamps);
         sb.append(", isolatable=" + isIsolatable());
-        sb.append(", errorRate=" + errorRate);
+        sb.append(", bloomFilterFactory=" == null ? "N/A" : bloomFilterFactory
+                .toString()); 
         sb.append(", overflowHandler="
                 + (overflowHandler == null ? "N/A" : overflowHandler.getClass()
                         .getName()));
@@ -798,7 +852,18 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
         
     }
 
+    /**
+     * The initial version.
+     */
     private static transient final int VERSION0 = 0x0;
+    
+    /**
+     * This version drops the errorRate field and replaces it with a serialized
+     * {@link BloomFilterFactory}. When reading an older version it creates a
+     * {@link BloomFilterFactory} instance using the de-serialized error rate
+     * and an expected index entry count of 1M.
+     */
+    private static transient final int VERSION1 = 0x1;
 
     /**
      * @todo review generated record for compactness.
@@ -807,7 +872,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
 
         final int version = (int) LongPacker.unpackLong(in);
 
-        if (version != VERSION0) {
+        if (version != VERSION0 && version != VERSION1) {
 
             throw new IOException("Unknown version: version=" + version);
 
@@ -847,7 +912,24 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
         
         versionTimestamps = in.readBoolean();
 
-        errorRate = in.readDouble();
+        if (version == VERSION0) {
+            
+            final double errorRate = in.readDouble();
+            
+            if (errorRate != 0d) {
+            
+                final int n = 1000000; // 1M
+                
+                bloomFilterFactory = new BloomFilterFactory(n, errorRate,
+                        errorRate * 10);
+                
+            }
+            
+        } else {
+
+            bloomFilterFactory = (BloomFilterFactory) in.readObject();
+            
+        }
 
         overflowHandler = (IOverflowHandler)in.readObject();
 
@@ -857,12 +939,12 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
 
     public void writeExternal(ObjectOutput out) throws IOException {
         
-        LongPacker.packLong(out,VERSION0);
+        LongPacker.packLong(out, VERSION1);
 
         // immutable
         
         // hasName?
-        out.writeBoolean(name!=null?true:false);
+        out.writeBoolean(name != null ? true : false);
         
         // the name
         if (name != null) {
@@ -896,8 +978,11 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
         out.writeBoolean(deleteMarkers);
         
         out.writeBoolean(versionTimestamps);
-        
-        out.writeDouble(errorRate);
+
+        // Note: VERSION0
+        // out.writeDouble(errorRate);
+        // Note: VERSION1 (replaces the errorRate)
+        out.writeObject(bloomFilterFactory);
         
         out.writeObject(overflowHandler);
 
@@ -912,7 +997,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
         
         try {
 
-            IndexMetadata copy = (IndexMetadata) super.clone();
+            final IndexMetadata copy = (IndexMetadata) super.clone();
             
             copy.addrMetadata = 0L;
             

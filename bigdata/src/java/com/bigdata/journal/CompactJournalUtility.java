@@ -52,7 +52,6 @@ import java.util.Date;
 import java.util.Properties;
 import java.util.concurrent.Future;
 
-
 /**
  * Utility class to compact a {@link Journal}. The {@link Journal} can not be
  * open in another application.
@@ -138,7 +137,7 @@ public class CompactJournalUtility {
             final int percentChange = 100 - (int) (bytesAfter * 100d / bytesBefore);
             
             System.out.println("bytes used: before=" + bytesBefore + ", after="
-                    + bytesAfter + ", reducedBy=" + percentChange);
+                    + bytesAfter + ", reducedBy=" + percentChange+"%");
             
             /*
              * Immediate shutdown since nothing should be running on the newly
