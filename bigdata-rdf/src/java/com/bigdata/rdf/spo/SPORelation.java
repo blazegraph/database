@@ -45,6 +45,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.BloomFilterFactory;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
@@ -61,6 +62,8 @@ import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
+import com.bigdata.journal.ITx;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.lexicon.ITermIdFilter;
@@ -191,6 +194,16 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         }
 
+        {
+            
+            bloomFilter = Boolean.parseBoolean(properties.getProperty(
+                    Options.BLOOM_FILTER, Options.DEFAULT_BLOOM_FILTER));
+
+            if (INFO)
+                log.info(Options.BLOOM_FILTER + "=" + bloomFilter);
+
+        }
+        
         {
             
             final Set<String> set = new HashSet<String>();
@@ -457,6 +470,13 @@ public class SPORelation extends AbstractRelation<ISPO> {
     final protected int branchingFactor;
 
     /**
+     * <code>true</code> iff the SPO index will maintain a bloom filter.
+     * 
+     * @see Options#BLOOM_FILTER
+     */
+    final protected boolean bloomFilter;
+    
+    /**
      * When <code>true</code> the database will support statement identifiers.
      * A statement identifier is a unique 64-bit integer taken from the same
      * space as the term identifiers and which uniquely identifiers a statement
@@ -572,7 +592,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * 
      * @return A new {@link IndexMetadata} object for that index.
      */
-    protected IndexMetadata getIndexMetadata(String name) {
+    protected IndexMetadata getIndexMetadata(final String name) {
 
         final IndexMetadata metadata = new IndexMetadata(name, UUID.randomUUID());
 
@@ -656,6 +676,42 @@ public class SPORelation extends AbstractRelation<ISPO> {
         metadata.setTupleSerializer(new SPOTupleSerializer(keyOrder,
                 leafKeySer, leafValSer));
 
+        if (bloomFilter && keyOrder.equals(SPOKeyOrder.SPO)) {
+            
+            /*
+             * Enable the bloom filter for the SPO index only.
+             * 
+             * Note: This SPO index is used any time we have an access path that
+             * is a point test. Therefore this is the only index for which it
+             * makes sense to maintain a bloom filter.
+             * 
+             * Note: The maximum error rate (maxP) applies to the mutable BTree
+             * only. For scale-out indices, there is one mutable BTree per index
+             * partition and a new (empty) BTree is allocated each time the live
+             * journal for the index partitions overflows.
+             */
+
+//            // good performance up to ~2M triples.
+//            final int n = 1000000; // 1M
+//            final double p = 0.01;
+//            final double maxP = 0.20;
+
+//            // good performance up to ~20M triples.
+//            final int n = 10000000; // 10M
+//            final double p = 0.05;
+//            final double maxP = 0.20;
+
+//            final BloomFilterFactory factory = new BloomFilterFactory(n, p, maxP);
+            
+            final BloomFilterFactory factory = BloomFilterFactory.DEFAULT;
+            
+            if (INFO)
+                log.info("Enabling bloom filter for SPO index: " + factory);
+            
+            metadata.setBloomFilterFactory( factory );
+            
+        }
+        
         return metadata;
 
     }
@@ -750,19 +806,27 @@ public class SPORelation extends AbstractRelation<ISPO> {
             throw new IllegalArgumentException();
         
         final SPOPredicate pred = (SPOPredicate) predicate;
-        
+
+        // FIXME hacked in attempt to track down a nagging issue.
+        if (getTimestamp() == ITx.UNISOLATED) {
+
+            // create an access path instance for that predicate.
+            return _getAccessPath(pred);
+
+        }
+
         // test cache for access path.
         SPOAccessPath accessPath = cache.get(pred);
 
         if (accessPath != null) {
-        
+
             return accessPath;
-            
+
         }
 
         // create an access path instance for that predicate.
         accessPath = _getAccessPath(pred);
-        
+
         // add to cache.
         cache.put(pred, accessPath);
         
@@ -900,7 +964,10 @@ public class SPORelation extends AbstractRelation<ISPO> {
             
         }
         
-        final int flags = IRangeQuery.KEYS | IRangeQuery.VALS;
+        final int flags = IRangeQuery.KEYS
+                | IRangeQuery.VALS
+                | (TimestampUtility.isHistoricalRead(getTimestamp()) ? IRangeQuery.READONLY
+                        : 0);
         
         final AbstractTripleStore container = getContainer();
         

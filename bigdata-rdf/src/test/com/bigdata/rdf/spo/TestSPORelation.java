@@ -54,6 +54,7 @@ import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
 import com.bigdata.relation.rule.eval.IEvaluationPlan;
 import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
+import com.bigdata.relation.rule.eval.IRuleState;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.RuleState;
 import com.bigdata.striterator.ChunkedArrayIterator;
@@ -424,7 +425,7 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
 
                 final IBindingSet bindings = joinNexus.newBindingSet(rule);
 
-                final RuleState ruleState = new RuleState(rule, joinNexus);
+                final IRuleState ruleState = new RuleState(rule, joinNexus);
 
                 bindings.set(Var.var("u"), U1);
 

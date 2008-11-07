@@ -64,9 +64,13 @@ import org.openrdf.rio.rdfxml.RDFXMLParser;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.BloomFilter;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.filter.ITupleFilter;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -582,11 +586,33 @@ abstract public class AbstractTripleStore extends
          * off the other access paths for special bulk load purposes. The use of
          * this option is NOT compatible with either the application of the
          * {@link InferenceEngine} or high-level query.
+         * <p>
+         * Note: You may want to explicitly enable or disable the bloom filter
+         * for this. Normally a single access path (SPO) is used for a temporary
+         * store. Temporary stores tend to be smaller, so if you will also be
+         * doing point tests on the temporary store then you probably want to
+         * use the {@link #BLOOM_FILTER}. Otherwise it may be turned off to
+         * realize some (minimal) performance gain.
          */
         String ONE_ACCESS_PATH = "oneAccessPath";
 
         String DEFAULT_ONE_ACCESS_PATH = "false";
 
+        /**
+         * Optional property controls whether or not a bloom filter is
+         * maintained for the SPO {@link IAccessPath}.
+         * 
+         * @see IndexMetadata#getBloomFilterFactory()
+         * 
+         * @todo consider defaulting the bloom filter to <code>true</code>,
+         *       but first I want to assess the impact of a bunch of 1M bloom
+         *       filters for things that use a lot of temporary stores such as
+         *       truth maintenance.
+         */
+        String BLOOM_FILTER = "BloomFilter";
+        
+        String DEFAULT_BLOOM_FILTER = "false";
+        
         /**
          * Optional property gives the {@link UUID} of the {@link IDataService}
          * on which the indices for the {@link LexiconRelation} will be
