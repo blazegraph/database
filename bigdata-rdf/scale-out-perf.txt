@@ -3023,6 +3023,118 @@ JOIN optimizations:
   - Modify so that maxParallelSubqueries is applied per join
     dimension.  See if that improves throughput on LUBM and EOSSYS.
 
+- There is slow performance on complex joins when store file is not
+  warm.  Examples are LUBM Q2 and Q9.
+
+  - This might to be related to tuning parameters in BlockingBuffer,
+    but that might be a red herring.
+
+  - Another explanation is that the reads are not well ordered (a) in
+    terms of the BTree (an issue which is addressed by the pipeline
+    join); and (b) that the nodes and leaves of the BTree are not well
+    ordered in the backing file.  The latter hypothesis could be
+    tested by a compacting copy of a Journal or by the use of the LDS
+    mode and performing an overflow after all of the data have been
+    loaded (and their closure computed).
+
+    Since compacting the journal does not have a big effect on query
+    performance, we might as well process the indices with limited
+    parallelism (N=~5) and get it done more quickly (actually, it was
+    slower at N==5, so I will retry with N==3 and perhaps do some
+    performance tuning).
+
+============================================================
+
+- BTree counters do not reflect Bloom filter.  They need to have the
+  bloom filter counters added when the bloom filter is read from the
+  store and its reference set (and when a new bloom filter is created
+  for a new root leaf).  Verify by examining the counters for BTree
+  and IndexSegment.
+
+Done. Update the lgpl-util dependency since bloom filter serialization
+has changed (change breaks serialization for stores iff they had an
+existing bloom filter, but the change is forward evolvable unlike the
+previous serialization scheme).
+
+  * Commit to repo !
+
+- Test load rates for CDL w/ bloom filter since there will be more
+  writes of the filter on the store (one per commit point for the SPO
+  index).
+
+* Test SPORelation w/ enabled bloom filter for the SPO index.  This
+  seems to improve query performance for Q9 for LUBM U1 and U5. 
+
+- Try LUBM U50 Q9 with more RAM (workstation or server) and with more
+  concurrency.
+
+- A larger retention queue for the BTree appears to help (a lot on
+  U5).  The reason to keep the write rention queue down is to minimize
+  the commit latency.  However, the read retention queue can be
+  enabled and given a large capacity (5000+).
+
+  Consider only putting dirty nodes onto the write retention queue and
+  then reducing its capacity.
+
+  Consider a "big" btree (or small btree) property or autoset the
+  retention factor to be larger?
+
+- Also look at the chunk factor.  I seem the recall that lubm did
+  better with a larger chunk factor.  Are my U50/Q9 results reasonable
+  in terms of the earlier performance?
+
+- try vtune 9.1 on java 6.  does this work?  If not then try a
+  different profiler since we have to switch to java 6 for
+  ExecutorService API changes and problems with 1.5 compilers.
+
+- ??? Why is this also improving performance for Q6 and Q14?  Those
+  are access path scans.  Why would they be doing point tests?  Is the
+  the owlSameAs expander?  Turn it off then since we don't need it for
+  lubm.
+
+- Work out pipeline join issues!
+
+- *** Remove hack disabling SPORelation's access path cache for
+  unisolated views.
+
+- Try building index segments from an LDS load with the default split
+  points and see how many we get and how large the filters are and how
+  they perform on the monolithic index view.
+
+- It would be nice if the index segment builds could use the upper
+  bound on the #of index entries for the plan.  However, an
+  incremental index build knows the exact #of index entries a priori
+  since delete index entries must be carried forward until a
+  compacting merge.
+
+============================================================ 
+
+OwlSameAs via rule rewrites using anonymous variables so that the
+costs show up in the rule execution and so that we can use it for
+scale-out.
+
+Mike wrote: I am headed out in a sec, but all I would be doing is
+cutting and pasting from OwlSameAsPropertiesExpandingIterator anyway,
+so take a look in there.
+
+There are four access paths that I rewrite into three tail rules: 
+
+(s ? ?) & (s, p, o) -> accessSP 
+(? ? o) & (?, p, o) -> accessPO 
+(? ? ?) & (?, p, ?) -> accessP 
+(s ? o) & (s, p, o) -> accessSPO 
+
+It works this way because you cannot use owl:sameAs for a property, so p is never the sameAs anything. 
+
+Basically you are taking a cross product of: 
+
+s1 = {s, ? sameAs s} 
+o1 = {o, ? sameAs o} 
+{s1, p, o1} 
+
+It just does it ever so slightly differently for the four cases depending on what is bound, but that is the gist of all of them.
+
+--M 
 ============================================================
 CLOSURE CORRECTNESS
 
@@ -3111,8 +3223,8 @@ DefaultRuleTaskFactory
 ============================================================
 Conferences and papers:
 
-http://www.semantic-conference.com/2009/cfptopics/, proposals due Nov
-24th.
+**** http://www.semantic-conference.com/2009/cfptopics/, proposals due
+     Nov 24th.
 
 
 -Xmx500m -server -Xrunjavaperf:cg -Dlog4j.configuration=file:src/resources/logging/log4j.properties -Djava.security.policy=policy.all -cp "bigdata-lubm.jar;lib/ctc_utils-5-4-2005.jar;lib/cweb-commons-1.1-b2-dev.jar;lib/cweb-extser-0.1-b2-dev.jar;lib/cweb-junit-ext-1.1-b3-dev.jar;lib/junit-3.8.1.jar;lib/lgpl-utils-1.0-b3-dev.jar;lib/log4j-1.2.8.jar;lib/apache/commons-io-1.4.jar;lib/icu/icu4j-3_6.jar;lib/lucene/lucene-analyzers-2.2.0.jar;lib/lucene/lucene-core-2.2.0.jar;lib/unimi/colt-1.2.0.jar;lib/unimi/fastutil-5.1.4.jar;lib/slf4j-api-1.4.3.jar;lib/slf4j-log4j12-1.4.3.jar;lib/openrdf-sesame-2.2-onejar.jar;lib/jini/classserver.jar;lib/jini/jini-core.jar;lib/jini/jini-ext.jar;lib/jini/jsk-lib.jar;lib/jini/jsk-platform.jar;lib/jini/jsk-resources.jar;lib/jini/reggie.jar;lib/jini/start.jar;lib/jini/sun-util.jar;lib/jini/tools.jar" edu.lehigh.swat.bench.ubt.Test query src/java/edu/lehigh/swat/bench/ubt/bigdata/config.kb.bigdata src/java/edu/lehigh/swat/bench/ubt/bigdata/config.query.sparql
@@ -3120,3 +3232,70 @@ http://www.semantic-conference.com/2009/cfptopics/, proposals due Nov
 -Xmx500m -server -Xrunjavaperf:cg -Dlog4j.configuration=file:src/resources/logging/log4j.properties -Djava.security.policy=policy.all -cp "bigdata-lubm.jar;lib/ctc_utils-5-4-2005.jar;lib/cweb-commons-1.1-b2-dev.jar;lib/cweb-extser-0.1-b2-dev.jar;lib/cweb-junit-ext-1.1-b3-dev.jar;lib/junit-3.8.1.jar;lib/lgpl-utils-1.0-b3-dev.jar;lib/log4j-1.2.8.jar;lib/apache/commons-io-1.4.jar;lib/icu/icu4j-3_6.jar;lib/lucene/lucene-analyzers-2.2.0.jar;lib/lucene/lucene-core-2.2.0.jar;lib/unimi/colt-1.2.0.jar;lib/unimi/fastutil-5.1.4.jar;lib/slf4j-api-1.4.3.jar;lib/slf4j-log4j12-1.4.3.jar;lib/openrdf-sesame-2.2-onejar.jar;lib/jini/classserver.jar;lib/jini/jini-core.jar;lib/jini/jini-ext.jar;lib/jini/jsk-lib.jar;lib/jini/jsk-platform.jar;lib/jini/jsk-resources.jar;lib/jini/reggie.jar;lib/jini/start.jar;lib/jini/sun-util.jar;lib/jini/tools.jar" edu.lehigh.swat.bench.ubt.Test query src/java/edu/lehigh/swat/bench/ubt/bigdata/config.kb.eossys src/java/edu/lehigh/swat/bench/ubt/bigdata/config.query.eossys
 
 ------------------------------------------------------------
+
+Odd errors when running TestRuleRdfs03#test_rdfs3_01 for LDS.  Also
+happens on rdfs7, 10 and a slice test.
+
+java.lang.RuntimeException: java.util.concurrent.ExecutionException: java.lang.RuntimeException: Aborted.
+	at com.bigdata.service.DataServiceIndex.submit(DataServiceIndex.java:493)
+	at com.bigdata.sparse.SparseRowStore.delete(SparseRowStore.java:841)
+	at com.bigdata.sparse.SparseRowStore.delete(SparseRowStore.java:779)
+	at com.bigdata.relation.AbstractResource.destroy(AbstractResource.java:323)
+	at com.bigdata.rdf.lexicon.LexiconRelation.destroy(LexiconRelation.java:332)
+	at com.bigdata.rdf.store.AbstractTripleStore.destroy(AbstractTripleStore.java:1409)
+	at com.bigdata.rdf.store.ScaleOutTripleStore.closeAndDelete(ScaleOutTripleStore.java:151)
+	at com.bigdata.rdf.rules.TestRuleRdfs03.test_rdfs3_01(TestRuleRdfs03.java:184)
+Caused by: java.util.concurrent.ExecutionException: java.lang.RuntimeException: Aborted.
+	at java.util.concurrent.FutureTask$Sync.innerGet(FutureTask.java:222)
+	at java.util.concurrent.FutureTask.get(FutureTask.java:83)
+	at com.bigdata.service.DataService.submit(DataService.java:991)
+	at com.bigdata.service.DataServiceIndex.submit(DataServiceIndex.java:489)
+	... 35 more
+Caused by: java.lang.RuntimeException: Aborted.
+	at com.bigdata.journal.WriteExecutorService.groupCommit(WriteExecutorService.java:921)
+	at com.bigdata.journal.WriteExecutorService.afterTask(WriteExecutorService.java:636)
+	at com.bigdata.journal.AbstractTask.doUnisolatedReadWriteTask(AbstractTask.java:1676)
+	at com.bigdata.journal.AbstractTask.call2(AbstractTask.java:1585)
+	at com.bigdata.journal.AbstractTask.call(AbstractTask.java:1462)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:303)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:138)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:885)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:907)
+	at java.lang.Thread.run(Thread.java:619)
+
+------------------------------------------------------------
+TestAddDropIndexTask.test_addDropIndex
+
+junit.framework.AssertionFailedError: Not expecting: java.util.concurrent.ExecutionException: java.lang.NullPointerException
+	at junit.framework.TestCase2.fail(TestCase2.java:118)
+	at com.bigdata.journal.TestAddDropIndexTask.test_addDropIndex(TestAddDropIndexTask.java:290)
+Caused by: java.util.concurrent.ExecutionException: java.lang.NullPointerException
+	at java.util.concurrent.FutureTask$Sync.innerGet(FutureTask.java:222)
+	at java.util.concurrent.FutureTask.get(FutureTask.java:83)
+	at com.bigdata.journal.TestAddDropIndexTask.test_addDropIndex(TestAddDropIndexTask.java:273)
+	... 26 more
+Caused by: java.lang.NullPointerException
+	at com.bigdata.btree.ReadCommittedView.getIndex(ReadCommittedView.java:148)
+	at com.bigdata.btree.ReadCommittedView.getBTreeCounters(ReadCommittedView.java:326)
+	at com.bigdata.journal.ConcurrencyManager.addIndexCounters(ConcurrencyManager.java:1521)
+	at com.bigdata.journal.AbstractTask.clearIndexCache(AbstractTask.java:444)
+	at com.bigdata.journal.AbstractTask.call2(AbstractTask.java:1570)
+	at com.bigdata.journal.AbstractTask.call(AbstractTask.java:1462)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:303)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:138)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:885)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:907)
+	at java.lang.Thread.run(Thread.java:619)
+
+------------------------------------------------------------
+junit.framework.AssertionFailedError: Expecting wrapped class com.bigdata.journal.NoSuchIndexException
+	at junit.framework.Assert.fail(Assert.java:47)
+	at com.bigdata.journal.TestAddDropIndexTask.test_NoSuchIndexException(TestAddDropIndexTask.java:481)
+
+------------------------------------------------------------
+junit.framework.AssertionFailedError
+	at junit.framework.Assert.fail(Assert.java:47)
+	at junit.framework.Assert.assertTrue(Assert.java:20)
+	at junit.framework.Assert.assertNull(Assert.java:233)
+	at junit.framework.Assert.assertNull(Assert.java:226)
+	at com.bigdata.journal.TestReadCommittedTx.test_readComittedIsolation(TestReadCommittedTx.java:179)

@@ -90,7 +90,6 @@ import com.bigdata.relation.rule.Var;
 import com.bigdata.relation.rule.eval.AbstractSolutionBuffer;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.DefaultRangeCountFactory;
-import com.bigdata.relation.rule.eval.DefaultRuleTaskFactory;
 import com.bigdata.relation.rule.eval.EmptyProgramTask;
 import com.bigdata.relation.rule.eval.IEvaluationPlan;
 import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
@@ -98,6 +97,7 @@ import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 import com.bigdata.relation.rule.eval.IProgramTask;
 import com.bigdata.relation.rule.eval.IRangeCountFactory;
+import com.bigdata.relation.rule.eval.IRuleState;
 import com.bigdata.relation.rule.eval.IRuleStatisticsFactory;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.ProgramTask;
@@ -264,9 +264,9 @@ public class RDFJoinNexus implements IJoinNexus {
             
         }
 
-        public RuleStats newInstance(IRule rule, IEvaluationPlan plan, IKeyOrder[] keyOrder) {
+        public RuleStats newInstance(IRuleState ruleState) {
          
-            return new RDFRuleStats(null, readTimestamp, rule, plan, keyOrder);
+            return new RDFRuleStats(null, readTimestamp, ruleState);
 
         }
         
@@ -280,15 +280,13 @@ public class RDFJoinNexus implements IJoinNexus {
          *       can figure out who that is, you will see term identifiers
          *       rather than {@link BigdataValue}s.
          */
-        public RuleStats newInstancex(IRule rule, IEvaluationPlan plan, IKeyOrder[] keyOrder) {
+        public RuleStats newInstancex(IRuleState ruleState) {
             
             return new RDFRuleStats(
                     (indexManager instanceof IBigdataFederation ? null
                             : indexManager), //
                         readTimestamp, //
-                        rule, //
-                        plan, //
-                        keyOrder
+                        ruleState//
                         );
             
         }
@@ -321,13 +319,12 @@ public class RDFJoinNexus implements IJoinNexus {
          *            the term identifers in the {@link IPredicate}s in the
          *            tail of the rule to {@link BigdataValue}s.
          * 
-         * @param rule
-         * @param plan
+         * @param ruleState
          */
         public RDFRuleStats(IIndexManager indexManager, long timestamp,
-                IRule rule, IEvaluationPlan plan, IKeyOrder[] keyOrder) {
+                IRuleState ruleState) {
 
-            super(rule, plan, keyOrder);
+            super(ruleState);
 
             this.indexManager = indexManager;
             
