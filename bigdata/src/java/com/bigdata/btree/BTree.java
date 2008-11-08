@@ -176,7 +176,24 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
     
     /**
      * The default capacity of the hard reference queue used to defer the
-     * eviction of dirty nodes (nodes or leaves).
+     * eviction of dirty nodes (nodes or leaves). Once a node falls off the
+     * write retention queue it is checked to see if it is dirty. If it is
+     * dirty, then it is serialized and persisted on the backing store. The
+     * write retention queue can not be increased without bound as that will
+     * increase the commit latency. Too small a value will mean that nodes that
+     * are undergoing mutation will be serialized and persisted prematurely
+     * leading to excessive writes on the backing store. For append-only stores,
+     * this directly contributes to what are effectively redundent and
+     * thereafter unreachable copies of the intermediate state of nodes as only
+     * nodes that can be reached by navigation from a {@link Checkpoint} will
+     * ever be read again. The value <code>500</code> appears to be a good
+     * default. While it is possible that some workloads could benefit from a
+     * larger value, this leads to higher commit latency and can therefore have
+     * a broad impact on performance.
+     * 
+     * @todo If this were an {@link IndexMetadata} property with the given
+     *       default then it could be tuned for specific indices without
+     *       changing the default.
      */
     static public final int DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY = 500;
 
@@ -192,12 +209,38 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
     static public final int DEFAULT_WRITE_RETENTION_QUEUE_SCAN = 20;
 
     /**
-     * The default capacity of the hard reference queue used to retain clean
-     * nodes (or leaves). The goal is to keep the read to write ratio down.
+     * The default capacity of the hard reference queue used to retain recently
+     * used nodes (or leaves). When zero (0), this queue is disabled.
+     * <p>
+     * The read retention queue complements the write retention queue. The
+     * latter has a strong buffering effect, but we can not increase the size of
+     * the write retention queue without bound as that will increase the commit
+     * latency. However, the read retention queue can be quite large and will
+     * "simply" buffer "recently" used nodes and leaves in memory. This can have
+     * a huge effect, especially when a complex high-level query would otherwise
+     * thrash the disk as nodes that are required for query processing fall off
+     * of the write retention queue and get garbage collected. The pragmatic
+     * upper bound for this probably depends on the index workload. At some
+     * point, you will stop seeing an increase in performance as a function of
+     * the read retention queue for a given workload. The larger the read
+     * retention queue, the more burden the index can impose on the heap.
+     * However, copy-on-write explicitly clears all references in a node so the
+     * JVM can collect the data for nodes that are no longer part of the index
+     * before they fall off of the queue even if it can not collect the node
+     * reference itself.
      * 
-     * FIXME This is an experimental feature - it is disabled when set to zero.
-     * Note: There is an interaction with the branching factor which should be
-     * neutralized by a dynamic policy.
+     * @todo This could be an {@link IndexMetadata} property. However, the size
+     *       of the read rentention queue could also be set dynamically, e.g.,
+     *       as a function of the depth of the BTree and the branching factor.
+     *       Since the BTree depth only changes during index writes, and since
+     *       index writes are single-threaded, it would not be difficult to
+     *       re-provision this to a larger capacity when the root is split or
+     *       joined. To avoid needless effort, there should be a minimum queue
+     *       capacity that is used up to depth=2/3. If the queue capacity is set
+     *       to n=~5-10% of the maximum possible #of nodes in a btree of a given
+     *       depth, then we can compute the capacity dynamically based on that
+     *       parameter. And of course it can be easily provisioned when the
+     *       BTree is {@link #reopen()}ed.
      */
     static public final int DEFAULT_READ_RETENTION_QUEUE_CAPACITY = 10000;
 
@@ -205,10 +248,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
      * The #of entries on the hard reference queue that will be scanned for a
      * match before a new reference is appended to the queue. This trades off
      * the cost of scanning entries on the queue, which is handled by the queue
-     * itself, against the cost of queue churn. Note that queue eviction drives
-     * IOs required to write the leaves on the store, but incremental writes
-     * occurr iff the {@link AbstractNode#referenceCount} is zero and the leaf
-     * is dirty.
+     * itself, against the cost of queue churn.
      */
     static public final int DEFAULT_READ_RETENTION_QUEUE_SCAN = 20;
 
