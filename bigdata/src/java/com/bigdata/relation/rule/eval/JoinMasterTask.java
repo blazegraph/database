@@ -33,6 +33,8 @@ import java.io.Serializable;
 import java.nio.channels.ClosedByInterruptException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -2530,59 +2532,31 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
                                     + partitionId);
 
                         /*
-                         * Generate an AbstractPathTask from each bindingset in
-                         * the chunk and reorder those tasks for better index
-                         * read performance.
+                         * Aggregate the source bindingSets that license the
+                         * same asBound predicate.
                          */
-                        final AccessPathTask[] tasks = getAccessPathTasks(chunk);
+                        final Map<IPredicate, Collection<IBindingSet>> map = combineBindingSets(chunk);
 
-                        // used to eliminate duplicates.
-                        AccessPathTask lastTask = null;
+                        /*
+                         * Generate an AbstractPathTask from each distinct
+                         * asBound predicate that will consume all of the source
+                         * bindingSets in the chunk which resulted in the same
+                         * asBound predicate.
+                         */
+                        final AccessPathTask[] tasks = getAccessPathTasks(map);
 
-                        for (AccessPathTask task : tasks) {
+                        /*
+                         * Reorder those tasks for better index read
+                         * performance.
+                         */
+                        reorderTasks(tasks);
 
-                            if (lastTask != null && task.equals(lastTask)) {
-
-                                if (DEBUG)
-                                    log.debug("Eliminated duplicate: "
-                                            + task.accessPath);
-
-                                stats.accessPathEliminatedCount++;
-
-                                continue;
-
-                            }
-
-                            if (halt)
-                                return null;
-
-                            if (executor != null) {
-
-                                /*
-                                 * Queue the AccessPathTask for execution.
-                                 * 
-                                 * Note: The caller MUST verify that no tasks
-                                 * submitted to the [executor] result in errors.
-                                 * This is done by checking the errorCount for
-                                 * that [executor], so you need to run the tasks
-                                 * on a service which exposes that information.
-                                 */
-                                executor.submit(task);
-
-                            } else {
-
-                                /*
-                                 * Execute the AccessPathTask in the caller's
-                                 * thread.
-                                 */
-                                task.call();
-
-                            }
-
-                            lastTask = task;
-
-                        }
-
+                        /*
+                         * Execute the tasks (either in the caller's thread or
+                         * on the supplied service).
+                         */
+                        executeTasks(tasks);
+                        
                     }
 
                     if (DEBUG)
@@ -2602,12 +2576,100 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
             }
 
             /**
+             * Populates a map of asBound predicates paired to a set of
+             * bindingSets.
+             * <p>
+             * Note: The {@link AccessPathTask} will apply each bindingSet to
+             * each element visited by the {@link IAccessPath} obtained for the
+             * asBound {@link IPredicate}. This has the natural consequence of
+             * eliminating subqueries within the chunk.
+             * 
+             * @param chunk
+             *            A chunk of bindingSets from the source join dimension.
+             * 
+             * @return A map which pairs the distinct asBound predicates to the
+             *         bindingSets in the chunk from which the predicate was
+             *         generated.
+             */
+            protected Map<IPredicate, Collection<IBindingSet>> combineBindingSets(
+                    final IBindingSet[] chunk) {
+           
+                if (DEBUG)
+                    log.debug("chunkSize=" + chunk.length);
+
+                final int tailIndex = getTailIndex(orderIndex);
+
+                final Map<IPredicate, Collection<IBindingSet>> map = new LinkedHashMap<IPredicate, Collection<IBindingSet>>(
+                        chunk.length);
+                
+                for( IBindingSet bindingSet : chunk ) {
+                    
+                    if (halt)
+                        return Collections.EMPTY_MAP;
+
+                    // constrain the predicate to the given bindings.
+                    final IPredicate predicate = rule.getTail(tailIndex).asBound(
+                            bindingSet);
+
+                    if (partitionId != -1) {
+
+                        /*
+                         * Constrain the predicate to the desired index partition.
+                         * 
+                         * Note: we do this for scale-out joins since the access
+                         * path will be evaluated by a JoinTask dedicated to this
+                         * index partition, which is part of how we give the
+                         * JoinTask to gain access to the local index object for an
+                         * index partition.
+                         */
+
+                        predicate.setPartitionId(partitionId);
+
+                    }
+
+                    // lookup the asBound predicate in the map.
+                    Collection<IBindingSet> values = map.get(predicate);
+
+                    if (values == null) {
+
+                        /*
+                         * This is the first bindingSet for this asBound
+                         * predicate. We create a collection of bindingSets to
+                         * be paired with that predicate and put the collection
+                         * into the map using that predicate as the key.
+                         */
+                        
+                        values = new LinkedList<IBindingSet>();
+                     
+                        map.put(predicate, values);
+                        
+                    } else {
+                        
+                        // more than one bindingSet will use the same access path.
+                        stats.accessPathEliminatedCount++;
+                        
+                    }
+                    
+                    /*
+                     * Add the bindingSet to the collection of bindingSets
+                     * paired with the asBound predicate.
+                     */
+
+                    values.add(bindingSet);
+                    
+                }
+
+                if (DEBUG)
+                    log.debug("chunkSize=" + chunk.length
+                            + ", #distinct predicates=" + map.size());
+                
+                return map;
+                
+            }
+            
+            /**
              * Creates an {@link AccessPathTask} for each {@link IBindingSet} in
-             * the given chunk. The tasks are ordered based on the <i>fromKey</i>
-             * for the associated {@link IAccessPath} as licensed by each
-             * {@link IBindingSet}. This order tends to focus the reads on the
-             * same parts of the index partitions with a steady progression in
-             * the <i>fromKey</i> as we process a chunk of {@link IBindingSet}s.
+             * the given chunk.
              * 
              * @param chunk
              *            A chunk of {@link IBindingSet}s from one or more
@@ -2619,56 +2681,122 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
              * @throws Exception
              */
             protected AccessPathTask[] getAccessPathTasks(
-                    final IBindingSet[] chunk) {
+                    final Map<IPredicate, Collection<IBindingSet>> map) {
 
+                final int n = map.size();
+                
                 if (DEBUG)
-                    log.debug("chunkSize=" + chunk.length);
+                    log.debug("#distinct predicates=" + map.size());
 
-                final AccessPathTask[] tasks = new AccessPathTask[chunk.length];
+                final AccessPathTask[] tasks = new AccessPathTask[n];
 
-                for (int i = 0; i < chunk.length; i++) {
+                final Iterator<Map.Entry<IPredicate, Collection<IBindingSet>>> itr = map
+                        .entrySet().iterator();
 
-                    final IBindingSet bindingSet = chunk[i];
+                int i = 0;
 
-                    /*
-                     * Assign unsyncOutputBuffer to the AccessPathTask.
-                     * 
-                     * Note: If the access path task will be assigned to a
-                     * worker thread then the unsync output buffer must be
-                     * lazily resolved by the task when it begins to execute
-                     * since that is when we will know the Thread.
-                     * 
-                     * Note: If using a ThreadLocal for this, then be sure to
-                     * clear the ThreadLocal once the task is finished or they
-                     * will just hang around for ever.
-                     */
+                while (itr.hasNext()) {
 
-                    tasks[i] = new AccessPathTask(bindingSet);
-
+                    if (halt)
+                        return new AccessPathTask[] {};
+                    
+                    final Map.Entry<IPredicate, Collection<IBindingSet>> entry = itr
+                            .next();
+                    
+                    final IPredicate predicate = entry.getKey();
+                    
+                    final Collection<IBindingSet> bindingSets = entry.getValue();
+                    
+                    tasks[i++] = new AccessPathTask(predicate, bindingSets);
+                    
                 }
+                
+                return tasks;
 
+            }
+
+            /**
+             * The tasks are ordered based on the <i>fromKey</i> for the
+             * associated {@link IAccessPath} as licensed by each
+             * {@link IBindingSet}. This order tends to focus the reads on the
+             * same parts of the index partitions with a steady progression in
+             * the <i>fromKey</i> as we process a chunk of {@link IBindingSet}s.
+             * 
+             * @param tasks
+             *            The tasks.
+             */
+            protected void reorderTasks(final AccessPathTask[] tasks) {
+                
                 // @todo layered access paths do not expose a fromKey.
                 if (tasks[0].accessPath instanceof AbstractAccessPath) {
 
                     // reorder the tasks.
                     Arrays.sort(tasks);
 
+                } else {
+
+                    // @todo change to info or debug.
+                    log.warn("Can not sort layered access path: "+orderIndex);
+                    
                 }
 
-                return tasks;
+            }
+
+            /**
+             * Either execute the tasks in the caller's thread or schedule them
+             * for execution on the supplied service.
+             * 
+             * @param tasks
+             *            The tasks.
+             * 
+             * @throws Exception
+             */
+            protected void executeTasks(final AccessPathTask[] tasks)
+                    throws Exception {
+                
+                for (AccessPathTask task : tasks) {
+
+                    if (halt)
+                        return;
+
+                    if (executor != null) {
+
+                        /*
+                         * Queue the AccessPathTask for execution.
+                         * 
+                         * Note: The caller MUST verify that no tasks
+                         * submitted to the [executor] result in errors.
+                         * This is done by checking the errorCount for
+                         * that [executor], so you need to run the tasks
+                         * on a service which exposes that information.
+                         */
+                        
+                        executor.submit(task);
+
+                    } else {
+
+                        /*
+                         * Execute the AccessPathTask in the caller's
+                         * thread.
+                         */
+
+                        task.call();
+
+                    }
+
+                }
 
             }
             
         }
         
         /**
-         * Accepts an {@link IBindingSet}, obtains the corresponding
-         * {@link IAccessPath} and pairs the {@link IBindingSet} in turn with
-         * each element visited by that {@link IAccessPath}, generating a new
-         * {@link IBindingSet} each time. If the new {@link IBindingSet} is
-         * consistent with the {@link IRule}, then it is added to the
-         * {@link JoinTaskSink}(s) for the index partition(s) on which the next
-         * join dimension will have to read for the new {@link IBindingSet}.
+         * Accepts an asBound {@link IPredicate} and a (non-empty) collection of
+         * {@link IBindingSet}s each of which licenses the same asBound
+         * predicate for the current join dimension. The task obtains the
+         * corresponding {@link IAccessPath} and delegates each chunk visited on
+         * that {@link IAccessPath} to a {@link ChunkTask}. Note that optionals
+         * are also handled by this task.
          * 
          * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
          *         Thompson</a>
@@ -2676,8 +2804,26 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
          */
         class AccessPathTask implements Callable, Comparable<AccessPathTask> {
 
-            final private IBindingSet bindingSet;
+            /**
+             * The {@link IBindingSet}s from the source join dimension to be
+             * combined with each element visited on the {@link #accessPath}.
+             * If there is only a single source {@link IBindingSet} in a given
+             * chunk of source {@link IBindingSet}s that results in the same
+             * asBound {@link IPredicate} then this will be a collection with a
+             * single member. However, if multiple source {@link IBindingSet}s
+             * result in the same asBound {@link IPredicate} within the same
+             * chunk then those are aggregated and appear together in this
+             * collection.
+             * <p>
+             * Note: An array is used for thread-safe traversal.
+             */
+            final private IBindingSet[] bindingSets;
 
+            /**
+             * The {@link IAccessPath} corresponding to the asBound
+             * {@link IPredicate} for this join dimension. The asBound
+             * {@link IPredicate} is {@link IAccessPath#getPredicate()}.
+             */
             final private IAccessPath accessPath;
 
             /**
@@ -2711,23 +2857,54 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
             }
             
             /**
-             * Evaluate an {@link IBindingSet} for the join dimension.
+             * Evaluate an {@link IBindingSet} for the join dimension. When the
+             * task runs, it will pair each element visited on the
+             * {@link IAccessPath} with the asBound {@link IPredicate}. For
+             * each element visited, if the binding is acceptable for the
+             * constraints on the asBound {@link IPredicate}, then the task
+             * will emit one {@link IBindingSet} for each source
+             * {@link IBindingSet}.
              * 
-             * @param bindingSet
-             *            The bindings from the prior join(s) (if any).
+             * @param predicate
+             *            The asBound {@link IPredicate}.
+             * @param bindingSets
+             *            A collection of {@link IBindingSet}s from the source
+             *            join dimension that all result in the same asBound
+             *            {@link IPredicate}.
              */
-            public AccessPathTask(
-                    final IBindingSet bindingSet) {
+            public AccessPathTask(final IPredicate predicate,
+                    final Collection<IBindingSet> bindingSets) {
 
-                if (bindingSet == null)
+                if (predicate == null)
+                    throw new IllegalArgumentException();
+
+                if (bindingSets == null)
                     throw new IllegalArgumentException();
                 
-                if(DEBUG)
-                    log.debug("bindingSet=" + bindingSet);
-                
-                this.bindingSet = bindingSet;
+                /*
+                 * Note: this needs to be the access path for the local index
+                 * partition. We handle this by (a) constraining the predicate
+                 * to the desired index partition; (b) using an IJoinNexus that
+                 * is initialized once the JoinTask starts to execute inside of
+                 * the ConcurrencyManager; (c) declaring; and (d) using the
+                 * index partition name NOT the scale-out index.
+                 */
 
-                this.accessPath = getAccessPath(orderIndex, bindingSet);
+                final int n = bindingSets.size();
+                
+                if (n == 0)
+                    throw new IllegalArgumentException();
+                
+                this.accessPath = joinNexus.getTailAccessPath(predicate);
+
+                if (DEBUG)
+                    log.debug("orderIndex=" + orderIndex + ", tailIndex="
+                            + tailIndex + ", tail=" + rule.getTail(tailIndex)
+                            + ", #bindingSets=" + n + ", accessPath="
+                            + accessPath);
+
+                // convert to array for thread-safe traversal.
+                this.bindingSets = bindingSets.toArray(new IBindingSet[n]);
 
             }
 
@@ -2735,72 +2912,14 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
 
                 return getClass().getSimpleName() + "{ orderIndex="
                         + orderIndex + ", partitionId=" + partitionId
-                        + ", bindingSet=" + bindingSet + "}";
+                        + ", #bindingSets=" + bindingSets.length+ "}";
                 
             }
             
             /**
-             * Return the {@link IAccessPath} for the tail predicate to be
-             * evaluated at the given index in the evaluation order.
-             * 
-             * @param orderIndex
-             *            The index into the evaluation order.
-             * @param bindingSet
-             *            The bindings from the prior join(s) (if any).
-             * 
-             * @return The {@link IAccessPath}.
-             */
-            protected IAccessPath getAccessPath(final int orderIndex,
-                    final IBindingSet bindingSet) {
-
-                final int tailIndex = getTailIndex(orderIndex);
-
-                // constrain the predicate to the given bindings.
-                IPredicate predicate = rule.getTail(tailIndex).asBound(
-                        bindingSet);
-
-                if (partitionId != -1) {
-
-                    /*
-                     * Constrain the predicate to the desired index partition.
-                     * 
-                     * Note: we do this for scale-out joins since the access
-                     * path will be evaluated by a JoinTask dedicated to this
-                     * index partition, which is part of how we give the
-                     * JoinTask to gain access to the local index object for an
-                     * index partition.
-                     */
-
-                    predicate.setPartitionId(partitionId);
-
-                }
-
-                /*
-                 * Note: this needs to obtain the access path for the local
-                 * index partition. We handle this by (a) constraining the
-                 * predicate to the desired index partition; (b) using an
-                 * IJoinNexus that is initialized once the JoinTask starts to
-                 * execute inside of the ConcurrencyManager; (c) declaring; and
-                 * (d) using the index partition name NOT the scale-out index.
-                 */
-
-                final IAccessPath accessPath = joinNexus
-                        .getTailAccessPath(predicate);
-
-                if (DEBUG)
-                    log.debug("orderIndex=" + orderIndex + ", tailIndex="
-                            + tailIndex + ", tail=" + rule.getTail(tailIndex)
-                            + ", bindingSet=" + bindingSet + ", accessPath="
-                            + accessPath);
-
-                return accessPath;
-
-            }
-
-            /**
-             * Evaluate the {@link #accessPath} against the {@link #bindingSet}.
+             * Evaluate the {@link #accessPath} against the {@link #bindingSets}.
              * If nothing is accepted and {@link IPredicate#isOptional()} then
-             * the {@link #bindingSet} is output anyway (this implements the
+             * the {@link #bindingSets} is output anyway (this implements the
              * semantics of OPTIONAL).
              * 
              * @return <code>null</code>.
@@ -2837,7 +2956,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
                         stats.chunkCount++;
 
                         // process the chunk in the caller's thread.
-                        if (new ChunkTask(bindingSet, unsyncBuffer, chunk)
+                        if (new ChunkTask(bindingSets, unsyncBuffer, chunk)
                                 .call()) {
 
                             nothingAccepted = false;
@@ -2851,10 +2970,14 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
                         /*
                          * Note: when NO binding sets were accepted AND the
                          * predicate is OPTIONAL then we output the _original_
-                         * binding set to the sink join task(s).
+                         * binding set(s) to the sink join task(s).
                          */
 
-                        unsyncBuffer.add(this.bindingSet);
+                        for(IBindingSet bs : this.bindingSets) {
+                        
+                            unsyncBuffer.add(bs);
+                            
+                        }
                         
                     }
                     
@@ -2891,9 +3014,9 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
         }
 
         /**
-         * Task processes a chunk of elements read from the access path for a
-         * join dimension. Each element in the chunk in paired with a copy of
-         * the given bindings and the resulting bindings are buffered into
+         * Task processes a chunk of elements read from the {@link IAccessPath}
+         * for a join dimension. Each element in the chunk in paired with a copy
+         * of the given bindings and the resulting bindings are buffered into
          * chunks and the chunks added to the
          * {@link JoinPipelineTask#bindingSetBuffers} for the corresponding
          * predicate.
@@ -2901,6 +3024,16 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
          * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
          *         Thompson</a>
          * @version $Id$
+         */
+        /*
+         * @todo javadoc review: If the asBound predicate can be paired with an
+         * element visited for that {@link IAccessPath} then a new
+         * {@link IBindingSet} will be output for each of the given
+         * {@link IBindingSet}s as paired in turn with the visited element. If
+         * the new {@link IBindingSet} is consistent with the {@link IRule},
+         * then it is added to the {@link JoinTaskSink}(s) for the index
+         * partition(s) on which the next join dimension will have to read for
+         * the new {@link IBindingSet}.
          */
         class ChunkTask implements Callable {
 
@@ -2911,10 +3044,11 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
             private final int tailIndex;
 
             /**
-             * The bindings with which the each element in the chunk will be
-             * paired to create the bindings for the downstream join dimension.
+             * The {@link IBindingSet}s which the each element in the chunk
+             * will be paired to create {@link IBindingSet}s for the downstream
+             * join dimension.
              */
-            private final IBindingSet bindingSet;
+            private final IBindingSet[] bindingSets;
 
             /**
              * A per-{@link Thread} buffer that is used to collect
@@ -2943,20 +3077,22 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
              *            A chunk of elements read from the {@link IAccessPath}
              *            for the current join dimension.
              */
-            public ChunkTask(final IBindingSet bindingSet,
+            public ChunkTask(final IBindingSet[] bindingSet,
                     final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer,
                     final Object[] chunk) {
 
                 if (bindingSet == null)
                     throw new IllegalArgumentException();
+                
                 if (unsyncBuffer == null)
                     throw new IllegalArgumentException();
+
                 if (chunk == null)
                     throw new IllegalArgumentException();
                 
                 this.tailIndex = getTailIndex(orderIndex);
 
-                this.bindingSet = bindingSet;
+                this.bindingSets = bindingSet;
 
                 this.chunk = chunk;
 
@@ -2967,7 +3103,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
             /**
              * @return <code>true</code> iff NO elements in the chunk (as read
              *         from the access path by the caller) were accepted when
-             *         combined with the {@link #bindingSet} from the source
+             *         combined with the {@link #bindingSets} from the source
              *         {@link JoinTask}.
              * 
              * @throws BufferClosedException
@@ -2991,31 +3127,38 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
                         if (halt)
                             return nothingAccepted;
 
-                        // indicates whether we accepted this bindingSet (trace only).
-                        boolean ok = false;
+                        // naccepted for the current element (trace only).
+                        int naccepted = 0;
 
                         stats.elementCount++;
 
-                        // clone the binding set.
-                        final IBindingSet bset = bindingSet.clone();
+                        for (IBindingSet bset : bindingSets) {
 
-                        // propagate bindings from the visited element.
-                        if (joinNexus.bind(rule, tailIndex, e, bset)) {
+                            // clone the binding set.
+                            bset = bset.clone();
 
-                            /* Accept this binding set.
-                             * 
-                             * Note:
-                             */
-                            unsyncBuffer.add(bset);
+                            // propagate bindings from the visited element.
+                            if (joinNexus.bind(rule, tailIndex, e, bset)) {
 
-                            ok = true;
+                                /*
+                                 * Accept this binding set.
+                                 * 
+                                 * Note:
+                                 */
+                                unsyncBuffer.add(bset);
 
-                            nothingAccepted = false;
+                                naccepted++;
+
+                                nothingAccepted = false;
+
+                            }
 
                         }
 
                         if (DEBUG)
-                            log.debug((ok ? "Accepted" : "Rejected") + ": "
+                            log.debug("Accepted element for " + naccepted
+                                    + " of " + bindingSets.length
+                                    + " possible bindingSet combinations: "
                                     + e.toString() + ", orderIndex="
                                     + orderIndex + ", lastJoin=" + lastJoin
                                     + ", rule=" + rule.getName());
