@@ -273,6 +273,17 @@ public class FileMetadata {
      *            opened. See {@link Options#VALIDATE_CHECKSUM}.
      * @param checker
      *            The object used to compute the checksum of the root blocks.
+     * @param alternateRootBlock
+     *            When <code>true</code> the prior root block will be used.
+     *            This option may be used when a commit record is valid but the
+     *            data associated with the commit point is invalid. There are
+     *            two root blocks. Normally the one which has been most recently
+     *            written will be loaded on restart. When this option is
+     *            specified, the older of the two root blocks will be loaded
+     *            instead. <strong>If you use this option and then do a commit
+     *            then the more recent of the root blocks will be lost and any
+     *            data associated with that commit point will be lost as well!</strong>
+     * 
      * @throws RuntimeException
      *             if there is a problem preparing the file for use by the
      *             journal.
@@ -283,7 +294,7 @@ public class FileMetadata {
             ForceEnum forceWrites, int offsetBits, int readCacheCapacity,
             int readCacheMaxRecordSize, ByteBuffer writeCache,
             boolean validateChecksum, final long createTime,
-            ChecksumUtility checker) throws RuntimeException {
+            ChecksumUtility checker, boolean alternateRootBlock) throws RuntimeException {
 
         if (file == null)
             throw new IllegalArgumentException();
@@ -480,11 +491,13 @@ public class FileMetadata {
                 if( rootBlock0 == null && rootBlock1 == null ) {
                     throw new RuntimeException("Both root blocks are bad - journal is not usable: "+file);
                 }
+                if(alternateRootBlock)
+                    log.warn("Using alternate root block");
                 // Choose the root block based on the commit counter.
                 this.rootBlock =
                     ( rootBlock0.getCommitCounter() > rootBlock1.getCommitCounter()
-                        ? rootBlock0
-                        : rootBlock1
+                        ? (alternateRootBlock ?rootBlock1 :rootBlock0)
+                        : (alternateRootBlock ?rootBlock0 :rootBlock1)
                         );
                 
                 /*
