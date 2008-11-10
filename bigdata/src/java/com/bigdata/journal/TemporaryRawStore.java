@@ -231,7 +231,8 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
                 writeCache,//
                 false, // validateChecksum (deperation option for restart).
                 createTime,//
-                new ChecksumUtility() // checker (root blocks generated but not saved).
+                new ChecksumUtility(), // checker (root blocks generated but not saved).
+                false // alternateRootBlock
         );
         
         buf = new DiskOnlyStrategy(maximumExtent, md);

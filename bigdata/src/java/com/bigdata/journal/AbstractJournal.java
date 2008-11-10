@@ -812,6 +812,20 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         log.info(Options.READ_ONLY+"="+readOnly);
 
         /*
+         * "alternateRootBlock"
+         */
+
+        final boolean alternateRootBlock = Boolean.parseBoolean(properties
+                .getProperty(Options.ALTERNATE_ROOT_BLOCK, "false"));
+        
+        if (INFO)
+            log.info(Options.ALTERNATE_ROOT_BLOCK + "=" + alternateRootBlock);
+        
+        if (alternateRootBlock && !readOnly)
+            log.warn("*** Using the alternate root block: "
+                    + "Data will be lost on the next commit! ***");
+
+        /*
          * "forceWrites"
          */
 
@@ -1040,7 +1054,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                     isEmptyFile, deleteOnExit, readOnly, forceWrites,
                     offsetBits, 0/* readCacheCapacity */,
                     0/* readCacheMaxRecordSize */, null/* writeCache */,
-                    validateChecksum, createTime, checker);
+                    validateChecksum, createTime, checker, alternateRootBlock);
 
             _bufferStrategy = new DirectBufferStrategy(
                     0L/* soft limit for maximumExtent */, fileMetadata);
@@ -1063,7 +1077,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                     isEmptyFile, deleteOnExit, readOnly, forceWrites,
                     offsetBits, 0/*readCacheCapacity*/,
                     0/* readCacheMaxRecordSize */, null/* writeCache */,
-                    validateChecksum, createTime, checker);
+                    validateChecksum, createTime, checker, alternateRootBlock);
 
             /*
              * Note: the maximumExtent is a hard limit in this case only since
@@ -1090,7 +1104,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                     isEmptyFile, deleteOnExit, readOnly, forceWrites,
                     offsetBits, readCacheCapacity, readCacheMaxRecordSize,
                     readOnly ? null : writeCache, validateChecksum,
-                    createTime, checker);
+                    createTime, checker, alternateRootBlock);
 
             _bufferStrategy = new DiskOnlyStrategy(
                     0L/* soft limit for maximumExtent */, fileMetadata);
@@ -1115,7 +1129,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                     true/* create */, isEmptyFile, true/* deleteOnExit */,
                     false/* readOnly */, ForceEnum.No/* forceWrites */,
                     offsetBits, readCacheCapacity, readCacheMaxRecordSize,
-                    writeCache, false/* validateChecksum */, createTime, null/* checker */);
+                    writeCache, false/* validateChecksum */, createTime,
+                    null/* checker */, alternateRootBlock);
 
             _bufferStrategy = new DiskOnlyStrategy(
                     0L/* soft limit for maximumExtent */, fileMetadata);
