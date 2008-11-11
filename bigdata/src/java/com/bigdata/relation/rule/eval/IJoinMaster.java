@@ -46,17 +46,19 @@ public interface IJoinMaster extends Remote {
     
     /**
      * Return a unique identifier for the {@link JoinMasterTask} instance. This
-     * is used to concentrate all {@link DistributedJoinTask} that target the same tail
-     * predicate and index partition onto the same {@link DistributedJoinTask} sink.
+     * is used to concentrate all {@link DistributedJoinTask} that target the
+     * same tail predicate and index partition onto the same
+     * {@link DistributedJoinTask} sink.
      * 
      * @return The unique identifer.
      */
     UUID getUUID() throws IOException;
-    
+
     /**
-     * A proxy for the buffer on which the last {@link DistributedJoinTask} must write its
-     * <em>query</em> solutions. Note that mutation operations DO NOT use this
-     * buffer in order to avoid sending all data through the master.
+     * A proxy for the buffer on which the last {@link DistributedJoinTask} must
+     * write its <em>query</em> solutions. Note that mutation operations DO
+     * NOT use this buffer in order to avoid sending all data through the
+     * master.
      * 
      * @throws UnsupportedOperationException
      *             if the operation is not a query.
