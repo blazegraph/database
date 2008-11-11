@@ -102,6 +102,11 @@ public interface IBlockingBuffer<E> extends IBuffer<E> {
     public void add(E e);
     
     /**
+     * Return <code>true</code> if the buffer is open.
+     */
+    public boolean isOpen();
+    
+    /**
      * Signal that no more data will be written on this buffer (this is required
      * in order for the {@link #iterator()} to know when no more data will be
      * made available).

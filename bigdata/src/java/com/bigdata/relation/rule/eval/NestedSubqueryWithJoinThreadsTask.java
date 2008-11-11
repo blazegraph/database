@@ -32,9 +32,11 @@ import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -300,9 +302,11 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
             
         } catch (Throwable t) {
 
-            if (InnerCause.isInnerCause(t, InterruptedException.class)||
+            if (InnerCause.isInnerCause(t, InterruptedException.class) ||
+                InnerCause.isInnerCause(t, CancellationException.class) ||
                 InnerCause.isInnerCause(t, ClosedByInterruptException.class) ||
-                InnerCause.isInnerCause(t, BufferClosedException.class)) {
+                InnerCause.isInnerCause(t, BufferClosedException.class) ||
+                InnerCause.isInnerCause(t, RejectedExecutionException.class)) {
                 
                 /*
                  * The root cause was the asynchronous close of the buffer that
@@ -331,6 +335,12 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
                  * the AsynchronousCloseException should be swiftly followed by
                  * an BlockingBuffer#add() throwing an IllegalStateException if
                  * there is an attempt to write on a closed buffer.
+                 * 
+                 * Note: RejectedExecutionException will be thrown if the
+                 * service on which an asynchronous iterator is being run has
+                 * been shutdown. For example, this can be triggered by a test
+                 * harness that shutdown down the database once it has its
+                 * results if the query uses a SLICE.
                  * 
                  * Note: Using Thread#interrupt() to halt asynchronous
                  * processing for query is NOT ideal as it will typically force

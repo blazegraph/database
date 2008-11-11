@@ -26,6 +26,9 @@ package com.bigdata.journal;
 import java.io.File;
 import java.util.Properties;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -45,7 +48,7 @@ import com.bigdata.journal.Journal.Options;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.resources.OverflowManager;
-import com.bigdata.util.concurrent.ParallelismLimitedExecutorService;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ShutdownHelper;
 
 /**
@@ -272,9 +275,16 @@ public class CompactTask implements Callable<Journal> {
          * processing of the index files.
          * 
          * Note: Too much parallelism here appears to slow things down.
+         * 
+         * FIXME The ParallelismLimitedExecutorService is broken (11/10/08).
+         * This can be demonstrated if it is enabled for the pipeline join.
+         * Therefore it has been taken out of service until it can be fixed.
          */
-        final ParallelismLimitedExecutorService service = new ParallelismLimitedExecutorService(
-                oldJournal.getExecutorService(), 3/* maxParallel */, 20/* queueCapacity */);
+//        final ParallelismLimitedExecutorService service = new ParallelismLimitedExecutorService(
+//                oldJournal.getExecutorService(), 3/* maxParallel */, 20/* queueCapacity */);
+        
+        final ThreadPoolExecutor service = (ThreadPoolExecutor)Executors.newFixedThreadPool(
+                3/* maxParallel */, DaemonThreadFactory.defaultThreadFactory());
         
         while (itr.hasNext()) {
 

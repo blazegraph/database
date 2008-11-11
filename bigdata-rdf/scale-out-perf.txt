@@ -2832,64 +2832,75 @@ supplied to Sail.evaluate() as a seperate map of key-value pairs.
 Comments?
 
 Arjohn
-============================================================
-
-Some test failures related to the changes to the read-committed index.
-
-junit.framework.AssertionFailedError
-	at junit.framework.Assert.fail(Assert.java:47)
-	at junit.framework.Assert.assertTrue(Assert.java:20)
-	at junit.framework.Assert.assertNull(Assert.java:233)
-	at junit.framework.Assert.assertNull(Assert.java:226)
-	at com.bigdata.journal.TestReadCommittedTx.test_readComittedIsolation(TestReadCommittedTx.java:179)
-
-junit.framework.AssertionFailedError: Not expecting: java.util.concurrent.ExecutionException: java.lang.NullPointerException
-	at junit.framework.TestCase2.fail(TestCase2.java:118)
-	at com.bigdata.journal.TestAddDropIndexTask.test_addDropIndex(TestAddDropIndexTask.java:290)
-Caused by: java.util.concurrent.ExecutionException: java.lang.NullPointerException
-	at java.util.concurrent.FutureTask$Sync.innerGet(FutureTask.java:205)
-	at java.util.concurrent.FutureTask.get(FutureTask.java:80)
-	at com.bigdata.journal.TestAddDropIndexTask.test_addDropIndex(TestAddDropIndexTask.java:273)
-	at jrockit.reflect.VirtualNativeMethodInvoker.invoke(Ljava.lang.Object;[Ljava.lang.Object;)Ljava.lang.Object;(Unknown Source)
-Caused by: java.lang.NullPointerException
-	at com.bigdata.btree.ReadCommittedView.getIndex(ReadCommittedView.java:148)
-	at com.bigdata.btree.ReadCommittedView.getBTreeCounters(ReadCommittedView.java:326)
-	at com.bigdata.journal.ConcurrencyManager.addIndexCounters(ConcurrencyManager.java:1516)
-	at com.bigdata.journal.AbstractTask.clearIndexCache(AbstractTask.java:446)
-	at com.bigdata.journal.AbstractTask.call2(AbstractTask.java:1572)
-	at com.bigdata.journal.AbstractTask.call(AbstractTask.java:1464)
-	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:269)
-	at java.util.concurrent.FutureTask.run(FutureTask.java:123)
-	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:650)
-	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:675)
-	at java.lang.Thread.run()V(Unknown Source)
-
-
-A test failure that has been going on for a while now: index partition move.
-
-junit.framework.AssertionFailedError: #dataService0 expected:<1> but was:<2>
-	at junit.framework.Assert.fail(Assert.java:47)
-	at junit.framework.Assert.failNotEquals(Assert.java:282)
-	at junit.framework.Assert.assertEquals(Assert.java:64)
-	at junit.framework.Assert.assertEquals(Assert.java:201)
-	at com.bigdata.service.TestIndexPartitionMove.test_move(TestIndexPartitionMove.java:441)
 
 ============================================================
 JOIN optimizations:
 
+  - Test scale-out query.  (a) Closure correctness for pipeline and
+    nested subquery joins (might be Ok now that subquery elimination
+    is correct); (b) test on simple data set (U5/EDS) and verify that
+    join tasks are created and terminate correctly; (c) test on U5/JDS
+    and work through kinks for proxies; (d) Load data set on cluster;
+    (e) test pipeline query w/o type resource expander.
+
+  - Full text search queries with SLICE are slow.  The solution is to
+    rewrite the Sesame query before evaluation so that we can optimize
+    SLICE by using native JOINs.
+
+  - Lexicon resolution is slow.
+
+  - Scattered disk reads?
+
+    DiskOnlyStrategy#read() is fully synchronized during a read on the
+    cache and the FileChannel.  This limits the ability of the OS and
+    disk to schedule IOs more efficiently.
+
+    - Try removing synchronization and seeing how it impacts cold
+      query performance.
+
+      Note that corruptions have been observed with synchronization
+      removed so it might need to stay in.
+
+      Note that FileChannel may well be atomic for read/write (I
+      believe that it is) so removing synchronization might not help
+      where as scatter/gather might since it is a single request, but
+      a more complex request and one that can be more readily
+      optimized by the OS and the disk controller.
+
+      On cold pipeline join for U50 Q9 I see 74 kbytes/s read, disk
+      queue length=.9, reads/s=156.  What is the best that the disk
+      can do?
+
+      Hitachi Travelstar 7K100; 100 GB capacity; 7200 RPM spindle
+      speed; 50 GB/platter; 10.0 millisecond seek time; 8-megabyte
+      buffer.  Tested: average random read time is 10.7 with
+      rotational latency of 4.2ms; seqential read rate is 28-53mbs;
+      400-500 IO/s; [http://www.storagereview.com/2005notebook.sr] and
+      [http://www.hitachigst.com/hdd/support/7k100/7k100.htm]
+
+    - Try queuing up a set of reads and scatter/gather them.  This
+      would be similar to the BlockingBuffer.  Requests would be put
+      into a queue and the queue drained atomically by a read
+      operation.  The read would allocate the buffers for each read
+      request and would issue a scatter/gather request with those
+      buffers.  
+
+  - Tuning parameters
+
+    - Review the default chunk capacity (1000) but we are actually
+      using 100 in all of our query runs.  Is this used for anything
+      except query?  Well, it would be used for closure.  How much of
+      a difference between 100 and 1000 for closure performance?  For
+      query, I believe that most of the difference emerges when a
+      SLICE is used.
+
+    - Try lowering the fullyBufferedReadThreshold to the
+      chunkCapacity.  How is that for query (not much of an effect)?
+      For closure (larger joins).
+
+  - Examine cold query performance for nested and pipeline joins.
+  
   - JoinMaster
- 
-    - Done. {@link IPredicate} needs to be modified to accept an
-      optional index partition identifier. When provided, {@link
-      IJoinNexus#getTailRelationView(IPredicate)} and {@link
-      IJoinNexus#getTailAccessPath(IPredicate)} must both use the
-      specified index partition, rather than attempting to use the
-      scale-out index view. The {@link IJoinNexus} also needs to be
-      able to deliver the name of the indices that would be used by
-      the {@link IJoinNexus#getTailAccessPath(IPredicate)} so those
-      indices may be declared. Of course, during execution the {@link
-      IJoinNexus} must be using the local {@link IIndexManager} rather
-      than the {@link IBigdataFederation} for this to succeed.
 
     - Modify RDFJoinNexus to execute the ProgramTask on the client.    
 
@@ -2908,9 +2919,6 @@ JOIN optimizations:
       note that IO operations will not be interrupted by an
       application level protocol, just be interrupt() so this might
       not be a win.
-
-    - Done. Modify ProgramTask to advance the read-historical
-      timestamp at the start of each closure round.
 
     - Modify owl:sameAs expansion to be a rule rewrite so it can be
       distributed just like any other rule.  Each {@link IPredicate}
@@ -2945,8 +2953,6 @@ JOIN optimizations:
     - Modify ProgramTask so that LDS runs the entire program on the
       data service.
 
-  - Look for further performance tuning, heap cost reduction, etc.
-
   - 1/2 of the cost of query evaluation right now appears to be
     converting Sesame Values to BigdataValues.  The cost is mostly
     resolving the lexicon using the sparse row store.  This could be
@@ -2960,33 +2966,10 @@ JOIN optimizations:
     than for the UNISOLATED view first.  That would move the cost of
     resolving those resources outside of the timed issueQuery() call.
 
-  * LUBM U50/Q9 can show unacceptable performance for the first trial.
-    This appears to be work Ok for some specific (but difficult to
-    identify) BlockingBuffer constants.  The problem appears with both
-    the nexted and the pipeline join strategies, at least for LTS.
-
-  - LUBM LTS Q8 is slower with the pipeline join.
-
-  - (***) LUBM Q9 is inconsistent (!?!) with the pipeline join.
-
-    Also, I have seen some +1/-1 differences in the #of elements
-    visited for an access path in LUBM Q8, so maybe the problem is
-    more common but not as readily observable for some queries because
-    fewer binding sets are propagated from one join dimension to the
-    next?
-
   * Make sure that we have unit tests which cover both nested subquery
     and pipeline joins for all deployments (LTS, LDS, EDS, JDS) for
     (closure vs query) and (full text search, optionals) and any other
     rule features that need testing (DISTINCT, ORDER BY, SLICE, etc).
-
-  - Try LUBM U5 Q9 with chunkCapacity=1000 and with
-    maxParallelSubqueries=0, 5, 10, 50.
-
-  - Experiment with differing values for chunkTimeout.  1000ms seems a
-    long time for the consumer to be willing to wait when they could
-    get moving sooner on a smaller chunk.  Also try with
-    chunkTimeout=0, which disables the chunk combiner.
 
   - Turn off the query time expanders for scale-out joins.  This will
     disable both (x type resource) and owl:sameAs expansion. We will
@@ -3012,51 +2995,38 @@ JOIN optimizations:
     the first predicate that does NOT use an expander and then map
     that predicate across the index partitions.
 
-  - (***) EOSSYS R9 is underproducing with the new join algorithm (2
-    vs 10) and is failing to terminate when using the regex variant of
-    R9!  The regex variant is also not reporting the bindingSets out
-    and related JoinStats data for the last predicate in the
-    evaluation order.
-
 - NestedSubqueryJoin
   
   - Modify so that maxParallelSubqueries is applied per join
     dimension.  See if that improves throughput on LUBM and EOSSYS.
 
-- There is slow performance on complex joins when store file is not
-  warm.  Examples are LUBM Q2 and Q9.
+- try vtune 9.1 on java 6.  does this work?  If not then try a
+  different profiler since we have to switch to java 6 for
+  ExecutorService API changes and problems with 1.5 compilers.
 
-  - This might to be related to tuning parameters in BlockingBuffer,
-    but that might be a red herring.
+- Try building index segments from an LDS load with the default split
+  points and see how many we get and how large the filters are and how
+  they perform on the monolithic index view. Of interest is measuring
+  the upper bound for perfect indices and bloom filters improve
+  performance.  A scale-out system can have different performance
+  gains since more resources can be put to work as the index is
+  partitioned but more data needs to be moved around (e.g., pipeline
+  joins, hot spots acquiring a jeri connection, etc).
 
-  - Another explanation is that the reads are not well ordered (a) in
-    terms of the BTree (an issue which is addressed by the pipeline
-    join); and (b) that the nodes and leaves of the BTree are not well
-    ordered in the backing file.  The latter hypothesis could be
-    tested by a compacting copy of a Journal or by the use of the LDS
-    mode and performing an overflow after all of the data have been
-    loaded (and their closure computed).
-
-    Since compacting the journal does not have a big effect on query
-    performance, we might as well process the indices with limited
-    parallelism (N=~5) and get it done more quickly (actually, it was
-    slower at N==5, so I will retry with N==3 and perhaps do some
-    performance tuning).
+- It would be nice if the index segment builds could use the upper
+  bound on the #of index entries for the plan.  However, an
+  incremental index build knows the exact #of index entries a priori
+  since delete index entries must be carried forward until a
+  compacting merge.
 
 ============================================================
+Bloom filter
 
 - BTree counters do not reflect Bloom filter.  They need to have the
   bloom filter counters added when the bloom filter is read from the
   store and its reference set (and when a new bloom filter is created
   for a new root leaf).  Verify by examining the counters for BTree
   and IndexSegment.
-
-Done. Update the lgpl-util dependency since bloom filter serialization
-has changed (change breaks serialization for stores iff they had an
-existing bloom filter, but the change is forward evolvable unlike the
-previous serialization scheme).
-
-  * Commit to repo !
 
 - Test load rates for CDL w/ bloom filter since there will be more
   writes of the filter on the store (one per commit point for the SPO
@@ -3065,47 +3035,10 @@ previous serialization scheme).
 * Test SPORelation w/ enabled bloom filter for the SPO index.  This
   seems to improve query performance for Q9 for LUBM U1 and U5. 
 
-- Try LUBM U50 Q9 with more RAM (workstation or server) and with more
-  concurrency.
-
-- A larger retention queue for the BTree appears to help (a lot on
-  U5).  The reason to keep the write rention queue down is to minimize
-  the commit latency.  However, the read retention queue can be
-  enabled and given a large capacity (5000+).
-
-  Consider only putting dirty nodes onto the write retention queue and
-  then reducing its capacity.
-
-  Consider a "big" btree (or small btree) property or autoset the
-  retention factor to be larger?
-
-- Also look at the chunk factor.  I seem the recall that lubm did
-  better with a larger chunk factor.  Are my U50/Q9 results reasonable
-  in terms of the earlier performance?
-
-- try vtune 9.1 on java 6.  does this work?  If not then try a
-  different profiler since we have to switch to java 6 for
-  ExecutorService API changes and problems with 1.5 compilers.
-
 - ??? Why is this also improving performance for Q6 and Q14?  Those
   are access path scans.  Why would they be doing point tests?  Is the
   the owlSameAs expander?  Turn it off then since we don't need it for
   lubm.
-
-- Work out pipeline join issues!
-
-- *** Remove hack disabling SPORelation's access path cache for
-  unisolated views.
-
-- Try building index segments from an LDS load with the default split
-  points and see how many we get and how large the filters are and how
-  they perform on the monolithic index view.
-
-- It would be nice if the index segment builds could use the upper
-  bound on the #of index entries for the plan.  However, an
-  incremental index build knows the exact #of index entries a priori
-  since delete index entries must be carried forward until a
-  compacting merge.
 
 ============================================================ 
 
@@ -3299,3 +3232,18 @@ junit.framework.AssertionFailedError
 	at junit.framework.Assert.assertNull(Assert.java:233)
 	at junit.framework.Assert.assertNull(Assert.java:226)
 	at com.bigdata.journal.TestReadCommittedTx.test_readComittedIsolation(TestReadCommittedTx.java:179)
+
+------------------------------------------------------------
+
+Demonstrates an error with split/join/move failing to preserve the
+index state.
+
+junit.framework.AssertionFailedError: Wrong key: nvisited=2611, expecting=[128, 0, 13, 176], actual=[128, 0, 13, 174]
+	at junit.framework.Assert.fail(Assert.java:47)
+	at com.bigdata.btree.AbstractBTreeTestCase.assertSameEntryIterator(AbstractBTreeTestCase.java:2055)
+	at com.bigdata.service.StressTestConcurrent.doConcurrentClientTest(StressTestConcurrent.java:582)
+	at com.bigdata.service.StressTestConcurrent.test_stressTest1(StressTestConcurrent.java:212)
+
+------------------------------------------------------------
+
+Commit notes:

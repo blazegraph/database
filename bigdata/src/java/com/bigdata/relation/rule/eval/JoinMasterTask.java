@@ -34,7 +34,6 @@ import java.nio.channels.ClosedByInterruptException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -47,7 +46,9 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -89,6 +90,7 @@ import com.bigdata.service.LocalDataServiceFederation;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 import com.bigdata.util.InnerCause;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ExecutionExceptions;
 import com.bigdata.util.concurrent.ParallelismLimitedExecutorService;
 
@@ -1877,7 +1879,13 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
          * (including any tasks executing on its behalf) should halt. This flag
          * is monitored by the {@link BindingSetConsumerTask}, the
          * {@link AccessPathTask}, and the {@link ChunkTask}. It is set by any
-         * of those tasks if they are interrupted or error.
+         * of those tasks if they are interrupted or error out.
+         * 
+         * @todo review handling of this flag. Should an exception always be
+         *       thrown if the flag is set wrapping the {@link #firstCause}?
+         *       Are there any cases where the behavior should be different?
+         *       If not, then replace tests with halt() and encapsulate the
+         *       logic in that method.
          */
         volatile protected boolean halt = false;
 
@@ -1908,10 +1916,10 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
                 
                 try {
                 
-                    // @todo CancellationException?
                     if (!InnerCause.isInnerCause(cause, InterruptedException.class) &&
                         !InnerCause.isInnerCause(cause, CancellationException.class) &&
                         !InnerCause.isInnerCause(cause, ClosedByInterruptException.class) &&
+                        !InnerCause.isInnerCause(cause, RejectedExecutionException.class) &&
                         !InnerCause.isInnerCause(cause, BufferClosedException.class)) {
                         
                         log.info("" + cause, cause);
@@ -2154,11 +2162,11 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
             this.stats = new JoinStats(partitionId, orderIndex);
             this.masterProxy = master;
             /*
-             * FIXME restore getMaxParallel...() but not really working yet
-             * either with maxParallel=0 or with maxParallel GT 0.
+             * Note: even when maxParallel is zero there will be one thread per
+             * join dimension. For many queries that may be just fine.
              */
-//            this.maxParallel = joinNexus.getMaxParallelSubqueries();
-            this.maxParallel = 0;
+            this.maxParallel = joinNexus.getMaxParallelSubqueries();
+//            this.maxParallel = 10;
             
             if (DEBUG)
                 log.debug("orderIndex=" + orderIndex + ", partitionId="
@@ -2186,20 +2194,18 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
                  * Flush and close output buffers and wait for all sink
                  * JoinTasks to complete.
                  */
-                
                 // flush the unsync buffers.
                 flushUnsyncBuffers();
 
                 // flush the sync buffer and await the sink JoinTasks
                 flushAndCloseBuffersAndAwaitSinks();
                 
-                if (halt)
-                    throw new RuntimeException(firstCause.get());
-
                 if (DEBUG)
                     log.debug("JoinTask done: orderIndex=" + orderIndex
                             + ", partitionId=" + partitionId + ", halt=" + halt
                             + "firstCause=" + firstCause.get());
+                if (halt)
+                    throw new RuntimeException(firstCause.get());
 
                 return null;
 
@@ -2304,29 +2310,46 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
             if(INFO)
                 log.info(getTaskName());
             
-            if (maxParallel > 0) {
+            /*
+             * Note: There is little reason for parallelism in the first join
+             * dimension as there will be only a single source bindingSet so the
+             * thread pool is just overhead.
+             */
+            if (orderIndex > 0 && maxParallel > 0) {
                 
                 /*
-                 * Setup parallelism limitedService that will be used to run
-                 * the access path tasks. Note that this is layered over the
-                 * shared ExecutorService.
+                 * Setup parallelism limitedService that will be used to run the
+                 * access path tasks. Note that this is layered over the shared
+                 * ExecutorService.
+                 * 
+                 * FIXME The parallelism limited executor service is clearly
+                 * broken. When enabled here it will fail to progress. However
+                 * the code runs just fine if you use a standard executor
+                 * service in its place.
                  */
 
-                // the sharedService.
-                final ExecutorService sharedService = joinNexus
-                        .getIndexManager().getExecutorService();
+//                // the sharedService.
+//                final ExecutorService sharedService = joinNexus
+//                        .getIndexManager().getExecutorService();
+//
+//                final ParallelismLimitedExecutorService limitedService = new ParallelismLimitedExecutorService(//
+//                        sharedService, //
+//                        maxParallel, //
+//                        joinNexus.getChunkCapacity() * 2// workQueueCapacity
+//                );
 
-                final ParallelismLimitedExecutorService limitedService = new ParallelismLimitedExecutorService(//
-                        sharedService, //
-                        maxParallel, //
-                        joinNexus.getChunkCapacity() * 2// workQueueCapacity
-                );
-
+                final ExecutorService limitedService = Executors
+                        .newFixedThreadPool(maxParallel, DaemonThreadFactory
+                                .defaultThreadFactory());
+                
                 try {
 
-                    // consume chunks until done.
+                    /*
+                     * consume chunks until done (using caller's thread to
+                     * consume and service to run subtasks).
+                     */
                     new BindingSetConsumerTask(limitedService).call();
-
+                    
                     // normal shutdown.
                     limitedService.shutdown();
 
@@ -2334,21 +2357,23 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
                     limitedService.awaitTermination(Long.MAX_VALUE,
                             TimeUnit.SECONDS);
 
-                    if (limitedService.getErrorCount() > 0) {
-
-                        // at least one AccessPathTask failed.
-
-                        if (INFO)
-                            log.info("Task failure(s): " + limitedService);
-
-                        throw new RuntimeException(
-                                "Join failure(s): errorCount="
-                                        + limitedService.getErrorCount());
-
-                    }
+//                    if (limitedService.getErrorCount() > 0) {
+//
+//                        // at least one AccessPathTask failed.
+//
+//                        if (INFO)
+//                            log.info("Task failure(s): " + limitedService);
+//
+//                        throw new RuntimeException(
+//                                "Join failure(s): errorCount="
+//                                        + limitedService.getErrorCount());
+//
+//                    }
+                    if(halt)
+                        throw new RuntimeException(firstCause.get());
                     
                 } finally {
-                    
+
                     if (!limitedService.isTerminated()) {
 
                         // shutdown the parallelism limitedService.
@@ -2360,7 +2385,10 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
 
             } else {
                 
-                // consume chunks until done using the caller's thread.
+                /*
+                 * consume chunks until done using the caller's thread and run
+                 * subtasks in the caller's thread as well.
+                 */
                 new BindingSetConsumerTask(null/* noService */).call();
 
             }
@@ -2380,7 +2408,8 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
         protected void flushUnsyncBuffers() {
 
             if(INFO) 
-                log.info("Flushing "+unsyncBufferList.size()+" unsynchronized buffers");
+                log.info("Flushing " + unsyncBufferList.size()
+                        + " unsynchronized buffers");
             
             for (AbstractUnsynchronizedArrayBuffer<IBindingSet> b : unsyncBufferList) {
 
@@ -2523,7 +2552,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
 
                     IBindingSet[] chunk;
 
-                    while ((chunk = nextChunk()) != null && !halt) {
+                    while (!halt && (chunk = nextChunk()) != null) {
                         // @todo ChunkTrace for bindingSet chunks in as well as access path chunks consumed 
                         if (DEBUG)
                             log.debug("Read chunk of bindings: chunkSize="
@@ -2559,6 +2588,9 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
                         
                     }
 
+                    if(halt)
+                        throw new RuntimeException(firstCause.get());
+                    
                     if (DEBUG)
                         log.debug("done: orderIndex=" + orderIndex
                                 + ", partitionId=" + partitionId);
@@ -2605,7 +2637,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
                 for( IBindingSet bindingSet : chunk ) {
                     
                     if (halt)
-                        return Collections.EMPTY_MAP;
+                        throw new RuntimeException(firstCause.get());
 
                     // constrain the predicate to the given bindings.
                     final IPredicate predicate = rule.getTail(tailIndex).asBound(
@@ -2698,7 +2730,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
                 while (itr.hasNext()) {
 
                     if (halt)
-                        return new AccessPathTask[] {};
+                        throw new RuntimeException(firstCause.get());
                     
                     final Map.Entry<IPredicate, Collection<IBindingSet>> entry = itr
                             .next();
@@ -2733,13 +2765,8 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
                     // reorder the tasks.
                     Arrays.sort(tasks);
 
-                } else {
-
-                    // @todo change to info or debug.
-                    log.warn("Can not sort layered access path: "+orderIndex);
-                    
                 }
-
+                
             }
 
             /**
@@ -2754,21 +2781,22 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
             protected void executeTasks(final AccessPathTask[] tasks)
                     throws Exception {
                 
+                int i=0;
                 for (AccessPathTask task : tasks) {
 
                     if (halt)
-                        return;
+                        throw new RuntimeException(firstCause.get());
 
                     if (executor != null) {
 
                         /*
                          * Queue the AccessPathTask for execution.
                          * 
-                         * Note: The caller MUST verify that no tasks
-                         * submitted to the [executor] result in errors.
-                         * This is done by checking the errorCount for
-                         * that [executor], so you need to run the tasks
-                         * on a service which exposes that information.
+                         * Note: The caller MUST verify that no tasks submitted
+                         * to the [executor] result in errors. This is done by
+                         * checking the errorCount for that [executor], so you
+                         * need to run the tasks on a service which exposes that
+                         * information.
                          */
                         
                         executor.submit(task);
@@ -2776,15 +2804,16 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
                     } else {
 
                         /*
-                         * Execute the AccessPathTask in the caller's
-                         * thread.
+                         * Execute the AccessPathTask in the caller's thread.
                          */
 
                         task.call();
 
                     }
 
-                }
+                    i++;
+                    
+                } // next task.
 
             }
             
@@ -2935,7 +2964,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
             public Object call() throws Exception {
 
                 if (halt)
-                    return null;
+                    throw new RuntimeException(firstCause.get());
                 
                 final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer = threadLocalBufferFactory
                         .get();
@@ -2952,7 +2981,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
                     while (itr.hasNext()) {
 
                         final Object[] chunk = itr.nextChunk();
-
+                        
                         stats.chunkCount++;
 
                         // process the chunk in the caller's thread.
@@ -2963,7 +2992,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
                             
                         }
 
-                    } // while
+                    } // next chunk.
 
                     if (nothingAccepted && predicate.isOptional()) {
 
@@ -3323,7 +3352,8 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
          * The {@link Future} for the sink for this {@link LocalJoinTask} and
          * <code>null</code> iff this is {@link JoinTask#lastJoin}. This
          * field is set by the {@link LocalJoinMasterTask} so it can be
-         * <code>null</code> if things error out before it gets set.
+         * <code>null</code> if things error out before it gets set or 
+         * perhaps if they complete too quickly.
          */
         protected Future<? extends Object> sinkFuture;
         
@@ -3364,12 +3394,14 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
                  */
                 syncBuffer.flush();
                 syncBuffer.close();
+                assert !syncBuffer.isOpen();
 
                 if (halt)
                     throw new RuntimeException(firstCause.get());
 
                 if (sinkFuture == null) {
 
+                    // @todo should we wait for the Future to be assigned?
                     log.warn("sinkFuture not assigned yet: orderIndex="
                             + orderIndex);
                     
@@ -3467,7 +3499,9 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
 
         /**
          * @param joinTask
+         *            The task that is writing on this buffer.
          * @param capacity
+         *            The capacity of this buffer.
          * @param syncBuffer
          *            The thread-safe buffer onto which this buffer writes when
          *            it overflows.
@@ -3481,6 +3515,14 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
 
         }
 
+        /**
+         * Adds the chunk to the {@link #syncBuffer} and updated the
+         * {@link JoinStats} to reflect the #of {@link IBindingSet} chunks that
+         * will be output and the #of {@link IBindingSet}s in those chunks.
+         * 
+         * @param chunk
+         *            A chunk of {@link IBindingSet}s to be output.
+         */
         @Override
         protected void handleChunk(final E[] chunk) {
 

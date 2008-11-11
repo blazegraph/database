@@ -35,6 +35,7 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 
 import com.bigdata.journal.ITx;
+import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.ISolutionExpander;
 import com.bigdata.relation.rule.IVariableOrConstant;
@@ -397,6 +398,23 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
 
         if (rangeCount[tailIndex] == -1L) {
 
+            final IPredicate predicate = rule.getTail(tailIndex);
+            
+            final ISolutionExpander expander = predicate.getSolutionExpander();
+
+            if (expander != null && expander.runFirst()) {
+
+                /*
+                 * Note: runFirst() essentially indicates that the cardinality
+                 * of the predicate in the data is to be ignored. Therefore we
+                 * do not request the actual range count and just return -1L as
+                 * a marker indicating that the range count is not available.
+                 */
+                
+                return -1L;
+                
+            }
+            
             final long rangeCount = joinNexus.getRangeCountFactory()
                     .rangeCount(rule.getTail(tailIndex));
 

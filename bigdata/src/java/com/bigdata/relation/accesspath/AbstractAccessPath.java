@@ -30,7 +30,9 @@ package com.bigdata.relation.accesspath;
 
 import java.util.Iterator;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 
 import org.apache.log4j.Logger;
 
@@ -494,6 +496,11 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
     }
     
     /**
+     * @throws RejectedExecutionException
+     *             if the iterator is run asynchronously and the
+     *             {@link ExecutorService} is shutdown or has a maximum capacity
+     *             and is saturated.
+     * 
      * FIXME Support both offset and limit for asynchronous iterators. right now
      * this will force the use of the
      * {@link #synchronousIterator(long, long, Iterator)} when the offset or
@@ -853,9 +860,14 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
     /**
      * Asynchronous read using a {@link BlockingBuffer}.
      * 
-     * @param src The source iterator.
+     * @param src
+     *            The source iterator.
      * 
      * @return
+     * 
+     * @throws RejectedExecutionException
+     *             if the {@link ExecutorService} is shutdown or has a maximum
+     *             capacity and is saturated.
      */
     final protected IChunkedOrderedIterator<R> asynchronousIterator(
             final Iterator<R> src) {
@@ -873,9 +885,12 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
          */
         final BlockingBuffer<R[]> buffer = new BlockingBuffer<R[]>(
                 chunkOfChunksCapacity);
+
+        final ExecutorService executorService = indexManager
+                .getExecutorService();
         
-        final Future<Void> future = indexManager.getExecutorService().submit(
-                new ChunkConsumerTask(src, buffer));
+        final Future<Void> future = executorService
+                .submit(new ChunkConsumerTask(src, buffer));
 
         buffer.setFuture(future);
         

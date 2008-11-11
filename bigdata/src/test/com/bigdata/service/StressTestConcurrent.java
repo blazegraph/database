@@ -88,11 +88,7 @@ import com.bigdata.util.concurrent.QueueStatisticsTask;
  * @todo I have observed better performance with the {@link BufferMode#Disk}
  *       when compared to {@link BufferMode#Direct}. I expect that this is due
  *       to resource starvation on a laptop class platform. The fully buffered
- *       mode should be faster if there are sufficent resources available (its
- *       main advantage occurs during overflow since that operation requires
- *       reads against partly random locations in the journal to build up the
- *       index segments). (The problem is also that we are not IO bound - the
- *       btree search and node/leaf serialization are the main bottlenecks.)
+ *       mode should be faster if there are sufficent resources available.
  * 
  * @todo The primary metrics reported by the test are elapsed time and
  *       operations per second. Compute the through put in terms of bytes per

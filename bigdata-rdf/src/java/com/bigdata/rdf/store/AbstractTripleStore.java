@@ -153,6 +153,8 @@ import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 import com.bigdata.relation.rule.eval.ISolution;
+import com.bigdata.relation.rule.eval.JoinMasterTask;
+import com.bigdata.relation.rule.eval.NestedSubqueryWithJoinThreadsTask;
 import com.bigdata.resources.OverflowManager;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.search.IHit;
@@ -327,6 +329,14 @@ abstract public class AbstractTripleStore extends
      * @see Options#MAX_PARALLEL_SUBQUERIES
      */
     final private int maxParallelSubqueries;
+
+    /**
+     * When <code>true</code> the {@link NestedSubqueryWithJoinThreadsTask} is
+     * applied. Otherwise the {@link JoinMasterTask} is applied.
+     * 
+     * @see Options#NESTED_SUBQUERY
+     */
+    final private boolean nestedSubquery;
     
     /**
      * The {@link Axioms} class.
@@ -911,6 +921,28 @@ abstract public class AbstractTripleStore extends
         
         String DEFAULT_MAX_PARALLEL_SUBQUERIES = "5";
 
+        /**
+         * Boolean option controls the JOIN evaluation strategy. Normally joins
+         * are evaluated using the {@link NestedSubqueryWithJoinThreadsTask}.
+         * When <code>false</code> the experimental {@link JoinMasterTask} is
+         * used instead.
+         * 
+         * @todo should identify the strategy by type safe enum or class name.
+         */
+        String NESTED_SUBQUERY = "nestedSubquery";
+        String DEFAULT_NESTED_SUBQUERY = "true";
+//        /** 
+//         * @todo option to specify the class that will serve as the
+//         *       {@link IRuleTaskFactory} - basically, this is how you choose
+//         *       the join strategy. however, {@link DefaultRuleTaskFactory}
+//         *       needs to be refactored in order to make this choice by
+//         *       {@link Class} rather than by the object's state.  Also note
+//         *       that the pipeline join may be better off with maxParallel=0.
+//         */
+//        String RULE_TASK_FACTORY_CLASS = "ruleTaskFactoryClass";
+//
+//        String DEFAULT_RULE_TASK_FACTORY_CLASS = DefaultRuleTaskFactory.class.getName();
+        
     }
 
     /**
@@ -1083,6 +1115,16 @@ abstract public class AbstractTripleStore extends
             if (INFO)
                 log.info(Options.MAX_PARALLEL_SUBQUERIES + "="
                         + maxParallelSubqueries); 
+            
+        }
+
+        {
+            
+            nestedSubquery = Boolean.parseBoolean(properties.getProperty(
+                    Options.NESTED_SUBQUERY, Options.DEFAULT_NESTED_SUBQUERY));
+
+            if(INFO)
+                log.info(Options.NESTED_SUBQUERY+"="+nestedSubquery);
             
         }
         
@@ -3712,8 +3754,8 @@ abstract public class AbstractTripleStore extends
          * @todo configuration property or always use the pipeline for scale-out
          * (EDS, JDS) and nested subquery for LTS and LDS.
          */ 
-        final IRuleTaskFactory defaultRuleTaskFactory = DefaultRuleTaskFactory.SUBQUERY;
-//        final IRuleTaskFactory defaultRuleTaskFactory = DefaultRuleTaskFactory.PIPELINE;
+        final IRuleTaskFactory defaultRuleTaskFactory = nestedSubquery ? DefaultRuleTaskFactory.SUBQUERY
+                : DefaultRuleTaskFactory.PIPELINE;
         
         return new RDFJoinNexusFactory(ruleContext, action, //
                 writeTimestamp, readTimestamp, //

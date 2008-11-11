@@ -243,7 +243,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
      * 
      * @see BNS#SEARCH
      */
-    static final URI MAGIC_SEARCH = new URIImpl(BNS.SEARCH);
+    static private final URI MAGIC_SEARCH = new URIImpl(BNS.SEARCH);
 
     private final long NULL = IRawTripleStore.NULL;
     

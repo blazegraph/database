@@ -807,7 +807,23 @@ public class SPORelation extends AbstractRelation<ISPO> {
         
         final SPOPredicate pred = (SPOPredicate) predicate;
 
-        // FIXME hacked in attempt to track down a nagging issue.
+        /*
+         * FIXME This was hacked in attempt to track down a nagging issue. There
+         * were two symptoms. First, some access paths were failing to deliver
+         * the correct results for joins. Second, the kb lost track of what was
+         * an inference and was treating everything as explicit. NOTE: The
+         * problem would go away on a restart, which is what led us to consider
+         * a stateful / cache effect. The data on disk was correct.
+         * 
+         * It is possible that the join problem is related to the cache because
+         * the AbstractAccessPath is stateful for historical reads and it is
+         * within the grasp of reason that the logic there was failing and was
+         * keeping state for the UNISOLATED view as well.
+         * 
+         * Note: I have no idea how the the cache could cause the kb to loose
+         * track of what is inferred and what was explicit. This may be a red
+         * herring.
+         */
         if (getTimestamp() == ITx.UNISOLATED) {
 
             // create an access path instance for that predicate.

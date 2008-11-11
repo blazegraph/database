@@ -839,8 +839,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
         sb.append(", deleteMarkers=" + deleteMarkers);
         sb.append(", versionTimestamps=" + versionTimestamps);
         sb.append(", isolatable=" + isIsolatable());
-        sb.append(", bloomFilterFactory=" == null ? "N/A" : bloomFilterFactory
-                .toString()); 
+        sb.append(", bloomFilterFactory=" + (bloomFilterFactory == null ? "N/A"
+                : bloomFilterFactory.toString())); 
         sb.append(", overflowHandler="
                 + (overflowHandler == null ? "N/A" : overflowHandler.getClass()
                         .getName()));

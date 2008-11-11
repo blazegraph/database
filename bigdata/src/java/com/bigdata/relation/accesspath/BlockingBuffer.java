@@ -365,35 +365,47 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         
     }
 
+    public boolean isOpen() {
+        
+        return open;
+        
+    }
+    
     /**
      * Closes the {@link BlockingBuffer} such that it will not accept new
      * elements. The {@link IAsynchronousIterator} will drain any elements
      * remaining in the {@link BlockingBuffer} (this does NOT close the
      * {@link BlockingIterator}).
      */
-    public void close() {
+    synchronized public void close() {
     
         if (open) {
          
-            if (INFO)
-                log.info("closed.");
-            
-            if (stackFrame != null) {
+            try {
+         
+                if (INFO)
+                    log.info("closed.");
 
-                /*
-                 * Purely for debugging.
-                 */
-                
-                log.warn("closing buffer at", new RuntimeException());
+                if (stackFrame != null) {
 
-                log.warn("buffer allocated at", stackFrame);
+                    /*
+                     * Purely for debugging.
+                     */
+
+                    log.warn("closing buffer at", new RuntimeException());
+
+                    log.warn("buffer allocated at", stackFrame);
+
+                }
                 
+            } finally {
+
+                this.open = false;
+
             }
-            
+
         }
         
-        this.open = false;
-
     }
 
     public void abort(final Throwable cause) {
@@ -1099,6 +1111,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                                 + ", elapsed="
                                 + TimeUnit.MILLISECONDS.convert(elapsedNanos,
                                         TimeUnit.NANOSECONDS) + "ms"
+//                                + ", buffer.open=" + BlockingBuffer.this.open
+//                                + ", itr.open=" + this.open
 //                                        , stackFrame // shows where it was allocated.
 //                                        , new RuntimeException() // shows where it is being consumed.
                                 );
