@@ -54,12 +54,6 @@ import com.bigdata.service.DataService;
  */
 public class MutationTask extends AbstractStepTask {
 
-    /**
-     * @param buffers
-     *            The buffers on which the tasks will write. There must be one
-     *            buffer for each distinct relation in the heads of the various
-     *            rules from which the tasks were created.
-     */
     protected MutationTask(ActionEnum action,
             IJoinNexusFactory joinNexusFactory, IStep step,
             IIndexManager indexManager, DataService dataService) {
@@ -86,7 +80,7 @@ public class MutationTask extends AbstractStepTask {
     public RuleStats call() throws Exception {
         
         /*
-         * Create the IJoinNexus that will be used to evaluate the Query now
+         * Create the IJoinNexus that will be used to evaluate the operation now
          * that we are in the execution context and have the correct
          * IIndexManager object.
          */
