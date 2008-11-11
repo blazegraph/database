@@ -53,6 +53,8 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.spo.SPORelation;
@@ -81,6 +83,10 @@ import com.bigdata.relation.rule.eval.IStepTask;
  */
 public class RDFJoinNexusFactory implements IJoinNexusFactory {
 
+    protected static final Logger log = Logger.getLogger(RDFJoinNexusFactory.class);
+
+    protected static final boolean INFO = log.isInfoEnabled();
+    
     /**
      * 
      */
@@ -329,6 +335,9 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
             joinNexusCache.clear();
             
             this.readTimestamp = readTimestamp; 
+            
+            // @todo change to INFO
+            log.warn("Advancing read timestamp: "+readTimestamp);
             
         }
         
