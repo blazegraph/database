@@ -112,6 +112,10 @@ public class RuleState implements IRuleState {
         
         // The key order that will be used for each join dimension.
         this.keyOrder = computeKeyOrderForEachTail(rule, joinNexus, plan.getOrder(), nvars);
+       
+        if (INFO)
+            log.info("\nrule=" + rule + "\nplan=" + plan + "\nkeyOrder="
+                + Arrays.toString(keyOrder));
         
     }
 
@@ -135,7 +139,7 @@ public class RuleState implements IRuleState {
      */
     public String toString(IBindingSet bindingSet) {
 
-        return rule.toString(bindingSet)+ " order="
+        return rule.toString(bindingSet)+ ", order="
                 + Arrays.toString(plan.getOrder()) + ", keyOrder="
                 + Arrays.toString(keyOrder) + ", nvars="
                 + Arrays.toString(nvars);
