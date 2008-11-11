@@ -112,15 +112,13 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
      * the {@link ExecutorService} set on the clone, and the clone is then
      * submitted to the {@link ConcurrencyManager} for the {@link DataService}.
      * 
+     * @param action
+     *            Indicate whether this is a query or a mutation operation.
+     * @param joinNexusFactory
+     *            Various goodies.
      * @param step
      *            The rule or program.
-     * @param joinNexus
-     *            Various goodies.
-     * @param defaultTaskFactory
-     *            For the tasks to be executed.
-     * @param executorService
-     *            MAY be null. When <code>null</code> the task MUST be
-     *            executing on a {@link DataService}.
+     * @param indexManager
      * @param dataService
      *            non-<code>null</code> iff the caller is already running on
      *            a {@link DataService}.
@@ -128,15 +126,15 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
      * @throws IllegalArgumentException
      *             if <i>action</i> is <code>null</code>.
      * @throws IllegalArgumentException
-     *             if <i>joinNexus</i> is <code>null</code>.
+     *             if <i>joinNexusFactory</i> is <code>null</code>.
      * @throws IllegalArgumentException
      *             if <i>step</i> is <code>null</code>.
-     * @throws IllegalArgumentException
-     *             if <i>tasks</i> is <code>null</code>.
      */
-    protected AbstractStepTask(ActionEnum action,
-            IJoinNexusFactory joinNexusFactory, IStep step,
-            IIndexManager indexManager, DataService dataService) {
+//    * @throws IllegalArgumentException
+//    *             if <i>indexManager</i> is <code>null</code>.
+    protected AbstractStepTask(final ActionEnum action,
+            final IJoinNexusFactory joinNexusFactory, final IStep step,
+            final IIndexManager indexManager, final DataService dataService) {
 
         if (action == null)
             throw new IllegalArgumentException();

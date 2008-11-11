@@ -61,11 +61,10 @@ public interface IRuleState {
     /**
      * An array of the {@link IKeyOrder} that will be used for each predicate in
      * the tail of the rule. The array is correlated with the predicates index
-     * in the tail of the rule NOT with its evaluation order. This information
-     * may be used to re-order a chunk into the {@link IKeyOrder} for the next
-     * join dimension. This increases performance by making sure that ordered
-     * reads are used by the subqueries for any given chunk on some join
-     * dimension.
+     * in the tail of the rule NOT with its evaluation order.
+     * <p>
+     * Note: The fully qualified index name for a given predicate is the name of
+     * the relation for that predicate plus {@link IKeyOrder#getIndexName()}.
      */
     public IKeyOrder[] getKeyOrder();
 
