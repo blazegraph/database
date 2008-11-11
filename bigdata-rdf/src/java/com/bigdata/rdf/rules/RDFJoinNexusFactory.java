@@ -83,9 +83,9 @@ import com.bigdata.relation.rule.eval.IStepTask;
  */
 public class RDFJoinNexusFactory implements IJoinNexusFactory {
 
-    protected static final Logger log = Logger.getLogger(RDFJoinNexusFactory.class);
+    protected static final transient Logger log = Logger.getLogger(RDFJoinNexusFactory.class);
 
-    protected static final boolean INFO = log.isInfoEnabled();
+    protected static final transient boolean INFO = log.isInfoEnabled();
     
     /**
      * 
