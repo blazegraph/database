@@ -1275,7 +1275,9 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
         if (isResource(resource))
             return resource;
 
-        throw new IllegalStateException("Not declared by task: " + resource);
+        throw new IllegalStateException("Not declared: task=" + getTaskName()
+                + ", resource=" + resource + " is not in "
+                + Arrays.toString(this.resource));
         
     }
     
