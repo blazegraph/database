@@ -316,7 +316,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
 
         this.relationName = src.relationName;
         
-        this.partitionId = src.partitionId;
+        this.partitionId = partitionId;
         
         this.s = src.s;
         this.p = src.p;
@@ -534,7 +534,12 @@ public class SPOPredicate implements IPredicate<ISPO> {
         
         sb.append(")");
 
-        if (optional || constraint != null || expander != null) {
+        if (optional || constraint != null || expander != null
+                || partitionId != -1) {
+            
+            /*
+             * Something special, so do all this stuff.
+             */
             
             boolean first = true;
             
