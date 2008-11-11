@@ -1,8 +1,12 @@
 package com.bigdata.rdf.sail;
 
 import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
+
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
+import org.openrdf.query.algebra.StatementPattern;
+
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rdf.spo.ISPO;
@@ -10,6 +14,8 @@ import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.BNS;
+import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.ISolutionExpander;
@@ -22,6 +28,14 @@ import com.bigdata.striterator.IChunkConverter;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 
+/**
+ * Class used to expand a {@link StatementPattern} involving a
+ * {@link BNS#SEARCH} magic predicate into the set of subjects having any of the
+ * tokens in the query.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
 public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
     
     protected static final Logger log = Logger.getLogger(FreeTextSearchExpander.class);
@@ -30,19 +44,27 @@ public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
 
     protected static final boolean DEBUG = log.isDebugEnabled();
     
-    
     private static final long serialVersionUID = 1L;
     
     private final AbstractTripleStore database;
     
-    private final long NULL;
+    private static final long NULL = IRawTripleStore.NULL;
     
     private final Literal query;
     
-    public FreeTextSearchExpander(AbstractTripleStore database, Literal query) {
+    public FreeTextSearchExpander(final AbstractTripleStore database,
+            final Literal query) {
+
+        if (database == null)
+            throw new IllegalArgumentException();
+       
+        if (query == null)
+            throw new IllegalArgumentException();
+        
         this.database = database;
-        this.NULL = database.NULL;
+        
         this.query = query;
+        
     }
     
     public boolean backchain() {
@@ -55,7 +77,9 @@ public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
     
     public IAccessPath<ISPO> getAccessPath(
             final IAccessPath<ISPO> accessPath) {
+
         return new FreeTextSearchAccessPath(accessPath);
+        
     }
     
     private class FreeTextSearchAccessPath implements IAccessPath<ISPO> {
@@ -81,63 +105,126 @@ public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
                 if (database.getSearchEngine() == null)
                     throw new UnsupportedOperationException(
                             "No free text index?");
+//                final long begin = System.nanoTime();
                 hiterator = database.getSearchEngine().search
                     ( query.getLabel(),
                       query.getLanguage(), 
-                      0d/* minCosine */,
-                      10000/* maxRank */
-                      );                
+                      0d, // @todo param for minCosine,
+                      10000 // @todo param for maxRank,
+//                      timeout,
+//                      unit
+                      );
+//                final long elapsed = System.nanoTime() - begin;
+//                log.warn("search time="
+//                        + TimeUnit.MILLISECONDS.convert(elapsed,
+//                                TimeUnit.NANOSECONDS)+", query="+query+", nhits="+hiterator.size());
             }
             return hiterator;
         }
         
         public IIndex getIndex() {
+
             return accessPath.getIndex();
+            
         }
 
+        /**
+         * The results are in decreasing cosine (aka relevance) order.
+         * 
+         * @return <code>null</code> since the results are not in any
+         *         {@link SPOKeyOrder}.
+         */
         public IKeyOrder<ISPO> getKeyOrder() {
-            return accessPath.getKeyOrder();
+            
+           return null;
+            
+//            return accessPath.getKeyOrder();
+            
         }
 
         public IPredicate<ISPO> getPredicate() {
+
             return accessPath.getPredicate();
+            
         }
 
         public boolean isEmpty() {
-            return rangeCount(true) > 0;
+
+            return rangeCount(false/* exact */) > 0;
+            
         }
 
         public IChunkedOrderedIterator<ISPO> iterator() {
+
+//            /*
+//             * FIXME remove. times the search hit converter but has side effect.
+//             */
+//            {
+//                final IChunkedOrderedIterator<IHit> itr2 = new ChunkedWrappedIterator<IHit>(
+//                        getHiterator());
+//
+//                final IChunkedOrderedIterator<ISPO> itr3 = new ChunkedConvertingIterator<IHit, ISPO>(
+//                        itr2, new HitConverter(accessPath));
+//
+//                final long begin = System.nanoTime();
+//                while (itr3.hasNext()) {
+//                    itr3.next();
+//                }
+//                final long elapsed = System.nanoTime() - begin;
+//                log.error("search converting iterator time="
+//                        + TimeUnit.MILLISECONDS.convert(elapsed,
+//                                TimeUnit.NANOSECONDS) + ", query=" + query
+//                        + ", nhits=" + hiterator.size());
+//                hiterator = null; // clear reference since we will need to reobtain the hiterator.
+//            }
+            
             final IChunkedOrderedIterator<IHit> itr2 = 
                 new ChunkedWrappedIterator<IHit>(getHiterator());
+            
             final IChunkedOrderedIterator<ISPO> itr3 = 
                 new ChunkedConvertingIterator<IHit,ISPO>
                 ( itr2, new HitConverter(accessPath)
                   );
             return itr3;
+            
+
         }
 
+        //@todo ignores limit.
         public IChunkedOrderedIterator<ISPO> iterator(int limit, int capacity) {
+
             return iterator();
+            
         }
 
+        //@todo ignores offset & limit.
         public IChunkedOrderedIterator<ISPO> iterator(long offset, long limit, int capacity) {
+
             return iterator();
+            
         }
 
         public long rangeCount(boolean exact) {
-            long rangeCount = 1;
-            rangeCount = getHiterator().size();
-            if (INFO) log.info("range count: " + rangeCount);
+
+            final long rangeCount = getHiterator().size();
+
+            if (INFO)
+                log.info("range count: " + rangeCount);
+
             return rangeCount;
+            
         }
 
         public ITupleIterator<ISPO> rangeIterator() {
+            
             throw new UnsupportedOperationException();
+            
         }
 
         public long removeAll() {
+            
             throw new UnsupportedOperationException();
+            
         }
         
     }
@@ -169,7 +256,7 @@ public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
                 if (INFO) log.info("hit: " + s);
                 spos[i] = new SPO(s, NULL, NULL);
             }
-            Arrays.sort(spos, SPOKeyOrder.SPO.getComparator());
+//            Arrays.sort(spos, SPOKeyOrder.SPO.getComparator());
             return spos;
         }
         
@@ -179,10 +266,13 @@ public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
                 long s = hit.getDocId();
                 if (s == boundVal) {
                     result = new ISPO[] { new SPO(s, NULL, NULL) };
+                    break;
                 }
             }
             if (INFO) log.info("# of results: " + result.length);
             return result;
         }
+
     }
-};
+
+}

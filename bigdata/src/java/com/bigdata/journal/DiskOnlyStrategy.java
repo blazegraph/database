@@ -36,6 +36,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Exchanger;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.bigdata.cache.LRUCache;
 import com.bigdata.counters.AbstractStatisticsCollector;
@@ -1390,7 +1391,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
          * VM and OS versions and see what is going on here!
          */
 
-        synchronized (this) {
+        synchronized (this)  //FIXME RESTORE SYNCHRONIZATION HERE! 
+        {
 
             if (nbytes > counters.maxReadSize) {
 

@@ -13,6 +13,8 @@ import java.util.TreeMap;
 
 import org.openrdf.sail.SailException;
 
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -406,8 +408,56 @@ public class BigdataSailHelper {
         }
         
     }
+
+    /**
+     * Shows some interesting details about the term2id index.
+     * 
+     * @param sail
+     */
+    public static void showLexiconIndexDetails(BigdataSail sail) {
+        
+        IIndex ndx = sail.getDatabase().getLexiconRelation().getTerm2IdIndex();
+        IndexMetadata md = ndx.getIndexMetadata();
+        
+        System.out.println("Lexicon:");
+        System.out.println(md.toString());
+        System.out.println(md.getTupleSerializer().toString());
+        
+    }
     
+    /**
+     * Shows some interesting details about the SPO index.
+     * 
+     * @param sail
+     */
+    public static void showSPOIndexDetails(BigdataSail sail) {
+        
+        IIndex ndx = sail.getDatabase().getSPORelation().getSPOIndex();
+        IndexMetadata md = ndx.getIndexMetadata();
+        
+        System.out.println("SPO:");
+        System.out.println(md.toString());
+        System.out.println(md.getTupleSerializer().toString());
+        
+    }
+    
+    /**
+     * Utility class.
+     * 
+     * @param args
+     *            <i>filename</i> (<i>namespace</i> (<i>timestamp</i>))
+     * 
+     * @throws SailException
+     */
     public static void main(String[] args) throws SailException {
+       
+        if (args.length == 0) {
+
+            System.err.println("usage: filename (namespace (timestamp))");
+
+            System.exit(1);
+            
+        }
         
         final String filename = args[0];
         
@@ -450,15 +500,19 @@ public class BigdataSailHelper {
 
             System.out.println("\npre-modification properties::");
             showProperties(helper.getProperties(sail));
+            showLexiconIndexDetails(sail);
+            showSPOIndexDetails(sail);
 
             // change some property values.
-            {
+            if(true) {
                 final Properties p = new Properties();
 
+//                p.setProperty(Options.NESTED_SUBQUERY, "true");
                 p.setProperty(Options.CHUNK_CAPACITY, "100");
+                p.setProperty(Options.FULLY_BUFFERED_READ_THRESHOLD, "1000");
                 p.setProperty(Options.MAX_PARALLEL_SUBQUERIES, "0");
 //                p.setProperty(Options.INCLUDE_INFERRED, "true");
-//                p.setProperty(Options.QUERY_TIME_EXPANDER, "true");
+                p.setProperty(Options.QUERY_TIME_EXPANDER, "false");
 
                 System.out.println("\npost-modification properties::");
                 showProperties(helper.setProperties(sail, p));

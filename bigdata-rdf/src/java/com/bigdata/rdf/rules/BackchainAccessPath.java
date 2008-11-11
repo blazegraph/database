@@ -516,5 +516,11 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
         return accessPath.removeAll();
         
     }
+
+    public String toString() {
+        
+        return super.toString()+"{isOwlSameAsUsed="+isOwlSameAsUsed+", source="+accessPath+"}";
+        
+    }
     
 }

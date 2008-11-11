@@ -464,7 +464,7 @@ public class Predicate<E> implements IPredicate<E> {
             
             final IVariableOrConstant y = o.get(i);
             
-            if (!(x == y || x.equals(y))) {
+            if (x != y && !(x.equals(y))) {
                 
                 return false;
             

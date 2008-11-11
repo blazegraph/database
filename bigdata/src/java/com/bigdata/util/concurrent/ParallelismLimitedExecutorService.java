@@ -125,6 +125,12 @@ import com.bigdata.service.DataService;
  *       design will allow the {@link ParallelismLimitedExecutorService} to be
  *       used for map/reduce style processing. A client should be able to manage
  *       1000s of concurrent tasks without trouble.
+ * 
+ * FIXME The ParallelismLimitedExecutorService is broken (11/10/08). This can be
+ * demonstrated if it is enabled for the pipeline join. Therefore it has been
+ * taken out of service until it can be fixed. Users include the
+ * {@link CompactTask} and the {@link JoinMasterTask}. Prospective users
+ * include the ConcurrentDataLoader (RDF DB) and map/reduce processing.
  */
 public class ParallelismLimitedExecutorService extends AbstractExecutorService {
 
