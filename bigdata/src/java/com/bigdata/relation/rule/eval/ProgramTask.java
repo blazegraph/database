@@ -41,6 +41,7 @@ import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IIndexStore;
+import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.relation.IMutableRelation;
@@ -52,6 +53,7 @@ import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.DataService;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IDataServiceAwareProcedure;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -143,8 +145,8 @@ public class ProgramTask implements IProgramTask,
         if (dataService == null)
             throw new IllegalArgumentException();
 
-        if (INFO)
-            log.info("Running on data service: dataService="+dataService);
+        if (DEBUG)
+            log.debug("Running on data service: dataService="+dataService);
         
         this.dataService = dataService;
         
@@ -454,12 +456,26 @@ public class ProgramTask implements IProgramTask,
         if (!action.isMutation())
             throw new IllegalArgumentException();
         
-//        /*
-//         * Advance the read-consistent timestamp so that any writes from
-//         * the previous rules or the last round are now visible.
-//         */
-//        joinNexusFactory.setReadTimestamp(TimestampUtility
-//                .asHistoricalRead(indexManager.getLastCommitTime()));
+        if (indexManager instanceof IBigdataFederation) {
+
+            /*
+             * Advance the read-consistent timestamp so that any writes from the
+             * previous rules or the last round are now visible.
+             * 
+             * Note: We can only do this for the federation with its autoCommit
+             * semantics.
+             * 
+             * Note: The Journal (LTS) must both read and write against the
+             * unisolated view for closure operations.
+             * 
+             * @todo clone the joinNexusFactory 1st to avoid possible side
+             * effects?
+             */
+            
+            joinNexusFactory.setReadTimestamp(TimestampUtility
+                    .asHistoricalRead(indexManager.getLastCommitTime()));
+            
+        }
 
         final MutationTask mutationTask = new MutationTask(action, joinNexusFactory,
                 step, indexManager, dataService );

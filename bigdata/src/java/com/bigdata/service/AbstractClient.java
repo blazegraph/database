@@ -387,7 +387,7 @@ abstract public class AbstractClient implements IBigdataClient {
 
         if (isConnected()) {
 
-            log.warn("Disconnnecting client or service");
+            log.warn("Disconnecting client or service");
             
             disconnect(true/* immediateShutdown */);
 

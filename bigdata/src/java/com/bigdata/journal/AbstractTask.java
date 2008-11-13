@@ -2429,11 +2429,12 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 //            return new GlobalRowStoreHelper(this).getReadCommitted();
 
             // last commit time.
-            final long timestamp = delegate.getRootBlockView().getLastCommitTime();
+            final long lastCommitTime = delegate.getRootBlockView()
+                    .getLastCommitTime();
             
             final IIndex ndx = delegate.getIndex(
                     GlobalRowStoreHelper.GLOBAL_ROW_STORE_INDEX,
-                    timestamp);
+                    TimestampUtility.asHistoricalRead(lastCommitTime));
 
             if (ndx != null) {
 
@@ -2465,10 +2466,11 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
                 public IIndex getIndex(String name, long timestampIsIgnored) {
 
                     // last commit time.
-                    final long timestamp = delegate.getRootBlockView()
+                    final long commitTime = delegate.getRootBlockView()
                             .getLastCommitTime();
                     
-                    return delegate.getIndex(name, timestamp);
+                    return delegate.getIndex(name, TimestampUtility
+                            .asHistoricalRead(commitTime));
 
                 }
 

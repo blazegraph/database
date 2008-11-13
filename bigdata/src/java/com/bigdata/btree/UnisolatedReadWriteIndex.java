@@ -119,6 +119,10 @@ public class UnisolatedReadWriteIndex implements IIndex {
 
     protected static final Logger log = Logger.getLogger(UnisolatedReadWriteIndex.class);
 
+//    protected static final boolean INFO = log.isInfoEnabled();
+
+    protected static final boolean DEBUG = log.isDebugEnabled();
+    
     /**
      * The #of milliseconds that the class will wait for a read or write lock. A
      * (wrapped) {@link InterruptedException} will be thrown if this timeout is
@@ -146,7 +150,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
         
         try {
             
-            if(log.isDebugEnabled()) {
+            if(DEBUG) {
                 
                 log.debug(ndx.toString());
                 
@@ -183,7 +187,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
 
         try {
 
-            if(log.isDebugEnabled()) {
+            if(DEBUG) {
                 
                 log.debug(ndx.toString()
 //                        , new RuntimeException()
@@ -237,7 +241,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
         
         lock.unlock();
         
-        if(log.isDebugEnabled()) {
+        if(DEBUG) {
             
             log.debug(ndx.toString());
             
@@ -318,7 +322,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
      *       the computed solutions onto the relations. It is likely that a
      *       read-write lock will do well for this situation.
      */
-    public UnisolatedReadWriteIndex(IIndex ndx, int capacity) {
+    public UnisolatedReadWriteIndex(final IIndex ndx, final int capacity) {
 
         if (ndx == null)
             throw new IllegalArgumentException();

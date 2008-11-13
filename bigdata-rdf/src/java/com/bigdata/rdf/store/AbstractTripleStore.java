@@ -64,13 +64,10 @@ import org.openrdf.rio.rdfxml.RDFXMLParser;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BloomFilter;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.filter.ITupleFilter;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -79,6 +76,7 @@ import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.axioms.BaseAxioms;
@@ -3685,14 +3683,6 @@ abstract public class AbstractTripleStore extends
         // use the timestamp for the database view.
         final long writeTimestamp = getTimestamp();
         
-//        /*
-//		 * The default is to read from the last committed state for the
-//		 * database.
-//         * 
-//         * @issue negative timestamp
-//		 */
-//        final long readTimestamp = -getIndexManager().getLastCommitTime();
-        
         /*
          * Use the timestamp for the database view.
          * 
@@ -3705,37 +3695,84 @@ abstract public class AbstractTripleStore extends
          * 
          * Note: If we are only reading (Query) then we just use the timestamp
          * of the view.
+         * 
+         * --- LTS (closure using nested or pipeline joins)
+         * 
+         * Closure can't use READ_COMMITTED for LTS unless we force commits
+         * after each rule executes. Therefore it uses UNISOLATED indices for
+         * both reads and writes. This works since (a) the entire JOIN task is
+         * executed while holding all required locks; and (b) the
+         * UnisolatedReadWriteIndex is used to avoid concurrency problems that
+         * would otherwise arise since there are readers running concurrent with
+         * the writer that flushes solutions to the relation.
+         * 
+         * Using UNISOLATED JOINs for LTS means that parallel programs will be
+         * (mostly) serialized since they will be ordered by the requirement for
+         * resource locks on the various indices, including the head relation
+         * (SPORelation) on which the rules will write. However, as noted above,
+         * our only other choice is to enforce auto-commit semantics as we do
+         * for LDS/EDS/JDS.
+         * 
+         * ---- Federations and pipeline joins.
+         * 
+         * Federations (LDS/EDS/JDS) use auto-commit semantics. For EDS/JDS we
+         * do NOT use READ_COMMITTED for closure since that can lead to stale
+         * locator problems during overflow processing. Instead we advance the
+         * readTimestamp before each mutation rule is run. For simplicity, we do
+         * this for LDS as well as EDS/JDS, while it is in fact only required
+         * for EDS/JDS since LDS does not use locators.
+         * 
+         * Federation JoinTasks require access to the dataService so that they
+         * can obtain the live journal. However, they use read-historical access
+         * and you can do that without declaring locks. More to the point, if
+         * they attempted to access the UNISOLATED index that would cause a
+         * deadlock with the tasks responsible for flushing the generated
+         * solutions onto the head relation.
          */
         final long readTimestamp;
-        if (action.isMutation() && writeTimestamp == ITx.UNISOLATED
-                && getIndexManager() instanceof IBigdataFederation) {
-           
-            /*
-             * Note: Use a read-only view for the data source(s) in order to
-             * permit higher concurrency (writers will obtain a lock on the
-             * unisolated view, but readers will not block if they are reading
-             * from the read-committed view).
-             * 
-             * Note: [READ_COMMITTED] ensures that we always see the results of
-             * (committed) writes, but index partition split/join/moves can
-             * cause locators to become stale so this is not recommended for
-             * mutation operations (including closure) for scale-out
-             * deployments.
-             * 
-             * Note: [lastCommitTime] gives us read-consistent semantics and is
-             * safe in the face of concurrent split/join/moves of index
-             * partitions during a mutation operation.
-             */
+        if (action.isMutation()) {
 
-//            readTimestamp = TimestampUtility.asHistoricalRead(getIndexManager()
-//                    .getLastCommitTime());
-            readTimestamp = ITx.READ_COMMITTED;
-//            readTimestamp = getTimestamp();
+            if (writeTimestamp != ITx.UNISOLATED) {
+
+                // mutation requires the UNISOLATED view.
+
+                throw new UnsupportedOperationException();
+                
+            }
+
+            if( getIndexManager() instanceof IBigdataFederation) {
+
+                /*
+                 * Use historical reads.
+                 * 
+                 * Note: The read timestamp will be automatically updated before
+                 * each mutation step so that all mutation operations will see
+                 * the last committed state of the database but will also avoid
+                 * problems with stale locators.
+                 */
+                
+                readTimestamp = TimestampUtility.asHistoricalRead(getIndexManager()
+                        .getLastCommitTime());
+                
+            } else {
+
+                /*
+                 * LTS closure operations.
+                 * 
+                 * Note: This means that we use UNISOLATED reads since mutation
+                 * requires that the caller is using the UNISOLATED relation.
+                 */
+                
+                readTimestamp = getTimestamp();
+
+            }
             
         } else {
 
             /*
-             * Otherwise, just use the same view as the resource container.
+             * Query.
+             * 
+             * Use the same timestamp as the relation.
              */
             
             readTimestamp = getTimestamp();
@@ -3750,10 +3787,6 @@ abstract public class AbstractTripleStore extends
                 && !getAccessPath(NULL, getVocabulary().get(OWL.SAMEAS), NULL)
                         .isEmpty();
         
-        /*
-         * @todo configuration property or always use the pipeline for scale-out
-         * (EDS, JDS) and nested subquery for LTS and LDS.
-         */ 
         final IRuleTaskFactory defaultRuleTaskFactory = nestedSubquery ? DefaultRuleTaskFactory.SUBQUERY
                 : DefaultRuleTaskFactory.PIPELINE;
         

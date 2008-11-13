@@ -114,7 +114,7 @@ public class TimestampUtility {
      *             if <i>commitTime</i> is negative (zero is permitted for some
      *             edge cases).
      */
-    static public long asHistoricalRead(long commitTime) {
+    static public long asHistoricalRead(final long commitTime) {
     
         if (commitTime < 0)
             throw new IllegalArgumentException("commitTime: " + commitTime);

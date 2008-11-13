@@ -834,6 +834,9 @@ abstract public class OverflowManager extends IndexManager {
         
         if (INFO)
             log.info("begin");
+
+        // @todo uncomment.
+        System.err.println("OverflowManager::doSynchronousOverflow: "+getLiveJournal().getFile());
         
         /*
          * Note: We assign the same timestamp to the createTime of the new

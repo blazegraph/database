@@ -1794,13 +1794,6 @@ abstract public class StoreManager extends ResourceEvents implements
 
     public abstract void setConcurrencyManager(IConcurrencyManager concurrencyManager);
     
-//    /**
-//     * Declaration allows access to the {@link IMetadataService}.  The method is also
-//     * declared by {@link IResourceManager} and is implemented by concrete instances of
-//     * the {@link ResourceManager} class. 
-//     */
-//    public abstract IMetadataService getMetadataService();
-    
     /**
      * Implementation designed to use a shared {@link ConcurrencyManager}.
      * 
@@ -1815,6 +1808,8 @@ abstract public class StoreManager extends ResourceEvents implements
          * on the old journal BEFORE you may allocate a new journal.
          * 
          * @param properties
+         * 
+         * @see AbstractJournal#closeForWrites(long)
          */
         protected ManagedJournal(Properties properties) {
 
