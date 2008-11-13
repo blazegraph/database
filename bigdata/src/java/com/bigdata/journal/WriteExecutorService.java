@@ -42,7 +42,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
@@ -138,14 +137,12 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final protected static boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final protected static boolean DEBUG = log.isDebugEnabled();
 
     /**
      * Uses the {@link OverflowManager} log for things relating to synchronous
@@ -157,14 +154,12 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     /**
      * True iff the {@link #overflowLog} level is INFO or less.
      */
-    final protected static boolean OVERFLOW_INFO = overflowLog
-            .getEffectiveLevel().toInt() <= Level.INFO.toInt();
+    final protected static boolean OVERFLOW_INFO = overflowLog.isInfoEnabled();
 
     /**
      * True iff the {@link #overflowLog} level is DEBUG or less.
      */
-    final protected static boolean OVERFLOW_DEBUG = overflowLog
-            .getEffectiveLevel().toInt() <= Level.DEBUG.toInt();
+    final protected static boolean OVERFLOW_DEBUG = overflowLog.isDebugEnabled();
 
     /**
      * When <code>true</code>, writes the set of {@link #active} tasks into

@@ -3069,89 +3069,58 @@ It just does it ever so slightly differently for the four cases depending on wha
 
 --M 
 ============================================================
+Executor services
+
+  - Replace DataService#submit() with a method taking a RunnableFuture
+    and including an interface for collecting queue statistics.  The
+    statistics are important as they allow us to readily measure load
+    on the various work queues.
+
+    AbstractTask should probably become hidden as part of this with an
+    interface exposed for tasks that require access to specific
+    resources, namely, indices on the live journal.
+
+  - Refactor the limited parallelism service to use a proxied
+    RunnableFuture for map/reduce, CDL, pipeline joins, etc.
+
+  - Simplify proxying of iterators and other types [JDS].
+
+============================================================
 CLOSURE CORRECTNESS
 
-This is looking for a problem that I introduced while making changes
-to the closure execution to support the new scale-out JOINs.  The
-symptom was one dropped result on LUBM Q13. ntriples should be 139762
-after closure, but we are only getting 134258 when using
-lastCommitTime.
+x. Validate LTS/LDS/EDS/JDS query for both nested and pipeline joins.
 
-READ_COMMITTED LTS:
-Loaded data files: loadTime(ms)=6453, loadRate(tps)=15631, toldTriples=100868, #terms=26598
-nextOffset: 11412393
-statementCount	101044
-closure: ClosureStats{mutationCount=26647, elapsed=3938ms}; nextOffset: 18875214
-Net: tps=12907, ntriples=139762, elapsed=10828ms
+2. fix overgeneration by the pipeline join (all cases).
 
-READ_CONSISTENT from lastCommitTime with LTS:
-2008
-Loaded data files: loadTime(ms)=6390, loadRate(tps)=15785, toldTriples=100868, #terms=26598
-nextOffset: 11412424
-class	com.bigdata.rdf.store.LocalTripleStore
-indexManager	com.bigdata.journal.Journal
-exactStatementCount	101044
-statementCount	101044
-termCount	26636
-uriCount	17310
-literalCount	9326
-bnodeCount	0
+   - Write a unit test based on LUBM U1 to verify load+closure,
+     restart, and query for each of LTS, LDS, EDS, and JDS.  The test
+     should report out the load, closure, and query times and also
+     whether or not the same #of triples was loaded, #of triples was
+     inferred by closure (if enabled by the properties), and #of
+     answers was produced by query.  This will mean bundling the
+     generated LUBM U1 data, which should be fine.  In fact, the test
+     can have as inputs a set of properties, a set of file(s), and a
+     set of queries.  This could be used to readily verify consistency
+     and cross-check performance for all tripleStore modes on any
+     dataset.
 
-Computing closure: now=Wed Oct 22 11:25:56 EDT 2008
-closure: ClosureStats{mutationCount=25177, elapsed=2954ms}
-exactStatementCount	134258
-statementCount	134258
-termCount	26636
-uriCount	17310
-literalCount	9326
-bnodeCount	0
-Net: tps=13726, ntriples=134258, elapsed=9781ms
+   - Write unit tests for access to the global row store and bigdata
+     file system from read-only tasks running on the concurrency
+     manager.  This can be expected to fail right now since it appears
+     to see the commitTime as a transaction identifier rather than a
+     commitTime.
 
+   - Write unit tests for access to the global row store and bigdata
+     file system from unisolated tasks running on the concurrency
+     manager.
 
-Suspects and places of interest:
+   - Correct aggregation of mutation counts by ProgramTask and friends
+     for nested and pipeline joins [see notes above on this issue].
 
-AbstractTripleStore
-	
-	-newJoinNexus : choice of the readTimestamp.
-
-RDFJoinNexusFactory
-
-	- indexManager:joinNexus cache.
-
-	- setReadTimestamp(timestamp)
-
-RDFJoinNexus
-	
-	- runDistributedProgram(IStep)
-
-ProgramTask
-
-   Whether or not they advance the readTimestamp before/after flushing
-   the buffer.  Ideally, each rule will read from the [lastCommitTime]
-   (expressed as a read-consistent timestamp).
-
-	executeMutation()
-
-	executeClosure()
-	
-Future<RuleStats> AbstractStepTask:submitToConcurrencyManager()
-
-   Chooses the timestamp for the AbstractTask.
-
-   Note: mutation tasks run with the writeTimestamp since they would
-   otherwise block when the buffer was full and needed to be flushed.
-   
-   However, this should be done differently for the JoinMaster since
-   the JoinTask will be read-only and writes will be unisolated.
-
-   It seems like this is only one of several ways in which the best
-   approach for LTS/LDS does not generalize nicely to EDS/JDS.  Maybe
-   these should be factored apart?
-
-DefaultRuleTaskFactory
-
-   Responsible for using either the JoinMasterTask or the
-   NestedSubqueryWithJoinThreadsTask.
+   - Try reducing the latency of the write service to 0 if nothing is
+     in the queue and to 10ms if there is something in the queue.  The
+     chance for tasks to complete is really during each commit since
+     they are running asynchronously.
 
 ============================================================
 Conferences and papers:
@@ -3247,3 +3216,72 @@ junit.framework.AssertionFailedError: Wrong key: nvisited=2611, expecting=[128, 
 ------------------------------------------------------------
 
 Commit notes:
+
+Note: Closure is not still not correct for LTS/LDS/EDS on pipeline
+joins.  In all cases the pipeline join overgenerates by the same #of
+inferences.  Debug for LTS first since this is easier.
+
+Done. I was failing to set the predicateId on the SPOPredicate and
+then I was failing to use the new SPOPredicate with the predicateId.
+This meant that the pipeline was always using the scale-out indices.
+
+Done. RDFJoinNexus#getTailAccessPath() was not calling init() on the
+SPOAccessPath.
+
+Done. Was not tracking the mutationCount for the pipeline join in
+JoinTask#flushAndCloseBuffersAndAwaitSinks()
+
+Done. Run LTS closure as UNISOLATED.  This should work for both nested
+and pipeline joins, but we have to make JoinTask a simple callable
+first and make sure that the MutationTask sets up all necessary lock
+requests for the joins (it should since it already does this for
+nested subquery).
+
+Done. Run LDS/EDS/JDS closure as read-consistent and advance the
+readTimestamp before each mutation task to the lastCommitTime.
+
+Done. EDS closure is slow because we are not aggregating the solution
+chunks which is resulting in a large #of sequential inserts of small
+chunks on the relation.  [Modified AbstractSolutionBuffer#flush(...)
+to aggregate the caller's chunks into a single perfect fit chunk.]
+
+Done. LDS closure and query run now that JoinTask is no longer an
+AbstractTask.
+
+Done. Fix LDS query (read-only access to the row store was throwing an
+UnsupportedOperationException from
+AbstractJournal#getIndex(name,timestamp)).  A commitTime was being
+passed in as a timestamp without using
+TimestampUtility.asHistoricalRead(commitTime).
+
+--------------------
+Places of interest for JOINs.
+
+AbstractTripleStore
+	
+	-newJoinNexus : choice of the readTimestamp.
+
+RDFJoinNexusFactory
+
+	- indexManager:joinNexus cache.
+
+	- setReadTimestamp(timestamp)
+
+RDFJoinNexus
+	
+	- runDistributedProgram(IStep)
+
+ProgramTask
+
+   Advances the readTimestamp before running each mutation step.
+
+	executeMutation()
+	
+Future<RuleStats> AbstractStepTask:submitToConcurrencyManager()
+
+   Chooses the timestamp for the AbstractTask.
+
+DefaultRuleTaskFactory
+
+   Responsible for using either the JoinMasterTask or the
+   NestedSubqueryWithJoinThreadsTask.

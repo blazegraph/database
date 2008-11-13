@@ -98,11 +98,8 @@ public class DefaultRuleTaskFactory implements IRuleTaskFactory, Externalizable 
                 return new DistributedJoinMasterTask(rule, joinNexus, buffer);
 
             } else {
-                
-                /*
-                 * FIXME We need a class that handles LDS query or closure for
-                 * pipeline joins.
-                 */
+
+                // local joins using a pipeline strategy.
                 return new LocalJoinMasterTask(rule, joinNexus, buffer);
                 
             }

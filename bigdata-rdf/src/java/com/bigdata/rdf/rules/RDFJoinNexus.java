@@ -91,7 +91,6 @@ import com.bigdata.relation.rule.eval.AbstractSolutionBuffer;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.DefaultRangeCountFactory;
 import com.bigdata.relation.rule.eval.EmptyProgramTask;
-import com.bigdata.relation.rule.eval.IEvaluationPlan;
 import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
@@ -710,6 +709,24 @@ public class RDFJoinNexus implements IJoinNexus {
 
         if (predicate.getPartitionId() != -1) {
 
+            if(indexManager instanceof IBigdataFederation) {
+                
+                /*
+                 * This will happen if you fail to re-create the JoinNexus
+                 * within the target execution environment.
+                 * 
+                 * This is disallowed because the predicate specifies an index
+                 * partition and expects to have access to the local index
+                 * objects for that index partition. However, the index
+                 * partition is only available when running inside of the
+                 * ConcurrencyManager and when using the IndexManager exposed by
+                 * the ConcurrencyManager to its tasks.
+                 */
+                
+                throw new IllegalStateException();
+                
+            }
+            
             /*
              * This handles a request for an access path that is restricted to a
              * specific index partition.
@@ -739,6 +756,7 @@ public class RDFJoinNexus implements IJoinNexus {
              */
             final IKeyOrder keyOrder = SPORelation.getKeyOrder(predicate);
 
+            // The name of the desired index partition.
             final String name = DataService.getIndexPartitionName(namespace
                     + keyOrder.getIndexName(), predicate.getPartitionId());
             
@@ -757,7 +775,7 @@ public class RDFJoinNexus implements IJoinNexus {
             
             return new SPOAccessPath(indexManager, timestamp, predicate,
                     keyOrder, ndx, flags, getChunkOfChunksCapacity(),
-                    getChunkCapacity(), getFullyBufferedReadThreshold());
+                    getChunkCapacity(), getFullyBufferedReadThreshold()).init();
             
         }
         
@@ -1292,7 +1310,7 @@ public class RDFJoinNexus implements IJoinNexus {
      * returned by this method.
      */
     @SuppressWarnings("unchecked")
-    public IBuffer<ISolution[]> newInsertBuffer(IMutableRelation relation) {
+    public IBuffer<ISolution[]> newInsertBuffer(final IMutableRelation relation) {
 
         if (getAction() != ActionEnum.Insert)
             throw new IllegalStateException();
@@ -1332,7 +1350,7 @@ public class RDFJoinNexus implements IJoinNexus {
      * returned by this method.
      */
     @SuppressWarnings("unchecked")
-    public IBuffer<ISolution[]> newDeleteBuffer(IMutableRelation relation) {
+    public IBuffer<ISolution[]> newDeleteBuffer(final IMutableRelation relation) {
 
         if (getAction() != ActionEnum.Delete)
             throw new IllegalStateException();
@@ -1457,7 +1475,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
     }
     
-    public long runMutation(IStep step)
+    public long runMutation(final IStep step)
             throws Exception {
 
         if (step == null)

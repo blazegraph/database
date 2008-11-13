@@ -132,7 +132,15 @@ public class MappedBufferStrategy extends DiskBackedBufferStrategy {
                     + file.getAbsoluteFile()
                     + " - marked for deletion on exit");
 
-            file.deleteOnExit();
+            try {
+                file.deleteOnExit();
+            } catch(NullPointerException ex) {
+                /*
+                 * Ignore NPE caused by a known Sun bug.
+                 * 
+                 * See http://bugs.sun.com/view_bug.do?bug_id=6526376
+                 */
+            }
             
         }
         

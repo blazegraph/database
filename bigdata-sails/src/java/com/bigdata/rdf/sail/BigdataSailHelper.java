@@ -28,7 +28,13 @@ import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.relation.locator.RelationSchema;
+import com.bigdata.service.AbstractFederation;
+import com.bigdata.service.EmbeddedClient;
+import com.bigdata.service.EmbeddedFederation;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.LocalDataServiceClient;
+import com.bigdata.service.LocalDataServiceFederation;
+import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.JiniServicesHelper;
 
 /**
@@ -441,11 +447,32 @@ public class BigdataSailHelper {
         
     }
     
+    private static enum FederationEnum {
+        
+        LTS,
+        LDS,
+        EDS,
+        JDS;
+        
+    }
+    
     /**
      * Utility class.
+     * <p>
+     * Note: The LTS (local triple store) mode is inferred when the filename is
+     * a plain file rather than a directory. However, when the filename
+     * identifies a directory then you must specify whether the directory should
+     * be interpreted as a {@link LocalDataServiceFederation} (LDS), an
+     * {@link EmbeddedFederation} (EDS), or a {@link JiniFederation} (JDS).
+     * <p>
+     * Note: The namespace identifies which triple store you are accessing and
+     * defaults to "kb".
+     * <p>
+     * Note: The timestamp identifies which commit point you are accessing and
+     * defaults to the {@link ITx#UNISOLATED} view.
      * 
      * @param args
-     *            <i>filename</i> (<i>namespace</i> (<i>timestamp</i>))
+     *            <i>filename</i> ((LTS|LDS|EDS|JDS (<i>namespace</i> (<i>timestamp</i>)))
      * 
      * @throws SailException
      */
@@ -453,7 +480,7 @@ public class BigdataSailHelper {
        
         if (args.length == 0) {
 
-            System.err.println("usage: filename (namespace (timestamp))");
+            System.err.println("usage: filename (LTS|LDS|EDS|JDS (namespace (timestamp)))");
 
             System.exit(1);
             
@@ -461,37 +488,122 @@ public class BigdataSailHelper {
         
         final String filename = args[0];
         
-        final String namespace = args.length > 1 ? args[1] : "kb";
+        final File file = new File(filename);
+        
+        final FederationEnum fedType = args.length > 1 ? FederationEnum
+                .valueOf(args[1]) : (!file.isDirectory() ? FederationEnum.LTS
+                : null);
+                
+        if (fedType == null) {
 
-        final long timestamp = args.length > 2 ? Long.valueOf(args[2]) : ITx.UNISOLATED;
-        
-        final BigdataSailHelper helper = new BigdataSailHelper();
-        
-        System.out.println("filename: "+filename);
-        
-        final BigdataSail sail;
-        final JiniServicesHelper jiniServicesHelper;
-        
-        if(!new File(filename).isDirectory()) {
+            System.err.println("Must specify the federation type: dir=" + filename);
 
-            // Presume a simple Journal.
+            System.exit(1);
             
+        }
+        
+        if (file.isDirectory() && FederationEnum.LTS.equals(fedType)) {
+
+            System.err.println("LTS is a plain file, not a directory: dir="
+                    + filename);
+
+            System.exit(1);
+            
+        }
+        
+        if (!file.isDirectory() && !FederationEnum.LTS.equals(fedType)) {
+
+            System.err.println(fedType
+                    + "requires a directory, not a plain file: file="
+                    + filename);
+
+            System.exit(1);
+
+        }
+        
+        final String namespace = args.length > 2 ? args[2] : "kb";
+
+        final long timestamp = args.length > 3 ? Long.valueOf(args[3])
+                : ITx.UNISOLATED;
+
+        final BigdataSailHelper helper = new BigdataSailHelper();
+
+        System.out.println("filename: " + filename);
+
+        final BigdataSail sail;
+        // Note: iff we need to shutdown the federation in finally{}
+        final AbstractFederation fed;
+        // Note: iff JDS.
+        final JiniServicesHelper jiniServicesHelper;
+
+        switch (fedType) {
+
+        case LTS:
+
             sail = helper.getSail(filename, namespace, timestamp);
+
+            fed = null;
             
             jiniServicesHelper = null;
+
+            break;
+
+        case LDS: {
+
+            // @todo make sure federation is closed when main exits.
+            jiniServicesHelper = null;
+
+            final Properties properties = new Properties();
             
-        } else {
+            properties.setProperty(
+                    com.bigdata.service.LocalDataServiceClient.Options.DATA_DIR,
+                    filename);
             
-            // Presume a Jini config directory (@todo also handle LDS/EDS).
-            
-            jiniServicesHelper = new JiniServicesHelper(filename);
-            
-            jiniServicesHelper.start();
-            
-            final IBigdataFederation fed = jiniServicesHelper.client.connect(); 
-            
+            fed = new LocalDataServiceClient(properties).connect();
+
             sail = helper.getSail(fed, namespace, timestamp);
+
+            break;
+        
+        }
             
+        case EDS: {
+
+            jiniServicesHelper = null;
+
+            final Properties properties = new Properties();
+            
+            properties.setProperty(
+                    com.bigdata.service.EmbeddedClient.Options.DATA_DIR,
+                    filename);
+            
+            fed = new EmbeddedClient(properties).connect();
+
+            sail = helper.getSail(fed, namespace, timestamp);
+
+            break;
+            
+        }
+            
+        case JDS:
+
+            // Should be a Jini config directory
+
+            jiniServicesHelper = new JiniServicesHelper(filename);
+
+            jiniServicesHelper.start();
+
+            // don't shutdown in finally{} - jiniServicesHelper will do shutdown instead.
+            fed = null;
+
+            sail = helper.getSail(jiniServicesHelper.client.connect(),
+                    namespace, timestamp);
+
+            break;
+
+        default:
+            throw new AssertionError();
+
         }
 
         try {
@@ -507,10 +619,10 @@ public class BigdataSailHelper {
             if(true) {
                 final Properties p = new Properties();
 
-//                p.setProperty(Options.NESTED_SUBQUERY, "true");
-                p.setProperty(Options.CHUNK_CAPACITY, "100");
-                p.setProperty(Options.FULLY_BUFFERED_READ_THRESHOLD, "1000");
-                p.setProperty(Options.MAX_PARALLEL_SUBQUERIES, "0");
+                p.setProperty(Options.NESTED_SUBQUERY, "true");
+//                p.setProperty(Options.CHUNK_CAPACITY, "100");
+//                p.setProperty(Options.FULLY_BUFFERED_READ_THRESHOLD, "1000");
+//                p.setProperty(Options.MAX_PARALLEL_SUBQUERIES, "0");
 //                p.setProperty(Options.INCLUDE_INFERRED, "true");
                 p.setProperty(Options.QUERY_TIME_EXPANDER, "false");
 
@@ -522,6 +634,12 @@ public class BigdataSailHelper {
 
             sail.shutDown();
 
+            if( fed != null) {
+                
+                fed.shutdownNow();
+                
+            }
+            
             if (jiniServicesHelper != null) {
                 
                 jiniServicesHelper.shutdown();

@@ -293,17 +293,38 @@ public class MutationTask extends AbstractStepTask {
         }
 
         /*
-         * Atomic set of the total mutation count for all buffers on which the
-         * set of step(s) were writing.
+         * Note: For a distributed "pipeline" join, the JoinTask(s) for the last
+         * join dimension each create their own buffers onto which they write
+         * their solution. This is done in order to prevent all data from
+         * flowing through the join master. This means that the buffer that is
+         * being flushed above was never written on, so the [mutationCount] as
+         * computed above will be zero for a _distributed_ pipeline join.
+         * 
+         * @todo while this avoids an assertion error for the pipeline join, I
+         * need to explore more carefully how each join implementation reports
+         * the mutation count and how it is aggregated throughput the program
+         * execution.
          */
+        
+//        if (mutationCount > 0) {
+        
+            /*
+             * Atomic set of the total mutation count for all buffers on which
+             * the set of step(s) were writing [but only if the task did not
+             * update the mutationCount itself].
+             */
 
-        if (!totals.mutationCount.compareAndSet(0L, mutationCount)) {
-
-            throw new AssertionError("Already set: mutationCount="
-                    + mutationCount+", task="+this);
+//            if (!
+                    totals.mutationCount.compareAndSet(0L, mutationCount);
+//                    ) {
+//
+//                throw new AssertionError("Already set: mutationCount="
+//                        + mutationCount + ", task=" + this);
+//
+//            }
             
-        }
-
+//        }
+        
         return mutationCount;
         
     }
