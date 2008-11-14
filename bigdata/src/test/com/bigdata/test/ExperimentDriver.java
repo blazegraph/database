@@ -1248,26 +1248,34 @@ public class ExperimentDriver {
      */
     public static void main(String[] args) throws Exception {
 
-        if(args.length==0) {
-            
-            System.err.println("usage: <experiment.xml> #runs?");
-            
-            System.exit( 1 );
-            
+        if (args.length == 0) {
+
+            System.err.println("usage: <experiment.xml> (#runs? (randomize?))");
+
+            System.exit(1);
+
         }
-        
+
         Experiment exp = new DTDParserHelper().parse(new InputSource(
                 new FileReader(args[0])));
-        
+
         int nruns = 1;
         
-        if(args.length==2) {
+        if (args.length == 2) {
 
             nruns = Integer.parseInt(args[1]);
             
         }
         
-        exp.run(true/*randomize*/,nruns);
+        boolean randomize = true;
+
+        if (args.length == 3) {
+
+            randomize = Boolean.parseBoolean(args[2]);
+
+        }
+        
+        exp.run(randomize, nruns);
         
     }
 
