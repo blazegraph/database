@@ -100,17 +100,17 @@ public class BigdataSailHelper {
      *            The namespace of the triple store.
      * @param timestamp
      *            The timestamp of the view.
-     *            
+     * 
      * @return The SAIL.
      */
     public BigdataSail getSail(String filename, String namespace, long timestamp) {
-    
+
         final Properties properties = new Properties();
-        
+
         properties.setProperty(Options.FILE, filename);
-        
+
         final Journal journal = new Journal(properties);
-        
+
         System.err.println("createTime="+journal.getRootBlockView().getCreateTime());
         System.err.println("lastCommitTime="+journal.getLastCommitTime());
         
@@ -446,7 +446,13 @@ public class BigdataSailHelper {
         System.out.println(md.getTupleSerializer().toString());
         
     }
-    
+
+    /**
+     * Typesafe enumeration of the deployment models.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
     private static enum FederationEnum {
         
         LTS,
@@ -550,7 +556,6 @@ public class BigdataSailHelper {
 
         case LDS: {
 
-            // @todo make sure federation is closed when main exits.
             jiniServicesHelper = null;
 
             final Properties properties = new Properties();
