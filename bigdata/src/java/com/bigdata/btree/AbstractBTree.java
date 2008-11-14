@@ -1324,7 +1324,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
 
             final BloomFilter filter = getBloomFilter();
 
-            if (bloomFilter != null) {
+            if (filter != null) {
 
                 if (getEntryCount() > filter.getMaxN()) {
 
