@@ -83,6 +83,7 @@ import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.relation.locator.IResourceLocator;
@@ -1803,6 +1804,16 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
             UnsynchronizedOutputBuffer<E> {
 
         private final IJoinNexus joinNexus;
+        /**
+         * An optional filter on the generated {@link ISolution}s. This filter
+         * is obtained from {@link IJoinNexus#getSolutionFilter()}. When non-<code>null</code>,
+         * {@link #handleChunk(IBindingSet[])} applies the filter to keep
+         * {@link ISolution}s licensed by the {@link IBindingSet}s that do not
+         * meet constraint imposed by that filter. (For RDF, this is used to
+         * keep literals out of the subject position, keep axioms from being
+         * written into the DB by inference, etc.)
+         */
+        private final IElementFilter<ISolution> solutionFilter;
         
         public UnsynchronizedSolutionBuffer(final JoinTask joinTask,
                 final IJoinNexus joinNexus, final int capacity) {
@@ -1810,6 +1821,9 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
             super(joinTask, capacity);
 
             this.joinNexus = joinNexus;
+            
+            // Note: MAY be null.
+            this.solutionFilter = joinNexus.getSolutionFilter();
             
         }
         
@@ -1838,12 +1852,12 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
                     .getSolutionBuffer();
 
             final IRule rule = joinTask.rule;
+            
+            ISolution[] a = new ISolution[chunk.length];
 
-            final int naccepted = chunk.length;
-            
-            final ISolution[] a = new ISolution[naccepted];
-            
-            for (int i = 0; i < naccepted; i++) {
+            int naccepted = 0;
+
+            for (int i = 0; i < chunk.length; i++) {
 
                 // an accepted binding set.
                 final IBindingSet bindingSet = chunk[i];
@@ -1857,10 +1871,29 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
                 final ISolution solution = joinNexus.newSolution(rule,
                         bindingSet);
 
-                a[i] = solution;
-                
+                if (solutionFilter == null || solutionFilter.accept(solution)) {
+
+                    a[naccepted++] = solution;
+
+                }
+
             }
 
+            if (naccepted == 0)
+                return;
+            
+            if (naccepted < chunk.length) {
+
+                // Make the array dense and snug.
+                
+                final ISolution[] b = new ISolution[naccepted];
+                
+                System.arraycopy(a, 0, b, 0, naccepted);
+                
+                a = b;
+                
+            }
+            
             /*
              * Add the chunk to the [solutionBuffer].
              * 
@@ -1869,6 +1902,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
              * buffer and a SLICE been satisified causing the [solutionBuffer]
              * to be asynchronously closed by the query consumer.
              */
+
             solutionBuffer.add(a);
 
             joinTask.stats.bindingSetChunksOut++;

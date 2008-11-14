@@ -34,10 +34,11 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.TripleStoreUtility;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
- * Test suite for {@link AbstractRuleTestCase#modelsEqual(AbstractTripleStore, AbstractTripleStore)}
+ * Test suite for {@link TripleStoreUtility#modelsEqual(AbstractTripleStore, AbstractTripleStore)}
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -112,7 +113,7 @@ public class TestModelsEqual extends AbstractRuleTestCase {
 
             // verify all in store1 also found in store2.
             {
-                final ICloseableIterator<BigdataStatement> notFoundItr = notFoundInTarget(store1,
+                final ICloseableIterator<BigdataStatement> notFoundItr = TripleStoreUtility.notFoundInTarget(store1,
                         store2);
                 try {
                     assertFalse(notFoundItr.hasNext());
@@ -123,7 +124,7 @@ public class TestModelsEqual extends AbstractRuleTestCase {
 
             // verify all in store2 also found in store1.
             {
-                final ICloseableIterator<BigdataStatement> notFoundItr = notFoundInTarget(store2,
+                final ICloseableIterator<BigdataStatement> notFoundItr = TripleStoreUtility.notFoundInTarget(store2,
                         store1);
                 try {
                     assertFalse(notFoundItr.hasNext());
@@ -133,7 +134,7 @@ public class TestModelsEqual extends AbstractRuleTestCase {
             }
             
             // high-level test.
-            assertTrue(modelsEqual(store1, store2));
+            assertTrue(TripleStoreUtility.modelsEqual(store1, store2));
 
             // now remove one statement from store2.
             {
@@ -154,7 +155,7 @@ public class TestModelsEqual extends AbstractRuleTestCase {
 
             // verify one in store1 NOT FOUND in store2.
             {
-                final ICloseableIterator<BigdataStatement> notFoundItr = notFoundInTarget(
+                final ICloseableIterator<BigdataStatement> notFoundItr = TripleStoreUtility.notFoundInTarget(
                         store1, store2);
                 int nnotFound = 0;
                 try {
@@ -170,7 +171,7 @@ public class TestModelsEqual extends AbstractRuleTestCase {
 
             // verify all in store2 found in store1.
             {
-                final ICloseableIterator<BigdataStatement> notFoundItr = notFoundInTarget(
+                final ICloseableIterator<BigdataStatement> notFoundItr = TripleStoreUtility.notFoundInTarget(
                         store2, store1);
                 try {
                     assertFalse(notFoundItr.hasNext());
@@ -180,7 +181,7 @@ public class TestModelsEqual extends AbstractRuleTestCase {
             }
             
             // high-level test.
-            assertFalse(modelsEqual(store1, store2));
+            assertFalse(TripleStoreUtility.modelsEqual(store1, store2));
 
         } finally {
             store1.close();

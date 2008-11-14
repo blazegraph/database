@@ -68,7 +68,9 @@ public class DataLoader {
     /**
      * Logger.
      */
-    public static final Logger log = Logger.getLogger(DataLoader.class);
+    protected static final Logger log = Logger.getLogger(DataLoader.class);
+
+    protected static final boolean INFO = log.isInfoEnabled();
 
     private final boolean verifyData;
 
@@ -218,7 +220,8 @@ public class DataLoader {
 
         if (buffer != null) {
 
-            log.info("");
+            if(INFO)
+                log.info("");
             
             buffer.flush();
             
@@ -439,21 +442,24 @@ public class DataLoader {
 
         if (database == null)
             throw new IllegalArgumentException();
-        
+
         verifyData = Boolean.parseBoolean(properties.getProperty(
                 Options.VERIFY_DATA, Options.DEFAULT_VERIFY_DATA));
-        
-        log.info(Options.VERIFY_DATA+"="+verifyData);
-        
-        commitEnum = CommitEnum.valueOf(properties.getProperty(
-                Options.COMMIT, Options.DEFAULT_COMMIT));
-        
-        log.info(Options.COMMIT+"="+commitEnum);
 
-        closureEnum = ClosureEnum.valueOf(properties.getProperty(Options.CLOSURE,
-                Options.DEFAULT_CLOSURE));
+        if (INFO)
+            log.info(Options.VERIFY_DATA + "=" + verifyData);
 
-        log.info(Options.CLOSURE+"="+closureEnum);
+        commitEnum = CommitEnum.valueOf(properties.getProperty(Options.COMMIT,
+                Options.DEFAULT_COMMIT));
+
+        if (INFO)
+            log.info(Options.COMMIT + "=" + commitEnum);
+
+        closureEnum = ClosureEnum.valueOf(properties.getProperty(
+                Options.CLOSURE, Options.DEFAULT_CLOSURE));
+
+        if (INFO)
+            log.info(Options.CLOSURE + "=" + closureEnum);
 
         bufferCapacity = Integer.parseInt(properties.getProperty(
                 Options.BUFFER_CAPACITY, Options.DEFAULT_BUFFER_CAPACITY));        
@@ -483,7 +489,8 @@ public class DataLoader {
         flush = Boolean.parseBoolean(properties.getProperty(
                 Options.FLUSH, Options.DEFAULT_FLUSH));
         
-        log.info(Options.FLUSH+"="+flush);
+        if(INFO)
+            log.info(Options.FLUSH+"="+flush);
         
     }
 
@@ -537,7 +544,7 @@ public class DataLoader {
         if (resource.length != rdfFormat.length)
             throw new IllegalArgumentException();
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("commit=" + commitEnum + ", closure=" + closureEnum
                     + ", resource=" + Arrays.toString(resource));
 
@@ -570,7 +577,7 @@ public class DataLoader {
         
         if (commitEnum == CommitEnum.Batch) {
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("Commit after batch of "+resource.length+" resources");
 
             long beginCommit = System.currentTimeMillis();
@@ -579,12 +586,12 @@ public class DataLoader {
 
             totals.commitTime += System.currentTimeMillis() - beginCommit;
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("commit: latency="+totals.commitTime+"ms");
 
         }
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("Loaded " + resource.length+" resources: "+totals);
         
         return totals;
@@ -653,7 +660,8 @@ public class DataLoader {
         if (url == null)
             throw new IllegalArgumentException();
         
-        log.info("loading: " + url);
+        if(INFO)
+            log.info("loading: " + url);
 
         final InputStream is = url.openStream();
         
@@ -687,7 +695,7 @@ public class DataLoader {
     protected LoadStats loadData2(String resource, String baseURL,
             RDFFormat rdfFormat, boolean endOfBatch) throws IOException {
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("loading: " + resource);
 
         // try the classpath
@@ -882,7 +890,8 @@ public class DataLoader {
             
             public void processingNotification( RioLoaderEvent e ) {
                 
-                log.info
+                if (INFO)
+                    log.info
                     ( e.getStatementsProcessed() + 
                       " stmts added in " + 
                       (e.getTimeElapsed() / 1000d) +
@@ -921,7 +930,7 @@ public class DataLoader {
                  * @todo batch closure logically belongs in the outer method.
                  */
                 
-                if (log.isInfoEnabled())
+                if (INFO)
                     log.info("Computing closure.");
                 
                 stats.closureStats.add(doClosure());
@@ -931,7 +940,8 @@ public class DataLoader {
             // commit the data.
             if (commitEnum == CommitEnum.Incremental) {
 
-                log.info("Commit after each resource");
+                if(INFO)
+                    log.info("Commit after each resource");
 
                 long beginCommit = System.currentTimeMillis();
 
@@ -939,13 +949,15 @@ public class DataLoader {
 
                 stats.commitTime = System.currentTimeMillis() - beginCommit;
 
-                log.info("commit: latency="+stats.commitTime+"ms");
+                if(INFO)
+                    log.info("commit: latency="+stats.commitTime+"ms");
                 
             }
             
             stats.totalTime = System.currentTimeMillis() - begin;
             
-            log.info( stats.toString());
+            if (INFO)
+                log.info(stats.toString());
 
             return stats;
             

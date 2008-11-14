@@ -3,7 +3,6 @@ package com.bigdata.relation.rule.eval;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AbstractArrayBuffer;
-import com.bigdata.relation.accesspath.ChunkConsumerIterator;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ChunkedResolvingIterator;
@@ -52,7 +51,13 @@ abstract public class AbstractSolutionBuffer<R> extends
     }
 
     /**
-     * Delegates to {@link #flush(IChunkedOrderedIterator)}.
+     * Combines chunks of solutions together into a single chunk and then
+     * delegates to {@link #flush(IChunkedOrderedIterator)}.
+     * <p>
+     * Note: Combining chunks together is a huge performance win if the source
+     * chunks tend to be small (100). For example, this is true for scale-out
+     * joins such as LUBM U1 EDS. There the performance gain is better than
+     * 20:1.
      */
     @Override
     final protected long flush(final int n, final ISolution<R>[][] a) {
@@ -60,43 +65,32 @@ abstract public class AbstractSolutionBuffer<R> extends
         final IChunkedOrderedIterator<ISolution<R>> itr;
 
         /*
-         * Note: Combinine chunks together is a huge performance win if the
-         * source chunks tend to be small. For example, this is true for
-         * scale-out joins such as LUBM U1 EDS.  The performance gain is
-         * an order of magnitude (240secs vs 20secs). 
+         * Combine the chunks together.
          */
-        if (true) {
-
-            /*
-             * Combine the chunks together.
-             */
-            // count #of elements in all chunks.
-            int m = 0;
-            for (int i = 0; i < n; i++) {
-                m += a[i].length;
-            }
-            // allocate perfect fit array.
-            final ISolution<R>[] b = new ISolution[m];
-            // combine all elements into a single chunk.
-            int k = 0;
-            for (int i = 0; i < n; i++) {
-                final ISolution<R>[] tmp = a[i];
-                System.arraycopy(tmp, 0, b, k, tmp.length);
-                k += tmp.length;
-            }
-            // iterator on that single combined chunk.
-            itr = new ChunkedArrayIterator<ISolution<R>>(m, b, null/* keyOrder */);
-            
-        } else {
-
-            /*
-             * Handle each chunk by itself.
-             */
-            
-            itr = new ChunkConsumerIterator<ISolution<R>>(
-                    new ArrayIterator<ISolution<R>[]>(n, a), null/* keyOrder(unknown) */);
-
+        // count #of elements in all chunks.
+        int m = 0;
+        for (int i = 0; i < n; i++) {
+            m += a[i].length;
         }
+        // allocate perfect fit array.
+        final ISolution<R>[] b = new ISolution[m];
+        // combine all elements into a single chunk.
+        int k = 0;
+        for (int i = 0; i < n; i++) {
+            final ISolution<R>[] tmp = a[i];
+            System.arraycopy(tmp, 0, b, k, tmp.length);
+            k += tmp.length;
+        }
+        // iterator on that single combined chunk.
+        itr = new ChunkedArrayIterator<ISolution<R>>(m, b, null/* keyOrder */);
+
+        // /*
+        // * Handle each chunk by itself.
+        // */
+        //            
+        // itr = new ChunkConsumerIterator<ISolution<R>>(
+        // new ArrayIterator<ISolution<R>[]>(n, a), null/* keyOrder(unknown)
+        // */);
 
         return flush(itr);
         
