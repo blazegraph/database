@@ -54,6 +54,7 @@ import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.TripleStoreUtility;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 
@@ -169,7 +170,7 @@ public class TestCompareFullAndFastClosure extends AbstractRuleTestCase {
              * should have the same statements in the data without the
              * backchainer.
              */
-            assertTrue(modelsEqual(store1, store2));
+            assertTrue(TripleStoreUtility.modelsEqual(store1, store2));
 
         } finally {
 

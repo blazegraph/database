@@ -2843,9 +2843,11 @@ JOIN optimizations:
     and work through kinks for proxies; (d) Load data set on cluster;
     (e) test pipeline query w/o type resource expander.
 
-  - Full text search queries with SLICE are slow.  The solution is to
-    rewrite the Sesame query before evaluation so that we can optimize
-    SLICE by using native JOINs.
+  - Full text search queries with SLICE are slow.  The full text index
+    itself is fast.  The problem is that we overgenerate solutions
+    before Sesame can close the iterator so we do too much work.  The
+    solution is to rewrite the Sesame query before evaluation so that
+    we can optimize SLICE by using native JOINs.
 
   - Lexicon resolution is slow.
 
@@ -2902,13 +2904,6 @@ JOIN optimizations:
   
   - JoinMaster
 
-    - Modify RDFJoinNexus to execute the ProgramTask on the client.    
-
-    - Modify ProgramTask to create the JoinMasterTask on the client.
-      The JoinMasterTask will then create the JoinTasks on the data
-      service hosting each index partition on which the query will
-      read.
-
     - Handle SLICE at the query buffer.
 
     - Consider whether it is possible to reduce the costs associated
@@ -2933,17 +2928,13 @@ JOIN optimizations:
       indices. Its really quite a challenge to do this where the
       search terms become bound in a join and then applied.
 
-      Note: The easy way to handle this when the search terms are
-      bound first is to generate one rule per query result and then
-      run those rules as a program.
-
     - Revisit handling of (foo type resource) expansion.  The
       expansion needs to be done at the query buffer level since it
       requires access to the scale-out index view, not the local index
       partition.  Note that there will also be an interaction with
       SLICE.
 
-    - Modify the distributed federation to return an
+    - [JDS] Modify the distributed federation to return an
       IAsynchronousIterator using the approach that we are already
       using for Future so that the interface is preserved (the
       returned proxy does not declare the IOExceptions).
@@ -3083,26 +3074,10 @@ Executor services
   - Refactor the limited parallelism service to use a proxied
     RunnableFuture for map/reduce, CDL, pipeline joins, etc.
 
-  - Simplify proxying of iterators and other types [JDS].
-
 ============================================================
 CLOSURE CORRECTNESS
 
-x. Validate LTS/LDS/EDS/JDS query for both nested and pipeline joins.
-
-2. fix overgeneration by the pipeline join (all cases).
-
-   - Write a unit test based on LUBM U1 to verify load+closure,
-     restart, and query for each of LTS, LDS, EDS, and JDS.  The test
-     should report out the load, closure, and query times and also
-     whether or not the same #of triples was loaded, #of triples was
-     inferred by closure (if enabled by the properties), and #of
-     answers was produced by query.  This will mean bundling the
-     generated LUBM U1 data, which should be fine.  In fact, the test
-     can have as inputs a set of properties, a set of file(s), and a
-     set of queries.  This could be used to readily verify consistency
-     and cross-check performance for all tripleStore modes on any
-     dataset.
+x. write unit tests
 
    - Write unit tests for access to the global row store and bigdata
      file system from read-only tasks running on the concurrency
@@ -3217,71 +3192,3 @@ junit.framework.AssertionFailedError: Wrong key: nvisited=2611, expecting=[128, 
 
 Commit notes:
 
-Note: Closure is not still not correct for LTS/LDS/EDS on pipeline
-joins.  In all cases the pipeline join overgenerates by the same #of
-inferences.  Debug for LTS first since this is easier.
-
-Done. I was failing to set the predicateId on the SPOPredicate and
-then I was failing to use the new SPOPredicate with the predicateId.
-This meant that the pipeline was always using the scale-out indices.
-
-Done. RDFJoinNexus#getTailAccessPath() was not calling init() on the
-SPOAccessPath.
-
-Done. Was not tracking the mutationCount for the pipeline join in
-JoinTask#flushAndCloseBuffersAndAwaitSinks()
-
-Done. Run LTS closure as UNISOLATED.  This should work for both nested
-and pipeline joins, but we have to make JoinTask a simple callable
-first and make sure that the MutationTask sets up all necessary lock
-requests for the joins (it should since it already does this for
-nested subquery).
-
-Done. Run LDS/EDS/JDS closure as read-consistent and advance the
-readTimestamp before each mutation task to the lastCommitTime.
-
-Done. EDS closure is slow because we are not aggregating the solution
-chunks which is resulting in a large #of sequential inserts of small
-chunks on the relation.  [Modified AbstractSolutionBuffer#flush(...)
-to aggregate the caller's chunks into a single perfect fit chunk.]
-
-Done. LDS closure and query run now that JoinTask is no longer an
-AbstractTask.
-
-Done. Fix LDS query (read-only access to the row store was throwing an
-UnsupportedOperationException from
-AbstractJournal#getIndex(name,timestamp)).  A commitTime was being
-passed in as a timestamp without using
-TimestampUtility.asHistoricalRead(commitTime).
-
---------------------
-Places of interest for JOINs.
-
-AbstractTripleStore
-	
-	-newJoinNexus : choice of the readTimestamp.
-
-RDFJoinNexusFactory
-
-	- indexManager:joinNexus cache.
-
-	- setReadTimestamp(timestamp)
-
-RDFJoinNexus
-	
-	- runDistributedProgram(IStep)
-
-ProgramTask
-
-   Advances the readTimestamp before running each mutation step.
-
-	executeMutation()
-	
-Future<RuleStats> AbstractStepTask:submitToConcurrencyManager()
-
-   Chooses the timestamp for the AbstractTask.
-
-DefaultRuleTaskFactory
-
-   Responsible for using either the JoinMasterTask or the
-   NestedSubqueryWithJoinThreadsTask.

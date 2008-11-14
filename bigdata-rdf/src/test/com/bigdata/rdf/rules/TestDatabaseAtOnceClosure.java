@@ -70,6 +70,7 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.TripleStoreUtility;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
@@ -448,9 +449,9 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
              * entailments) into a TempTripleStore and then compare that
              * TempTripleStore to the data from Sesame2.
              */
-            final TempTripleStore tmp = bulkExport(closure);
+            final TempTripleStore tmp = TripleStoreUtility.bulkExport(closure);
 
-            assertTrue(modelsEqual(groundTruth, tmp));
+            assertTrue(TripleStoreUtility.modelsEqual(groundTruth, tmp));
             
             tmp.closeAndDelete();
             

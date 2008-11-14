@@ -76,6 +76,10 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
         implements IStatementBuffer<F> {
 
     protected static final Logger log = Logger.getLogger(AbstractStatementBuffer.class);
+
+    protected static final boolean INFO = log.isInfoEnabled();
+
+    protected static final boolean DEBUG = log.isDebugEnabled();
     
     /**
      * The database against which the {@link Value}s will be resolved (or
@@ -411,8 +415,7 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
                         .getStatementType() : StatementEnum.Explicit));
 
         if (deferredStatementBuffer != null
-                && e.getSubject() instanceof BNode
-                || e.getObject() instanceof BNode) {
+                && (e.getSubject() instanceof BNode || e.getObject() instanceof BNode)) {
 
             /*
              * When statement identifiers are enabled and a blank node
@@ -423,7 +426,7 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
              * Note: blank nodes do not appear in the predicate position.
              */
             
-            if(log.isInfoEnabled()) {
+            if(INFO) {
                 
                 log.info("deferred: " + stmt);
 
@@ -433,7 +436,7 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
 
         } else {
 
-            if (log.isInfoEnabled()) {
+            if (INFO) {
 
                 log.info("added=" + stmt);
                 
@@ -482,7 +485,7 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
      */
     protected void processBufferedValues() {
         
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("nvalues=" + nvalues);
 
         db.getLexiconRelation().addTerms(valueBuffer, nvalues, readOnly);
@@ -501,7 +504,8 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
                 || deferredStatementBuffer.isEmpty())
             return;
 
-        log.info("");
+        if (INFO)
+            log.info("");
 
         /*
          * FIXME convert deferred statements, incrementing counter as they
@@ -523,7 +527,7 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
     @SuppressWarnings("unchecked")
     final protected void overflow() {
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("nvalues=" + nvalues + ", nstmts=" + nstmts);
 
         if (nstmts == 0)
@@ -576,7 +580,8 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
      */
     public long flush() {
 
-        log.info("");
+        if(INFO)
+            log.info("");
 
         processBufferedValues();
 
@@ -602,7 +607,8 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
      */
     public void reset() {
 
-        log.info("");
+        if(INFO)
+            log.info("");
         
         bnodes = null;
         
@@ -622,7 +628,8 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
      */
     protected void clear() {
 
-        log.info("");
+        if (INFO)
+            log.info("");
 
         distinctValues.clear();
 
