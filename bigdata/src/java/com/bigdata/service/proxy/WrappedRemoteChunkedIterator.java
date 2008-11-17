@@ -26,13 +26,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 27, 2008
  */
 
-package com.bigdata.striterator;
+package com.bigdata.service.proxy;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
 
 import org.apache.log4j.Logger;
+
+import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * Wraps an {@link IRemoteChunkedIterator} so that it looks like an

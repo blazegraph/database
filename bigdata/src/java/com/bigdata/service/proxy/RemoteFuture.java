@@ -1,4 +1,4 @@
-package com.bigdata.service.jini;
+package com.bigdata.service.proxy;
 
 import java.io.IOException;
 import java.rmi.Remote;
@@ -6,8 +6,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
-import net.jini.export.Exporter;
 
 /**
  * {@link Remote} interface declaring the API of {@link Future} but also
@@ -18,12 +16,11 @@ import net.jini.export.Exporter;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-interface RemoteFuture<T> extends Remote {
+public interface RemoteFuture<T> extends Remote {
 
     public boolean cancel(boolean mayInterruptIfRunning) throws IOException;
 
-    public T get() throws InterruptedException, ExecutionException,
-            IOException;
+    public T get() throws InterruptedException, ExecutionException, IOException;
 
     public T get(long timeout, TimeUnit unit) throws InterruptedException,
             ExecutionException, TimeoutException, IOException;

@@ -2841,15 +2841,22 @@ JOIN optimizations:
     is correct); (b) test on simple data set (U5/EDS) and verify that
     join tasks are created and terminate correctly; (c) test on U5/JDS
     and work through kinks for proxies; (d) Load data set on cluster;
-    (e) test pipeline query w/o type resource expander.
+    (e) test pipeline query w/o type resource expander; and (f) work
+    through correctness when index partition splits are enabled (fanIn
+    GT ONE).
 
-  - Full text search queries with SLICE are slow.  The full text index
-    itself is fast.  The problem is that we overgenerate solutions
-    before Sesame can close the iterator so we do too much work.  The
-    solution is to rewrite the Sesame query before evaluation so that
-    we can optimize SLICE by using native JOINs.
+  - Full text search queries with SLICE are slow, but the full text
+    index itself is fast.  The problem is that we overgenerate
+    solutions before Sesame can close the iterator so we do too much
+    work.  The solution is to rewrite the Sesame query before
+    evaluation so that we can optimize SLICE by using native JOINs.
 
-  - Lexicon resolution is slow.
+  - Lexicon resolution is slow (LUBM Q6 and Q14).
+
+  - Compact serialization for ISolution[] and IBindingSet[].  This
+    will require a change to RemoteAsynchronousIterator(Impl) along
+    the lines of RemoteChunk(edIterator).  See
+    JiniFederation#getProxy(...).
 
   - Scattered disk reads?
 
@@ -2934,20 +2941,15 @@ JOIN optimizations:
       partition.  Note that there will also be an interaction with
       SLICE.
 
-    - [JDS] Modify the distributed federation to return an
-      IAsynchronousIterator using the approach that we are already
-      using for Future so that the interface is preserved (the
-      returned proxy does not declare the IOExceptions).
-
   - NestedSubqueryJoin
 
     - Modify ProgramTask so that LDS runs the entire program on the
       data service.
 
-  - 1/2 of the cost of query evaluation right now appears to be
-    converting Sesame Values to BigdataValues.  The cost is mostly
-    resolving the lexicon using the sparse row store.  This could be
-    addressed by some of the issues that I have noted before
+  - 1/2 of the cost of query evaluation (for fast queries) right now
+    appears to be converting Sesame Values to BigdataValues.  The cost
+    is mostly resolving the lexicon using the sparse row store.  This
+    could be addressed by some of the issues that I have noted before
     concerning the resource locator, most notably using a logical row
     scan to recover all property values for the resources in the
     tripleStore container.
@@ -2988,8 +2990,10 @@ JOIN optimizations:
 
 - NestedSubqueryJoin
   
-  - Modify so that maxParallelSubqueries is applied per join
-    dimension.  See if that improves throughput on LUBM and EOSSYS.
+  * Modify so that maxParallelSubqueries is applied per join
+    dimension.  This change would be comparable to how the pipeline
+    join operates.  See if that improves throughput on LUBM and
+    EOSSYS.
 
 - try vtune 9.1 on java 6.  does this work?  If not then try a
   different profiler since we have to switch to java 6 for
@@ -3190,5 +3194,23 @@ junit.framework.AssertionFailedError: Wrong key: nvisited=2611, expecting=[128, 
 
 ------------------------------------------------------------
 
-Commit notes:
+Problem with EOSSYS load for LTS in LoadClosureAndQueryTest.
 
+WARN : 1438 [main] com.bigdata.test.ExperimentDriver$Experiment.run(ExperimentDriver.java:666): Error running condition: java.lang.RuntimeException: While loading: d:\eossys\data\ranker.nt
+java.lang.RuntimeException: While loading: d:\eossys\data\ranker.nt
+	at com.bigdata.rdf.store.DataLoader.loadFiles(DataLoader.java:836)
+	at com.bigdata.rdf.store.DataLoader.loadFiles(DataLoader.java:782)
+	at com.bigdata.rdf.stress.LoadClosureAndQueryTest.loadSingleThreaded(LoadClosureAndQueryTest.java:1064)
+	at com.bigdata.rdf.stress.LoadClosureAndQueryTest.loadData(LoadClosureAndQueryTest.java:861)
+	at com.bigdata.rdf.stress.LoadClosureAndQueryTest.doComparisonTest(LoadClosureAndQueryTest.java:736)
+	at com.bigdata.test.ExperimentDriver$Experiment.run(ExperimentDriver.java:662)
+	at com.bigdata.test.ExperimentDriver.main(ExperimentDriver.java:1278)
+Caused by: org.openrdf.rio.UnsupportedRDFormatException: No parser factory available for RDF format null
+	at org.openrdf.rio.Rio.createParser(Rio.java:173)
+	at org.openrdf.rio.Rio.createParser(Rio.java:188)
+	at com.bigdata.rdf.rio.BasicRioLoader.getParser(BasicRioLoader.java:131)
+	at com.bigdata.rdf.rio.BasicRioLoader.loadRdf2(BasicRioLoader.java:177)
+	at com.bigdata.rdf.rio.BasicRioLoader.loadRdf(BasicRioLoader.java:147)
+	at com.bigdata.rdf.store.DataLoader.loadData3(DataLoader.java:910)
+	at com.bigdata.rdf.store.DataLoader.loadFiles(DataLoader.java:832)
+	... 6 more

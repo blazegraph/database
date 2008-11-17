@@ -98,13 +98,17 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
     
     /**
      * Return an empty {@link File} created using the temporary file name
-     * mechanism.
+     * mechanism. The file is marked for eventual deletion.
      */
     static protected File getTempFile() {
 
         try {
             
-            return File.createTempFile("bigdata", ".tmp");
+            final File file = File.createTempFile("bigdata", ".tmp");
+            
+            file.deleteOnExit();
+            
+            return file;
             
         } catch (IOException ex) {
         

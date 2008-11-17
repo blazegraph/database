@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.rdf.rules;
 
+import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.util.WeakHashMap;
 import java.util.concurrent.BlockingQueue;
@@ -285,6 +286,8 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
         
         this.defaultRuleTaskFactory = defaultRuleTaskFactory;
 
+        joinNexusCache = new WeakHashMap<IIndexManager, WeakReference<IJoinNexus>>();
+
     }
 
     //@todo refactor singleton factory into base class or utility class.
@@ -312,7 +315,7 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
         
     }
 
-    private final transient WeakHashMap<IIndexManager, WeakReference<IJoinNexus>> joinNexusCache = new WeakHashMap<IIndexManager, WeakReference<IJoinNexus>>();
+    private transient WeakHashMap<IIndexManager, WeakReference<IJoinNexus>> joinNexusCache;
     
     public long getReadTimestamp() {
         
@@ -336,8 +339,8 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
             
             this.readTimestamp = readTimestamp; 
             
-            // @todo change to INFO
-            log.warn("Advancing read timestamp: "+readTimestamp);
+            if(INFO)
+                log.info("readTimestamp: "+readTimestamp);
             
         }
         
@@ -347,6 +350,19 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
         
         return writeTimestamp;
         
+    }
+
+    private void readObject(java.io.ObjectInputStream in)
+         throws IOException, ClassNotFoundException {
+        
+        /*
+         * Note: Must be explicitly allocated when de-serialized.
+         */
+
+        joinNexusCache = new WeakHashMap<IIndexManager, WeakReference<IJoinNexus>>();
+
+        in.defaultReadObject();
+
     }
 
 }

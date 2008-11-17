@@ -1,4 +1,4 @@
-package com.bigdata.service.jini;
+package com.bigdata.service.proxy;
 
 import java.io.IOException;
 import java.io.Serializable;
@@ -24,21 +24,26 @@ public class ClientFuture<T> implements Future<T>, Serializable {
      */
     private static final long serialVersionUID = -910518634373204705L;
     
-    private final RemoteFuture<T> future;
+    private final RemoteFuture<T> proxy;
 
-    public ClientFuture(RemoteFuture<T> future) {
+    /**
+     * 
+     * @param proxy
+     *            A proxy for the {@link RemoteFuture}.
+     */
+    public ClientFuture(final RemoteFuture<T> proxy) {
 
-        if (future == null)
+        if (proxy == null)
             throw new IllegalArgumentException();
 
-        this.future = future;
+        this.proxy = proxy;
 
     }
 
     public boolean cancel(boolean mayInterruptIfRunning) {
 
         try {
-            return future.cancel(mayInterruptIfRunning);
+            return proxy.cancel(mayInterruptIfRunning);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -48,7 +53,7 @@ public class ClientFuture<T> implements Future<T>, Serializable {
     public T get() throws InterruptedException, ExecutionException {
 
         try {
-            return future.get();
+            return proxy.get();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -59,7 +64,7 @@ public class ClientFuture<T> implements Future<T>, Serializable {
             ExecutionException, TimeoutException {
 
         try {
-            return future.get(timeout, unit);
+            return proxy.get(timeout, unit);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -69,7 +74,7 @@ public class ClientFuture<T> implements Future<T>, Serializable {
     public boolean isCancelled() {
 
         try {
-            return future.isCancelled();
+            return proxy.isCancelled();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -79,7 +84,7 @@ public class ClientFuture<T> implements Future<T>, Serializable {
     public boolean isDone() {
 
         try {
-            return future.isDone();
+            return proxy.isDone();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

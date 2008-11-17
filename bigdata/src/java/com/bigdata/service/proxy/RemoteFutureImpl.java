@@ -1,4 +1,4 @@
-package com.bigdata.service.jini;
+package com.bigdata.service.proxy;
 
 import java.io.IOException;
 import java.rmi.Remote;
@@ -6,8 +6,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
-import net.jini.export.Exporter;
 
 /**
  * A helper object that provides the API of {@link Future} but whose methods
@@ -18,11 +16,11 @@ import net.jini.export.Exporter;
  * @version $Id$
  * @param <T>
  */
-class RemoteFutureImpl<T> implements RemoteFuture {
+public class RemoteFutureImpl<T> implements RemoteFuture<T> {
 
     private final Future<T> future;
 
-    public RemoteFutureImpl(Future<T> future) {
+    public RemoteFutureImpl(final Future<T> future) {
 
         if (future == null)
             throw new IllegalArgumentException();

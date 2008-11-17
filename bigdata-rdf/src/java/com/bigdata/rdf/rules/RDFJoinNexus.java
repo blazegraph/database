@@ -118,8 +118,6 @@ import com.bigdata.striterator.DistinctFilter;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
-import com.bigdata.striterator.IRemoteChunkedIterator;
-import com.bigdata.striterator.WrappedRemoteChunkedIterator;
 
 /**
  * {@link IProgram} execution support for the RDF DB.
@@ -1042,6 +1040,22 @@ public class RDFJoinNexus implements IJoinNexus {
         
     }
 
+    /**
+     * FIXME Custom serialization for binding sets, especially since there tends
+     * to be a lot of redudency in the data arising from how bindings are
+     * propagated during JOINs.
+     * 
+     * @todo We can sort the {@link ISolution}s much like we already do for
+     *       DISTINCT or intend to do for SORT and use the equivilent of leading
+     *       key compression to reduce IO costs (or when they are SORTed we
+     *       could leverage that to produce a more compact serialization).
+     */
+    public ISerializer<IBindingSet[]> getBindingSetSerializer() {
+        
+        return SerializerUtil.INSTANCE;
+        
+    }
+
     public IBindingSet newBindingSet(IRule rule) {
 
         final IBindingSet constants = rule.getConstants();
@@ -1620,19 +1634,21 @@ public class RDFJoinNexus implements IJoinNexus {
 
         final Object ret = innerTask.call();
         
-        if(!(ret instanceof IRemoteChunkedIterator)) {
-            
-            return ret;
-            
-        }
-
-        /*
-         * The federation is using RMI so we got back a proxy object. We wrap
-         * that proxy object so that it looks like an IChunkedOrderedIterator
-         * and return it to the caller.
-         */
+//        if(!(ret instanceof IRemoteChunkedIterator)) {
+//            
+//            return ret;
+//            
+//        }
+//
+//        /*
+//         * The federation is using RMI so we got back a proxy object. We wrap
+//         * that proxy object so that it looks like an IChunkedOrderedIterator
+//         * and return it to the caller.
+//         */
+//        
+//        return new WrappedRemoteChunkedIterator((IRemoteChunkedIterator) ret);
         
-        return new WrappedRemoteChunkedIterator((IRemoteChunkedIterator) ret);
+        return ret;
 
     }
 

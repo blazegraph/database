@@ -400,6 +400,11 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
             return null;
         }
 
+        public ISerializer<IBindingSet[]> getBindingSetSerializer() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
     }
 
     private static class MockRangeCountFactory implements IRangeCountFactory {

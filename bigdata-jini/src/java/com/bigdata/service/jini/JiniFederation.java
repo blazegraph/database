@@ -53,12 +53,15 @@ import net.jini.lookup.entry.Name;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.io.ISerializer;
+import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.TimestampServiceUtil;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
-import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.relation.rule.IBindingSet;
+import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
@@ -66,8 +69,17 @@ import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.IService;
 import com.bigdata.service.jini.JiniClient.JiniConfig;
-import com.bigdata.striterator.IChunkedOrderedIterator;
-import com.bigdata.striterator.IKeyOrder;
+import com.bigdata.service.proxy.ClientAsynchronousIterator;
+import com.bigdata.service.proxy.ClientBuffer;
+import com.bigdata.service.proxy.ClientFuture;
+import com.bigdata.service.proxy.RemoteAsynchronousIterator;
+import com.bigdata.service.proxy.RemoteAsynchronousIteratorImpl;
+import com.bigdata.service.proxy.RemoteBuffer;
+import com.bigdata.service.proxy.RemoteBufferImpl;
+import com.bigdata.service.proxy.RemoteChunk;
+import com.bigdata.service.proxy.RemoteChunkedIterator;
+import com.bigdata.service.proxy.RemoteFuture;
+import com.bigdata.service.proxy.RemoteFutureImpl;
 import com.sun.jini.admin.DestroyAdmin;
 
 /**
@@ -632,12 +644,11 @@ public class JiniFederation extends AbstractDistributedFederation implements
     }
     
     /**
-     * Export and return a proxy object. The client will have to wrap the proxy
-     * object to get back an {@link IChunkedOrderedIterator} interface.
+     * Export and return a proxy object.
      * <p>
-     * Note: This is used for {@link IRule} evaluation in which there is at
-     * least one JOIN. It DOES NOT get used for simple {@link IAccessPath}
-     * scans. Those use {@link IRangeQuery#rangeIterator()} instead.
+     * Note: This is used for query evaluation in which there is at least one
+     * JOIN. It DOES NOT get used for simple {@link IAccessPath} scans. Those
+     * use {@link IRangeQuery#rangeIterator()} instead.
      * 
      * @todo Allow {@link Configuration} of the {@link Exporter} for the proxy
      *       iterators and futures.
@@ -647,32 +658,51 @@ public class JiniFederation extends AbstractDistributedFederation implements
      *       level of indirection when compared to the {@link Configuration} of
      *       an {@link AbstractServer}'s {@link Exporter}.
      * 
-     * @todo if this is solely used for high-level query then we can probably
-     *       drop the {@link IKeyOrder} from the API here and on
-     *       {@link RemoteChunk}.
+     * FIXME The caller's {@link ISerializer} is not being applied. The problem
+     * is that the {@link RemoteAsynchronousIterator} interface and the
+     * {@link RemoteAsynchronousIteratorImpl} use the same API as
+     * {@link IAsynchronousIterator}. This means that
+     * {@link RemoteAsynchronousIterator#next()} will return the element and
+     * that RMI will automatically marshall that return value without regard to
+     * our {@link ISerializer}. Fixing this will require
+     * {@link RemoteAsynchronousIterator} to declare methods that facilitate the
+     * compact custom serialization, much like the {@link RemoteChunkedIterator}
+     * and {@link RemoteChunk}. Note that we only use three methods to
+     * implement {@link ClientAsynchronousIterator} - hasNext(timeout,unit),
+     * isExhausted(), and next(). The rest of the API does not need to be
+     * implemented and next() needs to be reworked as byte[]:nextElement() so
+     * that we can impose our own (de-)serialization.  (Also, note that the
+     * {@link SerializerUtil} is being used as the serializer so far and
+     * that class is neither {@link Serializable} nor efficient for either
+     * {@link IBindingSet}[]s nor {@link ISolution}[]s).
      */
     @Override
-    public Object getProxy(
-            final IAsynchronousIterator<? extends Object[]> sourceIterator,
-            final ISerializer<? extends Object[]> serializer,
-            final IKeyOrder<? extends Object> keyOrder) {
+    public <E> IAsynchronousIterator<E> getProxy(
+            final IAsynchronousIterator<E> sourceIterator,
+            final ISerializer<E> serializer,
+            final int capacity) {
         
         if (sourceIterator == null)
             throw new IllegalArgumentException();
-        
+
+        if (serializer == null)
+            throw new IllegalArgumentException();
+
+        if (capacity <= 0)
+            throw new IllegalArgumentException();
+
 //        if (sourceIterator.hasNext(1L, TimeUnit.MILLISECONDS)
 //                && sourceIterator.isFutureDone()) {
 //            
 //            /*
 //             * @todo If the producer is done we can materialize all of the data
 //             * in a thick iterator, ResultSet or RemoteChunk and send that back.
+//             * [probably do not wait at all, but just test isFutureDone].
 //             */
 //            
 //            log.warn("Async iterator is done: modify code to send back fully materialized chunk.");
 //            
 //        }
-        
-        final long begin = System.currentTimeMillis();
         
         /*
          * Setup the Exporter for the iterator.
@@ -687,36 +717,33 @@ public class JiniFederation extends AbstractDistributedFederation implements
         final Exporter exporter = getExporter(true/* enableDCG */);
         
         // wrap the iterator with an exportable object.
-        final RemoteChunkedIterator impl = new RemoteChunkedIterator(
-                sourceIterator, serializer, keyOrder);
+        final RemoteAsynchronousIterator<E> impl = new RemoteAsynchronousIteratorImpl<E>(
+                sourceIterator
+                //, serializer
+                );
         
         /*
          * Export and return the proxy.
          */
-        final Remote proxy;
+        final RemoteAsynchronousIterator<E> proxy;
         try {
 
             // export proxy.
-            proxy = exporter.export(impl);
-            
-            if (INFO) {
-
-                final long elapsed = System.currentTimeMillis() - begin;
-
-                log.info("Exported proxy: elapsed=" + elapsed + ", proxy="
-                        + proxy + "(" + proxy.getClass() + ")");
-                
-            }
-
-            // return proxy to caller.
-            return proxy;
+            proxy = (RemoteAsynchronousIterator<E>) exporter.export(impl);
 
         } catch (ExportException ex) {
 
             throw new RuntimeException("Export error: " + ex, ex);
             
         }
-        
+
+        /*
+         * Wrap the proxy object in a serializable object so that it looks like
+         * an IChunkedOrderedIterator and return it to the caller.
+         */
+
+        return new ClientAsynchronousIterator<E>(proxy, capacity);
+
     }
 
     /**
@@ -732,7 +759,9 @@ public class JiniFederation extends AbstractDistributedFederation implements
      * @return A proxy for that {@link Future} that masquerades any RMI
      *         exceptions.
      */
-    public Future<? extends Object> getProxy(final Future<? extends Object> future) {
+    public <E> Future<E> getProxy(final Future<E> future) {
+
+//        log.fatal("\nExporting proxy for future: "+future,new RuntimeException("stack trace"));
         
         /*
          * Setup the Exporter for the Future.
@@ -746,16 +775,16 @@ public class JiniFederation extends AbstractDistributedFederation implements
         final Exporter exporter = getExporter(true/* enableDGC */);
         
         // wrap the future in a proxyable object.
-        final RemoteFuture impl = new RemoteFutureImpl(future);
+        final RemoteFuture<E> impl = new RemoteFutureImpl<E>(future);
 
         /*
          * Export the proxy.
          */
-        final RemoteFuture proxy;
+        final RemoteFuture<E> proxy;
         try {
 
             // export proxy.
-            proxy = (RemoteFuture) exporter.export(impl);
+            proxy = (RemoteFuture<E>) exporter.export(impl);
 
             if (INFO) {
 
@@ -771,13 +800,70 @@ public class JiniFederation extends AbstractDistributedFederation implements
         }
 
         // return proxy to caller.
-        return new ClientFuture(proxy);
+        return new ClientFuture<E>(proxy);
 
     }
 
-    public Object getProxy(final Object obj, final boolean enableDGC) {
+    /**
+     * A proxy for an {@link IBuffer} that does not extend {@link Remote} and
+     * which DOES NOT declare that its methods throw {@link IOException} (for
+     * RMI).
+     * 
+     * @param buffer
+     *            The future.
+     * 
+     * @return A proxy for that {@link IBuffer} that masquerades any RMI
+     *         exceptions.
+     */
+    public <E> IBuffer<E> getProxy(final IBuffer<E> buffer) {
+        
+        /*
+         * Setup the Exporter.
+         */
+        final Exporter exporter = getExporter(true/* enableDGC */);
+        
+        // wrap in a proxyable object.
+        final RemoteBuffer<E> impl = new RemoteBufferImpl<E>(buffer);
 
-        return getExporter(enableDGC).equals((Remote)obj);
+        /*
+         * Export the proxy.
+         */
+        final RemoteBuffer<E> proxy;
+        try {
+
+            // export proxy.
+            proxy = (RemoteBuffer<E>) exporter.export(impl);
+
+            if (INFO) {
+
+                log.info("Exported proxy: proxy=" + proxy + "("
+                        + proxy.getClass() + ")");
+
+            }
+
+        } catch (ExportException ex) {
+
+            throw new RuntimeException("Export error: " + ex, ex);
+
+        }
+
+        // return proxy to caller.
+        return new ClientBuffer<E>(proxy);
+
+    }
+
+    @SuppressWarnings("unchecked")
+    public <E> E getProxy(final E obj, final boolean enableDGC) {
+
+        try {
+
+            return (E) getExporter(enableDGC).export((Remote) obj);
+            
+        } catch (ExportException e) {
+            
+            throw new RuntimeException(e);
+            
+        }
         
     }
     

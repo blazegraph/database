@@ -1,4 +1,4 @@
-package com.bigdata.service.jini;
+package com.bigdata.service.proxy;
 
 import java.io.IOException;
 
@@ -7,8 +7,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.io.ISerializer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.striterator.IKeyOrder;
-import com.bigdata.striterator.IRemoteChunk;
-import com.bigdata.striterator.IRemoteChunkedIterator;
 
 /**
  * Wrapper for an {@link IAsynchronousIterator} exposing an interface suitable

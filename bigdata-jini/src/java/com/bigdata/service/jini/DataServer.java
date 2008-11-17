@@ -305,7 +305,8 @@ public class DataServer extends AbstractServer {
         /**
          * Extends the base behavior to return an RMI compatible proxy.
          */
-        public Future<? extends Object> submit(Callable<? extends Object> task)
+        public Future<? extends Object> submit(
+                final Callable<? extends Object> task)
                 throws InterruptedException, ExecutionException {
 
             return getFederation().getProxy(super.submit(task));

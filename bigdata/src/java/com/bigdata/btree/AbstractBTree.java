@@ -1336,9 +1336,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
                     
                     filter.disable();
                     
-                    // @todo change to WARN
-                    log
-                            .error("Maximum error rate would be exceeded: bloom filter disabled: entryCount="
+                    log.warn("Bloom filter disabled - maximum error rate would be exceeded"
+                                    + ": entryCount="
                                     + getEntryCount()
                                     + ", factory="
                                     + getIndexMetadata()

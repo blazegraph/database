@@ -1,7 +1,9 @@
-package com.bigdata.striterator;
+package com.bigdata.service.proxy;
 
 import java.io.Serializable;
 import java.rmi.Remote;
+
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * Abstraction for a chunk from a remote iterator. Instances of this interface

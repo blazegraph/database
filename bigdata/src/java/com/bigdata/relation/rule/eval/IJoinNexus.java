@@ -61,6 +61,7 @@ import com.bigdata.relation.rule.IRuleTaskFactory;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.Var;
+import com.bigdata.relation.rule.eval.JoinMasterTask.JoinTask;
 import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IDataServiceAwareProcedure;
@@ -551,9 +552,17 @@ public interface IJoinNexus {
     
     /**
      * Return the object that is responsible for (de-)serializing chunks of
-     * {@link ISolution}s.
+     * {@link ISolution}s.  This is used by high-level query to transfer
+     * {@link ISolution}s back to the client.
      */
     ISerializer<ISolution[]> getSolutionSerializer();
+    
+    /**
+     * Return the object that is responsible for (de-)serializing chunks of
+     * {@link IBindingSet}s. This is used by {@link JoinTask}s to transfer
+     * intermediate {@link IBindingSet}s from one join dimension to the next.
+     */
+    ISerializer<IBindingSet[]> getBindingSetSerializer();
     
     /**
      * Make the write sets visible, eg, by committing the store(s) having

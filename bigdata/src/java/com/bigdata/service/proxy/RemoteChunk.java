@@ -1,4 +1,4 @@
-package com.bigdata.service.jini;
+package com.bigdata.service.proxy;
 
 import java.io.Externalizable;
 import java.io.IOException;
@@ -7,7 +7,6 @@ import java.io.ObjectOutput;
 
 import com.bigdata.io.ISerializer;
 import com.bigdata.striterator.IKeyOrder;
-import com.bigdata.striterator.IRemoteChunk;
 
 /**
  * A chunk of elements materialized from a remote iterator together with some
@@ -18,7 +17,7 @@ import com.bigdata.striterator.IRemoteChunk;
  * @version $Id$
  * @param <E>
  */
-class RemoteChunk<E> implements IRemoteChunk<E>, Externalizable {
+public class RemoteChunk<E> implements IRemoteChunk<E>, Externalizable {
 
     /**
      * 
