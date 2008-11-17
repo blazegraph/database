@@ -473,6 +473,10 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     /**
      * @throws BufferClosedException
      *             if the buffer has been {@link #close()}d.
+     * @throws RuntimeException
+     *             if the caller's {@link Thread} is interrupted. The
+     *             {@link RuntimeException} will wrap the
+     *             {@link InterruptedException} as its cause.  
      */
     public void add(E e) {
 
@@ -726,7 +730,32 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
             if (future == null) {
 
-                log.warn("Future not set");
+                /*
+                 * Note: The future is not always set. For example, when a Join
+                 * Task creates a BlockingBuffer for each sink there is an
+                 * inversion of control. The JoinTask is populating the
+                 * BlockingBuffer in its own thread(s) while the sink is
+                 * draining the BlockingBuffer independely. However, the more
+                 * common case has a task that is created to write on the
+                 * BlockingBuffer and the iterator is then consumed by the
+                 * caller (Query works this way).
+                 */
+                
+                if(INFO)
+                    log.info("Future not set");
+                
+                if (stackFrame != null) {
+
+                    /*
+                     * Purely for debugging.
+                     */
+
+                    log.warn("Future not set at", new RuntimeException());
+
+                    log.warn("buffer allocated at", stackFrame);
+
+                }
+
 
             } else if (!future.isDone()) {
 
@@ -895,6 +924,15 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
          *            {@link #_hasNext(long)} will timeout.
          * 
          * @return iff an element is available before the timeout has expired.
+         * 
+         * @todo The if the iterator is interrupted the
+         *       {@link IAsynchronousIterator} API hides the interrupt and
+         *       closes the iterator. Consider an API change that does not clear
+         *       the interrupted status so that callers can notice that they
+         *       were interrupted or that simply throws out the
+         *       {@link InterruptedException}? This API change would put us
+         *       more in line with how Java APIs deal with interrupts might have
+         *       consequences for the existing code.
          */
         private boolean _hasNext(long nanos) {
 

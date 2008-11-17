@@ -464,14 +464,18 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
 //      
 //  }
 
-    public void setUpComparisonTest(Properties properties) throws Exception {
-
+    static {
+        
         // adds "ntriples" as an N-Triples filename extension.
-        RDFFormat NTRIPLES = new RDFFormat("N-Triples", "text/plain", Charset
-                .forName("US-ASCII"), Arrays.asList("nt", "ntriples"), false,
-                false);
+        final RDFFormat NTRIPLES = new RDFFormat("N-Triples", "text/plain",
+                Charset.forName("US-ASCII"), Arrays.asList("nt", "ntriples"),
+                false, false);
 
         RDFFormat.register(NTRIPLES);
+
+    }
+
+    public void setUpComparisonTest(Properties properties) throws Exception {
 
         final DatabaseModel fedType = DatabaseModel.valueOf(properties
                 .getProperty(TestOptions.DATABASE_MODEL));
@@ -488,8 +492,8 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
         case LTS:
 
             /*
-             * For the LTS, this is the name of the backing file created and used by
-             * the Journal.
+             * For the LTS, this is the name of the backing file created and
+             * used by the Journal.
              */
             properties.setProperty(Options.FILE, file.toString());
 
@@ -555,7 +559,14 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
             
         case JDS:
 
-            // Should be a Jini config directory
+            /*
+             * The file identifies a Jini config directory
+             * 
+             * FIXME We really need to copy either this into a temporary
+             * directory and edit the name of the data directory or we need to
+             * use a config file that is specifically for test data and delete
+             * everything in the data directory before running the test.
+             */
 
             jiniServicesHelper = new JiniServicesHelper(file.toString());
 
@@ -761,8 +772,10 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
      * <p>
      * Note: This sets the <i>baseURI</i> to the URI form of the name of each
      * file to be loaded.
+     * 
+     * @throws InterruptedException 
      */
-    public boolean loadData(Properties properties) {
+    public void loadData(Properties properties) throws InterruptedException {
 
         final File dataDir = new File(properties.getProperty(TestOptions.DATA));
 
@@ -813,7 +826,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
             // show the current time when we start.
             System.out.println("Loading data: now="+new Date().toString());
             
-            try {
+            {
 
                 final AbstractTripleStore db = sail.getDatabase();
                 
@@ -880,15 +893,8 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
                 result.put("toldTerms", "" + termsLoaded);
                 result.put("loadRate", "" + statementsPerSecond);
                 result.put("loadTime", "" + elapsed);
-
-            } catch (Throwable t) {
-
-                log.error("Error loading files: dir=" + dataDir, t);
-
-                return false;
-
             }
-
+            
         }
 
         /*
@@ -950,8 +956,6 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
         
         // show the current time when we start.
         System.out.println("Done: now="+new Date().toString());
-        
-        return true;
         
     }
 
@@ -1229,7 +1233,8 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
     
     private Query newQuery(String label, StringBuilder sb) {
         
-        System.out.println("Will run query: " + label); // "\n" + sb);
+        if(INFO)
+            log.info("Will run query: " + label); // "\n" + sb);
         
         return new Query(label, sb.toString());
         
@@ -1487,27 +1492,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
 
         public String toString() {
             
-            long nresults = 0;
-            
-            boolean consistent = true;
-            
             final int ntrials = trialResults.length;
-            
-            for (int j = 0; j < ntrials; j++) {
-
-                final TrialResult trialResult = trialResults[j];
-
-                if (j == 0) {
-
-                    nresults = trialResult.nresults;
-
-                } else if (trialResult.nresults != nresults) {
-
-                    consistent = false;
-                    
-                }
-
-            }
 
             final StringBuilder sb = new StringBuilder();
             
@@ -1518,19 +1503,19 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
             sb.append(Long.toString(elapsed));
             
             sb.append('\t');
-            
+
             if(consistent) {
             
                 sb.append(Long.toString(nresults));
                 
             } else {
                 
-                final long [] a = new long[ntrials];
-                
-                for(int j=0; j<ntrials; j++) {
-                
+                final long[] a = new long[ntrials];
+
+                for (int j = 0; j < ntrials; j++) {
+
                     a[j] = trialResults[j].nresults;
-                    
+
                 }
                 
                 sb.append("*** INCONSISTENT " + Arrays.toString(a));
@@ -1737,6 +1722,8 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
             this.results = results;
 
             this.firstCauses = firstCauses;
+
+            assert results.length == firstCauses.length;
             
             long n = results[0];
 
@@ -1764,7 +1751,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
 
             }
 
-            this.nresults = results[0];
+            this.nresults = n;
 
             this.consistent = consistent;
 

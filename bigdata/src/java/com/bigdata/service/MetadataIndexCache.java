@@ -17,6 +17,12 @@ import com.bigdata.util.InnerCause;
  */
 public class MetadataIndexCache extends AbstractIndexCache<IMetadataIndex>{
 
+    /**
+     * Text for an exception thrown when the metadata service has not been
+     * discovered.
+     */
+    protected static transient final String ERR_NO_METADATA_SERVICE = "Metadata service";
+    
     private final AbstractScaleOutFederation fed;
 
     public MetadataIndexCache(final AbstractScaleOutFederation fed,
@@ -93,15 +99,19 @@ public class MetadataIndexCache extends AbstractIndexCache<IMetadataIndex>{
      *         iff no scale-out index is registered by that name at that
      *         timestamp.
      */
-    protected MetadataIndexMetadata getMetadataIndexMetadata(String name,
-            long timestamp) {
+    protected MetadataIndexMetadata getMetadataIndexMetadata(final String name,
+            final long timestamp) {
+
+        final IMetadataService mds = fed.getMetadataService();
+
+        if (mds == null)
+            throw new NoSuchService(ERR_NO_METADATA_SERVICE);
 
         final MetadataIndexMetadata mdmd;
         try {
 
             // @todo test cache for this object as of that timestamp?
-            mdmd = (MetadataIndexMetadata) fed.getMetadataService()
-                    .getIndexMetadata(
+            mdmd = (MetadataIndexMetadata) mds.getIndexMetadata(
                             MetadataService.getMetadataIndexName(name),
                             timestamp);
             

@@ -27,8 +27,7 @@ import java.util.concurrent.Future;
 
 import com.bigdata.io.ISerializer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
-import com.bigdata.striterator.IKeyOrder;
-import com.bigdata.striterator.IRemoteChunkedIterator;
+import com.bigdata.relation.accesspath.IBuffer;
 
 /**
  * Abstract base class for {@link IBigdataFederation} implementations where the
@@ -75,39 +74,31 @@ abstract public class AbstractDistributedFederation extends AbstractScaleOutFede
     }
 
     /**
-     * Return a proxy object for an iterator suiteable for use in an RMI
-     * environment.
-     * <p>
-     * Note: The method MAY either return an {@link IRemoteChunkedIterator} -or-
-     * return a "thick" iterator that fully buffers the results. A "thick"
-     * iterator is generally better if the results would fit within a single
-     * "chunk" since you avoid additional RMI calls.
-     * <p>
-     * Note: The elements visited by the source iterator are an array type. Each
-     * visited element corresponds to a single chunk of elements of the
-     * component type of the array.
+     * Return a proxy object for an {@link IAsynchronousIterator} suiteable for
+     * use in an RMI environment.
      * 
-     * @param itr
-     *            The source iterator. Note that the iterator visits elements of
-     *            some array type (chunks).
+     * @param src
+     *            The source iterator. Note that the iterator normally visits
+     *            elements of some array type (chunks).
      * @param serializer
      *            The object responsible for (de-)serializing a chunk of
      *            elements visited by the iterator.
-     * @param keyOrder
-     *            The natural order in which the elements will be visited iff
-     *            known and otherwise <code>null</code>.
+     * @param capacity
+     *            The capacity for the internal buffer that is used to
+     *            asynchronously transfer elements (chunks) from the remote
+     *            iterator to the client iterator.
      * 
      * @return Either a thick iterator (when the results would fit within a
-     *         single chunk) or an {@link IRemoteChunkedIterator} (when multiple
-     *         chunks are expected).
+     *         single chunk) or a thin iterator that uses RMI to fetch chunks
+     *         from the remote {@link IAsynchronousIterator}.
      * 
      * @throws IllegalArgumentException
      *             if the iterator is <code>null</code>.
      */
-    public abstract Object getProxy(
-            IAsynchronousIterator<? extends Object[]> itr,//
-            ISerializer<? extends Object[]> serializer, //
-            IKeyOrder<? extends Object> keyOrder//
+    public abstract <E> IAsynchronousIterator<E> getProxy(
+            IAsynchronousIterator<E> src,//
+            ISerializer<E> serializer, //
+            int capacity
     );
 
     /**
@@ -119,9 +110,20 @@ abstract public class AbstractDistributedFederation extends AbstractScaleOutFede
      * 
      * @return The proxy for that future.
      */
-    public abstract Future<? extends Object> getProxy(
-            Future<? extends Object> future);
+    public abstract <E> Future<E> getProxy(Future<E> future);
 
+    /**
+     * Return a proxy object for an {@link IBuffer} suitable for use in an RMI
+     * environment.
+     * 
+     * @param buffer
+     *            The future.
+     * 
+     * @return A proxy for that {@link IBuffer} that masquerades any RMI
+     *         exceptions.
+     */
+    public abstract <E> IBuffer<E> getProxy(final IBuffer<E> buffer);
+    
     /**
      * Return a proxy for an object.
      * 
@@ -133,6 +135,6 @@ abstract public class AbstractDistributedFederation extends AbstractScaleOutFede
      *            
      * @return The proxy.
      */
-    public abstract Object getProxy(Object obj, boolean enableDGC);
+    public abstract <E> E getProxy(E obj, boolean enableDGC);
     
 }

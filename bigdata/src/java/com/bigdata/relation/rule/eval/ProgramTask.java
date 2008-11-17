@@ -41,7 +41,6 @@ import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IIndexStore;
-import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.relation.IMutableRelation;
@@ -51,7 +50,6 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
-import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
@@ -232,6 +230,12 @@ public class ProgramTask implements IProgramTask,
 
     /**
      * Execute the program.
+     * <p>
+     * Note: There is no natural order for high-level query. Also, unless stable
+     * evaluation is requested, the results can be produced by parallel threads
+     * and the order of the materialized solution is therefore not even stable.
+     * The only way to have a natural order is for a sort to be imposed on the
+     * {@link ISolution}s.
      * 
      * @throws Exception
      */
@@ -307,26 +311,19 @@ public class ProgramTask implements IProgramTask,
                  */
                 final IAsynchronousIterator<ISolution[]> ret = executeQuery(step);
                 
-                if (indexManager instanceof AbstractDistributedFederation) {
-
-                    /*
-                     * Note: The distributed federation (JDS) uses RMI and
-                     * requires either a "thick" iterator (fully buffered) or a
-                     * proxy object.
-                     * 
-                     * Note: There is no natural order for high-level query
-                     * since results can be produced by parallel threads for
-                     * join subqueries. The only way to have a natural order is
-                     * for a sort to be imposed on the result. And the results
-                     * are often Solutions, not just Elements, so they lack any
-                     * sense of natural order.
-                     */
-                    
-                    return ((AbstractDistributedFederation) indexManager)
-                            .getProxy(ret, joinNexusFactory.newInstance(
-                                    indexManager).getSolutionSerializer(), null/* keyOrder */);
-
-                }
+//                if (indexManager instanceof AbstractDistributedFederation) {
+//
+//                    /*
+//                     * Note: The distributed federation (JDS) uses RMI and
+//                     * requires either a "thick" iterator (fully buffered) or a
+//                     * proxy object.
+//                     */
+//                    
+//                    return ((AbstractDistributedFederation) indexManager)
+//                            .getProxy(ret, joinNexusFactory.newInstance(
+//                                    indexManager).getSolutionSerializer());
+//
+//                }
 
                 return new ChunkConsumerIterator<ISolution>(ret);
 

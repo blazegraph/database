@@ -61,6 +61,13 @@ public class DefaultRuleTaskFactory implements IRuleTaskFactory, Externalizable 
             false/*pipeline*/);
     
     private boolean subquery;
+
+    /**
+     * De-serialization ctor.
+     */
+    public DefaultRuleTaskFactory() {
+        
+    }
     
     public DefaultRuleTaskFactory(boolean subquery) {
         

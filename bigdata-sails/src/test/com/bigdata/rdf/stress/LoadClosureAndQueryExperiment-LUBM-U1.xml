@@ -55,4 +55,14 @@
   <property name="databaseModel">EDS</property>
   <property name="nestedSubquery">false</property>
  </condition>
+ <!-- condition#7 -->
+ <condition>
+  <property name="databaseModel">JDS</property>
+  <property name="nestedSubquery">true</property>
+ </condition>
+ <!-- condition#8 -->
+ <condition>
+  <property name="databaseModel">JDS</property>
+  <property name="nestedSubquery">false</property>
+ </condition>
 </experiment>

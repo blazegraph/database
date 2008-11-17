@@ -22,40 +22,35 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Aug 27, 2008
+ * Created on Nov 15, 2008
  */
 
-package com.bigdata.striterator;
+package com.bigdata.service.proxy;
 
 import java.io.IOException;
 import java.rmi.Remote;
 
+import com.bigdata.relation.accesspath.IBuffer;
+
 /**
- * Interface for objects proxying for asynchronous chunked iterators. This is
- * used to export iterators. We wrap an {@link IChunkedIterator} with an object
- * that implements this interface, and then export a proxy for that object. On
- * the client, we wrap the proxy so as to hide the {@link IOException}s and
- * regain our original interface signature.
+ * {@link Remote} interface declaring the API of {@link IBuffer} but also
+ * declaring that each methods throws {@link IOException} in order to be
+ * compatible with {@link Remote} and {@link Exporter}. Of course, this means
+ * that this interface can not extend {@link IBuffer}!
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * @param <E>
- *            The generic type of the elements visited by the source iterator.
  */
-public interface IRemoteChunkedIterator<E> extends Remote {
+public interface RemoteBuffer<E> extends Remote {
 
-    /**
-     * Close the remote iterator.
-     * 
-     * @throws IOException
-     */
-    public void close() throws IOException;
+    public int size() throws IOException;
 
-    /**
-     * Return the next "chunk" from the iterator.
-     * 
-     * @return The next {@link IRemoteChunk}.
-     */
-    public IRemoteChunk<E> nextChunk() throws IOException;
+    public boolean isEmpty() throws IOException;
+    
+    public void add(E e) throws IOException;
+    
+    public long flush() throws IOException;
+
+    public void reset() throws IOException;
     
 }

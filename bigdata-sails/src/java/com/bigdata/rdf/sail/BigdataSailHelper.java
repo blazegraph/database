@@ -624,12 +624,12 @@ public class BigdataSailHelper {
             if(true) {
                 final Properties p = new Properties();
 
-                p.setProperty(Options.NESTED_SUBQUERY, "true");
+//                p.setProperty(Options.NESTED_SUBQUERY, "false");
 //                p.setProperty(Options.CHUNK_CAPACITY, "100");
 //                p.setProperty(Options.FULLY_BUFFERED_READ_THRESHOLD, "1000");
 //                p.setProperty(Options.MAX_PARALLEL_SUBQUERIES, "0");
 //                p.setProperty(Options.INCLUDE_INFERRED, "true");
-                p.setProperty(Options.QUERY_TIME_EXPANDER, "false");
+//                p.setProperty(Options.QUERY_TIME_EXPANDER, "false");
 
                 System.out.println("\npost-modification properties::");
                 showProperties(helper.setProperties(sail, p));
