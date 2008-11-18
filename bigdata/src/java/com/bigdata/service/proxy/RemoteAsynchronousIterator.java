@@ -35,7 +35,7 @@ import java.util.concurrent.TimeUnit;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.eval.ISolution;
-import com.bigdata.relation.rule.eval.JoinMasterTask.JoinTask;
+import com.bigdata.relation.rule.eval.pipeline.JoinTask;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**

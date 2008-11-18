@@ -39,7 +39,7 @@ import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.IEvaluationPlan;
 import com.bigdata.relation.rule.eval.ISolution;
-import com.bigdata.relation.rule.eval.JoinMasterTask;
+import com.bigdata.relation.rule.eval.pipeline.JoinMasterTask;
 import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.DataService;
 

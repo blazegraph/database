@@ -28,7 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.rule.eval;
 
-import com.bigdata.relation.rule.eval.JoinMasterTask.JoinTask;
+import com.bigdata.relation.rule.eval.pipeline.JoinMasterTask;
+import com.bigdata.relation.rule.eval.pipeline.JoinTask;
 
 /**
  * Utility class that may be used to trace the chunks accepted for join
@@ -58,7 +59,7 @@ public class ChunkTrace {
      */
     protected static int col = -1;
 
-    static final void chunk(final int orderIndex, final Object[] chunk) {
+    static final public void chunk(final int orderIndex, final Object[] chunk) {
 
         if (col >= 0) {
 

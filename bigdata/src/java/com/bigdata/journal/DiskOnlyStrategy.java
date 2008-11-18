@@ -36,7 +36,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Exchanger;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import com.bigdata.cache.LRUCache;
 import com.bigdata.counters.AbstractStatisticsCollector;
@@ -1572,9 +1571,6 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      * 
      * @return true iff the channel was re-opened.
      * 
-     * @throws IllegalStateException
-     *             if the buffer strategy has been closed.
-     *             
      * @throws RuntimeException
      *             if the backing file can not be opened (can not be found or
      *             can not acquire a lock).

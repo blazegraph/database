@@ -54,7 +54,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.journal.CompactTask;
-import com.bigdata.relation.rule.eval.JoinMasterTask;
+import com.bigdata.relation.rule.eval.pipeline.JoinMasterTask;
 import com.bigdata.service.DataService;
 
 /**

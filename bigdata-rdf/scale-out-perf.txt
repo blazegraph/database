@@ -3214,3 +3214,72 @@ Caused by: org.openrdf.rio.UnsupportedRDFormatException: No parser factory avail
 	at com.bigdata.rdf.store.DataLoader.loadData3(DataLoader.java:910)
 	at com.bigdata.rdf.store.DataLoader.loadFiles(DataLoader.java:832)
 	... 6 more
+------------------------------------------------------------
+
+concurrencyee-interest@altair.cs.oswego.edu and also check this link
+for more active sites to post: http://gee.cs.oswego.edu/dl/
+
+Hello,
+
+I was wondering if anyone has worked on a solution for allowing a client to queue requests that will execute with a parallelism limit specified by the client against either a local or remote executor.  I am thinking here about situations where multiple clients have access to a common executor with whatever internal parallelism limits and each client wants to specify a parallelism limit for its own operations.  Examples might include map/reduce processing where the client is a master and each host exposes an executor on which the tasks from that master will be executed with no more than a parallelism specified by the master.  Another example would be join processing where a join task would queue tasks to process intermediate binding sets against a common thread pool but would limit its own parallelism to some specified value.
+
+I realize that I can create a thread pool executor with a maximum pool size, but what I am interested in doing is reusing both local and remote executors for various clients within an application in which the parallelism limit is specified by the client.
+
+One of the things that motivates this for me is that some processes can not have parallelism limits without causing deadlocks.  So I find that it is best to use a cached thread pool without an upper bound on the #of threads but to then limit the parallelism which can be imposed on tasks submitted to that executor by various clients.
+
+Thanks,
+
+-bryan
+
+------------------------------------------------------------
+
+Odd RMI error thrown during JDS pipeline U50 for Q9.  It looks like
+there was an IO error when deserializing the JoinTask's outcome.  That
+is especially odd since the task returns Void:null.
+
+ERROR: 344422 pool-1-thread-109         com.bigdata.relation.rule.eval.QueryTask.call(QueryTask.java:99): Problem running query: java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.rmi.UnmarshalException: exception unmarshalling response; nested exception is: 
+	java.io.IOException: I/O error reading from mux connection: java.io.EOFException
+java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.rmi.UnmarshalException: exception unmarshalling response; nested exception is: 
+	java.io.IOException: I/O error reading from mux connection: java.io.EOFException
+	at com.bigdata.relation.rule.eval.AbstractStepTask.runOne(AbstractStepTask.java:333)
+	at com.bigdata.relation.rule.eval.QueryTask.runTasks(QueryTask.java:140)
+	at com.bigdata.relation.rule.eval.QueryTask.call(QueryTask.java:76)
+	at com.bigdata.relation.rule.eval.QueryTask.call(QueryTask.java:1)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:303)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:138)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:885)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:907)
+	at java.lang.Thread.run(Thread.java:619)
+Caused by: java.lang.RuntimeException: java.rmi.UnmarshalException: exception unmarshalling response; nested exception is: 
+	java.io.IOException: I/O error reading from mux connection: java.io.EOFException
+	at com.bigdata.service.proxy.ClientFuture.get(ClientFuture.java:69)
+	at com.bigdata.relation.rule.eval.pipeline.JoinMasterTask.awaitAll(JoinMasterTask.java:526)
+	at com.bigdata.relation.rule.eval.pipeline.JoinMasterTask.call(JoinMasterTask.java:378)
+	at com.bigdata.relation.rule.eval.pipeline.JoinMasterTask.call(JoinMasterTask.java:1)
+	at com.bigdata.relation.rule.eval.AbstractStepTask.runOne(AbstractStepTask.java:331)
+	... 8 more
+Caused by: java.rmi.UnmarshalException: exception unmarshalling response; nested exception is: 
+	java.io.IOException: I/O error reading from mux connection: java.io.EOFException
+	at net.jini.jeri.BasicInvocationHandler.invokeRemoteMethodOnce(BasicInvocationHandler.java:847)
+	at net.jini.jeri.BasicInvocationHandler.invokeRemoteMethod(BasicInvocationHandler.java:659)
+	at net.jini.jeri.BasicInvocationHandler.invoke(BasicInvocationHandler.java:528)
+	at $Proxy10.get(Unknown Source)
+	at com.bigdata.service.proxy.ClientFuture.get(ClientFuture.java:67)
+	... 12 more
+Caused by: java.io.IOException: I/O error reading from mux connection: java.io.EOFException
+	at com.sun.jini.jeri.internal.mux.Session$MuxInputStream.read(Session.java:852)
+	at net.jini.jeri.connection.ConnectionManager$Outbound$Input.read(ConnectionManager.java:515)
+	at net.jini.jeri.BasicObjectEndpoint.executeCall(BasicObjectEndpoint.java:411)
+	at net.jini.jeri.BasicInvocationHandler.invokeRemoteMethodOnce(BasicInvocationHandler.java:806)
+	... 16 more
+Caused by: java.io.EOFException
+	at com.sun.jini.jeri.internal.mux.SocketChannelConnectionIO.handleReadReady(SocketChannelConnectionIO.java:384)
+	at com.sun.jini.jeri.internal.mux.SocketChannelConnectionIO.access$200(SocketChannelConnectionIO.java:41)
+	at com.sun.jini.jeri.internal.mux.SocketChannelConnectionIO$Handler.handleSelection(SocketChannelConnectionIO.java:464)
+	at com.sun.jini.jeri.internal.runtime.SelectionManager$SelectLoop.run(SelectionManager.java:288)
+	at com.sun.jini.thread.ThreadPool$Worker.run(ThreadPool.java:136)
+	... 1 more
+
+
+------------------------------------------------------------
+Commit notes:

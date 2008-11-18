@@ -61,7 +61,7 @@ import com.bigdata.relation.rule.IRuleTaskFactory;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.Var;
-import com.bigdata.relation.rule.eval.JoinMasterTask.JoinTask;
+import com.bigdata.relation.rule.eval.pipeline.JoinTask;
 import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IDataServiceAwareProcedure;

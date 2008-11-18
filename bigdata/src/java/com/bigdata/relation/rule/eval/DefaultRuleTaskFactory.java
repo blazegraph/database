@@ -10,9 +10,10 @@ import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IRuleTaskFactory;
-import com.bigdata.relation.rule.eval.JoinMasterTask.DistributedJoinMasterTask;
-import com.bigdata.relation.rule.eval.JoinMasterTask.JoinTask;
-import com.bigdata.relation.rule.eval.JoinMasterTask.LocalJoinMasterTask;
+import com.bigdata.relation.rule.eval.pipeline.DistributedJoinMasterTask;
+import com.bigdata.relation.rule.eval.pipeline.JoinMasterTask;
+import com.bigdata.relation.rule.eval.pipeline.JoinTask;
+import com.bigdata.relation.rule.eval.pipeline.LocalJoinMasterTask;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.IBigdataFederation;
 
