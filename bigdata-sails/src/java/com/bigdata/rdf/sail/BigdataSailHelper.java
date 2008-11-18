@@ -624,7 +624,7 @@ public class BigdataSailHelper {
             if(true) {
                 final Properties p = new Properties();
 
-//                p.setProperty(Options.NESTED_SUBQUERY, "false");
+                p.setProperty(Options.NESTED_SUBQUERY, "false");
 //                p.setProperty(Options.CHUNK_CAPACITY, "100");
 //                p.setProperty(Options.FULLY_BUFFERED_READ_THRESHOLD, "1000");
 //                p.setProperty(Options.MAX_PARALLEL_SUBQUERIES, "0");

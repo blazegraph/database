@@ -30,9 +30,14 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
+import java.nio.channels.AsynchronousCloseException;
+import java.nio.channels.ClosedByInterruptException;
+import java.nio.channels.ClosedChannelException;
+import java.nio.channels.FileChannel;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
@@ -63,6 +68,9 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
      */
     protected static final Logger log = Logger
             .getLogger(IndexSegmentStore.class);
+
+    protected static final boolean WARN = log.getEffectiveLevel().toInt() <= Level.WARN
+            .toInt();
     
     protected static final boolean INFO = log.isInfoEnabled();
 
@@ -878,17 +886,70 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             // Allocate buffer: limit = capacity; pos = 0.
             dst = ByteBuffer.allocate(length);
 
-            try {
+            /*
+             * Read the record from the file.
+             * 
+             * Note: Java will close the backing FileChannel if Thread is
+             * interrupted during an NIO operation. Since the index segment is a
+             * read-only data structure, all of the in-memory state remains
+             * valid and we only need to re-open the FileChannel to the backing
+             * store and retry.
+             */
 
-                // read into [dst] - does not modify the channel's position().
-                FileChannelUtility.readAll(raf.getChannel(), dst, offset);
+            while(true) {
 
-            } catch (IOException ex) {
+                try {
 
-                throw new RuntimeException(ex);
+                    // read into [dst] - does not modify the channel's
+                    // position().
+                    FileChannelUtility.readAll(raf.getChannel(), dst, offset);
 
-            }
+                    // successful read - exit the loop.
+                    break;
 
+                } catch (ClosedByInterruptException ex) {
+
+                    /*
+                     * This indicates that this thread was interrupted. We
+                     * always abort in this case.
+                     */
+
+                    throw new RuntimeException(ex);
+
+                } catch (AsynchronousCloseException ex) {
+
+                    /*
+                     * The channel was closed asynchronously while blocking
+                     * during the read. If the buffer strategy still thinks that
+                     * it is open then we re-open the channel and re-read.
+                     */
+
+                    if (reopenChannel())
+                        continue;
+
+                    throw new RuntimeException(ex);
+
+                } catch (ClosedChannelException ex) {
+
+                    /*
+                     * The channel is closed. If the buffer strategy still
+                     * thinks that it is open then we re-open the channel and
+                     * re-read.
+                     */
+
+                    if (reopenChannel())
+                        continue;
+
+                    throw new RuntimeException(ex);
+
+                } catch (IOException ex) {
+
+                    throw new RuntimeException(ex);
+
+                }
+
+            } // while(true)
+            
             // Flip buffer for reading.
             dst.flip();
 
@@ -896,6 +957,68 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
 
         return dst;
 
+    }
+
+    /**
+     * This method transparently re-opens the channel for the backing file.
+     * <p>
+     * Note: This method is synchronized so that concurrent readers do not try
+     * to all open the store at the same time.
+     * <p>
+     * Note: Java will close the backing {@link FileChannel} if {@link Thread}
+     * is interrupted during an NIO operation. However, since the
+     * {@link IndexSegment} is a read-only data structure, all of the in-memory
+     * state remains valid and we only need to re-open the {@link FileChannel}
+     * to the backing store and retry. In particular, we do not need to re-read
+     * the root node, {@link IndexMetadata}, {@link BloomFilter}, etc. All we
+     * have to do is re-open the {@link FileChannel}.
+     * 
+     * @return true iff the channel was re-opened.
+     * 
+     * @throws RuntimeException
+     *             if the backing file can not be opened (can not be found or
+     *             can not acquire a lock).
+     */
+    synchronized private boolean reopenChannel() {
+        
+        if (raf != null && raf.getChannel().isOpen()) {
+            
+            /*
+             * The channel is still open. If you are allowing concurrent reads
+             * on the channel, then this could indicate that two readers each
+             * found the channel closed and that one was able to re-open the
+             * channel before the other such that the channel was open again by
+             * the time the 2nd reader got here.
+             */
+            
+            return true;
+            
+        }
+        
+        if(!isOpen()) {
+
+            // the IndexSegmentStore has been closed.
+            
+            return false;
+            
+        }
+        
+        try {
+
+            // open the file.
+            this.raf = new RandomAccessFile(file, "r");
+
+            if (WARN)
+                log.warn("Re-opened file: "+file);
+            
+        } catch(IOException ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
+
+        return true;
+        
     }
 
     /**

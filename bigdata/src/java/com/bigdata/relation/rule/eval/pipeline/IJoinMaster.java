@@ -26,15 +26,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Oct 16, 2008
  */
 
-package com.bigdata.relation.rule.eval;
+package com.bigdata.relation.rule.eval.pipeline;
 
 import java.io.IOException;
 import java.rmi.Remote;
 import java.util.UUID;
 
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.relation.rule.eval.JoinMasterTask.JoinStats;
-import com.bigdata.relation.rule.eval.JoinMasterTask.DistributedJoinTask;
+import com.bigdata.relation.rule.eval.ISolution;
 
 /**
  * Interface exported by the {@link JoinMasterTask}.
