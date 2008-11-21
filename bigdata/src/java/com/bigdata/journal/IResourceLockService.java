@@ -62,7 +62,8 @@ public interface IResourceLockService extends IService {
      *             wrapping {@link InterruptedException} or
      *             {@link TimeoutException}
      */
-    public IResourceLock acquireExclusiveLock(String namespace) throws IOException;
+    public IResourceLock acquireExclusiveLock(String namespace)
+            throws IOException;
 
     /**
      * Acquire an exclusive lock on a resource hierarchy. The request will block
@@ -80,7 +81,8 @@ public interface IResourceLockService extends IService {
      *             wrapping {@link InterruptedException} or
      *             {@link TimeoutException}
      */
-    public IResourceLock acquireExclusiveLock(String namespace, long timeout) throws IOException;
+    public IResourceLock acquireExclusiveLock(String namespace, long timeout)
+            throws IOException, InterruptedException;
 
     /**
      * Acquire a shared lock on a resource hierarchy (permits concurrent read and/or write operations on
@@ -94,7 +96,8 @@ public interface IResourceLockService extends IService {
      * @throws RuntimeException
      *             wrapping {@link InterruptedException}
      */
-    public IResourceLock acquireSharedLock(String namespace) throws IOException;
+    public IResourceLock acquireSharedLock(String namespace)
+            throws IOException;
 
     /**
      * Acquire a shared lock on a resource hierarchy (permits concurrent read
@@ -113,6 +116,7 @@ public interface IResourceLockService extends IService {
      *             wrapping {@link InterruptedException} or
      *             {@link TimeoutException}
      */
-    public IResourceLock acquireSharedLock(String namespace, long timeout) throws IOException;
+    public IResourceLock acquireSharedLock(String namespace, long timeout)
+            throws IOException, InterruptedException;
 
 }

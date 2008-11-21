@@ -73,8 +73,6 @@ import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.relation.rule.eval.pipeline.JoinTask;
-import com.bigdata.relation.rule.eval.pipeline.JoinTaskFactoryTask;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StoreManager;

@@ -1,13 +1,17 @@
 package com.bigdata.service.jini;
 
+import java.io.IOException;
+import java.io.Serializable;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.server.ServerNotActiveException;
 import java.util.Properties;
 
 import net.jini.config.Configuration;
+import net.jini.export.Exporter;
 import net.jini.export.ServerContext;
 import net.jini.io.context.ClientHost;
 import net.jini.io.context.ClientSubject;
@@ -16,6 +20,7 @@ import net.jini.lookup.entry.Name;
 import org.apache.log4j.MDC;
 
 import com.bigdata.counters.httpd.CounterSetHTTPDServer;
+import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ResourceLockService;
 import com.bigdata.service.DefaultServiceFederationDelegate;
 import com.bigdata.service.LoadBalancerService;
@@ -310,6 +315,101 @@ public class ResourceLockServer extends AbstractServer {
                 s = super.getServiceName();
 
             return s;
+
+        }
+
+        /**
+         * Wraps the lock as a {@link RemoteLock}, exports the
+         * {@link RemoteLock} to obtain its proxy object, and the wraps the
+         * {@link RemoteLock}'s proxy with a {@link ClientLock} so that the
+         * {@link IResourceLock} API is preserved.
+         */
+        @Override
+        protected IResourceLock getProxy(ResourceLock lock) {
+
+            final RemoteLock proxy = getFederation().getProxy(
+                    new RemoteLockImpl(lock), true/* enableDGC */);
+
+            return new ClientLock(proxy);
+
+        }
+
+        /**
+         * Serializable {@link IResourceLock} that wraps the proxy object and hides
+         * {@link IOException}s from the API.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+         * @version $Id$
+         */
+        private static class ClientLock implements IResourceLock, Serializable {
+
+            /**
+             * 
+             */
+            private static final long serialVersionUID = -3717335186306277769L;
+            
+            private final RemoteLock remoteLock;
+
+            public ClientLock(final RemoteLock remoteLock) {
+
+                if (remoteLock == null)
+                    throw new IllegalArgumentException();
+
+                this.remoteLock = remoteLock;
+
+            }
+
+            public void unlock() {
+
+                try {
+
+                    remoteLock.unlock();
+
+                } catch (IOException ex) {
+
+                    throw new RuntimeException(ex);
+
+                }
+
+            }
+
+        }
+
+        /**
+         * Interface provides the API of {@link IResourceLock} but its methods
+         * throw {@link IOException} and it extends {@link Remote} and is
+         * therefore compatible with RMI and {@link Exporter}.
+         */
+        private static interface RemoteLock extends Remote {
+            
+            public void unlock() throws IOException;
+            
+        }
+        
+        /**
+         * {@link RemoteLock} implementation.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+         * @version $Id$
+         */
+        private static class RemoteLockImpl implements RemoteLock {
+
+            private final ResourceLock lock;
+
+            public RemoteLockImpl(final ResourceLock lock) {
+
+                if (lock == null)
+                    throw new IllegalArgumentException();
+
+                this.lock = lock;
+
+            }
+
+            public void unlock() throws IOException {
+
+                this.lock.unlock();
+
+            }
 
         }
 

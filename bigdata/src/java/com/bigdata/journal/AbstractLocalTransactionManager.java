@@ -46,14 +46,12 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility i
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final static protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final static protected boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final static protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final static protected boolean DEBUG = log.isDebugEnabled();
 
     /**
      * Object used to manage local resources.

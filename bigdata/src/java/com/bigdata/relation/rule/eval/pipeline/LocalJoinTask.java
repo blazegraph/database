@@ -2,6 +2,7 @@ package com.bigdata.relation.rule.eval.pipeline;
 
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import com.bigdata.journal.Journal;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
@@ -309,23 +310,27 @@ class LocalJoinTask extends JoinTask {
         if (DEBUG)
             log.debug("orderIndex=" + orderIndex);
 
-        // @todo use timeout and test halt to avoid long waits?
-        if(source.hasNext()) {
+        while (!source.isExhausted()) {
 
             if (halt)
                 throw new RuntimeException(firstCause.get());
 
-            // read the chunk.
-            final IBindingSet[] chunk = source.next();
+            // note: uses timeout to avoid blocking w/o testing [halt].
+            if (source.hasNext(10, TimeUnit.MILLISECONDS)) {
 
-            stats.bindingSetChunksIn++;
-            stats.bindingSetsIn += chunk.length;
+                // read the chunk.
+                final IBindingSet[] chunk = source.next();
 
-            if (DEBUG)
-                log.debug("Read chunk from source: chunkSize="
-                        + chunk.length + ", orderIndex=" + orderIndex);
+                stats.bindingSetChunksIn++;
+                stats.bindingSetsIn += chunk.length;
 
-            return chunk;
+                if (DEBUG)
+                    log.debug("Read chunk from source: chunkSize="
+                            + chunk.length + ", orderIndex=" + orderIndex);
+
+                return chunk;
+
+            }
 
         }
 

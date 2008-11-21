@@ -256,7 +256,7 @@ public class DistributedJoinMasterTask extends JoinMasterTask implements
      *         evaluation order given the initial bindingSet for the rule).
      */
     @Override
-    final protected List<Future<? extends Object>> start() throws Exception {
+    final protected List<Future<Void>> start() throws Exception {
 
         /*
          * The initial bindingSet.
@@ -269,7 +269,7 @@ public class DistributedJoinMasterTask extends JoinMasterTask implements
         final List<Future> factoryTaskFutures = mapBindingSet(initialBindingSet);
 
         // await futures for the factory tasks.
-        final List<Future<? extends Object>> joinTaskFutures = awaitFactoryFutures(factoryTaskFutures);
+        final List<Future<Void>> joinTaskFutures = awaitFactoryFutures(factoryTaskFutures);
 
         return joinTaskFutures;
 
@@ -403,7 +403,7 @@ public class DistributedJoinMasterTask extends JoinMasterTask implements
      * @throws ExecutionExceptions
      *             if any of the factory tasks fail.
      */
-    protected List<Future<? extends Object>> awaitFactoryFutures(
+    protected List<Future<Void>> awaitFactoryFutures(
             final List<Future> factoryTaskFutures) throws InterruptedException,
             ExecutionExceptions {
 
@@ -419,7 +419,7 @@ public class DistributedJoinMasterTask extends JoinMasterTask implements
          * Since we process the factory task futures in order the list will
          * be in the same order as the factory task futures.
          */
-        final List<Future<? extends Object>> joinTaskFutures = new ArrayList<Future<? extends Object>>(
+        final List<Future<Void>> joinTaskFutures = new ArrayList<Future<Void>>(
                 size);
 
         final Iterator<Future> itr = factoryTaskFutures.iterator();
@@ -451,7 +451,7 @@ public class DistributedJoinMasterTask extends JoinMasterTask implements
                 JoinMasterTask.log.debug("Waiting for factoryTask");
 
             // wait for the JoinTaskFactoryTask to finish.
-            final Future<? extends Object> joinTaskFuture;
+            final Future<Void> joinTaskFuture;
 
             try {
 
@@ -468,10 +468,9 @@ public class DistributedJoinMasterTask extends JoinMasterTask implements
 
                 }
 
-                //                    log.fatal("\nWaiting on factoryTaskFuture: "+factoryTaskFuture);
-                joinTaskFuture = (Future<? extends Object>) factoryTaskFuture
-                        .get();
-                //                    log.fatal("\nHave joinTaskFuture: "+joinTaskFuture);
+                // log.fatal("\nWaiting on factoryTaskFuture: "+factoryTaskFuture);
+                joinTaskFuture = (Future<Void>) factoryTaskFuture.get();
+                // log.fatal("\nHave joinTaskFuture: "+joinTaskFuture);
 
             } catch (ExecutionException ex) {
 

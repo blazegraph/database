@@ -7,13 +7,13 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Vector;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
 import com.bigdata.concurrent.NamedLock;
-import com.bigdata.journal.IResourceLock;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
@@ -808,43 +808,42 @@ public class DistributedJoinTask extends JoinTask {
              * Close sinks.
              * 
              * For all but the lastJoin, the buffers are writing onto the
-             * per-sink buffers. We flush and close those buffers now. The
-             * sink JoinTasks drain those buffers. Once the buffers are
-             * closed, the sink JoinTasks will eventually exhaust the
-             * buffers.
+             * per-sink buffers. We flush and close those buffers now. The sink
+             * JoinTasks drain those buffers. Once the buffers are closed, the
+             * sink JoinTasks will eventually exhaust the buffers.
              * 
-             * FIXME This should flush the buffers using a thread pool with
-             * one thread per sink. This will give better throughput when
-             * the fanOut is GT ONE (1).
+             * Note: This flushes the buffers using a thread pool which should
+             * give better throughput when the fanOut is GT ONE (1).
              */
 
             {
+
+                if (halt)
+                    throw new RuntimeException(firstCause.get());
+
+                final List<Callable<Void>> tasks = new LinkedList<Callable<Void>>();
 
                 final Iterator<JoinTaskSink> itr = sinkCache.values()
                         .iterator();
 
                 while (itr.hasNext()) {
 
-                    if (halt)
-                        throw new RuntimeException(firstCause.get());
-
                     final JoinTaskSink sink = itr.next();
 
-                    if (DEBUG)
-                        log.debug("Closing sink: sink=" + sink
-                                + ", unsyncBufferSize="
-                                + sink.unsyncBuffer.size()
-                                + ", blockingBufferSize="
-                                + sink.blockingBuffer.size());
-
-                    // flush to the blockingBuffer.
-                    sink.unsyncBuffer.flush();
-
-                    // close the blockingBuffer.
-                    sink.blockingBuffer.close();
+                    tasks.add(new FlushAndCloseSinkBufferTask(sink));
 
                 }
 
+                final List<Future<Void>> futures = fed.getExecutorService()
+                        .invokeAll(tasks);
+
+                for (Future f : futures) {
+
+                    // make sure that all tasks were successfull.
+                    f.get();
+
+                }
+                
             }
 
             // Await sinks.
@@ -884,6 +883,49 @@ public class DistributedJoinTask extends JoinTask {
 
     }
 
+    /**
+     * Flushes any buffered data for a {@link JoinTaskSink} and closes the
+     * {@link BlockingBuffer} for that sink so that the sink {@link JoinTask}'s
+     * iterator can eventually drain the buffer and report that it is exhausted.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private class FlushAndCloseSinkBufferTask implements Callable<Void> {
+
+        final private JoinTaskSink sink;
+
+        public FlushAndCloseSinkBufferTask(final JoinTaskSink sink) {
+
+            if (sink == null)
+                throw new IllegalArgumentException();
+
+            this.sink = sink;
+
+        }
+
+        public Void call() throws Exception {
+
+            if (halt)
+                throw new RuntimeException(firstCause.get());
+
+            if (DEBUG)
+                log.debug("Closing sink: sink=" + sink
+                        + ", unsyncBufferSize=" + sink.unsyncBuffer.size()
+                        + ", blockingBufferSize=" + sink.blockingBuffer.size());
+
+            // flush to the blockingBuffer.
+            sink.unsyncBuffer.flush();
+
+            // close the blockingBuffer.
+            sink.blockingBuffer.close();
+
+            return null;
+
+        }
+
+    }
+    
     /**
      * Cancel all {@link DistributedJoinTask}s that are sinks for this
      * {@link DistributedJoinTask}.

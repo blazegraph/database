@@ -66,7 +66,7 @@ public class LocalJoinMasterTask extends JoinMasterTask {
      *         join dimension.
      */
     @Override
-    protected List<Future<? extends Object>> start() throws Exception {
+    protected List<Future<Void>> start() throws Exception {
 
         // source for each join dimension.
         final IAsynchronousIterator<IBindingSet[]>[] sources = new IAsynchronousIterator[tailCount];
@@ -75,7 +75,7 @@ public class LocalJoinMasterTask extends JoinMasterTask {
         sources[0] = newBindingSetIterator(joinNexus.newBindingSet(rule));
 
         // Future for each JoinTask.
-        final List<Future<? extends Object>> futures = new ArrayList<Future<? extends Object>>(tailCount); 
+        final List<Future<Void>> futures = new ArrayList<Future<Void>>(tailCount); 
         
         // The JoinTasks will be run on this service.
         final ExecutorService executorService = joinNexus.getIndexManager().getExecutorService();
@@ -125,9 +125,8 @@ public class LocalJoinMasterTask extends JoinMasterTask {
              * evaluation order.
              */
 
-            // Submit the JoinTask for execution. @todo Future<Void>
-            final Future<? extends Object> future = executorService
-                    .submit(joinTask);
+            // Submit the JoinTask for execution.
+            final Future<Void> future = executorService.submit(joinTask);
 
             // Save reference to the Future.
             futures.add( future );
