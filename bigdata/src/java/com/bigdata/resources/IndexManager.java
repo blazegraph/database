@@ -937,6 +937,8 @@ abstract public class IndexManager extends StoreManager {
 
                     }
 
+//                    System.err.println("getIndex(name="+name+", timestamp="+timestamp);
+                    
                     assert sources.length > 0;
 
                     assert sources[0].isReadOnly();

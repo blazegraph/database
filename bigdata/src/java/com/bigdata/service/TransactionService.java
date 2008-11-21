@@ -242,15 +242,20 @@ abstract public class TransactionService extends TimestampService implements
      * If a transaction has a write set, then this method does not return until
      * that write set has been made restart safe or the transaction has failed.
      */
-    public long commit(long startTime) throws ValidationError {
+    public long commit(final long startTime) throws ValidationError {
         
-        TxMetadata tx = activeTx.get(startTime);
+        final TxMetadata tx = activeTx.get(startTime);
         
-        if (tx == null)
+        if (tx == null) {
+
             throw new IllegalStateException("Unknown: " + startTime);
+            
+        }
 
         if(!tx.isActive()) {
+
             throw new IllegalStateException("Not active: " + startTime);
+            
         }
 
         final long commitTime = nextTimestamp();

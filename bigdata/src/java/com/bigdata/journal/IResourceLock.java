@@ -1,6 +1,5 @@
 package com.bigdata.journal;
 
-import java.io.IOException;
 import java.rmi.Remote;
 
 /**
@@ -14,11 +13,6 @@ public interface IResourceLock extends Remote {
     /**
      * Release the lock.
      */
-    public void unlock() throws IOException;
-
-    //        /**
-    //         * The unique identifier for this lock.
-    //         */
-    //        public UUID uuid();
+    public void unlock();
 
 }

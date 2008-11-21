@@ -28,12 +28,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
-import java.io.Serializable;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
 
 import org.apache.log4j.MDC;
 
+import com.bigdata.concurrent.NamedReadWriteLock;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.service.AbstractService;
 import com.bigdata.service.IBigdataFederation;
@@ -49,7 +51,10 @@ import com.bigdata.service.IServiceShutdown;
  * may be obtained that bear no relationship to actual indices or relations.
  * This can be convenient for coordinating distributed processes.
  * 
- * FIXME Implement!
+ * FIXME test suite for Journal, LDS, EDS, and JDS.
+ * 
+ * FIXME The current implementation uses the namespace as a token, not a
+ * hierarchy.
  * <p>
  * The concept of the resource hierarchy described here can be realized by
  * storing lock "tokens" in a B+Tree with Unicode keys. Lock tokens have two
@@ -124,18 +129,32 @@ abstract public class ResourceLockService extends AbstractService implements
         
     };
     
-    public ResourceLockService(Properties properties) {
+    /**
+     * Table of locks. Locks are weakly held. DGC is therefore required when
+     * locks are exported for RMI.
+     * 
+     * @todo this is not a namespace hierarchy, but only locks for a specified
+     *       token. See notes above on support for a hierarchy but also consider
+     *       ZooKeeper, which also allows data to be stored in the nodes.
+     */
+    private final NamedReadWriteLock<String/* namespace */> locks = new NamedReadWriteLock<String>();
+
+    public ResourceLockService(final Properties properties) {
         
     }
     
-    // TODO Auto-generated method stub
-    public IResourceLock acquireExclusiveLock(String namespace) {
+    public IResourceLock acquireExclusiveLock(final String namespace) {
 
         setupLoggingContext();
         
         try {
         
-            return new Lock(UUID.randomUUID());
+            final Lock lock = locks.acquireWriteLock(namespace);
+
+            final ResourceLock resourceLock = newLock(namespace,
+                    true/* exclusive */, lock);
+            
+            return getProxy( resourceLock );
             
         } finally {
             
@@ -145,15 +164,21 @@ abstract public class ResourceLockService extends AbstractService implements
         
     }
 
-    // TODO Auto-generated method stub
-    public IResourceLock acquireExclusiveLock(String namespace, long timeout) {
+    public IResourceLock acquireExclusiveLock(final String namespace,
+            final long timeout) throws InterruptedException {
     
         setupLoggingContext();
-        
+
         try {
-        
-            return new Lock(UUID.randomUUID());
-            
+
+            final Lock lock = locks.acquireWriteLock(namespace, timeout,
+                    TimeUnit.MILLISECONDS);
+
+            final ResourceLock resourceLock = newLock(namespace,
+                    true/* exclusive */, lock);
+
+            return getProxy(resourceLock);
+
         } finally {
             
             clearLoggingContext();
@@ -162,14 +187,18 @@ abstract public class ResourceLockService extends AbstractService implements
 
     }
 
-    //  TODO Auto-generated method stub
     public IResourceLock acquireSharedLock(String namespace) {
 
         setupLoggingContext();
         
         try {
         
-            return new Lock(UUID.randomUUID());
+            final Lock lock = locks.acquireReadLock(namespace);
+
+            final ResourceLock resourceLock = newLock(namespace,
+                    false /* exclusive */, lock);
+
+            return getProxy(resourceLock);
             
         } finally {
             
@@ -179,14 +208,20 @@ abstract public class ResourceLockService extends AbstractService implements
         
     }
 
-    //  TODO Auto-generated method stub
-    public IResourceLock acquireSharedLock(String namespace, long timeout) {
+    public IResourceLock acquireSharedLock(String namespace, long timeout)
+            throws InterruptedException {
         
         setupLoggingContext();
         
         try {
         
-            return new Lock(UUID.randomUUID());
+            final Lock lock = locks.acquireReadLock(namespace, timeout,
+                    TimeUnit.MILLISECONDS);
+
+            final ResourceLock resourceLock = newLock(namespace,
+                    false /* exclusive */, lock);
+
+            return getProxy(resourceLock);
             
         } finally {
             
@@ -195,48 +230,85 @@ abstract public class ResourceLockService extends AbstractService implements
         }
         
     }
-
-    protected void unlock(Lock lock) {
-
-        setupLoggingContext();
+    
+    /**
+     * {@link ResourceLock} factory.
+     * 
+     * @param namespace
+     *            The namespace on which the lock was acquired.
+     * @param exclusive
+     *            <code>true</code> iff this is an exclusive lock.
+     * @param lock
+     *            The {@link Lock}.
+     * 
+     * @return A new lock.
+     */
+    protected ResourceLock newLock(final String namespace,
+            final boolean exclusive, Lock lock) {
         
-        try {
+        return new ResourceLock(namespace, exclusive, lock);
         
-            // TODO unlock
-            
-        } finally {
-            
-            clearLoggingContext();
-            
-        }
-
     }
 
-    private static class Lock implements IResourceLock, Serializable {
+    /**
+     * Return a proxy for a lock. The default implementation simply returns the
+     * lock itself. Distributed (RMI) based services must override this and
+     * return a suitable proxy object.
+     * 
+     * @param lock
+     *            The lock.
+     * 
+     * @return The proxy.
+     */
+    protected IResourceLock getProxy(ResourceLock lock) {
+       
+        if (lock == null)
+            throw new IllegalArgumentException();
+        
+        return lock;
+        
+    }
+    
+    /**
+     * Inner class for lock tokens (NOT serializable).
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected class ResourceLock implements IResourceLock {
+        
+        protected final String namespace;
+        protected final boolean exclusive;
+        protected final Lock lock;
 
         /**
          * 
+         * @param namespace
+         *            The namespace.
+         * @param exclusive
+         *            <code>true</code> iff this is an exclusive lock.
+         * @param lock
+         *            The lock (must have been acquired by the caller).
          */
-        private static final long serialVersionUID = -902736253411429335L;
-        private final UUID uuid;
+        protected ResourceLock(String namespace, boolean exclusive, final Lock lock) {
 
-        private Lock(UUID uuid) {
-
-            if (uuid == null)
+            if (namespace == null)
                 throw new IllegalArgumentException();
 
-            this.uuid = uuid;
+            if (lock == null)
+                throw new IllegalArgumentException();
 
-        }
-
-        /**
-         * FIXME must proxy for jini/RMI (currently disabled as it forces
-         * serialization of the {@link ResourceLockService}). make the proxy a
-         * wrapper so that we can avoid the "IOException" throwable.
-         */
-        public void unlock() {
+            this.namespace = namespace;
             
-//            ResourceLockService.this.unlock(this);
+            this.exclusive = exclusive;
+
+            this.lock = lock;
+            
+        }
+        
+        public void unlock() {
+
+            lock.unlock();
 
         }
 

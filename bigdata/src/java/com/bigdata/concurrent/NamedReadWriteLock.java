@@ -32,14 +32,16 @@ import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 
 /**
- * A factory for named {@link Lock}s. A simple {@link Lock} manages access to a
- * single resource. However, a {@link NamedLock} manages access to the members
- * of a set of named resources. This is more efficient when the latency of the
- * operation once the lock is acquired is significant, e.g., an RMI call or a
- * disk IO.
+ * A factory for named {@link ReadWriteLock}s. A simple {@link ReadWriteLock}
+ * manages access to a single resource. However, a {@link NamedReadWriteLock}
+ * manages access to the members of a set of named resources. This is more
+ * efficient when the latency of the operation once the lock is acquired is
+ * significant, e.g., an RMI call or a disk IO.
  * <p>
  * The locks are stored in a {@link WeakHashMap} so that they will be garbage
  * collected if there are no threads waiting in the queue for a given named
@@ -52,9 +54,9 @@ import java.util.concurrent.locks.ReentrantLock;
  *            and equals() since the instances of this type will serve as keys
  *            in a {@link Map}.
  */
-public class NamedLock<T> {
+public class NamedReadWriteLock<T> {
 
-    final private Map<T, ReentrantLock> locks = new WeakHashMap<T, ReentrantLock>();
+    final private Map<T, ReentrantReadWriteLock> locks = new WeakHashMap<T, ReentrantReadWriteLock>();
 
     /**
      * Return the canonical instance of the lock for a named resource.
@@ -64,20 +66,20 @@ public class NamedLock<T> {
      * 
      * @return The canonical instance of the lock for that name.
      */
-    protected Lock lockFactory(T name) {
+    protected ReentrantReadWriteLock lockFactory(T name) {
 
         if (name == null)
             throw new IllegalArgumentException();
 
-        ReentrantLock lock;
-        
+        ReentrantReadWriteLock lock;
+
         synchronized (locks) {
 
             lock = locks.get(name);
 
             if (lock == null) {
 
-                lock = new ReentrantLock();
+                lock = new ReentrantReadWriteLock();
 
                 locks.put(name, lock);
 
@@ -86,37 +88,59 @@ public class NamedLock<T> {
         }
 
         return lock;
-
+        
     }
     
     /**
-     * Block until the {@link Lock} for the named resource is available, then
-     * {@link Lock#lock()} the {@link Lock} and return the locked {@link Lock}.
+     * Block until the {@link ReadLock} for the named resource is available,
+     * then {@link Lock#lock()} the {@link Lock} and returns the {@link Lock}.
      * 
      * @param name
      *            The name of the resource whose {@link Lock} is desired.
      * 
      * @return The {@link Lock}. It will have already been {@link Lock#lock()}ed.
      */
-    public Lock acquireLock(T name) {
+    public Lock acquireReadLock(T name) {
 
-        final Lock lock = lockFactory(name);
+        final Lock lock = lockFactory(name).readLock();
 
         lock.lock();
-
+        
         return lock;
 
     }
 
-    public Lock acquireLock(T name, long timeout, TimeUnit unit)
+    public Lock acquireReadLock(T name, long timeout, TimeUnit unit)
             throws InterruptedException {
 
-        final Lock lock = lockFactory(name);
+        final Lock lock = lockFactory(name).readLock();
 
         lock.tryLock(timeout, unit);
 
         return lock;
 
     }
-    
+
+
+    public Lock acquireWriteLock(T name) {
+
+        final Lock lock = lockFactory(name).writeLock();
+
+        lock.lock();
+        
+        return lock;
+
+    }
+
+    public Lock acquireWriteLock(T name, long timeout, TimeUnit unit)
+            throws InterruptedException {
+
+        final Lock lock = lockFactory(name).writeLock();
+
+        lock.tryLock(timeout, unit);
+
+        return lock;
+
+    }
+
 }

@@ -390,17 +390,9 @@ abstract public class AbstractResource<E> implements IMutableResource<E>{
      * @param resourceLock
      *            The lock.
      */
-    protected void unlock(IResourceLock resourceLock) {
+    protected void unlock(final IResourceLock resourceLock) {
         
-        try {
-            
-            resourceLock.unlock();
-            
-        } catch (IOException e) {
-            
-            throw new RuntimeException(e);
-            
-        }
+        resourceLock.unlock();
         
     }
     

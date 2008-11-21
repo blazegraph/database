@@ -371,7 +371,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
 
         final long begin = System.currentTimeMillis();
 
-        final List<Future<?extends Object>> futures = start();
+        final List<Future<Void>> futures = start();
         
         try {
 
@@ -464,7 +464,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
      * 
      * @return The {@link Future}s for those {@link JoinTask}s.
      */
-    abstract List<Future<? extends Object>> start() throws Exception;
+    abstract List<Future<Void>> start() throws Exception;
 
     /**
      * Make sure that each {@link JoinTask} completed successfully.
@@ -490,7 +490,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
      * @throws TimeoutException
      *             if the timeout expires first.
      */
-    protected void awaitAll(final List<Future<? extends Object>> futures,
+    protected void awaitAll(final List<Future<Void>> futures,
             final long timeout, final TimeUnit unit) throws ExecutionExceptions,
             InterruptedException, TimeoutException {
 
@@ -501,13 +501,13 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
         // errors.
         final List<ExecutionException> errors = new LinkedList<ExecutionException>();
 
-        for (Future<? extends Object> f : futures) {
+        for (Future<Void> f : futures) {
 
             if (remaining < 0L) {
 
                 int ncancelled = 0;
 
-                for (Future x : futures) {
+                for (Future<Void> x : futures) {
 
                     if (x.cancel(true/* mayInterruptIfRunning */)) {
 
