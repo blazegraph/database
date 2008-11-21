@@ -124,5 +124,11 @@ final public class EmptyBindingSet implements IBindingSet, Serializable {
         return EmptyBindingSet.INSTANCE;
 
     }
+
+    public Iterator<IVariable> vars() {
+
+        return EmptyIterator.DEFAULT;
+        
+    }
     
 }

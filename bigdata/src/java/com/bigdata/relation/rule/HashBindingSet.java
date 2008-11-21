@@ -31,6 +31,7 @@ package com.bigdata.relation.rule;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -40,21 +41,23 @@ import java.util.Map.Entry;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo compact serialization.
  */
 public class HashBindingSet implements IBindingSet {
 
     private static final long serialVersionUID = -2989802566387532422L;
     
-    private HashMap<IVariable, IConstant> map;
+    /**
+     * Note: A {@link LinkedHashMap} provides a fast iterator, which we use a
+     * bunch.
+     */
+    private LinkedHashMap<IVariable, IConstant> map;
 
     /**
      * New empty binding set.
      */
     public HashBindingSet() {
         
-        map = new HashMap<IVariable, IConstant>();
+        map = new LinkedHashMap<IVariable, IConstant>();
         
     }
 
@@ -65,7 +68,7 @@ public class HashBindingSet implements IBindingSet {
      */
     protected HashBindingSet(HashBindingSet src) {
         
-        map = new HashMap<IVariable, IConstant>(src.map);
+        map = new LinkedHashMap<IVariable, IConstant>(src.map);
         
     }
     
@@ -157,6 +160,12 @@ public class HashBindingSet implements IBindingSet {
         
     }
 
+    public Iterator<IVariable> vars() {
+
+        return Collections.unmodifiableSet(map.keySet()).iterator();
+        
+    }
+    
     public int size() {
 
         return map.size();

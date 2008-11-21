@@ -141,6 +141,11 @@ public interface IBindingSet extends Cloneable, Serializable {
      * Visits the bindings.
      */
     public Iterator<Map.Entry<IVariable,IConstant>> iterator();
+
+    /**
+     * Visits the bound variables.
+     */
+    public Iterator<IVariable> vars();
     
     /**
      * Return a shallow copy of the binding set.

@@ -52,16 +52,13 @@ import net.jini.lookup.entry.Name;
 
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.io.ISerializer;
-import com.bigdata.io.SerializerUtil;
+import com.bigdata.io.IStreamSerializer;
 import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.TimestampServiceUtil;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
@@ -76,8 +73,6 @@ import com.bigdata.service.proxy.RemoteAsynchronousIterator;
 import com.bigdata.service.proxy.RemoteAsynchronousIteratorImpl;
 import com.bigdata.service.proxy.RemoteBuffer;
 import com.bigdata.service.proxy.RemoteBufferImpl;
-import com.bigdata.service.proxy.RemoteChunk;
-import com.bigdata.service.proxy.RemoteChunkedIterator;
 import com.bigdata.service.proxy.RemoteFuture;
 import com.bigdata.service.proxy.RemoteFutureImpl;
 import com.sun.jini.admin.DestroyAdmin;
@@ -657,29 +652,11 @@ public class JiniFederation extends AbstractDistributedFederation implements
      *       configuration of the {@link Exporter} will require an additional
      *       level of indirection when compared to the {@link Configuration} of
      *       an {@link AbstractServer}'s {@link Exporter}.
-     * 
-     * FIXME The caller's {@link ISerializer} is not being applied. The problem
-     * is that the {@link RemoteAsynchronousIterator} interface and the
-     * {@link RemoteAsynchronousIteratorImpl} use the same API as
-     * {@link IAsynchronousIterator}. This means that
-     * {@link RemoteAsynchronousIterator#next()} will return the element and
-     * that RMI will automatically marshall that return value without regard to
-     * our {@link ISerializer}. Fixing this will require
-     * {@link RemoteAsynchronousIterator} to declare methods that facilitate the
-     * compact custom serialization, much like the {@link RemoteChunkedIterator}
-     * and {@link RemoteChunk}. Note that we only use three methods to
-     * implement {@link ClientAsynchronousIterator} - hasNext(timeout,unit),
-     * isExhausted(), and next(). The rest of the API does not need to be
-     * implemented and next() needs to be reworked as byte[]:nextElement() so
-     * that we can impose our own (de-)serialization.  (Also, note that the
-     * {@link SerializerUtil} is being used as the serializer so far and
-     * that class is neither {@link Serializable} nor efficient for either
-     * {@link IBindingSet}[]s nor {@link ISolution}[]s).
      */
     @Override
     public <E> IAsynchronousIterator<E> getProxy(
             final IAsynchronousIterator<E> sourceIterator,
-            final ISerializer<E> serializer,
+            final IStreamSerializer<E> serializer,
             final int capacity) {
         
         if (sourceIterator == null)
@@ -719,7 +696,7 @@ public class JiniFederation extends AbstractDistributedFederation implements
         // wrap the iterator with an exportable object.
         final RemoteAsynchronousIterator<E> impl = new RemoteAsynchronousIteratorImpl<E>(
                 sourceIterator
-                //, serializer
+                , serializer
                 );
         
         /*
@@ -761,8 +738,6 @@ public class JiniFederation extends AbstractDistributedFederation implements
      */
     public <E> Future<E> getProxy(final Future<E> future) {
 
-//        log.fatal("\nExporting proxy for future: "+future,new RuntimeException("stack trace"));
-        
         /*
          * Setup the Exporter for the Future.
          * 

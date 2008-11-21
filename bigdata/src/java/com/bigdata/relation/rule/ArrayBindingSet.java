@@ -28,11 +28,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.rule;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 /**
@@ -44,8 +45,6 @@ import org.apache.log4j.Logger;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo compact serialization.
  */
 public class ArrayBindingSet implements IBindingSet {
 
@@ -63,7 +62,14 @@ public class ArrayBindingSet implements IBindingSet {
      */
     protected static final boolean DEBUG = log.isDebugEnabled();
 
+    /**
+     * A dense array of the bound variables.
+     */
     private final IVariable[] vars;
+    /**
+     * A dense array of the values bound to the variables (correlated with
+     * {@link #vars}).
+     */
     private final IConstant[] vals;
 
     private int nbound = 0;
@@ -144,6 +150,12 @@ public class ArrayBindingSet implements IBindingSet {
 
     }
 
+    public Iterator<IVariable> vars() {
+
+        return Collections.unmodifiableList(Arrays.asList(vars)).iterator();
+        
+    }
+    
     /**
      * Iterator does not support either removal or concurrent modification of 
      * the binding set.

@@ -5,7 +5,7 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
-import com.bigdata.io.ISerializer;
+import com.bigdata.io.IStreamSerializer;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
@@ -32,7 +32,7 @@ public class RemoteChunk<E> implements IRemoteChunk<E>, Externalizable {
     /**
      * Used to (de-)serialize the chunk of elements.
      */
-    private ISerializer<E[]> serializer;
+    private IStreamSerializer<E[]> serializer;
     
     /**
      * The natural order of those elements (if any).
@@ -51,9 +51,12 @@ public class RemoteChunk<E> implements IRemoteChunk<E>, Externalizable {
         
     }
     
-    public RemoteChunk(final boolean exhausted,
-            final ISerializer<E[]> serializer, final IKeyOrder<E> keyOrder,
-            E[] a) {
+    public RemoteChunk(
+            final boolean exhausted,
+            final IStreamSerializer<E[]> serializer,
+            final IKeyOrder<E> keyOrder,
+            final E[] a
+            ) {
 
         if (serializer == null)
             throw new IllegalArgumentException();
@@ -99,20 +102,11 @@ public class RemoteChunk<E> implements IRemoteChunk<E>, Externalizable {
         
         if(haveChunk) {
             
-            // #of bytes in the chunk.
-            final int nbytes = in.readInt();
+            // de-serialize the serializer object.
+            serializer = (IStreamSerializer<E[]>) in.readObject();
             
-            // allocate buffer.
-            final byte[] data = new byte[nbytes]; 
-                
-            // read serialized data for the chunk into the buffer.
-            in.readFully(data);
-            
-            // de-serialize the serialized.
-            serializer = (ISerializer<E[]>)in.readObject();
-            
-            // de-serialize the chunk from the buffer.
-            a = serializer.deserialize(data);
+            // de-serialize the chunk using that serializer.
+            a = serializer.deserialize(in);
             
         }
         
@@ -131,25 +125,12 @@ public class RemoteChunk<E> implements IRemoteChunk<E>, Externalizable {
 
         if (haveChunk) {
 
-            // serialize the chunk.
-            final byte[] data = serializer.serialize(a);
-
-            // #of bytes in the serialized chunk.
-            out.writeInt(data.length);
-
-            // the serialized chunk.
-            out.write(data);
-            
-            /*
-             * The (de-)serializer for the chunk.
-             * 
-             * Note: We write out the serializer after we have serialized the
-             * chunk in case the serializer has serializable state. For example,
-             * a dictionary that it will use on the other end to decode the
-             * chunk.
-             */
+            // The (de-)serializer for the chunk.
             out.writeObject(serializer);
 
+            // serialize the chunk.
+            serializer.serialize(out,a);
+            
         }
 
     }

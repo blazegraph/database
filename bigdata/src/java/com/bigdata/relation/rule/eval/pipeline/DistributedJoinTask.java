@@ -10,10 +10,10 @@ import java.util.Vector;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import com.bigdata.concurrent.NamedLock;
+import com.bigdata.journal.IResourceLock;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
@@ -32,7 +32,9 @@ import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
+import com.bigdata.service.Session;
 import com.bigdata.striterator.IKeyOrder;
+
 
 /**
  * Implementation used by scale-out deployments. There will be one instance
@@ -44,7 +46,7 @@ import com.bigdata.striterator.IKeyOrder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-class DistributedJoinTask extends JoinTask {
+public class DistributedJoinTask extends JoinTask {
 
     /**
      * When <code>true</code>, enables a trace on {@link System#err} of
@@ -68,6 +70,11 @@ class DistributedJoinTask extends JoinTask {
     final protected IJoinNexus fedJoinNexus;
 
     /**
+     * A (proxy for) the {@link Future} for this {@link DistributedJoinTask}.
+     */
+    protected Future<Void> futureProxy;
+    
+    /**
      * @see IRuleState#getKeyOrder()
      */
     final private IKeyOrder[] keyOrders;
@@ -90,6 +97,23 @@ class DistributedJoinTask extends JoinTask {
     final private Vector<IAsynchronousIterator<IBindingSet[]>> sources = new Vector<IAsynchronousIterator<IBindingSet[]>>();
 
     /**
+     * <code>false</code> until all binding sets have been consumed and the
+     * join task has made an atomic decision that it will not accept any new
+     * sources. Note that the join task may still be consuming binding sets once
+     * this flag is set - it is not necessarily done with its work, just no
+     * willing to accept new {@link #sources}.
+     * 
+     * @todo rename as sourcesClosed
+     */
+    private boolean sourcesExhausted = false;
+    
+    /**
+     * The {@link DataService} on which this task is executing. This is used to
+     * remove the entry for the task from {@link DataService#getSession()}.
+     */
+    private final DataService dataService;
+    
+    /**
      * The {@link JoinTaskSink}s for the downstream
      * {@link DistributedJoinTask}s onto which the generated
      * {@link IBindingSet}s will be written. This is <code>null</code>
@@ -102,16 +126,20 @@ class DistributedJoinTask extends JoinTask {
     final private Map<PartitionLocator, JoinTaskSink> sinkCache;
 
     public DistributedJoinTask(
-            //final ConcurrencyManager concurrencyManager,
-            final String scaleOutIndexName, final IRule rule,
-            final IJoinNexus joinNexus, final int[] order,
-            final int orderIndex, final int partitionId,
-            final AbstractScaleOutFederation fed, final IJoinMaster master,
+            final String scaleOutIndexName,
+            final IRule rule,
+            final IJoinNexus joinNexus,
+            final int[] order,
+            final int orderIndex,
+            final int partitionId,
+            final AbstractScaleOutFederation fed,
+            final IJoinMaster master,
             final IAsynchronousIterator<IBindingSet[]> src,
-            final IKeyOrder[] keyOrders) {
+            final IKeyOrder[] keyOrders,
+            final DataService dataService
+            ) {
 
         super(
-                //concurrencyManager,
                 DataService.getIndexPartitionName(scaleOutIndexName,
                         partitionId), rule, joinNexus, order, orderIndex,
                 partitionId, master);
@@ -122,10 +150,15 @@ class DistributedJoinTask extends JoinTask {
         if (src == null)
             throw new IllegalArgumentException();
 
+        if (dataService == null)
+            throw new IllegalArgumentException();
+
         this.fed = fed;
 
         this.keyOrders = keyOrders;
 
+        this.dataService = dataService;
+        
         this.fedJoinNexus = joinNexus.getJoinNexusFactory().newInstance(fed);
 
         if (lastJoin) {
@@ -225,37 +258,54 @@ class DistributedJoinTask extends JoinTask {
 
     /**
      * Adds a source from which this {@link DistributedJoinTask} will read
-     * {@link IBindingSet} chunks. 
+     * {@link IBindingSet} chunks.
      * 
      * @param source
      *            The source.
      * 
+     * @return <code>true</code> iff the source was accepted.
+     * 
      * @throws IllegalArgumentException
      *             if the <i>source</i> is <code>null</code>.
-     * @throws IllegalStateException
-     *             if {@link #closeSources()} has already been invoked.
      */
-    public void addSource(final IAsynchronousIterator<IBindingSet[]> source) {
+    public boolean addSource(final IAsynchronousIterator<IBindingSet[]> source) {
 
         if (source == null)
             throw new IllegalArgumentException();
 
-        if (closedSources) {
+        lock.lock();
 
-            // new source declarations are rejected.
-            throw new IllegalStateException();
+        try {
+
+            if (sourcesExhausted) {
+
+                // new source declarations are rejected.
+
+                if (INFO)
+                    log.info("source rejected: orderIndex=" + orderIndex
+                            + ", partitionId=" + partitionId);
+
+                return false;
+
+            }
+
+            sources.add(source);
+
+            stats.fanIn++;
+
+        } finally {
+
+            lock.unlock();
 
         }
-
-        sources.add(source);
-
-        stats.fanIn++;
-
+    
         if (DEBUG)
             log.debug("orderIndex=" + orderIndex + ", partitionId="
                     + partitionId + ", fanIn=" + stats.fanIn + ", fanOut="
                     + stats.fanOut);
 
+        return true;
+        
     }
 
     final protected IBuffer<ISolution[]> getSolutionBuffer() {
@@ -268,51 +318,91 @@ class DistributedJoinTask extends JoinTask {
 
     /**
      * Sets a flag preventing new sources from being declared and closes all
-     * known {@link #sources}.
+     * known {@link #sources} and removes this task from the {@link Session}.
      */
     protected void closeSources() {
 
         if (INFO)
             log.info(toString());
+        
+        lock.lock();
 
-        closedSources = true;
+        try {
 
-        final IAsynchronousIterator[] a = sources
-                .toArray(new IAsynchronousIterator[] {});
+            sourcesExhausted = true;
 
-        for (IAsynchronousIterator source : a) {
+            final IAsynchronousIterator[] a = sources
+                    .toArray(new IAsynchronousIterator[] {});
 
-            source.close();
+            for (IAsynchronousIterator source : a) {
+
+                source.close();
+
+            }
+
+            removeFromSession();
+            
+        } finally {
+
+            lock.unlock();
 
         }
 
     }
 
-    private volatile boolean closedSources = false;
+    /**
+     * Remove the task from the session, but only if the task in the session is
+     * this task (it will have been overwritten if this task decides not to
+     * accept more sources and another source shows up).
+     */
+    private void removeFromSession() {
 
+        lock.lock();
+
+        try {
+
+            // @todo allocate this in the ctor.
+            final String namespace = JoinTaskFactoryTask.getJoinTaskNamespace(
+                    masterProxy, orderIndex, partitionId);
+
+            /*
+             * Note: If something else has the entry in the session then that is
+             * Ok, but we need to make sure that we don't remove it by accident!
+             */
+
+            dataService.getSession().remove(namespace, this);
+            
+        } finally {
+
+            lock.unlock();
+
+        }
+
+    }
+    
     /**
      * This lock is used to make {@link #nextChunk()} and
      * {@link #addSource(IAsynchronousIterator)} into mutally exclusive
      * operations. {@link #nextChunk()} is the reader.
-     * {@link #addSource(IAsynchronousIterator)} is the writer. These
-     * operations need to be exclusive and atomic so that the termination
-     * condition of {@link #nextChunk()} is consistent -- it should
-     * terminate when there are no sources remaining. The first source is
-     * added when the {@link DistributedJoinTask} is created. Additional
-     * sources are added (and can result in a fan-in greater than one) when
-     * a {@link JoinTaskFactoryTask} identifies that there is an existing
-     * {@link DistributedJoinTask} and is able to atomically assign a new
-     * source to that {@link DistributedJoinTask}. If the atomic assignment
-     * of the new source fails (because all sources are exhausted before the
-     * assignment occurs) then a new {@link DistributedJoinTask} will be
-     * created for the same {@link DistributedJoinMasterTask}, orderIndex,
-     * and index partition identifier and the source will be assigned to
-     * that {@link DistributedJoinTask} instead.
+     * {@link #addSource(IAsynchronousIterator)} is the writer. These operations
+     * need to be exclusive and atomic so that the termination condition of
+     * {@link #nextChunk()} is consistent -- it should terminate when there are
+     * no sources remaining. The first source is added when the
+     * {@link DistributedJoinTask} is created. Additional sources are added (and
+     * can result in a fan-in greater than one) when a
+     * {@link JoinTaskFactoryTask} identifies that there is an existing
+     * {@link DistributedJoinTask} and is able to atomically assign a new source
+     * to that {@link DistributedJoinTask}. If the atomic assignment of the new
+     * source fails (because all sources are exhausted before the assignment
+     * occurs) then a new {@link DistributedJoinTask} will be created for the
+     * same {@link DistributedJoinMasterTask}, orderIndex, and index partition
+     * identifier and the source will be assigned to that
+     * {@link DistributedJoinTask} instead.
      * 
-     * FIXME this implies that we replace one task with the other in the
-     * data service session.
+     * @todo javadoc update
      */
-    private ReadWriteLock lock = new ReentrantReadWriteLock(false/* fair */);
+//    private ReadWriteLock lock = new ReentrantReadWriteLock(false/* fair */);
+    private final ReentrantLock lock = new ReentrantLock();
 
     /**
      * Returns a chunk of {@link IBindingSet}s by combining chunks from the
@@ -322,6 +412,14 @@ class DistributedJoinTask extends JoinTask {
      *         the source {@link JoinTask}s.
      */
     protected IBindingSet[] nextChunk() {
+
+        if (sourcesExhausted) {
+
+            // nothing remaining in any accepted source.
+
+            return null;
+
+        }
 
         if (DEBUG)
             log.debug("Reading chunk of bindings from source(s): orderIndex="
@@ -336,160 +434,220 @@ class DistributedJoinTask extends JoinTask {
         /*
          * Assemble a chunk of suitable size
          * 
-         * @todo don't wait too long. if we have some data then it is
-         * probably better to process that data rather than waiting beyond a
-         * timeout for a full chunk. also, make sure that we are neither
-         * yielding nor spinning too long in this loop. However, the loop
-         * must wait if there is nothing available and the sources are not
-         * yet exhausted.
+         * @todo don't wait too long. if we have some data then it is probably
+         * better to process that data rather than waiting beyond a timeout for
+         * a full chunk. also, make sure that we are neither yielding nor
+         * spinning too long in this loop. However, the loop must wait if there
+         * is nothing available and the sources are not yet exhausted.
          * 
-         * @todo config. we need a different capacity here than the one used
-         * for batch index operations. on the order of 100 should work well.
+         * @todo config. we need a different capacity here than the one used for
+         * batch index operations. on the order of 100 should work well.
          * 
-         * FIXME If fanIn GT ONE then how do we know when we can terminate
-         * since there may be new upstream tasks at any time? E.g., we map
-         * the 1st join dimension over 4 index partitions. At any given
-         * time, this will read from one, two, or all of the mapped join
-         * tasks for the first join dimension. However, it is perfectly
-         * possible for one of the source join tasks to be done before
-         * another one starts, in which case this loop might terminate early
-         * since [sources] would be empty in between.
+         * Note: The termination conditions under which we will return [null]
+         * indicating that no more binding sets can be read are: (a) [halt] is
+         * true; (b) [sourcesExhausted] is true; or (c) all sources are
+         * exhausted and we are able to acquire the lock.
+         * 
+         * Once we do acquire the lock we set [sourcesExhausted] to true and any
+         * subsequent request to add another source to this joinTask will fail.
+         * This has the consequence that a new JoinTask will be created if a new
+         * source has been identified once this task halts.
          */
 
         final int chunkCapacity = 100;// joinNexus.getChunkCapacity();
 
-        while (!halt && !sources.isEmpty() && bindingSetCount < chunkCapacity) {
+        while (!sourcesExhausted) {
 
-            if (trace)
-                System.err.print("\norderIndex=" + orderIndex);
-
-            if (trace)
-                System.err.print(": reading");
-
-            //                if (DEBUG)
-            //                    log.debug("Testing " + nsources + " sources: orderIndex="
-            //                            + orderIndex + ", partitionId=" + partitionId);
-
-            // clone to avoid concurrent modification of sources during traversal.
-            final IAsynchronousIterator<IBindingSet[]>[] sources = (IAsynchronousIterator<IBindingSet[]>[]) this.sources
-                    .toArray(new IAsynchronousIterator[] {});
-
-            // #of sources that are exhausted.
-            int nexhausted = 0;
-
-            for (int i = 0; i < sources.length
-                    && bindingSetCount < chunkCapacity; i++) {
+            while (!halt && !sources.isEmpty()
+                    && bindingSetCount < chunkCapacity) {
 
                 if (trace)
-                    System.err.print(" <<(" + i + ":" + sources.length + ")");
+                    System.err.print("\norderIndex=" + orderIndex);
 
-                final IAsynchronousIterator<IBindingSet[]> src = sources[i];
+                if (trace)
+                    System.err.print(": reading");
 
-                // if there is something to read on that source.
-                if (src.hasNext(1L, TimeUnit.MILLISECONDS)) {
+                // if (DEBUG)
+                // log.debug("Testing " + nsources + " sources: orderIndex="
+                // + orderIndex + ", partitionId=" + partitionId);
 
-                    /*
-                     * Read the chunk, waiting up to the timeout for
-                     * additional chunks from this source which can be
-                     * combined together by the iterator into a single
-                     * chunk.
-                     * 
-                     * @todo config chunkCombiner timeout here and
-                     * experiment with the value with varying fanIns.
-                     */
-                    final IBindingSet[] chunk = src.next(10L,
-                            TimeUnit.MILLISECONDS);
+                // clone to avoid concurrent modification of sources during
+                // traversal.
+                final IAsynchronousIterator<IBindingSet[]>[] sources = (IAsynchronousIterator<IBindingSet[]>[]) this.sources
+                        .toArray(new IAsynchronousIterator[] {});
 
-                    /*
-                     * Note: Since hasNext() returned [true] for this source
-                     * we SHOULD get a chunk back since it is known to be
-                     * there waiting for us. The timeout should only give
-                     * the iterator an opportunity to combine multiple
-                     * chunks together if they are already in the iterator's
-                     * queue (or if they arrive in a timely manner).
-                     */
-                    assert chunk != null;
+                // #of sources that are exhausted.
+                int nexhausted = 0;
 
-                    chunks.add(chunk);
-
-                    bindingSetCount += chunk.length;
+                for (int i = 0; i < sources.length
+                        && bindingSetCount < chunkCapacity; i++) {
 
                     if (trace)
-                        System.err.print("[" + chunk.length + "]");
+                        System.err.print(" <<(" + i + ":" + sources.length
+                                + ")");
 
-                    if (DEBUG)
-                        log.debug("Read chunk from source: sources[" + i
-                                + "], chunkSize=" + chunk.length
-                                + ", orderIndex=" + orderIndex
-                                + ", partitionId=" + partitionId);
+                    final IAsynchronousIterator<IBindingSet[]> src = sources[i];
 
-                } else if (src.isExhausted()) {
+                    // if there is something to read on that source.
+                    if (src.hasNext(1L, TimeUnit.MILLISECONDS)) {
 
-                    nexhausted++;
+                        /*
+                         * Read the chunk, waiting up to the timeout for
+                         * additional chunks from this source which can be
+                         * combined together by the iterator into a single
+                         * chunk.
+                         * 
+                         * @todo config chunkCombiner timeout here and
+                         * experiment with the value with varying fanIns.
+                         */
+                        final IBindingSet[] chunk = src.next(10L,
+                                TimeUnit.MILLISECONDS);
 
-                    if (trace)
-                        System.err.print("X{" + nexhausted + "}");
+                        /*
+                         * Note: Since hasNext() returned [true] for this source
+                         * we SHOULD get a chunk back since it is known to be
+                         * there waiting for us. The timeout should only give
+                         * the iterator an opportunity to combine multiple
+                         * chunks together if they are already in the iterator's
+                         * queue (or if they arrive in a timely manner).
+                         */
+                        assert chunk != null;
 
-                    if (DEBUG)
-                        log.debug("Source is exhausted: nexhausted="
-                                + nexhausted);
+                        chunks.add(chunk);
 
-                    // no longer consider an exhausted source.
-                    if (!this.sources.remove(src)) {
+                        bindingSetCount += chunk.length;
 
-                        // could happen if src.equals() is not defined.
-                        throw new AssertionError("Could not find source: "
-                                + src);
+                        if (trace)
+                            System.err.print("[" + chunk.length + "]");
+
+                        if (DEBUG)
+                            log.debug("Read chunk from source: sources[" + i
+                                    + "], chunkSize=" + chunk.length
+                                    + ", orderIndex=" + orderIndex
+                                    + ", partitionId=" + partitionId);
+
+                    } else if (src.isExhausted()) {
+
+                        nexhausted++;
+
+                        if (trace)
+                            System.err.print("X{" + nexhausted + "}");
+
+                        if (DEBUG)
+                            log.debug("Source is exhausted: nexhausted="
+                                    + nexhausted);
+
+                        // no longer consider an exhausted source.
+                        if (!this.sources.remove(src)) {
+
+                            // could happen if src.equals() is not defined.
+                            throw new AssertionError("Could not find source: "
+                                    + src);
+
+                        }
 
                     }
 
                 }
 
+                if (nexhausted == sources.length) {
+
+                    /*
+                     * All sources on which we were reading in this loop have
+                     * been exhausted.
+                     * 
+                     * Note: we may have buffered some data, which is checked
+                     * below.
+                     * 
+                     * Note: new sources may have been added concurrently, so we
+                     * get the lock and then test the [sources] field, not just
+                     * the local array.
+                     */
+
+                    lock.lock();
+
+                    try {
+
+                        if (this.sources.isEmpty()) {
+
+                            if (INFO)
+                                log.info("Sources are exhausted: orderIndex="
+                                        + orderIndex + ", partitionId="
+                                        + partitionId);
+
+                            sourcesExhausted = true;
+
+                            /*
+                             * Remove ourselves from the Session since we will
+                             * no longer accept any new sources.
+                             */
+                            
+                            removeFromSession();
+                            
+                        }
+
+                    } finally {
+
+                        lock.unlock();
+
+                    }
+
+                    break;
+
+                }
+
             }
 
-            if (nexhausted == sources.length) {
-
-                /*
-                 * All sources are exhausted, but we may have buffered some
-                 * data, which is checked below.
-                 */
-
-                break;
-
-            }
-
-        }
-
-        if (halt)
-            throw new RuntimeException(firstCause.get());
-
-        /*
-         * Combine the chunks.
-         */
-
-        final int chunkCount = chunks.size();
-
-        if (chunkCount == 0) {
+            if (halt)
+                throw new RuntimeException(firstCause.get());
 
             /*
-             * Termination condition: we did not get any data from any
-             * source.
-             * 
-             * Note: This implies that all sources are exhausted per the
-             * logic above.
+             * Combine the chunks.
              */
 
-            if (DEBUG)
-                log.debug("Sources are exhausted: orderIndex=" + orderIndex
-                        + ", partitionId=" + partitionId);
+            if (!chunks.isEmpty()) {
 
-            if (trace)
-                System.err.print(" exhausted");
+                return combineChunks(chunks, bindingSetCount);
 
-            return null;
+            }
 
-        }
+        } // while(!sourcesExhausted)
 
+        /*
+         * Termination condition: we did not get any data from any source, we
+         * are not permitting any new sources, and there are no sources
+         * remaining.
+         */
+
+        if (DEBUG)
+            log.debug("Sources are exhausted: orderIndex=" + orderIndex
+                    + ", partitionId=" + partitionId);
+
+        if (trace)
+            System.err.print(" exhausted");
+
+        return null;
+
+    }
+    
+    /**
+     * Combine the chunk(s) into a single chunk.
+     * 
+     * @param chunks
+     *            A list of chunks read from the {@link #sources}.
+     * @param bindingSetCount
+     *            The #of bindingSets in those chunks.
+     * @return
+     */
+    protected IBindingSet[] combineChunks(final List<IBindingSet[]> chunks,
+            final int bindingSetCount) {
+        
+        final int chunkCount = chunks.size();
+
+        assert chunkCount > 0; // at least one chunk.
+        
+        assert bindingSetCount > 0; // at least on bindingSet.
+        
         final IBindingSet[] chunk;
 
         if (chunkCount == 1) {
@@ -763,34 +921,6 @@ class DistributedJoinTask extends JoinTask {
 
     }
 
-    //        protected IAsynchronousIterator<ISolution[]> getSolutionIteratorProxy(
-    //                IAsynchronousIterator<ISolution[]> itr) {
-    //
-    //            if (fed.isDistributed()) {
-    //
-    //                return ((AbstractDistributedFederation) fed).getProxy(itr,
-    //                        joinNexus.getSolutionSerializer());
-    //
-    //            }
-    //
-    //            return itr;
-    //
-    //        }
-
-    //        protected IAsynchronousIterator<IBindingSet[]> getBindingSetIteratorProxy(
-    //                IAsynchronousIterator<IBindingSet[]> itr) {
-    //
-    //            if (fed.isDistributed()) {
-    //
-    //                return ((AbstractDistributedFederation) fed).getProxy(itr,
-    //                        joinNexus.getBindingSetSerializer());
-    //
-    //            }
-    //
-    //            return itr;
-    //
-    //        }
-
     /**
      * Return the sink on which we will write {@link IBindingSet} for the
      * index partition associated with the specified locator. The sink will
@@ -827,78 +957,136 @@ class DistributedJoinTask extends JoinTask {
 
         if (sink == null) {
 
-            /*
-             * Allocate JoinTask on the target data service and obtain a
-             * sink reference for its future and buffers.
-             * 
-             * Note: The JoinMasterTask uses very similar logic to setup the
-             * first join dimension.
-             */
+//            /*
+//             * Cache miss.
+//             * 
+//             * First, obtain an exclusive resource lock on the sink task
+//             * namespace and see if there is an instance of the required join
+//             * task running somewhere. If there is, then request the proxy for
+//             * its Future from the dataService on which it is executing.
+//             * 
+//             * Otherwise, we are holding an exclusive lock on the sink task
+//             * namespace. Select a dataService instance on which the desired
+//             * index partition is replicated and then create a join task on that
+//             * instance, register the join task under the lock, and return its
+//             * Future.
+//             * 
+//             * Finally, release the exclusive lock.
+//             * 
+//             * Note: The JoinTask must acquire the same lock in order to
+//             * conclude that it is done with its work and may exit. The lock
+//             * therefore provides for an atomic decision vis-a-vis whether we
+//             * need to create a new join task or use an existing one as well as
+//             * whether an existing join task may exit.
+//             * 
+//             * @todo since replication is not implemented we don't need to store
+//             * anything under the namespace while we hold a lock. however, this
+//             * shows a pattern where we would like to do that in the future. I
+//             * believe that ZooKeeper would support this. If we do store
+//             * something, then be sure that we also clean it up when we are done
+//             * with the master instance.
+//             */
+//
+//            final String namespace;
+//            try {
+//                namespace = masterProxy.getUUID() + "/" + orderIndex + "/"
+//                        + partitionId;
+//            } catch (IOException ex) {
+//                throw new RuntimeException(ex);
+//            }
+//    
+//            final IResourceLock lock;
+//            try {
+//                lock = fed.getResourceLockService().acquireExclusiveLock(namespace);
+//            } catch (IOException ex) {
+//                throw new RuntimeException(ex);
+//            }
+//
+//            try {
+                
+                /*
+                 * Allocate/discover JoinTask on the target data service and
+                 * obtain a sink reference for its future and buffers.
+                 * 
+                 * Note: The JoinMasterTask uses very similar logic to setup the
+                 * first join dimension. Of course, it gets to assume that there
+                 * is no such JoinTask in existence at the time.
+                 */
 
-            final int nextOrderIndex = orderIndex + 1;
+                final int nextOrderIndex = orderIndex + 1;
 
-            if (DEBUG)
-                log.debug("Creating join task: nextOrderIndex="
-                        + nextOrderIndex + ", indexName="
-                        + nextScaleOutIndexName + ", partitionId="
-                        + locator.getPartitionId());
+                if (DEBUG)
+                    log.debug("Creating join task: nextOrderIndex="
+                            + nextOrderIndex + ", indexName="
+                            + nextScaleOutIndexName + ", partitionId="
+                            + locator.getPartitionId());
 
-            final IDataService dataService = fed.getDataService(locator
-                    .getDataServices()[0]);
+                final IDataService dataService = fed.getDataService(locator
+                        .getDataServices()[0]);
 
-            sink = new JoinTaskSink(fed, locator, this);
+                sink = new JoinTaskSink(fed, locator, this);
 
-            /*
-             * Export async iterator proxy.
-             * 
-             * Note: This proxy is used by the sink to draw chunks from the
-             * source JoinTask(s).
-             */
-            final IAsynchronousIterator<IBindingSet[]> sourceItrProxy;
-            if (fed.isDistributed()) {
+                /*
+                 * Export async iterator proxy.
+                 * 
+                 * Note: This proxy is used by the sink to draw chunks from the
+                 * source JoinTask(s).
+                 */
+                final IAsynchronousIterator<IBindingSet[]> sourceItrProxy;
+                if (fed.isDistributed()) {
 
-                sourceItrProxy = ((AbstractDistributedFederation) fed)
-                        .getProxy(sink.blockingBuffer.iterator(), joinNexus
-                                .getBindingSetSerializer(), joinNexus
-                                .getChunkOfChunksCapacity());
+                    sourceItrProxy = ((AbstractDistributedFederation) fed)
+                            .getProxy(sink.blockingBuffer.iterator(), joinNexus
+                                    .getBindingSetSerializer(), joinNexus
+                                    .getChunkOfChunksCapacity());
 
-            } else {
+                } else {
 
-                sourceItrProxy = sink.blockingBuffer.iterator();
+                    sourceItrProxy = sink.blockingBuffer.iterator();
 
-            }
+                }
 
-            // the future for the factory task (not the JoinTask).
-            final Future factoryFuture;
-            try {
+                // the future for the factory task (not the JoinTask).
+                final Future factoryFuture;
+                try {
 
-                final JoinTaskFactoryTask factoryTask = new JoinTaskFactoryTask(
-                        nextScaleOutIndexName, rule, joinNexus
-                                .getJoinNexusFactory(), order, nextOrderIndex,
-                        locator.getPartitionId(), masterProxy, sourceItrProxy,
-                        keyOrders);
+                    final JoinTaskFactoryTask factoryTask = new JoinTaskFactoryTask(
+                            nextScaleOutIndexName, rule, joinNexus
+                                    .getJoinNexusFactory(), order, nextOrderIndex,
+                            locator.getPartitionId(), masterProxy, sourceItrProxy,
+                            keyOrders);
 
-                // submit the factory task, obtain its future.
-                factoryFuture = dataService.submit(factoryTask);
+                    // submit the factory task, obtain its future.
+                    factoryFuture = dataService.submit(factoryTask);
 
-            } catch (IOException ex) {
+                } catch (IOException ex) {
 
-                // RMI problem.
-                throw new RuntimeException(ex);
+                    // RMI problem.
+                    throw new RuntimeException(ex);
 
-            }
+                }
 
-            /*
-             * Obtain the future for the JoinTask from the factory task's
-             * Future.
-             */
+                /*
+                 * Obtain the future for the JoinTask from the factory task's
+                 * Future.
+                 */
 
-            sink.setFuture((Future) factoryFuture.get());
+                sink.setFuture((Future) factoryFuture.get());
 
-            stats.fanOut++;
+                stats.fanOut++;
 
-            sinkCache.put(locator, sink);
-
+                sinkCache.put(locator, sink);
+                
+//            } finally {
+//
+//                try {
+//                    lock.unlock();
+//                } catch (IOException ex) {
+//                    throw new RuntimeException(ex);
+//                }
+//                
+//            }
+            
         }
 
         return sink;

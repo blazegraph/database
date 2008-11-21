@@ -19,6 +19,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
@@ -129,6 +130,11 @@ abstract public class JoinTask implements Callable<Void> {
     static protected final Logger log = Logger.getLogger(JoinTask.class);
 
     /**
+     * True iff the {@link #log} level is WARN or less.
+     */
+    static final protected boolean WARN = log.isEnabledFor(Level.WARN);
+
+    /**
      * True iff the {@link #log} level is INFO or less.
      */
     static final protected boolean INFO = log.isInfoEnabled();
@@ -230,9 +236,9 @@ abstract public class JoinTask implements Callable<Void> {
 
         halt = true;
 
-        firstCause.compareAndSet(null/*expect*/, cause);
+        final boolean first = firstCause.compareAndSet(null/* expect */, cause);
 
-        if (INFO)
+        if (WARN)
 
             try {
 
@@ -246,7 +252,17 @@ abstract public class JoinTask implements Callable<Void> {
                         && !InnerCause.isInnerCause(cause,
                                 BufferClosedException.class)) {
 
-                    log.info("" + cause, cause);
+                    /*
+                     * This logs all unexpected causes, not just the first one
+                     * to be reported for this join task.
+                     * 
+                     * Note: The master will log the firstCause that it receives
+                     * as an error.
+                     */
+
+                    log.warn("orderIndex=" + orderIndex + ", partitionId="
+                            + partitionId + ", firstCause=" + first + " : "
+                            + cause.getLocalizedMessage(), cause);
 
                 }
 

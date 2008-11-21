@@ -1027,7 +1027,8 @@ abstract public class StoreManager extends ResourceEvents implements
          * @throws InterruptedException
          * 
          * @throws IllegalStateException
-         *             if the {@link IConcurrencyManager} has not been set.
+         *             if the {@link IConcurrencyManager} has not been set
+         *             (after a timeout).
          * 
          * @throws IllegalStateException
          *             if the the {@link ResourceManager} is already running.
@@ -1052,7 +1053,7 @@ abstract public class StoreManager extends ResourceEvents implements
              */
             if (INFO)
                 log.info("Waiting for concurrency manager");
-            for (int i = 0; i < 3; i++) {
+            for (int i = 0; i < 5; i++) {
                 try {
                     getConcurrencyManager();
                 } catch (IllegalStateException ex) {

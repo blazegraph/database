@@ -470,13 +470,17 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
      * Make sure that each {@link JoinTask} completed successfully.
      * <p>
      * Note: This waits until all {@link JoinTask}s complete, regardless of
-     * their outcome, so that all {@link JoinTask} have the opportunity to
-     * report their {@link JoinStats} to the {@link JoinMasterTask}.
+     * their outcome (or until the timeout expires), so that all
+     * {@link JoinTask} have the opportunity to report their {@link JoinStats}
+     * to the {@link JoinMasterTask}.
      * 
      * @param futures
-     *            The {@link Future} for each {@link JoinTask}.
+     *            The {@link Future} for each {@link JoinTask} that was created
+     *            by the {@link JoinMasterTask}.
      * @param timeout
+     *            The timeout for awaiting those futures.
      * @param unit
+     *            The unit for that timeout.
      * 
      * @throws ExecutionExceptions
      *             if one or more {@link JoinTask}s fail.
@@ -494,8 +498,6 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
         
         long remaining = unit.toNanos(timeout);
         
-        int orderIndex = 0;
-
         // errors.
         final List<ExecutionException> errors = new LinkedList<ExecutionException>();
 
@@ -515,7 +517,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
                     
                 }
                 
-                log.warn("Cancelled "+ncancelled+" futures due to timeout");
+                log.warn("Cancelled " + ncancelled + " futures due to timeout");
                 
                 throw new TimeoutException();
                 
@@ -537,7 +539,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
                  */
 
                 if (INFO)
-                    log.info("orderIndex=" + orderIndex, ex);
+                    log.info(ex.getLocalizedMessage(), ex);
                 
             } catch (ExecutionException ex) {
 
@@ -591,7 +593,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
                      */
 
                     if (INFO)
-                        log.info("orderIndex=" + orderIndex, ex);
+                        log.info(ex.getLocalizedMessage(), ex);
 
                 } else {
 
@@ -602,16 +604,13 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
                      * that we can figure out which JoinTask failed.
                      */
 
-                    errors.add(new ExecutionException("orderIndex="
-                            + orderIndex, ex));
+                    errors.add(new ExecutionException(ex));
 
-                    log.error("orderIndex=" + orderIndex, ex);
+                    log.error(ex);
                     
                 }
 
             }
-
-            orderIndex++;
 
             // subtract out the elapsed time so far.
             remaining -= (System.nanoTime() - begin);

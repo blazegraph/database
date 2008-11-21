@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service.proxy;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.rmi.Remote;
 import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
@@ -67,6 +68,16 @@ public interface RemoteAsynchronousIterator<E> extends Remote {
     E next() throws IOException;
 
     /**
+     * Method applies a custom serializer to the value returned by
+     * {@link #next()} and returns a {@link RemoteElement} that can be
+     * transported by RMI and which knows how to de-serialize the element on the
+     * other end.
+     * 
+     * @return 
+     */
+    RemoteElement<E> nextElement() throws IOException;
+    
+    /**
      * @see Iterator#remove()
      */
     void remove() throws IOException;
@@ -74,22 +85,41 @@ public interface RemoteAsynchronousIterator<E> extends Remote {
     /**
      * @see ICloseableIterator#close()
      */
-    public void close() throws IOException;
+    void close() throws IOException;
 
     /**
      * @see IAsynchronousIterator#isExhausted()
      */
-    public boolean isExhausted() throws IOException;
+    boolean isExhausted() throws IOException;
 
     /**
      * @see IAsynchronousIterator#hasNext(long, TimeUnit)
      */
-    public boolean hasNext(final long timeout, final TimeUnit unit)
+    boolean hasNext(final long timeout, final TimeUnit unit)
             throws IOException;
 
     /**
      * @see IAsynchronousIterator#next(long, TimeUnit)
      */
-    public E next(long timeout, TimeUnit unit) throws IOException;
+    E next(long timeout, TimeUnit unit) throws IOException;
+    
+    /**
+     * Used to send an serialized element together with the object that knows
+     * how to de-serialize the element.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * @param <E>
+     */
+    interface RemoteElement<E> extends Serializable {
+    
+        /**
+         * Return the de-serialized element.
+         * 
+         * @return The de-serialized element.
+         */
+        public E get();
+        
+    }
     
 }

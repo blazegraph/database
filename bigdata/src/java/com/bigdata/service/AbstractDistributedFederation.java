@@ -25,7 +25,7 @@ package com.bigdata.service;
 
 import java.util.concurrent.Future;
 
-import com.bigdata.io.ISerializer;
+import com.bigdata.io.IStreamSerializer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBuffer;
 
@@ -97,7 +97,7 @@ abstract public class AbstractDistributedFederation extends AbstractScaleOutFede
      */
     public abstract <E> IAsynchronousIterator<E> getProxy(
             IAsynchronousIterator<E> src,//
-            ISerializer<E> serializer, //
+            IStreamSerializer<E> serializer, //
             int capacity
     );
 

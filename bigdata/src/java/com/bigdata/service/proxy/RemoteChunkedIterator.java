@@ -4,7 +4,7 @@ import java.io.IOException;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.io.ISerializer;
+import com.bigdata.io.IStreamSerializer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.striterator.IKeyOrder;
 
@@ -30,7 +30,7 @@ public class RemoteChunkedIterator<E> implements IRemoteChunkedIterator<E> {
     
     private final IAsynchronousIterator<E[]> sourceIterator;
 
-    private final ISerializer<E[]> serializer;
+    private final IStreamSerializer<E[]> serializer;
     
     private final IKeyOrder<E> keyOrder;
     
@@ -46,9 +46,11 @@ public class RemoteChunkedIterator<E> implements IRemoteChunkedIterator<E> {
      *            The natural order of the visited elements if known and
      *            otherwise <code>null</code>.
      */
-    public RemoteChunkedIterator(IAsynchronousIterator<E[]> sourceIterator,
-            ISerializer<E[]> serializer,
-            IKeyOrder<E> keyOrder) {
+    public RemoteChunkedIterator(
+            final IAsynchronousIterator<E[]> sourceIterator,
+            final IStreamSerializer<E[]> serializer,
+            final IKeyOrder<E> keyOrder
+            ) {
 
         if (sourceIterator == null)
             throw new IllegalArgumentException();

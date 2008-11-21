@@ -62,6 +62,7 @@ import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.DropIndexTask;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ILocalTransactionManager;
+import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.ITransactionManager;
@@ -72,6 +73,8 @@ import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.relation.rule.eval.pipeline.JoinTask;
+import com.bigdata.relation.rule.eval.pipeline.JoinTaskFactoryTask;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StoreManager;
@@ -282,6 +285,30 @@ abstract public class DataService extends AbstractService
     public Properties getProperties() {
 
         return new Properties(properties);
+        
+    }
+
+    /**
+     * The dynamic property set associated with the data service instance.
+     */
+    private final Session session = new Session();
+    
+    /**
+     * The dynamic property set (aka session) associated with the
+     * {@link DataService} instance. The state of the {@link Session} is NOT
+     * persistent.
+     * <p>
+     * <strong>This is an experimental feature</strong>
+     * <p>
+     * Note: These {@link Session} properties are transient and local to a
+     * specific {@link DataService} instance. if failover support is desired,
+     * then you should probably use the {@link IResourceLockService} so that the
+     * updates can be atomic across the replicated instances of the data
+     * service.
+     */
+    public Session getSession() {
+
+        return session;
         
     }
     

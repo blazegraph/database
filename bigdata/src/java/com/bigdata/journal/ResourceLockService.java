@@ -231,7 +231,8 @@ abstract public class ResourceLockService extends AbstractService implements
 
         /**
          * FIXME must proxy for jini/RMI (currently disabled as it forces
-         * serialization of the {@link ResourceLockService}).
+         * serialization of the {@link ResourceLockService}). make the proxy a
+         * wrapper so that we can avoid the "IOException" throwable.
          */
         public void unlock() {
             
