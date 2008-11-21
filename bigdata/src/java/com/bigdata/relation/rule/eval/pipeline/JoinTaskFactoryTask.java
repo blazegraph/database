@@ -1,6 +1,8 @@
 package com.bigdata.relation.rule.eval.pipeline;
 
+import java.io.IOException;
 import java.io.Serializable;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -27,38 +29,63 @@ import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataServiceAwareProcedure;
+import com.bigdata.service.Session;
 import com.bigdata.service.proxy.ClientAsynchronousIterator;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
- * A factory for {@link DistributedJoinTask}s. The factory either creates a
- * new {@link DistributedJoinTask} or returns the pre-existing
- * {@link DistributedJoinTask} for the given {@link JoinMasterTask}
- * instance, orderIndex, and partitionId. The use of a factory pattern
- * allows us to concentrate all {@link DistributedJoinTask}s which target
- * the same tail predicate and index partition for the same rule execution
- * instance onto the same {@link DistributedJoinTask}. The concentrator
- * effect achieved by the factory only matters when the fan-out is GT ONE
- * (1). When the fan-out from the source join dimension is GT ONE(1), then
- * factory achieves an idential fan-in for the sink.
+ * A factory for {@link DistributedJoinTask}s. The factory either creates a new
+ * {@link DistributedJoinTask} or returns the pre-existing
+ * {@link DistributedJoinTask} for the given {@link JoinMasterTask} instance (as
+ * identified by its {@link UUID}), <i>orderIndex</i>, and <i>partitionId</i>.
+ * When the desired join task pre-exists, factory will invoke
+ * {@link DistributedJoinTask#addSource(IAsynchronousIterator)} and specify the
+ * {@link #sourceItrProxy} as another source for that join task.
+ * <p>
+ * The use of a factory pattern allows us to concentrate all
+ * {@link DistributedJoinTask}s which target the same tail predicate and index
+ * partition for the same rule execution instance onto the same
+ * {@link DistributedJoinTask}. The concentrator effect achieved by the factory
+ * only matters when the fan-out is GT ONE (1).
+ * 
+ * @todo The factory semantics requires something like a "session" concept on
+ *       the {@link DataService}. However, it could also be realized by a
+ *       canonicalizing mapping of {masterProxy, orderIndex, partitionId} onto
+ *       an object that is placed within a weak value cache.
+ * 
+ * @todo Whenever a {@link DistributedJoinTask} is interrupted or errors it must
+ *       make sure that the entry is removed from the session (it could also
+ *       interupt/cancel the remaining {@link DistributedJoinTask}s for the
+ *       same {masterInstance}, but we are already doing that in a different
+ *       way.)
+ * 
+ * @todo We need to specify the failover behavior when running query or mutation
+ *       rules. The simplest answer is that the query or closure operation fails
+ *       and can be retried.
+ *       <P>
+ *       When retried a different data service instance could takeover for the
+ *       failed instance. This presumes some concept of "affinity" for a data
+ *       service instance when locating a join task. If there are replicated
+ *       instances of a data service, then affinity would be the tendency to
+ *       choose the same instance for all join tasks with the same master,
+ *       orderIndex, and partitionId. That might be more efficient since it
+ *       allows aggregation of binding sets that require the same access path
+ *       read. However, it might be more efficient to distribute the reads
+ *       across the failover instances - it really depends on the workload.
+ *       <p>
+ *       Ideally, a data service failure would be handled by restarting only
+ *       those parts of the operation that had failed. This means that there is
+ *       some notion of idempotent for the operation. For at least the RDF
+ *       database, this may be achievable. Failure during query leading to
+ *       resend of some binding set chunks to a new join task could result in
+ *       overgeneration of results, but those results would all be duplicates.
+ *       If that is acceptable, then this approach could be considered "safe".
+ *       Failure during mutation (aka closure) is even easier for RDF as
+ *       redundent writes on an index still lead to the same fixed point.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * FIXME The factory semantics requires something like a "session" concept
- * on the {@link DataService}. Whenever a {@link DistributedJoinTask} is
- * interrupted or errors it must make sure that the entry is removed from
- * the session. This could also interupt/cancel the remaining
- * {@link DistributedJoinTask}s for the same {masterInstance}, but we are
- * already doing that in a different way.
- * <p>
- * This should not be a problem for a single index partition since fan-in ==
- * fan-out == 1, but it will be a problem for larger fan-in/outs.
- * <p>
- * When the desired join task pre-exists, factory will need to invoke
- * {@link DistributedJoinTask#addSource(IAsynchronousIterator)} and specify
- * the {@link #sourceItrProxy} as another source for that join task.
  */
 public class JoinTaskFactoryTask implements Callable<Future>,
         IDataServiceAwareProcedure, Serializable {
@@ -110,6 +137,12 @@ public class JoinTaskFactoryTask implements Callable<Future>,
         
     }
 
+    /**
+     * Set by {@link #call()} to the federation instance available on the
+     * {@link DataService}.
+     */
+    private transient AbstractScaleOutFederation fed;
+    
     public String toString() {
 
         return getClass().getSimpleName() + "{ orderIndex=" + orderIndex
@@ -183,14 +216,14 @@ public class JoinTaskFactoryTask implements Callable<Future>,
         if (dataService == null)
             throw new IllegalStateException();
 
-        final AbstractScaleOutFederation fed = (AbstractScaleOutFederation) dataService
-                .getFederation();
+        this.fed = (AbstractScaleOutFederation) dataService.getFederation();
 
-        // FIXME new vs locating existing JoinTask in session.
-        
         /*
          * Start the iterator using our local thread pool in order to avoid
          * having it start() with a new Thead().
+         * 
+         * Note: This MUST be done before we create the join task or the
+         * iterator will create its own Thread.
          */
         if (sourceItrProxy instanceof ClientAsynchronousIterator) {
 
@@ -198,43 +231,140 @@ public class JoinTaskFactoryTask implements Callable<Future>,
                     .getExecutorService());
 
         }
+
+        final String namespace = getJoinTaskNamespace(masterProxy, orderIndex,
+                partitionId);
+        
+        final Future<Void> joinTaskFuture;
+
+        final Session session = dataService.getSession();
         
         /*
-         * Note: This wrapper class passes getIndex(name,timestamp) to the
-         * IndexManager for the DataService, which is the class that knows
-         * how to assemble the index partition view.
-         */
+         * @todo this serializes all requests for a new join task on this data
+         * service. However, we only need to serialize requests for the same
+         * [uuid, orderIndex, partitionId]. A NamedLock on [namespace] would do
+         * exactly that.
+         * 
+         * Note: The DistributedJoinTask will remove itself from the session
+         * when it completes (regardless of success or failure). It does not
+         * obtain a lock on the session but instead relies on addSource(itr) to
+         * reject new sources until it can be removed from the session.
+         */ 
+        synchronized (session) {
+
+            // lookup task for that key in the session.
+            DistributedJoinTask joinTask = (DistributedJoinTask) session
+                    .get(namespace);
+
+            if (joinTask != null) {
+
+                if (joinTask.addSource(sourceItrProxy)) {
+
+                    // use the existing join task.
+                    joinTaskFuture = joinTask.futureProxy;
+
+                } else {
+
+                    /*
+                     * Create a new join task (the old one has decided that it
+                     * will not accept any new sources).
+                     */
+
+                    // new task.
+                    joinTask = newJoinTask();
+
+                    // put into the session.
+                    session.put(namespace, joinTask);
+
+                    // submit task and note its future.
+                    joinTaskFuture = submit(joinTask);
+
+                }
+
+            } else {
+
+                /*
+                 * There is no join task in the session so we create one now.
+                 */
+                
+                // new task.
+                joinTask = newJoinTask();
+
+                // put into the session.
+                session.put(namespace, joinTask);
+
+                // submit task and note its future.
+                joinTaskFuture = submit(joinTask);
+                
+            }
+            
+        }
+
+        return joinTaskFuture;
+        
+    }
+
+    protected DistributedJoinTask newJoinTask() {
+
         final DistributedJoinTask task;
         {
 
+            /*
+             * Note: This wrapper class passes getIndex(name,timestamp) to the
+             * IndexManager for the DataService, which is the class that knows
+             * how to assemble the index partition view.
+             */
             final IIndexManager indexManager = new DelegateIndexManager(
                     dataService);
 
             task = new DistributedJoinTask(scaleOutIndexName, rule,
                     joinNexusFactory.newInstance(indexManager), order,
                     orderIndex, partitionId, fed, masterProxy,
-                    sourceItrProxy, keyOrders);
+                    sourceItrProxy, keyOrders, dataService);
             
         }
-        
+
+        return task;
+
+    }
+   
+    protected Future<Void> submit(DistributedJoinTask task) {
+
         if (DEBUG)
             log.debug("Submitting new JoinTask: orderIndex=" + orderIndex
                     + ", partitionId=" + partitionId + ", indexName="
                     + scaleOutIndexName);
 
-        final Future<Void> joinTaskFuture = dataService.getFederation()
+        Future<Void> joinTaskFuture = dataService.getFederation()
                 .getExecutorService().submit(task);
 
         if (fed.isDistributed()) {
-            
-            // return a proxy for the future.
-            return ((AbstractDistributedFederation) fed).getProxy(joinTaskFuture);
+
+            // create a proxy for the future.
+            joinTaskFuture = ((AbstractDistributedFederation) fed)
+                    .getProxy(joinTaskFuture);
 
         }
 
-        // just return the future.
-        return joinTaskFuture;
+        task.futureProxy = joinTaskFuture;
         
+        return joinTaskFuture;
+
+    }
+    
+    static public String getJoinTaskNamespace(IJoinMaster master,
+            int orderIndex, int partitionId) {
+
+        try {
+            
+            return master.getUUID() + "/" + orderIndex + "/" + partitionId;
+            
+        } catch (IOException ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
+
     }
 
     /**
@@ -344,9 +474,9 @@ public class JoinTaskFactoryTask implements Callable<Future>,
         public TemporaryStore getTempStore() {
 
             return dataService.getFederation().getTempStore();
-            
+
         }
-        
+
     }
-    
+
 }

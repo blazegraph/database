@@ -34,7 +34,7 @@ import java.util.concurrent.ExecutorService;
 
 import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.btree.keys.ISortKeyBuilder;
-import com.bigdata.io.ISerializer;
+import com.bigdata.io.IStreamSerializer;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
@@ -555,14 +555,14 @@ public interface IJoinNexus {
      * {@link ISolution}s.  This is used by high-level query to transfer
      * {@link ISolution}s back to the client.
      */
-    ISerializer<ISolution[]> getSolutionSerializer();
+    IStreamSerializer<ISolution[]> getSolutionSerializer();
     
     /**
      * Return the object that is responsible for (de-)serializing chunks of
      * {@link IBindingSet}s. This is used by {@link JoinTask}s to transfer
      * intermediate {@link IBindingSet}s from one join dimension to the next.
      */
-    ISerializer<IBindingSet[]> getBindingSetSerializer();
+    IStreamSerializer<IBindingSet[]> getBindingSetSerializer();
     
     /**
      * Make the write sets visible, eg, by committing the store(s) having

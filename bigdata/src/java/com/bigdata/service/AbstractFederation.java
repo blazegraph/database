@@ -276,7 +276,7 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
     }
     
     /**
-     * Locator for relations.
+     * Locator for relations, etc.
      */
     private final DefaultResourceLocator resourceLocator;
     

@@ -28,47 +28,48 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.io;
 
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.io.Serializable;
 
-import com.bigdata.rawstore.IStoreSerializer;
-
 /**
- * An abstraction for serializing and de-serializing objects as byte[]s.
- * <p>
- * Note: Some serializers use the convention that a <code>null</code> will be
- * de-serialized as a <code>null</code>. This convention makes it easy to
- * de-serialize the value and then test to see whether or not the value was in
- * fact found in the index.
+ * An abstraction for serializing and de-serializing objects on streams.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
  * @see SerializerUtil
+ * @see IRecordSerializer
  * 
- * @todo reconcile with {@link SerializerUtil} and
- *       {@link org.CognitiveWeb.extser.ISerializer} and reconsider
- *       {@link IStoreSerializer}.
+ * @todo reconcile {@link org.CognitiveWeb.extser.ISerializer}
  */
-public interface ISerializer<T> extends Serializable {
+public interface IStreamSerializer<T> extends Serializable {
 
     /**
      * Serialize an object.
+     * <p>
+     * Note: All state required to de-serialize the object must be written onto
+     * the stream. That may include serializer state as well, such as dictionary
+     * that will be used on the other end to decode the object. In such cases
+     * the serializer needs to know how to de-serialize both the dictionary and
+     * the data. Stateful serializers such as <em>extSer</em> must encapsulate
+     * all requisite state on the output stream.
      * 
+     * @param out
+     *            The stream onto which the object's state will be written.
      * @param obj
-     *            A object.
-     * 
-     * @return A byte[] that is the serialization of that object.
+     *            The object.
      */
-    byte[] serialize(T obj);
+    void serialize(ObjectOutput out, T obj);
 
     /**
      * De-serialize an object.
      * 
-     * @param data
-     *            The data.
+     * @param in
+     *            The stream from which the object's state will be read.
      * 
-     * @return The object for that data.
+     * @return The object.
      */
-    T deserialize(byte[] data);
+    T deserialize(ObjectInput in);
 
 }

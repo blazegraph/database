@@ -36,7 +36,7 @@ import java.util.Map;
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.keys.ISortKeyBuilder;
-import com.bigdata.io.ISerializer;
+import com.bigdata.io.IStreamSerializer;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.IMutableRelation;
@@ -387,7 +387,7 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
             return null;
         }
 
-        public ISerializer<ISolution[]> getSolutionSerializer() {
+        public IStreamSerializer<ISolution[]> getSolutionSerializer() {
             return null;
         }
 
@@ -400,7 +400,7 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
             return null;
         }
 
-        public ISerializer<IBindingSet[]> getBindingSetSerializer() {
+        public IStreamSerializer<IBindingSet[]> getBindingSetSerializer() {
             // TODO Auto-generated method stub
             return null;
         }

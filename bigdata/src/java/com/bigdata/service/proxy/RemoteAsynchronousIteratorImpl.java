@@ -27,10 +27,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.proxy;
 
+import java.io.Externalizable;
 import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.rmi.Remote;
 import java.util.concurrent.TimeUnit;
 
+import com.bigdata.io.IStreamSerializer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 
 /**
@@ -47,11 +51,32 @@ public class RemoteAsynchronousIteratorImpl<E> implements
 
     private final IAsynchronousIterator<E> itr;
 
-//    private final ISerializer<E> serializer;
+    private final IStreamSerializer<E> serializer;
 
+    /**
+     * Ctor variant does not support {@link #nextElement()}.
+     * 
+     * @param itr
+     *            The source iterator (local object).
+     */
+    public RemoteAsynchronousIteratorImpl(final IAsynchronousIterator<E> itr) {
+
+        this(itr, null/* serializer */);
+        
+    }
+    
+    /**
+     * Ctor variant optionally supports {@link #nextElement()}.
+     * 
+     * @param itr
+     *            The source iterator (local object).
+     * @param serializer
+     *            Optional, but {@link #nextElement()} only works when you
+     *            specify an {@link IStreamSerializer}.
+     */
     public RemoteAsynchronousIteratorImpl(
-            final IAsynchronousIterator<E> itr
-//            final ISerializer<E> serializer
+            final IAsynchronousIterator<E> itr,
+            final IStreamSerializer<E> serializer
             ) {
 
         if (itr == null)
@@ -62,7 +87,7 @@ public class RemoteAsynchronousIteratorImpl<E> implements
 
         this.itr = itr;
 
-//        this.serializer = serializer;
+        this.serializer = serializer;
         
     }
 
@@ -108,4 +133,83 @@ public class RemoteAsynchronousIteratorImpl<E> implements
         
     }
     
+    /**
+     * @throws UnsupportedOperationException
+     *             if you did not specify an {@link IStreamSerializer} to the ctor.
+     */
+    public RemoteElement<E> nextElement() {
+
+        if (serializer == null)
+            throw new UnsupportedOperationException();
+        
+        final E e = itr.next();
+
+        return new RemoteElementImpl<E>(e, serializer);
+        
+    }
+    
+    /**
+     * {@link RemoteElement} impl.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * @param <E>
+     */
+    private static class RemoteElementImpl<E> implements RemoteElement<E>,
+            Externalizable {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -167351084165715123L;
+
+        private transient E e;
+        private transient IStreamSerializer<E> ser;
+        
+        /**
+         * De-serialization ctor.
+         */
+        public RemoteElementImpl() {
+            
+        }
+        
+        public RemoteElementImpl(final E e, final IStreamSerializer<E> ser) {
+
+            if (e == null)
+                throw new IllegalArgumentException();
+
+            if (ser == null)
+                throw new IllegalArgumentException();
+            
+            this.e = e;
+            
+            this.ser = ser;
+            
+        }
+
+        public E get() {
+
+            return e;
+            
+        }
+
+        public void readExternal(ObjectInput in) throws IOException,
+                ClassNotFoundException {
+            
+            ser = (IStreamSerializer<E>) in.readObject();
+
+            e = ser.deserialize(in);
+            
+        }
+
+        public void writeExternal(ObjectOutput out) throws IOException {
+
+            out.writeObject(ser);
+            
+            ser.serialize(out, e);
+            
+        }
+
+    }
+
 }

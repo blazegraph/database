@@ -29,9 +29,13 @@ package com.bigdata.io;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.ObjectInput;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
+import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 
@@ -45,10 +49,72 @@ import java.nio.ByteBuffer;
 public class SerializerUtil {
 
     /**
-     * An {@link ISerializer} wrapper for the static methods declared by the
-     * {@link SerializerUtil}.
+     * An {@link IStreamSerializer} that uses java default serialization.
      */
-    public static final ISerializer INSTANCE = new ISerializer() {
+    public static final IStreamSerializer STREAMS = new IStreamSerializer() {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -2625456835905636703L;
+
+        public Object deserialize(ObjectInput in) {
+
+            try {
+
+                return in.readObject();
+
+            } catch (Exception ex) {
+
+                throw new RuntimeException(ex);
+
+            }
+
+        }
+
+        public void serialize(ObjectOutput out, Object obj) {
+
+            try {
+
+                out.writeObject(obj);
+
+            } catch (IOException e) {
+
+                throw new RuntimeException(e);
+
+            }
+
+        }
+
+        /**
+         * Always returns the same reference.
+         */
+        private Object readResolve() throws ObjectStreamException {
+
+            return STREAMS;
+
+        }
+
+        private void writeObject(java.io.ObjectOutputStream out)
+                throws IOException {
+
+            // NOP
+
+        }
+
+        private void readObject(java.io.ObjectInputStream in)
+                throws IOException, ClassNotFoundException {
+
+            // NOP
+
+        }
+    };
+    
+    /**
+     * An {@link IRecordSerializer} wrapper for the static methods declared by
+     * the {@link SerializerUtil}.
+     */
+    public static final IRecordSerializer RECORDS = new IRecordSerializer() {
 
         /**
          * 
@@ -67,6 +133,29 @@ public class SerializerUtil {
             
         }
         
+        /**
+         * Always returns the same reference.
+         */
+        private Object readResolve() throws ObjectStreamException {
+            
+            return RECORDS;
+            
+        }
+        
+        private void writeObject(java.io.ObjectOutputStream out)
+                throws IOException {
+
+            // NOP
+            
+        }
+
+        private void readObject(java.io.ObjectInputStream in)
+                throws IOException, ClassNotFoundException {
+
+            // NOP
+
+        }
+    
     };
     
     /**

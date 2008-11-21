@@ -45,7 +45,7 @@ import com.bigdata.btree.keys.DelegateSortKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.ISortKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.io.ISerializer;
+import com.bigdata.io.IStreamSerializer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
@@ -1033,10 +1033,12 @@ public class RDFJoinNexus implements IJoinNexus {
      *       DISTINCT or intend to do for SORT and use the equivilent of leading
      *       key compression to reduce IO costs (or when they are SORTed we
      *       could leverage that to produce a more compact serialization).
+     * 
+     * @see SPOSolutionSerializer (needs to be written).
      */
-    public ISerializer<ISolution[]> getSolutionSerializer() {
+    public IStreamSerializer<ISolution[]> getSolutionSerializer() {
         
-        return SerializerUtil.INSTANCE;
+        return SerializerUtil.STREAMS;
         
     }
 
@@ -1049,10 +1051,12 @@ public class RDFJoinNexus implements IJoinNexus {
      *       DISTINCT or intend to do for SORT and use the equivilent of leading
      *       key compression to reduce IO costs (or when they are SORTed we
      *       could leverage that to produce a more compact serialization).
+     * 
+     * @see SPOBindingSetSerializer, which has not been finished.
      */
-    public ISerializer<IBindingSet[]> getBindingSetSerializer() {
+    public IStreamSerializer<IBindingSet[]> getBindingSetSerializer() {
         
-        return SerializerUtil.INSTANCE;
+        return SerializerUtil.STREAMS;
         
     }
 

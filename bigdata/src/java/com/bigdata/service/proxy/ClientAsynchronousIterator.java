@@ -71,6 +71,11 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * {@link Thread} will be allocated. Typically, an {@link ExecutorService} can
  * be much more efficient than creating a new {@link Thread}.
  * 
+ * @todo Note that we only use three methods to implement
+ *       {@link ClientAsynchronousIterator} - hasNext(timeout,unit),
+ *       isExhausted(), and next(). The rest of the
+ *       {@link RemoteAsynchronousIterator} API does not need to be implemented.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -341,7 +346,8 @@ public class ClientAsynchronousIterator<E> implements IAsynchronousIterator<E>,
                     if(trace)
                         System.err.print(">>");                        
                     
-                    final E e = remoteIterator.next();
+//                    final E e = remoteIterator.next();
+                    final E e = remoteIterator.nextElement().get();
 
                     if (trace)
                         System.err
