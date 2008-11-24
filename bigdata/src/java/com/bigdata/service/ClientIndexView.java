@@ -2063,14 +2063,8 @@ public class ClientIndexView implements IClientIndex {
      */
     public IDataService getDataService(PartitionLocator pmd) {
 
-        final UUID [] dataServiceUUIDs = pmd.getDataServices();
+        final UUID serviceUUID = pmd.getDataServiceUUID();
 
-        assert dataServiceUUIDs.length > 0: "No DataService UUIDs? : pmd="+pmd;
-
-        final UUID serviceUUID = dataServiceUUIDs[0];
-
-        assert serviceUUID != null : "DataService UUID is null? : pmd="+pmd;
-        
         final IDataService dataService;
 
         try {

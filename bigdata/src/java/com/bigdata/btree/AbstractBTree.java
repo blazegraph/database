@@ -41,6 +41,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.Banner;
 import com.bigdata.btree.AbstractBTreeTupleCursor.MutableBTreeTupleCursor;
 import com.bigdata.btree.AbstractBTreeTupleCursor.ReadOnlyBTreeTupleCursor;
+import com.bigdata.btree.IndexMetadata.Options;
 import com.bigdata.btree.IndexSegment.IndexSegmentTupleCursor;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.filter.Reverserator;
@@ -56,6 +57,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.CompactTask;
 import com.bigdata.journal.IAtomicStore;
@@ -63,6 +65,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.OverflowManager;
 import com.bigdata.service.Split;
 
@@ -222,69 +225,6 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
      * field.
      */
     /*private*/ volatile BloomFilter bloomFilter;
-
-//    /**
-//     * Return <code>true</code> iff the optional bloom filter is enabled for
-//     * this {@link AbstractBTree} and the bloom filter has NOT been disabled.
-//     * Note that a bloom filter will be disabled if #of index entries exceeds
-//     * the threshold at which the bloom filter would exceed its maximum expected
-//     * error rate.
-//     * 
-//     * @see BloomFilterFactory
-//     * @see IndexMetadata#getBloomFilterFactory()
-//     */
-//    abstract public boolean isBloomFilter();
-//
-//    /**
-//     * Disable the bloom filter.
-//     * 
-//     * @throws UnsupportedOperationException
-//     *             if the bloom filter was not enabled.
-//     * @throws UnsupportedOperationException
-//     *             if the index is not mutable.
-//     */
-//    abstract protected void disableBloomFilter();
-    
-//    /**
-//     * Method used by subclasses to establish the bloom filter from within their
-//     * {@link #_reopen()} implementation.
-//     * <p>
-//     * Note: It is possible to (re-)establish a bloom filter on an existing
-//     * index simply by re-adding each key in the index to the bloom filter.
-//     * However, you MUST NOT set a bloom filter that lacks keys that exist in
-//     * the index since that would cause <em>false negatives</em>, which is in
-//     * violation of the bloom filter contract. One way to do this is there to
-//     * obtain exclusive write access for the index, create a new bloom filter
-//     * and set it on this class, then use a iterator ({@link IRangeQuery#CURSOR}
-//     * will be required since you will be writing on the btree concurrent with
-//     * the iterator traversal) and adding each key visited by the iterator to
-//     * the index.
-//     * 
-//     * @param bloomFilter
-//     *            The bloom filter.
-//     * 
-//     * @throws IllegalArgumentException
-//     *             if the <i>bloomFilter</i> is <code>null</code>.
-//     * @throws IllegalStateException
-//     *             if the bloom filter is already set.
-//     * @throws UnsupportedOperationException
-//     *             if support for the optional bloom filter was not enabled when
-//     *             the {@link AbstractBTree} was created.
-//     */
-//    protected void setBloomFilter(final BloomFilter bloomFilter) {
-//
-//        if (bloomFilter == null)
-//            throw new IllegalArgumentException();
-//
-////        if (!isBloomFilter())
-////            throw new UnsupportedOperationException();
-//
-//        if (this.bloomFilter != null)
-//            throw new IllegalStateException();
-//
-//        this.bloomFilter = bloomFilter;
-//        
-//    }
     
     /**
      * Return the optional {@link IBloomFilter}, transparently
@@ -449,12 +389,6 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
     final protected HardReferenceQueue<PO> readRetentionQueue;
 
     /**
-     * The minimum allowed branching factor (3). The branching factor may be odd
-     * or even.
-     */
-    static public final int MIN_BRANCHING_FACTOR = 3;
-
-    /**
      * Return some "statistics" about the btree.
      * 
      * @todo fold in {@link #getUtilization()} here.
@@ -572,10 +506,10 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
      *            The {@link IndexMetadata} object for this B+Tree.
      */
     protected AbstractBTree(//
-            IRawStore store,//
-            INodeFactory nodeFactory,//
-            boolean readOnly,
-            IndexMetadata metadata//
+            final IRawStore store,//
+            final INodeFactory nodeFactory,//
+            final boolean readOnly,
+            final IndexMetadata metadata//
             ) {
 
         // show the copyright banner during statup.
@@ -590,7 +524,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
         
         this.branchingFactor = metadata.getBranchingFactor();
 
-        assert branchingFactor >= MIN_BRANCHING_FACTOR;
+        assert branchingFactor >= Options.MIN_BRANCHING_FACTOR;
         
         assert nodeFactory != null;
 
@@ -611,29 +545,42 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
 
     }
 
-    protected HardReferenceQueue<PO> newWriteRetentionQueue() {
+    /**
+     * Note: Method is package private since it must be overriden for some unit
+     * tests.
+     */
+    HardReferenceQueue<PO> newWriteRetentionQueue() {
 
         return new HardReferenceQueue<PO>(//
                 new DefaultEvictionListener(),//
-                BTree.DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY,//
-                BTree.DEFAULT_WRITE_RETENTION_QUEUE_SCAN//
+                metadata.getWriteRetentionQueueCapacity(),//
+                metadata.getWriteRetentionQueueScan()//
         );
 
     }
     
+    /**
+     * Note: Method is package private so that it may be overriden for unit
+     * tests.
+     * 
+     * @todo Consider using soft references for the read retention queue. This
+     *       would allow the references to be cleared in a low memory situation.
+     *       However, I think that we are better off closing out indices that
+     *       have not been recently used in the {@link IndexManager} and the
+     *       {@link AbstractJournal}, e.g., after a 60 second timeout.
+     */
     protected HardReferenceQueue<PO> newReadRetentionQueue() {
 
-        if (BTree.DEFAULT_READ_RETENTION_QUEUE_CAPACITY != 0) {
+        return (metadata.getReadRetentionQueueCapacity() != 0
 
-            return new HardReferenceQueue<PO>(
-                    NOPEvictionListener.INSTANCE,
-                    BTree.DEFAULT_READ_RETENTION_QUEUE_CAPACITY,
-                    BTree.DEFAULT_READ_RETENTION_QUEUE_SCAN);
-            
-        }
-        
-        return null;
-        
+        ? new HardReferenceQueue<PO>(NOPEvictionListener.INSTANCE, metadata
+                .getReadRetentionQueueCapacity(), metadata
+                .getReadRetentionQueueScan())
+
+        : null
+
+        );
+          
     }
     
     /**

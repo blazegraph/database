@@ -52,10 +52,9 @@ public class IndexSegmentIndex extends BTree {
 
     /**
      * Instance used to encode the timestamp into the key.
-     * 
-     * @todo use thread local instance 
      */
-    private IKeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG+Bytes.SIZEOF_UUID);
+    final private IKeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG
+            + Bytes.SIZEOF_UUID);
 
     /**
      * Create a new instance.

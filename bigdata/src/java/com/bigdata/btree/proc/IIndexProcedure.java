@@ -126,4 +126,3 @@ public interface IIndexProcedure extends Serializable {
     public Object apply(IIndex ndx);
 
 }
-

@@ -27,7 +27,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
-import com.bigdata.relation.locator.RelationSchema;
+import com.bigdata.relation.RelationSchema;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.EmbeddedClient;
 import com.bigdata.service.EmbeddedFederation;

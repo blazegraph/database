@@ -160,6 +160,28 @@ public interface IBigdataFederation extends IIndexManager {
      * @return <code>null</code> if there are NO known {@link IDataService}s.
      */
     public IDataService getAnyDataService();
+    
+    /**
+     * Return an {@link IDataService} joined with this
+     * {@link IBigdataFederation} and having the specified service name.
+     * Services that are not joined will not be discovered.
+     * <p>
+     * Note: At least some service fabrics (such as jini) do not enforce a
+     * uniqueness constraint on the service name(s). In such cases an arbitrary
+     * {@link IDataService} method the other requirements will be returned. It
+     * is the responsibility of the administrator to ensure that each
+     * {@link IDataService} is assigned a distinct service name.
+     * 
+     * @param name
+     *            The service name.
+     * 
+     * @return A service assigned that name -or- <code>null</code> if none is
+     *         joined with the {@link IBigdataFederation} at this time.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>name</i> is <code>null</code>.
+     */
+    public IDataService getDataServiceByName(String name);
      
     /**
      * Return a read-only view of the index partitions for the named scale-out

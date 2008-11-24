@@ -276,15 +276,15 @@ abstract public class AbstractClient implements IBigdataClient {
         {
 
             tempStoreMaxExtent = Long.parseLong(properties.getProperty(
-                    Options.TEMP_STORE_MAX_EXTENT,
-                    Options.DEFAULT_TEMP_STORE_MAX_EXTENT));
+                    Options.TEMP_STORE_MAXIMUM_EXTENT,
+                    Options.DEFAULT_TEMP_STORE_MAXIMUM_EXTENT));
 
             if (INFO)
-                log.info(Options.TEMP_STORE_MAX_EXTENT + "="
+                log.info(Options.TEMP_STORE_MAXIMUM_EXTENT + "="
                         + tempStoreMaxExtent);
 
             if (tempStoreMaxExtent < 0)
-                throw new RuntimeException(Options.TEMP_STORE_MAX_EXTENT
+                throw new RuntimeException(Options.TEMP_STORE_MAXIMUM_EXTENT
                         + " must be non-negative");
 
         }

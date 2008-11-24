@@ -42,7 +42,9 @@ public class BigdataSolutionResolverator
             IChunkedOrderedIterator<ISolution> src) {
 
         super(db, src, new BlockingBuffer<IBindingSet[]>(
-                db.chunkOfChunksCapacity, db.chunkCapacity, db.chunkTimeout,
+                db.getChunkOfChunksCapacity(),
+                db.getChunkCapacity(),
+                db.getChunkTimeout(),
                 TimeUnit.MILLISECONDS));
 
     }

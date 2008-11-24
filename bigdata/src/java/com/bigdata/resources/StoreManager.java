@@ -55,12 +55,12 @@ import org.apache.log4j.Logger;
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentStore;
-import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.concurrent.NamedLock;
@@ -150,9 +150,9 @@ abstract public class StoreManager extends ResourceEvents implements
             IndexSegmentStore.Options {
 
         /**
-         * <code>data.dir</code> - The property whose value is the name of the
-         * directory in which the store files will be created (no default). This
-         * property is required unless the instance is transient. If you specify
+         * The property whose value is the name of the directory in which the
+         * store files will be created (no default). This property is required
+         * unless the instance is transient. If you specify
          * {@link com.bigdata.journal.Options#BUFFER_MODE} as
          * {@link BufferMode#Transient} then journals will be NOT stored in the
          * file system and {@link ResourceManager#overflow()} will be disabled.
@@ -176,7 +176,7 @@ abstract public class StoreManager extends ResourceEvents implements
          * Note: Each {@link DataService} or {@link MetadataService} MUST have
          * its own {@link #DATA_DIR}.
          */
-        String DATA_DIR = "data.dir";
+        String DATA_DIR = StoreManager.class.getName()+".dataDir";
 
         /**
          * How long you want to hold onto the database history (in milliseconds)
@@ -192,7 +192,7 @@ abstract public class StoreManager extends ResourceEvents implements
          * @see #MIN_RELEASE_AGE_1W
          * @see #MIN_RELEASE_AGE_NEVER
          */
-        String MIN_RELEASE_AGE = "minReleaseAge";
+        String MIN_RELEASE_AGE = StoreManager.class.getName()+".minReleaseAge";
         
         /**
          * Minimum release age is zero (0). A value of ZERO (0) implies that any
@@ -253,7 +253,7 @@ abstract public class StoreManager extends ResourceEvents implements
          * @todo define maximum age on the LRU and the delay between sweeps of
          *       the LRU
          */
-        String STORE_CACHE_CAPACITY = "storeCacheCapacity";
+        String STORE_CACHE_CAPACITY = StoreManager.class.getName()+".storeCacheCapacity";
 
         /**
          * The default for the {@link #STORE_CACHE_CAPACITY} option.
@@ -270,7 +270,7 @@ abstract public class StoreManager extends ResourceEvents implements
          * Regardless, bad files will be logged as they are identified and all
          * files will be scanned before the {@link StoreManager} aborts.
          */
-        String IGNORE_BAD_FILES = "ignoreBadFiles";
+        String IGNORE_BAD_FILES = StoreManager.class.getName()+".ignoreBadFiles";
 
         String DEFAULT_IGNORE_BAD_FILES = "false";
 
@@ -832,7 +832,7 @@ abstract public class StoreManager extends ResourceEvents implements
                 // Note: stored in canonical form.
                 dataDir = new File(val).getCanonicalFile();
 
-                if(INFO)
+                if (INFO)
                     log.info(Options.DATA_DIR + "=" + dataDir);
 
                 journalsDir = new File(dataDir, "journals").getCanonicalFile();
@@ -1185,8 +1185,8 @@ abstract public class StoreManager extends ResourceEvents implements
                     /*
                      * Set the createTime on the new journal resource.
                      */
-                    p.setProperty(Options.CREATE_TIME, ""
-                            + nextTimestampRobust());
+                    p.setProperty(Options.CREATE_TIME, Long
+                            .toString(nextTimestampRobust()));
 
                     newJournal = true;
 
@@ -1472,13 +1472,15 @@ abstract public class StoreManager extends ResourceEvents implements
         if (INFO)
             log.info("Scanning file: " + file + ", stats=" + stats);
 
-        stats.nfiles++;
-
         final IResourceMetadata resource;
 
+        // name of the file.
         final String name = file.getName();
 
-        if (name.endsWith(Options.JNL)) {
+        // #of bytes in the file as reported by the OS.
+        final long len = file.length();
+
+        if (len > 0 && name.endsWith(Options.JNL)) {
 
             final Properties properties = getProperties();
 
@@ -1498,6 +1500,8 @@ abstract public class StoreManager extends ResourceEvents implements
                 log.error("Problem opening journal: file="
                         + file.getAbsolutePath(), ex);
 
+                stats.nfiles++;
+                
                 stats.badFiles.add(file.getAbsolutePath());
 
                 return;
@@ -1508,9 +1512,11 @@ abstract public class StoreManager extends ResourceEvents implements
 
                 resource = tmp.getResourceMetadata();
 
+                stats.nfiles++;
+                
                 stats.njournals++;
 
-                stats.nbytes += file.length();
+                stats.nbytes += len;
 
             } finally {
 
@@ -1518,7 +1524,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
             }
 
-        } else if (name.endsWith(Options.SEG)) {
+        } else if (len > 0 && name.endsWith(Options.SEG)) {
 
             final Properties p = new Properties();
 
@@ -1541,6 +1547,8 @@ abstract public class StoreManager extends ResourceEvents implements
                 log.error("Problem opening segment: file="
                         + file.getAbsolutePath(), ex);
 
+                stats.nfiles++;
+
                 stats.badFiles.add(file.getAbsolutePath());
 
                 return;
@@ -1551,9 +1559,11 @@ abstract public class StoreManager extends ResourceEvents implements
 
                 resource = segStore.getResourceMetadata();
 
+                stats.nfiles++;
+
                 stats.nsegments++;
 
-                stats.nbytes += file.length();
+                stats.nbytes += len;
 
             } finally {
 
@@ -1563,11 +1573,21 @@ abstract public class StoreManager extends ResourceEvents implements
 
         } else {
 
-            /*
-             * This file is not relevant to the resource manager.
-             */
+            if (len == 0L
+                    && (name.endsWith(Options.JNL) || name
+                            .endsWith(Options.SEG))) {
 
-            log.warn("Ignoring file: " + file);
+                log.warn("Ignoring empty file: " + file);
+
+            } else {
+
+                /*
+                 * This file is not relevant to the resource manager.
+                 */
+
+                log.warn("Ignoring file: " + file);
+
+            }
 
             return;
 
@@ -1638,7 +1658,7 @@ abstract public class StoreManager extends ResourceEvents implements
     /**
      * The #of journals on hand.
      */
-    public int getManagedJournalCount() {
+    synchronized public int getManagedJournalCount() {
 
         assertOpen();
 
@@ -1649,7 +1669,7 @@ abstract public class StoreManager extends ResourceEvents implements
     /**
      * The #of index segments on hand.
      */
-    public int getManagedIndexSegmentCount() {
+    synchronized public int getManagedIndexSegmentCount() {
 
         assertOpen();
 
@@ -1666,6 +1686,15 @@ abstract public class StoreManager extends ResourceEvents implements
      * <p>
      * Note: This also adds the size of the store in bytes as reported by the OS
      * to {@link #bytesUnderManagement}.
+     * <p>
+     * Note: Adding a resource to the store manager has no persistent effect
+     * other than the presumed presence of the specified file in the file
+     * system. However, error handling routines SHOULD invoke
+     * {@link #deleteResource(UUID, boolean)} in order to remove a resource that
+     * was not built correctly or not incorporated into the view. Otherwise the
+     * mapping from the {@link UUID} to the {@link File} will be maintained in
+     * memory and the {@link StoreManager} will overreport the #of bytes under
+     * management.
      * 
      * @param resourceMetadata
      *            The metadata describing that resource.
@@ -1688,9 +1717,13 @@ abstract public class StoreManager extends ResourceEvents implements
      * @throws IllegalArgumentException
      *             if the <i>file</i> is <code>null</code> and
      *             {@link #isTransient} is <code>false</code>.
+     * 
+     * @see #deleteResource(UUID, boolean)
      */
-    synchronized protected void addResource(IResourceMetadata resourceMetadata,
-            File file) {
+    synchronized protected void addResource(
+            final IResourceMetadata resourceMetadata,
+            final File file
+            ) {
 
         assertOpen();
 
@@ -2194,28 +2227,6 @@ abstract public class StoreManager extends ResourceEvents implements
     }
 
     /**
-     * An instance of this class is thrown when a {@link UUID} does not identify
-     * any store known to the {@link StoreManager}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class NoSuchStoreException extends RuntimeException {
-        
-        /**
-         * 
-         */
-        private static final long serialVersionUID = -4200720776469568430L;
-
-        public NoSuchStoreException(UUID uuid) {
-            
-            super(uuid.toString());
-            
-        }
-        
-    }
-    
-    /**
      * Report the next timestamp assigned by the
      * {@link ILocalTransactionManager}.
      * <p>
@@ -2578,7 +2589,8 @@ abstract public class StoreManager extends ResourceEvents implements
      *            at least one view as of that commit time and therefore MUST
      *            NOT be deleted.
      */
-    private void deleteUnusedResources(final long commitTimeToPreserve, final Set<UUID> resourcesInUse) {
+    private void deleteUnusedResources(final long commitTimeToPreserve,
+            final Set<UUID> resourcesInUse) {
         
         /*
          * Delete old journals.
@@ -2591,10 +2603,18 @@ abstract public class StoreManager extends ResourceEvents implements
              * Note: used to bulk delete the entries for deleted journals from
              * the journalIndex since the iterator does not support removal.
              */
-            final Set<byte[]> keys = new TreeSet<byte[]>(
-                    UnsignedByteArrayComparator.INSTANCE);
+//            final Set<byte[]> keys = new TreeSet<byte[]>(
+//                    UnsignedByteArrayComparator.INSTANCE);
 
-            final ITupleIterator itr = journalIndex.rangeIterator();
+            /*
+             * Note: This iterator supports traversal with concurrent
+             * modification (by a single thread). If we decide to delete a
+             * journal resource, then deleteResource() will be tasked to delete
+             * it from the [journalIndex] as well.
+             */
+            final ITupleIterator itr = journalIndex.rangeIterator(
+                    null/* fromKey */, null/* toKey */, 0/* capacity */,
+                    IRangeQuery.DEFAULT | IRangeQuery.CURSOR, null/*filter*/);
 
             while (itr.hasNext()) {
 
@@ -2630,25 +2650,27 @@ abstract public class StoreManager extends ResourceEvents implements
                 if (INFO)
                     log.info("Will delete: " + resourceMetadata);
 
-                deleteResource(uuid, true/*isJournal*/);
+                deleteResource(uuid, true/* isJournal */);
 
-                // add to set for batch remove.
-                keys.add(journalIndex.getKey(resourceMetadata.getCreateTime()));
+//                // add to set for batch remove.
+//                keys.add(journalIndex.getKey(resourceMetadata.getCreateTime()));
 
+//                itr.remove();
+                
                 njournals++;
                 
             }
 
-            // remove entries from the journalIndex.
-            for (byte[] key : keys) {
-
-                if (journalIndex.remove(key) == null) {
-
-                    throw new AssertionError();
-
-                }
-
-            }
+//            // remove entries from the journalIndex.
+//            for (byte[] key : keys) {
+//
+//                if (journalIndex.remove(key) == null) {
+//
+//                    throw new AssertionError();
+//
+//                }
+//
+//            }
 
         }
 
@@ -2659,15 +2681,25 @@ abstract public class StoreManager extends ResourceEvents implements
         int nsegments = 0;
         {
 
+//            /*
+//             * Note: used to bulk delete the entries for deleted segments from
+//             * the segmentIndex since the iterator does not support removal.
+//             */
+//            final Set<byte[]> keys = new TreeSet<byte[]>(
+//                    UnsignedByteArrayComparator.INSTANCE);
+//
+//            final ITupleIterator itr = segmentIndex.rangeIterator();
+            
             /*
-             * Note: used to bulk delete the entries for deleted segments from
-             * the segmentIndex since the iterator does not support removal.
+             * Note: This iterator supports traversal with concurrent
+             * modification (by a single thread). If we decide to delete a
+             * indexSegment resource, then deleteResource() will be tasked to
+             * delete it from the [segmentIndex] as well.
              */
-            final Set<byte[]> keys = new TreeSet<byte[]>(
-                    UnsignedByteArrayComparator.INSTANCE);
-
-            final ITupleIterator itr = segmentIndex.rangeIterator();
-
+            final ITupleIterator itr = segmentIndex.rangeIterator(
+                    null/* fromKey */, null/* toKey */, 0/* capacity */,
+                    IRangeQuery.DEFAULT | IRangeQuery.CURSOR, null/* filter */);
+            
             while (itr.hasNext()) {
 
                 final ITuple tuple = itr.next();
@@ -2703,25 +2735,27 @@ abstract public class StoreManager extends ResourceEvents implements
                     log.info("Will delete: " + resourceMetadata);
 
                 // delete the backing file.
-                deleteResource(uuid, false/*isJournal*/);
+                deleteResource(uuid, false/* isJournal */);
                 
-                // add to set for batch remove.
-                keys.add(segmentIndex.getKey(resourceMetadata.getCreateTime(), uuid));
+//                // add to set for batch remove.
+//                keys.add(segmentIndex.getKey(resourceMetadata.getCreateTime(), uuid));
+                
+//                itr.remove();
 
                 nsegments++;
                 
             }
 
-            // remove entries from the journalIndex.
-            for (byte[] key : keys) {
-
-                if (segmentIndex.remove(key) == null) {
-
-                    throw new AssertionError();
-
-                }
-
-            }
+//            // remove entries from the journalIndex.
+//            for (byte[] key : keys) {
+//
+//                if (segmentIndex.remove(key) == null) {
+//
+//                    throw new AssertionError();
+//
+//                }
+//
+//            }
 
         }
 
@@ -2735,20 +2769,26 @@ abstract public class StoreManager extends ResourceEvents implements
     
     /**
      * Delete the resource in the file system and remove it from the
-     * {@link #storeCache} and {@link #resourceFiles}.
+     * {@link #storeCache} and {@link #resourceFiles} and either
+     * {@link #journalIndex} or {@link #segmentIndex} as appropriate.
      * <p>
-     * Note: The caller is responsible for removing it from the
-     * {@link #journalIndex} or the {@link #segmentIndex} as appropriate.
-     * <p>
-     * Note: This is invoked via {@link #purgeOldResources()} which imposes that
-     * constraint on the caller that they are responsible for synchronization.
+     * 
+     * <strong>DO NOT delete resources that are in use!</strong>
+     * 
+     * A resource that has not yet been incoporated into a view may be deleted
+     * without futher concern. However, once a resource has been incorporated
+     * into a view then you MUST arange for appropriate synchronization before
+     * the resource may be deleted. For example, {@link #purgeOldResources()}
+     * imposes that constraint on the caller that they are responsible for
+     * synchronization and is generally invoked during synchronous overflow
+     * since we know that there are no active writers at that time.
      * 
      * @param uuid
      *            The {@link UUID} which identifies the resource.
      * @param isJournal
      *            <code>true</code> if the resource is a journal.
      */
-    private void deleteResource(UUID uuid, boolean isJournal) {
+    protected void deleteResource(final UUID uuid, final boolean isJournal) {
 
         // can't close out the live journal!
         if (uuid == getLiveJournal().getRootBlockView().getUUID()) {
@@ -2799,6 +2839,13 @@ abstract public class StoreManager extends ResourceEvents implements
 
             if (file == null) {
 
+                /*
+                 * Note: This can happen if you confuse the indexUUID and the
+                 * indexSegment's UUID in the code. The former is on the
+                 * IndexMetadata while the latter (the one that you want) is on
+                 * the SegmentMetadata.
+                 */
+
                 throw new NoSuchStoreException(uuid);
 
             } else {
@@ -2833,9 +2880,21 @@ abstract public class StoreManager extends ResourceEvents implements
 
         if(isJournal) {
 
+            synchronized(journalIndex) {
+                
+                journalIndex.remove(uuid);
+                
+            }
+            
             journalDeleteCount.incrementAndGet();
             
         } else {
+            
+            synchronized(segmentIndex) {
+                
+                segmentIndex.remove(uuid);
+                
+            }
             
             segmentStoreDeleteCount.incrementAndGet();
             
@@ -3038,44 +3097,43 @@ abstract public class StoreManager extends ResourceEvents implements
     }
 
     /**
-     * Munge the name of a scale out index so that it is suitable for use in a
-     * filesystem. In particular, any non-word characters are converted to an
-     * underscore character ("_"). This gets rid of all punctuation characters
-     * and whitespace in the index name itself, but will not translate unicode
+     * Munge a name index so that it is suitable for use in a filesystem. In
+     * particular, any non-word characters are converted to an underscore
+     * character ("_"). This gets rid of all punctuation characters and
+     * whitespace in the index name itself, but will not translate unicode
      * characters.
-     * <p>
-     * Note: The index name appears in the file path beneath the {@link UUID} of
-     * the scale-out index. Therefore it is not possible to have collisions
-     * arise in the file system when given indices whose scale-out names differ
-     * only in characters that are munged onto the same character since the
-     * files will always be stored in a directory specific to the scale-out
-     * index.
      * 
      * @param s
      *            The name of the scale-out index.
      * 
      * @return A string suitable for inclusion in a filename.
      */
-    private String munge(String s) {
+    static public String munge(final String s) {
 
         return s.replaceAll("[\\W]", "_");
 
     }
 
     /**
+     * Note: The index name appears in the file path above the {@link UUID} of
+     * the scale-out index. Therefore it is not possible to have collisions
+     * arise in the file system when given indices whose scale-out names differ
+     * only in characters that are munged onto the same character since the
+     * files will always be stored in a directory specific to the scale-out
+     * index.
      * 
      * @todo should the filename be relative or absolute?
      */
-    public File getIndexSegmentFile(IndexMetadata indexMetadata) {
+    public File getIndexSegmentFile(final IndexMetadata indexMetadata) {
 
         assertOpen();
 
         // munge index name to fit the file system.
         final String mungedName = munge(indexMetadata.getName());
 
-        // subdirectory using the scale-out indices unique index UUID.
-        final File indexDir = new File(segmentsDir, indexMetadata
-                .getIndexUUID().toString());
+        // subdirectory into which the individual index segs will be placed.
+        final File indexDir = new File(segmentsDir, mungedName
+                + File.pathSeparator + indexMetadata.getIndexUUID().toString());
 
         // make sure that directory exists.
         indexDir.mkdirs();

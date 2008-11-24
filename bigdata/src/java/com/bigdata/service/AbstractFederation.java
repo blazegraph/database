@@ -501,46 +501,54 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
 
     }
 
-    public UUID registerIndex(IndexMetadata metadata, UUID dataServiceUUID) {
+    public UUID registerIndex(final IndexMetadata metadata, UUID dataServiceUUID) {
 
         assertOpen();
 
         if (dataServiceUUID == null) {
             
-            final ILoadBalancerService loadBalancerService = getLoadBalancerService();
+            // see if there is an override.
+            dataServiceUUID = metadata.getInitialDataServiceUUID();
+            
+            if (dataServiceUUID == null) {
 
-            if (loadBalancerService == null) {
+                final ILoadBalancerService loadBalancerService = getLoadBalancerService();
 
-                try {
+                if (loadBalancerService == null) {
 
-                    /*
-                     * As a failsafe (or at least a failback) we ask the client
-                     * for ANY data service that it knows about and use that as
-                     * the data service on which we will register this index.
-                     * This lets us keep going if the load balancer is dead when
-                     * this request comes through.
-                     */
+                    try {
 
-                    dataServiceUUID = getAnyDataService().getServiceUUID();
+                        /*
+                         * As a failsafe (or at least a failback) we ask the
+                         * client for ANY data service that it knows about and
+                         * use that as the data service on which we will
+                         * register this index. This lets us keep going if the
+                         * load balancer is dead when this request comes
+                         * through.
+                         */
 
-                } catch (Exception ex) {
+                        dataServiceUUID = getAnyDataService().getServiceUUID();
 
-                    log.error(ex);
+                    } catch (Exception ex) {
 
-                    throw new RuntimeException(ex);
+                        log.error(ex);
 
-                }
-                
-            } else {
+                        throw new RuntimeException(ex);
 
-                try {
+                    }
 
-                    dataServiceUUID = loadBalancerService
-                            .getUnderUtilizedDataService();
+                } else {
 
-                } catch (Exception ex) {
+                    try {
 
-                    throw new RuntimeException(ex);
+                        dataServiceUUID = loadBalancerService
+                                .getUnderUtilizedDataService();
+
+                    } catch (Exception ex) {
+
+                        throw new RuntimeException(ex);
+
+                    }
 
                 }
 
@@ -556,8 +564,8 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
 
     }
 
-    public UUID registerIndex(IndexMetadata metadata, byte[][] separatorKeys,
-            UUID[] dataServiceUUIDs) {
+    public UUID registerIndex(final IndexMetadata metadata,
+            final byte[][] separatorKeys, final UUID[] dataServiceUUIDs) {
 
         assertOpen();
 

@@ -325,7 +325,7 @@ public class ResourceLockServer extends AbstractServer {
          * {@link IResourceLock} API is preserved.
          */
         @Override
-        protected IResourceLock getProxy(ResourceLock lock) {
+        protected IResourceLock getProxy(final ResourceLock lock) {
 
             final RemoteLock proxy = getFederation().getProxy(
                     new RemoteLockImpl(lock), true/* enableDGC */);
@@ -359,17 +359,23 @@ public class ResourceLockServer extends AbstractServer {
 
             }
 
+            /**
+             * FIXME client-service locks are NOT functional! The problem is
+             * that the client and service do not operate in the same thread and
+             * the lock is based on java locks. Locking is currently disabled in
+             * {@link ResourceLockService}.
+             */
             public void unlock() {
-
-                try {
-
-                    remoteLock.unlock();
-
-                } catch (IOException ex) {
-
-                    throw new RuntimeException(ex);
-
-                }
+                
+//                try {
+//
+//                    remoteLock.unlock();
+//
+//                } catch (IOException ex) {
+//
+//                    throw new RuntimeException(ex);
+//
+//                }
 
             }
 

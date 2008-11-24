@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.rmi.RemoteException;
 import java.util.UUID;
 
+import net.jini.core.entry.Entry;
 import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceItem;
 import net.jini.core.lookup.ServiceTemplate;
@@ -41,6 +42,7 @@ import net.jini.lookup.ServiceDiscoveryEvent;
 import net.jini.lookup.ServiceDiscoveryListener;
 import net.jini.lookup.ServiceDiscoveryManager;
 import net.jini.lookup.ServiceItemFilter;
+import net.jini.lookup.entry.Name;
 
 import org.apache.log4j.Logger;
 
@@ -247,14 +249,30 @@ public class DataServicesClient {
      */
     public IDataService getDataService() {
 
+        return getDataService(DataServiceFilter.INSTANCE);
+        
+    }
+
+    /**
+     * Return an arbitrary {@link IDataService} instance from the cache that
+     * satisifies the given filter -or- <code>null</code> if there is none in
+     * the cache and a remote lookup times out.
+     * 
+     * @throws UnsupportedOperationException
+     *             if {@link DataService} discovery was disallowed by the
+     *             constructor.
+     */
+    public IDataService getDataService(final DataServiceFilter filter) {
+
+        if (filter == null)
+            throw new IllegalArgumentException();
+        
         if(!cacheDataServices) {
             
             throw new UnsupportedOperationException();
             
         }
 
-        final ServiceItemFilter filter = DataServiceFilter.INSTANCE;
-        
         ServiceItem item = serviceLookupCache.lookup(filter);
 
         if (item == null) {
@@ -479,8 +497,8 @@ public class DataServicesClient {
 
         }
 
-        if(INFO)
-        log.info("Found: " + item);
+        if (INFO)
+            log.info("Found: " + item);
 
         return item;
 
@@ -515,6 +533,50 @@ public class DataServicesClient {
 
         return uuids;
 
+    }
+
+    /**
+     * Return an arbitrary {@link IDataService} having the specified service
+     * name on an {@link Entry} for that service.
+     * 
+     * @param name
+     *            The service name.
+     * @return The {@link IDataService} -or- <code>null</code> if there is
+     *         none in the cache and a remote lookup times out.
+     */
+    public IDataService getDataServiceByName(final String name) {
+
+        if (name == null)
+            throw new IllegalArgumentException();
+
+        return getDataService(new DataServiceFilter() {
+
+            public boolean check(final ServiceItem item) {
+
+                if (super.check(item)) {
+
+                    for (Entry e : item.attributeSets) {
+
+                        if (e instanceof Name) {
+
+                            if (((Name) e).name.equals(name)) {
+
+                                return true;
+
+                            }
+
+                        }
+
+                    }
+                    
+                }
+
+                return false;
+                
+            }
+            
+        });
+        
     }
     
 }

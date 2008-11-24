@@ -236,6 +236,66 @@ public class JiniFederation extends AbstractDistributedFederation implements
         
     }
 
+    public IDataService getDataServiceByName(final String name) {
+        
+        // Note: no services are available/discovered.
+        if (dataServicesClient == null)
+            return null;
+
+        return dataServicesClient.getDataServiceByName(name);
+        
+    }
+
+//    /**
+//     * Helper places {@link IService}s into order by their {@link UUID}s.
+//     * 
+//     * @todo this will do RMI for {@link IService#getServiceUUID()}s during the
+//     *       sort, which is not very nice and should be cached.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    private static class ServiceUUIDComparator implements Comparator<IService> {
+//
+//        public static final ServiceUUIDComparator INSTANCE = new ServiceUUIDComparator();
+//        
+//        private ServiceUUIDComparator() {
+//            
+//        }
+//        
+//        public int compare(IService o1, IService o2) {
+//            
+//            final UUID u1, u2;
+//
+//            try {
+//                // Note: This is RMI and should be cached.
+//                u1 = o1.getServiceUUID();
+//                u2 = o2.getServiceUUID();
+//            } catch (IOException ex) {
+//                throw new RuntimeException(ex);
+//            }
+//            
+//            final long msb1 = u1.getMostSignificantBits();
+//
+//            final long msb2 = u2.getMostSignificantBits();
+//
+//            int ret = msb1 < msb2 ? -1 : msb1 > msb2 ? 1 : 0;
+//
+//            if (ret == 0) {
+//
+//                final long lsb1 = u1.getLeastSignificantBits();
+//                final long lsb2 = u2.getLeastSignificantBits();
+//
+//                ret = lsb1 < lsb2 ? -1 : lsb1 > lsb2 ? 1 : 0;
+//
+//            }
+//            
+//            return ret;
+//            
+//        }
+//        
+//    }
+    
     private boolean open;
     
     synchronized public void shutdown() {

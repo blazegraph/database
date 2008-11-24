@@ -55,7 +55,6 @@ import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.resources.BuildIndexSegmentTask.AtomicUpdateBuildIndexSegmentTask;
-import com.bigdata.resources.BuildIndexSegmentTask.BuildResult;
 
 /**
  * Basic test of building an index segment from an index partition on overflow.

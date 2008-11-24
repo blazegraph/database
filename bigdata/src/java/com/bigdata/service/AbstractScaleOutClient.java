@@ -64,8 +64,9 @@ public abstract class AbstractScaleOutClient extends AbstractClient {
          * 
          * <strong>Warning: This feature is expected to evolve.</strong>
          */
-        String METADATA_INDEX_CACHE_POLICY = "cacheMetadataIndex";
-        
+        String METADATA_INDEX_CACHE_POLICY = IBigdataClient.class.getName()
+                + ".metadataIndex.cachePolicy";
+
         String DEFAULT_METADATA_INDEX_CACHE_POLICY = MetadataIndexCachePolicy.CacheAll
                 .toString();
         

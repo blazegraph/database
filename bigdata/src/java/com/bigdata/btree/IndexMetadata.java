@@ -31,6 +31,7 @@ import java.io.Serializable;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.util.Locale;
+import java.util.Properties;
 import java.util.UUID;
 
 import org.CognitiveWeb.extser.LongPacker;
@@ -39,12 +40,19 @@ import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.compression.PrefixSerializer;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
+import com.bigdata.config.Configuration;
+import com.bigdata.config.IValidator;
+import com.bigdata.config.IntegerRangeValidator;
+import com.bigdata.config.IntegerValidator;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.isolation.IConflictResolver;
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.DefaultSplitHandler;
+import com.bigdata.service.DataService;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.sparse.SparseRowStore;
 
 /**
@@ -173,12 +181,6 @@ import com.bigdata.sparse.SparseRowStore;
  * a backward compatible manner.
  * </p>
  * 
- * @todo Consider just having a property set since there are so many possible
- *       properties.
- * 
- * @todo Write (de-)serialization tests for both kinds of metadata including
- *       with the optional metadata (pmd, etc).
- * 
  * @todo Make sure that metadata for index partition "zones" propagates with the
  *       partition metadata so that appropriate policies are enforcable locally
  *       (access control, latency requirements, replication, purging of
@@ -196,10 +198,322 @@ import com.bigdata.sparse.SparseRowStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class IndexMetadata implements Serializable, Externalizable, Cloneable, IKeyBuilderFactory {
+public class IndexMetadata implements Serializable, Externalizable, Cloneable,
+        IKeyBuilderFactory {
 
     private static final long serialVersionUID = 4370669592664382720L;
+    
+    /**
+     * Options and their defaults for the {@link com.bigdata.btree} package and
+     * the {@link BTree} and {@link IndexSegment} classes. Options that apply
+     * equally to views and {@link AbstractBTree}s are in the package
+     * namespace, such as whether or not a bloom filter is enabled. Options that
+     * apply to all {@link AbstractBTree}s are specified within that namespace
+     * while those that are specific to {@link BTree} or {@link IndexSegment}
+     * are located within their respective class namespaces. Some properties,
+     * such as the branchingFactor, are defined for both the {@link BTree} and
+     * the {@link IndexSegment} because their defaults tend to be different when
+     * an {@link IndexSegment} is generated from an {@link BTree}.
+     * 
+     * @todo It should be possible to specify the key compression (serializer)
+     *       for nodes and leaves and the value compression (serializer) via
+     *       this interface. This is easy enough if there is a standard factory
+     *       interface, since we can specify the class name, and more difficult
+     *       if we need to create an instance.
+     *       <p>
+     *       Note: The basic pattern here is using the class name, having a
+     *       default instance of the class (or a factory for that instance), and
+     *       then being able to override properties for that instance. Beans
+     *       stuff really, just simpler.
+     * 
+     * @todo it should be possible to specify the overflow handler and its
+     *       properties via options (as you can with beans or jini
+     *       configurations).
+     * 
+     * @todo it should be possible to specify a different split handler and its
+     *       properties via options (as you can with beans or jini
+     *       configurations).
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static interface Options {
 
+        /*
+         * Options that apply to fused views as well as to AbstractBTrees.
+         * 
+         * Note: These options are in the package namespace.
+         */
+        
+        /**
+         * Optional property controls whether or not a bloom filter is
+         * maintained (default {@value #DEFAULT_BLOOM_FILTER}). When enabled,
+         * the bloom filter is effective up to ~ 2M entries per index
+         * (partition). For scale-up, the bloom filter is automatically disabled
+         * after its error rate would be too large given the #of index enties.
+         * For scale-out, as the index grows we keep splitting it into more and
+         * more index partitions, and those index partitions are comprised of
+         * both views of one or more {@link AbstractBTree}s. While the mutable
+         * {@link BTree}s might occasionally grow to large to support a bloom
+         * filter, data is periodically migrated onto immutable
+         * {@link IndexSegment}s which have perfect fit bloom filters. This
+         * means that the bloom filter scales-out, but not up.
+         * 
+         * @see BloomFilterFactory#DEFAULT
+         * 
+         * @see #DEFAULT_BLOOM_FILTER
+         */
+        String BLOOM_FILTER = com.bigdata.btree.BTree.class.getPackage()
+                .getName()
+                + ".bloomFilter";
+        
+        String DEFAULT_BLOOM_FILTER = "false";
+        
+        /**
+         * The name of an optional property whose value identifies the data
+         * service on which the initial index partition of a scale-out index
+         * will be created. The value may be the {@link UUID} of that data
+         * service (this is unambiguous) of the name associated with the data
+         * service (it is up to the administrator to not assign the same name to
+         * different data service instances and an arbitrary instance having the
+         * desired name will be used if more than one instance is assigned the
+         * same name). The default behavior is to select a data service using
+         * the load balancer, which is done automatically if
+         * {@link IndexMetadata#getInitialDataServiceUUID()} returns
+         * <code>null</code>.
+         */
+        // note: property applies to views so namespace is the package.
+        String INITIAL_DATA_SERVICE = com.bigdata.btree.BTree.class
+                .getPackage().getName()
+                + ".initialDataService";
+
+        /**
+         * The capacity of the hard reference queue used to defer the eviction
+         * of dirty nodes (nodes or leaves).
+         * <p>
+         * The purpose of this queue is to defer eviction of dirty nodes and
+         * leaves. Once a node falls off the write retention queue it is checked
+         * to see if it is dirty. If it is dirty, then it is serialized and
+         * persisted on the backing store. If the write retention queue capacity
+         * is set to a large value (say, GTE 1000), then that will will increase
+         * the commit latency and have a negative effect on the overall
+         * performance. Too small a value will mean that nodes that are
+         * undergoing mutation will be serialized and persisted prematurely
+         * leading to excessive writes on the backing store. For append-only
+         * stores, this directly contributes to what are effectively redundent
+         * and thereafter unreachable copies of the intermediate state of nodes
+         * as only nodes that can be reached by navigation from a
+         * {@link Checkpoint} will ever be read again. The value
+         * <code>500</code> appears to be a good default. While it is possible
+         * that some workloads could benefit from a larger value, this leads to
+         * higher commit latency and can therefore have a broad impact on
+         * performance.
+         * <p>
+         * Note: For historical reasons, the write rentention queue is used for
+         * both {@link BTree} and {@link IndexSegment}.
+         */
+        String WRITE_RETENTION_QUEUE_CAPACITY = com.bigdata.btree.AbstractBTree.class
+                .getPackage().getName()
+                + ".writeRetentionQueue.capacity";
+
+        /**
+         * The #of entries on the write retention queue that will be scanned for
+         * a match before a new reference is appended to the queue. This trades
+         * off the cost of scanning entries on the queue, which is handled by
+         * the queue itself, against the cost of queue churn. Note that queue
+         * eviction drives IOs required to write the leaves on the store, but
+         * incremental writes occur iff the {@link AbstractNode#referenceCount}
+         * is zero and the node or leaf is dirty.
+         */
+        String WRITE_RETENTION_QUEUE_SCAN = com.bigdata.btree.AbstractBTree.class
+                .getPackage().getName()
+                + ".writeRetentionQueue.scan";
+
+        /**
+         * The capacity of the hard reference queue used to retain recently used
+         * nodes (or leaves). When zero (0), this queue is disabled.
+         * <p>
+         * The read retention queue complements the write retention queue. The
+         * latter has a strong buffering effect, but we can not increase the
+         * size of the write retention queue without bound as that will increase
+         * the commit latency. However, the read retention queue can be quite
+         * large and will "simply" buffer "recently" used nodes and leaves in
+         * memory. This can have a huge effect, especially when a complex
+         * high-level query would otherwise thrash the disk as nodes that are
+         * required for query processing fall off of the write retention queue
+         * and get garbage collected. The pragmatic upper bound for this
+         * probably depends on the index workload. At some point, you will stop
+         * seeing an increase in performance as a function of the read retention
+         * queue for a given workload. The larger the read retention queue, the
+         * more burden the index can impose on the heap. However, copy-on-write
+         * explicitly clears all references in a node so the JVM can collect the
+         * data for nodes that are no longer part of the index before they fall
+         * off of the queue even if it can not collect the node reference
+         * itself.
+         * 
+         * @todo The size of the read rentention queue could also be set
+         *       dynamically, e.g., as a function of the depth of the BTree and
+         *       the branching factor. Since the BTree depth only changes during
+         *       index writes, and since index writes are single-threaded, it
+         *       would not be difficult to re-provision this to a larger
+         *       capacity when the root is split or joined. To avoid needless
+         *       effort, there should be a minimum queue capacity that is used
+         *       up to depth=2/3. If the queue capacity is set to n=~5-10% of
+         *       the maximum possible #of nodes in a btree of a given depth,
+         *       then we can compute the capacity dynamically based on that
+         *       parameter. And of course it can be easily provisioned when the
+         *       BTree is {@link #reopen()}ed.
+         */
+        String READ_RETENTION_QUEUE_CAPACITY = com.bigdata.btree.AbstractBTree.class
+                .getPackage().getName()
+                + ".readRetentionQueue.capacity";
+
+        /**
+         * The #of entries on the hard reference queue that will be scanned for a
+         * match before a new reference is appended to the queue. This trades off
+         * the cost of scanning entries on the queue, which is handled by the queue
+         * itself, against the cost of queue churn.
+         */
+        String READ_RETENTION_QUEUE_SCAN = com.bigdata.btree.AbstractBTree.class
+                .getPackage().getName()
+                + ".readRetentionQueue.scan"; 
+
+        /**
+         * The minimum write retention queue capacity is two (2) in order to
+         * avoid cache evictions of the leaves participating in a split.
+         */
+        int MIN_WRITE_RETENTION_QUEUE_CAPACITY = 2;
+        
+        /**
+         * A reasonable maximum write retention queue capacity.
+         */
+        int MAX_WRITE_RETENTION_QUEUE_CAPACITY = 2000;
+        
+        String DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY = "500";
+
+        String DEFAULT_WRITE_RETENTION_QUEUE_SCAN = "20";
+
+        String DEFAULT_READ_RETENTION_QUEUE_CAPACITY = "10000";
+
+        String DEFAULT_READ_RETENTION_QUEUE_SCAN = "20";
+
+        /*
+         * Split handler properties.
+         * 
+         * @see DefaultSplitHandler
+         * 
+         * Note: Use these settings to trigger splits sooner and thus enter the
+         * more interesting regions of the phase space more quickly BUT DO NOT
+         * use these settings for deployment!
+         * 
+         * final int minimumEntryCount = 1 * Bytes.kilobyte32; (or 10k)
+         * 
+         * final int entryCountPerSplit = 5 * Bytes.megabyte32; (or 50k)
+         */
+        
+        String SPLIT_HANDLER_MIN_ENTRY_COUNT = DefaultSplitHandler.class
+                .getName()
+                + ".minimumEntryCount";
+
+        String SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT = DefaultSplitHandler.class
+                .getName()
+                + ".entryCountPerSplit";
+
+        String SPLIT_HANDLER_OVER_CAPACITY_MULTIPLIER = DefaultSplitHandler.class
+                .getName()
+                + ".overCapacityMultiplier";
+
+        String SPLIT_HANDLER_UNDER_CAPACITY_MULTIPLIER = DefaultSplitHandler.class
+                .getName()
+                + ".underCapacityMultiplier";
+
+        String SPLIT_HANDLER_SAMPLE_RATE = DefaultSplitHandler.class.getName()
+                + ".sampleRate";
+
+        String DEFAULT_SPLIT_HANDLER_MIN_ENTRY_COUNT = ""
+                + (500 * Bytes.kilobyte32);
+
+        String DEFAULT_SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT = ""
+                + (1 * Bytes.megabyte32);
+
+        String DEFAULT_SPLIT_HANDLER_OVER_CAPACITY_MULTIPLIER = "1.5";
+
+        String DEFAULT_SPLIT_HANDLER_UNDER_CAPACITY_MULTIPLIER = ".75";
+
+        String DEFAULT_SPLIT_HANDLER_SAMPLE_RATE = "20"; 
+
+        /*
+         * Options that are valid for any AbstractBTree but which are not
+         * defined for a FusedView.
+         * 
+         * Note: These options are in the AbstractBTree namespace.
+         */
+        
+        /*
+         * Options that are specific to BTree.
+         * 
+         * Note: These options are in the BTree namespace.
+         */
+        
+        /**
+         * The name of an optional property whose value specifies the branching
+         * factor for a mutable {@link BTree}.
+         * 
+         * @see #DEFAULT_BTREE_BRANCHING_FACTOR
+         * @see #INDEX_SEGMENT_BRANCHING_FACTOR
+         */
+        String BTREE_BRANCHING_FACTOR = BTree.class.getName()+".branchingFactor";
+        
+        /**
+         * The default branching factor for a mutable {@link BTree}.
+         * 
+         * @todo Performance is best for up to at least a 4M triple RDF dataset for
+         *       load, closure and query at m=256, but thereafter performance begins
+         *       to drag. Reconsider once I get rid of the
+         *       {@link ImmutableKeyBuffer} and other cruft that is driving GC.
+         */
+        String DEFAULT_BTREE_BRANCHING_FACTOR = "32"; //"256"
+
+        /*
+         * Options that are specific to IndexSegment.
+         * 
+         * Note: These options are in the IndexSegment namespace.
+         */
+        
+        /**
+         * The name of the property whose value specifies the branching factory
+         * for an immutable {@link IndexSegment}.
+         */
+        String INDEX_SEGMENT_BRANCHING_FACTOR = IndexSegment.class
+                .getName()
+                + ".branchingFactor";
+
+        /**
+         * The default branching factor for an {@link IndexSegment}.
+         * 
+         * @todo experiment with performance for various values in {128:4096}
+         *       for commonly used scale-out indices.
+         */
+        String DEFAULT_INDEX_SEGMENT_BRANCHING_FACTOR = "512";
+
+        /**
+         * The minimum allowed branching factor (3). The branching factor may be
+         * odd or even.
+         */
+        int MIN_BRANCHING_FACTOR = 3;
+
+        /**
+         * A reasonable maximum branching factor for a {@link BTree}.
+         */
+        int MAX_BTREE_BRANCHING_FACTOR = 1024;
+
+        /**
+         * A reasonable maximum branching factor for an {@link IndexSegment}.
+         */
+        int MAX_INDEX_SEGMENT_BRANCHING_FACTOR = 10240;
+        
+    }
+    
     /**
      * Address that can be used to read this metadata record from the store.
      * <p>
@@ -222,6 +536,28 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
         return addrMetadata;
         
     }
+    
+    /**
+     * The {@link UUID} of the {@link DataService} on which the first partition
+     * of the scale-out index should be created. This is a purely transient
+     * property and will be <code>null</code> unless either explicitly set or
+     * set using {@value Options#INITIAL_DATA_SERVICE}. This property is only
+     * set by the ctor(s) that are used to create a new {@link IndexMetadata}
+     * instance, so no additional lookups are performed during de-serialization.
+     * 
+     * @see Options#INITIAL_DATA_SERVICE
+     */
+    public UUID getInitialDataServiceUUID() {
+        
+        return initialDataServiceUUID;
+        
+    }
+    public void setInitialDataServiceUUID(UUID uuid) {
+        
+        initialDataServiceUUID = uuid;
+        
+    }
+    private transient UUID initialDataServiceUUID;
 
     /*
      * @todo consider allowing distinct values for the branching factor (already
@@ -233,6 +569,10 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
     private String name;
     private int branchingFactor;
     private int indexSegmentBranchingFactor;
+    private int writeRetentionQueueCapacity;
+    private int writeRetentionQueueScan;
+    private int readRetentionQueueCapacity;
+    private int readRetentionQueueScan;
     private LocalPartitionMetadata pmd;
     private String className;
     private String checkpointClassName;
@@ -242,7 +582,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
     private IConflictResolver conflictResolver;
     private boolean deleteMarkers;
     private boolean versionTimestamps;
-//    private double errorRate;
     private BloomFilterFactory bloomFilterFactory;
     private IOverflowHandler overflowHandler;
     private ISplitHandler splitHandler;
@@ -312,6 +651,66 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
      */
     public final int getIndexSegmentBranchingFactor() {return indexSegmentBranchingFactor;}
     
+    /**
+     * @see Options#WRITE_RETENTION_QUEUE_CAPACITY
+     */
+    public final int getWriteRetentionQueueCapacity() {
+        
+        return writeRetentionQueueCapacity;
+        
+    }
+
+    public final void setWriteRetentionQueueCapacity(int v) {
+        
+        this.writeRetentionQueueCapacity = v;
+        
+    }
+
+    /**
+     * @see Options#WRITE_RETENTION_QUEUE_SCAN
+     */
+    public final int getWriteRetentionQueueScan() {
+        
+        return writeRetentionQueueScan;
+        
+    }
+    
+    public final void setWriteRetentionQueueScan(int v) {
+        
+        this.writeRetentionQueueScan = v;
+        
+    }
+
+    /**
+     * @see Options#READ_RETENTION_QUEUE_CAPACITY
+     */
+    public final int getReadRetentionQueueCapacity() {
+        
+        return readRetentionQueueCapacity;
+        
+    }
+    
+    public final void setReadRetentionQueueCapacity(int v) {
+        
+        this.readRetentionQueueCapacity = v;
+        
+    }
+
+    /**
+     * @see Options#READ_RETENTION_QUEUE_SCAN
+     */
+    public final int getReadRetentionQueueScan() {
+        
+        return readRetentionQueueScan;
+        
+    }
+    
+    public final void setReadRetentionQueueScan(int v) {
+        
+        this.readRetentionQueueScan = v;
+        
+    }
+
     /**
      * When non-<code>null</code>, this is the description of the view of
      * this index partition. This will be <code>null</code> iff the
@@ -489,7 +888,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
      */
     public void setBranchingFactor(int branchingFactor) {
         
-        if(branchingFactor < BTree.MIN_BRANCHING_FACTOR) {
+        if(branchingFactor < Options.MIN_BRANCHING_FACTOR) {
             
             throw new IllegalArgumentException();
             
@@ -501,7 +900,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
 
     public void setIndexSegmentBranchingFactor(int branchingFactor) {
 
-        if(branchingFactor < BTree.MIN_BRANCHING_FACTOR) {
+        if(branchingFactor < Options.MIN_BRANCHING_FACTOR) {
             
             throw new IllegalArgumentException();
             
@@ -525,38 +924,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
         this.conflictResolver = conflictResolver;
         
     }
-
-//    /**
-//     * A value in [0:1] that is interpreted as an allowable false positive error
-//     * rate for an optional bloom filter. When zero (0.0), the bloom filter is
-//     * not constructed. The bloom filter provides efficient fast rejection of
-//     * keys that are not in the index. If the bloom filter reports that a key is
-//     * in the index then the index MUST be tested to verify that the result is
-//     * not a false positive. Bloom filters are great if you have a lot of point
-//     * tests to perform but they are not used if you are doing range scans.
-//     * <p>
-//     * Maintaing a bloom filter is fairly expensive and this option should only
-//     * be enabled if you know that point access tests are a hotspot for an
-//     * index.
-//     * 
-//     * @todo consider changing this to a boolean flag and then computing a
-//     *       suitable capacity for the bloom filter based on a reasonable
-//     *       expectation of the #of index entries that might be observed.
-//     */
-//    public double getErrorRate() {
-//        
-//        return errorRate;
-//        
-//    }
-//    
-//    public void setErrorRate(final double errorRate) {
-//
-//        if (errorRate < 0d || errorRate > 1d)
-//            throw new IllegalArgumentException();
-//        
-//        this.errorRate = errorRate;
-//        
-//    }
 
     /**
      * Return the bloom filter factory.
@@ -650,8 +1017,10 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
     
     /**
      * Constructor used to configure a new <em>unnamed</em> B+Tree. The index
-     * UUID is set to the given value and all other fields are defaulted. Those
-     * defaults may be overriden using the various setter methods.
+     * UUID is set to the given value and all other fields are defaulted as
+     * explained at {@link #IndexMetadata(Properties, String, UUID)}. Those
+     * defaults may be overriden using the various setter methods, but some
+     * values can not be safely overriden after the index is in use.
      * 
      * @param indexUUID
      *            The indexUUID.
@@ -667,8 +1036,10 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
         
     /**
      * Constructor used to configure a new <em>named</em> B+Tree. The index
-     * UUID is set to the given value and all other fields are defaulted. Those
-     * defaults may be overriden using the various setter methods.
+     * UUID is set to the given value and all other fields are defaulted as
+     * explained at {@link #IndexMetadata(Properties, String, UUID)}. Those
+     * defaults may be overriden using the various setter methods, but some
+     * values can not be safely overriden after the index is in use.
      * 
      * @param name
      *            The index name. When this is a scale-out index, the same
@@ -685,16 +1056,81 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
      */
     public IndexMetadata(final String name, final UUID indexUUID) {
 
+        this(null, System.getProperties(), name, indexUUID);
+    
+    }
+
+    /**
+     * Constructor used to configure a new <em>named</em> B+Tree. The index
+     * UUID is set to the given value and all other fields are defaulted as
+     * explained at {@link #getProperty(Properties, String, String, String)}.
+     * Those defaults may be overriden using the various setter methods.
+     * 
+     * @param indexManager
+     *            Optional. When given and when the {@link IIndexManager} is a
+     *            scale-out {@link IBigdataFederation}, this object will be
+     *            used to interpret the {@link Options#INITIAL_DATA_SERVICE}
+     *            property.
+     * @param properties
+     *            Properties object used to overriden the default values for
+     *            this {@link IndexMetadata} instance.
+     * @param namespace
+     *            The index name. When this is a scale-out index, the same
+     *            <i>name</i> is specified for each index resource. However
+     *            they will be registered on the journal under different names
+     *            depending on the index partition to which they belong.
+     * @param indexUUID
+     *            The indexUUID. The same index UUID MUST be used for all
+     *            component indices in a scale-out index.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>properties</i> is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if <i>indexUUID</i> is <code>null</code>.
+     */
+    public IndexMetadata(final IIndexManager indexManager,
+            final Properties properties, final String namespace,
+            final UUID indexUUID) {
+
         if (indexUUID == null)
             throw new IllegalArgumentException();
         
-        this.name = name;
+        this.name = namespace;
         
         this.indexUUID = indexUUID;
         
-        this.branchingFactor = BTree.DEFAULT_BRANCHING_FACTOR;
+        this.branchingFactor = getProperty(indexManager, properties, namespace,
+                Options.BTREE_BRANCHING_FACTOR,
+                Options.DEFAULT_BTREE_BRANCHING_FACTOR,
+                new IntegerRangeValidator(Options.MIN_BRANCHING_FACTOR,
+                        Options.MAX_BTREE_BRANCHING_FACTOR));
 
-        this.indexSegmentBranchingFactor = 512;
+        this.indexSegmentBranchingFactor = getProperty(indexManager,
+                properties, namespace, Options.INDEX_SEGMENT_BRANCHING_FACTOR,
+                Options.DEFAULT_INDEX_SEGMENT_BRANCHING_FACTOR,
+                new IntegerRangeValidator(Options.MIN_BRANCHING_FACTOR,
+                        Options.MAX_INDEX_SEGMENT_BRANCHING_FACTOR));
+
+        this.writeRetentionQueueCapacity = getProperty(indexManager,
+                properties, namespace, Options.WRITE_RETENTION_QUEUE_CAPACITY,
+                Options.DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY,
+                new IntegerRangeValidator(Options.MIN_WRITE_RETENTION_QUEUE_CAPACITY,
+                        Options.MAX_WRITE_RETENTION_QUEUE_CAPACITY));
+
+        this.writeRetentionQueueScan = getProperty(indexManager,
+                properties, namespace, Options.WRITE_RETENTION_QUEUE_SCAN,
+                Options.DEFAULT_WRITE_RETENTION_QUEUE_SCAN,
+                IntegerValidator.GTE_ZERO);
+
+        this.readRetentionQueueCapacity = getProperty(indexManager,
+                properties, namespace, Options.READ_RETENTION_QUEUE_CAPACITY,
+                Options.DEFAULT_READ_RETENTION_QUEUE_CAPACITY,
+                IntegerValidator.GTE_ZERO);
+
+        this.readRetentionQueueScan = getProperty(indexManager,
+                properties, namespace, Options.READ_RETENTION_QUEUE_SCAN,
+                Options.DEFAULT_READ_RETENTION_QUEUE_SCAN,
+                IntegerValidator.GTE_ZERO);
 
         // Note: default assumes NOT an index partition.
         this.pmd = null;
@@ -721,33 +1157,55 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
         this.deleteMarkers = false;
         
         this.versionTimestamps = false;
-        
-//        this.errorRate = 0.0;
-        this.bloomFilterFactory = null;
-  
-        this.overflowHandler = null;
-        
-        /*
-         * Note: Use these settings to trigger splits sooner and thus enter the
-         * more interesting regions of the phase space more quickly BUT DO NOT
-         * use these settings for deployment!
-         */
-//        final int minimumEntryCount = 1 * Bytes.kilobyte32;
-//        final int entryCountPerSplit = 5 * Bytes.megabyte32;
-        
-        /*
-         * Use these settings as the default for release/deployment.
-         */
-        final int minimumEntryCount = 500 * Bytes.kilobyte32;
-        final int entryCountPerSplit = 1 * Bytes.megabyte32;
 
-        this.splitHandler = new DefaultSplitHandler(
-                minimumEntryCount,
-                entryCountPerSplit,
-                1.5, // overCapacityMultiplier
-                .75, // underCapacityMultiplier
-                20   // sampleRate
-                );
+        // optional bloom filter setup.
+        final boolean bloomFilter = Boolean.parseBoolean(getProperty(
+                indexManager, properties, namespace, Options.BLOOM_FILTER,
+                Options.DEFAULT_BLOOM_FILTER));
+        
+        this.bloomFilterFactory = bloomFilter ? BloomFilterFactory.DEFAULT
+                : null;
+  
+        // Note: by default there is no overflow handler.
+        this.overflowHandler = null;
+
+        // split handler setup (used iff scale-out).
+        {
+            
+            final int minimumEntryCount = Integer.parseInt(getProperty(
+                    indexManager, properties, namespace,
+                    Options.SPLIT_HANDLER_MIN_ENTRY_COUNT,
+                    Options.DEFAULT_SPLIT_HANDLER_MIN_ENTRY_COUNT));
+
+            final int entryCountPerSplit = Integer.parseInt(getProperty(
+                    indexManager, properties, namespace,
+                    Options.SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT,
+                    Options.DEFAULT_SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT));
+
+            final double overCapacityMultiplier = Double.parseDouble(getProperty(
+                    indexManager, properties, namespace,
+                    Options.SPLIT_HANDLER_OVER_CAPACITY_MULTIPLIER,
+                    Options.DEFAULT_SPLIT_HANDLER_OVER_CAPACITY_MULTIPLIER));
+
+            final double underCapacityMultiplier = Double.parseDouble(getProperty(
+                    indexManager, properties, namespace,
+                    Options.SPLIT_HANDLER_UNDER_CAPACITY_MULTIPLIER,
+                    Options.DEFAULT_SPLIT_HANDLER_UNDER_CAPACITY_MULTIPLIER));
+
+            final int sampleRate = Integer.parseInt(getProperty(
+                    indexManager, properties, namespace,
+                    Options.SPLIT_HANDLER_SAMPLE_RATE,
+                    Options.DEFAULT_SPLIT_HANDLER_SAMPLE_RATE));
+
+            this.splitHandler = new DefaultSplitHandler(//
+                    minimumEntryCount, //
+                    entryCountPerSplit, //
+                    overCapacityMultiplier, //
+                    underCapacityMultiplier, //
+                    sampleRate //
+            );
+        
+        }
 
     }
 
@@ -858,27 +1316,18 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
     private static transient final int VERSION0 = 0x0;
     
     /**
-     * This version drops the errorRate field and replaces it with a serialized
-     * {@link BloomFilterFactory}. When reading an older version it creates a
-     * {@link BloomFilterFactory} instance using the de-serialized error rate
-     * and an expected index entry count of 1M.
-     */
-    private static transient final int VERSION1 = 0x1;
-
-    /**
      * @todo review generated record for compactness.
      */
-    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+    public void readExternal(ObjectInput in) throws IOException,
+            ClassNotFoundException {
 
         final int version = (int) LongPacker.unpackLong(in);
 
-        if (version != VERSION0 && version != VERSION1) {
+        if (version != VERSION0) {
 
             throw new IOException("Unknown version: version=" + version);
 
         }
-
-        // immutable
 
         final boolean hasName = in.readBoolean();
 
@@ -888,12 +1337,20 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
 
         }
         
-        indexUUID = new UUID(in.readLong()/*MSB*/,in.readLong()/*LSB*/);
+        indexUUID = new UUID(in.readLong()/* MSB */, in.readLong()/* LSB */);
 
         branchingFactor = (int)LongPacker.unpackLong(in);
 
         indexSegmentBranchingFactor = (int)LongPacker.unpackLong(in);
+
+        writeRetentionQueueCapacity = (int)LongPacker.unpackLong(in);
         
+        writeRetentionQueueScan = (int)LongPacker.unpackLong(in);
+        
+        readRetentionQueueCapacity = (int)LongPacker.unpackLong(in);
+        
+        readRetentionQueueScan = (int)LongPacker.unpackLong(in);
+
         pmd = (LocalPartitionMetadata)in.readObject();
         
         className = in.readUTF();
@@ -912,24 +1369,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
         
         versionTimestamps = in.readBoolean();
 
-        if (version == VERSION0) {
-            
-            final double errorRate = in.readDouble();
-            
-            if (errorRate != 0d) {
-            
-                final int n = 1000000; // 1M
-                
-                bloomFilterFactory = new BloomFilterFactory(n, errorRate,
-                        errorRate * 10);
-                
-            }
-            
-        } else {
-
-            bloomFilterFactory = (BloomFilterFactory) in.readObject();
-            
-        }
+        bloomFilterFactory = (BloomFilterFactory) in.readObject();
 
         overflowHandler = (IOverflowHandler)in.readObject();
 
@@ -939,10 +1379,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
 
     public void writeExternal(ObjectOutput out) throws IOException {
         
-        LongPacker.packLong(out, VERSION1);
+        LongPacker.packLong(out, VERSION0);
 
-        // immutable
-        
         // hasName?
         out.writeBoolean(name != null ? true : false);
         
@@ -960,6 +1398,14 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
         LongPacker.packLong(out, branchingFactor);
 
         LongPacker.packLong(out, indexSegmentBranchingFactor);
+
+        LongPacker.packLong(out, writeRetentionQueueCapacity);
+
+        LongPacker.packLong(out, writeRetentionQueueScan);
+        
+        LongPacker.packLong(out, readRetentionQueueCapacity);
+       
+        LongPacker.packLong(out, readRetentionQueueScan);
 
         out.writeObject(pmd);
         
@@ -979,9 +1425,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
         
         out.writeBoolean(versionTimestamps);
 
-        // Note: VERSION0
-        // out.writeDouble(errorRate);
-        // Note: VERSION1 (replaces the errorRate)
         out.writeObject(bloomFilterFactory);
         
         out.writeObject(overflowHandler);
@@ -1196,5 +1639,32 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
         return getTupleSerializer().getKeyBuilder();
         
     }
-        
+    
+    /**
+     * @see Configuration#getProperty(IIndexManager, Properties, String, String,
+     *      String)
+     */
+    protected String getProperty(final IIndexManager indexManager,
+            final Properties properties, final String namespace,
+            final String globalName, final String defaultValue) {
+
+        return Configuration.getProperty(indexManager, properties, namespace,
+                globalName, defaultValue);
+
+    }
+
+    /**
+     * @see Configuration#getProperty(IIndexManager, Properties, String, String,
+     *      String, IValidator)
+     */
+    protected <E> E getProperty(final IIndexManager indexManager,
+            final Properties properties, final String namespace,
+            final String globalName, final String defaultValue,
+            IValidator<E> validator) {
+
+        return Configuration.getProperty(indexManager, properties, namespace,
+                globalName, defaultValue, validator);
+
+    }
+
 }

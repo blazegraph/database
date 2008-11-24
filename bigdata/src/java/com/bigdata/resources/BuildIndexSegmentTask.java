@@ -19,17 +19,27 @@ import com.bigdata.mdi.SegmentMetadata;
 
 /**
  * Task builds an {@link IndexSegment} from the fused view of an index partition
- * as of some historical timestamp. This task is typically applied after an
+ * as of some historical timestamp and then atomically updates the view (aka a
+ * compacting merge).
+ * <p>
+ * Note: This task may be used after
  * {@link IResourceManager#overflow(boolean, boolean)} in order to produce a
- * compact view of the index as of the lastCommitTime on the old journal. As its
- * last action, this task submits a {@link AtomicUpdateBuildIndexSegmentTask}
- * which replaces the view with one defined by the current {@link BTree} on the
- * journal and the newly built {@link IndexSegment}.
+ * compact view of the index as of the <i>lastCommitTime</i> on the old
+ * journal.
+ * <p>
+ * Note: As its last action, this task submits a
+ * {@link AtomicUpdateBuildIndexSegmentTask} which replaces the view with one
+ * defined by the current {@link BTree} on the journal and the newly built
+ * {@link IndexSegment}.
+ * <p>
+ * Note: If the task fails, then the output {@link IndexSegment} will be
+ * deleted.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
+public class BuildIndexSegmentTask extends
+        AbstractResourceManagerTask<BuildResult> {
 
     final protected long lastCommitTime;
 
@@ -66,7 +76,7 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
      * 
      * @return The {@link BuildResult}.
      */
-    public Object doTask() throws Exception {
+    public BuildResult doTask() throws Exception {
 
         if (resourceManager.isOverflowAllowed())
             throw new IllegalStateException();
@@ -89,71 +99,41 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
         
         // Build the index segment.
         final BuildResult result = resourceManager.buildIndexSegment(name, src,
-                outFile, lastCommitTime, null/*fromKey*/, null/*toKey*/);
+                outFile, true/* compactingMerge */, lastCommitTime,
+                null/* fromKey */, null/* toKey */);
 
-        // task will update the index partition view definition.
-        final AbstractTask task = new AtomicUpdateBuildIndexSegmentTask(resourceManager,
-                concurrencyManager, name, result);
+        /*
+         * @todo error handling should be inside of the atomic update task since
+         * it has more visibility into the state changes and when we can no
+         * longer delete the new index segment.
+         */
+        try {
+            
+            // task will update the index partition view definition.
+            final AbstractTask<Void> task = new AtomicUpdateBuildIndexSegmentTask(
+                    resourceManager, concurrencyManager, name, result);
 
-        if(INFO)
-            log.info("src=" + name + ", will run atomic update task");
+            if (INFO)
+                log.info("src=" + name + ", will run atomic update task");
 
-        // submit task and wait for it to complete @todo config timeout?
-        concurrencyManager.submit(task).get();
+            // submit task and wait for it to complete @todo config timeout?
+            concurrencyManager.submit(task).get();
+
+        } catch (Throwable t) {
+
+            // delete the generated index segment.
+            resourceManager.deleteResource(result.segmentMetadata.getUUID(),
+                    false/* isJournal */);
+
+            // re-throw the exception
+            throw new Exception(t);
+
+        }
 
         return result;
 
     }
 
-    /**
-     * The result of an {@link BuildIndexSegmentTask}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static public class BuildResult extends AbstractResult {
-
-        /**
-         * The metadata describing the generated {@link IndexSegment}.
-         */
-        public final SegmentMetadata segmentMetadata;
-
-        /**
-         * 
-         * @param name
-         *            The name under which the processed index partition was
-         *            registered (this is typically different from the name of
-         *            the scale-out index).
-         * @param indexMetadata
-         *            The index metadata object for the processed index as of
-         *            the timestamp of the view from which the
-         *            {@link IndexSegment} was generated.
-         * @param segmentMetadata
-         *            The metadata describing the generated {@link IndexSegment}.
-         */
-        public BuildResult(String name, IndexMetadata indexMetadata,
-                SegmentMetadata segmentMetadata) {
-
-            super(name, indexMetadata);
-            
-            if (segmentMetadata == null) {
-
-                throw new IllegalArgumentException();
-                
-            }
-
-            this.segmentMetadata = segmentMetadata;
-
-        }
-
-        public String toString() {
-            
-            return "BuildResult{name="+name+"}";
-            
-        }
-
-    }
-    
     /**
      * <p>
      * The source view is pre-overflow (the last writes are on the old journal)
@@ -181,7 +161,7 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static public class AtomicUpdateBuildIndexSegmentTask extends AbstractResourceManagerTask {
+    static public class AtomicUpdateBuildIndexSegmentTask extends AbstractResourceManagerTask<Void> {
 
         final protected BuildResult buildResult;
         
@@ -217,7 +197,7 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
          * @return <code>null</code>
          */
         @Override
-        protected Object doTask() throws Exception {
+        protected Void doTask() throws Exception {
 
             if (resourceManager.isOverflowAllowed())
                 throw new IllegalStateException();

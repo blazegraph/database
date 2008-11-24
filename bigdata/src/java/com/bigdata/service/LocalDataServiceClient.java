@@ -63,7 +63,8 @@ public class LocalDataServiceClient extends AbstractClient {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static interface Options extends DataService.Options, IBigdataClient.Options {
+    public static interface Options extends DataService.Options,
+            IBigdataClient.Options {
        
     }
     

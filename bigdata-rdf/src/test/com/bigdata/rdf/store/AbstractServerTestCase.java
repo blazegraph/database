@@ -450,9 +450,11 @@ public abstract class AbstractServerTestCase extends TestCase2 {
      */
     protected void assertEquals(PartitionLocator expected, PartitionLocator actual) {
         
-        assertEquals("partitionId",expected.getPartitionId(), actual.getPartitionId());
-        
-        assertEquals("dataServices",expected.getDataServices(),actual.getDataServices());
+        assertEquals("partitionId", expected.getPartitionId(), actual
+                .getPartitionId());
+
+        assertEquals("dataServiceUUID", expected.getDataServiceUUID(), actual
+                .getDataServiceUUID());
 
     }
     

@@ -142,14 +142,20 @@ abstract public class ResourceLockService extends AbstractService implements
     public ResourceLockService(final Properties properties) {
         
     }
-    
+
+    /**
+     * FIXME client-service locks are NOT functional! The problem is that the
+     * client and service do not operate in the same thread and the lock is
+     * based on java locks. Locking is currently disabled!!!
+     */
     public IResourceLock acquireExclusiveLock(final String namespace) {
 
         setupLoggingContext();
         
         try {
         
-            final Lock lock = locks.acquireWriteLock(namespace);
+            final Lock lock = null;
+//            final Lock lock = locks.acquireWriteLock(namespace);
 
             final ResourceLock resourceLock = newLock(namespace,
                     true/* exclusive */, lock);
@@ -171,8 +177,9 @@ abstract public class ResourceLockService extends AbstractService implements
 
         try {
 
-            final Lock lock = locks.acquireWriteLock(namespace, timeout,
-                    TimeUnit.MILLISECONDS);
+            final Lock lock = null;
+//          final Lock lock = locks.acquireWriteLock(namespace, timeout,
+//            TimeUnit.MILLISECONDS);
 
             final ResourceLock resourceLock = newLock(namespace,
                     true/* exclusive */, lock);
@@ -193,7 +200,8 @@ abstract public class ResourceLockService extends AbstractService implements
         
         try {
         
-            final Lock lock = locks.acquireReadLock(namespace);
+//            final Lock lock = locks.acquireReadLock(namespace);
+            final Lock lock = null;
 
             final ResourceLock resourceLock = newLock(namespace,
                     false /* exclusive */, lock);
@@ -215,9 +223,11 @@ abstract public class ResourceLockService extends AbstractService implements
         
         try {
         
-            final Lock lock = locks.acquireReadLock(namespace, timeout,
-                    TimeUnit.MILLISECONDS);
+//            final Lock lock = locks.acquireReadLock(namespace, timeout,
+//                    TimeUnit.MILLISECONDS);
 
+            final Lock lock = null;
+            
             final ResourceLock resourceLock = newLock(namespace,
                     false /* exclusive */, lock);
 
@@ -295,8 +305,9 @@ abstract public class ResourceLockService extends AbstractService implements
             if (namespace == null)
                 throw new IllegalArgumentException();
 
-            if (lock == null)
-                throw new IllegalArgumentException();
+            // @todo check arg once locking is fixed.
+//            if (lock == null)
+//                throw new IllegalArgumentException();
 
             this.namespace = namespace;
             
@@ -308,6 +319,7 @@ abstract public class ResourceLockService extends AbstractService implements
         
         public void unlock() {
 
+            if(lock!=null) //@todo remove this line.
             lock.unlock();
 
         }

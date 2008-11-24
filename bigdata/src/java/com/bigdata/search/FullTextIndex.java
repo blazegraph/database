@@ -471,11 +471,11 @@ public class FullTextIndex extends AbstractRelation {
              * 
              * FIXME put the IKeyBuilderFactory on the index.
              */
-            final IndexMetadata indexMetadata = new IndexMetadata(name, UUID
-                    .randomUUID());
-
             final Properties p = getProperties();
             
+            final IndexMetadata indexMetadata = new IndexMetadata(indexManager,
+                    p, name, UUID.randomUUID());
+
             if (indexManager instanceof IBigdataFederation
                     && ((IBigdataFederation) indexManager).isScaleOut() &&
                     p.getProperty(Options.DATA_SERVICE_UUID)!=null

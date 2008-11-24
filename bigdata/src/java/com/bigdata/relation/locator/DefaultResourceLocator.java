@@ -47,6 +47,7 @@ import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IRelation;
+import com.bigdata.relation.RelationSchema;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.sparse.SparseRowStore;
 

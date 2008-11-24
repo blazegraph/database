@@ -49,11 +49,20 @@ public class DataServiceFilter implements ServiceItemFilter {
     
     protected static final boolean DEBUG = log.isDebugEnabled();
 
-    public static final transient ServiceItemFilter INSTANCE = new DataServiceFilter();
+    public static final transient DataServiceFilter INSTANCE = new DataServiceFilter();
     
-    private DataServiceFilter(){}
-    
-    public boolean check(ServiceItem item) {
+    /**
+     * Use {@link #INSTANCE} if there are no other constraints.
+     */
+    protected DataServiceFilter() {
+
+    }
+
+    /**
+     * @return <code>true</code> if the item is an {@link IDataService} that
+     *         does NOT implement the {@link IMetadataService} interface.
+     */
+    public boolean check(final ServiceItem item) {
 
         if (item.service == null) {
 

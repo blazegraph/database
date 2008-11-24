@@ -86,7 +86,8 @@ public interface IServiceShutdown {
          * 
          * @see #DEFAULT_SHUTDOWN_TIMEOUT
          */
-        String SHUTDOWN_TIMEOUT = "shutdownTimeout";
+        String SHUTDOWN_TIMEOUT = IServiceShutdown.class.getName()
+                + ".shutdownTimeout";
 
         /**
          * The default timeout (0).

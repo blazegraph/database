@@ -1111,9 +1111,7 @@ abstract public class MetadataService extends DataService implements
 
                 PartitionLocator pmd = new PartitionLocator(//
                         mdi.incrementAndGetNextPartitionId(),//
-                        new UUID[] { //
-                            dataServiceUUIDs[i]
-                        },
+                        dataServiceUUIDs[i],
                         leftSeparator,
                         rightSeparator
                         );
@@ -1278,7 +1276,7 @@ abstract public class MetadataService extends DataService implements
                     
                     final int partitionId = pmd.getPartitionId();
                     
-                    final UUID serviceUUID = pmd.getDataServices()[0];
+                    final UUID serviceUUID = pmd.getDataServiceUUID();
                     
                     final IDataService dataService = fed
                             .getDataService(serviceUUID);

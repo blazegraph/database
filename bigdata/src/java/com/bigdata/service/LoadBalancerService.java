@@ -520,7 +520,7 @@ abstract public class LoadBalancerService extends AbstractService
          * 
          * @see AbstractStatisticsCollector.Options#PERFORMANCE_COUNTERS_SAMPLE_INTERVAL
          */
-        String UPDATE_DELAY = "updateDelay";
+        String UPDATE_DELAY = LoadBalancerService.class.getName()+".updateDelay";
         
         /**
          * The default {@link #UPDATE_DELAY}.
@@ -534,7 +534,7 @@ abstract public class LoadBalancerService extends AbstractService
          * service was started. You may specify an alternative directory using
          * this property.
          */
-        String LOG_DIR = "log.dir";
+        String LOG_DIR = LoadBalancerService.class.getName()+".log.dir";
         
         String DEFAULT_LOG_DIR = ".";
 
@@ -543,7 +543,7 @@ abstract public class LoadBalancerService extends AbstractService
          * a log file (default is {@value #DEFAULT_LOG_DELAY}, which is
          * equivilent to one hour).
          */
-        String LOG_DELAY = "log.delay";
+        String LOG_DELAY = LoadBalancerService.class.getName()+".log.delay";
         
         String DEFAULT_LOG_DELAY = "" + 1000 * 60 * 60;
 
@@ -551,7 +551,7 @@ abstract public class LoadBalancerService extends AbstractService
          * The maximum #of distinct log files to retain (default is one week
          * based on a {@link #LOG_DELAY} equivilant to one hour).
          */
-        String LOG_MAX_FILES = "log.maxFiles";
+        String LOG_MAX_FILES = LoadBalancerService.class.getName()+".log.maxFiles";
 
         String DEFAULT_LOG_MAX_FILES = "" + 24 * 7;
 

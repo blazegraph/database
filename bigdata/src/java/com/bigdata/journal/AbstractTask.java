@@ -106,7 +106,7 @@ import com.bigdata.util.concurrent.TaskCounters;
  * @todo declare generic type for the return as <? extends Object> to be compatible
  * with {@link ConcurrencyManager#submit(AbstractTask)}
  */
-public abstract class AbstractTask implements Callable<Object>, ITask {
+public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
     static protected final Logger log = Logger.getLogger(AbstractTask.class);
 
@@ -1374,7 +1374,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
      *                {@link Thread#interrupted()} becomes true during
      *                execution.
      */
-    abstract protected Object doTask() throws Exception;
+    abstract protected T doTask() throws Exception;
 
     /**
      * Adds the following fields to the {@link MDC} logging context:
@@ -1446,7 +1446,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
      *             executor service running the task to be shutdown and thereby
      *             interrupt all running tasks).
      */
-    final public Object call() throws Exception {
+    final public T call() throws Exception {
         
         try {
 
@@ -1461,7 +1461,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             
             setupLoggingContext();
             
-            final Object ret = call2();
+            final T ret = call2();
             
             clearLoggingContext();
 
@@ -1506,7 +1506,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
     }
 
-    final private Object call2() throws Exception {
+    final private T call2() throws Exception {
 
         nanoTime_assignedWorker = System.nanoTime();
 
@@ -1548,7 +1548,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
                  * Delegate handles handshaking for writable transactions.
                  */
 
-                final Callable<Object> delegate = new InnerReadWriteTxServiceCallable(
+                final Callable<T> delegate = new InnerReadWriteTxServiceCallable(
                         this, tx);
                 
                 return delegate.call();
@@ -1604,7 +1604,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
      * 
      * @throws Exception
      */
-    private Object doUnisolatedReadWriteTask() throws Exception {
+    private T doUnisolatedReadWriteTask() throws Exception {
         
         // lock manager.
         final LockManager<String> lockManager = concurrencyManager.getWriteService().getLockManager();
@@ -1618,7 +1618,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
         lockManager.addResource(resource);
 
         // delegate will handle lock acquisition and invoke doTask().
-        final LockManagerTask<String> delegate = new LockManagerTask<String>(lockManager,
+        final LockManagerTask<String,T> delegate = new LockManagerTask<String,T>(lockManager,
                 resource, new InnerWriteServiceCallable(this));
         
         final WriteExecutorService writeService = concurrencyManager.getWriteService();
@@ -1629,7 +1629,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
         try {
 
-            final Object ret;
+            final T ret;
             
             /*
              * Note: The lock(s) are only held during this call. By the time the

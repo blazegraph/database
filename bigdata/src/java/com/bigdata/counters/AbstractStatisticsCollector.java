@@ -520,10 +520,12 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
          * The interval in seconds at which the performance counters of the host
          * platform will be sampled (default 60).
          */
-        public String PERFORMANCE_COUNTERS_SAMPLE_INTERVAL = "counters.interval";
-        
+        public String PERFORMANCE_COUNTERS_SAMPLE_INTERVAL = AbstractStatisticsCollector.class
+                .getPackage().getName()
+                + ".interval";
+
         public String DEFAULT_PERFORMANCE_COUNTERS_SAMPLE_INTERVAL = "60";
-        
+
         /**
          * The name of the process whose per-process performance counters are to
          * be collected (required, no default). This causes the per-process
@@ -536,7 +538,9 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
          * run many different services and will report the counters for each
          * service using the path formed as described above.
          */
-        public String PROCESS_NAME = "counters.processName";
+        public String PROCESS_NAME = AbstractStatisticsCollector.class
+                .getPackage().getName()
+                + ".processName";
         
     }
     

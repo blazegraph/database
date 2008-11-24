@@ -35,7 +35,6 @@ import java.util.concurrent.ExecutionException;
 
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.resources.StoreManager.NoSuchStoreException;
 import com.bigdata.resources.StoreManager.Options;
 
 /**

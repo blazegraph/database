@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.resources;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.journal.AbstractTask;
@@ -58,7 +57,7 @@ import com.bigdata.service.IMetadataService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractResourceManagerTask extends AbstractTask {
+abstract public class AbstractResourceManagerTask<T> extends AbstractTask<T> {
     
     /**
      * Note: Logger shadows {@link AbstractTask#log}.
@@ -68,14 +67,12 @@ abstract public class AbstractResourceManagerTask extends AbstractTask {
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    static final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    static final protected boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    static final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    static final protected boolean DEBUG = log.isDebugEnabled();
 
     protected final ResourceManager resourceManager;
     

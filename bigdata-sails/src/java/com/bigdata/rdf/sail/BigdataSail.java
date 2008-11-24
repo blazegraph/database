@@ -65,7 +65,6 @@ package com.bigdata.rdf.sail;
 import info.aduna.iteration.CloseableIteration;
 
 import java.lang.ref.WeakReference;
-import java.lang.reflect.Constructor;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -124,7 +123,6 @@ import com.bigdata.rdf.spo.InferredSPOFilter;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOAccessPath;
 import com.bigdata.rdf.spo.SPORelation;
-import com.bigdata.rdf.store.AbstractLocalTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.store.EmptyStatementIterator;
@@ -136,7 +134,6 @@ import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -204,27 +201,34 @@ public class BigdataSail extends SailBase implements Sail {
          * base (the default is <code>true</code>).  This property only effects
          * data loaded through the {@link Sail}.
          */
-        public static final String TRUTH_MAINTENANCE = "truthMaintenance"; 
+        public static final String TRUTH_MAINTENANCE = BigdataSail.class
+                .getPackage().getName()
+                + ".truthMaintenance"; 
     
         public static final String DEFAULT_TRUTH_MAINTENANCE = "true"; 
     
-        /**
-         * The property whose value is the name of the {@link ITripleStore}
-         * implementation that will be instantiated. This may be used to select
-         * either the {@link LocalTripleStore} (default) or the
-         * {@link TempTripleStore} in combination
-         * {@link BigdataSail#BigdataSail(Properties)} ctor.
-         */
-        public static final String STORE_CLASS = "storeClass";
-        
-        public static final String DEFAULT_STORE_CLASS = LocalTripleStore.class.getName();
+//        /**
+//         * The property whose value is the name of the {@link ITripleStore}
+//         * implementation that will be instantiated. This may be used to select
+//         * either the {@link LocalTripleStore} (default) or the
+//         * {@link TempTripleStore} in combination
+//         * {@link BigdataSail#BigdataSail(Properties)} ctor.
+//         * 
+//         * @deprecated 
+//         */
+//        public static final String STORE_CLASS = "storeClass";
+//        
+//        /** @deprecated */
+//        public static final String DEFAULT_STORE_CLASS = LocalTripleStore.class.getName();
     
         /**
-         * The capacity of the buffers used to absorb writes.
+         * The capacity of the statement buffer used to absorb writes.
          * 
-         * @todo name conflict?
+         * @see #DEFAULT_BUFFER_CAPACITY
          */
-        public static final String BUFFER_CAPACITY = "bufferCapacity";
+        public static final String BUFFER_CAPACITY = BigdataSail.class
+                .getPackage().getName()
+                + ".bufferCapacity";
     
         public static final String DEFAULT_BUFFER_CAPACITY = "10000";
         
@@ -239,8 +243,12 @@ public class BigdataSail extends SailBase implements Sail {
          * When query results are externalized, efficient batch resolution is
          * used to translate from those 64-bit term identifiers to
          * {@link BigdataValue}s.
+         * 
+         * @see #DEFAULT_NATIVE_JOINS
          */
-        public static final String NATIVE_JOINS = "nativeJoins";
+        public static final String NATIVE_JOINS = BigdataSail.class
+                .getPackage().getName()
+                + ".nativeJoins";
         
         public static final String DEFAULT_NATIVE_JOINS = "true";
         
@@ -251,8 +259,12 @@ public class BigdataSail extends SailBase implements Sail {
          * expansion of (x rdf:type rdfs:Resource) and owl:sameAs. (Those
          * entailments are fast for the {@link LocalTripleStore} but have not
          * been optimized for scale-out deployments.)
+         * 
+         * @see #DEFAULT_QUERY_TIME_EXPANDER
          */
-        public static final String QUERY_TIME_EXPANDER = "queryTimeExpander";
+        public static final String QUERY_TIME_EXPANDER = BigdataSail.class
+                .getPackage().getName()
+                + ".queryTimeExpander";
         
         public static final String DEFAULT_QUERY_TIME_EXPANDER = "true";
         
@@ -365,57 +377,58 @@ public class BigdataSail extends SailBase implements Sail {
         
     }
     
-    /**
-     * Create/re-open the database identified by the properites.
-     * <p>
-     * Note: This can only be used for {@link AbstractLocalTripleStore}s. The
-     * {@link ScaleOutTripleStore} uses the {@link DefaultResourceLocator}
-     * pattern and does not have a constructor suitable for just a
-     * {@link Properties} object.
-     * 
-     * @see Options
-     */
-    @SuppressWarnings("unchecked")
-    private static AbstractLocalTripleStore setUp(Properties properties) {
-
-        final String val = properties.getProperty(
-                BigdataSail.Options.STORE_CLASS,
-                BigdataSail.Options.DEFAULT_STORE_CLASS);
-
-        try {
-
-            final Class storeClass = Class.forName(val);
-
-            if (!AbstractLocalTripleStore.class.isAssignableFrom(storeClass)) {
-
-                throw new RuntimeException("Must extend "
-                        + AbstractLocalTripleStore.class.getName() + " : "
-                        + storeClass.getName());
-
-            }
-
-            final Constructor<AbstractLocalTripleStore> ctor = storeClass
-                    .getConstructor(new Class[] { Properties.class });
-
-            final AbstractLocalTripleStore database = ctor
-                    .newInstance(new Object[] { properties });
-
-            return database;
-
-        } catch (Exception t) {
-
-            throw new RuntimeException(t);
-
-        }
-
-    }
+//    /**
+//     * Create/re-open the database identified by the properites.
+//     * <p>
+//     * Note: This can only be used for {@link AbstractLocalTripleStore}s. The
+//     * {@link ScaleOutTripleStore} uses the {@link DefaultResourceLocator}
+//     * pattern and does not have a constructor suitable for just a
+//     * {@link Properties} object.
+//     * 
+//     * @see Options
+//     */
+//    @SuppressWarnings("unchecked")
+//    private static AbstractLocalTripleStore setUp(Properties properties) {
+//
+//        final String val = properties.getProperty(
+//                BigdataSail.Options.STORE_CLASS,
+//                BigdataSail.Options.DEFAULT_STORE_CLASS);
+//
+//        try {
+//
+//            final Class storeClass = Class.forName(val);
+//
+//            if (!AbstractLocalTripleStore.class.isAssignableFrom(storeClass)) {
+//
+//                throw new RuntimeException("Must extend "
+//                        + AbstractLocalTripleStore.class.getName() + " : "
+//                        + storeClass.getName());
+//
+//            }
+//
+//            final Constructor<AbstractLocalTripleStore> ctor = storeClass
+//                    .getConstructor(new Class[] { Properties.class });
+//
+//            final AbstractLocalTripleStore database = ctor
+//                    .newInstance(new Object[] { properties });
+//
+//            return database;
+//
+//        } catch (Exception t) {
+//
+//            throw new RuntimeException(t);
+//
+//        }
+//
+//    }
 
     /**
      * Create or re-open a database instance configured using defaults.
      */
     public BigdataSail() {
         
-        this(setUp(getDefaultProperties()));
+//        this(setUp(getDefaultProperties()));
+        this(new LocalTripleStore(getDefaultProperties()));
         
         closeOnShutdown = true;
         
@@ -429,14 +442,16 @@ public class BigdataSail extends SailBase implements Sail {
      */
     public BigdataSail(Properties properties) {
         
-        this(setUp(properties));
+//        this(setUp(properties));
         
+        this(new LocalTripleStore(properties));
+
         closeOnShutdown = true;
 
     }
     
     /**
-     * Core ctor.
+     * Core ctor.  You must use this variant for a scale-out triple store.
      * <p>
      * To create a {@link BigdataSail} backed by an
      * {@link IBigdataFederation} use the {@link ScaleOutTripleStore} ctor and

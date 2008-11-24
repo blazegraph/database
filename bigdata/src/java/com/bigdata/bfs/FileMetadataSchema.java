@@ -37,13 +37,17 @@ public class FileMetadataSchema extends Schema {
      * is defined by the client. This is generally a pathname, similar to a path
      * in a file system.
      */
-    public static transient final String ID = "Id";
+    public static transient final String ID = FileMetadataSchema.class
+            .getPackage().getName()
+            + ".Id";
     
     /**
      * The MIME type associated with the content (the same semantics as the
      * HTTP <code>Content-Type</code> header).
      */
-    public static transient final String CONTENT_TYPE = "ContentType";
+    public static transient final String CONTENT_TYPE = FileMetadataSchema.class
+            .getPackage().getName()
+            + ".ContentType";
 
     /**
      * The encoding, if any, used to convert the byte[] content to
@@ -53,7 +57,9 @@ public class FileMetadataSchema extends Schema {
      * <code>Content-Type</code> header and at times the leading bytes of
      * the response body itself.
      */
-    public static transient final String CONTENT_ENCODING = "ContentEncoding";
+    public static transient final String CONTENT_ENCODING = FileMetadataSchema.class
+            .getPackage().getName()
+            + ".ContentEncoding";
 
     /**
      * The file version number. Together the file {@link #ID} and the file
@@ -61,7 +67,9 @@ public class FileMetadataSchema extends Schema {
      * <code>null</code> value is stored in this field when the file version
      * is deleted.
      */
-    public static transient final String VERSION = "Version";
+    public static transient final String VERSION = FileMetadataSchema.class
+            .getPackage().getName()
+            + ".Version";
 
     /**
      * Optional boolean property. When present, the text in the file version
@@ -71,11 +79,13 @@ public class FileMetadataSchema extends Schema {
      * 
      * @todo need a property that is the "URI" of the indexed document?
      */
-    public static transient final String INDEX_TEXT = "IndexText";
+    public static transient final String INDEX_TEXT = FileMetadataSchema.class
+            .getPackage().getName()
+            + ".IndexText";
     
     public FileMetadataSchema() {
         
-        super("metadata", ID, KeyType.Unicode);
+        super( "__bfs"/*FileMetadataSchema.class.getName()*/, ID, KeyType.Unicode);
         
     }
     

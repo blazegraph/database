@@ -62,6 +62,9 @@ public class GlobalRowStoreHelper {
         
     }
     
+    /**
+     * @return
+     */
     synchronized public SparseRowStore getGlobalRowStore() {
 
         if (INFO)
@@ -78,6 +81,11 @@ public class GlobalRowStoreHelper {
                 
                 try {
 
+                    /*
+                     * @todo The global row store does not get properties so
+                     * only system defaults are used when it is registered.
+                     */
+                    
                     indexManager.registerIndex(new IndexMetadata(GLOBAL_ROW_STORE_INDEX,
                             UUID.randomUUID()));
 

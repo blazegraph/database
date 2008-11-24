@@ -120,7 +120,7 @@ public class EmbeddedClient extends AbstractScaleOutClient {
          * The name of the optional property whose value is the #of data
          * services that will be (re-)started.
          */
-        public static String NDATA_SERVICES = "ndataServices";
+        public static String NDATA_SERVICES = EmbeddedFederation.class.getName()+".ndataServices";
 
         /**
          * The default is two (2).
@@ -128,9 +128,9 @@ public class EmbeddedClient extends AbstractScaleOutClient {
         public static String DEFAULT_NDATA_SERVICES = "2";
 
         /**
-         * <code>data.dir</code> - The name of the required property whose
-         * value is the name of the directory under which each metadata and data
-         * service will store their state (their journals and index segments).
+         * The name of the required property whose value is the name of the
+         * directory under which each metadata and data service will store their
+         * state (their journals and index segments).
          * <p>
          * Note: A set of subdirectories will be created under the specified
          * data directory. Those subdirectories will be named by the UUID of the
@@ -145,7 +145,7 @@ public class EmbeddedClient extends AbstractScaleOutClient {
          * data directory. Otherwise a new federation starting up with another
          * federation's data directory will attempt to re-start that federation.
          */
-        public static final String DATA_DIR = "data.dir";
+        public static final String DATA_DIR = EmbeddedFederation.class.getName()+".dataDir";
 
     }
 

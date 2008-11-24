@@ -1064,7 +1064,7 @@ public class DistributedJoinTask extends JoinTask {
                             + locator.getPartitionId());
 
                 final IDataService dataService = fed.getDataService(locator
-                        .getDataServices()[0]);
+                        .getDataServiceUUID());
 
                 sink = new JoinTaskSink(fed, locator, this);
 

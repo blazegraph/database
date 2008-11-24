@@ -41,7 +41,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
@@ -293,7 +292,7 @@ abstract public class OverflowManager extends IndexManager {
          * partitions will not be split, joined nor moved away from this
          * {@link ResourceManager}.
          */
-        String OVERFLOW_ENABLED = "overflowEnabled";
+        String OVERFLOW_ENABLED = OverflowManager.class.getName()+".overflowEnabled";
 
         String DEFAULT_OVERFLOW_ENABLED = "true";
 
@@ -310,7 +309,7 @@ abstract public class OverflowManager extends IndexManager {
          * 
          * @see #DEFAULT_COPY_INDEX_THRESHOLD
          */
-        String COPY_INDEX_THRESHOLD = "copyIndexThreshold";
+        String COPY_INDEX_THRESHOLD = OverflowManager.class.getName()+".copyIndexThreshold";
 
         String DEFAULT_COPY_INDEX_THRESHOLD = "1000";
 
@@ -343,7 +342,7 @@ abstract public class OverflowManager extends IndexManager {
          * 
          * @see #DEFAULT_MINIMUM_ACTIVE_INDEX_PARTITIONS
          */
-        String MINIMUM_ACTIVE_INDEX_PARTITIONS = "minimumActiveIndexPartitions";
+        String MINIMUM_ACTIVE_INDEX_PARTITIONS = OverflowManager.class.getName()+".minimumActiveIndexPartitions";
 
         String DEFAULT_MINIMUM_ACTIVE_INDEX_PARTITIONS = "3";
 
@@ -361,7 +360,7 @@ abstract public class OverflowManager extends IndexManager {
          * 
          * @see #DEFAULT_MAXIMUM_MOVES_PER_TARGET
          */
-        String MAXIMUM_MOVES_PER_TARGET = "maximumMovesPerTarget";
+        String MAXIMUM_MOVES_PER_TARGET = OverflowManager.class.getName()+".maximumMovesPerTarget";
 
         String DEFAULT_MAXIMUM_MOVES_PER_TARGET = "3";
 
@@ -377,7 +376,7 @@ abstract public class OverflowManager extends IndexManager {
          * Otherwise clients continue to use the old view of the index
          * partition.
          */
-        String OVERFLOW_TIMEOUT = "overflow.timeout";
+        String OVERFLOW_TIMEOUT = OverflowManager.class.getName()+".timeout";
         
         /**
          * The default timeout in milliseconds for asynchronous overflow
@@ -906,7 +905,7 @@ abstract public class OverflowManager extends IndexManager {
             /*
              * Set the create time on the new journal.
              */
-            p.setProperty(Options.CREATE_TIME, "" + createTime);
+            p.setProperty(Options.CREATE_TIME, Long.toString(createTime));
 
             /*
              * Note: the new journal will be handed the write cache from the old

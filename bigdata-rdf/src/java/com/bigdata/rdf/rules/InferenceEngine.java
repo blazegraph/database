@@ -118,7 +118,9 @@ public class InferenceEngine {
          * @see BackchainAccessPath
          * @see BackchainTypeResourceIterator
          */
-        String FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE = "forwardChainRdfTypeRdfsResource";
+        String FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE = InferenceEngine.class
+                .getName()
+                + ".forwardChainRdfTypeRdfsResource";
 
         String DEFAULT_FORWARD_RDF_TYPE_RDFS_RESOURCE = "false";
 
@@ -133,7 +135,9 @@ public class InferenceEngine {
          * <code>false</code> those entailments are not computed and
          * <code>owl:sameAs</code> processing is disabled.
          */
-        String FORWARD_CHAIN_OWL_SAMEAS_CLOSURE = "forwardChainOwlSameAsClosure";
+        String FORWARD_CHAIN_OWL_SAMEAS_CLOSURE = InferenceEngine.class
+                .getName()
+                + ".forwardChainOwlSameAsClosure";
 
         String DEFAULT_FORWARD_CHAIN_OWL_SAMEAS_CLOSURE = "true";
 
@@ -156,7 +160,9 @@ public class InferenceEngine {
          * 
          * @see BackchainAccessPath
          */
-        String FORWARD_CHAIN_OWL_SAMEAS_PROPERTIES = "forwardChainOwlSameAsProperties";
+        String FORWARD_CHAIN_OWL_SAMEAS_PROPERTIES = InferenceEngine.class
+                .getName()
+                + ".forwardChainOwlSameAsProperties";
 
         String DEFAULT_FORWARD_CHAIN_OWL_SAMEAS_PROPERTIES = "false";
 
@@ -172,7 +178,9 @@ public class InferenceEngine {
          * @todo implement backward chaining for owl:equivalentProperty and
          *       compare performance?
          */
-        String FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY = "forwardChainOwlEquivalentProperty";
+        String FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY = InferenceEngine.class
+                .getName()
+                + ".forwardChainOwlEquivalentProperty";
 
         String DEFAULT_FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY = "true";
 
@@ -188,7 +196,9 @@ public class InferenceEngine {
          * @todo implement backward chaining for owl:equivalentClass and compare
          *       performance?
          */
-        String FORWARD_CHAIN_OWL_EQUIVALENT_CLASS = "forwardChainOwlEquivalentClass";
+        String FORWARD_CHAIN_OWL_EQUIVALENT_CLASS = InferenceEngine.class
+                .getName()
+                + ".forwardChainOwlEquivalentClass";
 
         String DEFAULT_FORWARD_CHAIN_OWL_EQUIVALENT_CLASS = "true";
 
@@ -201,7 +211,8 @@ public class InferenceEngine {
          * computed NOR stored and a backward chainer or magic sets technique
          * must be used to generate the entailments at query time.
          */
-        String FORWARD_CHAIN_OWL_INVERSE_OF = "forwardChainOwlInverseOf";
+        String FORWARD_CHAIN_OWL_INVERSE_OF = InferenceEngine.class.getName()
+                + ".forwardChainOwlInverseOf";
 
         String DEFAULT_FORWARD_CHAIN_OWL_INVERSE_OF = "false";
 
@@ -214,7 +225,9 @@ public class InferenceEngine {
          * are neither computed NOR stored and a backward chainer or magic sets
          * technique must be used to generate the entailments at query time.
          */
-        String FORWARD_CHAIN_OWL_TRANSITIVE_PROPERY = "forwardChainOwlTransitiveProperty";
+        String FORWARD_CHAIN_OWL_TRANSITIVE_PROPERY = InferenceEngine.class
+                .getName()
+                + ".forwardChainOwlTransitiveProperty";
 
         String DEFAULT_FORWARD_CHAIN_OWL_TRANSITIVE_PROPERY = "false";
 

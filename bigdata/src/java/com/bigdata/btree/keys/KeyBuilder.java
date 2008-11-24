@@ -1414,7 +1414,7 @@ public class KeyBuilder implements IKeyBuilder {
          * 
          * @see CollatorEnum
          */
-        public String COLLATOR = "collator";
+        public String COLLATOR = KeyBuilder.class.getName()+".collator";
 
         /**
          * Optional string -or- integer property whose value is the strength to
@@ -1439,7 +1439,7 @@ public class KeyBuilder implements IKeyBuilder {
          * different values for this strength, hence the use of the type safe
          * enums is recommended.
          */
-        public String STRENGTH = "collator.strength";
+        public String STRENGTH = KeyBuilder.class.getName()+".collator.strength";
 
         /**
          * Optional string property whose value is one of the type safe
@@ -1449,7 +1449,7 @@ public class KeyBuilder implements IKeyBuilder {
          * 
          * @see DecompositionEnum
          */
-        public String DECOMPOSITION = "collator.decomposition";
+        public String DECOMPOSITION = KeyBuilder.class.getName()+".collator.decomposition";
 
         /**
          * The pre-defined System property {@value #USER_LANGUAGE} determines

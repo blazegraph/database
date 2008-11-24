@@ -262,13 +262,12 @@ public class DumpFederation {
 
             System.out.println("\t"+locator.toString());
 
-            for (UUID uuid : locator.getDataServices()) {
+            // logical data service UUID.
+            final UUID uuid = locator.getDataServiceUUID();
 
-                final ServiceMetadata smd = getServiceMetadata(uuid);
-                
-                System.out.println("\t\tDataService: label=" +smd.label+", uuid="+uuid);
-
-            }
+            final ServiceMetadata smd = getServiceMetadata(uuid);
+            
+            System.out.println("\t\tDataService: label=" +smd.label+", uuid="+uuid);
 
         }
 

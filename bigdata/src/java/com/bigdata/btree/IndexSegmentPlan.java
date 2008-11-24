@@ -23,6 +23,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
+import org.apache.log4j.Logger;
+
+import com.bigdata.btree.IndexMetadata.Options;
+
 /**
  * A plan for building a B+-Tree based on an input branching factor and #of
  * entries.
@@ -32,6 +36,11 @@ package com.bigdata.btree;
  */
 public class IndexSegmentPlan {
 
+    protected static final transient Logger log = Logger
+            .getLogger(IndexSegmentPlan.class);
+
+    protected static final transient boolean INFO = log.isInfoEnabled();
+    
     /**
      * The branching factor of the output tree (input).
      */
@@ -104,7 +113,7 @@ public class IndexSegmentPlan {
      */
     public IndexSegmentPlan(int m,int nentries) {
 
-        assert m >= BTree.MIN_BRANCHING_FACTOR;
+        assert m >= Options.MIN_BRANCHING_FACTOR;
         assert nentries > 0;
 
         // The branching factor of the output tree.
@@ -122,7 +131,9 @@ public class IndexSegmentPlan {
         // The height of the output tree.
         height = getMinimumHeight(m,nleaves);
 
-        IndexSegmentBuilder.log.info("branchingFactor="+m+", nentries="+nentries+", nleaves="+nleaves+", height="+height);
+        if (INFO)
+            log.info("branchingFactor=" + m + ", nentries=" + nentries
+                    + ", nleaves=" + nleaves + ", height=" + height);
         
         // #of entries in each leaf.
         numInLeaf = distributeKeys(m,m2,nleaves,nentries);
@@ -257,7 +268,7 @@ public class IndexSegmentPlan {
      */
     public static int[] distributeKeys(int m, int m2, int nleaves, int nentries) {
 
-        assert m >= BTree.MIN_BRANCHING_FACTOR;
+        assert m >= Options.MIN_BRANCHING_FACTOR;
         assert m2 >= (m + 1) / 2;
         assert m2 <= m;
         assert nleaves > 0;

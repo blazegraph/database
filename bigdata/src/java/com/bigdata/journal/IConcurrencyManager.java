@@ -136,7 +136,7 @@ public interface IConcurrencyManager extends IServiceShutdown {
      * @exception NullPointerException
      *                if task is <code>null</code>
      */
-    public Future<? extends Object> submit(AbstractTask task);
+    public <T> Future<T> submit(AbstractTask<T> task);
 
     /**
      * Executes the given tasks, returning a list of Futures holding their
@@ -160,7 +160,7 @@ public interface IConcurrencyManager extends IServiceShutdown {
      * @exception RejectedExecutionException
      *                if any task cannot be scheduled for execution
      */
-    public List<Future<? extends Object>> invokeAll(Collection<AbstractTask> tasks)
+    public <T> List<Future<T>> invokeAll(Collection<? extends AbstractTask<T>> tasks)
             throws InterruptedException;
 
     /**
@@ -190,8 +190,9 @@ public interface IConcurrencyManager extends IServiceShutdown {
      * @exception RejectedExecutionException
      *                if any task cannot be scheduled for execution
      */
-    public List<Future<? extends Object>> invokeAll(Collection<AbstractTask> tasks,
-            long timeout, TimeUnit unit) throws InterruptedException;
+    public <T> List<Future<T>> invokeAll(
+            Collection<? extends AbstractTask<T>> tasks, long timeout,
+            TimeUnit unit) throws InterruptedException;
 
     /**
      * The service on which read-write tasks are executed.

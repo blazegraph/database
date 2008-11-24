@@ -123,13 +123,16 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
             final IndexMetadata indexMetadata = new IndexMetadata(name,indexUUID);
 
             // The threshold below which we will try to join index partitions.
-            ((DefaultSplitHandler)indexMetadata.getSplitHandler()).setMinimumEntryCount(minimumEntryCountPerSplit);
-            
+            ((DefaultSplitHandler) indexMetadata.getSplitHandler())
+                    .setMinimumEntryCount(minimumEntryCountPerSplit);
+
             // The target #of index entries per partition.
-            ((DefaultSplitHandler)indexMetadata.getSplitHandler()).setEntryCountPerSplit(entryCountPerSplit);
+            ((DefaultSplitHandler) indexMetadata.getSplitHandler())
+                    .setEntryCountPerSplit(entryCountPerSplit);
 
             // Overcapacity multipler before an index partition will be split.
-            ((DefaultSplitHandler)indexMetadata.getSplitHandler()).setOverCapacityMultiplier(overCapacityMultiplier);
+            ((DefaultSplitHandler) indexMetadata.getSplitHandler())
+                    .setOverCapacityMultiplier(overCapacityMultiplier);
             
             // must support delete markers
             indexMetadata.setDeleteMarkers(true);
@@ -156,8 +159,8 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
 
             assertEquals("partitionId", 0L, pmd0.getPartitionId());
 
-            assertEquals("dataServiceUUIDs", new UUID[] { dataService0
-                    .getServiceUUID() }, pmd0.getDataServices());
+            assertEquals("dataServiceUUID", dataService0
+                    .getServiceUUID(), pmd0.getDataServiceUUID());
             
         }
         assertEquals("partitionCount", 1, getPartitionCount(name));
@@ -417,13 +420,13 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
 
                 System.err.println("locators["+n+"]="+locator);
                 
-                if (locator.getDataServices()[0].equals(dataService0
+                if (locator.getDataServiceUUID().equals(dataService0
                         .getServiceUUID())) {
 
                     ndataService0++;
 
-                } else if (locator.getDataServices()[0].equals(dataService1
-                        .getServiceUUID())) {
+                } else if (locator.getDataServiceUUID().equals(
+                        dataService1.getServiceUUID())) {
 
                     ndataService1++;
 

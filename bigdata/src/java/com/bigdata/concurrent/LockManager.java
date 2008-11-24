@@ -766,7 +766,7 @@ public class LockManager</*T,*/R extends Comparable<R>> {
      * 
      * @param task
      */
-    void didStart(Callable<Object> task) {
+    void didStart(final Callable task) {
 
         nstarted.incrementAndGet();
 
@@ -777,7 +777,7 @@ public class LockManager</*T,*/R extends Comparable<R>> {
     /**
      * Invoked on successful task completion.
      */
-    void didSucceed(Callable<Object> task) {
+    void didSucceed(final Callable task) {
 
         nended.incrementAndGet();
 
@@ -821,7 +821,7 @@ public class LockManager</*T,*/R extends Comparable<R>> {
      *            if you are not sure and the less efficient technique will
      *            be used to update the {@link TxDag}.
      */
-    void didAbort(Callable<Object> task, Throwable t, boolean waiting) {
+    void didAbort(final Callable task, Throwable t, boolean waiting) {
 
         if(INFO) log.info("Begin: nended=" + nended);
 

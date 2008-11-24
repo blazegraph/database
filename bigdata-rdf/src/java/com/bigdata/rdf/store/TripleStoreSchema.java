@@ -2,7 +2,7 @@ package com.bigdata.rdf.store;
 
 import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.vocab.RDFSVocabulary;
-import com.bigdata.relation.locator.RelationSchema;
+import com.bigdata.relation.RelationSchema;
 
 /**
  * Extensions for additional state maintained by the

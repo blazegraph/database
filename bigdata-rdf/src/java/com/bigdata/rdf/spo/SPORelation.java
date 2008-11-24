@@ -36,7 +36,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -44,12 +43,10 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BTree;
 import com.bigdata.btree.BloomFilterFactory;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.compression.IDataSerializer;
@@ -64,7 +61,6 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.lexicon.ITermIdFilter;
 import com.bigdata.rdf.lexicon.LexiconRelation;
@@ -72,7 +68,6 @@ import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.WriteJustificationsProc.WriteJustificationsProcConstructor;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
-import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
@@ -85,9 +80,7 @@ import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.Var;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.AbstractSolutionBuffer.InsertSolutionBuffer;
-import com.bigdata.resources.DefaultSplitHandler;
 import com.bigdata.service.DataService;
-import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IClientIndex;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.IChunkedIterator;
@@ -142,76 +135,37 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         super(indexManager, namespace, timestamp, properties);
 
-        {
-            
-            /*
-             * Reads off the property for the inference engine that tells us
-             * whether or not the justification index is being used. This is
-             * used to conditionally enable the logic to retract justifications
-             * when the corresponding statements is retracted.
-             */
+        /*
+         * Reads off the property for the inference engine that tells us whether
+         * or not the justification index is being used. This is used to
+         * conditionally enable the logic to retract justifications when the
+         * corresponding statements is retracted.
+         */
 
-            this.justify = Boolean.parseBoolean(properties.getProperty(
-                    Options.JUSTIFY, Options.DEFAULT_JUSTIFY));
+        this.justify = Boolean.parseBoolean(getProperty(
+                AbstractTripleStore.Options.JUSTIFY,
+                AbstractTripleStore.Options.DEFAULT_JUSTIFY));
 
-            if(INFO) log.info(Options.JUSTIFY + "=" + justify);
-            
-        }
-        
-        {
-        
-            this.oneAccessPath = Boolean.parseBoolean(properties.getProperty(
-                    Options.ONE_ACCESS_PATH, Options.DEFAULT_ONE_ACCESS_PATH));
+        this.oneAccessPath = Boolean.parseBoolean(getProperty(
+                AbstractTripleStore.Options.ONE_ACCESS_PATH,
+                AbstractTripleStore.Options.DEFAULT_ONE_ACCESS_PATH));
 
-            if(INFO) log.info(Options.ONE_ACCESS_PATH + "=" + oneAccessPath);
-            
-        }
+        this.statementIdentifiers = Boolean.parseBoolean(getProperty(
+                AbstractTripleStore.Options.STATEMENT_IDENTIFIERS,
+                AbstractTripleStore.Options.DEFAULT_STATEMENT_IDENTIFIERS));
 
-        {
-        
-            this.statementIdentifiers = Boolean.parseBoolean(properties
-                .getProperty(Options.STATEMENT_IDENTIFIERS,
-                        Options.DEFAULT_STATEMENT_IDENTIFIERS));
-
-            if(INFO) log.info(Options.STATEMENT_IDENTIFIERS + "=" + statementIdentifiers);
-            
-        }
+        bloomFilter = Boolean.parseBoolean(getProperty(
+                AbstractTripleStore.Options.BLOOM_FILTER,
+                AbstractTripleStore.Options.DEFAULT_BLOOM_FILTER));
 
         {
 
-            branchingFactor = Integer
-                    .parseInt(properties.getProperty(Options.BRANCHING_FACTOR,
-                            Options.DEFAULT_BRANCHING_FACTOR));
-
-            if (branchingFactor < BTree.MIN_BRANCHING_FACTOR) {
-
-                throw new IllegalArgumentException(Options.BRANCHING_FACTOR
-                        + " must be at least " + BTree.MIN_BRANCHING_FACTOR);
-
-            }
-
-            if(INFO) log.info(Options.BRANCHING_FACTOR + "=" + branchingFactor);
-
-        }
-
-        {
-            
-            bloomFilter = Boolean.parseBoolean(properties.getProperty(
-                    Options.BLOOM_FILTER, Options.DEFAULT_BLOOM_FILTER));
-
-            if (INFO)
-                log.info(Options.BLOOM_FILTER + "=" + bloomFilter);
-
-        }
-        
-        {
-            
             final Set<String> set = new HashSet<String>();
 
-            if(oneAccessPath) {
+            if (oneAccessPath) {
 
                 set.add(getFQN(SPOKeyOrder.SPO));
-                
+
             } else {
 
                 set.add(getFQN(SPOKeyOrder.SPO));
@@ -219,7 +173,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
                 set.add(getFQN(SPOKeyOrder.POS));
 
                 set.add(getFQN(SPOKeyOrder.OSP));
-            
+
             }
             
             if(justify) {
@@ -327,34 +281,34 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
                 final IndexMetadata ospMetadata = getStatementIndexMetadata(SPOKeyOrder.OSP);
 
-                final Properties p = getProperties();
-                
-                if (indexManager instanceof IBigdataFederation
-                        && ((IBigdataFederation) indexManager).isScaleOut() &&
-                        p.getProperty(Options.SPO_RELATION_DATA_SERVICE_UUID)!=null
-                        ) {
-
-                    // register the indices on the same data service.
-                    
-                    final IBigdataFederation fed = (IBigdataFederation)indexManager;
-                    
-                    final UUID dataServiceUUID = UUID.fromString(p
-                            .getProperty(Options.SPO_RELATION_DATA_SERVICE_UUID));
-
-                    if (INFO) {
-
-                        log.info("Allocating SPORelation on dataService="
-                                + dataServiceUUID);
-
-                    }
-
-                    fed.registerIndex(spoMetadata, dataServiceUUID);
-
-                    fed.registerIndex(posMetadata, dataServiceUUID);
-
-                    fed.registerIndex(ospMetadata, dataServiceUUID);
-                    
-                } else {
+//                final Properties p = getProperties();
+//                
+//                if (indexManager instanceof IBigdataFederation
+//                        && ((IBigdataFederation) indexManager).isScaleOut() &&
+//                        p.getProperty(Options.SPO_RELATION_DATA_SERVICE_UUID)!=null
+//                        ) {
+//
+//                    // register the indices on the same data service.
+//                    
+//                    final IBigdataFederation fed = (IBigdataFederation)indexManager;
+//                    
+//                    final UUID dataServiceUUID = UUID.fromString(p
+//                            .getProperty(Options.SPO_RELATION_DATA_SERVICE_UUID));
+//
+//                    if (INFO) {
+//
+//                        log.info("Allocating SPORelation on dataService="
+//                                + dataServiceUUID);
+//
+//                    }
+//
+//                    fed.registerIndex(spoMetadata, dataServiceUUID);
+//
+//                    fed.registerIndex(posMetadata, dataServiceUUID);
+//
+//                    fed.registerIndex(ospMetadata, dataServiceUUID);
+//                    
+//                } else {
 
                     // register the indices.
                     
@@ -364,7 +318,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
                     indexManager.registerIndex(ospMetadata);
 
-                }
+//                }
 
                 // resolve the index and set the index reference.
                 spo = super.getIndex(SPOKeyOrder.SPO);
@@ -461,13 +415,6 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * (aka access path).
      */
     final public boolean oneAccessPath;
-
-    /**
-     * The branching factor for indices registered by this class.
-     * 
-     * @see com.bigdata.journal.Options#BRANCHING_FACTOR
-     */
-    final protected int branchingFactor;
 
     /**
      * <code>true</code> iff the SPO index will maintain a bloom filter.
@@ -578,54 +525,12 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
     }
     
-//    public String getFQN(IKeyOrder<? extends ISPO> keyOrder) {
-//        
-//        return getNamespace() + ((SPOKeyOrder)keyOrder).getIndexName();
-//        
-//    }
-    
-    /**
-     * Shared {@link IndexMetadata} configuration.
-     * 
-     * @param name
-     *            The index name.
-     * 
-     * @return A new {@link IndexMetadata} object for that index.
-     */
-    protected IndexMetadata getIndexMetadata(final String name) {
-
-        final IndexMetadata metadata = new IndexMetadata(name, UUID.randomUUID());
-
-        metadata.setBranchingFactor(branchingFactor);
-
-        /*
-         * Note: Mainly used for torture testing.
-         */
-        if(false){
-            
-            // An override that makes a split very likely.
-            final ISplitHandler splitHandler = new DefaultSplitHandler(
-                    10 * Bytes.kilobyte32, // minimumEntryCount
-                    50 * Bytes.kilobyte32, // entryCountPerSplit
-                    1.5, // overCapacityMultiplier
-                    .75, // underCapacityMultiplier
-                    20 // sampleRate
-            );
-            
-            metadata.setSplitHandler(splitHandler);
-            
-        }
-                
-        return metadata;
-
-    }
-
     /**
      * Overrides for the statement indices.
      */
     protected IndexMetadata getStatementIndexMetadata(SPOKeyOrder keyOrder) {
 
-        final IndexMetadata metadata = getIndexMetadata(getFQN(keyOrder));
+        final IndexMetadata metadata = newIndexMetadata(getFQN(keyOrder));
         
         final IDataSerializer leafKeySer;
         if(false) {
@@ -721,7 +626,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
      */
     protected IndexMetadata getJustIndexMetadata(String name) {
 
-        final IndexMetadata metadata = getIndexMetadata(name);
+        final IndexMetadata metadata = newIndexMetadata(name);
 
         metadata.setTupleSerializer(new JustificationTupleSerializer(
                 IRawTripleStore.N));
@@ -987,11 +892,11 @@ public class SPORelation extends AbstractRelation<ISPO> {
         
         final AbstractTripleStore container = getContainer();
         
-        final int chunkOfChunksCapacity = container.chunkOfChunksCapacity;
+        final int chunkOfChunksCapacity = container.getChunkOfChunksCapacity();
 
-        final int chunkCapacity = container.chunkCapacity;
+        final int chunkCapacity = container.getChunkCapacity();
 
-        final int fullyBufferedReadThreshold = container.fullyBufferedReadThreshold;
+        final int fullyBufferedReadThreshold = container.getFullyBufferedReadThreshold();
         
         return new SPOAccessPath(this, predicate, keyOrder, ndx, flags,
                 chunkOfChunksCapacity, chunkCapacity,

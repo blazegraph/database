@@ -328,7 +328,7 @@ public class DataLoader {
          * Optional boolean property may be used to turn on data verification in
          * the RIO parser (default is <code>false</code>).
          */
-        public static final String VERIFY_DATA = "dataLoader.verifyData";
+        public static final String VERIFY_DATA = DataLoader.class.getName()+".verifyData";
         
         public static final String DEFAULT_VERIFY_DATA = "false";
         
@@ -340,7 +340,7 @@ public class DataLoader {
          * Note: commit semantics vary depending on the specific backing store.
          * See {@link ITripleStore#commit()}.
          */
-        public static final String COMMIT = "dataLoader.commit";
+        public static final String COMMIT = DataLoader.class.getName()+".commit";
         
         public static final String DEFAULT_COMMIT = CommitEnum.Batch.toString();
 
@@ -348,7 +348,7 @@ public class DataLoader {
          * Optional property specifying the capacity of the
          * {@link StatementBuffer} (default is 100k statements).
          */
-        public static final String BUFFER_CAPACITY = "dataLoader.bufferCapacity";
+        public static final String BUFFER_CAPACITY = DataLoader.class.getName()+".bufferCapacity";
         
         public static final String DEFAULT_BUFFER_CAPACITY = "100000";
 
@@ -372,7 +372,7 @@ public class DataLoader {
          * @see InferenceEngine
          * @see InferenceEngine.Options
          */
-        public static final String CLOSURE = "dataLoader.closure";
+        public static final String CLOSURE = DataLoader.class.getName()+".closure";
         
         public static final String DEFAULT_CLOSURE = ClosureEnum.Batch.toString();
         
@@ -404,7 +404,7 @@ public class DataLoader {
          * flushes the {@link DataLoader} when statement identifers are enabled.
          * </strong>
          */
-        public static final String FLUSH = "dataLoader.flush";
+        public static final String FLUSH = DataLoader.class.getName()+".flush";
         
         /**
          * The default value (<code>true</code>) for {@link #FLUSH}.

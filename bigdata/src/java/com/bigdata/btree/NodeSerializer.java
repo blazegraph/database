@@ -41,6 +41,7 @@ import java.nio.ByteBuffer;
 
 import org.CognitiveWeb.extser.LongPacker;
 
+import com.bigdata.btree.IndexMetadata.Options;
 import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.compression.RandomAccessByteArray;
 import com.bigdata.io.ByteBufferInputStream;
@@ -294,7 +295,7 @@ public class NodeSerializer {
          * @todo already available from IndexMetadata#getBranchingFactor() so
          * drop as argument here.
          */
-        assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR : "branchingFactor="+branchingFactor;
+        assert branchingFactor >= Options.MIN_BRANCHING_FACTOR : "branchingFactor="+branchingFactor;
 
         assert initialBufferCapacity >= 0;
 

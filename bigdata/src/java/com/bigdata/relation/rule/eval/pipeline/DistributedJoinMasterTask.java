@@ -349,7 +349,7 @@ public class DistributedJoinMasterTask extends JoinMasterTask implements
                     ruleState.getKeyOrder());
 
             final IDataService dataService = fed.getDataService(locator
-                    .getDataServices()[0]);
+                    .getDataServiceUUID());
 
             /*
              * Submit the JoinTask. It will begin to execute when it is

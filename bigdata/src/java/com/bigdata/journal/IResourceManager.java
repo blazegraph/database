@@ -299,8 +299,9 @@ public interface IResourceManager extends IServiceShutdown {
     public IBigdataFederation getFederation();
     
     /**
-     * Return the {@link UUID}[] of the {@link IDataService} failover chain for
-     * the {@link IDataService} resources are being managed.
+     * Return the ordered {@link UUID}[] of the physical {@link IDataService}
+     * failover chain for the logical {@link IDataService} whose resources are
+     * under management by this class.
      */
     public UUID[] getDataServiceUUIDs();
 

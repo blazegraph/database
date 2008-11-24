@@ -71,7 +71,8 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
     private final boolean isTransient;
     
     /**
-     * The directory in which the data files will reside.
+     * The directory in which the data files will reside. Each directory
+     * is named for the service {@link UUID} - restart depends on this.
      */
     private final File dataDir;
     
@@ -195,7 +196,7 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
      * 
      * @return The data service at that index.
      */
-    final public DataService getDataService(int index) {
+    final public DataService getDataService(final int index) {
         
         assertOpen();
 
@@ -203,7 +204,7 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
         
     }
     
-    final public UUID[] getDataServiceUUIDs(int maxCount) {
+    final public UUID[] getDataServiceUUIDs(final int maxCount) {
 
         assertOpen();
 
@@ -237,7 +238,7 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
      * @param client
      *            The client.
      */
-    protected EmbeddedFederation(EmbeddedClient client) {
+    protected EmbeddedFederation(final EmbeddedClient client) {
         
         super(client);
         
@@ -290,8 +291,8 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
             if (createTempFile) {
 
                 // files will be created in a temporary directory.
-                File tmpDir = new File(properties.getProperty(Options.TMP_DIR, System
-                        .getProperty("java.io.tmpdir")));
+                final File tmpDir = new File(properties.getProperty(
+                        Options.TMP_DIR, System.getProperty("java.io.tmpdir")));
                 
                 try {
 
@@ -427,7 +428,7 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
                      * Note: Use DATA_DIR if the metadata service is using a
                      * ResourceManager and FILE if it is using a simple Journal.
                      */
-                    p.setProperty(Options.DATA_DIR, serviceDir.toString());
+                    p.setProperty(MetadataService.Options.DATA_DIR, serviceDir.toString());
 //                    p.setProperty(Options.FILE, new File(serviceDir,"journal"+Options.JNL).toString());
 
                     if(new File(serviceDir,".mds").exists()) {
@@ -570,8 +571,7 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
 
             if (!isTransient) {
 
-                final File serviceDir = new File(dataDir, serviceUUID
-                        .toString());
+                final File serviceDir = new File(dataDir, serviceUUID.toString());
 
                 serviceDir.mkdirs();
 
@@ -590,7 +590,7 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
 
                 }
 
-                p.setProperty(Options.DATA_DIR, serviceDir.toString());
+                p.setProperty(MetadataService.Options.DATA_DIR, serviceDir.toString());
 
             }
             
@@ -619,7 +619,8 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
 
                     serviceDir.mkdirs();
 
-                    p.setProperty(Options.DATA_DIR, serviceDir.toString());
+                    p.setProperty(DataService.Options.DATA_DIR, serviceDir
+                            .toString());
 
                 }
 
@@ -696,7 +697,9 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
 
         @Override
         public AbstractFederation getFederation() {
+
             return EmbeddedFederation.this;
+            
         }
         
     }
@@ -708,7 +711,9 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
          * @param properties
          */
         public EmbeddedTimestampServiceImpl(UUID serviceUUID, Properties properties) {
+           
             super(serviceUUID, properties);
+            
         }
 
         @Override
@@ -964,6 +969,35 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
         }
         
         return maxValue;
+        
+    }
+
+    public IDataService getDataServiceByName(final String name) {
+
+        for (IDataService ds : dataService) {
+
+            final String serviceName;
+            try {
+
+                serviceName = ds.getServiceName();
+                
+            } catch (IOException e) {
+                
+                // note: will not be thrown (local service, no RMI).
+                throw new RuntimeException(e);
+                
+            }
+            
+            if (name.equals(serviceName)) {
+
+                return ds;
+
+            }
+
+        }
+        
+        // no match.
+        return null;
         
     }
 
