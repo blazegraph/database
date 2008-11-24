@@ -1569,7 +1569,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * moves of a hot index partition since there could be a lot of buffered
                  * writes.
                  */
-                final List<Future<? extends Object>> futures = resourceManager
+                final List<Future> futures = resourceManager
                         .getConcurrencyManager().invokeAll(tasks,
                                 resourceManager.overflowTimeout,
                                 TimeUnit.MILLISECONDS);

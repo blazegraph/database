@@ -189,10 +189,17 @@ public interface IConcurrencyManager extends IServiceShutdown {
      *                if tasks or any of its elements are null
      * @exception RejectedExecutionException
      *                if any task cannot be scheduled for execution
+     * 
+     * FIXME Figure out why a generic for the future type causes errors under
+     * some java 1.6.0_07 and 1.6.0_10 compilers.  It does not seem to be a
+     * problem in the variant w/o the timeout, which is very, very strange.
      */
-    public <T> List<Future<T>> invokeAll(
-            Collection<? extends AbstractTask<T>> tasks, long timeout,
+    public List<Future> invokeAll(
+            Collection<? extends AbstractTask> tasks, long timeout,
             TimeUnit unit) throws InterruptedException;
+//    public <T> List<Future<T>> invokeAll(
+//            Collection<? extends AbstractTask<T>> tasks, long timeout,
+//            TimeUnit unit) throws InterruptedException;
 
     /**
      * The service on which read-write tasks are executed.
