@@ -83,7 +83,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -94,7 +93,6 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
-import com.bigdata.rawstore.Bytes;
 
 /**
  * Integration for bigdata.
@@ -500,18 +498,10 @@ public class PersistenceStore implements IPersistentStore
      */
     private BTree registerIndex(String name) {
         
-        final int branchingFactor = m_journal.getDefaultBranchingFactor();
-        
-//        BTree ndx = new UnisolatedBTree(m_journal, branchingFactor, UUID.randomUUID());
-        
-        IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
+        final IndexMetadata metadata = new IndexMetadata(m_journal, m_journal
+                .getProperties(), name, UUID.randomUUID());
 
-        metadata.setBranchingFactor(branchingFactor);
-        
-        BTree ndx = BTree.create(m_journal, metadata); 
-        
-//        BTree ndx = new BTree(m_journal, branchingFactor, UUID.randomUUID(),
-//                ByteArrayValueSerializer.INSTANCE);
+        final BTree ndx = BTree.create(m_journal, metadata); 
         
         return (BTree) m_journal.registerIndex(name,ndx);
         
@@ -1511,8 +1501,6 @@ public class PersistenceStore implements IPersistentStore
 //        String name = ndx.getLinkPropertyClass().identity();
 
         final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
-        
-        metadata.setBranchingFactor(m_journal.getDefaultBranchingFactor());
         
         final BTree btree;
 //        btree = (BTree) m_journal.getIndex(name);
