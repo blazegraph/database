@@ -3164,6 +3164,20 @@ Thanks,
 ------------------------------------------------------------
 Commit notes:
 
+- Fix compile error for Java 1.6.0_07 from API refactor.
+
+- Generate U1500 and U8000 (delete the old U10000 data set first so
+  that we have enough room on NAS).
+
+  Load U1500 data set and collect query performance times.
+
+  Do it again with overflow enabled.
+
+  Load U8000 data set w/ overflow enabled and collect query
+  performance times.
+
+- Optimize resolution of locators for pipeline joins.
+
 - Close out indices that have not been recently used in the
   AbstractJournal and the IndexManager after a configurable timeout
   (default 60 seconds).  This will help to keep down the resource

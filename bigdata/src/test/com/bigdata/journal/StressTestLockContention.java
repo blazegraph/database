@@ -116,7 +116,7 @@ public class StressTestLockContention extends ProxyTestCase {
          * or all of the tasks may complete before this method returns.
          */
         
-        final List<Future<? extends Object>> futures = journal.invokeAll(tasks, 3,
+        final List<Future> futures = journal.invokeAll(tasks, 3,
                 TimeUnit.SECONDS);
 
         /*
@@ -131,7 +131,7 @@ public class StressTestLockContention extends ProxyTestCase {
         
         journal.deleteResources();
 
-        final Iterator<Future<? extends Object>> itr = futures.iterator();
+        final Iterator<Future> itr = futures.iterator();
 
         int ncancelled = 0;
         int ncomplete = 0;

@@ -1003,7 +1003,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
             }
     
             // the list of tasks to be run.
-            final List<AbstractTask> tasks = new LinkedList<AbstractTask>();
+            final List<AbstractTask<Object>> tasks = new LinkedList<AbstractTask<Object>>();
 
             // NOP
             tasks.add(new AbstractTask(journal, ITx.UNISOLATED, name) {
@@ -1065,7 +1065,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
             final long committedTaskCount0 = writeService.getTaskCommittedCount();
             
             // submit the tasks and await their completion.
-            final List<Future<? extends Object>> futures = journal.invokeAll( tasks );
+            final List<Future<Object>> futures = journal.invokeAll( tasks );
 
             /*
              * verify the #of commits on the journal is unchanged since nothing
@@ -1776,9 +1776,9 @@ public class TestConcurrentJournal extends ProxyTestCase {
                 }
                 
                 // await futures.
-                final List<Future<? extends Object>> futures = journal.invokeAll(tasks, 10, TimeUnit.SECONDS);
+                final List<Future> futures = journal.invokeAll(tasks, 10, TimeUnit.SECONDS);
                 
-                for(Future<? extends Object> f : futures) {
+                for(Future f : futures) {
                 
                     if(f.isDone()) {
                         // all tasks that complete should have done so without error.
