@@ -80,7 +80,7 @@ public class Configuration {
     /**
      * The prefix for namespace specific property value overrides.
      */
-    public static final transient String BNS = "bigdata.namespace";
+    public static final transient String BNS = "com.bigdata.namespace";
 
     /**
      * The namespace separator character.
