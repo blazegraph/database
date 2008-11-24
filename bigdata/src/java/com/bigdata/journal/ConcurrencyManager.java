@@ -123,35 +123,37 @@ public class ConcurrencyManager implements IConcurrencyManager {
     public static interface Options extends IServiceShutdown.Options {
     
         /**
-         * <code>txServicePoolSize</code> - The #of threads in the pool
-         * handling concurrent transactions.
+         * The #of threads in the pool handling concurrent transactions.
          * 
          * @see #DEFAULT_TX_SERVICE_CORE_POOL_SIZE
          */
-        public static final String TX_SERVICE_CORE_POOL_SIZE = "txServiceCorePoolSize";
-    
+        public static final String TX_SERVICE_CORE_POOL_SIZE = ConcurrencyManager.class
+                .getName()
+                + ".txService.corePoolSize";
+
         /**
          * The default #of threads in the transaction service thread pool.
          */
         public final static String DEFAULT_TX_SERVICE_CORE_POOL_SIZE = "0";
-    
+
         /**
-         * <code>readServicePoolSize</code> - The #of threads in the pool
-         * handling concurrent unisolated read requests on named indices -or-
-         * ZERO (0) if the size of the thread pool is not fixed (default is
-         * <code>0</code>).
+         * The #of threads in the pool handling concurrent unisolated read
+         * requests on named indices -or- ZERO (0) if the size of the thread
+         * pool is not fixed (default is <code>0</code>).
          * 
          * @see #DEFAULT_READ_SERVICE_CORE_POOL_SIZE
          */
-        public static final String READ_SERVICE_CORE_POOL_SIZE = "readServiceCorePoolSize";
-    
+        public static final String READ_SERVICE_CORE_POOL_SIZE = ConcurrencyManager.class
+                .getName()
+                + ".readService.corePoolSize";
+
         /**
          * The default #of threads in the read service thread pool.
          * 
          * @see #READ_SERVICE_CORE_POOL_SIZE
          */
         public final static String DEFAULT_READ_SERVICE_CORE_POOL_SIZE = "0";
-    
+
         /**
          * The minimum #of threads in the pool handling concurrent unisolated
          * write on named indices (default is
@@ -180,13 +182,15 @@ public class ConcurrencyManager implements IConcurrencyManager {
          * 
          * @see #DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE
          */
-        public final static String WRITE_SERVICE_CORE_POOL_SIZE = "writeServiceCorePoolSize";
-    
+        public final static String WRITE_SERVICE_CORE_POOL_SIZE = ConcurrencyManager.class
+                .getName()
+                + ".writeService.corePoolSize";
+
         /**
          * The default minimum #of threads in the write service thread pool.
          */
         public final static String DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE = "5";
-        
+
         /**
          * The maximum #of threads allowed in the pool handling concurrent
          * unisolated write on named indices (default is
@@ -199,14 +203,16 @@ public class ConcurrencyManager implements IConcurrencyManager {
          * 
          * @see #DEFAULT_WRITE_SERVICE_MAXIMUM_POOL_SIZE
          */
-        public final static String WRITE_SERVICE_MAXIMUM_POOL_SIZE = "writeServiceMaximumPoolSize";
-    
+        public final static String WRITE_SERVICE_MAXIMUM_POOL_SIZE = ConcurrencyManager.class
+                .getName()
+                + ".writeService.maximumPoolSize";
+
         /**
          * The default for the maximum #of threads in the write service thread
          * pool.
          */
         public final static String DEFAULT_WRITE_SERVICE_MAXIMUM_POOL_SIZE = "50";
-        
+
         /**
          * When true, the write service will be prestart all of its worker
          * threads (default
@@ -214,13 +220,15 @@ public class ConcurrencyManager implements IConcurrencyManager {
          * 
          * @see #DEFAULT_WRITE_SERVICE_PRESTART_ALL_CORE_THREADS
          */
-        public final static String WRITE_SERVICE_PRESTART_ALL_CORE_THREADS = "writeServicePrestartAllCoreThreads";
-    
+        public final static String WRITE_SERVICE_PRESTART_ALL_CORE_THREADS = ConcurrencyManager.class
+                .getName()
+                + ".writeService.prestartAllCoreThreads";
+
         /**
          * The default for {@link #WRITE_SERVICE_PRESTART_ALL_CORE_THREADS}.
          */
         public final static String DEFAULT_WRITE_SERVICE_PRESTART_ALL_CORE_THREADS = "false";
-    
+
         /**
          * The maximum depth of the write service queue before newly submitted
          * tasks will block the caller -or- ZERO (0) to use a queue with an
@@ -229,8 +237,10 @@ public class ConcurrencyManager implements IConcurrencyManager {
          * @see #WRITE_SERVICE_CORE_POOL_SIZE
          * @see #DEFAULT_WRITE_SERVICE_QUEUE_CAPACITY
          */
-        public static final String WRITE_SERVICE_QUEUE_CAPACITY = "writeServiceQueueCapacity";
-    
+        public static final String WRITE_SERVICE_QUEUE_CAPACITY = ConcurrencyManager.class
+                .getName()
+                + ".writeService.queueCapacity";
+
         /**
          * The default maximum depth of the write service queue (1000).
          */
@@ -1004,7 +1014,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * @exception NullPointerException
      *                if task null
      */
-    public Future<? extends Object> submit(AbstractTask task) {
+    public <T> Future<T> submit(final AbstractTask<T> task) {
 
         assertOpen();
         
@@ -1082,8 +1092,8 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * 
      * @return The {@link Future}.
      */
-    private Future<? extends Object> submitWithDynamicLatency(
-            final AbstractTask task, final ExecutorService service,
+    private <T> Future<T> submitWithDynamicLatency(
+            final AbstractTask<T> task, final ExecutorService service,
             final TaskCounters taskCounters) {
 
         taskCounters.taskSubmitCount.incrementAndGet();
@@ -1193,12 +1203,13 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * @exception RejectedExecutionException
      *                if any task cannot be scheduled for execution
      */
-    public List<Future<? extends Object>> invokeAll(
-            final Collection<AbstractTask> tasks) throws InterruptedException {
+    public <T> List<Future<T>> invokeAll(
+            final Collection<? extends AbstractTask<T>> tasks)
+            throws InterruptedException {
 
         assertOpen();
 
-        final List<Future<? extends Object>> futures = new LinkedList<Future<? extends Object>>();
+        final List<Future<T>> futures = new LinkedList<Future<T>>();
 
         boolean done = false;
 
@@ -1206,7 +1217,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
             // submit all.
             
-            for (AbstractTask task : tasks) {
+            for (AbstractTask<T> task : tasks) {
 
                 futures.add(submit(task));
 
@@ -1246,7 +1257,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
                 // At least one future did not complete.
                 
-                for (Future<? extends Object> f : futures) {
+                for (Future<T> f : futures) {
 
                     if(!f.isDone()) {
 
@@ -1289,13 +1300,13 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * @exception RejectedExecutionException
      *                if any task cannot be scheduled for execution
      */
-    public List<Future<? extends Object>> invokeAll(
-            final Collection<AbstractTask> tasks, final long timeout,
+    public <T> List<Future<T>> invokeAll(
+            final Collection<? extends AbstractTask<T>> tasks, final long timeout,
             final TimeUnit unit) throws InterruptedException {
 
         assertOpen();
         
-        final List<Future<? extends Object>> futures = new LinkedList<Future<? extends Object>>();
+        final List<Future<T>> futures = new LinkedList<Future<T>>();
 
         boolean done = false;
         
@@ -1307,7 +1318,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
             // submit all.
             
-            for (AbstractTask task : tasks) {
+            for (AbstractTask<T> task : tasks) {
 
                 long now = System.nanoTime();
                 
@@ -1329,7 +1340,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
             // await all futures.
             
-            for (Future<? extends Object> f : futures) {
+            for (Future<T> f : futures) {
 
                 if (!f.isDone()) {
 
@@ -1379,7 +1390,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
                 // At least one future did not complete.
 
-                for (Future<? extends Object> f : futures) {
+                for (Future<T> f : futures) {
 
                     if (!f.isDone()) {
 

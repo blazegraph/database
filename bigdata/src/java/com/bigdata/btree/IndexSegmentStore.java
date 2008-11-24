@@ -40,6 +40,9 @@ import java.util.concurrent.TimeUnit;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.config.Configuration;
+import com.bigdata.config.IValidator;
+import com.bigdata.config.IntegerValidator;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
@@ -47,6 +50,7 @@ import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.RootBlockException;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
@@ -107,7 +111,12 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     /**
      * See {@link Options#BUFFER_NODES}.
      */
-    private final boolean bufferNodes;
+    private boolean bufferNodes;
+    
+    /**
+     * See {@link Options#LEAF_CACHE_SIZE}
+     */
+    protected int leafCacheSize;
     
     /**
      * An optional <strong>direct</strong> {@link ByteBuffer} containing a disk
@@ -137,6 +146,11 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
      */
     private IndexMetadata metadata;
 
+    /**
+     * The index name.
+     */
+    private String namespace;
+    
     /**
      * The optional bloom filter.
      */
@@ -229,15 +243,14 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     public interface Options {
         
         /**
-         * <code>segmentFile</code> - The name of the file to be opened.
+         * The name of the file to be opened.
          */
-        String SEGMENT_FILE = "segmentFile";
+        String SEGMENT_FILE = IndexSegment.class.getName()+".segmentFile";
         
         /**
-         * <code>bufferNodes</code> - when <code>true</code> an attempt will
-         * be made to fully buffer the index nodes (but not the leaves) using a
-         * buffer allocated from the {@link DirectBufferPool} (default
-         * {@value #DEFAULT_BUFFER_NODES}).
+         * When <code>true</code> an attempt will be made to fully buffer the
+         * index nodes (but not the leaves) using a buffer allocated from the
+         * {@link DirectBufferPool} (default {@value #DEFAULT_BUFFER_NODES}).
          * <p>
          * Note: The nodes in the {@link IndexSegment} are serialized in a
          * contiguous region by the {@link IndexSegmentBuilder}. That region
@@ -247,7 +260,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
          * 
          * @see #DEFAULT_BUFFER_NODES
          */
-        String BUFFER_NODES = "bufferNodes";
+        String BUFFER_NODES = IndexSegment.class.getName()+".bufferNodes";
         
         /**
          * @see #BUFFER_NODES
@@ -268,7 +281,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
          * consuming more RAM when many parts of the {@link IndexSegment} are
          * hot.
          */
-        String LEAF_CACHE_SIZE = "leafCacheSize";
+        String LEAF_CACHE_SIZE = IndexSegment.class.getName()+".leafCacheSize";
         
         /**
          * 
@@ -281,14 +294,14 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     /**
      * Used solely to align the old ctor with the new.
      */
-    private static Properties getDefaultProperties(File file) {
+    private static Properties getDefaultProperties(final File file) {
 
         if (file == null)
             throw new IllegalArgumentException();
 
         Properties p = new Properties();
         
-        p.setProperty(Options.SEGMENT_FILE, ""+file);
+        p.setProperty(Options.SEGMENT_FILE, file.toString());
         
         return p;
         
@@ -329,12 +342,12 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             throw new IllegalArgumentException();
 
         // clone to avoid side effects from modifications by the caller.
-        this.properties = (Properties)properties.clone();
-        
+        this.properties = (Properties) properties.clone();
+
         // segmentFile
         {
 
-            String val = properties.getProperty(Options.SEGMENT_FILE);
+            final String val = properties.getProperty(Options.SEGMENT_FILE);
 
             if (val == null) {
 
@@ -347,19 +360,34 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             
         }
         
-        {
-            
-            bufferNodes = Boolean.parseBoolean(properties.getProperty(
-                    Options.BUFFER_NODES, Options.DEFAULT_BUFFER_NODES));
-
-            log.info(Options.BUFFER_NODES + "=" + bufferNodes);
-        
-        }
-        
         reopen();
 
     }
-    
+
+    /**
+     * @see Configuration#getProperty(IIndexManager, Properties, String, String,
+     *      String)
+     */
+    protected String getProperty(final String globalName,
+            final String defaultValue) {
+
+        return Configuration.getProperty(null/* indexManager */, properties,
+                namespace, globalName, defaultValue);
+
+    }
+
+    /**
+     * @see Configuration#getProperty(IIndexManager, Properties, String, String,
+     *      String, IValidator)
+     */
+    protected <E> E getProperty(final String globalName,
+            final String defaultValue, IValidator<E> validator) {
+
+        return Configuration.getProperty(null/* indexManager */, properties,
+                namespace, globalName, defaultValue, validator);
+
+    }
+
     /**
      * Closes out the {@link IndexSegmentStore} iff it is still open.
      * <p>
@@ -448,6 +476,15 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             
             // Read the metadata record.
             this.metadata = readMetadata();
+
+            // The index name.
+            namespace = metadata.getName();
+            
+            leafCacheSize = getProperty(Options.LEAF_CACHE_SIZE,
+                    Options.DEFAULT_LEAF_CACHE_SIZE, IntegerValidator.GT_ZERO);
+
+            bufferNodes = Boolean.parseBoolean(getProperty(
+                    Options.BUFFER_NODES, Options.DEFAULT_BUFFER_NODES));
 
             /*
              * Read the index nodes from the file into a buffer. If there are no

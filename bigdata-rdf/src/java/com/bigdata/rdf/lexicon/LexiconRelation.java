@@ -20,7 +20,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
@@ -34,10 +33,8 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
-import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.filter.FilterConstructor;
@@ -75,7 +72,6 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataSolutionResolverator;
 import com.bigdata.rdf.store.BigdataStatementIteratorImpl;
 import com.bigdata.rdf.store.IRawTripleStore;
-import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
@@ -83,10 +79,8 @@ import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.resources.DefaultSplitHandler;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.search.TokenBuffer;
-import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.Split;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -147,12 +141,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
         {
 
-            this.textIndex = Boolean.parseBoolean(properties.getProperty(
-                    Options.TEXT_INDEX, Options.DEFAULT_TEXT_INDEX));
+            this.textIndex = Boolean.parseBoolean(getProperty(
+                    AbstractTripleStore.Options.TEXT_INDEX,
+                    AbstractTripleStore.Options.DEFAULT_TEXT_INDEX));
          
-            if (INFO)
-                log.info(Options.TEXT_INDEX + "=" + textIndex);
-            
             /*
              * Explicitly disable overwrite for the full text index associated
              * with the lexicon. By default, the full text index will replace
@@ -163,38 +155,15 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
              * journal size to grow but will not add any information to the
              * index.
              */
-            properties.setProperty(Options.OVERWRITE, "false");
+            if (textIndex)
+                properties.setProperty(AbstractTripleStore.Options.OVERWRITE,
+                        "false");
 
         }
         
-        {
-
-            this.storeBlankNodes = Boolean.parseBoolean(properties
-                    .getProperty(Options.STORE_BLANK_NODES,
-                            Options.DEFAULT_STORE_BLANK_NODES));
-
-            if (INFO)
-                log.info(Options.STORE_BLANK_NODES + "=" + storeBlankNodes);
-            
-        }
-        
-        {
-
-            branchingFactor = Integer
-                    .parseInt(properties.getProperty(Options.BRANCHING_FACTOR,
-                            Options.DEFAULT_BRANCHING_FACTOR));
-
-            if (branchingFactor < BTree.MIN_BRANCHING_FACTOR) {
-
-                throw new IllegalArgumentException(Options.BRANCHING_FACTOR
-                        + " must be at least " + BTree.MIN_BRANCHING_FACTOR);
-
-            }
-            
-            if (INFO)
-                log.info(Options.BRANCHING_FACTOR + "=" + branchingFactor);
-
-        }
+        this.storeBlankNodes = Boolean.parseBoolean(getProperty(
+                AbstractTripleStore.Options.STORE_BLANK_NODES,
+                AbstractTripleStore.Options.DEFAULT_STORE_BLANK_NODES));
         
         {
 
@@ -266,32 +235,32 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
             final IIndexManager indexManager = getIndexManager();
 
-            final Properties p = getProperties();
-            
-            if (indexManager instanceof IBigdataFederation
-                    && ((IBigdataFederation) indexManager).isScaleOut() &&
-                    p.getProperty(Options.LEXICON_RELATION_DATA_SERVICE_UUID)!=null
-                    ) {
-
-                // register the indices on the same data service.
-                
-                final IBigdataFederation fed = (IBigdataFederation)indexManager;
-                
-                final UUID dataServiceUUID = UUID.fromString(p
-                        .getProperty(Options.LEXICON_RELATION_DATA_SERVICE_UUID));
-
-                if (INFO) {
-
-                    log.info("Allocating LexiconRelation on dataService="
-                            + dataServiceUUID);
-
-                }
-
-                fed.registerIndex(term2IdMetadata, dataServiceUUID);
-
-                fed.registerIndex(id2TermMetadata, dataServiceUUID);
-
-            } else {
+//            final Properties p = getProperties();
+//            
+//            if (indexManager instanceof IBigdataFederation
+//                    && ((IBigdataFederation) indexManager).isScaleOut() &&
+//                    p.getProperty(Options.LEXICON_RELATION_DATA_SERVICE_UUID)!=null
+//                    ) {
+//
+//                // register the indices on the same data service.
+//                
+//                final IBigdataFederation fed = (IBigdataFederation)indexManager;
+//                
+//                final UUID dataServiceUUID = UUID.fromString(p
+//                        .getProperty(Options.LEXICON_RELATION_DATA_SERVICE_UUID));
+//
+//                if (INFO) {
+//
+//                    log.info("Allocating LexiconRelation on dataService="
+//                            + dataServiceUUID);
+//
+//                }
+//
+//                fed.registerIndex(term2IdMetadata, dataServiceUUID);
+//
+//                fed.registerIndex(id2TermMetadata, dataServiceUUID);
+//
+//            } else {
 
                 // register the indices.
                 
@@ -299,7 +268,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
                 indexManager.registerIndex(id2TermMetadata);
 
-            }
+//            }
 
             if (textIndex) {
 
@@ -362,7 +331,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
     private IIndex term2id;
     private final boolean textIndex;
     private final boolean storeBlankNodes;
-    private final int branchingFactor;
 
     /**
      * <code>true</code> iff blank nodes are being stored in the lexicon's
@@ -450,45 +418,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
     }
     private SoftReference<FullTextIndex> searchEngineRef;
 
-    /**
-     * Shared {@link IndexMetadata} configuration.
-     * 
-     * @param name
-     *            The index name.
-     * 
-     * @return A new {@link IndexMetadata} object for that index.
-     */
-    protected IndexMetadata getIndexMetadata(String name) {
-
-        final IndexMetadata metadata = new IndexMetadata(name, UUID.randomUUID());
-
-        metadata.setBranchingFactor(branchingFactor);
-        
-        /*
-         * Note: Mainly used for torture testing.
-         */
-        if(false){
-            
-            // An override that makes a split very likely.
-            final ISplitHandler splitHandler = new DefaultSplitHandler(
-                    10 * Bytes.kilobyte32, // minimumEntryCount
-                    50 * Bytes.kilobyte32, // entryCountPerSplit
-                    1.5, // overCapacityMultiplier
-                    .75, // underCapacityMultiplier
-                    20 // sampleRate
-            );
-            
-            metadata.setSplitHandler(splitHandler);
-            
-        }
-                
-        return metadata;
-
-    }
-
     protected IndexMetadata getTerm2IdIndexMetadata(String name) {
 
-        final IndexMetadata metadata = getIndexMetadata(name);
+        final IndexMetadata metadata = newIndexMetadata(name);
 
         metadata.setTupleSerializer(new Term2IdTupleSerializer(getProperties()));
         
@@ -498,7 +430,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
     protected IndexMetadata getId2TermIndexMetadata(String name) {
 
-        final IndexMetadata metadata = getIndexMetadata(name);
+        final IndexMetadata metadata = newIndexMetadata(name);
 
         metadata.setTupleSerializer(new Id2TermTupleSerializer(
                 getNamespace()));

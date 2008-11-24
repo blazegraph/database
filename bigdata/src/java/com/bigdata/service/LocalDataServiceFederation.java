@@ -594,5 +594,21 @@ public class LocalDataServiceFederation extends AbstractFederation {
         }
         
     }
-    
+
+    public IDataService getDataServiceByName(final String name) {
+
+        if(name==null) throw new IllegalArgumentException();
+        
+        if (dataService.getServiceName().equals(name)) {
+
+            return dataService;
+
+        } else {
+
+            return null;
+
+        }
+
+    }
+
 }

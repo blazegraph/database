@@ -87,7 +87,7 @@ import com.bigdata.rdf.store.ConcurrentDataLoader;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
-import com.bigdata.relation.locator.RelationSchema;
+import com.bigdata.relation.RelationSchema;
 import com.bigdata.resources.OverflowManager;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.EmbeddedClient;
@@ -329,8 +329,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
                     + p.getProperty(Options.FILE));
 
             System.err.println(Options.NESTED_SUBQUERY + "="
-                    + p.getProperty(Options.NESTED_SUBQUERY,
-                            Options.DEFAULT_NESTED_SUBQUERY));
+                    + p.getProperty(Options.NESTED_SUBQUERY));
 
             System.err.println(Options.CHUNK_CAPACITY + "="
                     + p.getProperty(Options.CHUNK_CAPACITY));

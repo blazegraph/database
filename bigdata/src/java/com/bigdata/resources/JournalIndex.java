@@ -51,10 +51,8 @@ public class JournalIndex extends BTree {
 
     /**
      * Instance used to encode the timestamp into the key.
-     * 
-     * @todo use thread local instance
      */
-    private IKeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG);
+    final private IKeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG);
 
     /**
      * Create a new instance.

@@ -68,7 +68,6 @@ import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.resources.BuildIndexSegmentTask.BuildResult;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IClientIndex;
@@ -162,10 +161,11 @@ abstract public class IndexManager extends StoreManager {
          * 
          * @see #DEFAULT_INDEX_CACHE_CAPACITY
          */
-        String INDEX_CACHE_CAPACITY = "indexCacheCapacity";
-        
+        String INDEX_CACHE_CAPACITY = IndexManager.class.getName()
+                + ".indexCacheCapacity";
+
         String DEFAULT_INDEX_CACHE_CAPACITY = "20";
-        
+
         /**
          * The capacity of the LRU cache of open {@link IndexSegment}s. The
          * capacity of this cache indirectly controls how many
@@ -191,7 +191,8 @@ abstract public class IndexManager extends StoreManager {
          * 
          * @see #DEFAULT_INDEX_SEGMENT_CACHE_CAPACITY
          */
-        String INDEX_SEGMENT_CACHE_CAPACITY = "indexSegmentCacheCapacity";
+        String INDEX_SEGMENT_CACHE_CAPACITY = IndexManager.class.getName()
+                + ".indexSegmentCacheCapacity";
 
         /**
          * The default for the {@link #INDEX_SEGMENT_CACHE_CAPACITY} option.
@@ -1099,15 +1100,26 @@ abstract public class IndexManager extends StoreManager {
     }
 
     /**
-     * Build an index segment from an index partition.
+     * Build an {@link IndexSegment} from an index partition. Delete markers are
+     * propagated to the {@link IndexSegment} unless <i>compactingMerge</i> is
+     * <code>true</code>.
      * 
      * @param name
      *            The name of the index partition (not the name of the scale-out
      *            index).
      * @param src
      *            A view of the index partition as of the <i>createTime</i>.
-     * @parma outFile The file on which the {@link IndexSegment} will be
-     *        written.
+     * @param outFile
+     *            The file on which the {@link IndexSegment} will be written.
+     *            The file MAY exist, but if it exists then it MUST be empty.
+     * @param compactingMerge
+     *            When <code>true</code> the caller asserts that <i>src</i>
+     *            is a {@link FusedView} and deleted index entries WILL NOT be
+     *            included in the generated {@link IndexSegment}. Otherwise, it
+     *            is assumed that the only select component(s) of the index
+     *            partition view are being exported onto an {@link IndexSegment}
+     *            and deleted index entries will therefore be propagated to the
+     *            new {@link IndexSegment}.
      * @param createTime
      *            The timestamp of the view. This is typically the
      *            lastCommitTime of the old journal after an
@@ -1123,109 +1135,150 @@ abstract public class IndexManager extends StoreManager {
      *         and the source index.
      * 
      * @throws Exception
+     *             if any errors are encountered then the file (if it exists)
+     *             will be deleted as a side-effect before returning control to
+     *             the caller.
      */
-    public BuildResult buildIndexSegment(String name, IIndex src, File outFile,
-            long createTime, byte[] fromKey, byte[] toKey) throws Exception {
+    public BuildResult buildIndexSegment(final String name, final IIndex src,
+            final File outFile, final boolean compactingMerge,
+            final long createTime, final byte[] fromKey, final byte[] toKey)
+            throws Exception {
 
-        if (name == null)
-            throw new IllegalArgumentException();
+        final IndexMetadata indexMetadata;
+        final SegmentMetadata segmentMetadata;
         
-        if (src == null)
-            throw new IllegalArgumentException();
-        
-        if (outFile == null)
-            throw new IllegalArgumentException();
+        try {
 
-        if (createTime <= 0L)
-            throw new IllegalArgumentException();
-        
-        // metadata for that index / index partition.
-        final IndexMetadata indexMetadata = src.getIndexMetadata();
+            if (name == null)
+                throw new IllegalArgumentException();
 
-        // the branching factor for the generated index segment.
-        final int branchingFactor = indexMetadata
-                .getIndexSegmentBranchingFactor();
+            if (src == null)
+                throw new IllegalArgumentException();
 
-//         // Note: truncates nentries to int.
-//        final int nentries = (int) Math.min(src.rangeCount(fromKey, toKey),
-//                Integer.MAX_VALUE);
+            if (outFile == null)
+                throw new IllegalArgumentException();
 
-        /*
-         * Use the range iterator to get an exact entry count for the view.
-         * 
-         * Note: We need the exact entry count for the IndexSegmentBuilder. It
-         * requires the exact #of index entries when it creates its plan for
-         * populating the index segment.
-         */
-        final int nentries;
-        {
+            if (createTime <= 0L)
+                throw new IllegalArgumentException();
 
-            final ITupleIterator itr = src
-                    .rangeIterator(fromKey, toKey, 0/* capacity */,
-                            0/*no flags*/, null/* filter */);
+            // metadata for that index / index partition.
+            indexMetadata = src.getIndexMetadata();
 
-            int i = 0;
-
-            while(itr.hasNext()) {
-                
-                itr.next();
-                
-                i++;
-                
-            }
-            
-            nentries = i;
+            /*
+             * Use the range iterator to get an exact entry count for the view.
+             * 
+             * Note: We need the exact entry count for the IndexSegmentBuilder.
+             * It requires the exact #of index entries when it creates its plan
+             * for populating the index segment.
+             * 
+             * FIXME Truncating to int. drive through long range count.
+             */
+            final int nentries = (int) src.rangeCountExact(fromKey, toKey);
 
             if (INFO)
                 log.info("There are " + nentries
                         + " non-deleted index entries: " + name);
 
+            /*
+             * Note: When [compactingMerge == true], then delete markers are
+             * ignored so they will NOT be transferred to the new index segment.
+             * 
+             * Note: When [compactingMerge == false], the deleted tuples are
+             * propagated to the new index segment.
+             */
+            final int flags = IRangeQuery.KEYS | IRangeQuery.VALS
+                    | (compactingMerge ? 0 : IRangeQuery.DELETED);
+
+            /*
+             * Iterator reading the source tuples to be copied to the index
+             * segment.
+             */
+            final ITupleIterator itr = src.rangeIterator(fromKey, toKey,
+                    0/* capacity */, flags, null/* filter */);
+
+            // Setup the index segment build operation.
+            final IndexSegmentBuilder builder = new IndexSegmentBuilder(//
+                    outFile, //
+                    getTmpDir(), //
+                    nentries,//
+                    itr, //
+                    indexMetadata.getIndexSegmentBranchingFactor(),//
+                    indexMetadata,//
+                    createTime//
+            );
+
+            // build the index segment.
+            builder.call();
+
+            // report event
+            notifyIndexSegmentBuildEvent(builder);
+
+            /*
+             * Describe the index segment.
+             */
+            // final long length = outFile.length();
+            segmentMetadata = new SegmentMetadata(//
+                    outFile, //
+                    builder.segmentUUID, //
+                    createTime //
+            );
+
+            /*
+             * Notify the resource manager so that it can find this file.
+             */
+            addResource(segmentMetadata, outFile);
+
+        } catch (Throwable t) {
+
+            if (outFile != null && outFile.exists()) {
+
+                try {
+
+                    outFile.delete();
+
+                } catch (Throwable t2) {
+
+                    log.warn(t2.getLocalizedMessage(), t2);
+
+                }
+
+            }
+
+            if (t instanceof Exception)
+                throw (Exception) t;
+
+            throw new RuntimeException(t);
+
         }
+
+        /*
+         * Note: Now that the resource is registered with the StoreManager we
+         * have to handle errors somewhat differently.
+         */
         
-         /*
-          * Note: Delete markers are ignored so they will NOT be transferred to
-          * the new index segment (compacting merge).
-          */
-         final ITupleIterator itr = src
-                 .rangeIterator(fromKey, toKey, 0/* capacity */,
-                         IRangeQuery.KEYS | IRangeQuery.VALS, null/* filter */);
-         
-         // Setup the index segment build operation.
-         final IndexSegmentBuilder builder = new IndexSegmentBuilder(//
-                 outFile, //
-                 getTmpDir(), //
-                 nentries,//
-                 itr, //
-                 branchingFactor,//
-                 indexMetadata,//
-                 createTime//
-         );
-         
-         // build the index segment.
-         builder.call();
+        try {
 
-         // report event
-         notifyIndexSegmentBuildEvent(builder);
+            return new BuildResult(name, indexMetadata, segmentMetadata);
 
-         /*
-          * Describe the index segment.
-          */
-//         final long length = outFile.length();
-         final SegmentMetadata segmentMetadata = new SegmentMetadata(//
-                 outFile, //
-//                length, //
-                builder.segmentUUID, //
-                createTime //
-        );
+        } catch (Throwable t) {
 
-         /*
-          * notify the resource manager so that it can find this file.
-          */
+            try {
 
-         addResource(segmentMetadata, outFile);
+                deleteResource(segmentMetadata.getUUID(), false/* isJournal */);
+                
+            } catch (Throwable t2) {
+                
+                log.warn(t2.getLocalizedMessage(), t2);
+                
+            }
 
-         return new BuildResult(name, indexMetadata, segmentMetadata);
-         
+            if (t instanceof Exception)
+                throw (Exception) t;
+
+            throw new RuntimeException(t);
+
+        }
+
     }
 
 }

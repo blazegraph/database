@@ -204,8 +204,8 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
 
             assertEquals("partitionId", 0L, pmd0.getPartitionId());
 
-            assertEquals("dataServiceUUIDs", new UUID[] { dataService0
-                    .getServiceUUID() }, pmd0.getDataServices());
+            assertEquals("dataServiceUUID", dataService0.getServiceUUID(), pmd0
+                    .getDataServiceUUID());
             
         }
         assertEquals("partitionCount", 1, getPartitionCount(name));
@@ -270,8 +270,8 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
 
             assertEquals("partitionId", 0L, pmd0.getPartitionId());
 
-            assertEquals("dataServiceUUIDs", new UUID[] { dataService0
-                    .getServiceUUID() }, pmd0.getDataServices());
+            assertEquals("dataServiceUUIDs", dataService0.getServiceUUID(),
+                    pmd0.getDataServiceUUID());
             
         }
         assertEquals("partitionCount", 1, getPartitionCount(name));

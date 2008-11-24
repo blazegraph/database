@@ -49,6 +49,11 @@ import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.btree.BTree.Counter;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
+import com.bigdata.config.Configuration;
+import com.bigdata.config.IValidator;
+import com.bigdata.config.IntegerRangeValidator;
+import com.bigdata.config.IntegerValidator;
+import com.bigdata.config.LongRangeValidator;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.journal.Name2Addr.Entry;
@@ -158,7 +163,6 @@ import com.bigdata.util.ChecksumUtility;
  * 
  * FIXME Priority items are:
  * <ol>
- * <li> Minimize (de-)serialization costs for B+Trees since we are not IO bound.</li>
  * <li> AIO for the Direct and Disk modes (low priority since not IO bound).</li>
  * <li> GOM integration features, including: support for primary key (clustered)
  * indices; supporting both embedded and remote scenarios; and using state-based
@@ -435,47 +439,6 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
     }
 
     /**
-     * The default branching factor for indices created using {@link #registerIndex(String)}.
-     * 
-     * @see Options#BRANCHING_FACTOR
-     * 
-     * @deprecated by the use of {@link IndexMetadata} 
-     */
-    private final int defaultBranchingFactor;
-
-//    /**
-//     * A thread-local key builder factory configured with the properties
-//     * specified to the ctor.
-//     */
-//    private final IKeyBuilderFactory keyBuilderFactory;
-//
-//    /**
-//     * Return a {@link ThreadLocal} {@link IKeyBuilder} instance configured
-//     * using the properties specified to the journal constructor.
-//     * 
-//     * @see IndexMetadata#getKeyBuilder()
-//     */
-//    public IKeyBuilder getKeyBuilder() {
-//        
-//        return keyBuilderFactory.getKeyBuilder();
-//        
-//    }
-    
-    /**
-     * The default branching factor for indices created using
-     * {@link #registerIndex(String)}.
-     * 
-     * @see Options#BRANCHING_FACTOR
-     * 
-     * @deprecated See {@link Options#BRANCHING_FACTOR}
-     */
-    public final int getDefaultBranchingFactor() {
-        
-        return defaultBranchingFactor;
-        
-    }
-    
-    /**
      * Used to allocate the {@link ByteBuffer} for the {@link BufferMode#Disk}
      * write cache.
      * 
@@ -492,26 +455,24 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      * @see Options#READ_ONLY
      * @see Options#WRITE_CACHE_CAPACITY
      */
-    public static ByteBuffer getWriteCache(Properties properties) {
+    public static ByteBuffer getWriteCache(final Properties properties) {
 
-        final BufferMode bufferMode = BufferMode.valueOf(properties.getProperty(
-                Options.BUFFER_MODE, "" + Options.DEFAULT_BUFFER_MODE));
+        final BufferMode bufferMode = BufferMode.valueOf(getProperty(
+                properties, Options.BUFFER_MODE, Options.DEFAULT_BUFFER_MODE));
 
-        final boolean readOnly = Boolean.parseBoolean(properties.getProperty(
+        final boolean readOnly = Boolean.parseBoolean(getProperty(properties,
                 Options.READ_ONLY, "" + Options.DEFAULT_READ_ONLY));
 
         if (bufferMode.equals(BufferMode.Disk) && !readOnly) {
-            
-            final int capacity = Integer.parseInt(properties.getProperty(
-                Options.WRITE_CACHE_CAPACITY, ""
-                        + Options.DEFAULT_WRITE_CACHE_CAPACITY));
+
+            final int capacity = Integer.parseInt(getProperty(properties,
+                    Options.WRITE_CACHE_CAPACITY,
+                    Options.DEFAULT_WRITE_CACHE_CAPACITY));
 
             final int minWriteCacheCapacity = (int) Math.min(
                     Options.minimumInitialExtent,
                     Options.minimumWriteCacheCapacity);
 
-            if(INFO) log.info(Options.WRITE_CACHE_CAPACITY + "=" + capacity);
-            
             if (capacity > 0 && capacity < minWriteCacheCapacity) {
 
                 throw new RuntimeException(Options.WRITE_CACHE_CAPACITY
@@ -528,6 +489,47 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
     }
     
+    /**
+     * Resolves the property value (static variant for ctor initialization).
+     * 
+     * @see Configuration#getProperty(IIndexManager, Properties, String, String,
+     *      String)
+     */
+    static protected String getProperty(final Properties properties,
+            final String name, final String defaultValue) {
+
+        return Configuration.getProperty(null/* indexManager */, properties,
+                ""/* no namespace */, name, defaultValue);
+
+    }
+
+    /**
+     * Resolves the property value.
+     * 
+     * @see Configuration#getProperty(IIndexManager, Properties, String, String,
+     *      String)
+     */
+    protected String getProperty(final String name, final String defaultValue) {
+
+        return Configuration.getProperty(this, properties,
+                ""/* no namespace */, name, defaultValue);
+
+    }
+
+    /**
+     * Resolves, parses, and validates the property value.
+     * @param name The property name. 
+     * @param defaultValue The default value.
+     * @return
+     */
+    protected <E> E getProperty(final String name, final String defaultValue,
+            IValidator<E> validator) {
+
+        return Configuration.getProperty(this, properties,
+                ""/* no namespace */, name, defaultValue, validator);
+
+    }
+
     /**
      * Create or re-open a journal.
      * <p>
@@ -580,18 +582,13 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      */
     protected AbstractJournal(Properties properties, final ByteBuffer writeCache) {
 
-        boolean create = Options.DEFAULT_CREATE;
+        boolean create = Boolean.parseBoolean(Options.DEFAULT_CREATE);
         boolean isEmptyFile = false;
-
-        String val;
 
         if (properties == null)
             throw new IllegalArgumentException();
 
         this.properties = properties = (Properties) properties.clone();
-
-        // a thread-local key builder factory configured with the caller's properties.
-//        this.keyBuilderFactory = new ThreadLocalKeyBuilderFactory(new DefaultKeyBuilderFactory(properties));
         
         /*
          * "bufferMode" mode.
@@ -599,147 +596,53 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
          * Note: very large journals MUST use the disk-based mode.
          */
 
-        final BufferMode bufferMode = BufferMode.valueOf(properties.getProperty(
-                Options.BUFFER_MODE, "" + Options.DEFAULT_BUFFER_MODE));
+        final BufferMode bufferMode = BufferMode.valueOf(getProperty(
+                Options.BUFFER_MODE, Options.DEFAULT_BUFFER_MODE));
 
-        if (INFO)
-            log.info(Options.BUFFER_MODE + "=" + bufferMode);
-
-        /*
-         * historicalIndexCacheCapacity
-         */
         {
-            historicalIndexCacheCapacity = Integer.parseInt(properties.getProperty(
+            
+            historicalIndexCacheCapacity = getProperty(
                     Options.HISTORICAL_INDEX_CACHE_CAPACITY,
-                    Options.DEFAULT_HISTORICAL_INDEX_CACHE_CAPACITY));
-
-            if (INFO)
-            log.info(Options.HISTORICAL_INDEX_CACHE_CAPACITY+"="+historicalIndexCacheCapacity);
-
-            if (historicalIndexCacheCapacity <= 0)
-                throw new RuntimeException(Options.HISTORICAL_INDEX_CACHE_CAPACITY
-                        + " must be non-negative");
+                    Options.DEFAULT_HISTORICAL_INDEX_CACHE_CAPACITY,
+                    IntegerValidator.GT_ZERO);
 
             historicalIndexCache = new WeakValueCache<Long, ICommitter>(
                     new LRUCache<Long, ICommitter>(historicalIndexCacheCapacity));
 
-        }
-        
-        /*
-         * liveIndexCacheCapacity
-         */
-        {
-        
-            liveIndexCacheCapacity = Integer.parseInt(properties.getProperty(
+            liveIndexCacheCapacity = getProperty(
                     Options.LIVE_INDEX_CACHE_CAPACITY,
-                    Options.DEFAULT_LIVE_INDEX_CACHE_CAPACITY));
-
-            if (INFO)
-            log.info(Options.LIVE_INDEX_CACHE_CAPACITY+"="+liveIndexCacheCapacity);
-
-            if (liveIndexCacheCapacity <= 0)
-                throw new RuntimeException(Options.LIVE_INDEX_CACHE_CAPACITY
-                        + " must be non-negative");
+                    Options.DEFAULT_LIVE_INDEX_CACHE_CAPACITY,
+                    IntegerValidator.GT_ZERO);
 
         }
-        
-        /*
-         * "useDirectBuffers"
-         */
 
-        final boolean useDirectBuffers = Boolean.parseBoolean(properties
-                .getProperty(Options.USE_DIRECT_BUFFERS, ""
-                        + Options.DEFAULT_USE_DIRECT_BUFFERS));
+        final boolean useDirectBuffers = Boolean
+                .parseBoolean(getProperty(Options.USE_DIRECT_BUFFERS,
+                        Options.DEFAULT_USE_DIRECT_BUFFERS));
             
-        if (INFO)
-        log.info(Options.USE_DIRECT_BUFFERS+"="+useDirectBuffers);
+        final long initialExtent = getProperty(Options.INITIAL_EXTENT,
+                Options.DEFAULT_INITIAL_EXTENT, new LongRangeValidator(
+                        Options.minimumInitialExtent, Long.MAX_VALUE));
 
-        /*
-         * "initialExtent"
-         */
-
-        final long initialExtent = Long.parseLong(properties.getProperty(
-                Options.INITIAL_EXTENT, "" + Options.DEFAULT_INITIAL_EXTENT));
-
-        if (initialExtent < Options.minimumInitialExtent) {
-
-            throw new RuntimeException("The '" + Options.INITIAL_EXTENT
-                    + "' must be at least " + Options.minimumInitialExtent
-                    + " bytes");
-
-        }
-
-        if (INFO)
-        log.info(Options.INITIAL_EXTENT + "=" + initialExtent);           
-
-        /*
-         * "maximumExtent"
-         */
-
-        maximumExtent = Long.parseLong(properties.getProperty(
-                Options.MAXIMUM_EXTENT, "" + Options.DEFAULT_MAXIMUM_EXTENT));
-
-        if (maximumExtent < initialExtent) {
-
-            throw new RuntimeException("The '" + Options.MAXIMUM_EXTENT + "' ("
-                    + maximumExtent + ") is less than the initial extent ("
-                    + initialExtent + ").");
-
-        }
-
-        if (INFO)
-        log.info(Options.MAXIMUM_EXTENT + "=" + maximumExtent); 
-
-        /*
-         * "offsetBits"
-         */
+        maximumExtent = getProperty(Options.MAXIMUM_EXTENT,
+                Options.DEFAULT_MAXIMUM_EXTENT, new LongRangeValidator(
+                        initialExtent, Long.MAX_VALUE));
         
-        final int offsetBits = Integer.parseInt(properties.getProperty(
-                Options.OFFSET_BITS, Options.DEFAULT_OFFSET_BITS));
+        final int offsetBits = getProperty(Options.OFFSET_BITS,
+                Options.DEFAULT_OFFSET_BITS, new IntegerRangeValidator(
+                        WormAddressManager.MIN_OFFSET_BITS,
+                        WormAddressManager.MAX_OFFSET_BITS));
 
-        WormAddressManager.assertOffsetBits(offsetBits);
+        final int readCacheCapacity = getProperty(Options.READ_CACHE_CAPACITY,
+                Options.DEFAULT_READ_CACHE_CAPACITY, IntegerValidator.GTE_ZERO);
 
-        if (INFO)
-        log.info(Options.OFFSET_BITS + "=" + offsetBits);
-
-        /*
-         * readCacheCapacity
-         */
-        final int readCacheCapacity = Integer.parseInt(properties.getProperty(
-                Options.READ_CACHE_CAPACITY,
-                Options.DEFAULT_READ_CACHE_CAPACITY));
-
-        if (INFO)
-        log.info(Options.READ_CACHE_CAPACITY + "=" + readCacheCapacity);
-
-        if (readCacheCapacity < 0)
-            throw new RuntimeException(Options.READ_CACHE_CAPACITY
-                    + " must be non-negative");
-        
-        /*
-         * readCacheMaxRecordSize
-         */
-        final int readCacheMaxRecordSize = Integer.parseInt(properties.getProperty(
+        final int readCacheMaxRecordSize = getProperty(
                 Options.READ_CACHE_MAX_RECORD_SIZE,
-                Options.DEFAULT_READ_CACHE_MAX_RECORD_SIZE));
+                Options.DEFAULT_READ_CACHE_MAX_RECORD_SIZE,
+                IntegerValidator.GT_ZERO);
 
-        if (INFO)
-        log.info(Options.READ_CACHE_MAX_RECORD_SIZE + "=" + readCacheMaxRecordSize);
-
-        if (readCacheMaxRecordSize <= 0)
-            throw new RuntimeException(Options.READ_CACHE_MAX_RECORD_SIZE
-                    + " must be positive");
-        
-        /*
-         * "createTempFile"
-         */
-
-        final boolean createTempFile = Boolean.parseBoolean(properties
-                .getProperty(Options.CREATE_TEMP_FILE, ""
-                        + Options.DEFAULT_CREATE_TEMP_FILE));
-
-        if (INFO)
-        log.info(Options.CREATE_TEMP_FILE + "=" + createTempFile);
+        final boolean createTempFile = Boolean.parseBoolean(getProperty(
+                Options.CREATE_TEMP_FILE, Options.DEFAULT_CREATE_TEMP_FILE));
 
         if (createTempFile) {
 
@@ -752,10 +655,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         // "tmp.dir"
         {
 
-            val = properties.getProperty(Options.TMP_DIR);
-
-            tmpDir = val == null ? new File(System
-                    .getProperty("java.io.tmpdir")) : new File(val);
+            tmpDir = new File(getProperty(Options.TMP_DIR, System
+                    .getProperty("java.io.tmpdir")));
 
             if (!tmpDir.exists()) {
 
@@ -774,125 +675,46 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                         + tmpDir.getAbsolutePath());
 
             }
-
-            if(val!=null) {
-                
-                if (INFO)
-                log.info(Options.TMP_DIR+"="+tmpDir); 
-                
-            }
             
         }
-            
-        /*
-         * "validateChecksum"
-         */
 
-        final boolean validateChecksum = Boolean.parseBoolean(properties
-                .getProperty(Options.VALIDATE_CHECKSUM, ""
-                        + Options.DEFAULT_VALIDATE_CHECKSUM));
+        final boolean validateChecksum = Boolean.parseBoolean(getProperty(
+                Options.VALIDATE_CHECKSUM, Options.DEFAULT_VALIDATE_CHECKSUM));
 
-        if (INFO)
-        log.info(Options.VALIDATE_CHECKSUM+"="+validateChecksum);
-
-        /*
-         * "readOnly"
-         */
-
-        readOnly = Boolean.parseBoolean(properties.getProperty(
-                Options.READ_ONLY, "" + Options.DEFAULT_READ_ONLY));
+        readOnly = Boolean.parseBoolean(getProperty(Options.READ_ONLY,
+                Options.DEFAULT_READ_ONLY));
 
         if (readOnly) {
 
             create = false;
 
         }
-        
-        if (INFO)
-        log.info(Options.READ_ONLY+"="+readOnly);
 
-        /*
-         * "alternateRootBlock"
-         */
+        final boolean alternateRootBlock = Boolean.parseBoolean(getProperty(
+                Options.ALTERNATE_ROOT_BLOCK, "false"));
+        
+        if (alternateRootBlock && !readOnly) {
 
-        final boolean alternateRootBlock = Boolean.parseBoolean(properties
-                .getProperty(Options.ALTERNATE_ROOT_BLOCK, "false"));
-        
-        if (INFO)
-            log.info(Options.ALTERNATE_ROOT_BLOCK + "=" + alternateRootBlock);
-        
-        if (alternateRootBlock && !readOnly)
             log.warn("*** Using the alternate root block: "
                     + "Data will be lost on the next commit! ***");
-
-        /*
-         * "forceWrites"
-         */
-
-        final ForceEnum forceWrites = ForceEnum.parse(properties.getProperty(
-                Options.FORCE_WRITES, "" + Options.DEFAULT_FORCE_WRITES));
-
-        if (INFO)
-        log.info(Options.FORCE_WRITES + "=" + forceWrites);
-
-        /*
-         * "forceOnCommit"
-         */
-
-        forceOnCommit = ForceEnum.parse(properties.getProperty(
-                Options.FORCE_ON_COMMIT, "" + Options.DEFAULT_FORCE_ON_COMMIT));
-
-        if (INFO)
-        log.info(Options.FORCE_ON_COMMIT+"="+forceOnCommit);
-
-        /*
-         * "doubleSync"
-         */
-
-        doubleSync = Boolean.parseBoolean(properties.getProperty(
-                Options.DOUBLE_SYNC, "" + Options.DEFAULT_DOUBLE_SYNC));
-
-        if (INFO)
-        log.info(Options.DOUBLE_SYNC + "=" + doubleSync);
-
-        /*
-         * "deleteOnClose"
-         */
-
-        deleteOnClose = Boolean.parseBoolean(properties.getProperty(
-                Options.DELETE_ON_CLOSE, "" + Options.DEFAULT_DELETE_ON_CLOSE));
-
-        if (INFO)
-        log.info(Options.DELETE_ON_CLOSE + "=" + deleteOnClose);
-
-        /*
-         * "deleteOnExit"
-         */
-
-        final boolean deleteOnExit = Boolean.parseBoolean(properties
-                .getProperty(Options.DELETE_ON_EXIT, ""
-                        + Options.DEFAULT_DELETE_ON_EXIT));
-
-        if (INFO)
-        log.info(Options.DELETE_ON_EXIT + "=" + deleteOnExit);
-        
-        /*
-         * branchingFactor.
-         */
-        
-        defaultBranchingFactor = Integer.parseInt(properties.getProperty(
-                Options.BRANCHING_FACTOR, Options.DEFAULT_BRANCHING_FACTOR));
-
-        if (defaultBranchingFactor < BTree.MIN_BRANCHING_FACTOR) {
-
-            throw new IllegalArgumentException(Options.BRANCHING_FACTOR
-                    + " must be at least " + BTree.MIN_BRANCHING_FACTOR);
             
         }
-        
-        if (INFO)
-        log.info(Options.BRANCHING_FACTOR+"="+defaultBranchingFactor);
-        
+
+        final ForceEnum forceWrites = ForceEnum.parse(getProperty(
+                Options.FORCE_WRITES, Options.DEFAULT_FORCE_WRITES));
+
+        forceOnCommit = ForceEnum.parse(getProperty(Options.FORCE_ON_COMMIT,
+                Options.DEFAULT_FORCE_ON_COMMIT));
+
+        doubleSync = Boolean.parseBoolean(getProperty(Options.DOUBLE_SYNC,
+                Options.DEFAULT_DOUBLE_SYNC));
+
+        deleteOnClose = Boolean.parseBoolean(getProperty(
+                Options.DELETE_ON_CLOSE, Options.DEFAULT_DELETE_ON_CLOSE));
+
+        final boolean deleteOnExit = Boolean.parseBoolean(getProperty(
+                Options.DELETE_ON_EXIT, Options.DEFAULT_DELETE_ON_EXIT));
+
         /*
          * "file"
          */
@@ -905,25 +727,22 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
             
         } else {
             
-            val = properties.getProperty(Options.FILE);
+            String val = getProperty(Options.FILE, null);
 
-            if (INFO)
-                log.info(Options.FILE + "=" + val);
+            if (createTempFile && val != null) {
 
-            if(createTempFile && val != null) {
-                
                 throw new RuntimeException("Can not use option '"
                         + Options.CREATE_TEMP_FILE + "' with option '"
                         + Options.FILE + "'");
-                
+
             }
 
-            if( createTempFile ) {
-                
+            if (createTempFile) {
+
                 try {
 
                     val = File.createTempFile("bigdata-" + bufferMode + "-",
-                            ".jnl", tmpDir).toString();
+                            Options.JNL, tmpDir).toString();
                     
                 } catch(IOException ex) {
                     
@@ -984,8 +803,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
          * a clock that is consistent with the commit protocol or even a clock
          * that assigns unique timestamps.
          */
-        final long createTime = Long.parseLong(properties.getProperty(
-                Options.CREATE_TIME, "" + System.currentTimeMillis()));
+        final long createTime = Long.parseLong(getProperty(Options.CREATE_TIME,
+                "" + System.currentTimeMillis()));
         
         assert createTime != 0L;
         
@@ -2435,18 +2254,15 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      * @exception IllegalStateException
      *                if there is an index already registered under that name.
      *                
-     * @see Options#BRANCHING_FACTOR
+     * @see Options#BTREE_BRANCHING_FACTOR
      * 
      * @deprecated This is only used by the test suites.
      */
-    public BTree registerIndex(String name) {
+    public BTree registerIndex(final String name) {
 
-        IndexMetadata metadata = new IndexMetadata(name, UUID.randomUUID());
+        final IndexMetadata metadata = new IndexMetadata(name, UUID
+                .randomUUID());
 
-        metadata.setBranchingFactor(defaultBranchingFactor);
-        
-//        metadata.setIsolatable(true);
-        
         return registerIndex(name, metadata);
         
     }
@@ -2461,9 +2277,9 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      * Note: You MUST {@link #commit()} before the registered index will be
      * either restart-safe or visible to new transactions.
      */
-    public void registerIndex(IndexMetadata metadata) {
+    public void registerIndex(final IndexMetadata metadata) {
 
-        registerIndex(metadata.getName(),metadata);
+        registerIndex(metadata.getName(), metadata);
         
     }
     
@@ -2477,7 +2293,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      * Note: You MUST {@link #commit()} before the registered index will be
      * either restart-safe or visible to new transactions.
      */
-    public BTree registerIndex(String name, IndexMetadata metadata) {
+    public BTree registerIndex(final String name, final IndexMetadata metadata) {
 
         validateIndexMetadata(name, metadata);
         
@@ -2493,9 +2309,11 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      * <code>null</code> since a remote caller can not have the correct
      * metadata on hand when they formulate the request.
      */
-    protected void validateIndexMetadata(String name, IndexMetadata metadata) {
+    protected void validateIndexMetadata(final String name,
+            final IndexMetadata metadata) {
 
         final LocalPartitionMetadata pmd = metadata.getPartitionMetadata();
+
         if (pmd != null) {
 
             if (pmd.getResources() == null) {
@@ -2575,7 +2393,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      * Note: You MUST {@link #commit()} before the registered index will be
      * either restart-safe or visible to new transactions.
      */
-    public BTree registerIndex(String name, BTree ndx) {
+    public BTree registerIndex(final String name, final BTree ndx) {
 
         assertOpen();
         
@@ -2596,7 +2414,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      * reclaimed on the {@link AbstractJournal} (it is an immortal store) and
      * historical states of the index will continue to be accessible.
      */
-    public void dropIndex(String name) {
+    public void dropIndex(final String name) {
         
         assertOpen();
         
@@ -2620,7 +2438,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      * 
      * @see #getIndex(String, long)
      */
-    public BTree getIndex(String name) {
+    public BTree getIndex(final String name) {
 
         assertOpen();
 

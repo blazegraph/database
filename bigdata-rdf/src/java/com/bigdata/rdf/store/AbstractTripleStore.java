@@ -41,12 +41,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
@@ -63,11 +60,13 @@ import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.rio.rdfxml.RDFXMLParser;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.filter.ITupleFilter;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -77,7 +76,6 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.axioms.BaseAxioms;
 import com.bigdata.rdf.axioms.NoAxioms;
@@ -102,8 +100,6 @@ import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.rules.MatchRule;
 import com.bigdata.rdf.rules.RDFJoinNexusFactory;
 import com.bigdata.rdf.rules.RuleContextEnum;
-import com.bigdata.rdf.rules.RuleFastClosure5;
-import com.bigdata.rdf.rules.RuleFastClosure6;
 import com.bigdata.rdf.spo.BulkCompleteConverter;
 import com.bigdata.rdf.spo.BulkFilterConverter;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
@@ -123,15 +119,11 @@ import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IDatabase;
 import com.bigdata.relation.IMutableDatabase;
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.accesspath.BlockingBuffer;
+import com.bigdata.relation.RelationSchema;
 import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.relation.locator.DefaultResourceLocator;
-import com.bigdata.relation.locator.ILocatableResource;
-import com.bigdata.relation.locator.RelationSchema;
 import com.bigdata.relation.rule.ArrayBindingSet;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
@@ -151,14 +143,11 @@ import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 import com.bigdata.relation.rule.eval.ISolution;
-import com.bigdata.relation.rule.eval.NestedSubqueryWithJoinThreadsTask;
-import com.bigdata.relation.rule.eval.pipeline.JoinMasterTask;
 import com.bigdata.resources.OverflowManager;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.search.IHit;
 import com.bigdata.service.AbstractEmbeddedDataService;
 import com.bigdata.service.DataService;
-import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IClientIndex;
 import com.bigdata.service.IDataService;
@@ -249,14 +238,6 @@ abstract public class AbstractTripleStore extends
     final protected boolean lexicon;
 
     /**
-     * This is used to conditionally disable all but a single statement index
-     * (aka access path).
-     * 
-     * @deprecated by {@link SPORelation#oneAccessPath}
-     */
-    final protected boolean oneAccessPath;
-
-    /**
      * The #of term identifiers in the key for a statement index (3 is a triple
      * store, 4 is a quad store).
      * 
@@ -276,65 +257,6 @@ abstract public class AbstractTripleStore extends
      *       resolve it from {@link SPORelation}?
      */
     final protected boolean statementIdentifiers;
-    
-    /**
-     * The capacity of the buffers accumulating chunks from concurrent producers.
-     * 
-     * @see Options#CHUNK_OF_CHUNKS_CAPACITY
-     */
-    final public int chunkOfChunksCapacity;
-
-    /**
-     * The target chunk size.
-     * 
-     * @see Options#CHUNK_CAPACITY
-     */
-    final public int chunkCapacity;
-
-    /**
-     * The timeout in milliseconds that the {@link BlockingBuffer} will wait for
-     * another chunk to combine with the current chunk before returning the
-     * current chunk. This may be ZERO (0) to disable the chunk combiner.
-     * 
-     * @see Options#CHUNK_TIMEOUT
-     */
-    final public long chunkTimeout;
-    
-    /**
-     * If the estimated range count for an
-     * {@link IAccessPath#iterator(int, int)} is LTE this threshold then do a
-     * fully buffered (synchronous) read. Otherwise we will do an asynchronous
-     * read.
-     * 
-     * @see Options#FULLY_BUFFERED_READ_THRESHOLD
-     */
-    final public int fullyBufferedReadThreshold;
-    
-    /**
-     * When <code>true</code>, rule sets will be forced to execute
-     * sequentially even when they are not flagged as a sequential program.
-     * 
-     * @see Options#FORCE_SERIAL_EXECUTION
-     */
-    final private boolean forceSerialExecution;
-
-    /**
-     * The maximum #of subqueries for the first join dimension that will be
-     * issued in parallel. Use ZERO(0) to avoid submitting tasks to the
-     * {@link ExecutorService} entirely and ONE (1) to submit a single task at a
-     * time to the {@link ExecutorService}.
-     * 
-     * @see Options#MAX_PARALLEL_SUBQUERIES
-     */
-    final private int maxParallelSubqueries;
-
-    /**
-     * When <code>true</code> the {@link NestedSubqueryWithJoinThreadsTask} is
-     * applied. Otherwise the {@link JoinMasterTask} is applied.
-     * 
-     * @see Options#NESTED_SUBQUERY
-     */
-    final private boolean nestedSubquery;
     
     /**
      * The {@link Axioms} class.
@@ -476,9 +398,9 @@ abstract public class AbstractTripleStore extends
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static interface Options extends InferenceEngine.Options,
-            com.bigdata.journal.Options, KeyBuilder.Options,
-            DataLoader.Options, FullTextIndex.Options {
+    public static interface Options extends AbstractResource.Options,
+            InferenceEngine.Options, com.bigdata.journal.Options,
+            KeyBuilder.Options, DataLoader.Options, FullTextIndex.Options {
 
         /**
          * Boolean option (default <code>true</code>) enables support for the
@@ -489,7 +411,7 @@ abstract public class AbstractTripleStore extends
          * 
          * @see LexiconRelation
          */
-        String LEXICON = "lexicon";
+        String LEXICON = AbstractTripleStore.class.getName() + ".lexicon";
 
         String DEFAULT_LEXICON = "true";
 
@@ -513,7 +435,7 @@ abstract public class AbstractTripleStore extends
          * writing the forward lexicon index (and it will also take up less
          * space).
          */
-        String STORE_BLANK_NODES = "storeBlankNodes";
+        String STORE_BLANK_NODES = AbstractTripleStore.class.getName() + ".storeBlankNodes";
         
         String DEFAULT_STORE_BLANK_NODES = "false";
 
@@ -522,7 +444,7 @@ abstract public class AbstractTripleStore extends
          * full text index that may be used to lookup literals by tokens found
          * in the text of those literals.
          */
-        String TEXT_INDEX = "textIndex";
+        String TEXT_INDEX = AbstractTripleStore.class.getName() + ".textIndex";
 
         String DEFAULT_TEXT_INDEX = "true";
         
@@ -538,7 +460,7 @@ abstract public class AbstractTripleStore extends
          * stored in the global row store under the
          * {@link TripleStoreSchema#VOCABULARY} property.
          */
-        String VOCABULARY_CLASS = "vocabularyClass";
+        String VOCABULARY_CLASS = AbstractTripleStore.class.getName() + ".vocabularyClass";
 
         String DEFAULT_VOCABULARY_CLASS = RDFSVocabulary.class.getName();
         
@@ -550,7 +472,7 @@ abstract public class AbstractTripleStore extends
          * {@link BaseAxioms}. This option is ignored if the lexicon is
          * disabled.
          */
-        String AXIOMS_CLASS = "axiomsClass";
+        String AXIOMS_CLASS = AbstractTripleStore.class.getName() + ".axiomsClass";
         
         String DEFAULT_AXIOMS_CLASS = OwlAxioms.class.getName();
 
@@ -582,7 +504,7 @@ abstract public class AbstractTripleStore extends
          * at query time. Both {@link FastClosure} and {@link FullClosure} are
          * aware of this and handle it correctly (e.g., as configured).
          */
-        String CLOSURE_CLASS = "closureClass";
+        String CLOSURE_CLASS = AbstractTripleStore.class.getName() + ".closureClass";
         
         String DEFAULT_CLOSURE_CLASS = FastClosure.class.getName();
 
@@ -602,13 +524,27 @@ abstract public class AbstractTripleStore extends
          * use the {@link #BLOOM_FILTER}. Otherwise it may be turned off to
          * realize some (minimal) performance gain.
          */
-        String ONE_ACCESS_PATH = "oneAccessPath";
+        String ONE_ACCESS_PATH = AbstractTripleStore.class.getName() + ".oneAccessPath";
 
         String DEFAULT_ONE_ACCESS_PATH = "false";
 
         /**
          * Optional property controls whether or not a bloom filter is
-         * maintained for the SPO {@link IAccessPath}.
+         * maintained for the SPO statement index. The bloom filter is effective
+         * up to ~ 2M entries per index (partition). For scale-up, the bloom
+         * filter is automatically disabled after its error rate would be too
+         * large given the #of index enties. For scale-out, as the index grows
+         * we keep splitting it into more and more index partitions, and those
+         * index partitions are comprised of both views of one or more
+         * {@link AbstractBTree}s. While the mutable {@link BTree}s might
+         * occasionally grow to large to support a bloom filter, data is
+         * periodically migrated onto immutable {@link IndexSegment}s which
+         * have perfect fit bloom filters. This means that the bloom filter
+         * scales-out, but not up.
+         * <p>
+         * Note: The SPO access path is used any time we have an access path
+         * that corresponds to a point test. Therefore this is the only index
+         * for which it makes sense to maintain a bloom filter.
          * 
          * @see IndexMetadata#getBloomFilterFactory()
          * 
@@ -617,44 +553,44 @@ abstract public class AbstractTripleStore extends
          *       filters for things that use a lot of temporary stores such as
          *       truth maintenance.
          */
-        String BLOOM_FILTER = "BloomFilter";
+        String BLOOM_FILTER = AbstractTripleStore.class.getName() + ".bloomFilter";
         
         String DEFAULT_BLOOM_FILTER = "false";
         
-        /**
-         * Optional property gives the {@link UUID} of the {@link IDataService}
-         * on which the indices for the {@link LexiconRelation} will be
-         * registered. This property only used for {@link IBigdataFederation}s
-         * and only when {@link IBigdataFederation#isScaleOut()} is
-         * <code>true</code> (it is ignored for temporary stores created when
-         * the deployment is scale-out since the temporary stores use a
-         * different index manager).
-         * <p>
-         * Note: You can lock the {@link LexiconRelation} onto a specific
-         * {@link IDataService} using this option if you also disable
-         * {@link OverflowManager.Options#MAXIMUM_MOVES_PER_TARGET} or disable
-         * {@link OverflowManager.Options#OVERFLOW_ENABLED} for the specified
-         * {@link IDataService}.
-         * 
-         * @see FullTextIndex.Options#DATA_SERVICE_UUID
-         */
-        String LEXICON_RELATION_DATA_SERVICE_UUID = "LexiconRelation.dataServiceUUID";
-
-        /**
-         * Optional property gives the {@link UUID} of the {@link IDataService}
-         * on which the indices for the {@link SPORelation} will be registered.
-         * This property only used for {@link IBigdataFederation}s and only
-         * when {@link IBigdataFederation#isScaleOut()} is <code>true</code>
-         * (it is ignored for temporary stores created when the deployment is
-         * scale-out since the temporary stores use a different index manager).
-         * <p>
-         * Note: You can lock the {@link SPORelation} onto a specific
-         * {@link IDataService} using this option if you also disable
-         * {@link OverflowManager.Options#MAXIMUM_MOVES_PER_TARGET} or disable
-         * {@link OverflowManager.Options#OVERFLOW_ENABLED} for the specified
-         * {@link IDataService}.
-         */
-        String SPO_RELATION_DATA_SERVICE_UUID = "SPORelation.dataServiceUUID";
+//        /**
+//         * Optional property gives the {@link UUID} of the {@link IDataService}
+//         * on which the indices for the {@link LexiconRelation} will be
+//         * registered. This property only used for {@link IBigdataFederation}s
+//         * and only when {@link IBigdataFederation#isScaleOut()} is
+//         * <code>true</code> (it is ignored for temporary stores created when
+//         * the deployment is scale-out since the temporary stores use a
+//         * different index manager).
+//         * <p>
+//         * Note: You can lock the {@link LexiconRelation} onto a specific
+//         * {@link IDataService} using this option if you also disable
+//         * {@link OverflowManager.Options#MAXIMUM_MOVES_PER_TARGET} or disable
+//         * {@link OverflowManager.Options#OVERFLOW_ENABLED} for the specified
+//         * {@link IDataService}.
+//         * 
+//         * @see FullTextIndex.Options#DATA_SERVICE_UUID
+//         */
+//        String LEXICON_RELATION_DATA_SERVICE_UUID = "LexiconRelation.dataServiceUUID";
+//
+//        /**
+//         * Optional property gives the {@link UUID} of the {@link IDataService}
+//         * on which the indices for the {@link SPORelation} will be registered.
+//         * This property only used for {@link IBigdataFederation}s and only
+//         * when {@link IBigdataFederation#isScaleOut()} is <code>true</code>
+//         * (it is ignored for temporary stores created when the deployment is
+//         * scale-out since the temporary stores use a different index manager).
+//         * <p>
+//         * Note: You can lock the {@link SPORelation} onto a specific
+//         * {@link IDataService} using this option if you also disable
+//         * {@link OverflowManager.Options#MAXIMUM_MOVES_PER_TARGET} or disable
+//         * {@link OverflowManager.Options#OVERFLOW_ENABLED} for the specified
+//         * {@link IDataService}.
+//         */
+//        String SPO_RELATION_DATA_SERVICE_UUID = "SPORelation.dataServiceUUID";
         
         /**
          * When <code>true</code> (default {@value Options#DEFAULT_JUSTIFY}),
@@ -670,7 +606,7 @@ abstract public class AbstractTripleStore extends
          * justifications are maintained in a distinct index and are only used
          * when retracting assertions.
          */
-        String JUSTIFY = "justify";
+        String JUSTIFY = AbstractTripleStore.class.getName() + ".justify";
 
         String DEFAULT_JUSTIFY = "true";
         
@@ -765,181 +701,10 @@ abstract public class AbstractTripleStore extends
          *       The quadStore mode is a plain quad store using 6 statement
          *       indices (not implemented yet).
          */
-        String STATEMENT_IDENTIFIERS = "statementIdentifiers";
+        String STATEMENT_IDENTIFIERS = AbstractTripleStore.class.getName()
+                + ".statementIdentifiers";
 
         String DEFAULT_STATEMENT_IDENTIFIERS = "true";
-        
-        /**
-         * <p>
-         * Set the maximum #of chunks from concurrent producers that can be
-         * buffered before an {@link IBuffer} containing chunks of
-         * {@link ISolution}s would block (default
-         * {@link #DEFAULT_CHUNK_OF_CHUNKS_CAPACITY}). This is used to
-         * provision a {@link BlockingQueue} for {@link BlockingBuffer}. A
-         * value of ZERO(0) indicates that a {@link SynchronousQueue} should be
-         * used instead. The best value may be more than the #of concurrent
-         * producers if the producers are generating small chunks, e.g., because
-         * there are few solutions for a join subquery.
-         * </p>
-         */
-        String CHUNK_OF_CHUNKS_CAPACITY = "chunkOfChunksCapacity";
-
-        /**
-         * Default for {@link #CHUNK_OF_CHUNKS_CAPACITY} 
-         */
-        String DEFAULT_CHUNK_OF_CHUNKS_CAPACITY = "1000";
-
-        /**
-         * <p>
-         * Sets the capacity of the {@link UnsynchronizedArrayBuffer}s used to
-         * accumulate a chunk of {@link ISolution}s when evaluating rules, etc
-         * (default {@value #CHUNK_CAPACITY}). These buffers make it possible
-         * to perform efficient ordered writes using the batch API.
-         * </p>
-         * <p>
-         * Some results for comparison on a 45k triple data set:
-         * </p>
-         * 
-         * <pre>
-         *  1k    - Computed closure in 4469ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=17966
-         *  10k   - Computed closure in 3250ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=24704
-         *  50k   - Computed closure in 3187ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=25193
-         *  100k  - Computed closure in 3359ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=23903
-         *  1000k - Computed closure in 3954ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=20306
-         * </pre>
-         * 
-         * <p>
-         * Note that the actual performance will depend on the sustained
-         * behavior of the JVM, including online performance tuning, parallism
-         * in the implementation, and the characteristics of the specific
-         * ontology, especially how it influences the #of entailments generated
-         * by each rule.
-         * </p>
-         * 
-         * @todo update the data above since the architecuture has changed more
-         *       than a little.
-         */
-        String CHUNK_CAPACITY = "chunkCapacity";
-
-        /**
-         * Default for {@link #CHUNK_CAPACITY} 
-         */
-        String DEFAULT_CHUNK_CAPACITY = ""+20*Bytes.kilobyte32;
-
-        /**
-         * The timeout in milliseconds that the {@link BlockingBuffer} will wait
-         * for another chunk to combine with the current chunk before returning
-         * the current chunk (default {@link #DEFAULT_CHUNK_TIMEOUT}). This may
-         * be ZERO (0) to disable the chunk combiner.
-         */
-        String CHUNK_TIMEOUT = "chunkTimeout";
-        
-        /**
-         * The default for {@link #CHUNK_TIMEOUT}.
-         */
-        String DEFAULT_CHUNK_TIMEOUT = "1000";
-        
-        /**
-         * If the estimated rangeCount for an
-         * {@link IAccessPath#iterator(int, int)} is LTE this threshold then use
-         * a fully buffered (synchronous) iterator. Otherwise use an
-         * asynchronous iterator whose internal queue capacity is specified by
-         * {@link #QUERY_BUFFER_CAPACITY}.
-         */
-        String FULLY_BUFFERED_READ_THRESHOLD = "fullyBufferedReadThreadshold";
-
-        /**
-         * Default for {@link #FULLY_BUFFERED_READ_THRESHOLD} 
-         */
-        String DEFAULT_FULLY_BUFFERED_READ_THRESHOLD = ""+20*Bytes.kilobyte32;
-
-        /**
-         * When <code>true</code> ({@value #DEFAULT_FORCE_SERIAL_EXECUTION}),
-         * rule sets will be forced to execute sequentially even when they are
-         * not flagged as a sequential program.
-         * <p>
-         * The {@link #CLOSURE_CLASS} option defaults to {@link FastClosure},
-         * which has very little possible parallelism (it is mostly a sequential
-         * program by nature). For that reason, {@link #FORCE_SERIAL_EXECUTION}
-         * defaults to <code>false</code> since the overhead of parallel
-         * execution is more likely to lower the observed performance with such
-         * limited possible parallelism. However, when using {@link FullClosure}
-         * the benefits of parallelism MAY justify its overhead.
-         * <p>
-         * The following data are for LUBM datasets.
-         * 
-         * <pre>
-         * U1  Fast Serial   : closure =  2250ms; 2765, 2499, 2530
-         * U1  Fast Parallel : closure =  2579ms; 2514, 2594
-         * U1  Full Serial   : closure = 10437ms.
-         * U1  Full Parallel : closure = 10843ms.
-         * 
-         * U10 Fast Serial   : closure = 41203ms, 39171ms (38594, 35360 when running in caller's thread rather than on the executorService).
-         * U10 Fast Parallel : closure = 30722ms. 
-         * U10 Full Serial   : closure = 108110ms.
-         * U10 Full Parallel : closure = 248550ms.
-         * </pre>
-         * 
-         * Note that the only rules in the fast closure program that have
-         * potential parallelism are {@link RuleFastClosure5} and
-         * {@link RuleFastClosure6} and these rules are not being triggered by
-         * these datasets, so there is in fact NO potential parallelism (in the
-         * data) for these datasets.
-         * <p>
-         * It is possible that a machine with more cores would perform better
-         * under the "full" closure program with parallel rule execution (these
-         * data were collected on a laptop with 2 cores) since performance tends
-         * to be CPU bound for small data sets. However, the benefit of the
-         * "fast" closure program is so large that there is little reason to
-         * consider parallel rule execution for the "full" closure program.
-         * 
-         * @todo collect new timings for this option. The LUBM performance has
-         *       basically doubled since these data were collected. Look further
-         *       into ways in which overhead might be reduced for rule
-         *       parallelism and also for when rule parallelism is not enabled.
-         * 
-         * @todo rename as parallel_rule_execution.
-         * 
-         * @todo all of the things bearing on rule execution are valid for any
-         *       {@link ILocatableResource} but they do not need to be as global
-         *       as {@link IBigdataClient.Options}. Perhaps an Options on the
-         *       {@link ILocatableResource} itself would do?
-         */
-        String FORCE_SERIAL_EXECUTION = "forceSerialExecution";
-        
-        String DEFAULT_FORCE_SERIAL_EXECUTION = "true";
-
-        /**
-         * The maximum #of subqueries for the first join dimension that will be
-         * issued in parallel. Use ZERO(0) to avoid submitting tasks to the
-         * {@link ExecutorService} entirely and ONE (1) to submit a single task
-         * at a time to the {@link ExecutorService}.
-         */
-        String MAX_PARALLEL_SUBQUERIES = "maxParallelSubqueries";
-        
-        String DEFAULT_MAX_PARALLEL_SUBQUERIES = "5";
-
-        /**
-         * Boolean option controls the JOIN evaluation strategy. Normally joins
-         * are evaluated using the {@link NestedSubqueryWithJoinThreadsTask}.
-         * When <code>false</code> the experimental {@link JoinMasterTask} is
-         * used instead.
-         * 
-         * @todo should identify the strategy by type safe enum or class name.
-         */
-        String NESTED_SUBQUERY = "nestedSubquery";
-        String DEFAULT_NESTED_SUBQUERY = "true";
-//        /** 
-//         * @todo option to specify the class that will serve as the
-//         *       {@link IRuleTaskFactory} - basically, this is how you choose
-//         *       the join strategy. however, {@link DefaultRuleTaskFactory}
-//         *       needs to be refactored in order to make this choice by
-//         *       {@link Class} rather than by the object's state.  Also note
-//         *       that the pipeline join may be better off with maxParallel=0.
-//         */
-//        String RULE_TASK_FACTORY_CLASS = "ruleTaskFactoryClass";
-//
-//        String DEFAULT_RULE_TASK_FACTORY_CLASS = DefaultRuleTaskFactory.class.getName();
         
     }
 
@@ -960,43 +725,23 @@ abstract public class AbstractTripleStore extends
          * corresponding statements is retracted.
          */
 
-        this.justify = Boolean.parseBoolean(properties.getProperty(
-                Options.JUSTIFY, Options.DEFAULT_JUSTIFY));
+        this.justify = Boolean.parseBoolean(getProperty(Options.JUSTIFY,
+                Options.DEFAULT_JUSTIFY));
 
-        if (INFO)
-            log.info(Options.JUSTIFY + "=" + justify);
+        this.lexicon = Boolean.parseBoolean(getProperty(Options.LEXICON,
+                Options.DEFAULT_LEXICON));
 
-        this.lexicon = Boolean.parseBoolean(properties.getProperty(
-                Options.LEXICON, Options.DEFAULT_LEXICON));
-
-        if (INFO)
-            log.info(Options.LEXICON + "=" + lexicon);
-
-        this.oneAccessPath = Boolean.parseBoolean(properties.getProperty(
-                Options.ONE_ACCESS_PATH, Options.DEFAULT_ONE_ACCESS_PATH));
-
-        if (INFO)
-            log.info(Options.ONE_ACCESS_PATH + "=" + oneAccessPath);
-
-        this.statementIdentifiers = Boolean.parseBoolean(properties
-                .getProperty(Options.STATEMENT_IDENTIFIERS,
-                        Options.DEFAULT_STATEMENT_IDENTIFIERS));
-
-        if (INFO)
-            log.info(Options.STATEMENT_IDENTIFIERS + "="
-                            + statementIdentifiers);
+        this.statementIdentifiers = Boolean.parseBoolean(getProperty(
+                Options.STATEMENT_IDENTIFIERS,
+                Options.DEFAULT_STATEMENT_IDENTIFIERS));
 
         if (lexicon) {
 
             // vocabularyClass
             {
 
-                final String className = properties.getProperty(
-                        Options.VOCABULARY_CLASS,
+                final String className = getProperty(Options.VOCABULARY_CLASS,
                         Options.DEFAULT_VOCABULARY_CLASS);
-
-                if (INFO)
-                    log.info(Options.VOCABULARY_CLASS + "=" + className);
 
                 final Class cls;
                 try {
@@ -1012,23 +757,20 @@ abstract public class AbstractTripleStore extends
                             + BaseVocabulary.class.getName());
                 }
                 vocabularyClass = cls;
-                
+
             }
-            
+
             // axiomsClass
             {
-                
+
                 /*
                  * Note: axioms may not be defined unless the lexicon is enabled
                  * since the axioms require the lexicon in order to resolve
                  * their expression as Statements into their expression as SPOs.
                  */
 
-                final String className = properties.getProperty(
-                        Options.AXIOMS_CLASS, Options.DEFAULT_AXIOMS_CLASS);
-
-                if (INFO)
-                    log.info(Options.AXIOMS_CLASS + "=" + className);
+                final String className = getProperty(Options.AXIOMS_CLASS,
+                        Options.DEFAULT_AXIOMS_CLASS);
 
                 final Class cls;
                 try {
@@ -1043,33 +785,29 @@ abstract public class AbstractTripleStore extends
                             + ": Must extend: " + BaseAxioms.class.getName());
                 }
                 axiomClass = cls;
-            
-            }    
-            
+
+            }
+
         } else {
-            
+
             /*
              * no axioms if no lexicon (the lexicon is required to write the
              * axioms).
              */
-            
+
             axiomClass = NoAxioms.class;
-            
+
             vocabularyClass = NoVocabulary.class;
-            
+
         }
-        
+
         // closureClass
         {
 
-            final String className = properties.getProperty(
-                    Options.CLOSURE_CLASS,
+            final String className = getProperty(Options.CLOSURE_CLASS,
                     Options.DEFAULT_CLOSURE_CLASS);
 
-            if (INFO)
-                log.info(Options.CLOSURE_CLASS + "=" + className);
-
-            final Class cls;
+           final Class cls;
             try {
                 cls = Class.forName(className);
             } catch (ClassNotFoundException e) {
@@ -1087,112 +825,6 @@ abstract public class AbstractTripleStore extends
             
         }
         
-        {
-            
-            forceSerialExecution = Boolean.parseBoolean(properties.getProperty(
-                    Options.FORCE_SERIAL_EXECUTION,
-                    Options.DEFAULT_FORCE_SERIAL_EXECUTION));
-
-            if (INFO)
-                log.info(Options.FORCE_SERIAL_EXECUTION + "="
-                        + forceSerialExecution); 
-            
-        }
-
-        {
-            
-            maxParallelSubqueries = Integer.parseInt(properties.getProperty(
-                    Options.MAX_PARALLEL_SUBQUERIES,
-                    Options.DEFAULT_MAX_PARALLEL_SUBQUERIES));
-
-            if (maxParallelSubqueries < 0)
-                throw new IllegalArgumentException(
-                        Options.MAX_PARALLEL_SUBQUERIES
-                                + " must be non-negative.");
-            
-            if (INFO)
-                log.info(Options.MAX_PARALLEL_SUBQUERIES + "="
-                        + maxParallelSubqueries); 
-            
-        }
-
-        {
-            
-            nestedSubquery = Boolean.parseBoolean(properties.getProperty(
-                    Options.NESTED_SUBQUERY, Options.DEFAULT_NESTED_SUBQUERY));
-
-            if(INFO)
-                log.info(Options.NESTED_SUBQUERY+"="+nestedSubquery);
-            
-        }
-        
-        {
-
-            chunkOfChunksCapacity = Integer.parseInt(properties.getProperty(
-                    Options.CHUNK_OF_CHUNKS_CAPACITY,
-                    Options.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY));
-
-            if (chunkOfChunksCapacity <= 0) {
-                throw new IllegalArgumentException(
-                        Options.CHUNK_OF_CHUNKS_CAPACITY + " must be positive");
-            }
-
-            if (INFO)
-                log.info(Options.CHUNK_OF_CHUNKS_CAPACITY + "="
-                        + chunkOfChunksCapacity);
-
-        }
-
-        {
-
-            chunkCapacity = Integer.parseInt(properties.getProperty(
-                    Options.CHUNK_CAPACITY,
-                    Options.DEFAULT_CHUNK_CAPACITY));
-
-            if (chunkCapacity <= 0) {
-                throw new IllegalArgumentException(
-                        Options.CHUNK_CAPACITY + " must be positive");
-            }
-
-            if (INFO)
-                log.info(Options.CHUNK_CAPACITY + "=" + chunkCapacity);
-            
-        }
-
-        {
-
-            chunkTimeout = Long.parseLong(properties.getProperty(
-                    Options.CHUNK_TIMEOUT,
-                    Options.DEFAULT_CHUNK_TIMEOUT));
-
-            if (chunkTimeout < 0) {
-                throw new IllegalArgumentException(
-                        Options.CHUNK_TIMEOUT + " must be non-negative");
-            }
-
-            if (INFO)
-                log.info(Options.CHUNK_TIMEOUT + "=" + chunkTimeout);
-            
-        }
-
-        {
-
-            fullyBufferedReadThreshold = Integer.parseInt(properties
-                    .getProperty(Options.FULLY_BUFFERED_READ_THRESHOLD,
-                            Options.DEFAULT_FULLY_BUFFERED_READ_THRESHOLD));
-
-            if (fullyBufferedReadThreshold <= 0) {
-                throw new IllegalArgumentException(
-                        Options.FULLY_BUFFERED_READ_THRESHOLD
-                                + " must be positive");
-            }
-
-            if (INFO)
-                log.info(Options.FULLY_BUFFERED_READ_THRESHOLD + "="
-                        + fullyBufferedReadThreshold);
-            
-        }
-
         // setup namespace mapping for serialization utility methods.
         addNamespace(RDF.NAMESPACE, "rdf");
         addNamespace(RDFS.NAMESPACE, "rdfs");
@@ -1306,13 +938,13 @@ abstract public class AbstractTripleStore extends
 
         assertWritable();
         
-        final IResourceLock resourceLock = acquireExclusiveLock();
-
         final Properties tmp = getProperties();
         
         // set property that will let the contained relations locate their container.
         tmp.setProperty(RelationSchema.CONTAINER, getNamespace());
         
+        final IResourceLock resourceLock = acquireExclusiveLock();
+
         try {
 
             super.create();
@@ -3787,15 +3419,15 @@ abstract public class AbstractTripleStore extends
                 && !getAccessPath(NULL, getVocabulary().get(OWL.SAMEAS), NULL)
                         .isEmpty();
         
-        final IRuleTaskFactory defaultRuleTaskFactory = nestedSubquery ? DefaultRuleTaskFactory.SUBQUERY
+        final IRuleTaskFactory defaultRuleTaskFactory = isNestedSubquery() ? DefaultRuleTaskFactory.SUBQUERY
                 : DefaultRuleTaskFactory.PIPELINE;
         
         return new RDFJoinNexusFactory(ruleContext, action, //
                 writeTimestamp, readTimestamp, //
-                forceSerialExecution, maxParallelSubqueries, //
+                isForceSerialExecution(), getMaxParallelSubqueries(), //
                 justify, backchain, isOwlSameAsUsed,
-                chunkOfChunksCapacity, chunkCapacity, chunkTimeout,
-                fullyBufferedReadThreshold, solutionFlags,
+                getChunkOfChunksCapacity(), getChunkCapacity(), getChunkTimeout(),
+                getFullyBufferedReadThreshold(), solutionFlags,
                 filter, planFactory, defaultRuleTaskFactory);
         
     }

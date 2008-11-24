@@ -21,7 +21,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
@@ -195,11 +194,12 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * (increased activity).
      */
     private final Score[] scores;
+
     /**
      * Random access to the index {@link Score}s.
      */
-    private final Map<String,Score> scoreMap;
-    
+    private final Map<String, Score> scoreMap;
+
     /**
      * This is populated with each index partition that has been "used",
      * starting with those that were copied during synchronous overflow
@@ -210,7 +210,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * Note: The {@link TreeMap} imposes an alpha order which is useful when
      * debugging.
      */
-    private final Map<String,String> used = new TreeMap<String,String>();
+    private final Map<String, String> used = new TreeMap<String, String>();
 
     /**
      * Return <code>true</code> if the named index partition has already been
@@ -290,7 +290,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             
         }
         
-        public Score(String name,Counters counters, double totalRawScore) {
+        public Score(final String name, final Counters counters,
+                final double totalRawScore) {
             
             assert name != null;
             
@@ -310,13 +311,13 @@ public class PostProcessOldJournalTask implements Callable<Object> {
          * Places elements into order by ascending {@link #rawScore}. The
          * {@link #name} is used to break any ties.
          */
-        public int compareTo(Score arg0) {
+        public int compareTo(final Score arg0) {
             
             if(rawScore < arg0.rawScore) {
                 
                 return -1;
                 
-            } else if(rawScore> arg0.rawScore ) {
+            } else if (rawScore > arg0.rawScore) {
                 
                 return 1;
                 
@@ -357,7 +358,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * @return The index {@link Score} -or- <code>null</code> iff the index
      *         was not touched for read-committed or unisolated operations.
      */
-    public Score getScore(String name) {
+    public Score getScore(final String name) {
         
         Score score = scoreMap.get(name);
         
@@ -538,10 +539,11 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     .getJournal(lastCommitTime);
             
             // the name2addr view as of that commit time.
-            final ITupleIterator itr = oldJournal.getName2Addr(lastCommitTime).rangeIterator(
-                    null, null);
+            final ITupleIterator itr = oldJournal.getName2Addr(lastCommitTime)
+                    .rangeIterator(null, null);
 
-            assert used.isEmpty() : "There are "+used.size()+" used index partitions";
+            assert used.isEmpty() : "There are " + used.size()
+                    + " used index partitions";
             
             while (itr.hasNext()) {
 
@@ -726,9 +728,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 
                 while (titr.hasNext()) {
 
-                    ITuple tuple = titr.next();
+                    final ITuple tuple = titr.next();
 
-                    LocalPartitionMetadata pmd = (LocalPartitionMetadata) SerializerUtil
+                    final LocalPartitionMetadata pmd = (LocalPartitionMetadata) SerializerUtil
                             .deserialize(tuple.getValue());
 
                     underUtilizedPartitions[i] = pmd;
@@ -801,7 +803,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     final PartitionLocator rightSiblingLocator = (PartitionLocator) SerializerUtil
                             .deserialize(resultBuffer.getResult(i));
 
-                    final UUID targetDataServiceUUID = rightSiblingLocator.getDataServices()[0];
+                    final UUID targetDataServiceUUID = rightSiblingLocator.getDataServiceUUID();
 
                     final String[] resources = new String[2];
 
@@ -1251,7 +1253,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * 
      * FIXME add partial build whose source is just the checkpoint record
      * corresponding to the lastCommitTime of the BTree on the old journal. This
-     * can be much faster to build that a full view since the latter includes
+     * can be much faster to build than a full view since the latter includes
      * all data in the index (partition). The index segment should be modified
      * to flag full vs partial builds and also to indicate the source for the
      * build (the view definition) in order to facilitate re-builds of scale-out

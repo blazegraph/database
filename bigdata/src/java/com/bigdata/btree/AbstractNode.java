@@ -36,6 +36,7 @@ import java.util.Iterator;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.IndexMetadata.Options;
 import com.bigdata.btree.filter.EmptyTupleIterator;
 import com.bigdata.cache.HardReferenceQueue;
 
@@ -300,7 +301,7 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
 
         assert btree != null;
 
-        assert branchingFactor>=BTree.MIN_BRANCHING_FACTOR;
+        assert branchingFactor>=Options.MIN_BRANCHING_FACTOR;
         
         this.btree = btree;
 

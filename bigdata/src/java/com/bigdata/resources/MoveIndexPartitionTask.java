@@ -89,8 +89,8 @@ import com.bigdata.service.RawDataServiceTupleIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
-
+public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResult> {
+    
     private final long lastCommitTime;
     private final UUID targetDataServiceUUID;
 
@@ -124,8 +124,12 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
                 
     }
 
+    /**
+     * FIXME Improve error handling for this task. See the build and split tasks
+     * for examples.
+     */
     @Override
-    protected Object doTask() throws Exception {
+    protected MoveResult doTask() throws Exception {
 
         if (resourceManager.isOverflowAllowed())
             throw new IllegalStateException();
@@ -145,16 +149,6 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
 
         // the partition metadata for the source index partition.
         final LocalPartitionMetadata oldpmd = newMetadata.getPartitionMetadata();
-
-//        newMetadata.setPartitionMetadata(oldpmd.move(//
-//                newPartitionId,
-//                /*
-//                 * Note: This is [null] to indicate that the resource metadata
-//                 * needs to be filled in by the target data service when the
-//                 * new index partition is registered.
-//                 */
-//                null
-//                ));
 
         newMetadata.setPartitionMetadata(new LocalPartitionMetadata(//
                 newPartitionId,//
@@ -214,7 +208,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
         final MoveResult result = new MoveResult(sourceIndexName, src
                 .getIndexMetadata(), targetDataServiceUUID, newPartitionId);
         
-        final AbstractTask task = new AtomicUpdateMoveIndexPartitionTask(
+        final AbstractTask<Long> task = new AtomicUpdateMoveIndexPartitionTask(
                 resourceManager, result.name, result);
 
         // submit atomic update and await completion @todo config timeout.
@@ -225,52 +219,14 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
     }
 
     /**
-     * The object returned by {@link MoveIndexPartitionTask}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class MoveResult extends AbstractResult {
-
-        final UUID targetDataServiceUUID;
-        final int newPartitionId;
-        
-        /**
-         * @param name 
-         * @param indexMetadata
-         * @param targetDataServiceUUID
-         * @param newPartitionId
-         */
-        public MoveResult(String name, IndexMetadata indexMetadata,
-                UUID targetDataServiceUUID, int newPartitionId) {
-            
-            super(name, indexMetadata);
-
-            this.targetDataServiceUUID = targetDataServiceUUID;
-            
-            this.newPartitionId = newPartitionId;
-            
-        }
-        
-        public String toString() {
-            
-            return "MoveResult{name=" + name + ", newPartitionId="
-                    + newPartitionId + ", targetDataService="
-                    + targetDataServiceUUID + "}";
-            
-        }
-
-
-    }
-
-    /**
      * Procedure copies data from the old index partition to the new index
      * partition.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class CopyIndexPartitionProcedure implements IDataServiceAwareProcedure, IIndexProcedure {
+    public static class CopyIndexPartitionProcedure implements
+            IDataServiceAwareProcedure, IIndexProcedure {
 
         /**
          * 
@@ -481,7 +437,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static public class AtomicUpdateMoveIndexPartitionTask extends AbstractResourceManagerTask {
+    static public class AtomicUpdateMoveIndexPartitionTask extends AbstractResourceManagerTask<Long> {
 
         final private MoveResult moveResult;
 
@@ -508,7 +464,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
          * @return The #of tuples copied.
          */
         @Override
-        protected Object doTask() throws Exception {
+        protected Long doTask() throws Exception {
 
             if (resourceManager.isOverflowAllowed())
                 throw new IllegalStateException();
@@ -591,14 +547,14 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
             
             final PartitionLocator oldLocator = new PartitionLocator(
                     pmd.getPartitionId(),//
-                    resourceManager.getDataServiceUUIDs(),//
+                    resourceManager.getDataServiceUUID(),//
                     pmd.getLeftSeparatorKey(),//
                     pmd.getRightSeparatorKey()//
                     );
             
             final PartitionLocator newLocator = new PartitionLocator(
                     moveResult.newPartitionId,//
-                    new UUID[]{moveResult.targetDataServiceUUID},//
+                    moveResult.targetDataServiceUUID,//
                     pmd.getLeftSeparatorKey(),//
                     pmd.getRightSeparatorKey()//
                     );

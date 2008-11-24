@@ -29,8 +29,10 @@
 package com.bigdata.relation;
 
 import java.util.Properties;
+import java.util.UUID;
 
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
@@ -162,6 +164,23 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
         }
 
         return ndx;
+
+    }
+
+    /**
+     * Factory for {@link IndexMetadata}.
+     * 
+     * @param name
+     *            The fully qualified index name.
+     * 
+     * @return A new {@link IndexMetadata} object for that index.
+     */
+    protected IndexMetadata newIndexMetadata(final String name) {
+
+        final IndexMetadata metadata = new IndexMetadata(getIndexManager(),
+                getProperties(), name, UUID.randomUUID());
+
+        return metadata;
 
     }
 

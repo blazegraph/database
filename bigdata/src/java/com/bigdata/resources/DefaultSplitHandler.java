@@ -9,13 +9,13 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bfs.BigdataFileSystem;
-import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.IndexMetadata.Options;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
@@ -222,7 +222,7 @@ public class DefaultSplitHandler implements ISplitHandler {
 
     public void setEntryCountPerSplit(int entryCountPerSplit) {
 
-        if (entryCountPerSplit <= BTree.MIN_BRANCHING_FACTOR) {
+        if (entryCountPerSplit <= Options.MIN_BRANCHING_FACTOR) {
 
             throw new IllegalArgumentException();
 

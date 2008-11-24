@@ -27,7 +27,6 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
-import java.util.Arrays;
 import java.util.UUID;
 
 import org.CognitiveWeb.extser.LongPacker;
@@ -74,10 +73,10 @@ public class PartitionLocator implements IPartitionMetadata, Externalizable {
     private int partitionId;
 
     /**
-     * The ordered list of data services on which data for this partition will
-     * be written and from which data for this partition may be read.
+     * The UUID of the (logical) data service on which the index partition
+     * resides.
      */
-    private UUID[] dataServices;
+    private UUID dataServiceUUID;
     
     private byte[] leftSeparatorKey;
     private byte[] rightSeparatorKey;
@@ -94,7 +93,7 @@ public class PartitionLocator implements IPartitionMetadata, Externalizable {
      * @param partitionId
      *            The unique partition identifier assigned by the
      *            {@link MetadataIndex}.
-     * @param dataServices
+     * @param logicalDataServiceUUID
      *            The ordered array of data service identifiers on which data
      *            for this partition will be written and from which data for
      *            this partition may be read.
@@ -110,24 +109,21 @@ public class PartitionLocator implements IPartitionMetadata, Externalizable {
      *            not have a right sibling (a <code>null</code> has the
      *            semantics of having no upper bound).
      */
-    public PartitionLocator(int partitionId, UUID[] dataServices,
-            byte[] leftSeparatorKey, byte[] rightSeparatorKey) {
+    public PartitionLocator(final int partitionId, final UUID logicalDataServiceUUID,
+            final byte[] leftSeparatorKey, final byte[] rightSeparatorKey) {
 
-        if (dataServices == null)
+        if (logicalDataServiceUUID == null)
             throw new IllegalArgumentException();
 
-        if (dataServices.length == 0)
-            throw new IllegalArgumentException("No data services?");
-
         if (leftSeparatorKey == null)
-            throw new IllegalArgumentException("leftSeparatorKey");
+            throw new IllegalArgumentException();
         
         // Note: rightSeparatorKey MAY be null.
         
-        if(rightSeparatorKey!=null) {
-            
-            if(BytesUtil.compareBytes(leftSeparatorKey, rightSeparatorKey)>=0) {
-                
+        if (rightSeparatorKey != null) {
+
+            if (BytesUtil.compareBytes(leftSeparatorKey, rightSeparatorKey) >= 0) {
+
                 throw new IllegalArgumentException(
                         "Separator keys are out of order: left="
                                 + BytesUtil.toString(leftSeparatorKey)
@@ -140,7 +136,7 @@ public class PartitionLocator implements IPartitionMetadata, Externalizable {
      
         this.partitionId = partitionId;
         
-        this.dataServices = dataServices;
+        this.dataServiceUUID = logicalDataServiceUUID;
 
         this.leftSeparatorKey = leftSeparatorKey;
         
@@ -155,51 +151,61 @@ public class PartitionLocator implements IPartitionMetadata, Externalizable {
     }
 
     /**
-     * The ordered list of data services on which the data for this partition
-     * will be written and from which the data for this partition may be read.
-     * The first data service is always the primary. Writes SHOULD be pipelined
-     * from the primary to the secondaries in the same order as they appear in
-     * this array.
-     * 
-     * @todo There is redundency in the partition locators as stored today in
-     *       the metadata index. Instead of storing an array of data service
-     *       UUIDs per index partition, there should be a UUID that identifies a
-     *       logical data service. For each logical data service there are one
-     *       or more physical data service instances. The first instance is the
-     *       primary physical data service, or just the primary data service.
-     *       The remaining instances are failover data services. You can read
-     *       from a failover data service, but you can only write on the primary
-     *       data service.
-     *       <p>
-     *       When a physical data service fails the replication manager drops it
-     *       from the set of failover services and begins an asynchronous
-     *       process to bring the replication count for that logical data
-     *       service up to the target value.
-     *       <p>
-     *       The clients should get physical data service UUIDs from the
-     *       replication manager, not this method. This method should be
-     *       replaced by <code>getLogicalDataServiceUUID()</code>. Clients
-     *       should discover the replication manager and use it to translate a
-     *       logical data service UUID into one or more phsyical data service
-     *       proxies.
-     *       <p>
-     * @todo The replication manager should hold replication state for
-     *       key-ranges of scale-out indices. A new scale-out index will be
-     *       provisioned with a single key-range on the replication manager and
-     *       a (configured) default replication factor.
-     *       <p>
-     * @todo Data services should be placed into groups for management purposes.
-     *       There should be a distinct group for the metadata services since
-     *       their data should not be co-mingled with the regular data services.
-     *       <p>
-     * 
-     * @return An array of the data service identifiers.
+     * The UUID of the (logical) data service on which the index partition
+     * resides.
      */
-    final public UUID[] getDataServices() {
+    public UUID getDataServiceUUID() {
         
-        return dataServices;
+        return dataServiceUUID;
         
     }
+    
+//    /**
+//     * The ordered list of data services on which the data for this partition
+//     * will be written and from which the data for this partition may be read.
+//     * The first data service is always the primary. Writes SHOULD be pipelined
+//     * from the primary to the secondaries in the same order as they appear in
+//     * this array.
+//     * 
+//     * @todo There is redundency in the partition locators as stored today in
+//     *       the metadata index. Instead of storing an array of data service
+//     *       UUIDs per index partition, there should be a UUID that identifies a
+//     *       logical data service. For each logical data service there are one
+//     *       or more physical data service instances. The first instance is the
+//     *       primary physical data service, or just the primary data service.
+//     *       The remaining instances are failover data services. You can read
+//     *       from a failover data service, but you can only write on the primary
+//     *       data service.
+//     *       <p>
+//     *       When a physical data service fails the replication manager drops it
+//     *       from the set of failover services and begins an asynchronous
+//     *       process to bring the replication count for that logical data
+//     *       service up to the target value.
+//     *       <p>
+//     *       The clients should get physical data service UUIDs from the
+//     *       replication manager, not this method. This method should be
+//     *       replaced by <code>getLogicalDataServiceUUID()</code>. Clients
+//     *       should discover the replication manager and use it to translate a
+//     *       logical data service UUID into one or more phsyical data service
+//     *       proxies.
+//     *       <p>
+//     * @todo The replication manager should hold replication state for
+//     *       key-ranges of scale-out indices. A new scale-out index will be
+//     *       provisioned with a single key-range on the replication manager and
+//     *       a (configured) default replication factor.
+//     *       <p>
+//     * @todo Data services should be placed into groups for management purposes.
+//     *       There should be a distinct group for the metadata services since
+//     *       their data should not be co-mingled with the regular data services.
+//     *       <p>
+//     * 
+//     * @return An array of the data service identifiers.
+//     */
+//    final public UUID[] getDataServices() {
+//        
+//        return dataServices;
+//        
+//    }
     
     final public byte[] getLeftSeparatorKey() {
 
@@ -231,22 +237,15 @@ public class PartitionLocator implements IPartitionMetadata, Externalizable {
         if (partitionId != o2.partitionId)
             return false;
 
-        if (dataServices.length != o2.dataServices.length)
+        if (!dataServiceUUID.equals(o2.dataServiceUUID))
             return false;
-
-        for (int i = 0; i < dataServices.length; i++) {
-
-            if (!dataServices[i].equals(o2.dataServices[i]))
-                return false;
-
-        }
 
         if (!BytesUtil.bytesEqual(leftSeparatorKey, o2.leftSeparatorKey))
             return false;
 
         if (rightSeparatorKey == null && o2.rightSeparatorKey != null)
             return false;
-        
+
         if (!BytesUtil.bytesEqual(rightSeparatorKey, o2.rightSeparatorKey))
             return false;
         
@@ -258,7 +257,7 @@ public class PartitionLocator implements IPartitionMetadata, Externalizable {
 
         return 
             "{ partitionId="+partitionId+
-            ", dataServices="+Arrays.toString(dataServices)+
+            ", dataServiceUUID="+dataServiceUUID+
             ", leftSeparator="+BytesUtil.toString(leftSeparatorKey)+
             ", rightSeparator="+(rightSeparatorKey==null?null:BytesUtil.toString(rightSeparatorKey))+
             "}"
@@ -272,7 +271,7 @@ public class PartitionLocator implements IPartitionMetadata, Externalizable {
         
         final short version = ShortPacker.unpackShort(in);
         
-        if(version!=VERSION0) {
+        if (version != VERSION0) {
             
             throw new IOException("Unknown version: "+version);
             
@@ -280,15 +279,7 @@ public class PartitionLocator implements IPartitionMetadata, Externalizable {
 
         partitionId = (int)LongPacker.unpackLong(in);
         
-        final int nservices = ShortPacker.unpackShort(in);
-                
-        dataServices = new UUID[nservices];
-        
-        for (int j = 0; j < nservices; j++) {
-
-            dataServices[j] = new UUID(in.readLong()/*MSB*/,in.readLong()/*LSB*/);
-            
-        }
+        dataServiceUUID = new UUID(in.readLong()/*MSB*/,in.readLong()/*LSB*/);
         
         final int leftLen = (int) LongPacker.unpackLong(in);
 
@@ -316,24 +307,12 @@ public class PartitionLocator implements IPartitionMetadata, Externalizable {
 
         ShortPacker.packShort(out, VERSION0);
         
-        final int nservices = dataServices.length;
-        
-        assert nservices < Short.MAX_VALUE;
-
         LongPacker.packLong(out, partitionId);
-        
-        ShortPacker.packShort(out,(short)nservices);
 
-        for( int j=0; j<nservices; j++) {
-            
-            final UUID serviceUUID = dataServices[j];
-            
-            out.writeLong(serviceUUID.getMostSignificantBits());
-            
-            out.writeLong(serviceUUID.getLeastSignificantBits());
-            
-        }
+        out.writeLong(dataServiceUUID.getMostSignificantBits());
         
+        out.writeLong(dataServiceUUID.getLeastSignificantBits());
+            
         LongPacker.packLong(out, leftSeparatorKey.length);
 
         LongPacker.packLong(out, rightSeparatorKey == null ? 0

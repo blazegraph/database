@@ -1,6 +1,6 @@
-package com.bigdata.relation.locator;
+package com.bigdata.relation;
 
-import com.bigdata.relation.IRelation;
+import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.sparse.KeyType;
 import com.bigdata.sparse.Schema;
 
@@ -30,13 +30,17 @@ public class RelationSchema extends Schema {
      * The name of the property whose value is the namespace of the
      * {@link ILocatableResource} (this is the primary key).
      */
-    public static final String NAMESPACE = "namespace";
+    public static final String NAMESPACE = RelationSchema.class.getPackage()
+            .getName()
+            + ".namespace";
 
     /**
      * The name of the property whose value is the name of the {@link Class}
      * used to instantiate the {@link ILocatableResource}.
      */
-    public static final String CLASS = "class";
+    public static final String CLASS = RelationSchema.class.getPackage()
+            .getName()
+            + ".class";
 
     /**
      * The name of the property whose value is namespace of the container (if
@@ -44,7 +48,9 @@ public class RelationSchema extends Schema {
      * as its resource identifer. When defined, this value MUST be a prefix of
      * the value stored under the {@link #NAMESPACE} property.
      */
-    public static final String CONTAINER = "container";
+    public static final String CONTAINER = RelationSchema.class.getPackage()
+            .getName()
+            + ".container";
 
     /**
      * A shared instance.
@@ -58,7 +64,7 @@ public class RelationSchema extends Schema {
      */
     public RelationSchema() {
 
-        super("__relation", NAMESPACE, KeyType.Unicode);
+        super("__rel"/*RelationSchema.class.getName()*/, NAMESPACE, KeyType.Unicode);
 
     }
 

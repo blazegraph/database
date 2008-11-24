@@ -88,26 +88,33 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
 
             metadata.setVersionTimestamps(r.nextBoolean());
             
+            metadata.setWriteRetentionQueueCapacity(10000);
+
+            metadata.setWriteRetentionQueueScan(10);
+
+            metadata.setReadRetentionQueueCapacity(0);
+            
             metadata.write(store);
             
             Checkpoint checkpoint = metadata.firstCheckpoint();
             
             checkpoint.write(store);
 
-            btree = new BTree(store,checkpoint,metadata) {
-                
-                @Override
-                protected HardReferenceQueue<PO> newWriteRetentionQueue() {
-                    
-                    return new HardReferenceQueue<PO>(//
-                            new NoEvictionListener(),//
-                            10000,//
-                            10//
-                    );
-                    
-                }
-                
-            };
+            btree = new BTree(store,checkpoint,metadata);
+//            {
+//                
+//                @Override
+//                protected HardReferenceQueue<PO> newWriteRetentionQueue() {
+//                    
+//                    return new HardReferenceQueue<PO>(//
+//                            new NoEvictionListener(),//
+//                            10000,//
+//                            10//
+//                    );
+//                    
+//                }
+//                
+//            };
             
         }
 

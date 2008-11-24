@@ -39,8 +39,8 @@ import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IDatabase;
+import com.bigdata.relation.RelationSchema;
 import com.bigdata.relation.locator.DefaultResourceLocator;
-import com.bigdata.relation.locator.RelationSchema;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
@@ -446,8 +446,8 @@ public class BigdataFileSystem extends
 
                 final String name = getNamespace()+FILE_METADATA_INDEX_BASENAME;
                 
-                final IndexMetadata md = new IndexMetadata(name, UUID
-                        .randomUUID());
+                final IndexMetadata md = new IndexMetadata(indexManager, tmp,
+                        name, UUID.randomUUID());
                 
                 indexManager.registerIndex(md);
 
@@ -467,7 +467,8 @@ public class BigdataFileSystem extends
 
                 final String name = getNamespace()+FILE_DATA_INDEX_BASENAME;
                 
-                final IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
+                final IndexMetadata md = new IndexMetadata(indexManager, tmp,
+                        name, UUID.randomUUID());
 
                 /*
                  * @todo unit tests for correct copying of blobs during overflow.

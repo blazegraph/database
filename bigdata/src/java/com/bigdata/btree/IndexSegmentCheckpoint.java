@@ -66,6 +66,16 @@ public class IndexSegmentCheckpoint {
     
     protected static final boolean INFO = log.isInfoEnabled();
 
+    /**
+     * The file is empty.
+     */
+    protected static final String ERR_EMPTY = "Empty file";
+
+    /**
+     * The file is non-empty, but is too small to contain a valid root block.
+     */
+    protected static final String ERR_TOO_SMALL = "Too small for valid root block";
+    
     static final int SIZEOF_MAGIC = Bytes.SIZEOF_INT;
     static final int SIZEOF_VERSION = Bytes.SIZEOF_INT;
     static final int SIZEOF_OFFSET_BITS = Bytes.SIZEOF_INT;
@@ -301,10 +311,18 @@ public class IndexSegmentCheckpoint {
      */
     public IndexSegmentCheckpoint(RandomAccessFile raf) throws IOException {
 
+        final long len = raf.length();
+        
+        if (len == 0L) {
+
+            throw new RootBlockException(ERR_EMPTY);
+            
+        }
+        
         if (raf.length() < SIZE) {
 
-            throw new RootBlockException(
-                    "File is too small to contain a valid root block");
+            // File is non-empty, but too small to contain a valid root block.
+            throw new RootBlockException(ERR_TOO_SMALL);
             
         }
         

@@ -46,16 +46,18 @@ import com.bigdata.concurrent.LockManager.HorridTaskDeath;
  *            The type of the object that identifies a resource for the purposes
  *            of the locking system. This is typically the name of an index.
  */
-public class LockManagerTask<R extends Comparable<R>> implements
-        Callable<Object> {
+public class LockManagerTask<R extends Comparable<R>,T> implements
+        Callable<T> {
 
     protected static final Logger log = Logger.getLogger(LockManagerTask.class);
+    
+    protected static final boolean INFO = log.isInfoEnabled();
     
     private final LockManager<R> lockManager;
 
     private final R[] resource;
 
-    private final Callable<Object> target;
+    private final Callable<T> target;
     
     private int maxLockTries = 1;
 
@@ -145,7 +147,7 @@ public class LockManagerTask<R extends Comparable<R>> implements
      *            The {@link Runnable} target that will be invoked iff the locks
      *            are successfully acquired.
      */
-    public LockManagerTask(LockManager<R> lockManager, R[] resource, Callable<Object> target) {
+    public LockManagerTask(LockManager<R> lockManager, R[] resource, Callable<T> target) {
 
         if (lockManager == null)
             throw new NullPointerException();
@@ -252,7 +254,7 @@ public class LockManagerTask<R extends Comparable<R>> implements
      * @throws InterruptedException
      *             if the current thread is interrupted.
      */
-    final public Object call() throws Exception {
+    final public T call() throws Exception {
 
         final long nanoTime_beforeLock = System.nanoTime();
         
@@ -279,7 +281,8 @@ public class LockManagerTask<R extends Comparable<R>> implements
 
             acquireLocks();
 
-            log.info("Acquired locks");
+            if(INFO)
+                log.info("Acquired locks");
 
         } catch (Exception ex) {
 
@@ -311,7 +314,7 @@ public class LockManagerTask<R extends Comparable<R>> implements
          */
         try {
 
-            if(log.isInfoEnabled()) log.info(toString() + ": run - start");
+            if(INFO) log.info(toString() + ": run - start");
 
             if(Thread.interrupted()) {
                 
@@ -328,7 +331,7 @@ public class LockManagerTask<R extends Comparable<R>> implements
             lockManager.maxrunning.set(Math.max(lockManager.maxrunning.get(),
                     nrunning));
 
-            final Object ret;
+            final T ret;
             try {
 
                 ret = target.call();
@@ -340,7 +343,7 @@ public class LockManagerTask<R extends Comparable<R>> implements
 
             }
 
-            if(log.isInfoEnabled()) log.info(toString() + ": run - end");
+            if(INFO) log.info(toString() + ": run - end");
 
             lockManager.didSucceed(this);
 

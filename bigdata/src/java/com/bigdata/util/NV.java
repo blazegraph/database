@@ -40,15 +40,15 @@ public class NV implements Serializable {
     /**
      * 
      * @throws IllegalArgumentException
-     *             if either parameter is <code>null</code>.
+     *             if the <i>name</i> is <code>null</code>.
      */
-    public NV(String name, String value) {
+    public NV(final String name, final String value) {
 
         if (name == null)
             throw new IllegalArgumentException();
 
-        if (value == null)
-            throw new IllegalArgumentException();
+//        if (value == null)
+//            throw new IllegalArgumentException();
 
         this.name = name;
 

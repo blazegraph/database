@@ -260,13 +260,6 @@ public class FusedView implements IIndex, ILocalBTreeView {
         
     }
 
-    /** @deprecated. */
-    final public UUID getIndexUUID() {
-       
-        return getIndexMetadata().getIndexUUID();
-        
-    }
-
     public IndexMetadata getIndexMetadata() {
         
         return srcs[0].getIndexMetadata();

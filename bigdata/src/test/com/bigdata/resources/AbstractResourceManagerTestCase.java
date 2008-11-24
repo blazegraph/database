@@ -541,6 +541,11 @@ public class AbstractResourceManagerTestCase extends
 
             return null;
         }
+
+        public IDataService getDataServiceByName(String name) {
+            // TODO Auto-generated method stub
+            return null;
+        }
         
     }
     

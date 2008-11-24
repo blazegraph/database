@@ -54,9 +54,9 @@ public class BigdataStatementIteratorImpl
     public BigdataStatementIteratorImpl(AbstractTripleStore db, IChunkedOrderedIterator<ISPO> src) {
 
         super(db, src, new BlockingBuffer<BigdataStatement[]>(
-                db.chunkOfChunksCapacity, 
-                db.chunkCapacity,
-                db.chunkTimeout,
+                db.getChunkOfChunksCapacity(), 
+                db.getChunkCapacity(),
+                db.getChunkTimeout(),
                 TimeUnit.MILLISECONDS));
         
     }

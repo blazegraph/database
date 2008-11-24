@@ -286,15 +286,15 @@ public class TestLockManager extends TestCase implements IComparisonTest {
 
             }
 
-            final LockManagerTask<String> task;
+            final LockManagerTask<String,Object> task;
             
             if(r.nextDouble()<percentTaskDeath) {
             
-                task = new LockManagerTask<String>(db,resource,new DeathResourceTask());
+                task = new LockManagerTask<String,Object>(db,resource,new DeathResourceTask());
                 
             } else {
                 
-                task = new LockManagerTask<String>(db,resource,new Wait10ResourceTask());
+                task = new LockManagerTask<String,Object>(db,resource,new Wait10ResourceTask());
                 
             }
             

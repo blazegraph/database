@@ -35,6 +35,8 @@ import java.util.Set;
 
 import org.apache.log4j.Level;
 
+import com.bigdata.btree.IndexMetadata.Options;
+
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.Expander;
 import cutthecrap.utils.striterators.SingleValueIterator;
@@ -229,7 +231,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         super( btree, branchingFactor, false /* The node is NOT dirty */ );
 
-        assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
+        assert branchingFactor >= Options.MIN_BRANCHING_FACTOR;
         
         assert nkeys < branchingFactor;
 

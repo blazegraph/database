@@ -41,7 +41,7 @@ import com.bigdata.util.concurrent.TaskCounters;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ITask extends Callable<Object> {
+public interface ITask<T> extends Callable<T> {
 
     /**
      * The object used to manage access to the resources from which views of the

@@ -2520,28 +2520,6 @@ Benchmarks
       skew the results.
 
 ============================================================
-Configuration:
-
- - Consider changing the JiniClient properties to allow the client to
-   override index properties ala log4j, where the data service on
-   which the index will initially be registered is just one such
-   property.  Other properties include the key and value serializers
-   and compression providers, index split/join criteria, etc.
-
-   index.[namespace].property=value
-
-   so
-
-   index.kb.spo.SPO.initalDataService=DataService0
-
-   would cause the [kb.spo.SPO] index to be registered on
-   DataService0.
-
-   We should also be using log4j style reflection to identify unknown
-   property values and to set those property values (this is probably
-   beans stuff).
-
-============================================================
 
 - post-process tasks should run on the concurrency manager thread
   pools and there should be histogram reporting for that thread pool
@@ -3043,9 +3021,23 @@ x. write unit tests
 ============================================================
 Conferences and papers:
 
-**** http://www.semantic-conference.com/2009/cfptopics/, proposals due
-     Nov 24th.
+**** Semtech
+     
+     http://www.semantic-conference.com/2009/cfptopics/.
 
+     June 14-18, 2009 at the Fairmont Hotel in San Jose, California.
+
+**** VLDB
+
+     When: Aug 24, 2009 - Aug 28, 2009  
+     Where: Lyon, France  
+     Abstract Due Date: Mar 13, 2009 
+     Submission Deadline: Mar 20, 2009 
+     Notification Date: May 29, 2009 
+     Final Version Due: Jun 20, 2009 
+
+     http://www.wikicfp.com/cfp/servlet/event.showcfp?eventid=3737&copyownerid=2
+------------------------------------------------------------
 
 -Xmx500m -server -Xrunjavaperf:cg -Dlog4j.configuration=file:src/resources/logging/log4j.properties -Djava.security.policy=policy.all -cp "bigdata-lubm.jar;lib/ctc_utils-5-4-2005.jar;lib/cweb-commons-1.1-b2-dev.jar;lib/cweb-extser-0.1-b2-dev.jar;lib/cweb-junit-ext-1.1-b3-dev.jar;lib/junit-3.8.1.jar;lib/lgpl-utils-1.0-b3-dev.jar;lib/log4j-1.2.8.jar;lib/apache/commons-io-1.4.jar;lib/icu/icu4j-3_6.jar;lib/lucene/lucene-analyzers-2.2.0.jar;lib/lucene/lucene-core-2.2.0.jar;lib/unimi/colt-1.2.0.jar;lib/unimi/fastutil-5.1.4.jar;lib/slf4j-api-1.4.3.jar;lib/slf4j-log4j12-1.4.3.jar;lib/openrdf-sesame-2.2-onejar.jar;lib/jini/classserver.jar;lib/jini/jini-core.jar;lib/jini/jini-ext.jar;lib/jini/jsk-lib.jar;lib/jini/jsk-platform.jar;lib/jini/jsk-resources.jar;lib/jini/reggie.jar;lib/jini/start.jar;lib/jini/sun-util.jar;lib/jini/tools.jar" edu.lehigh.swat.bench.ubt.Test query src/java/edu/lehigh/swat/bench/ubt/bigdata/config.kb.bigdata src/java/edu/lehigh/swat/bench/ubt/bigdata/config.query.sparql
 
@@ -3169,9 +3161,43 @@ One of the things that motivates this for me is that some processes can not have
 Thanks,
 
 -bryan
-
-------------------------------------------------------------
-
 ------------------------------------------------------------
 Commit notes:
 
+- Close out indices that have not been recently used in the
+  AbstractJournal and the IndexManager after a configurable timeout
+  (default 60 seconds).  This will help to keep down the resource
+  demands when large complex queries that touch a lot of data pass
+  through the system and cause many nodes and leaves to be buffered
+  for some timestamp but are not followed by additional queries so
+  those buffered data should then be released.
+
+- Fix JiniFederation#getLastCommitTime().
+
+- Abstract general relation support out of RDFJoinNexus(Factory).
+
+- API Change for IIndexProcedure to have a generic return type.
+
+- Retest lubm, etc.
+
+- Rerun entire test suite.
+
+- Test of index split/join/move
+
+  - Overflow appears to keep the lubm loader alive when those should
+    be daemon threads.  Who is waiting for what?
+
+  - Tests for the sparse row store since our relation declarations are
+    stored there.
+
+  - Ratio w/ compacting merges is 1:53 (triples to bytes).  So 1M
+    triples is 53M, 1B is would be 53GB, and 1T would be 53TB.
+    However, we also need to plan for some temporary drive space and
+    some duplication during index builds, etc.  Maybe a 1.2 multiplier
+    on top of that?
+
+- Negative transaction identifiers?
+
+- Possible problems where IIndexManager and Properties are not being
+  passed along to the IndexMetadata ctor: GlobalRowStoreHelper,
+  MetadataIndexMetadata, 

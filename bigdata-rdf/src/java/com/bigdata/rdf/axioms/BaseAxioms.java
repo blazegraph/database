@@ -44,6 +44,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.IndexMetadata.Options;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -267,7 +268,7 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
             throw new IllegalStateException();
                 
         // exact fill of the root leaf.
-        final int branchingFactor = Math.max(BTree.MIN_BRANCHING_FACTOR, naxioms );
+        final int branchingFactor = Math.max(Options.MIN_BRANCHING_FACTOR, naxioms );
         
         /*
          * Note: This uses a SimpleMemoryRawStore since we never explictly

@@ -229,7 +229,8 @@ public interface IBigdataClient {
          * that there is at least one source of deadlock remaining so the
          * default value of <code>0</code> is advised.
          */
-        String CLIENT_THREAD_POOL_SIZE = "client.threadPoolSize";
+        String CLIENT_THREAD_POOL_SIZE = IBigdataClient.class.getName()
+                + ".threadPoolSize";
 
         String DEFAULT_CLIENT_THREAD_POOL_SIZE = "0";
 
@@ -243,7 +244,9 @@ public interface IBigdataClient {
          * succeed. A limit is placed on the #of retries in order to force
          * abnormal sequences to terminate.
          */
-        String CLIENT_MAX_STALE_LOCATOR_RETRIES = "client.maxStaleLocatorRetries";
+        String CLIENT_MAX_STALE_LOCATOR_RETRIES = IBigdataClient.class
+                .getName()
+                + ".maxStaleLocatorRetries";
 
         String DEFAULT_CLIENT_MAX_STALE_LOCATOR_RETRIES = "3";
 
@@ -264,7 +267,9 @@ public interface IBigdataClient {
          * 
          * @todo use for {@link ProgramTask} for parallel rule evaluation?
          */
-        String CLIENT_MAX_PARALLEL_TASKS_PER_REQUEST = "client.maxParallelTasksPerRequest";
+        String CLIENT_MAX_PARALLEL_TASKS_PER_REQUEST = IBigdataClient.class
+                .getName()
+                + ".maxParallelTasksPerRequest";
 
         String DEFAULT_CLIENT_MAX_PARALLEL_TASKS_PER_REQUEST = "100";
 
@@ -275,7 +280,8 @@ public interface IBigdataClient {
          * Note: Use {@value Long#MAX_VALUE} for NO timeout (the maximum value
          * for a {@link Long}).
          */
-        String CLIENT_TASK_TIMEOUT = "client.taskTimeout";
+        String CLIENT_TASK_TIMEOUT = IBigdataClient.class.getName()
+                + "taskTimeout";
         
         /**
          * The default timeout in milliseconds.
@@ -289,12 +295,10 @@ public interface IBigdataClient {
          * The default capacity used when a client issues a range query request
          * (50000).
          * 
-         * @todo allow override on a per index basis as part of the index
-         *       metadata?
-         * 
          * @todo use on {@link IAccessPath}s for the chunk size?
          */
-        String CLIENT_RANGE_QUERY_CAPACITY = "client.rangeIteratorCapacity";
+        String CLIENT_RANGE_QUERY_CAPACITY = IBigdataClient.class.getName()
+                + ".rangeIteratorCapacity";
 
         String DEFAULT_CLIENT_RANGE_QUERY_CAPACITY = "50000";
 
@@ -305,7 +309,8 @@ public interface IBigdataClient {
          * to be re-written to use {@link IIndexProcedure}s in order to obtain
          * high performance.
          */
-        String CLIENT_BATCH_API_ONLY = "client.batchOnly";
+        String CLIENT_BATCH_API_ONLY = IBigdataClient.class.getName()
+                + ".batchOnly";
 
         String DEFAULT_CLIENT_BATCH_API_ONLY = "false";
 
@@ -324,7 +329,8 @@ public interface IBigdataClient {
          * 
          * @see #DEFAULT_CLIENT_INDEX_CACHE_CAPACITY
          */
-        String CLIENT_INDEX_CACHE_CAPACITY = "client.indexCacheCapacity";
+        String CLIENT_INDEX_CACHE_CAPACITY = IBigdataClient.class.getName()
+                + ".indexCacheCapacity";
 
         /**
          * The default for the {@link #CLIENT_INDEX_CACHE_CAPACITY} option.
@@ -335,11 +341,12 @@ public interface IBigdataClient {
          * The maximum extent for a {@link TemporaryStore} before a new
          * {@link TemporaryStore} will be created by
          * {@link IIndexStore#getTempStore()} for an {@link IBigdataClient}
-         * (default {@value #DEFAULT_TEMP_STORE_MAX_EXTENT}).
+         * (default {@value #DEFAULT_TEMP_STORE_MAXIMUM_EXTENT}).
          */
-        String TEMP_STORE_MAX_EXTENT = "tempStore.maxExtent";
+        String TEMP_STORE_MAXIMUM_EXTENT = IBigdataClient.class.getName()
+                + ".tempStore.maximumExtent";
 
-        String DEFAULT_TEMP_STORE_MAX_EXTENT = "" + (5 * Bytes.gigabyte);
+        String DEFAULT_TEMP_STORE_MAXIMUM_EXTENT = "" + (5 * Bytes.gigabyte);
         
         /**
          * Boolean option for the collection of statistics from the underlying
@@ -348,7 +355,8 @@ public interface IBigdataClient {
          * 
          * @see AbstractStatisticsCollector#newInstance(Properties)
          */
-        String COLLECT_PLATFORM_STATISTICS = "client.collectPlatformStatistics";
+        String COLLECT_PLATFORM_STATISTICS = IBigdataClient.class.getName()
+                + ".collectPlatformStatistics";
 
         String DEFAULT_COLLECT_PLATFORM_STATISTICS = "true"; 
 
@@ -359,7 +367,8 @@ public interface IBigdataClient {
          * 
          * @see QueueStatisticsTask
          */
-        String COLLECT_QUEUE_STATISTICS = "client.collectQueueStatistics";
+        String COLLECT_QUEUE_STATISTICS = IBigdataClient.class.getName()
+                + ".collectQueueStatistics";
 
         String DEFAULT_COLLECT_QUEUE_STATISTICS = "true";
 
@@ -369,7 +378,7 @@ public interface IBigdataClient {
          * 
          * @see #DEFAULT_REPORT_DELAY
          */
-        String REPORT_DELAY = "reportDelay";
+        String REPORT_DELAY = IBigdataClient.class.getName()+"reportDelay";
         
         /**
          * The default {@link #REPORT_DELAY}.
@@ -389,7 +398,7 @@ public interface IBigdataClient {
          * {@link #DEFAULT_HTTPD_PORT} will otherwise cause a random port to be
          * assigned.
          */
-        String HTTPD_PORT = "client.httpdPort";
+        String HTTPD_PORT = IBigdataClient.class.getName() + ".httpdPort";
 
         /**
          * The default http service port is ZERO (0), which means that a random

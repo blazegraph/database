@@ -331,7 +331,7 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
         IChunkedOrderedIterator<ISPO> itr = (owlSameAsItr == null//
                 ? accessPath.iterator(limit, capacity) //
                 : new ChunkedWrappedIterator<ISPO>(owlSameAsItr,
-                        capacity == 0 ? inf.database.chunkCapacity
+                        capacity == 0 ? inf.database.getChunkCapacity()
                                 : capacity, null/* keyOrder */, filter)//
         );
 
