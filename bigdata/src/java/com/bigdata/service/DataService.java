@@ -1001,7 +1001,7 @@ abstract public class DataService extends AbstractService
             
             if(proc instanceof IDataServiceAwareProcedure) {
 
-                if(log.isInfoEnabled()) {
+                if(INFO) {
                     
                     log.info("Data service aware procedure: "+proc.getClass().getName());
                     
@@ -1310,10 +1310,12 @@ abstract public class DataService extends AbstractService
     }
 
     /*
-     * 
+     * overflow processing API 
      */
-    
-    public void forceOverflow() throws IOException {
+
+    public void forceOverflow(final boolean immediate,
+            final boolean compactingMerge) throws IOException,
+            InterruptedException, ExecutionException {
     
         setupLoggingContext();
 
@@ -1324,18 +1326,62 @@ abstract public class DataService extends AbstractService
                 throw new UnsupportedOperationException();
 
             }
+            
+            final Callable task = new ForceOverflowTask(compactingMerge);
+            
+            log.warn("Will force overflow: immediate=" + immediate);
 
-            final WriteExecutorService writeService = concurrencyManager
-                    .getWriteService();
+            if (immediate) {
 
-            final ResourceManager resourceManager = (ResourceManager) this.resourceManager;
+                /*
+                 * Run the task on the write service. The task writes a small
+                 * record on the journal in order to make sure that it is dirty
+                 * and then sets the flag to force overflow with the next
+                 * commit. Since the task runs on the write service and since
+                 * the journal is dirty, a group commit will occur and
+                 * synchronous overflow processing will occur before this method
+                 * returns.
+                 * 
+                 * Note: the resource itself is arbitrary - there is no index
+                 * by that name.
+                 */
 
-            if (resourceManager.isOverflowAllowed()) {
+                getConcurrencyManager().submit(
+                        new AbstractTask(getConcurrencyManager(),
+                                ITx.UNISOLATED,
+                                new String[] { "__forceOverflow" }) {
 
-                log.info("Setting flag to force overflow processing");
+                    @Override
+                    protected Object doTask() throws Exception {
 
-                // trigger overflow on the next group commit.
-                writeService.forceOverflow.set(true);
+                        // write a one byte record on the journal.
+                        getJournal().write(ByteBuffer.wrap(new byte[]{1}));
+                        
+                        // run task that will set the overflow flag.
+                        return task.call();
+                        
+                    }
+                    
+                }).get();
+                
+            } else {
+
+                /*
+                 * Provoke overflow with the next group commit. All this does is
+                 * set the flag that will cause overflow to occur with the next
+                 * group commit. Since the task does not run on the write
+                 * service it will return immediately.
+                 */
+                
+                try {
+
+                    task.call();
+                    
+                } catch (Exception e) {
+                    
+                    throw new RuntimeException(e);
+                    
+                }
 
             }
 
@@ -1343,6 +1389,96 @@ abstract public class DataService extends AbstractService
 
             clearLoggingContext();
 
+        }
+        
+    }
+
+    /**
+     * This attempts to pause the write service and then purges any resources
+     * that exceed the minimum release age.
+     * 
+     * @throws InterruptedException 
+     */
+    public void purgeOldResources() throws InterruptedException {
+        
+        final WriteExecutorService writeService = concurrencyManager
+                .getWriteService();
+
+        if (writeService.awaitPaused(1000/* ms */)) {
+
+            try {
+
+                final ResourceManager resourceManager = getResourceManager();
+                
+                log.warn("Purging old resources: #bytes="
+                        + resourceManager.getBytesUnderManagement()
+                        + ", #journals="
+                        + resourceManager.getManagedJournalCount()
+                        + ", #segments="
+                        + resourceManager.getManagedIndexSegmentCount());
+                
+                resourceManager.purgeOldResources();
+                
+                log.warn("Purged old resources: #bytes="
+                        + resourceManager.getBytesUnderManagement()
+                        + ", #journals="
+                        + resourceManager.getManagedJournalCount()
+                        + ", #segments="
+                        + resourceManager.getManagedIndexSegmentCount());
+                
+            } finally {
+
+                writeService.resume();
+
+            }
+            
+        } else {
+            
+            log.warn("Write service did not pause for us.");
+            
+        }
+
+    }
+    
+    /**
+     * Task sets the flag that will cause overflow processing to be triggered on
+     * the next group commit.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private class ForceOverflowTask implements Callable<Void> {
+
+        private final boolean compactingMerge;
+        
+        public ForceOverflowTask(boolean compactingMerge) {
+            
+            this.compactingMerge = compactingMerge;
+            
+        }
+        
+        public Void call() throws Exception {
+
+            final WriteExecutorService writeService = concurrencyManager
+                    .getWriteService();
+
+            final ResourceManager resourceManager = (ResourceManager) DataService.this.resourceManager;
+
+            if (resourceManager.isOverflowAllowed()) {
+
+                if(compactingMerge) {
+                    
+                    resourceManager.compactingMerge.set(true);
+                    
+                }
+                
+                // trigger overflow on the next group commit.
+                writeService.forceOverflow.set(true);
+
+            }
+
+            return null;
+            
         }
         
     }
@@ -1360,6 +1496,33 @@ abstract public class DataService extends AbstractService
             }
 
             return resourceManager.getOverflowCount();
+
+        } finally {
+
+            clearLoggingContext();
+
+        }
+        
+    }
+    
+    public boolean isOverflowActive() throws IOException {
+        
+        setupLoggingContext();
+
+        try {
+
+            if (!(resourceManager instanceof ResourceManager)) {
+
+                throw new UnsupportedOperationException();
+
+            }
+
+            /*
+             * overflow processing is enabled but not allowed, which means that
+             * overflow processing is occurring right now.
+             */
+            return resourceManager.isOverflowEnabled()
+                    && !resourceManager.isOverflowAllowed();
 
         } finally {
 

@@ -232,7 +232,7 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
                 if (groundTruth.getEntryCount() >= overCapacityMultiplier
                         * entryCountPerSplit) {
 
-                    dataService0.forceOverflow();
+                    dataService0.forceOverflow(false/*immediate*/,false/*compactingMerge*/);
 
                     done = true;
 
@@ -345,7 +345,8 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
                 if (groundTruth.getEntryCount() >= overCapacityMultiplier
                         * entryCountPerSplit) {
 
-                    dataService0.forceOverflow();
+                    dataService0
+                            .forceOverflow(false/* immediate */, false/*compactingMerge*/);
 
                     done = true;
 

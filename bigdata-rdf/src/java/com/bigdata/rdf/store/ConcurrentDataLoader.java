@@ -326,7 +326,7 @@ public class ConcurrentDataLoader {
 
         loadService = new ThreadPoolExecutor(nthreads, nthreads,
                 Integer.MAX_VALUE, TimeUnit.NANOSECONDS, queue,
-                DaemonThreadFactory.defaultThreadFactory());
+                new DaemonThreadFactory(getClass().getName() + ".loadService"));
         
         /*
          * Setup reporting to the load balancer.

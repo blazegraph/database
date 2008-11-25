@@ -82,7 +82,8 @@ public class JournalIndex extends BTree {
      * @param metadata
      *            The metadata record for the index.
      */
-    public JournalIndex(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata) {
+    public JournalIndex(final IRawStore store, final Checkpoint checkpoint,
+            final IndexMetadata metadata) {
 
         super(store, checkpoint, metadata);
 
@@ -96,7 +97,7 @@ public class JournalIndex extends BTree {
      * 
      * @return The corresponding key.
      */
-    protected byte[] getKey(long commitTime) {
+    protected byte[] getKey(final long commitTime) {
 
         return keyBuilder.reset().append(commitTime).getKey();
 
@@ -120,7 +121,7 @@ public class JournalIndex extends BTree {
      * @throws IllegalArgumentException
      *             if <i>timestamp</i> is less than or equals to ZERO (0L).
      */
-    synchronized public IResourceMetadata find(long timestamp) {
+    synchronized public IResourceMetadata find(final long timestamp) {
 
         if (timestamp <= 0L)
             throw new IllegalArgumentException();
@@ -143,7 +144,7 @@ public class JournalIndex extends BTree {
     /**
      * Retrieve the entry from the index.
      */
-    private IResourceMetadata valueAtIndex(int index) {
+    private IResourceMetadata valueAtIndex(final int index) {
 
         final IResourceMetadata entry = (IResourceMetadata) SerializerUtil
                 .deserialize(super.valueAt(index));
@@ -162,7 +163,7 @@ public class JournalIndex extends BTree {
      * @return The commit record -or- <code>null</code> if there is no commit
      *         record whose timestamp is strictly greater than <i>timestamp</i>.
      */
-    synchronized public IResourceMetadata findNext(long timestamp) {
+    synchronized public IResourceMetadata findNext(final long timestamp) {
 
         if (timestamp < 0L)
             throw new IllegalArgumentException();
@@ -191,7 +192,7 @@ public class JournalIndex extends BTree {
      *         <code>-1</code> iff there are no {@link ICommitRecord}s
      *         defined.
      */
-    synchronized public int findIndexOf(long timestamp) {
+    synchronized public int findIndexOf(final long timestamp) {
         
         int pos = super.indexOf(getKey(timestamp));
         
@@ -245,7 +246,7 @@ public class JournalIndex extends BTree {
      *                if there is already an entry registered under for the
      *                given timestamp.
      */
-    synchronized public void add(IResourceMetadata resourceMetadata) {
+    synchronized public void add(final IResourceMetadata resourceMetadata) {
 
         if (resourceMetadata == null)
             throw new IllegalArgumentException();

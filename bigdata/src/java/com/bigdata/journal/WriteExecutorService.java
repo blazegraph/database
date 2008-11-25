@@ -229,6 +229,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     /**
      * Lock used for {@link Condition}s and to coordinate index checkpoints and
      * index rollbacks with the {@link AbstractTask}.
+     * 
+     * @todo we should be using {@link ReentrantLock#lockInterruptibly()} rather
+     *       than lock().  This will let us notice interrupts more readily.
      */
     final protected ReentrantLock lock = new ReentrantLock();
 
@@ -456,7 +459,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      */
     public void resume() {
         
-        log.debug("Resuming write service");
+        if(DEBUG)
+            log.debug("Resuming write service");
         
         lock.lock();
         
@@ -1454,13 +1458,16 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * 
      * @return true iff nothing is running.
      */
-    private boolean awaitPaused(final long timeout) throws InterruptedException {
+    public boolean awaitPaused(final long timeout) throws InterruptedException {
 
         assert timeout >= 0L;
         
-        assert lock.isHeldByCurrentThread();
-
         assert ! isPaused(); 
+        
+//        assert lock.isHeldByCurrentThread();
+        lock.lock();
+
+        try {
         
         // notify the write service that new tasks MAY NOT run.
         pause();
@@ -1520,6 +1527,12 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             log.info("Write service is paused: #running=" + nrunning);
         
         return true;
+        
+        } finally {
+            
+            lock.unlock();
+            
+        }
 
     }
     

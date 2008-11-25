@@ -33,6 +33,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
@@ -165,7 +166,8 @@ public class TestOverflow extends AbstractResourceManagerTestCase {
             Set<String> copied = new HashSet<String>();
             
             // do overflow.
-            resourceManager.doSynchronousOverflow(copied);
+            final AtomicBoolean postProcess = new AtomicBoolean(false);
+            resourceManager.doSynchronousOverflow(copied,postProcess);
 
             // Not expecting the index partition to be copied over.
             assertEquals(0,copied.size());

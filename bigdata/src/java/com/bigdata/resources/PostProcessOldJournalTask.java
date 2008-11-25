@@ -24,11 +24,10 @@ import java.util.concurrent.TimeUnit;
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
-import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Counters;
-import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -900,7 +899,15 @@ public class PostProcessOldJournalTask implements Callable<Object> {
     }
     
     protected List<AbstractTask> chooseIndexPartitionMoves() {
-        
+
+        if (resourceManager.maximumMovesPerTarget == 0) {
+
+            // Moves are not allowed.
+            
+            return EMPTY_LIST;
+            
+        }
+
         /*
          * Figure out if this data service is considered to be highly utilized.
          * We will consider moves IFF this is a highly utilized service.
@@ -1283,214 +1290,70 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
         // tasks to be created (capacity of the array is estimated).
         final List<AbstractTask> tasks = new ArrayList<AbstractTask>(
-                (int) oldJournal.getName2Addr().rangeCount(null, null));
+                (int) oldJournal.getName2Addr().rangeCount());
 
         /*
-         * First, identify any index partitions that have underflowed and will
-         * either be joined or moved. When an index partition is joined its
-         * rightSibling is also processed. This is why we identify the index
-         * partition joins first - so that we can avoid attempts to process the
-         * rightSibling now that we know it is being used by the join operation.
+         * Note whether or not a compacting merge was requested and clear the
+         * flag.
          */
-        tasks.addAll(chooseIndexPartitionJoins());
 
-        /*
-         * Identify index partitions that will be moved based on utilization.
-         * 
-         * We only identify index partitions when this data service is highly
-         * utilized and when there is at least one underutilized data service
-         * available.
-         */
-        tasks.addAll(chooseIndexPartitionMoves());
+        final boolean compactingMerge = resourceManager.compactingMerge
+                .getAndSet(false); 
         
+        if (compactingMerge) {
+
+            /*
+             * Note: When a compacting merge is requested we do not consider
+             * either join or move tasks.
+             */
+            
+            /*
+             * First, identify any index partitions that have underflowed and
+             * will either be joined or moved. When an index partition is joined
+             * its rightSibling is also processed. This is why we identify the
+             * index partition joins first - so that we can avoid attempts to
+             * process the rightSibling now that we know it is being used by the
+             * join operation.
+             */
+
+            tasks.addAll(chooseIndexPartitionJoins());
+
+            /*
+             * Identify index partitions that will be moved based on
+             * utilization.
+             * 
+             * We only identify index partitions when this data service is
+             * highly utilized and when there is at least one underutilized data
+             * service available.
+             */
+            
+            tasks.addAll(chooseIndexPartitionMoves());
+
+        }
+
         /*
          * Review all index partitions on the old journal as of the last commit
          * time and verify for each one that we have either already assigned a
-         * post-processing task to handle it, that we assign one now, or that no
-         * post-processing is required (this last case occurs when the view
-         * state was copied onto the new journal).
+         * post-processing task to handle it, that we assign one now (either a
+         * split or a build task), or that no post-processing is required (this
+         * last case occurs when the view state was copied onto the new
+         * journal).
          */
+
+        final boolean allowSplits = !compactingMerge;
+        
+        tasks.addAll(chooseIndexPartitionSplitOrBuild(allowSplits));
+
+        // log the selected post-processing decisions at a high level.
         {
-
-            // counters : must sum to ndone as post-condition.
-            int ndone = 0; // for each named index we process
-            int nskip = 0; // nothing.
-            int nbuild = 0; // build task.
-            int nsplit = 0; // split task.
-
-            // the name2addr view as of the last commit time.
-            final ITupleIterator itr = oldJournal.getName2Addr(lastCommitTime).rangeIterator(
-                    null, null);
-
-            while (itr.hasNext()) {
-
-                final ITuple tuple = itr.next();
-
-                final Entry entry = EntrySerializer.INSTANCE
-                        .deserialize(new DataInputBuffer(tuple.getValue()));
-
-                // the name of an index to consider.
-                final String name = entry.name;
-
-                /*
-                 * The index partition has already been handled.
-                 */
-                if(isUsed(name)) {
-                    
-                    if (INFO)
-                        log.info("was  handled: " + name);
-                    
-                    nskip++;
-
-                    ndone++;
-                    
-                    continue;
-                    
-                }
-
-                /*
-                 * Open the historical view of that index at that time (not just
-                 * the mutable BTree but the full view).
-                 * 
-                 * @todo there is overhead in opening a view comprised of more
-                 * than just the mutable BTree. we should be able to get by with
-                 * lazy opening of the index segment, and perhaps even the index
-                 * segment store.
-                 */
-                final IIndex view = resourceManager.getIndex(name,
-                        -lastCommitTime);
-
-                if (view == null) {
-
-                    throw new AssertionError(
-                            "Index not found? : name" + name
-                                    + ", lastCommitTime=" + lastCommitTime);
-
-                }
-
-                // note: the mutable btree - accessed here for debugging only.
-                final BTree btree;
-                if (view instanceof AbstractBTree) {
-                    btree = (BTree) view;
-                } else {
-                    btree = (BTree) ((FusedView) view).getSources()[0];
-                }
-
-                // index metadata for that index partition.
-                final IndexMetadata indexMetadata = view.getIndexMetadata();
-
-                // handler decides when and where to split an index partition.
-                final ISplitHandler splitHandler = indexMetadata
-                        .getSplitHandler();
-
-                if (splitHandler != null && splitHandler.shouldSplit(view)) {
-
-                    /*
-                     * Do an index split task.
-                     */
-
-                    final AbstractTask task = new SplitIndexPartitionTask(
-                            resourceManager,//
-                            lastCommitTime,//
-                            name//
-                            );
-
-                    // add to set of tasks to be run.
-                    tasks.add(task);
-
-                    putUsed(name,"willSplit(name="+name+")");
-                    
-                    if (INFO)
-                        log.info("will split  : " + name + ", counter="
-                                + view.getCounter().get() + ", checkpoint="
-                                + btree.getCheckpoint());
-
-                    nsplit++;
-
-                } else if (copied.contains(name)) {
-
-                    /*
-                     * The write set from the old journal was already copied to
-                     * the new journal so we do not need to do a build.
-                     */
-
-                    putUsed(name,"wasCopied(name="+name+")");
-
-                    if (INFO)
-                        log.info("was  copied : " + name + ", counter="
-                                + view.getCounter().get() + ", checkpoint="
-                                + btree.getCheckpoint());
-
-                    nskip++;
-
-                } else {
-
-                    /*
-                     * Just do an index build task.
-                     * 
-                     * @todo could do an incremental build if the amount of
-                     * history in the view is not too great.
-                     * 
-                     * @todo mark incremental build segments differently in the
-                     * file system since that might be important information
-                     * when doing a distributed index rebuild. This mark
-                     * probably needs to be driven through the index segment
-                     * build API so that it shows up in the view history and in
-                     * the index segment checkpoint record.
-                     */
-
-                    // the file to be generated.
-                    final File outFile = resourceManager
-                            .getIndexSegmentFile(indexMetadata);
-
-                    final AbstractTask task = new BuildIndexSegmentTask(
-                            resourceManager, lastCommitTime,
-                            name, outFile);
-
-                    // add to set of tasks to be run.
-                    tasks.add(task);
-
-                    putUsed(name,"willBuild(name="+name+")");
-
-                    if (INFO)
-                        log.info("will build  : " + name + ", counter="
-                                + view.getCounter().get() + ", checkpoint="
-                                + btree.getCheckpoint());
-
-                    nbuild++;
-
-                }
-
-                ndone++;
-
-            } // itr.hasNext()
-
-            // verify counters.
-            if (ndone != nskip + nbuild + nsplit) {
-                
-                log.warn("ndone=" + ndone + ", but : nskip=" + nskip
-                        + ", nbuild=" + nbuild + ", nsplit=" + nsplit);
-                
+            final StringBuilder sb = new StringBuilder();
+            final Iterator<Map.Entry<String, String>> itrx = used.entrySet()
+                    .iterator();
+            while (itrx.hasNext()) {
+                final Map.Entry<String, String> entry = itrx.next();
+                sb.append("\n" + entry.getKey() + "\t = " + entry.getValue());
             }
-
-            // verify all indices were handled in one way or another.
-            if (ndone != used.size()) {
-
-                log.warn("ndone=" + ndone + ", but #used=" + used.size());
-                
-            }
-
-            // log the selected post-processing decisions at a high level.
-            {
-                final StringBuilder sb = new StringBuilder();
-                final Iterator<Map.Entry<String,String>> itrx = used.entrySet().iterator();
-                while(itrx.hasNext()) {
-                    final Map.Entry<String,String> entry = itrx.next();
-                    sb.append("\n"+entry.getKey()+"\t = "+entry.getValue());
-                }
-                log.warn("\nlastCommitTime="+lastCommitTime+ sb);
-            }
-            
+            log.warn("\nlastCommitTime=" + lastCommitTime + sb);
         }
 
         if (INFO)
@@ -1500,6 +1363,189 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
     }
 
+    /**
+     * For each index (partition) that has not been handled, decide whether we
+     * will split the index partition or build an index segment.
+     * 
+     * @param allowSplits
+     *            May be used to disallow splits.
+     * 
+     * @return The list of tasks.
+     */
+    protected List<AbstractTask> chooseIndexPartitionSplitOrBuild(
+            final boolean allowSplits) {
+
+        // counters : must sum to ndone as post-condition.
+        int ndone = 0; // for each named index we process
+        int nskip = 0; // nothing.
+        int nbuild = 0; // build task.
+        int nsplit = 0; // split task.
+
+        // @todo estimate using #of indices not yet handled.
+        final List<AbstractTask> tasks = new LinkedList<AbstractTask>();
+
+        // the old journal (pre-overflow).
+        final AbstractJournal oldJournal = resourceManager
+                .getJournal(lastCommitTime);
+
+        // the name2addr view as of the last commit time.
+        final ITupleIterator itr = oldJournal.getName2Addr(lastCommitTime)
+                .rangeIterator();
+
+        while (itr.hasNext()) {
+
+            final ITuple tuple = itr.next();
+
+            final Entry entry = EntrySerializer.INSTANCE
+                    .deserialize(new DataInputBuffer(tuple.getValue()));
+
+            // the name of an index to consider.
+            final String name = entry.name;
+
+            /*
+             * The index partition has already been handled.
+             */
+            if (isUsed(name)) {
+
+                if (INFO)
+                    log.info("was  handled: " + name);
+
+                nskip++;
+
+                ndone++;
+
+                continue;
+
+            }
+
+            /*
+             * Open the historical view of that index at that time (not just the
+             * mutable BTree but the full view).
+             * 
+             * @todo there is overhead in opening a view comprised of more than
+             * just the mutable BTree. we should be able to get by with lazy
+             * opening of the index segment, and perhaps even the index segment
+             * store.
+             */
+            final IIndex view = resourceManager.getIndex(name, -lastCommitTime);
+
+            if (view == null) {
+
+                throw new AssertionError("Index not found? : name" + name
+                        + ", lastCommitTime=" + lastCommitTime);
+
+            }
+
+            // note: the mutable btree - accessed here for debugging only.
+            final BTree btree = ((ILocalBTreeView)view).getMutableBTree();
+
+            // index metadata for that index partition.
+            final IndexMetadata indexMetadata = view.getIndexMetadata();
+
+            // handler decides when and where to split an index partition.
+            final ISplitHandler splitHandler = indexMetadata.getSplitHandler();
+
+            if (copied.contains(name)) {
+
+                /*
+                 * The write set from the old journal was already copied to the
+                 * new journal so we do not need to do a build.
+                 */
+
+                putUsed(name, "wasCopied(name=" + name + ")");
+
+                if (INFO)
+                    log.info("was  copied : " + name + ", counter="
+                            + view.getCounter().get() + ", checkpoint="
+                            + btree.getCheckpoint());
+
+                nskip++;
+
+            } else if (allowSplits && splitHandler != null
+                    && splitHandler.shouldSplit(view)) {
+
+                /*
+                 * Do an index split task.
+                 */
+
+                final AbstractTask task = new SplitIndexPartitionTask(
+                        resourceManager,//
+                        lastCommitTime,//
+                        name//
+                );
+
+                // add to set of tasks to be run.
+                tasks.add(task);
+
+                putUsed(name, "willSplit(name=" + name + ")");
+
+                if (INFO)
+                    log.info("will split  : " + name + ", counter="
+                            + view.getCounter().get() + ", checkpoint="
+                            + btree.getCheckpoint());
+
+                nsplit++;
+
+               } else {
+
+                /*
+                 * Just do an index build task.
+                 * 
+                 * @todo could do an incremental build if the amount of history
+                 * in the view is not too great.
+                 * 
+                 * @todo mark incremental build segments differently in the file
+                 * system since that might be important information when doing a
+                 * distributed index rebuild. This mark probably needs to be
+                 * driven through the index segment build API so that it shows
+                 * up in the view history and in the index segment checkpoint
+                 * record.
+                 */
+
+                // the file to be generated.
+                final File outFile = resourceManager
+                        .getIndexSegmentFile(indexMetadata);
+
+                final AbstractTask task = new BuildIndexSegmentTask(
+                        resourceManager, lastCommitTime, name, outFile);
+
+                // add to set of tasks to be run.
+                tasks.add(task);
+
+                putUsed(name, "willBuild(name=" + name + ")");
+
+                if (INFO)
+                    log.info("will build  : " + name + ", counter="
+                            + view.getCounter().get() + ", checkpoint="
+                            + btree.getCheckpoint());
+
+                nbuild++;
+
+            }
+
+            ndone++;
+
+        } // itr.hasNext()
+
+        // verify counters.
+        if (ndone != nskip + nbuild + nsplit) {
+
+            log.warn("ndone=" + ndone + ", but : nskip=" + nskip + ", nbuild="
+                    + nbuild + ", nsplit=" + nsplit);
+
+        }
+
+        // verify all indices were handled in one way or another.
+        if (ndone != used.size()) {
+
+            log.warn("ndone=" + ndone + ", but #used=" + used.size());
+
+        }
+
+        return tasks;
+        
+    }
+    
     /**
      * Note: This task is interrupted by {@link OverflowManager#shutdownNow()}.
      * Therefore is tests {@link Thread#isInterrupted()} and returns immediately

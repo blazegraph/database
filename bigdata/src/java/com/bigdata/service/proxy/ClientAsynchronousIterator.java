@@ -211,8 +211,8 @@ public class ClientAsynchronousIterator<E> implements IAsynchronousIterator<E>,
          */
 
         this.executorService = Executors
-                .newSingleThreadExecutor(DaemonThreadFactory
-                        .defaultThreadFactory());
+                .newSingleThreadExecutor(new DaemonThreadFactory
+                        (getClass().getName()+".executorService"));
 
         start(executorService);
 

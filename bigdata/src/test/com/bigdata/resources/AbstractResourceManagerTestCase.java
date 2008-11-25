@@ -346,7 +346,13 @@ public class AbstractResourceManagerTestCase extends
             return null;
         }
 
-        public void forceOverflow() throws IOException {
+        public void forceOverflow(boolean immediate,boolean compactingMerge) throws IOException {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+        
+        public boolean isOverflowActive() throws IOException {
             
             throw new UnsupportedOperationException();
             
@@ -383,6 +389,11 @@ public class AbstractResourceManagerTestCase extends
         public String getServiceName() throws IOException {
 
             return null;
+        }
+
+        public void purgeOldResources() throws IOException, InterruptedException {
+            // TODO Auto-generated method stub
+            
         }
 
     }

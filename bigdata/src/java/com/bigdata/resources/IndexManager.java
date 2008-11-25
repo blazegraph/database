@@ -243,6 +243,18 @@ abstract public class IndexManager extends StoreManager {
      * Provides locks on a per-{name+timestamp} basis for higher concurrency.
      */
     private final transient NamedLock<NT> namedLock = new NamedLock<NT>();
+
+    /**
+     * Provides locks on a per-{@link IndexSegment} UUID basis for higher
+     * concurrency.
+     * <p>
+     * Note: The UUID is the unique key for the {@link #indexSegmentCache}.
+     * <p>
+     * Note: The index name + timestamp is NOT a good basis for locking for the
+     * {@link #indexSegmentCache} because many different timestamps will be
+     * mapped onto the same {@link IndexSegment}.
+     */
+    private final transient NamedLock<UUID> segmentLock = new NamedLock<UUID>();
     
     /**
      * The #of entries in the hard reference cache for {@link IIndex}s. There
@@ -570,11 +582,15 @@ abstract public class IndexManager extends StoreManager {
                  * atomic get/put against the WeakValueCache.
                  * 
                  * Note: The load of the index segment from the store can have
-                 * significiant latency. The use of a named lock allows us to
+                 * significiant latency. The use of a per-UUID lock allows us to
                  * load index segments for different index views concurrently.
+                 * 
+                 * Note: We DO NOT use a name+timestamp lock here because many
+                 * different timestamp values will be served by the same
+                 * IndexSegment.
                  */
-                final Lock lock = namedLock
-                        .acquireLock(new NT(name, timestamp));
+                final Lock lock = segmentLock.acquireLock(storeUUID);
+                
                 try {
 
                     // check the cache first.
@@ -1258,6 +1274,8 @@ abstract public class IndexManager extends StoreManager {
         
         try {
 
+            if(INFO) log.info("built index segment: "+name+", file="+outFile);
+            
             return new BuildResult(name, indexMetadata, segmentMetadata);
 
         } catch (Throwable t) {

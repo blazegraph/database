@@ -254,8 +254,8 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
      * {@link #threadPool}.
      */
     private final ScheduledExecutorService sampleService = Executors
-            .newSingleThreadScheduledExecutor(DaemonThreadFactory
-                    .defaultThreadFactory());
+            .newSingleThreadScheduledExecutor(new DaemonThreadFactory
+                    (getClass().getName()+".sampleService"));
     
     /**
      * httpd reporting the live counters for the client while it is connected to
@@ -468,13 +468,14 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
         if (threadPoolSize == 0) {
 
             threadPool = (ThreadPoolExecutor) Executors
-                    .newCachedThreadPool(DaemonThreadFactory
-                            .defaultThreadFactory());
+                    .newCachedThreadPool(new DaemonThreadFactory
+                            (getClass().getName()+".executorService"));
 
         } else {
 
             threadPool = (ThreadPoolExecutor) Executors.newFixedThreadPool(
-                    threadPoolSize, DaemonThreadFactory.defaultThreadFactory());
+                    threadPoolSize, new DaemonThreadFactory
+                    (getClass().getName()+".executorService"));
 
         }
         

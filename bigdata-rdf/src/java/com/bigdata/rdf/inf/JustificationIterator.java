@@ -230,8 +230,12 @@ public class JustificationIterator implements IJustificationIterator {
 
         if (async) {
 
-            readService = Executors.newSingleThreadExecutor(DaemonThreadFactory
-                    .defaultThreadFactory());
+            /*
+             * FIXME provide an API to run this on an existing executorService
+             * just like we do for proxied asynchronous iterators.
+             */ 
+            readService = Executors.newSingleThreadExecutor(new DaemonThreadFactory
+                    (getClass().getName()+".readService"));
 
             readService.submit(new Reader());
 

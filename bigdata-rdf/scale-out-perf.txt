@@ -2700,73 +2700,144 @@ supplied to Sail.evaluate() as a seperate map of key-value pairs.
 Comments?
 
 Arjohn
+============================================================
+Various:
+
+- Abstract general relation support out of RDFJoinNexus(Factory).
+
+- Some errors remain in the bigdata and perhaps the bigdata-rdf test
+  suites which should be resolved.
+
+- Negative transaction identifiers?
+
+- Possible problems where IIndexManager and Properties are not being
+  passed along to the IndexMetadata ctor: GlobalRowStoreHelper,
+  MetadataIndexMetadata, 
+
+============================================================
+OVERFLOW
+
+- Note: 350 bytes per statement w/o overflow but only 53 bytes per
+  statement with, so get overflow working (even w/o moves since we can
+  use a single data service to do 1B triples in 55G).  Moves can be
+  vetted as a second stage once we firmly believe that splits are
+  working correctly.
+
+- Estimate 1M triples at 53M, 1B is would be 53GB, (30B in 1.6TB), and
+  1 trillion would be 53TB.  However, we also need to plan for some
+  temporary drive space and some duplication during index builds, etc.
+  Maybe a 1.2 multiplier on top of that?
+
+- Modify the write service to notice when (a) there is little or no
+  write activity; (b) asynchronous overflow processing _completes_ ;
+  and (c) the overflow conditions are not yet satisified.  This is an
+  opportunity to purge old resources that are now releasable as a
+  side-effect of asynchronous overflow processing which will otherwise
+  hang around until the start of the next overflow event.  Without
+  this we always wind up with more state on hand than we require.
+
+- Add option for purgeOldResources() to truncate the journal so that
+  we use the smallest possible footprint on the disk?
+
+- Experiment with a variety of branching factors for the index
+  segments and make sure that the bloom filter is making it onto the
+  index segment. [obs. on EDS U50 on laptop].
+
+- Test w/ overflow enabled on EDS, comparing total #of statements and
+  terms to the ground truth as reported by LTS.
+
+  *** One solution was lost for EDS U10 on Q6 and Q14 (the statement
+      pattern scans)?!?  This is odd since the statement count agrees
+      with the LTS U10 data load and since the result is repeatable
+      even after a compacting merge when all data is in a single index
+      segment per index.
+
+  Test first with move disabled and a single data service.  Note that
+  with move disabled we can still observe most effects of scale-out
+  with up to one machine per index, including any issues with locator
+  splits and efficiencies in the lookup of locators for joins, etc.
+  
+  Do this with normal split points in order to assess the size of the
+  resulting index partitions.  This can be done on U10.
+
+  Do this with a low initial and maximum extent and small split
+  configuration in order to stress the overflow mechanisms.  This can
+  be done on U5 or U10.
+
+  Test with move enabled and more than one data service, probably on
+  the DP.  Note that I still have to write some performance counter
+  collection code for Linux, but there might be enough to get by for
+  now.
+
+- Generate U1500 and U8000 (running).
+
+  Load U1500 data set and collect query performance times.
+
+  Do it again with overflow enabled.
+
+  Load U8000 data set w/ overflow enabled and collect query
+  performance times.
+
+- Overflow appears to keep the lubm loader alive (e.g., JDS U50 on the
+  laptop) when those should be daemon threads.  Who is waiting for
+  what?
+
+- Write overflow tests for the sparse row store since our relation
+  declarations are stored there.
+
+- Verify scale-out for bloom filter.
 
 ============================================================
 JOIN optimizations:
 
-  - Whitepaper.
+- Test scale-out query.  (a) done. Closure correctness for pipeline
+  and nested subquery joins (might be Ok now that subquery elimination
+  is correct); (b) done. test on simple data set (U5/EDS) and verify
+  that join tasks are created and terminate correctly; (c) done. test
+  on U5/JDS and work through kinks for proxies; (d) Load data set on
+  cluster; (e) done. test pipeline query w/o type resource expander;
+  and (f) work through correctness when index partition splits are
+  enabled (fanIn GT ONE).
 
-  - Test scale-out query.  (a) done. Closure correctness for pipeline
-    and nested subquery joins (might be Ok now that subquery
-    elimination is correct); (b) done. test on simple data set
-    (U5/EDS) and verify that join tasks are created and terminate
-    correctly; (c) done. test on U5/JDS and work through kinks for
-    proxies; (d) Load data set on cluster; (e) done. test pipeline
-    query w/o type resource expander; and (f) work through correctness
-    when index partition splits are enabled (fanIn GT ONE).
-
-    Note that the best performance for the pipeline join will occur
-    when the indices and their index partitions are scattered over a
-    cluster.  For example, if the statement indices are all on a
-    single machine then you only have the resources of that one
-    machine for SPORelation self-joins.  But if those indices are on 3
-    machines then all 3 will be working the JOIN.
+  Note that the best performance for the pipeline join will occur when
+  the indices and their index partitions are scattered over a cluster.
+  For example, if the statement indices are all on a single machine
+  then you only have the resources of that one machine for SPORelation
+  self-joins.  But if those indices are on 3 machines then all 3 will
+  be working the JOIN.
     
-    As an intermediate step, the data could be loaded 1st, overflow
-    could then be enabled, and a split and compacting merge performed
-    before testing query.
+- Optimize resolution of locators for pipeline joins.
 
-  - Optimize locator resolution.
+- Close out indices that have not been recently used in the
+  AbstractJournal and the IndexManager after a configurable timeout
+  (default 60 seconds).  This will help to keep down the resource
+  demands when large complex queries that touch a lot of data pass
+  through the system and cause many nodes and leaves to be buffered
+  for some timestamp but are not followed by additional queries so
+  those buffered data should then be released.
 
-  - Support fan-in GT ONE.
+- Fix JiniFederation#getLastCommitTime().  This should report the
+  timestamp of the last commit.  The commit protocol needs to notify
+  the timestamp service that it is accepting a commit time and abort
+  if that notice fails.  This will help us to keep the indices focused
+  on the actual lastCommitTime during query.
 
-    Done. Modify DistributedJoinTask#addSource(itr) to have atomic
-    semantics and add a "session" to the data service.  If there is a
-    join task in the session for a given join master UUID, orderIndex,
-    and partitionId, then attempt to addSource(itr) to that join task.
-    if successful, then the join task will process that source.  else
-    create a new join task to consume that source.
+- Compact serialization for ISolution[] and IBindingSet[] to reduce
+  JDS IO costs. Everything is in place for this, but the custom
+  serializers still need to be written and tuned.
 
-    ??? Why are the session size numbers different than I would
-    expect?
+- Run JDS query under the performance analyzer and look for
+  interesting things.
 
-    - Test w/ splits, probably generated statically after a data load
-      by issuing overflow requests.
+- Full text search queries with SLICE are slow, but the full text
+  index itself is fast.  The problem is that we overgenerate solutions
+  before Sesame can close the iterator so we do too much work.  The
+  solution is to rewrite the Sesame query before evaluation so that we
+  can optimize SLICE by using native JOINs.
 
-  - Compact serialization for ISolution[] and IBindingSet[] to reduce
-    JDS IO costs.
+- Lexicon resolution is slow (LUBM Q6 and Q14).
 
-    Everything is in place for this, but the custom serializers still
-    need to be written.
-
-  - Run JDS query under the performance analyzer and look for
-    interesting things.
-
-  - JiniFederation#getLastCommitTime() should report the timestamp of
-    the last commit.  The commit protocol needs to notify the
-    timestamp service that it is accepting a commit time and abort if
-    that notice fails.  This will help us to keep the indices focused
-    on the actual lastCommitTime during query.
-
-  - Full text search queries with SLICE are slow, but the full text
-    index itself is fast.  The problem is that we overgenerate
-    solutions before Sesame can close the iterator so we do too much
-    work.  The solution is to rewrite the Sesame query before
-    evaluation so that we can optimize SLICE by using native JOINs.
-
-  - Lexicon resolution is slow (LUBM Q6 and Q14).
-
-  - Scattered disk reads?
+- Scattered disk reads?
 
     DiskOnlyStrategy#read() is fully synchronized during a read on the
     cache and the FileChannel.  This limits the ability of the OS and
@@ -2802,7 +2873,7 @@ JOIN optimizations:
       request and would issue a scatter/gather request with those
       buffers.  
 
-  - Tuning parameters
+- Tuning parameters
 
     - Review the default chunk capacity (1000) but we are actually
       using 100 in all of our query runs.  Is this used for anything
@@ -2823,12 +2894,12 @@ JOIN optimizations:
 
     - Try various values of chunk size and maxparallel for pipeline
       joins.
-
-  - Examine cold query performance for nested and pipeline joins.
   
-  - JoinMaster
+- JoinMaster
 
     - Handle SLICE at the query buffer.
+
+    - Verify correct handling for OPTIONALs.
 
     - Consider whether it is possible to reduce the costs associated
       with a SLICE, which is forced to interrupt() the join tasks.
@@ -2860,10 +2931,15 @@ JOIN optimizations:
       partition.  Note that there will also be an interaction with
       SLICE.
 
-  - NestedSubqueryJoin
+- NestedSubqueryJoin
 
     - Modify ProgramTask so that LDS runs the entire program on the
-      data service.
+      data service (may be only a marginal improvement).
+  
+    - Modify so that maxParallelSubqueries is applied per join
+      dimension.  This change would be comparable to how the pipeline
+      join operates.  See if that improves throughput on LUBM and
+      EOSSYS.
 
   - 1/2 of the cost of query evaluation (for fast queries) right now
     appears to be converting Sesame Values to BigdataValues.  The cost
@@ -2888,15 +2964,6 @@ JOIN optimizations:
       bit-wise negation of a field in the key - is this also true for
       Unicode sort keys?
 
-  - Note: Turn off the query time expanders for scale-out joins.  This
-    will disable both (x type resource) and owl:sameAs expansion. We
-    will need to handle owl:sameAs by rule rewrites.  (x type
-    resource) is won't be supported since it requires access to the
-    scale-out index for each join task, which is not supported when
-    the join itself is distributed across the index partitions.  Note
-    that this will not disable full text search support since that is
-    handled as part of the BigdataEvaluationStrategyImpl.
-
 - Pipeline join text search (LTS,EDS).
 
   - EDS/JDS: If the predicate defines an IExpander then DO NOT map the
@@ -2910,25 +2977,9 @@ JOIN optimizations:
     the first predicate that does NOT use an expander and then map
     that predicate across the index partitions.
 
-- NestedSubqueryJoin
-  
-  * Modify so that maxParallelSubqueries is applied per join
-    dimension.  This change would be comparable to how the pipeline
-    join operates.  See if that improves throughput on LUBM and
-    EOSSYS.
-
 - try vtune 9.1 on java 6.  does this work?  If not then try a
   different profiler since we have to switch to java 6 for
   ExecutorService API changes and problems with 1.5 compilers.
-
-- Try building index segments from an LDS load with the default split
-  points and see how many we get and how large the filters are and how
-  they perform on the monolithic index view. Of interest is measuring
-  the upper bound for perfect indices and bloom filters improve
-  performance.  A scale-out system can have different performance
-  gains since more resources can be put to work as the index is
-  partitioned but more data needs to be moved around (e.g., pipeline
-  joins, hot spots acquiring a jeri connection, etc).
 
 - It would be nice if the index segment builds could use the upper
   bound on the #of index entries for the plan.  However, an
@@ -2945,17 +2996,10 @@ Bloom filter
   for a new root leaf).  Verify by examining the counters for BTree
   and IndexSegment.
 
-- Test load rates for CDL w/ bloom filter since there will be more
-  writes of the filter on the store (one per commit point for the SPO
-  index).
+- Write unit tests when there is a complex view (a BTree plus one or
+  more index segments).
 
-* Test SPORelation w/ enabled bloom filter for the SPO index.  This
-  seems to improve query performance for Q9 for LUBM U1 and U5. 
-
-- ??? Why is this also improving performance for Q6 and Q14?  Those
-  are access path scans.  Why would they be doing point tests?  Is the
-  the owlSameAs expander?  Turn it off then since we don't need it for
-  lubm.
+- Write unit tests when there are multiple index partitions.
 
 ============================================================ 
 
@@ -2999,6 +3043,12 @@ Executor services
 
   - Refactor the limited parallelism service to use a proxied
     RunnableFuture for map/reduce, CDL, pipeline joins, etc.
+
+  - API for submitting abstract tasks is not generic.  I get compiler
+    complaints when I make it generic.
+
+  - IIndexProcedure should be generic (return type only at this
+    point).
 
 ============================================================
 CLOSURE CORRECTNESS
@@ -3111,18 +3161,6 @@ junit.framework.AssertionFailedError
 	at junit.framework.Assert.assertNull(Assert.java:233)
 	at junit.framework.Assert.assertNull(Assert.java:226)
 	at com.bigdata.journal.TestReadCommittedTx.test_readComittedIsolation(TestReadCommittedTx.java:179)
-
-------------------------------------------------------------
-
-Demonstrates an error with split/join/move failing to preserve the
-index state.
-
-junit.framework.AssertionFailedError: Wrong key: nvisited=2611, expecting=[128, 0, 13, 176], actual=[128, 0, 13, 174]
-	at junit.framework.Assert.fail(Assert.java:47)
-	at com.bigdata.btree.AbstractBTreeTestCase.assertSameEntryIterator(AbstractBTreeTestCase.java:2055)
-	at com.bigdata.service.StressTestConcurrent.doConcurrentClientTest(StressTestConcurrent.java:582)
-	at com.bigdata.service.StressTestConcurrent.test_stressTest1(StressTestConcurrent.java:212)
-
 ------------------------------------------------------------
 
 Problem with EOSSYS load for LTS in LoadClosureAndQueryTest.
@@ -3163,55 +3201,3 @@ Thanks,
 -bryan
 ------------------------------------------------------------
 Commit notes:
-
-- Fix compile error for Java 1.6.0_07 from API refactor.
-
-- Generate U1500 and U8000 (delete the old U10000 data set first so
-  that we have enough room on NAS).
-
-  Load U1500 data set and collect query performance times.
-
-  Do it again with overflow enabled.
-
-  Load U8000 data set w/ overflow enabled and collect query
-  performance times.
-
-- Optimize resolution of locators for pipeline joins.
-
-- Close out indices that have not been recently used in the
-  AbstractJournal and the IndexManager after a configurable timeout
-  (default 60 seconds).  This will help to keep down the resource
-  demands when large complex queries that touch a lot of data pass
-  through the system and cause many nodes and leaves to be buffered
-  for some timestamp but are not followed by additional queries so
-  those buffered data should then be released.
-
-- Fix JiniFederation#getLastCommitTime().
-
-- Abstract general relation support out of RDFJoinNexus(Factory).
-
-- API Change for IIndexProcedure to have a generic return type.
-
-- Retest lubm, etc.
-
-- Rerun entire test suite.
-
-- Test of index split/join/move
-
-  - Overflow appears to keep the lubm loader alive when those should
-    be daemon threads.  Who is waiting for what?
-
-  - Tests for the sparse row store since our relation declarations are
-    stored there.
-
-  - Ratio w/ compacting merges is 1:53 (triples to bytes).  So 1M
-    triples is 53M, 1B is would be 53GB, and 1T would be 53TB.
-    However, we also need to plan for some temporary drive space and
-    some duplication during index builds, etc.  Maybe a 1.2 multiplier
-    on top of that?
-
-- Negative transaction identifiers?
-
-- Possible problems where IIndexManager and Properties are not being
-  passed along to the IndexMetadata ctor: GlobalRowStoreHelper,
-  MetadataIndexMetadata, 

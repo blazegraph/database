@@ -55,8 +55,9 @@ public class ActiveProcess {
      * by the {@link #process}.
      */
     protected final ExecutorService readService = Executors
-            .newSingleThreadExecutor(DaemonThreadFactory
-                    .defaultThreadFactory());
+            .newSingleThreadExecutor(new DaemonThreadFactory(getClass()
+                    .getName()
+                    + ".readService"));
     
     protected Process process = null;
 

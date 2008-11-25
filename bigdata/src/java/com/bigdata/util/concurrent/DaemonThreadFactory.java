@@ -35,6 +35,8 @@ import java.util.concurrent.ThreadFactory;
 public class DaemonThreadFactory implements ThreadFactory {
 
     final private ThreadFactory delegate;
+    final private String basename; // MAY be null.
+    private int counter = 0; // used iff basename was given.
 
     private static ThreadFactory _default = new DaemonThreadFactory();
     
@@ -53,7 +55,13 @@ public class DaemonThreadFactory implements ThreadFactory {
      */
     public DaemonThreadFactory() {
         
-        this( Executors.defaultThreadFactory() );
+        this( Executors.defaultThreadFactory(), null/*basename*/ );
+        
+    }
+    
+    public DaemonThreadFactory(String basename) {
+
+        this(Executors.defaultThreadFactory(), basename);
         
     }
     
@@ -61,20 +69,35 @@ public class DaemonThreadFactory implements ThreadFactory {
      * Uses the specified delegate {@link ThreadFactory}.
      * 
      * @param delegate
-     *            The delegate thread factory that is responsible for
-     *            creating the threads.
+     *            The delegate thread factory that is responsible for creating
+     *            the threads.
+     * @param basename
+     *            Optional prefix that will be used to assign names to the
+     *            generated threads.
      */
-    public DaemonThreadFactory(ThreadFactory delegate) {
+    public DaemonThreadFactory(final ThreadFactory delegate,
+            final String basename) {
         
-        assert delegate != null;
+        if (delegate == null)
+            throw new IllegalArgumentException();
         
         this.delegate = delegate;
         
+        this.basename = basename;
+        
     }
     
-    public Thread newThread(Runnable r) {
+    public Thread newThread(final Runnable r) {
         
-        Thread t = delegate.newThread( r );
+        final Thread t = delegate.newThread( r );
+ 
+        if (basename != null) {
+         
+            counter++;
+            
+            t.setName(basename + counter);
+            
+        }
         
         t.setDaemon(true);
         
