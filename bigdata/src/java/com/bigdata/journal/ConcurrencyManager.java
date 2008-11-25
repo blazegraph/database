@@ -630,26 +630,26 @@ public class ConcurrencyManager implements IConcurrencyManager {
         if (txServicePoolSize == 0) {
             // cached thread pool.
             txWriteService = (ThreadPoolExecutor) Executors
-                    .newCachedThreadPool(DaemonThreadFactory
-                            .defaultThreadFactory());
+                    .newCachedThreadPool(new DaemonThreadFactory
+                            (getClass().getName()+".txWriteService"));
         } else {
             // fixed thread pool.
             txWriteService = (ThreadPoolExecutor) Executors.newFixedThreadPool(
-                    txServicePoolSize, DaemonThreadFactory
-                            .defaultThreadFactory());
+                    txServicePoolSize, new DaemonThreadFactory
+                    (getClass().getName()+".txWriteService"));
         }
 
         // setup thread pool for unisolated read operations.
         if (readServicePoolSize == 0) {
             // cached thread pool.
             readService = (ThreadPoolExecutor) Executors
-                    .newCachedThreadPool(DaemonThreadFactory
-                            .defaultThreadFactory());
+                    .newCachedThreadPool(new DaemonThreadFactory
+                            (getClass().getName()+".readService"));
         } else {
             // fixed thread pool.
             readService = (ThreadPoolExecutor) Executors.newFixedThreadPool(
-                    readServicePoolSize, DaemonThreadFactory
-                            .defaultThreadFactory());
+                    readServicePoolSize, new DaemonThreadFactory
+                    (getClass().getName()+".readService"));
         }
 
         // setup thread pool for unisolated write operations.
@@ -753,7 +753,8 @@ public class ConcurrencyManager implements IConcurrencyManager {
             
             writeService = new WriteExecutorService(resourceManager,
                     writeServiceCorePoolSize, writeServiceMaximumPoolSize,
-                    queue, DaemonThreadFactory.defaultThreadFactory());
+                    queue, new DaemonThreadFactory(getClass().getName()
+                            + ".writeService"));
 
             if (writeServicePrestart) {
 
@@ -798,8 +799,8 @@ public class ConcurrencyManager implements IConcurrencyManager {
             readServiceQueueStatisticsTask = new QueueStatisticsTask("readService",
                     readService, countersHR, w);
 
-            sampleService = Executors.newSingleThreadScheduledExecutor(DaemonThreadFactory
-                    .defaultThreadFactory());
+            sampleService = Executors.newSingleThreadScheduledExecutor(new DaemonThreadFactory
+                    (getClass().getName()+".sampleService"));
                     
             sampleService.scheduleWithFixedDelay(writeServiceQueueStatisticsTask,
                     initialDelay, delay, unit);

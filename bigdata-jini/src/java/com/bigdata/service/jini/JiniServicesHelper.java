@@ -72,7 +72,8 @@ public class JiniServicesHelper {
     private final String path;
 
     private ExecutorService threadPool = Executors
-            .newCachedThreadPool(DaemonThreadFactory.defaultThreadFactory());
+            .newCachedThreadPool(new DaemonThreadFactory
+                    (getClass().getName()+".threadPool"));
     
     /**
      * Starts all services and connects the {@link JiniClient} to the

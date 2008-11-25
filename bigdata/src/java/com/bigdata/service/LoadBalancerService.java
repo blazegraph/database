@@ -639,8 +639,8 @@ abstract public class LoadBalancerService extends AbstractService
             final TimeUnit unit = TimeUnit.MILLISECONDS;
 
             updateService = Executors
-                    .newSingleThreadScheduledExecutor(DaemonThreadFactory
-                            .defaultThreadFactory());
+                    .newSingleThreadScheduledExecutor(new DaemonThreadFactory
+                            (getClass().getName()+".updateService"));
             
             updateService.scheduleWithFixedDelay(new UpdateTask(), initialDelay,
                     delay, unit);

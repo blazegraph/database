@@ -35,6 +35,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.BTree;
@@ -179,7 +180,8 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
         final Set<String> copied = new HashSet<String>();
         
         // force overflow onto a new journal.
-        resourceManager.doSynchronousOverflow( copied );
+        final AtomicBoolean postProcess = new AtomicBoolean(false);
+        resourceManager.doSynchronousOverflow( copied, postProcess );
         
         // nothing should have been copied to the new journal.
         assertEquals(0,copied.size());

@@ -159,8 +159,8 @@ abstract public class TransactionService extends TimestampService implements
      * A thread that serializes transaction commits.
      */
     final protected ExecutorService commitService = Executors
-            .newSingleThreadExecutor(DaemonThreadFactory
-                    .defaultThreadFactory());
+            .newSingleThreadExecutor(new DaemonThreadFactory
+                    (getClass().getName()+".commitService"));
 
     public TransactionService(Properties properties) {
         

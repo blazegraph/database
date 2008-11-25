@@ -195,6 +195,17 @@ abstract public class OverflowManager extends IndexManager {
     protected final AtomicLong overflowCounter = new AtomicLong(0L);
 
     /**
+     * A flag that may be set to force the next overflow to perform a compacting
+     * merge for all indices that are not simply copied over to the new journal.
+     * This may be used to minimize the footprint of the {@link StoreManager} on
+     * the disk for the current view. However, note that you must also arrange
+     * to purge any unused resources after the compacting merge overflow in
+     * order to regain storage associated with views older than the
+     * {@link StoreManager.Options#MIN_RELEASE_AGE}.
+     */
+    public final AtomicBoolean compactingMerge = new AtomicBoolean(false);
+    
+    /**
      * The #of asynchronous overflow operations which fail.
      * 
      * @see PostProcessOldJournalTask
@@ -371,7 +382,7 @@ abstract public class OverflowManager extends IndexManager {
          * <p>
          * Note: Asynchronous overflow processing is responsible for splitting,
          * moving, and joining index partitions. The asynchronous overflow tasks
-         * are written to be fail "safe". Also, each task may succeed or fail on
+         * are written to fail "safe". Also, each task may succeed or fail on
          * its own. Iff the task succeeds, then its effect is made restart safe.
          * Otherwise clients continue to use the old view of the index
          * partition.
@@ -380,7 +391,7 @@ abstract public class OverflowManager extends IndexManager {
         
         /**
          * The default timeout in milliseconds for asynchronous overflow
-         * processing.
+         * processing (equivalent to 20 minutes).
          */
         String DEFAULT_OVERFLOW_TIMEOUT = "" + 20 * 1000 * 60L; // 20 minutes.
         
@@ -503,7 +514,7 @@ abstract public class OverflowManager extends IndexManager {
         if(overflowEnabled) {
 
             overflowService = Executors.newFixedThreadPool(1,
-                    DaemonThreadFactory.defaultThreadFactory());
+                    new DaemonThreadFactory("overflowService"));
          
             /*
              * Note: The core thread is pre-started so that the MDC logging
@@ -742,9 +753,10 @@ abstract public class OverflowManager extends IndexManager {
          */
         final long lastCommitTime;
         final Set<String> copied = new HashSet<String>();
+        final AtomicBoolean postProcess = new AtomicBoolean(false);
 
         // Do overflow processing.
-        lastCommitTime = doSynchronousOverflow(copied);
+        lastCommitTime = doSynchronousOverflow(copied,postProcess);
                     
         // Note: commented out to protect access to the new journal until the write service is resumed.
         // report event.
@@ -752,41 +764,63 @@ abstract public class OverflowManager extends IndexManager {
 
         if (asyncOverflowEnabled.get()) {
 
-            if (INFO)
-                log.info("Will start asynchronous overflow processing.");
+            if (postProcess.get()) {
 
-            /*
-             * Start the asynchronous processing of the named indices on the old
-             * journal.
-             */
-            if(!overflowAllowed.compareAndSet(true/*expect*/, false/*set*/)) {
-
-                throw new AssertionError();
+                /*
+                 * Post-processing SHOULD be performed.
+                 */
                 
+                if (INFO)
+                    log.info("Will start asynchronous overflow processing.");
+
+                /*
+                 * Start the asynchronous processing of the named indices on the
+                 * old journal.
+                 */
+                if (!overflowAllowed
+                        .compareAndSet(true/* expect */, false/* set */)) {
+
+                    throw new AssertionError();
+
+                }
+
+                /*
+                 * Aggregate the statistics for the named indices and reset the
+                 * various counters for those indices. These statistics are used
+                 * to decide which indices are "hot" and which are not.
+                 */
+                final Counters totalCounters = concurrencyManager
+                        .getTotalIndexCounters();
+
+                final Map<String/* name */, Counters> indexCounters = concurrencyManager
+                        .resetIndexCounters();
+
+                /*
+                 * Submit task on private service that will run asynchronously
+                 * and clear [overflowAllowed] when done.
+                 * 
+                 * Note: No one ever checks the Future returned by this method.
+                 * Instead the PostProcessOldJournalTask logs anything that it
+                 * throws in its call() method.
+                 */
+
+                return overflowService.submit(new PostProcessOldJournalTask(
+                        (ResourceManager) this, lastCommitTime, copied,
+                        totalCounters, indexCounters));
+
             }
+
+            if(INFO)
+                log.info("Asynchronous overflow not required");
+
+            /*
+             * Note: increment the counter now since we will not do asynchronous
+             * overflow processing.
+             */
             
-            /*
-             * Aggregate the statistics for the named indices and reset the
-             * various counters for those indices. These statistics are used to
-             * decide which indices are "hot" and which are not.
-             */
-            final Counters totalCounters = concurrencyManager.getTotalIndexCounters();
-
-            final Map<String/* name */, Counters> indexCounters = concurrencyManager
-                    .resetIndexCounters();
-
-            /*
-             * Submit task on private service that will run asynchronously and clear
-             * [overflowAllowed] when done.
-             * 
-             * Note: No one ever checks the Future returned by this method. Instead
-             * the PostProcessOldJournalTask logs anything that it throws in its
-             * call() method.
-             */
-
-            return overflowService.submit(new PostProcessOldJournalTask(
-                    (ResourceManager) this, lastCommitTime, copied,
-                    totalCounters, indexCounters));
+            overflowCounter.incrementAndGet();
+            
+            return null;
 
         } else {
             
@@ -811,9 +845,9 @@ abstract public class OverflowManager extends IndexManager {
      * This is invoked once all pre-conditions have been satisified.
      * <p>
      * Index partitions that have fewer than some threshold #of index entries
-     * will be copied onto the new journal.  Otherwise the view of the index
-     * will be re-defined to place writes on the new journal and read historical
-     * data from the old journal.
+     * will be copied onto the new journal. Otherwise the view of the index will
+     * be re-defined to place writes on the new journal and read historical data
+     * from the old journal.
      * <p>
      * This uses {@link #purgeOldResources()} to delete old resources from the
      * local file system that are no longer required as determined by
@@ -826,10 +860,15 @@ abstract public class OverflowManager extends IndexManager {
      * 
      * @param copied
      *            Any index partitions that are copied are added to this set.
+     * @param postProcess
+     *            Flag is set iff some indices are NOT copied onto the new
+     *            journal such that asynchronous post-processing should be
+     *            performed.
      * 
      * @return The lastCommitTime of the old journal.
      */
-    protected long doSynchronousOverflow(Set<String> copied) {
+    protected long doSynchronousOverflow(final Set<String> copied,
+            final AtomicBoolean postProcess) {
         
         if (INFO)
             log.info("begin");
@@ -961,11 +1000,16 @@ abstract public class OverflowManager extends IndexManager {
          * journal but its indices have not been propagated correctly onto that
          * journal!
          */
-        int noverflow = 0;
+        // #of declared indices.
+        final int numIndices;
+        // #of indices processed (copied over or view redefined).
+        int numIndicesProcessed = 0;
+        // #of indices whose view was redefined on the new journal.
+        int numIndicesViewRefined = 0;
         // #of indices with at least one index entry that were copied.
-        int numNonZeroCopy = 0;
+        int numIndicesNonZeroCopy = 0;
         // Maximum #of non-zero indices that we will copy over.
-        final int maxNonZeroCopy = 100;
+        final int maxNonZeroCopy = 100; // @todo config
         final long lastCommitTime = oldJournal.getRootBlockView().getLastCommitTime();
         final long firstCommitTime;
         {
@@ -978,7 +1022,7 @@ abstract public class OverflowManager extends IndexManager {
                     + listIndexPartitions(-lastCommitTime));
 
             // using read-committed view of Name2Addr
-            final int nindices = (int) oldJournal.getName2Addr().rangeCount(null,null);
+            numIndices = (int) oldJournal.getName2Addr().rangeCount(null,null);
 
             // using read-committed view of Name2Addr
             final ITupleIterator itr = oldJournal.getName2Addr().rangeIterator(null,null);
@@ -1051,7 +1095,7 @@ abstract public class OverflowManager extends IndexManager {
                  */
                 final boolean copyIndex = (entryCount == 0)
                         || ((copyIndexThreshold > 0 && entryCount <= copyIndexThreshold) //
-                                && numNonZeroCopy < maxNonZeroCopy//
+                                && numIndicesNonZeroCopy < maxNonZeroCopy//
                                 && !hasOverflowHandler);
 
                 if(copyIndex) {
@@ -1207,10 +1251,19 @@ abstract public class OverflowManager extends IndexManager {
                         if (entryCount > 0) {
                             
                             // count copied indices with at least one index entry.
-                            numNonZeroCopy++;
+                            numIndicesNonZeroCopy++;
                             
                         }
 
+                    } else {
+
+                        /*
+                         * The index was not copied so its view was re-defined
+                         * on the new journal.
+                         */
+                        
+                        numIndicesViewRefined++;
+                        
                     }
                     
                     /*
@@ -1220,18 +1273,28 @@ abstract public class OverflowManager extends IndexManager {
 
                 }
 
-                noverflow++;
+                numIndicesProcessed++;
 
 //                log.info("Did overflow: " + noverflow + " of " + nindices
 //                        + " : " + entry.name);
 
             }
 
-            if(INFO)
-            log.info("Did overflow of " + noverflow + " indices");
+            if (INFO)
+                log.info("Processed indices: #indices=" + numIndices
+                        + ", ncopy=" + copied.size() + ", ncopyNonZero="
+                        + numIndicesNonZeroCopy + ", #viewRedefined="
+                        + numIndicesViewRefined);
 
-            assert nindices == noverflow;
+            assert numIndices == numIndicesProcessed;
+            assert numIndices == (copied.size() + numIndicesViewRefined);
 
+            /*
+             * post processing should be performed if any indices were redefined
+             * onto the new journal rather than being copied over.
+             */
+            postProcess.set(numIndicesViewRefined > 0);
+            
             // make the index declarations restart safe on the new journal.
             firstCommitTime = newJournal.commit();
 
@@ -1275,6 +1338,10 @@ abstract public class OverflowManager extends IndexManager {
          * Note: This is run while we have a lock on the write executor service
          * so that we can guarentee that no tasks are running with access to
          * historical views which might be deleted when we purge old resources.
+         * 
+         * Note: If [postProcess == false] then ALL indices were copied to the
+         * new live journal and the old journal will be purged if
+         * [minReleaseTime == 0].
          */
         purgeOldResources();
         

@@ -31,6 +31,7 @@ package com.bigdata.service;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 
 import com.bigdata.bfs.BigdataFileSystem.Options;
 import com.bigdata.btree.BTree;
@@ -155,8 +156,11 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
      * available after the overflow operation.
      * 
      * @throws IOException
+     * @throws ExecutionException
+     * @throws InterruptedException
      */
-    public void test_register1ThenOverflow() throws IOException {
+    public void test_register1ThenOverflow() throws IOException,
+            InterruptedException, ExecutionException {
 
         /*
          * Register the index.
@@ -176,7 +180,7 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
             
             assertEquals(0,overflowCounter0);
             
-            dataService0.forceOverflow();
+            dataService0.forceOverflow(false/*immediate*/,false/*compactingMerge*/);
             
             // register the scale-out index, creating a single index partition.
             fed.registerIndex(indexMetadata,dataService0.getServiceUUID());
@@ -221,8 +225,11 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
      * scale-out index agrees with the ground truth.
      * 
      * @throws IOException
+     * @throws ExecutionException
+     * @throws InterruptedException
      */
-    public void test_splitJoin() throws IOException {
+    public void test_splitJoin() throws IOException, InterruptedException,
+            ExecutionException {
         
         /*
          * Register the index.
@@ -337,7 +344,7 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
              */
             if (groundTruth.getEntryCount() >= overCapacityMultiplier * entryCountPerSplit) {
                 
-                dataService0.forceOverflow();
+                dataService0.forceOverflow(false/*immediate*/,false/*compactingMerge*/);
 
                 done = true;
                 
@@ -419,7 +426,7 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
             groundTruth.submit(0/*fromIndex*/,ndelete/*toIndex*/, keys, null/* vals */,
                     BatchRemoveConstructor.RETURN_NO_VALUES, null/*handler*/);
 
-            dataService0.forceOverflow();
+            dataService0.forceOverflow(false/*immediate*/,false/*compactingMerge*/);
             
             fed.getIndex(name, ITx.UNISOLATED).submit(0/*fromIndex*/,ndelete/*toIndex*/, keys,
                     null/* vals */, BatchRemoveConstructor.RETURN_NO_VALUES,
@@ -457,7 +464,7 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
          */
         {
             
-            dataService0.forceOverflow();
+            dataService0.forceOverflow(false/*immediate*/,false/*compactingMerge*/);
             
             // find the locator for the last index partition.
             PartitionLocator locator = fed.getMetadataIndex(name,

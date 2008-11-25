@@ -90,6 +90,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestSplitTask.class);
 
         // test release of old resources.
+        suite.addTestSuite(TestAddDeleteResource.class);
         suite.addTestSuite(TestReleaseResources.TestWithCopyNoRelease.class);
         suite.addTestSuite(TestReleaseResources.TestWithCopyImmediateRelease.class);
 

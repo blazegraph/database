@@ -97,8 +97,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
         super(properties);
      
-        executorService = Executors.newCachedThreadPool(DaemonThreadFactory
-                .defaultThreadFactory());
+        executorService = Executors.newCachedThreadPool(new DaemonThreadFactory
+                (getClass().getName()+".executorService"));
 
         resourceLocator = new DefaultResourceLocator(this, null/*delegate*/);
 

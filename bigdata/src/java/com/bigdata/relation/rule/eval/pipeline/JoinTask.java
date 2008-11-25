@@ -629,8 +629,8 @@ abstract public class JoinTask implements Callable<Void> {
             //                        joinNexus.getChunkCapacity() * 2// workQueueCapacity
             //                );
             final ExecutorService limitedService = Executors
-                    .newFixedThreadPool(maxParallel, DaemonThreadFactory
-                            .defaultThreadFactory());
+                    .newFixedThreadPool(maxParallel, new DaemonThreadFactory
+                            (getClass().getName()+".joinService"));
 
             try {
 

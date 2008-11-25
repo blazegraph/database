@@ -47,6 +47,7 @@ import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.StaleLocatorException;
+import com.bigdata.resources.StoreManager;
 import com.bigdata.sparse.SparseRowStore;
 
 /**
@@ -497,22 +498,60 @@ public interface IDataService extends IRemoteTxCommitProtocol, IService {
     
     /**
      * Method sets a flag that will force overflow processing during the next
-     * group commit.
-     * <p>
-     * Note: This method is primarily used by unit tests. Normally there is no
+     * group commit and optionally forces a group commit. Normally there is no
      * reason to invoke this method directly. Overflow processing is triggered
      * automatically on a bottom-up basis when the extent of the live journal
      * nears the {@link Options#MAXIMUM_EXTENT}.
      * 
+     * @param immediate
+     *            The purpose of this argument is to permit the caller to
+     *            trigger an overflow event even though there are no writes
+     *            being made against the data service. When <code>true</code>
+     *            the method will write a token record on the live journal in
+     *            order to provoke a group commit. In this case synchronous
+     *            overflow processing will have occurred by the time the method
+     *            returns. When <code>false</code> a flag is set and overflow
+     *            processing will occur on the next commit.
+     * @param compactingMerge
+     *            The purpose of this flag is to permit the caller to indicate
+     *            that a compacting merge should be performed for all indices on
+     *            the data service whose data are not simply copied onto the new
+     *            journal during the next synchronous overflow.
+     * 
      * @throws IOException
+     * @throws InterruptedException
+     *             may be thrown if <i>immediate</i> is <code>true</code>.
+     * @throws ExecutionException
+     *             may be thrown if <i>immediate</i> is <code>true</code>.
      */
-    public void forceOverflow() throws IOException;
+    public void forceOverflow(boolean immediate, boolean compactingMerge)
+            throws IOException, InterruptedException, ExecutionException;
+    
+    /**
+     * Purges any resources that are no longer required based on the
+     * {@link StoreManager.Options#MIN_RELEASE_AGE}.
+     * <p>
+     * Note: Resources are normally purged during synchronous overflow handling.
+     * However, asynchronous overflow handling can cause resources to no longer
+     * be needed as new index partition views are defined. This method MAY be
+     * used to trigger a release before the next overflow event.
+     * 
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    public void purgeOldResources() throws IOException, InterruptedException;
     
     /**
      * The #of overflows that have taken place on this data service (the counter
      * is not restart safe).
      */
     public long getOverflowCounter() throws IOException;
+    
+    /**
+     * Return <code>true</code> iff the data service is currently engaged in
+     * overflow processing.
+     */
+    public boolean isOverflowActive() throws IOException;
     
     /**
      * Shutdown the service immediately and destroy any persistent data

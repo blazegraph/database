@@ -102,8 +102,8 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
 
         setupName2AddrBTree();
 
-        executorService = Executors.newCachedThreadPool(DaemonThreadFactory
-                .defaultThreadFactory());
+        executorService = Executors.newCachedThreadPool(new DaemonThreadFactory
+                (getClass().getName()+".executorService"));
         
         resourceLocator = new DefaultResourceLocator(//
                 this,//

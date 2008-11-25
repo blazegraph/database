@@ -366,6 +366,10 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
          * joins are MUCH faster for scale-out so they are used by default
          * whenever {@link IBigdataFederation#isScaleOut()} reports
          * <code>true</code>.
+         * <p>
+         * Note: Cold query performance for complex high volume queries appears
+         * to be better for the pipeline join, so it may make sense to use the
+         * pipeline join even for local data.
          * 
          * @todo should identify the strategy by type safe enum or class name
          *       since we may develop other join strategies.

@@ -46,7 +46,8 @@ import com.bigdata.util.InnerCause;
  * Integration provides a view of a local {@link DataService} as if it were a
  * federation. The {@link LocalDataServiceFederation} runs its own embedded
  * {@link TimestampService} and {@link LoadBalancerService} to support its
- * embedded {@link DataService}.
+ * embedded {@link DataService}. Since there is no {@link MetadataService},
+ * overflow processing is disabled.
  * 
  * @see LocalDataServiceClient
  * 

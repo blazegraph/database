@@ -79,6 +79,7 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.journal.TemporaryStore;
+import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.mdi.IPartitionMetadata;
@@ -434,7 +435,8 @@ abstract public class StoreManager extends ResourceEvents implements
      * Used to run the {@link Startup}.
      */
     private final ExecutorService startupService = Executors
-            .newSingleThreadExecutor(DaemonThreadFactory.defaultThreadFactory());
+            .newSingleThreadExecutor(new DaemonThreadFactory
+                    (getClass().getName()+".startupService"));
 
     /**
      * Succeeds if the {@link StoreManager} {@link #isOpen()} and is NOT
@@ -1725,6 +1727,9 @@ abstract public class StoreManager extends ResourceEvents implements
             final File file
             ) {
 
+        if(INFO) log.info("addResource(uuid=" + resourceMetadata.getUUID()
+                + ", file=" + file);
+        
         assertOpen();
 
         if (resourceMetadata == null)
@@ -2021,7 +2026,7 @@ abstract public class StoreManager extends ResourceEvents implements
      * @throws RuntimeException
      *             if something goes wrong.
      */
-    public IRawStore openStore(UUID uuid) {
+    public IRawStore openStore(final UUID uuid) {
 
         assertRunning();
 
@@ -2379,13 +2384,14 @@ abstract public class StoreManager extends ResourceEvents implements
      * state for the index so it can not be used to read from arbitrary
      * historical commit points.
      * <p>
-     * Note: The caller MUST arrange for synchronization. Typically this is
-     * invoked during {@link #doOverflow()}.
+     * Note: The caller MUST arrange for synchronization by pausing the
+     * {@link WriteExecutorService}. Typically this is invoked during
+     * {@link #doOverflow()}.
      * 
      * @throws IllegalStateException
      *             if the {@link StoreManager} is not running.
      */
-    protected void purgeOldResources() {
+    public void purgeOldResources() {
 
         assertRunning();
 
@@ -2650,12 +2656,23 @@ abstract public class StoreManager extends ResourceEvents implements
                 if (INFO)
                     log.info("Will delete: " + resourceMetadata);
 
-                deleteResource(uuid, true/* isJournal */);
+                try {
+
+                    deleteResource(uuid, true/* isJournal */, true/* callerWillRemoveFromIndex */);
+                    
+                } catch(Throwable t) {
+
+                    // log error and keep going.
+                    
+                    log.error("Could not delete journal: "+t, t);
+                    
+                }
 
 //                // add to set for batch remove.
 //                keys.add(journalIndex.getKey(resourceMetadata.getCreateTime()));
 
-//                itr.remove();
+                // remove from the [journalIndex].
+                itr.remove();
                 
                 njournals++;
                 
@@ -2734,13 +2751,23 @@ abstract public class StoreManager extends ResourceEvents implements
                 if(INFO)
                     log.info("Will delete: " + resourceMetadata);
 
+                try {
+                
                 // delete the backing file.
-                deleteResource(uuid, false/* isJournal */);
+                deleteResource(uuid, false/* isJournal */, true/* callerWillRemoveFromIndex */);
+                
+                } catch(Throwable t) {
+                    
+                    // log error and keep going.
+                    log.error("Could not delete segment: " + t, t);
+                    
+                }
                 
 //                // add to set for batch remove.
 //                keys.add(segmentIndex.getKey(resourceMetadata.getCreateTime(), uuid));
-                
-//                itr.remove();
+              
+                // remove from the [segmentIndex]
+                itr.remove();
 
                 nsegments++;
                 
@@ -2788,8 +2815,30 @@ abstract public class StoreManager extends ResourceEvents implements
      * @param isJournal
      *            <code>true</code> if the resource is a journal.
      */
-    protected void deleteResource(final UUID uuid, final boolean isJournal) {
+    protected void deleteResource(final UUID uuid, final boolean isJournal)
+            throws NoSuchStoreException {
 
+        deleteResource(uuid, isJournal, false/* callerWillRemoveFromIndex */);
+
+    }
+    
+    /**
+     * 
+     * @param uuid
+     * @param isJournal
+     * @param callerWillRemoveFromIndex
+     *            Used when the caller can more efficiently remove the store
+     *            from the {@link #journalIndex} or {@link #segmentIndex}. When
+     *            <code>false</code>, we have to scan the index for the
+     *            desired entry and then remove it.
+     */
+    private void deleteResource(final UUID uuid, final boolean isJournal,
+            boolean callerWillRemoveFromIndex) throws NoSuchStoreException {
+
+        if(INFO) log.info("deleteResource: uuid=" + uuid + ", isJournal="
+                + isJournal + ", callerWillRemoveFromIndex="
+                + callerWillRemoveFromIndex);
+        
         // can't close out the live journal!
         if (uuid == getLiveJournal().getRootBlockView().getUUID()) {
 
@@ -2816,15 +2865,15 @@ abstract public class StoreManager extends ResourceEvents implements
                     
                 }
                 
-                try {
+//                try {
 
                     store.close();
                     
-                } catch(Throwable t) {
-                    
-                    log.error(t.getMessage(),t);
-                    
-                }
+//                } catch(Throwable t) {
+//                    
+//                    log.error(t.getMessage(),t);
+//                    
+//                }
 
             }
 
@@ -2833,7 +2882,8 @@ abstract public class StoreManager extends ResourceEvents implements
         /*
          * delete the backing file.
          */
-        try {
+//        try
+        {
 
             final File file = resourceFiles.remove(uuid);
 
@@ -2872,29 +2922,84 @@ abstract public class StoreManager extends ResourceEvents implements
                 
             }
 
-        } catch(Throwable t) {
-            
-            log.error(t.getMessage(), t);
+//        } catch(Throwable t) {
+//            
+//            log.error(t.getMessage(), t);
             
         }
 
+        if (!callerWillRemoveFromIndex) {
+
+            boolean found = false;
+            
+            if (isJournal) {
+
+                synchronized (journalIndex) {
+
+                    ITupleIterator<IResourceMetadata> itr = journalIndex
+                            .rangeIterator(null/* fromKey */,
+                                    null/* toKey */, 0/* capacity */,
+                                    IRangeQuery.DEFAULT | IRangeQuery.CURSOR,
+                                    null/* filter */);
+                    
+                    while(itr.hasNext()) {
+
+                        IResourceMetadata md = itr.next().getObject();
+                        
+                        if(md.getUUID().equals(uuid)) {
+                            
+                            itr.remove();
+                            
+                            found = true;
+                            
+                            break;
+                            
+                        }
+                        
+                    }
+
+                }
+            
+            } else {
+
+                synchronized (segmentIndex) {
+
+                    ITupleIterator<IResourceMetadata> itr = segmentIndex
+                            .rangeIterator(null/* fromKey */,
+                                    null/* toKey */, 0/* capacity */,
+                                    IRangeQuery.DEFAULT | IRangeQuery.CURSOR,
+                                    null/* filter */);
+
+                    while (itr.hasNext()) {
+
+                        IResourceMetadata md = itr.next().getObject();
+
+                        if (md.getUUID().equals(uuid)) {
+
+                            itr.remove();
+
+                            found = true;
+
+                            break;
+
+                        }
+
+                    }
+
+                }
+         
+            }
+
+            if (!found)
+                throw new NoSuchStoreException(uuid);
+            
+        }
+        
         if(isJournal) {
 
-            synchronized(journalIndex) {
-                
-                journalIndex.remove(uuid);
-                
-            }
-            
             journalDeleteCount.incrementAndGet();
             
         } else {
-            
-            synchronized(segmentIndex) {
-                
-                segmentIndex.remove(uuid);
-                
-            }
             
             segmentStoreDeleteCount.incrementAndGet();
             
@@ -3132,8 +3237,8 @@ abstract public class StoreManager extends ResourceEvents implements
         final String mungedName = munge(indexMetadata.getName());
 
         // subdirectory into which the individual index segs will be placed.
-        final File indexDir = new File(segmentsDir, mungedName
-                + File.pathSeparator + indexMetadata.getIndexUUID().toString());
+        final File indexDir = new File(segmentsDir, mungedName + File.separator
+                + indexMetadata.getIndexUUID().toString());
 
         // make sure that directory exists.
         indexDir.mkdirs();

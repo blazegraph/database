@@ -289,14 +289,14 @@ public class NanoHTTPD implements IServiceShutdown
         if (requestServicePoolSize == 0) {
 
             requestService = (ThreadPoolExecutor) Executors
-                    .newCachedThreadPool(DaemonThreadFactory
-                            .defaultThreadFactory());
+                    .newCachedThreadPool(new DaemonThreadFactory
+                            (getClass().getName()+".requestService"));
 
         } else {
 
             requestService = (ThreadPoolExecutor) Executors.newFixedThreadPool(
-                    requestServicePoolSize, DaemonThreadFactory
-                            .defaultThreadFactory());
+                    requestServicePoolSize, new DaemonThreadFactory
+                    (getClass().getName()+".requestService"));
 
         }
         
@@ -345,7 +345,9 @@ public class NanoHTTPD implements IServiceShutdown
      * Runs a single thread which accepts connections.
      */
     private final ExecutorService acceptService = Executors
-            .newSingleThreadExecutor(DaemonThreadFactory.defaultThreadFactory());
+            .newSingleThreadExecutor(new DaemonThreadFactory(getClass()
+                    .getName()
+                    + ".acceptService"));
 
     /**
      * Runs a pool of threads for handling requests.
