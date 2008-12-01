@@ -1909,7 +1909,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
                 && ((flags & REMOVEALL) == 0) && ((flags & CURSOR) == 0)) {
 
             /*
-             * Use the faster recursion-based striterator.
+             * Use the recursion-based striterator since it is faster for a
+             * BTree (but not for an IndexSegment).
              * 
              * Note: The recursion-based striterator does not support remove()!
              * 
@@ -1918,7 +1919,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
              * iterators.
              * 
              * @todo when the capacity is one and REVERSE is specified then we
-             * can optimize this using a reverse traversal striterator - this 
+             * can optimize this using a reverse traversal striterator - this
              * will have lower overhead than the cursor for the BTree (but not
              * for an IndexSegment).
              */

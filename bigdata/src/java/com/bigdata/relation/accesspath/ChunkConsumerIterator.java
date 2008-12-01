@@ -9,7 +9,6 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.striterator.IKeyOrder;
 
-
 /**
  * A class that aligns a buffer of <code>E[]</code>s (a buffer of chunks)
  * with an {@link IChunkedOrderedIterator}.
@@ -53,10 +52,21 @@ public class ChunkConsumerIterator<E> implements IChunkedOrderedIterator<E> {
      */
     private E[] chunk = null;
     
+//    /**
+//     * Total elapsed time for the iterator instance.
+//     */
+//    private long elapsed = 0L;
+
     /**
-     * Total elapsed time for the iterator instance.
+     * #of chunks materialized so far via {@link #nextChunk()} or
+     * {@link #nextChunk(IKeyOrder)}.
      */
-    private long elapsed = 0L;
+    private long nchunks = 0L;
+
+    /**
+     * #of elements materialized so far.
+     */
+    private long nelements = 0L;
 
     /**
      * 
@@ -102,7 +112,7 @@ public class ChunkConsumerIterator<E> implements IChunkedOrderedIterator<E> {
 
     public boolean hasNext() {
         
-        if (lastIndex != -1 && lastIndex + 1 < chunk.length) {
+        if ((lastIndex != -1) && ((lastIndex + 1) < chunk.length)) {
 
             return true;
             
@@ -120,12 +130,10 @@ public class ChunkConsumerIterator<E> implements IChunkedOrderedIterator<E> {
     
     public E next() {
 
-        final long begin = System.currentTimeMillis();
-
         if (!hasNext())
             throw new NoSuchElementException();
 
-        if (lastIndex == -1 || lastIndex + 1 == chunk.length) {
+        if ((lastIndex == -1) || ((lastIndex + 1) == chunk.length)) {
 
             // get the next chunk from the source iterator.
             chunk = src.next();
@@ -134,34 +142,45 @@ public class ChunkConsumerIterator<E> implements IChunkedOrderedIterator<E> {
             lastIndex = -1;
 
             if (INFO)
-                log.info("nextChunk ready: time="
-                        + (System.currentTimeMillis() - begin) + "ms");
+                log.info("read chunk from source iterator: nchunks=" + nchunks
+                        + ", size=" + chunk.length);
 
         }
 
-        // the next resolved statement.
-        final E stmt = chunk[++lastIndex];
-            
+        // the next element.
+        final E e = chunk[++lastIndex];
+        nelements++;
+        
         if (DEBUG)
             log.debug("lastIndex=" + lastIndex + ", chunk.length="
-                    + chunk.length + ", stmt=" + stmt);
+                    + chunk.length + ", #chunks=" + nchunks + ", #elements="
+                    + nelements + ", e=" + e);
 
-        elapsed += (System.currentTimeMillis() - begin);
+//        elapsed += (System.currentTimeMillis() - begin);
 
-        return stmt;
+        return e;
         
     }
 
     @SuppressWarnings("unchecked")
     public E[] nextChunk() {
         
-        if (lastIndex == -1 || lastIndex + 1 == chunk.length) {
+        if ((lastIndex == -1) || ((lastIndex + 1) == chunk.length)) {
 
             /*
              * The next element from the source will be the next chunk.
              */
+
+            final E[] a = src.next();
             
-            return src.next();
+            nchunks++;
+            nelements += a.length;
+
+            if (INFO)
+                log.info("read chunk from source iterator: nchunks=" + nchunks
+                        + ", size=" + a.length);
+            
+            return a;
             
         }
         
@@ -185,13 +204,19 @@ public class ChunkConsumerIterator<E> implements IChunkedOrderedIterator<E> {
         // chunk has been consumed.
         chunk = null;
         lastIndex = -1;
+        nchunks++;
+        nelements += remaining;
+
+        if (INFO)
+            log.info("remainder chunk: nchunks=" + nchunks + ", size="
+                    + remaining);
 
         // return dense chunk.
         return a;
         
     }
 
-    public E[] nextChunk(IKeyOrder<E> keyOrder) {
+    public E[] nextChunk(final IKeyOrder<E> keyOrder) {
 
         if (keyOrder == null)
             throw new IllegalArgumentException();
@@ -222,8 +247,9 @@ public class ChunkConsumerIterator<E> implements IChunkedOrderedIterator<E> {
         
         chunk = null;
         
-        if (INFO) // @todo nelements, nchunks.
-            log.info("elapsed=" + elapsed);
+        if (INFO)
+            log.info("#chunks="+nchunks+", #elements="+nelements);
+//            log.info("elapsed=" + elapsed);
 
     }
 

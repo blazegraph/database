@@ -39,7 +39,10 @@ import com.bigdata.service.IDataService;
 import cutthecrap.utils.striterators.Striterator;
 
 /**
- * Interface for range count and range query operations (non-batch api).
+ * Interface for range count and range query operations.
+ * <p>
+ * Note: There are implementations of this interface for both local indices and
+ * for distributed scale-out indices.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

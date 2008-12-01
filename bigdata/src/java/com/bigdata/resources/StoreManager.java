@@ -70,6 +70,7 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.DiskOnlyStrategy;
+import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ILocalTransactionManager;
@@ -1094,8 +1095,17 @@ abstract public class StoreManager extends ResourceEvents implements
 
                     } else {
 
-                        final String msg = "There are " + nbad
-                                + " bad files - will not start: badFiles="
+                        /*
+                         * Note: This exception will be thrown if we could not
+                         * get a lock on a journal file (see FileMetadata - the
+                         * lock error is not reported until we try to read the
+                         * magic field) or if there is a problem with the data
+                         * in the file. You have to examine the stack trace to
+                         * see what the root cause is.
+                         */
+                        
+                        final String msg = "Could not open " + nbad
+                                + " files - will not start : problem files="
                                 + stats.badFiles;
 
                         log.fatal(msg);
@@ -3265,6 +3275,108 @@ abstract public class StoreManager extends ResourceEvents implements
             log.info("Created file: " + file);
 
         return file;
+
+    }
+
+    /**
+     * This attempts to pause the {@link WriteExecutorService} and then purges
+     * any resources that are no longer required based on
+     * {@link StoreManager.Options#MIN_RELEASE_AGE}.
+     * <p>
+     * Note: Resources are normally purged during synchronous overflow handling.
+     * However, asynchronous overflow handling can cause resources to no longer
+     * be needed as new index partition views are defined. This method MAY be
+     * used to trigger a release before the next overflow event.
+     * 
+     * @param timeout
+     *            The timeout (in milliseconds) that the method will await the
+     *            pause of the write service.
+     * @param truncateJournal
+     *            When <code>true</code>, the live journal will be truncated
+     *            to its minimum extent (all writes will be preserved but there
+     *            will be no free space left in the journal). This may be used
+     *            to force the {@link DataService} to its minimum possible
+     *            footprint given the configured
+     *            {@link StoreManager#getMinReleaseAge()}.
+     * 
+     * @return <code>true</code> if successful and <code>false</code> if the
+     *         write service could not be paused after the specified timeout.
+     * 
+     * @param truncateJournal
+     *            When <code>true</code> the live journal will be truncated
+     *            such that no free space remains in the journal.
+     * 
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    public boolean purgeOldResources(final long timeout,
+            final boolean truncateJournal) throws InterruptedException {
+
+        final WriteExecutorService writeService = getConcurrencyManager()
+                .getWriteService();
+
+        if (writeService.awaitPaused(1000/* ms */)) {
+
+            try {
+
+                final StoreManager storeManager = this;
+
+                log.warn("Purging old resources: #bytes="
+                        + storeManager.getBytesUnderManagement()
+                        + ", #journals="
+                        + storeManager.getManagedJournalCount()
+                        + ", #segments="
+                        + storeManager.getManagedIndexSegmentCount());
+
+                storeManager.purgeOldResources();
+
+                log.warn("Purged old resources: #bytes="
+                        + storeManager.getBytesUnderManagement()
+                        + ", #journals="
+                        + storeManager.getManagedJournalCount()
+                        + ", #segments="
+                        + storeManager.getManagedIndexSegmentCount());
+
+                if (truncateJournal) {
+
+                    /*
+                     * Truncate the backing buffer such that there is no
+                     * remaining free space in the live journal.
+                     * 
+                     * Note: This MUST be done while we are holding the
+                     * exclusive lock on the write service.
+                     */
+
+                    final IBufferStrategy backingBuffer = storeManager
+                            .getLiveJournal().getBufferStrategy();
+
+                    final long oldExtent = backingBuffer.getExtent();
+
+                    final long newExtent = backingBuffer.getHeaderSize()
+                            + backingBuffer.getUserExtent();
+
+                    backingBuffer.truncate(newExtent);
+
+                    log.warn("Truncated the live journal: oldExtent="
+                            + oldExtent + ", newExtent=" + newExtent);
+
+                }
+
+                return true;
+
+            } finally {
+
+                writeService.resume();
+
+            }
+
+        } else {
+
+            log.warn("Write service did not pause for us.");
+
+            return false;
+
+        }
 
     }
 

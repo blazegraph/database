@@ -217,7 +217,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      *            Otherwise an {@link ArrayBlockingQueue} of the given capacity
      *            is used.
      */
-    public BlockingBuffer(int capacity) {
+    public BlockingBuffer(final int capacity) {
 
        this(capacity,
             DEFAULT_CHUNK_SIZE,
@@ -317,7 +317,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
         sb.append("{ open=" + open);
 
-        sb.append(", hasFuture=" + future != null);
+        sb.append(", hasFuture=" + (future != null));
 
         sb.append(", elementCount=" + elementCount);
 

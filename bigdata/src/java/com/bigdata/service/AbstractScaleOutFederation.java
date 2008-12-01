@@ -28,11 +28,19 @@
 
 package com.bigdata.service;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
+
+import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ILinearList;
@@ -45,6 +53,7 @@ import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
+import com.bigdata.resources.StoreManager;
 import com.bigdata.service.AbstractScaleOutClient.MetadataIndexCachePolicy;
 import com.bigdata.service.AbstractScaleOutClient.Options;
 
@@ -469,4 +478,156 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
         
     }
 
+    /**
+     * Force overflow of each data service in the scale-out federation (only
+     * scale-out federations support overflow processing). This method is
+     * synchronous. It will not return until all {@link DataService}s have
+     * initiated and completed overflow processing. Any unused resources ( as
+     * determined by the {@link StoreManager#getMinReleaseAge()}) will have
+     * been purged.
+     * 
+     * @param truncateJournal
+     *            When <code>true</code>, the live journal will be truncated
+     *            to its minimum extent (all writes will be preserved but there
+     *            will be no free space left in the journal). This may be used
+     *            to force the {@link DataService} to its minimum possible
+     *            footprint given the configured
+     *            {@link StoreManager#getMinReleaseAge()}.
+     */
+    public void forceOverflow(final boolean truncateJournal) {
+        
+        // find UUID for each data service.
+        final UUID[] dataServiceUUIDs = getDataServiceUUIDs(0/* maxCount */);
+
+        final int ndataServices = dataServiceUUIDs.length;
+
+        if(INFO)
+            log.info("#dataServices=" + ndataServices + ", now=" + new Date());
+
+        final List<Callable<Void>> tasks = new ArrayList<Callable<Void>>(ndataServices);
+
+        for (UUID serviceUUID : dataServiceUUIDs) {
+
+            tasks.add(new ForceOverflowTask(getDataService(serviceUUID),
+                    truncateJournal));
+
+        }
+
+        final List<Future<Void>> futures;
+        try {
+
+            futures = getExecutorService().invokeAll(tasks);
+            
+        } catch (InterruptedException ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
+
+        int nok = 0;
+
+        for (Future f : futures) {
+
+            try {
+                f.get();
+                nok++;
+            } catch (InterruptedException ex) {
+                log.warn(ex.getLocalizedMessage());
+                continue;
+            } catch (ExecutionException ex) {
+                log.error(ex.getLocalizedMessage(), ex);
+            }
+
+        }
+
+        if(INFO)
+            log.info("Did overflow: #ok=" + nok + ", #dataServices="
+                + ndataServices + ", now=" + new Date());
+
+        if (nok != ndataServices) {
+
+            throw new RuntimeException(
+                    "Errors during overflow processing: #ok=" + nok
+                            + ", #dataServices=" + ndataServices);
+
+        }
+
+    }
+
+    /**
+     * Task forces immediate overflow of the specified data service, returning
+     * once both synchronous AND asynchronous overflow are complete.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class ForceOverflowTask implements Callable<Void> {
+
+        protected static final Logger log = Logger
+                .getLogger(ForceOverflowTask.class);
+
+        protected static final boolean INFO = log.isInfoEnabled();
+        
+        private final IDataService dataService;
+        private final boolean truncateJournal;
+        
+        public ForceOverflowTask(final IDataService dataService,
+                final boolean truncateJournal) {
+
+            if (dataService == null)
+                throw new IllegalArgumentException();
+
+            this.dataService = dataService;
+            
+            this.truncateJournal = truncateJournal;
+
+        }
+        
+        public Void call() throws Exception {
+            
+            if(INFO)
+                log.info("dataService: " + dataService.getServiceName());
+
+            // returns once synchronous overflow is complete.
+            dataService
+                    .forceOverflow(true/* immediate */, true/* compactingMerge */);
+
+            if (INFO)
+                log.info("Synchronous overflow is done: "
+                        + dataService.getServiceName());
+
+            // wait until overflow processing is done.
+            while (dataService.isOverflowActive()) {
+
+                Thread.sleep(100/* ms */);
+
+            }
+
+            if (INFO)
+                log.info("Asynchronous overflow is done: "
+                        + dataService.getServiceName());
+            
+            /*
+             * Note: Old resources are automatically released as the last step
+             * of asynchronous overflow processing. Therefore all we are really
+             * doing here is issuing a request to truncate the journal. However,
+             * we use the same method to accomplish both ends.
+             */
+            if (truncateJournal) {
+
+                if (!dataService
+                        .purgeOldResources(5000/* ms */, true/* truncateJournal */)) {
+
+                    log.warn("Could not pause write service - resources will not be purged.");
+
+                }
+
+            }
+            
+            return null;
+            
+        }
+        
+    }
+    
 }

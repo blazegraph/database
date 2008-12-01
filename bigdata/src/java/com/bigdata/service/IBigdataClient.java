@@ -236,7 +236,8 @@ public interface IBigdataClient {
 
         /**
          * The maximum #of times that a client will retry an operation which
-         * resulted in a {@link StaleLocatorException} (default 3).
+         * resulted in a {@link StaleLocatorException} (default
+         * {@value #DEFAULT_CLIENT_MAX_STALE_LOCATOR_RETRIES}).
          * <p>
          * Note: The {@link StaleLocatorException} is thrown when a split, join,
          * or move results in one or more new index partitions that replace the
@@ -252,15 +253,16 @@ public interface IBigdataClient {
 
         /**
          * The maximum #of tasks that will be created and submitted in parallel
-         * for a single application request (100). Multiple tasks are created
-         * for an application request whenever that request spans more than a
-         * single index partition. This limit prevents operations which span a
-         * very large #of index partitions from creating and submitting all of
-         * their tasks at once and thereby effectively blocking other client
-         * operations until the tasks have completed. Instead, this application
-         * request generates at most this many tasks at a time and new tasks
-         * will not be created for that request until the previous set of tasks
-         * for the request have completed.
+         * for a single application request (default
+         * {@value #DEFAULT_CLIENT_MAX_PARALLEL_TASKS_PER_REQUEST}). Multiple
+         * tasks are created for an application request whenever that request
+         * spans more than a single index partition. This limit prevents
+         * operations which span a very large #of index partitions from creating
+         * and submitting all of their tasks at once and thereby effectively
+         * blocking other client operations until the tasks have completed.
+         * Instead, this application request generates at most this many tasks
+         * at a time and new tasks will not be created for that request until
+         * the previous set of tasks for the request have completed.
          * 
          * @todo use for {@link NestedSubqueryWithJoinThreadsTask} for parallel
          *       subqueries?
@@ -293,21 +295,23 @@ public interface IBigdataClient {
         
         /**
          * The default capacity used when a client issues a range query request
-         * (50000).
+         * (default {@value #DEFAULT_CLIENT_RANGE_QUERY_CAPACITY}).
          * 
          * @todo use on {@link IAccessPath}s for the chunk size?
+         * 
+         * @see IBigdataClient#getDefaultRangeQueryCapacity()
          */
         String CLIENT_RANGE_QUERY_CAPACITY = IBigdataClient.class.getName()
                 + ".rangeIteratorCapacity";
 
-        String DEFAULT_CLIENT_RANGE_QUERY_CAPACITY = "50000";
+        String DEFAULT_CLIENT_RANGE_QUERY_CAPACITY = "10000";
 
         /**
          * A boolean property which controls whether or not the non-batch API
-         * will log errors complete with stack traces (default is
-         * <code>false</code>). This may be used to locating code that needs
-         * to be re-written to use {@link IIndexProcedure}s in order to obtain
-         * high performance.
+         * will log errors complete with stack traces (default
+         * {@value #DEFAULT_CLIENT_BATCH_API_ONLY}). This may be used to
+         * locating code that needs to be re-written to use
+         * {@link IIndexProcedure}s in order to obtain high performance.
          */
         String CLIENT_BATCH_API_ONLY = IBigdataClient.class.getName()
                 + ".batchOnly";
@@ -316,10 +320,11 @@ public interface IBigdataClient {
 
         /**
          * The capacity of the LRU cache of {@link IIndex} proxies held by the
-         * client. The capacity of this cache indirectly controls how long an
-         * {@link IIndex} proxy will be cached. The main reason for keeping an
-         * {@link IIndex} in the cache is to reuse its buffers if another
-         * request arrives "soon" for that {@link IIndex}.
+         * client (default {@value #DEFAULT_CLIENT_INDEX_CACHE_CAPACITY}). The
+         * capacity of this cache indirectly controls how long an {@link IIndex}
+         * proxy will be cached. The main reason for keeping an {@link IIndex}
+         * in the cache is to reuse its buffers if another request arrives
+         * "soon" for that {@link IIndex}.
          * <p>
          * The effect of this parameter is indirect owning to the semantics of
          * weak references and the control of the JVM over when they are
@@ -378,8 +383,8 @@ public interface IBigdataClient {
          * 
          * @see #DEFAULT_REPORT_DELAY
          */
-        String REPORT_DELAY = IBigdataClient.class.getName()+"reportDelay";
-        
+        String REPORT_DELAY = IBigdataClient.class.getName() + "reportDelay";
+
         /**
          * The default {@link #REPORT_DELAY}.
          */
@@ -387,9 +392,10 @@ public interface IBigdataClient {
     
         /**
          * Integer option specifies the port on which an httpd service will be
-         * started that exposes the {@link CounterSet} for the client. When ZERO
-         * (0), a random port will be used. The httpd service may be disabled by
-         * specifying <code>-1</code> as the port.
+         * started that exposes the {@link CounterSet} for the client (default
+         * {@value #DEFAULT_HTTPD_PORT}). When ZERO (0), a random port will be
+         * used. The httpd service may be disabled by specifying <code>-1</code>
+         * as the port.
          * <p>
          * Note: The httpd service for the {@link LoadBalancerService} is
          * normally run on a known port in order to make it easy to locate that

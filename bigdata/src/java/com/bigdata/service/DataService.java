@@ -239,7 +239,7 @@ abstract public class DataService extends AbstractService
      * 
      * @return The {@link IResourceManager}.
      */
-    protected IResourceManager newResourceManager(Properties properties) {
+    protected IResourceManager newResourceManager(final Properties properties) {
 
         return new ResourceManager(properties) {
 
@@ -262,7 +262,7 @@ abstract public class DataService extends AbstractService
 
                 return new UUID[] {
                         
-                        getDataServiceUUID()
+                    getDataServiceUUID()
                         
                 };
                 
@@ -1393,51 +1393,12 @@ abstract public class DataService extends AbstractService
         
     }
 
-    /**
-     * This attempts to pause the write service and then purges any resources
-     * that exceed the minimum release age.
-     * 
-     * @throws InterruptedException 
-     */
-    public void purgeOldResources() throws InterruptedException {
+    public boolean purgeOldResources(final long timeout,
+            final boolean truncateJournal) throws InterruptedException {
+
+        // delegate all the work.
+        return getResourceManager().purgeOldResources(timeout, truncateJournal);
         
-        final WriteExecutorService writeService = concurrencyManager
-                .getWriteService();
-
-        if (writeService.awaitPaused(1000/* ms */)) {
-
-            try {
-
-                final ResourceManager resourceManager = getResourceManager();
-                
-                log.warn("Purging old resources: #bytes="
-                        + resourceManager.getBytesUnderManagement()
-                        + ", #journals="
-                        + resourceManager.getManagedJournalCount()
-                        + ", #segments="
-                        + resourceManager.getManagedIndexSegmentCount());
-                
-                resourceManager.purgeOldResources();
-                
-                log.warn("Purged old resources: #bytes="
-                        + resourceManager.getBytesUnderManagement()
-                        + ", #journals="
-                        + resourceManager.getManagedJournalCount()
-                        + ", #segments="
-                        + resourceManager.getManagedIndexSegmentCount());
-                
-            } finally {
-
-                writeService.resume();
-
-            }
-            
-        } else {
-            
-            log.warn("Write service did not pause for us.");
-            
-        }
-
     }
     
     /**
@@ -1451,7 +1412,7 @@ abstract public class DataService extends AbstractService
 
         private final boolean compactingMerge;
         
-        public ForceOverflowTask(boolean compactingMerge) {
+        public ForceOverflowTask(final boolean compactingMerge) {
             
             this.compactingMerge = compactingMerge;
             

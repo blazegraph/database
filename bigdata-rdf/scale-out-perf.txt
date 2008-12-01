@@ -800,42 +800,13 @@ Short term tasks:
 
      - Offer commands to force overflow of a data service.
 
-
    - IndexSegment
 
-     - Done. Verify that there is an atomic commit point for the
-       IndexSegment so that partial index segment writes can be
-       recognized.
-
-     - Done. The addrLeaves and addrNodes can not be expressed as a
-       single long since they are regions spanning many records and a
-       long would limit their byteCount to whatever was allowed by the
-       offsetBits.
-
-     - Done. The logic to buffer the nodes was actually examining the
-       extent of the leaves.
-
-     - Done. Added checksum to the index segment store checkpoint
-       record.
-
-     - Done (the problem was failing to flush the write cache to the
-       disk before initiating the channel to channel transfer - since
-       the data were not on the channel they naturally were not being
-       transferred.)  Stress test of U100 and very large runs of
-       TestIndexSegmentBuilderWithLargeTrees (m=32, nentries=m**4)
-       cause corrupt leaves in an index segment build.
-
-     - Done. Modify IndexSegmentBuilder to support fast reverse scan,
-       at least in the data and in DumpIndexStore.
-
-     - Done. IndexSegmentBuilder should be refactored to implement
-       Runnable/Callable.  The ctor can do the setup and the index
-       build will run in run()/call().  The return can be a status code
-       for the operation or statistics on the operation.  Throw an
-       exception for an error.
-
-     - Done. Modify IndexSegmentBuilder to support fast forward scan,
-       at least in the data and in DumpIndexStore.
+     - The read retention queue capacity should be adjusted for an
+       IndexSegment since the branching factor is typically larger
+       than for the corresponding BTree, so a buffer capacity of N
+       will in fact allow more index entries to be buffer and will
+       require more RAM.
 
      - An index segment build that could operate without the actual #of
        entries would avoid one pass over the data.  See how expensive
@@ -844,40 +815,12 @@ Short term tasks:
        on hand.  Eg, by using the upper bound on the entry count and
        then allowing leaves and nodes to underflow.
 
-     - Done. Support transparent byte[] <=> value (de-)serialization
-       using a serializer object associated with the index metadata.
-
-     - Done. Add Map and Set impls. based on the BTree.
-
-     - Done (IUpdateStore). I need to create an interface extending
-       IRawStore, put those methods on that interface, and then declare
-       that interface on TemporaryRawStore in order to be able to
-       access these methods.
-
      - Explore efficient branching factor sizes for the index
        segments.  This will vary as a function of (a) the application
        and query demands; and (b) the compression options in use for
        the indices.
 
    - DiskOnlyStrategy
-
-     - Done. write tests of transferTo.  I did find a bug in
-       writeAll(), but that was not the problem (it was writing each
-       pass at the same offset in the file when a write required
-       multiple IOs).
-
-     - Done. Refactor to create a Journal using a Temporary BufferMode.
-
-     - Done. Refactor DiskOnlyStrategy to permit lazy creation of the
-       backing file.
-
-     - Done. Refactor of TemporaryRawStore to use DiskOnlyStrategy with
-       lazy creation of the backing file.
-
-     - Done. Found a bug in DiskOnlyStrategy where it was always
-       reading a record three times....  Probably there was little
-       performance impact since the read would have come from the OS
-       cache after the first time, but still....
 
      - Evaluate effect of the write cache capacity.  If 1M is as good
        as 10M then just use the DirectBufferPool for the write cache
@@ -888,12 +831,6 @@ Short term tasks:
      * Test suite for Temporary mode journals.
 
    - DirectBufferPool
-
-     - Done. Static config via System#getProperties() for the direct buffer pool
-
-     - Done. Counters for reporting out the pool state.
-
-     - Done. Report "bytesUsed" for the DirectBufferPool.
 
    - Transaction support.
 
@@ -2728,17 +2665,6 @@ OVERFLOW
   temporary drive space and some duplication during index builds, etc.
   Maybe a 1.2 multiplier on top of that?
 
-- Modify the write service to notice when (a) there is little or no
-  write activity; (b) asynchronous overflow processing _completes_ ;
-  and (c) the overflow conditions are not yet satisified.  This is an
-  opportunity to purge old resources that are now releasable as a
-  side-effect of asynchronous overflow processing which will otherwise
-  hang around until the start of the next overflow event.  Without
-  this we always wind up with more state on hand than we require.
-
-- Add option for purgeOldResources() to truncate the journal so that
-  we use the smallest possible footprint on the disk?
-
 - Experiment with a variety of branching factors for the index
   segments and make sure that the bloom filter is making it onto the
   index segment. [obs. on EDS U50 on laptop].
@@ -2807,6 +2733,26 @@ JOIN optimizations:
   be working the JOIN.
     
 - Optimize resolution of locators for pipeline joins.
+  
+  We can request all the locators for a join task when the join task
+  is created and wait until they arrive before processing the source
+  binding chunks, which can already be read from the source join
+  tasks.
+
+  Unlike splits for lookup(), an output binding set can be mapped
+  across multiple index partitions.
+
+  We can easily optimize for the case where there is only a single
+  sink index partition since there will be only one sink and all
+  output binding sets will go to the same sink.
+
+  Once the access path tasks are ordered, the odds are very good that
+  the next output binding set will be mapped onto the same index
+  partition(s) as the last output binding set.
+
+  If the locator is kept as state then we have the left- and
+  right-separators can we can easily test to see if an output binding
+  set would lie within the same index partition.
 
 - Close out indices that have not been recently used in the
   AbstractJournal and the IndexManager after a configurable timeout
@@ -2982,9 +2928,10 @@ JOIN optimizations:
   ExecutorService API changes and problems with 1.5 compilers.
 
 - It would be nice if the index segment builds could use the upper
-  bound on the #of index entries for the plan.  However, an
-  incremental index build knows the exact #of index entries a priori
-  since delete index entries must be carried forward until a
+  bound on the #of index entries for the plan.
+
+  An incremental index build knows the exact #of index entries a
+  priori since delete index entries must be carried forward until a
   compacting merge.
 
 ============================================================
@@ -3201,3 +3148,22 @@ Thanks,
 -bryan
 ------------------------------------------------------------
 Commit notes:
+
+- Reduce the CHUNK_TIMEOUT? E.g., from 1000ms to 10ms or 100ms?
+
+- Optimize mapping of access path tasks onto join sink tasks.
+
+- Compute ideal splits based on the #of bytes per triple for LUBM for
+  each statement index (100M index partition; SPO=9M, OSP=21M,
+  POS=8M).
+
+  Are those values the same for different LUBM datasets? 
+
+  Are they the same for non-LUBM data sets?  (Probably not.)
+
+- Does splitting the TERM2ID index get rid of the hotspot on that
+  index? Probably not.  While greater concurrency would be allowed for
+  writers, and while the hotspot was for writers, the bottleneck was
+  in fact IOWAIT and splitting the TERM2ID index will not reduce the
+  IOWAIT bottleneck until we move some of the term2id index partitions
+  onto a different machine.
