@@ -2048,7 +2048,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
     }
     
-    public void writeRootBlock(IRootBlockView rootBlock,ForceEnum forceOnCommit) {
+    public void writeRootBlock(final IRootBlockView rootBlock,
+            final ForceEnum forceOnCommit) {
 
         if(temporaryStore) {
             
@@ -2098,9 +2099,9 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         
     }
 
-    synchronized public void truncate(long newExtent) {
+    synchronized public void truncate(final long newExtent) {
 
-        long newUserExtent =  newExtent - headerSize;
+        final long newUserExtent =  newExtent - headerSize;
         
         if (newUserExtent < getNextOffset() ) {
            
@@ -2124,7 +2125,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         
         try {
 
-            // extend the file.
+            // extend (or truncate) the file.
             getRandomAccessFile().setLength(newExtent);
             
             /*

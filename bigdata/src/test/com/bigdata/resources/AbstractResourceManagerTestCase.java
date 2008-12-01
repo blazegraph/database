@@ -391,9 +391,9 @@ public class AbstractResourceManagerTestCase extends
             return null;
         }
 
-        public void purgeOldResources() throws IOException, InterruptedException {
+        public boolean purgeOldResources(long timeout, boolean truncateJournal) throws IOException, InterruptedException {
             // TODO Auto-generated method stub
-            
+            return false;
         }
 
     }

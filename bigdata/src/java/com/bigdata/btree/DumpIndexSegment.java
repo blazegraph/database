@@ -52,16 +52,25 @@ public class DumpIndexSegment {
     public static void usage() {
      
         System.err.println("usage: " + DumpIndexSegment.class.getSimpleName()
-                + "[options] " + " file(s)");
+                + " [options] " + " file(s)");
         
         // @todo declare the options that the class understands.
         
-//        System.err.println("options:");
-//
-//        System.err.println(" -i: dump Index");
+        System.err.println("options:");
+
+        System.err.println(" -d level: set the logger level");
         
     }
-    
+
+    /**
+     * Dump one or more {@link IndexSegment}s.
+     * 
+     * @param args
+     *            usage <code>[file|-d level]+</code>, where <i>file</i> is
+     *            the name of a n {@link IndexSegmentStore} file and
+     *            <code>level is the name of the {@link Level} to be used
+     *            for the {@link AbstractBTree#dumpLog}</code>
+     */
     public static void main(String[] args) {
         
         if(args.length==0) {
@@ -85,7 +94,7 @@ public class DumpIndexSegment {
                     System.out.println("Setting log level: "+level);
                     
                     // turn up the dumpLog level so that we can see the output.
-                    BTree.dumpLog.setLevel(level);
+                    AbstractBTree.dumpLog.setLevel(level);
                     
                 } else {
                     

@@ -34,6 +34,7 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ResultSet;
+import com.bigdata.btree.Tuple;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.proc.AbstractKeyRangeIndexProcedure;
 import com.bigdata.journal.ITx;
@@ -167,21 +168,22 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
      * The #of index partitions that have been queried so far. There will be one
      * {@link DataServiceTupleIterator} query issued per partition.
      * 
-     * @deprecated The #of partitions is a bit tricky since splits and introduce
-     *             new partitions.
+     * @deprecated The #of partitions is a bit tricky since splits and joins can
+     *             change the #of index partitions dynamically (for unisolated
+     *             or read-committed reads where read-consistent is not true).
      */
     private int nparts = 0;
     
     /**
-     * The #of enties visited so far.
+     * The #of tuples visited so far.
      */
-    private long nvisited = 0;
+    private long nvisited = 0L;
     
     /**
      * The {@link DataServiceTupleIterator} reading from the current index
      * partition.
      */
-    private DataServiceTupleIterator src;
+    private DataServiceTupleIterator<E> src;
    
     /**
      * When true, the entire key range specified by the client has been
@@ -495,7 +497,7 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
              * happen until you call [src.hasNext()].
              */
             
-            src = new DataServiceTupleIterator(ndx, dataService, DataService
+            src = new DataServiceTupleIterator<E>(ndx, dataService, DataService
                     .getIndexPartitionName(ndx.getName(), partitionId),
                     timestamp, _fromKey, _toKey, capacity, flags, filter) {
                 
@@ -503,12 +505,19 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
                  * Overriden so that we observe each distinct result set
                  * obtained from the DataService.
                  */
-                protected ResultSet getResultSet(long timestamp,
-                        byte[] fromKey, byte[] toKey, int capacity, int flags,
-                        IFilterConstructor filter) {
+                protected ResultSet getResultSet(final long timestamp,
+                        final byte[] fromKey, final byte[] toKey,
+                        final int capacity, final int flags,
+                        final IFilterConstructor filter) {
 
                     final ResultSet tmp = super.getResultSet(timestamp,
                             fromKey, toKey, capacity, flags, filter);
+
+                    if (INFO)
+                        log.info("Got chunk: ntuples=" + tmp.getNumTuples()
+                                + ", exhausted=" + tmp.isExhausted()
+                                + ", lastKey="
+                                + BytesUtil.toString(tmp.getLastKey()));
 
                     if (reverseScan) {
 
@@ -523,9 +532,9 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
 
                         if (INFO)
                             log.info("New exclusive upper bound: "
-                                    + currentToKey);
+                                    + BytesUtil.toString(currentToKey));
 
-//                        assert currentToKey != null;
+                        // assert currentToKey != null;
 
                     } else {
 
@@ -540,7 +549,7 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
 
                         if (INFO)
                             log.info("New inclusive lower bound: "
-                                    + currentFromKey);
+                                    + BytesUtil.toString(currentFromKey));
 
 //                        assert currentFromKey != null;
                         
@@ -605,5 +614,44 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
         src.remove();
         
     }
-    
+
+    public String toString() {
+        
+        final StringBuilder sb = new StringBuilder();
+        
+        sb.append(getClass().getSimpleName());
+
+        sb.append("{ flags=" + Tuple.flagString(flags));
+
+        sb.append(", timestamp=" + timestamp);
+
+        sb.append(", capacity=" + capacity);
+
+        sb.append(", fromKey="
+                + (fromKey == null ? "n/a" : BytesUtil.toString(fromKey)));
+
+        sb.append(", toKey="
+                + (toKey == null ? "n/a" : BytesUtil.toString(toKey)));
+
+        sb.append(", filter=" + filter);
+
+        // dynamic state.
+
+        sb.append(", #visited=" + nvisited);
+
+        sb.append(", exhausted=" + exhausted);
+
+        sb.append(", locator=" + locator);
+
+        sb.append(", lastStaleLocator=" + lastStaleLocator);
+
+        // Note: [src] is the per index partition source (dynamic state).
+        sb.append(", src=" + (src == null ? "N/A" : src.getClass()));
+
+        sb.append("}");
+
+        return sb.toString();
+
+    }
+
 }

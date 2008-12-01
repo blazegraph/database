@@ -119,4 +119,15 @@ public class TransientBufferStrategy extends BasicBufferStrategy {
         
     }
 
+    /**
+     * There is no header.
+     * 
+     * @return ZERO (0).
+     */
+    final public int getHeaderSize() {
+        
+        return 0;
+        
+    }
+    
 }

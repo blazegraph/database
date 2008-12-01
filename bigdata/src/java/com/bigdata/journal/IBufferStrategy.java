@@ -96,13 +96,24 @@ public interface IBufferStrategy extends IRawStore, IMRMW {
     public long getUserExtent();
     
     /**
+     * The size of the journal header, including MAGIC, version, and both root
+     * blocks. This is used as an offset when computing the address of a record
+     * in an underlying file and is ignored by buffer modes that are not backed
+     * by a file (e.g., transient) or that are memory mapped (since the map is
+     * setup to skip over the header)
+     */
+    public int getHeaderSize();
+    
+    /**
      * Either truncates or extends the journal.
      * <p>
      * Note: Implementations of this method MUST be synchronized so that the
      * operation is atomic with respect to concurrent writers.
      * 
      * @param extent
-     *            The new extent.
+     *            The new extent of the journal. This value represent the total
+     *            extent of the journal, including any root blocks together with
+     *            the user extent.
      * 
      * @exception IllegalArgumentException
      *                The user extent MAY NOT be increased beyond the maximum

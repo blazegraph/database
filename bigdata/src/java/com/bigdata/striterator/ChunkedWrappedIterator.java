@@ -30,6 +30,8 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.relation.accesspath.IElementFilter;
 
 import cutthecrap.utils.striterators.Filter;
@@ -43,6 +45,12 @@ import cutthecrap.utils.striterators.Striterator;
  */
 public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
 
+    protected static transient final Logger log = Logger.getLogger(ChunkedWrappedIterator.class);
+
+    protected static final boolean INFO = log.isInfoEnabled();
+
+    protected static final boolean DEBUG = log.isDebugEnabled();
+    
     private boolean open = true;
 
     /**
@@ -65,13 +73,16 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
     /** Optional filter applied to the source iterator. */
     private final IElementFilter<E> filter;
     
+    private long nchunks = 0L;
+    private long nelements = 0L;
+    
     /**
      * Create an iterator that reads from the source.
      * 
      * @param src
      *            The source iterator.
      */
-    public ChunkedWrappedIterator(Iterator<E> src) {
+    public ChunkedWrappedIterator(final Iterator<E> src) {
 
         this(src, DEFAULT_CHUNK_SIZE, null/* keyOrder */, null/* filter */);
         
@@ -119,7 +130,7 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
 
                     private static final long serialVersionUID = 1L;
 
-                    protected boolean isValid(Object arg0) {
+                    protected boolean isValid(final Object arg0) {
                         
                         return filter.accept((E) arg0);
                         
@@ -147,6 +158,9 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
             ((ICloseableIterator<E>)realSource).close();
             
         }
+        
+        if(INFO)
+            log.info("#chunks="+nchunks+", #elements="+nelements);
 
     }
 
@@ -172,7 +186,11 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
 
         }
 
-        return src.next();
+        final E e = src.next();
+        
+        nelements++;
+        
+        return e;
 
     }
 
@@ -193,14 +211,14 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
 
         E[] chunk = null;
         
-        while (hasNext() && n < chunkSize) {
+        while (open && src.hasNext() && n < chunkSize) {
 
-            E t = next();
+            final E t = src.next();
 
             if (chunk == null) {
 
                 /*
-                 * Dynamically instantiation an array of the same component type
+                 * Dynamically instantiate an array of the same component type
                  * as the objects that we are visiting.
                  */
 
@@ -218,7 +236,7 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
 
             // make it dense.
             
-            E[] tmp = (E[])java.lang.reflect.Array.newInstance(
+            final E[] tmp = (E[])java.lang.reflect.Array.newInstance(
                     chunk[0].getClass(), n);
             
             System.arraycopy(chunk, 0, tmp, 0, n);
@@ -226,6 +244,13 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
             chunk = tmp;
          
         }
+
+        nchunks++;
+        nelements += n;
+        
+        if (DEBUG)
+            log.debug("#chunks=" + nchunks + ", chunkSize=" + chunk.length
+                    + ", #elements=" + nelements);
         
         return chunk;
         
@@ -246,7 +271,7 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
         
     }
 
-    public E[] nextChunk(IKeyOrder<E> keyOrder) {
+    public E[] nextChunk(final IKeyOrder<E> keyOrder) {
 
         if (keyOrder == null)
             throw new IllegalArgumentException();

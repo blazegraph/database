@@ -528,18 +528,38 @@ public interface IDataService extends IRemoteTxCommitProtocol, IService {
             throws IOException, InterruptedException, ExecutionException;
     
     /**
-     * Purges any resources that are no longer required based on the
-     * {@link StoreManager.Options#MIN_RELEASE_AGE}.
+     * This attempts to pause the service accepting {@link ITx#UNISOLATED}
+     * writes and then purges any resources that are no longer required based on
+     * the {@link StoreManager.Options#MIN_RELEASE_AGE}.
      * <p>
      * Note: Resources are normally purged during synchronous overflow handling.
      * However, asynchronous overflow handling can cause resources to no longer
      * be needed as new index partition views are defined. This method MAY be
      * used to trigger a release before the next overflow event.
      * 
+     * @param timeout
+     *            The timeout (in milliseconds) that the method will await the
+     *            pause of the write service.
+     * @param truncateJournal
+     *            When <code>true</code>, the live journal will be truncated
+     *            to its minimum extent (all writes will be preserved but there
+     *            will be no free space left in the journal). This may be used
+     *            to force the {@link DataService} to its minimum possible
+     *            footprint given the configured
+     *            {@link StoreManager#getMinReleaseAge()}.
+     * 
+     * @return <code>true</code> if successful and <code>false</code> if the
+     *         write service could not be paused after the specified timeout.
+     * 
+     * @param truncateJournal
+     *            When <code>true</code> the live journal will be truncated
+     *            such that no free space remains in the journal.
+     * 
      * @throws IOException
      * @throws InterruptedException
      */
-    public void purgeOldResources() throws IOException, InterruptedException;
+    public boolean purgeOldResources(long timeout, boolean truncateJournal)
+            throws IOException, InterruptedException;
     
     /**
      * The #of overflows that have taken place on this data service (the counter

@@ -1697,7 +1697,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * the resource manager to refuse another overflow until we have
              * handle the old journal, all new writes are on the live index.
              */
-            
+
             final long overflowCounter = resourceManager.overflowCounter
                     .incrementAndGet();
 
@@ -1756,11 +1756,49 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
             }
 
-            // enable overflow again as a post-condition.
-            if (!resourceManager.overflowAllowed.compareAndSet(false/*expect*/, true/*set*/)) {
+            try {
 
-                throw new AssertionError();
+                /*
+                 * Once asynchronous processing is complete there are likely to
+                 * be resources that can be released because their views have
+                 * been redefined, typically by a compacting merge. This
+                 * attempts to release any resources that are no longer
+                 * required.
+                 */
+                
+                if (resourceManager
+                        .purgeOldResources(1000/* timeout */, false/* truncateJournal */)) {
 
+                    if (INFO)
+                        log
+                                .info("Purged old resources after asynchronous overflow.");
+
+                } else {
+
+                    log
+                            .warn("Write service did not pause within timeout - will not purge resources now.");
+
+                }
+
+            } catch(InterruptedException ex) {
+                
+                // Ignore.
+
+            } catch(Throwable t) {
+                
+                // log and ignore.
+                log.error("Problem purging old resources?", t);
+                
+            } finally {
+                
+                // enable overflow again as a post-condition.
+                if (!resourceManager.overflowAllowed.compareAndSet(
+                        false/* expect */, true/* set */)) {
+
+                    throw new AssertionError();
+
+                }
+                
             }
 
         }

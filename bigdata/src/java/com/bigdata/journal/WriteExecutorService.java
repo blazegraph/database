@@ -1910,7 +1910,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             
         } catch (Throwable t) {
 
-            log.error("Problem witn resetState?", t);
+            log.error("Problem with resetState?", t);
 
         }
 

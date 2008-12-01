@@ -107,8 +107,8 @@ public class ResultSet implements Externalizable {
      * that is actually stored in the index and the timestamped property sets
      * that are visited by the logical row scan.
      * <p>
-     * Note: This means that the ITupleSerializer will be null if the iterator
-     * does not visit any elements!
+     * Note: This means that the ITupleSerializer will be <code>null</code> if
+     * the iterator does not visit any elements!
      */
     private ITupleSerializer tupleSerializer;
     
@@ -1001,17 +1001,23 @@ public class ResultSet implements Externalizable {
         }
 
         /*
-         * True iff the source iterator will not visit any more tuples.
-         */
-        final boolean exhausted = !itr.hasNext();
-        
-        /*
          * We always return the lastKey visited and set lastKey := null iff no
          * keys were scanned. This ensures that tuples that are filtered out are
          * not re-scanned by a continuation query.
+         * 
+         * Note: Due to a side-effect of itr.hasNext() on [tuple] the [lastKey]
+         * MUST be copied out of the [tuple] before we test to determine if the
+         * iterator is exhausted!!!
          */
         final byte[] lastKey = (tuple == null ? null : tuple.getKey());
 
+        /*
+         * True iff the source iterator will not visit any more tuples.
+         * 
+         * Note: This has a side-effect on [tuple]!!!
+         */
+        final boolean exhausted = !itr.hasNext();
+        
         // Signal completion.
         done(exhausted, lastKey);
 

@@ -43,6 +43,7 @@ import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.Tuple;
 import com.bigdata.btree.filter.FilterConstructor;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.filter.ITupleFilter;
@@ -302,6 +303,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
         this.chunkCapacity = chunkCapacity;
 
+//        this.fullyBufferedReadThreshold = 100000;
         this.fullyBufferedReadThreshold = fullyBufferedReadThreshold;
         
         this.historicalRead = TimestampUtility.isHistoricalRead(timestamp);
@@ -348,7 +350,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         }
         
         @SuppressWarnings("unchecked")
-        public boolean isValid(ITuple<R> tuple) {
+        public boolean isValid(final ITuple<R> tuple) {
             
             final R obj = (R) tuple.getObject();
         
@@ -361,7 +363,8 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
     public String toString() {
 
         return getClass().getName() + "{predicate=" + predicate + ", keyOrder="
-                + keyOrder + ", flags=" + flags + ", fromKey="
+                + keyOrder + ", flags=" + Tuple.flagString(flags)
+                + ", fromKey="
                 + (fromKey == null ? "n/a" : BytesUtil.toString(fromKey))
                 + ", toKey="
                 + (toKey == null ? "n/a" : BytesUtil.toString(toKey) + "}");
@@ -728,8 +731,16 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
          * (IRangeQuery, ITupleIterator). This will require a lot of changes to
          * the code as that gets used everywhere.
          */
-        final Iterator<R> src = new Striterator(rangeIterator(capacity, flags,
-                filter)).addFilter(new TupleObjectResolver());
+        
+        // The raw tuple iterator: the impl depends on the IIndex impl (BTree,
+        // IndexSegment, ClientIndexView, or DataServiceIndexView).
+        final ITupleIterator<R> tupleItr = rangeIterator(capacity, flags,
+                filter);
+        
+        // Wrap raw tuple iterator with resolver that materializes the elements
+        // from the visited tuples.
+        final Iterator<R> src = new Striterator(tupleItr)
+                .addFilter(new TupleObjectResolver());
 
         if (fullyBufferedRead) {
 
@@ -821,7 +832,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
             
         }
         
-        // read up to the limit elements.
+        // read up to [limit] elements.
         while (src.hasNext() && nused < limit) {
 
             final R e = src.next();
@@ -890,7 +901,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
                 .getExecutorService();
         
         final Future<Void> future = executorService
-                .submit(new ChunkConsumerTask(src, buffer));
+                .submit(new ChunkConsumerTask<R>(this, src, buffer));
 
         buffer.setFuture(future);
         
@@ -906,10 +917,19 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private class ChunkConsumerTask implements Callable<Void> {
+    static private class ChunkConsumerTask<R> implements Callable<Void> {
+
+        static protected final Logger log = Logger.getLogger(ChunkConsumerTask.class);
+
+        static protected final boolean INFO = log.isInfoEnabled(); 
         
-        final Iterator<R> src;
-        final BlockingBuffer<R[]> buffer;
+        static protected final boolean DEBUG = log.isDebugEnabled(); 
+        
+        private final AbstractAccessPath<R> accessPath;
+
+        private final Iterator<R> src;
+        
+        private final BlockingBuffer<R[]> buffer;
         
         /**
          * 
@@ -920,10 +940,22 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
          *            The buffer onto which chunks of those elements will be
          *            written.
          */
-        public ChunkConsumerTask(final Iterator<R> src,
-                final BlockingBuffer<R[]> buffer) {
-        
-            this.src =src;
+        public ChunkConsumerTask(final AbstractAccessPath<R> accessPath,
+                final Iterator<R> src, final BlockingBuffer<R[]> buffer) {
+
+            if (accessPath == null)
+                throw new IllegalArgumentException();
+            
+            if (src == null)
+                throw new IllegalArgumentException();
+            
+            if (buffer == null)
+                throw new IllegalArgumentException();
+            
+            this.accessPath = accessPath;
+            
+            this.src = src;
+            
             this.buffer = buffer;
 
         }
@@ -933,19 +965,31 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
             /*
              * Chunked iterator reading from the ITupleIterator. The filter was
              * already applied by the ITupleIterator so we do not use it here.
+             * 
+             * Note: The chunk size is determined [chunkCapacity].
+             * 
+             * Note: The BlockingBuffer can combine multiple chunks together
+             * dynamically to provide a larger effective chunk size as long as
+             * those chunks are available with little or no added latency.
              */
             final IChunkedOrderedIterator<R> itr = new ChunkedWrappedIterator<R>(
-                    src, chunkCapacity, keyOrder, null/* filter */);
+                    src, accessPath.chunkCapacity, accessPath.keyOrder, null/* filter */);
 
+            long nchunks = 0;
+            long nelements = 0;
+            
             try {
 
                 while (src.hasNext()) {
 
-                    /*
-                     * Note: The chunk size is determined by the source
-                     * iterator.
-                     */
                     final R[] chunk = itr.nextChunk();
+                    
+                    nchunks++;
+                    nelements+=chunk.length;
+                    
+                    if(DEBUG)
+                        log.debug("#chunks=" + nchunks + ", chunkSize="
+                            + chunk.length + ", nelements=" + nelements);
 
                     buffer.add(chunk);
 
@@ -953,11 +997,13 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
             } finally {
 
-                if (DEBUG)
-                    log.debug("Closing buffer: " + AbstractAccessPath.this);
+                if (INFO)
+                    log.info("Closing buffer: #chunks=" + nchunks
+                            + ", #elements=" + nelements + ", accessPath="
+                            + accessPath);
 
                 buffer.close();
-
+            
                 itr.close();
 
             }
@@ -968,7 +1014,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
     }
 
-    final public long rangeCount(boolean exact) {
+    final public long rangeCount(final boolean exact) {
 
         assertInitialized();
 
@@ -1008,7 +1054,8 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
      * Note: the range count is cached for a historical read to reduce round
      * trips to the DataService.
      */
-    final private long historicalRangeCount(byte[] fromKey, byte[] toKey) {
+    final private long historicalRangeCount(final byte[] fromKey,
+            final byte[] toKey) {
         
         if (rangeCount == -1L) {
     
@@ -1027,23 +1074,24 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
     final public ITupleIterator<R> rangeIterator() {
 
         return rangeIterator(0/* capacity */, flags, filter);
-        
+
     }
-    
+
     @SuppressWarnings( { "unchecked" })
-    protected ITupleIterator<R> rangeIterator(int capacity, int flags,
-            IFilterConstructor<R> filter) {
+    protected ITupleIterator<R> rangeIterator(final int capacity,
+            final int flags, final IFilterConstructor<R> filter) {
 
         assertInitialized();
-        
+
         if (DEBUG) {
 
-            log.debug(this+" : capacity="+capacity+", flags="+flags+", filter="+filter);
-            
+            log.debug(this + " : capacity=" + capacity + ", flags=" + flags
+                    + ", filter=" + filter);
+
         }
 
         return ndx.rangeIterator(fromKey, toKey, capacity, flags, filter);
-        
+
     }
 
     /**

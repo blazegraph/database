@@ -29,7 +29,7 @@ public class TupleObjectResolver<R> extends Resolver {
      */
     @SuppressWarnings("unchecked")
     @Override
-    protected R resolve(Object arg0) {
+    protected R resolve(final Object arg0) {
 
         final ITuple tuple = (ITuple) arg0;
 
