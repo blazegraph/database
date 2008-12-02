@@ -588,9 +588,11 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 //    private Object historyPolicy;
 
     /**
-     * The unique identifier for the index whose data is stored in this B+Tree
-     * data structure. When using a scale-out index the same <i>indexUUID</i>
-     * MUST be assigned to each mutable and immutable B+Tree having data for any
+     * The unique identifier for the (scale-out) index whose data is stored in
+     * this B+Tree data structure.
+     * <p>
+     * Note: When using a scale-out index the same <i>indexUUID</i> MUST be
+     * assigned to each mutable and immutable B+Tree having data for any
      * partition of that scale-out index. This makes it possible to work
      * backwards from the B+Tree data structures and identify the index to which
      * they belong.

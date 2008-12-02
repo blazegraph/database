@@ -215,6 +215,8 @@ public class TestIndexSegmentAddressManager extends AbstractBTreeTestCase {
                     .encodeOffset(offsetMetadata));
 
             length = offsetMetadata + sizeMetadata; 
+
+            final boolean compactingMerge = r.nextBoolean();
             
             checkpoint = new IndexSegmentCheckpoint(
                 offsetBits,//
@@ -232,6 +234,7 @@ public class TestIndexSegmentAddressManager extends AbstractBTreeTestCase {
                 addrFirstLeaf,//
                 addrLastLeaf,//
                 length,//
+                compactingMerge,//
                 UUID.randomUUID(),// segmentUUID,
                 System.currentTimeMillis()//commitTime
                 );

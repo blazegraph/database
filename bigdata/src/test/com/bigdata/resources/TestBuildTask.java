@@ -55,7 +55,7 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
-import com.bigdata.resources.BuildIndexSegmentTask.AtomicUpdateBuildIndexSegmentTask;
+import com.bigdata.resources.CompactingMergeTask.AtomicReplaceHistoryTask;
 
 /**
  * Basic test of building an index segment from an index partition on overflow.
@@ -140,7 +140,7 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
             final byte[][] keys = new byte[nentries][];
             final byte[][] vals = new byte[nentries][];
 
-            Random r = new Random();
+            final Random r = new Random();
 
             for (int i = 0; i < nentries; i++) {
 
@@ -154,7 +154,7 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
 
             }
 
-            IIndexProcedure proc = BatchInsertConstructor.RETURN_NO_VALUES
+            final IIndexProcedure proc = BatchInsertConstructor.RETURN_NO_VALUES
                     .newInstance(indexMetadata, 0/* fromIndex */,
                             nentries/*toIndex*/, keys, vals);
 
@@ -212,7 +212,7 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
                     .getIndexSegmentFile(indexMetadata);
 
             // task to run.
-            final AbstractTask task = new BuildIndexSegmentTask(
+            final AbstractTask task = new CompactingMergeTask(
                     resourceManager, lastCommitTime, name, outFile);
 
             try {
@@ -268,8 +268,8 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
             // fake out the task so that it will run (it can only run during asyn overflow).
             resourceManager.overflowAllowed.set(false);
             
-            AbstractTask task = new AtomicUpdateBuildIndexSegmentTask(resourceManager,
-                    concurrencyManager, name, result);
+            AbstractTask task = new AtomicReplaceHistoryTask(resourceManager,
+                    concurrencyManager, name, indexUUID, result);
 
             // run task, await completion.
             concurrencyManager.submit(task).get();

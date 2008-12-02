@@ -2034,9 +2034,9 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      */
     public static void assertSameEntryIterator(IIndex expected, IIndex actual) {
         
-        ITupleIterator expectedItr = expected.rangeIterator(null,null);
+        final ITupleIterator expectedItr = expected.rangeIterator(null,null);
 
-        ITupleIterator actualItr = actual.rangeIterator(null,null);
+        final ITupleIterator actualItr = actual.rangeIterator(null,null);
         
         long nvisited = 0L;
         
@@ -2044,9 +2044,9 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
             assertTrue("Expecting another index entry: nvisited="+nvisited, actualItr.hasNext());
             
-            ITuple expectedTuple = expectedItr.next();
+            final ITuple expectedTuple = expectedItr.next();
 
-            ITuple actualTuple = actualItr.next();
+            final ITuple actualTuple = actualItr.next();
             
             nvisited++;
 

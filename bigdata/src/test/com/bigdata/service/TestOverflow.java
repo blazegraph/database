@@ -33,7 +33,6 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
-import com.bigdata.bfs.BigdataFileSystem.Options;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ISplitHandler;
@@ -49,6 +48,7 @@ import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.resources.DefaultSplitHandler;
 import com.bigdata.resources.ResourceManager;
+import com.bigdata.resources.ResourceManager.Options;
 import com.bigdata.sparse.SparseRowStore;
 
 /**
@@ -132,15 +132,15 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
         
         Properties properties = new Properties( super.getProperties() );
         
-        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
-                .toString());
-
+        // overrides value set in the superclass.
+        properties.setProperty(Options.BUFFER_MODE,BufferMode.Disk.toString());
+        
         // Note: disable copy of small index segments to the new journal during overflow.
         // @todo also test with copy enabled.
-        properties.setProperty(com.bigdata.resources.ResourceManager.Options.COPY_INDEX_THRESHOLD,"0");
-        
+        properties.setProperty(Options.COPY_INDEX_THRESHOLD, "0");
+
         // Note: disables index partition moves.
-        properties.setProperty(com.bigdata.resources.ResourceManager.Options.MAXIMUM_MOVES_PER_TARGET,"0");
+        properties.setProperty(Options.MAXIMUM_MOVES_PER_TARGET, "0");
         
 //        properties.setProperty(Options.INITIAL_EXTENT, ""+1*Bytes.megabyte);
         
@@ -222,7 +222,9 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
      * Test registers a scale-out index, writes data onto the initial index
      * partition, forces a split, verifies that the scale-out index has been
      * divided into two index partitions, and verifies that a range scan of the
-     * scale-out index agrees with the ground truth.
+     * scale-out index agrees with the ground truth. The test then goes on to
+     * delete index entries until it forces a join of the index partitions and
+     * verifies that the index partitions were in fact joined.
      * 
      * @throws IOException
      * @throws ExecutionException
@@ -266,9 +268,10 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
         final PartitionLocator pmd0;
         {
             
-            ClientIndexView ndx = (ClientIndexView)fed.getIndex(name,ITx.UNISOLATED);
-            
-            IMetadataIndex mdi = ndx.getMetadataIndex();
+            final ClientIndexView ndx = (ClientIndexView) fed.getIndex(name,
+                    ITx.UNISOLATED);
+
+            final IMetadataIndex mdi = ndx.getMetadataIndex();
             
             assertEquals("#index partitions", 1, mdi.rangeCount(null, null));
 
@@ -284,15 +287,16 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
         assertEquals("partitionCount", 1, getPartitionCount(name));
         
         /*
-         * Setup the ground truth B+Tree.
+         * Setup the ground truth B+Tree. This is backed by a temporary raw
+         * store so that it does not overflow.
          */
         final BTree groundTruth;
         {
         
-            IndexMetadata indexMetadata = new IndexMetadata(indexUUID);
-            
-            groundTruth = BTree.create(new TemporaryRawStore(),indexMetadata);
-        
+            final IndexMetadata indexMetadata = new IndexMetadata(indexUUID);
+
+            groundTruth = BTree.create(new TemporaryRawStore(), indexMetadata);
+
         }
 
         /*
@@ -311,7 +315,7 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
          * Once the overflow process completes the client be notified that the
          * index partition which it has been addressing no longer exists on the
          * data service. At that point the client SHOULD re-try the operation.
-         * Once the client returns from tha retry we will notice that the
+         * Once the client returns from that retry we will notice that the
          * partition count has increased and exit this loop.
          */
         int nrounds = 0;
@@ -378,9 +382,10 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
         }
         
         // wait until overflow processing is done.
-        final long overflowCounter1 = awaitOverflow(dataService0,overflowCounter0);
+        final long overflowCounter1 = awaitOverflow(dataService0,
+                overflowCounter0);
         
-        assertEquals("partitionCount", 2,getPartitionCount(name));
+        assertEquals("partitionCount", 2, getPartitionCount(name));
         
         /*
          * Compare the index against ground truth after overflow.
@@ -388,24 +393,24 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
         
         log.info("Verifying scale-out index against ground truth");
 
-        assertSameEntryIterator(groundTruth, fed.getIndex(name,ITx.UNISOLATED));
+        assertSameEntryIterator(groundTruth, fed.getIndex(name, ITx.UNISOLATED));
 
         /*
          * Get the key range for the left-most index partition and then delete
          * entries until the index partition underflows.
          */
         {
-                        
-            final byte[] fromKey = new byte[]{};
-            
+
+            final byte[] fromKey = new byte[] {};
+
             final PartitionLocator locator = fed.getMetadataIndex(name,
                     ITx.READ_COMMITTED).get(fromKey);
-            
+
             final byte[] toKey = locator.getRightSeparatorKey();
-            
+
             // ground truth range count for that index partition.
             final int rangeCount = (int) groundTruth.rangeCount(fromKey, toKey);
-            
+
             // #of entries to delete to trigger a join operation.
             final int ndelete = rangeCount - minimumEntryCountPerSplit;
             
@@ -422,20 +427,23 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
             
             log.info("Will delete " + ndelete + " of " + rangeCount
                     + " entries from " + locator + " to trigger underflow");
-            
-            groundTruth.submit(0/*fromIndex*/,ndelete/*toIndex*/, keys, null/* vals */,
-                    BatchRemoveConstructor.RETURN_NO_VALUES, null/*handler*/);
 
-            dataService0.forceOverflow(false/*immediate*/,false/*compactingMerge*/);
-            
-            fed.getIndex(name, ITx.UNISOLATED).submit(0/*fromIndex*/,ndelete/*toIndex*/, keys,
+            groundTruth.submit(0/* fromIndex */, ndelete/* toIndex */, keys,
                     null/* vals */, BatchRemoveConstructor.RETURN_NO_VALUES,
-                    null/*handler*/);
+                    null/* handler */);
+
+            dataService0
+                    .forceOverflow(false/* immediate */, false/* compactingMerge */);
+
+            fed.getIndex(name, ITx.UNISOLATED).submit(0/* fromIndex */,
+                    ndelete/* toIndex */, keys, null/* vals */,
+                    BatchRemoveConstructor.RETURN_NO_VALUES, null/* handler */);
             
         }
 
         // wait until overflow processing is done.
-        final long overflowCounter2 = awaitOverflow(dataService0, overflowCounter1);
+        final long overflowCounter2 = awaitOverflow(dataService0,
+                overflowCounter1);
         
         /*
          * Confirm index partitions were NOT joined.
@@ -454,7 +462,7 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
         
         log.info("Verifying scale-out index against ground truth");
 
-        assertSameEntryIterator(groundTruth, fed.getIndex(name,ITx.UNISOLATED));
+        assertSameEntryIterator(groundTruth, fed.getIndex(name, ITx.UNISOLATED));
 
         /*
          * Set the forceOverflow flag and then write another index entry on the
@@ -463,23 +471,26 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
          * gone through a compacting build.
          */
         {
-            
-            dataService0.forceOverflow(false/*immediate*/,false/*compactingMerge*/);
-            
+
+            dataService0
+                    .forceOverflow(false/* immediate */, false/* compactingMerge */);
+
             // find the locator for the last index partition.
-            PartitionLocator locator = fed.getMetadataIndex(name,
+            final PartitionLocator locator = fed.getMetadataIndex(name,
                     ITx.READ_COMMITTED).find(null);
 
             final byte[][] keys = new byte[][] { locator.getLeftSeparatorKey() };
 //            final byte[][] vals = new byte[][] { /*empty byte[] */ };
 
             // overwrite the value (if any) under the left separator key.
-            groundTruth.submit(0/*fromIndex*/,1/*toIndex*/, keys, null/*vals*/,
-                    BatchRemoveConstructor.RETURN_NO_VALUES, null/* handler */);
+            groundTruth.submit(0/* fromIndex */, 1/* toIndex */, keys,
+                    null/* vals */, BatchRemoveConstructor.RETURN_NO_VALUES,
+                    null/* handler */);
 
             // overwrite the value (if any) under the left separator key.
-            fed.getIndex(name, ITx.UNISOLATED).submit(0/*fromIndex*/,1/*toIndex*/, keys, null/*vals*/,
-                    BatchRemoveConstructor.RETURN_NO_VALUES, null/* handler */);
+            fed.getIndex(name, ITx.UNISOLATED)
+                    .submit(0/* fromIndex */, 1/* toIndex */, keys, null/*vals*/,
+                            BatchRemoveConstructor.RETURN_NO_VALUES, null/* handler */);
             
         }
 

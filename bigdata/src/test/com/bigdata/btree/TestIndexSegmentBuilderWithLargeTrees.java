@@ -50,6 +50,9 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
     public TestIndexSegmentBuilderWithLargeTrees(String name) {
         super(name);
     }
+    
+    // all the builds in this test suite use this flag.
+    private final boolean compactingMerge = true;
 
     public Properties getProperties() {
 
@@ -257,7 +260,8 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
             final long commitTime = System.currentTimeMillis();
             
             new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(),
-                    btree.rangeIterator(), m, btree.getIndexMetadata(), commitTime).call();
+                    btree.rangeIterator(), m, btree.getIndexMetadata(),
+                    commitTime, compactingMerge).call();
 
             /*
              * Verify can load the index file and that the metadata associated

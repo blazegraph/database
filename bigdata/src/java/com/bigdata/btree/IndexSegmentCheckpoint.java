@@ -110,6 +110,7 @@ public class IndexSegmentCheckpoint {
             Bytes.SIZEOF_LONG * 6 + // {offset,extent} tuples for the {leaves, nodes, blobs} regions.
             SIZEOF_ADDR * 5 + // address of the {root node/leaf, indexMetadata, bloomFilter, {first,last}Leaf}.
             Bytes.SIZEOF_LONG + // file size in bytes.
+            1 + // compactingMerge flag (0 | 1).
             SIZEOF_UNUSED + // available bytes for future versions.
             SIZEOF_CHECKSUM+ // the checksum for the proceeding bytes in the checkpoint record.
             Bytes.SIZEOF_LONG // timestamp1
@@ -264,6 +265,16 @@ public class IndexSegmentCheckpoint {
      * Length of the file in bytes.
      */
     final public long length;
+
+    /**
+     * <code>true</code> iff the caller asserted that the {@link IndexSegment}
+     * was a fused view of the source index (partition) as of the specified
+     * {@link #commitTime}. <code>false</code> implies that the
+     * {@link IndexSegment} is the result of an incremental build. This flag is
+     * important when attempting a bottom up reconstruction of a scale-out index
+     * from its components on various journals and {@link IndexSegmentStore}s.
+     */
+    final public boolean compactingMerge;
     
     /**
      * The commit time associated with the view from which the
@@ -309,7 +320,7 @@ public class IndexSegmentCheckpoint {
      *             is not large enough to contain an valid
      *             {@link IndexSegmentCheckpoint} record.
      */
-    public IndexSegmentCheckpoint(RandomAccessFile raf) throws IOException {
+    public IndexSegmentCheckpoint(final RandomAccessFile raf) throws IOException {
 
         final long len = raf.length();
         
@@ -396,6 +407,8 @@ public class IndexSegmentCheckpoint {
         
         length = buf.getLong();
         
+        compactingMerge = buf.get() != 0;
+        
         buf.position(buf.position() + SIZEOF_UNUSED);
         
         // Note: this sets the instance field to the checksum read from the record!
@@ -462,28 +475,29 @@ public class IndexSegmentCheckpoint {
      */
     public IndexSegmentCheckpoint(//
             //
-            int offsetBits,//
+            final int offsetBits,//
             // basic checkpoint record.
-            int height, //
-            int nleaves,//
-            int nnodes,//
-            int nentries,//
+            final int height, //
+            final int nleaves,//
+            final int nnodes,//
+            final int nentries,//
             //
-            int maxNodeOrLeafLength,//
+            final int maxNodeOrLeafLength,//
             // region extents
-            long offsetLeaves, long extentLeaves,//
-            long offsetNodes, long extentNodes,// 
-            long offsetBlobs, long extentBlobs,//
+            final long offsetLeaves, final long extentLeaves,//
+            final long offsetNodes, final long extentNodes,// 
+            final long offsetBlobs, final long extentBlobs,//
             // simple addresses
-            long addrRoot, //
-            long addrMetadata, //
-            long addrBloom,//
-            long addrFirstLeaf,//
-            long addrLastLeaf,//
+            final long addrRoot, //
+            final long addrMetadata, //
+            final long addrBloom,//
+            final long addrFirstLeaf,//
+            final long addrLastLeaf,//
             // misc.
-            long length,//
-            UUID segmentUUID,//
-            long commitTime//
+            final long length,//
+            final boolean compactingMerge,//
+            final UUID segmentUUID,//
+            final long commitTime//
     ) {
         
         /*
@@ -530,6 +544,8 @@ public class IndexSegmentCheckpoint {
         // other data
         
         this.length = length;
+        
+        this.compactingMerge = compactingMerge;
         
         this.commitTime = commitTime;
         
@@ -786,6 +802,8 @@ public class IndexSegmentCheckpoint {
         
         buf.putLong(length);
 
+        buf.put((byte) (compactingMerge ? 1 : 0));
+        
         // skip over this many bytes.
         buf.position(buf.position()+SIZEOF_UNUSED);
         
@@ -854,6 +872,7 @@ public class IndexSegmentCheckpoint {
         sb.append(", addrMetadata=" + am.toString(addrMetadata));
         sb.append(", addrBloom=" + am.toString(addrBloom));
         sb.append(", length=" + length);
+        sb.append(", compactingMerge=" + compactingMerge);
         sb.append(", checksum="+checksum);
         sb.append(", commitTime=" + new Date(commitTime));
 

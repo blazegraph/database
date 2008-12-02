@@ -107,9 +107,9 @@ public class TestIndexSegmentCursors extends AbstractTupleCursorTestCase {
      */
     protected IndexSegment buildIndexSegment(BTree btree) throws IOException, Exception {
 
-        new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(),
-                btree.rangeIterator(), 30/* m */,
-                btree.getIndexMetadata(), System.currentTimeMillis()/* commitTime */)
+        new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
+                .rangeIterator(), 30/* m */, btree.getIndexMetadata(), System
+                .currentTimeMillis()/* commitTime */, true/* compactingMerge */)
                 .call();
 
         IndexSegmentStore segStore = new IndexSegmentStore(outFile);

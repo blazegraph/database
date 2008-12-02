@@ -147,6 +147,16 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      * written into {@link IndexSegmentCheckpoint#commitTime}.
      */
     final public long commitTime;
+
+    /**
+     * <code>true</code> iff the generated {@link IndexSegment} will
+     * incorporate all state for the source index (partition) as of the
+     * specified <i>commitTime</i>.
+     * <p>
+     * Note: This flag is written into the {@link IndexSegmentCheckpoint} but it
+     * has no other effect on the build process.
+     */
+    final public boolean compactingMerge;
     
     /**
      * A copy of the metadata object provided to the ctor. This object is
@@ -409,25 +419,41 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      *            The commit time associated with the view from which the
      *            {@link IndexSegment} is being generated. This value is written
      *            into {@link IndexSegmentCheckpoint#commitTime}.
+     * @param compactingMerge
+     *            <code>true</code> iff the generated {@link IndexSegment}
+     *            will incorporate all state for the source index (partition) as
+     *            of the specified <i>commitTime</i>. This flag is written into
+     *            the {@link IndexSegmentCheckpoint} but does not otherwise
+     *            effect the build process.
      * 
      * @throws IOException
      */
     public IndexSegmentBuilder(//
-            File outFile,//
-            File tmpDir,//
+            final File outFile,//
+            final File tmpDir,//
             final int entryCount,//
-            ITupleIterator entryIterator, //
-            int m,
+            final ITupleIterator entryIterator, //
+            final int m,
             IndexMetadata metadata,//
-            final long commitTime
+            final long commitTime,
+            final boolean compactingMerge 
             )
             throws IOException {
 
-        assert outFile != null;
-        assert tmpDir != null;
-        assert entryCount > 0;
-        assert entryIterator != null;
-        assert commitTime > 0L;
+        if (outFile == null)
+            throw new IllegalArgumentException();
+
+        if (tmpDir == null)
+            throw new IllegalArgumentException();
+        
+        if (entryCount <= 0)
+            throw new IllegalArgumentException();
+        
+        if (entryIterator == null)
+            throw new IllegalArgumentException();
+        
+        if (commitTime <= 0L)
+            throw new IllegalArgumentException();
 
         final long begin_setup = System.currentTimeMillis();
 
@@ -479,6 +505,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
         //
         this.commitTime = commitTime;
+
+        this.compactingMerge = compactingMerge;
         
         /*
          * Override the branching factor on the index segment.
@@ -1675,7 +1703,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                     offsetLeaves, extentLeaves, offsetNodes, extentNodes,
                     offsetBlobs, extentBlobs, addrRoot, addrMetadata,
                     addrBloom, addrFirstLeaf, addrLastLeaf, out.length(),
-                    segmentUUID, commitTime);
+                    compactingMerge, segmentUUID, commitTime);
 
             md.write(out);
             

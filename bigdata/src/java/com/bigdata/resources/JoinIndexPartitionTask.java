@@ -363,7 +363,7 @@ public class JoinIndexPartitionTask extends
 
                 final String name = result.oldnames[i];
 
-                IIndex src = getIndex(name);
+                final IIndex src = getIndex(name);
 
                 assert src != null;
 

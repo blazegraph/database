@@ -1183,28 +1183,60 @@ abstract public class IndexManager extends StoreManager {
             /*
              * Use the range iterator to get an exact entry count for the view.
              * 
-             * Note: We need the exact entry count for the IndexSegmentBuilder.
-             * It requires the exact #of index entries when it creates its plan
-             * for populating the index segment.
+             * @todo We need the exact entry count for the IndexSegmentBuilder
+             * since requires the exact #of index entries when it creates its
+             * plan for populating the index segment. IndexSegmentBulder should
+             * be modified so that it can handle an estimate that is NOT LESS
+             * THAN the actual #of tuples that will be written into the
+             * IndexSegment. This change will mean that a compacting merge can
+             * generate an IndexSegment that is not "perfect" and some of whose
+             * nodes or leaves might even underflow. However it should be good
+             * enough and faster to produce. [actually, the range count will
+             * cause the nodes to be pre-materialized and buffered so it might
+             * be only very (VERY) slightly faster.]
              * 
-             * FIXME Truncating to int. drive through long range count.
+             * @todo This is truncating to int. drive through long range count.
              */
-            final int nentries = (int) src.rangeCountExact(fromKey, toKey);
+            final int nentries;
+            final int flags;
+            if(compactingMerge) {
 
-            if (INFO)
-                log.info("There are " + nentries
-                        + " non-deleted index entries: " + name);
+                /*
+                 * For a compacting merge the delete markers are ignored so they
+                 * will NOT be transferred to the new index segment.
+                 */
+                
+                flags = IRangeQuery.DEFAULT;
 
-            /*
-             * Note: When [compactingMerge == true], then delete markers are
-             * ignored so they will NOT be transferred to the new index segment.
-             * 
-             * Note: When [compactingMerge == false], the deleted tuples are
-             * propagated to the new index segment.
-             */
-            final int flags = IRangeQuery.KEYS | IRangeQuery.VALS
-                    | (compactingMerge ? 0 : IRangeQuery.DELETED);
+                nentries = (int) src.rangeCountExact(fromKey, toKey);
 
+                if (INFO)
+                    log.info("Compacting merge: name=" + name
+                            + ", non-deleted index entries=" + nentries);
+                
+            } else {
+
+                /*
+                 * For an incremental build the deleted tuples are propagated to
+                 * the new index segment. This is required in order for the fact
+                 * that those tuples were deleted as of the commitTime to be
+                 * retained by the generated index segment.
+                 * 
+                 * @todo unit test for this.
+                 */
+
+                flags = IRangeQuery.DEFAULT | IRangeQuery.DELETED;
+
+                // Note: An incremental build always reads from a BTree.
+//                nentries = ((BTree) src).getEntryCount();
+                nentries = (int) src.rangeCountExact(fromKey, toKey);
+                
+                if (INFO)
+                    log.info("Incremental build: name=" + name
+                            + ", all index entries=" + nentries);
+                
+            }
+            
             /*
              * Iterator reading the source tuples to be copied to the index
              * segment.
@@ -1220,7 +1252,8 @@ abstract public class IndexManager extends StoreManager {
                     itr, //
                     indexMetadata.getIndexSegmentBranchingFactor(),//
                     indexMetadata,//
-                    createTime//
+                    createTime,//
+                    compactingMerge//
             );
 
             // build the index segment.

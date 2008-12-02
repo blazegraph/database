@@ -29,7 +29,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import java.util.Arrays;
-import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
@@ -142,6 +141,12 @@ public class FusedView implements IIndex, ILocalBTreeView {
         
     }
 
+    public int getSourceCount() {
+        
+        return srcs.length;
+        
+    }
+    
     public BTree getMutableBTree() {
         
         return (BTree) srcs[0];
@@ -160,17 +165,17 @@ public class FusedView implements IIndex, ILocalBTreeView {
     }
     
     public IResourceMetadata[] getResourceMetadata() {
-        
-        IResourceMetadata[] resources = new IResourceMetadata[srcs.length];
 
-        for(int i=0; i<srcs.length; i++) {
-            
+        final IResourceMetadata[] resources = new IResourceMetadata[srcs.length];
+
+        for (int i = 0; i < srcs.length; i++) {
+
             resources[i] = srcs[i].getStore().getResourceMetadata();
-            
+
         }
 
         return resources;
-        
+
     }
 
     public FusedView(AbstractBTree src1, AbstractBTree src2) {

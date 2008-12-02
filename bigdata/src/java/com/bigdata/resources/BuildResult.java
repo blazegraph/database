@@ -5,7 +5,7 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.mdi.SegmentMetadata;
 
 /**
- * The result of an {@link BuildIndexSegmentTask}.
+ * The result of an {@link CompactingMergeTask}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

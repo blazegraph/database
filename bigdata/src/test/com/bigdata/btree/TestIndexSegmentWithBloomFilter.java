@@ -230,7 +230,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
         
         IndexSegmentBuilder builder2 = new IndexSegmentBuilder(outFile2,
                 tmpDir, btree.getEntryCount(), btree.rangeIterator(), m, btree
-                        .getIndexMetadata(), commitTime);
+                        .getIndexMetadata(), commitTime, true/* compactingMerge */);
         
         builder2.call();
         
@@ -340,7 +340,8 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
                 metadata.setBloomFilterFactory(null/*disable*/);
 
                 new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(),
-                        btree.rangeIterator(), m, metadata, commitTime).call();
+                        btree.rangeIterator(), m, metadata, commitTime,
+                        true/*compactingMerge*/).call();
                 
 //              new IndexSegmentBuilder(outFile, tmpDir, btree, m, 0.);
                 
@@ -365,7 +366,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
                 
                 builder2 = new IndexSegmentBuilder(outFile2, tmpDir, btree
                         .getEntryCount(), btree.rangeIterator(), m, metadata,
-                        commitTime);
+                        commitTime, true/* compactingMerge */);
                 
                 builder2.call();
             

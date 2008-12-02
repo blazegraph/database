@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Future;
 
 import com.bigdata.btree.BTree;
@@ -20,7 +21,7 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
-import com.bigdata.resources.BuildIndexSegmentTask.AtomicUpdateBuildIndexSegmentTask;
+import com.bigdata.resources.CompactingMergeTask.AtomicReplaceHistoryTask;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Split;
 import com.bigdata.sparse.SparseRowStore;
@@ -239,6 +240,9 @@ public class SplitIndexPartitionTask extends
         
         // The name of the scale-out index.
         final String scaleOutIndexName = indexMetadata.getName();
+
+        // The UUID associated with the scale-out index.
+        final UUID indexUUID = indexMetadata.getIndexUUID();
         
         final ISplitHandler splitHandler = indexMetadata.getSplitHandler();
         
@@ -327,8 +331,9 @@ public class SplitIndexPartitionTask extends
             try {
                 
                 // create task that will update the index partition view definition.
-                final AbstractTask<Void> task = new AtomicUpdateBuildIndexSegmentTask(
-                        resourceManager, concurrencyManager, name, result);
+                final AbstractTask<Void> task = new AtomicReplaceHistoryTask(
+                        resourceManager, concurrencyManager, name, indexUUID,
+                        result);
 
                 if (INFO)
                     log.info("src=" + name + ", will run atomic update task");
@@ -499,7 +504,7 @@ public class SplitIndexPartitionTask extends
              * source index partition into N new index partitions.
              */
             final AbstractTask<Void> task = new AtomicUpdateSplitIndexPartitionTask(
-                    resourceManager, resources, result);
+                    resourceManager, resources, indexUUID, result);
 
             // submit atomic update task and wait for it to complete 
             // @todo config timeout?
@@ -650,23 +655,28 @@ public class SplitIndexPartitionTask extends
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static public class AtomicUpdateSplitIndexPartitionTask extends AbstractResourceManagerTask<Void> {
-        
+    static public class AtomicUpdateSplitIndexPartitionTask extends
+            AbstractAtomicUpdateTask<Void> {
+
         protected final SplitResult splitResult;
         
         public AtomicUpdateSplitIndexPartitionTask(
                 final ResourceManager resourceManager,
                 final String[] resource,
+                final UUID indexUUID,
                 final SplitResult splitResult
                 ) {
 
-            super(resourceManager, ITx.UNISOLATED, resource);
+            super(resourceManager, ITx.UNISOLATED, resource, indexUUID);
 
             if (splitResult == null)
                 throw new IllegalArgumentException();
+
+            if (indexUUID == null)
+                throw new IllegalArgumentException();
             
             this.splitResult = splitResult;
-            
+
         }
 
         /**
@@ -697,6 +707,20 @@ public class SplitIndexPartitionTask extends
              */
             final BTree src = ((ILocalBTreeView)getIndex(name)).getMutableBTree();
             
+            if (!indexUUID.equals(src.getIndexMetadata().getIndexUUID())) {
+                
+                /*
+                 * This can happen if you drop/add a scale-out index during
+                 * overflow processing. The new index will have a new UUID. We
+                 * check this to prevent merging in data from the old index.
+                 */
+
+                throw new RuntimeException(
+                        "Different UUID: presuming drop/add of index: name="
+                                + getOnlyResource());
+                
+            }
+                        
             if (INFO) {
             
                 log.info("src=" + name + ",counter=" + src.getCounter().get()
