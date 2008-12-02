@@ -369,9 +369,9 @@ abstract public class MetadataService extends DataService implements
     /**
      * @todo if if exits already? (and has consistent/inconsistent metadata)?
      */
-    public UUID registerScaleOutIndex(IndexMetadata metadata,
-            byte[][] separatorKeys, UUID[] dataServices) throws IOException,
-            InterruptedException, ExecutionException {
+    public UUID registerScaleOutIndex(final IndexMetadata metadata,
+            final byte[][] separatorKeys, final UUID[] dataServices)
+            throws IOException, InterruptedException, ExecutionException {
 
         setupLoggingContext();
 
@@ -426,7 +426,7 @@ abstract public class MetadataService extends DataService implements
 
     }
     
-    public void dropScaleOutIndex(String name) throws IOException,
+    public void dropScaleOutIndex(final String name) throws IOException,
             InterruptedException, ExecutionException {
 
         setupLoggingContext();
@@ -937,11 +937,15 @@ abstract public class MetadataService extends DataService implements
          *            the index paritions will be auto-assigned to data
          *            services.
          */
-        public RegisterScaleOutIndexTask(IBigdataFederation fed,
-                ConcurrencyManager concurrencyManager,
-                IResourceManager resourceManager, String metadataIndexName,
-                final IndexMetadata metadata, byte[][] separatorKeys,
-                UUID[] dataServiceUUIDs) {
+        public RegisterScaleOutIndexTask(
+                final IBigdataFederation fed,
+                final ConcurrencyManager concurrencyManager,
+                final IResourceManager resourceManager,
+                final String metadataIndexName,
+                final IndexMetadata metadata,
+                final byte[][] separatorKeys,
+                UUID[] dataServiceUUIDs
+                ) {
 
             super(concurrencyManager, ITx.UNISOLATED, metadataIndexName);
 
@@ -1011,7 +1015,7 @@ abstract public class MetadataService extends DataService implements
             
             for (int i = 0; i < npartitions; i++) {
 
-                byte[] separatorKey = separatorKeys[i];
+                final byte[] separatorKey = separatorKeys[i];
                 
                 if (separatorKey == null) {
 
@@ -1030,7 +1034,7 @@ abstract public class MetadataService extends DataService implements
                     
                 }
 
-                UUID uuid = dataServiceUUIDs[i];
+                final UUID uuid = dataServiceUUIDs[i];
 
                 if (uuid == null) {
 
@@ -1100,16 +1104,16 @@ abstract public class MetadataService extends DataService implements
              * Map the partitions onto the data services.
              */
             
-            PartitionLocator[] partitions = new PartitionLocator[npartitions];
+            final PartitionLocator[] partitions = new PartitionLocator[npartitions];
             
-            for(int i=0; i<npartitions; i++) {
+            for (int i = 0; i < npartitions; i++) {
                 
                 final byte[] leftSeparator = separatorKeys[i];
 
                 final byte[] rightSeparator = i + 1 < npartitions ? separatorKeys[i + 1]
                         : null;
 
-                PartitionLocator pmd = new PartitionLocator(//
+                final PartitionLocator pmd = new PartitionLocator(//
                         mdi.incrementAndGetNextPartitionId(),//
                         dataServiceUUIDs[i],
                         leftSeparator,

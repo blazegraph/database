@@ -1329,8 +1329,9 @@ abstract public class DataService extends AbstractService
             
             final Callable task = new ForceOverflowTask(compactingMerge);
             
-            log.warn("Will force overflow: immediate=" + immediate);
-
+            log.warn("Will force overflow: immediate=" + immediate
+                    + ", compactingMerge=" + compactingMerge);
+            
             if (immediate) {
 
                 /*

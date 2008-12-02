@@ -26,6 +26,7 @@ import org.apache.log4j.MDC;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Counters;
+import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.ISplitHandler;
@@ -43,6 +44,7 @@ import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TemporaryRawStore;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.mdi.LocalPartitionMetadata;
@@ -1342,7 +1344,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
         final boolean allowSplits = !compactingMerge;
         
-        tasks.addAll(chooseIndexPartitionSplitOrBuild(allowSplits));
+        tasks.addAll(chooseIndexPartitionSplitBuildOrCompact(allowSplits));
 
         // log the selected post-processing decisions at a high level.
         {
@@ -1365,20 +1367,33 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
     /**
      * For each index (partition) that has not been handled, decide whether we
-     * will split the index partition or build an index segment.
+     * will:
+     * <ul>
+     * 
+     * <li>Split the index partition</li>
+     * 
+     * <li>Incremental build - build an {@link IndexSegment} from the writes
+     * absorbed by the mutable {@link BTree} on the old journal (this removes
+     * the dependency on the old journal as of its lastCommitTime); or</li>
+     * 
+     * <li>Compacting merge - build an {@link IndexSegment} the
+     * {@link FusedView} of the the index partition.</li>
+     * 
+     * </ul>
      * 
      * @param allowSplits
      *            May be used to disallow splits.
      * 
      * @return The list of tasks.
      */
-    protected List<AbstractTask> chooseIndexPartitionSplitOrBuild(
+    protected List<AbstractTask> chooseIndexPartitionSplitBuildOrCompact(
             final boolean allowSplits) {
 
         // counters : must sum to ndone as post-condition.
         int ndone = 0; // for each named index we process
         int nskip = 0; // nothing.
-        int nbuild = 0; // build task.
+        int nbuild = 0; // incremental build task.
+        int ncompact = 0; // compacting merge task.
         int nsplit = 0; // split task.
 
         // @todo estimate using #of indices not yet handled.
@@ -1427,7 +1442,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * opening of the index segment, and perhaps even the index segment
              * store.
              */
-            final IIndex view = resourceManager.getIndex(name, -lastCommitTime);
+            final ILocalBTreeView view = (ILocalBTreeView) resourceManager
+                    .getIndex(name, TimestampUtility
+                            .asHistoricalRead(lastCommitTime));
 
             if (view == null) {
 
@@ -1437,7 +1454,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             }
 
             // note: the mutable btree - accessed here for debugging only.
-            final BTree btree = ((ILocalBTreeView)view).getMutableBTree();
+            final BTree btree = view.getMutableBTree();
 
             // index metadata for that index partition.
             final IndexMetadata indexMetadata = view.getIndexMetadata();
@@ -1486,36 +1503,57 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                 nsplit++;
 
-               } else {
+            } else if (ncompact < resourceManager.maximumCompactingMergesPerOverflow
+                    && view.getSourceCount() >= resourceManager.maximumSourcesPerViewBeforeCompactingMerge
+                    ) {
 
                 /*
-                 * Just do an index build task.
-                 * 
-                 * @todo could do an incremental build if the amount of history
-                 * in the view is not too great.
-                 * 
-                 * @todo mark incremental build segments differently in the file
-                 * system since that might be important information when doing a
-                 * distributed index rebuild. This mark probably needs to be
-                 * driven through the index segment build API so that it shows
-                 * up in the view history and in the index segment checkpoint
-                 * record.
+                 * Compacting merge.
                  */
 
                 // the file to be generated.
                 final File outFile = resourceManager
                         .getIndexSegmentFile(indexMetadata);
 
-                final AbstractTask task = new BuildIndexSegmentTask(
+                final AbstractTask task = new CompactingMergeTask(
                         resourceManager, lastCommitTime, name, outFile);
 
                 // add to set of tasks to be run.
                 tasks.add(task);
 
-                putUsed(name, "willBuild(name=" + name + ")");
+                putUsed(name, "willCompact(name=" + name + ", #sources="
+                        + view.getSourceCount() + ")");
 
                 if (INFO)
-                    log.info("will build  : " + name + ", counter="
+                    log.info("will compact  : " + name + ", #sources="
+                            + view.getSourceCount() + ", counter="
+                            + view.getCounter().get() + ", checkpoint="
+                            + btree.getCheckpoint());
+
+                ncompact++;
+
+            } else {
+
+                /*
+                 * Incremental build.
+                 */
+
+                // the file to be generated.
+                final File outFile = resourceManager
+                        .getIndexSegmentFile(indexMetadata);
+
+                final AbstractTask task = new IncrementalBuildTask(
+                        resourceManager, lastCommitTime, name, outFile);
+
+                // add to set of tasks to be run.
+                tasks.add(task);
+
+                putUsed(name, "willBuild(name=" + name + ", #sources="
+                        + view.getSourceCount() + ")");
+
+                if (INFO)
+                    log.info("will build: " + name + ", #sources="
+                            + view.getSourceCount() + ", counter="
                             + view.getCounter().get() + ", checkpoint="
                             + btree.getCheckpoint());
 
@@ -1528,10 +1566,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         } // itr.hasNext()
 
         // verify counters.
-        if (ndone != nskip + nbuild + nsplit) {
+        if (ndone != nskip + nbuild + ncompact + nsplit) {
 
             log.warn("ndone=" + ndone + ", but : nskip=" + nskip + ", nbuild="
-                    + nbuild + ", nsplit=" + nsplit);
+                    + nbuild + ", ncompact=" + ncompact + ", nsplit=" + nsplit);
 
         }
 

@@ -161,9 +161,15 @@ abstract public class ResourceManager extends OverflowManager implements IResour
                     }
                 });
 
-                tmp.addCounter("Index Partition Build Count", new Instrument<Long>() {
+                tmp.addCounter("Index Partition Incremental Build Count", new Instrument<Long>() {
                     public void sample() {
-                        setValue(buildCounter.get());
+                        setValue(incrementalBuildCounter.get());
+                    }
+                });
+                
+                tmp.addCounter("Index Partition Compacting Merge Count", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(compactingMergeCounter.get());
                     }
                 });
                 

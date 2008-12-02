@@ -107,7 +107,8 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
             long lastCommitTime,
             String resource, UUID targetDataServiceUUID) {
 
-        super(resourceManager, -lastCommitTime, resource);
+        super(resourceManager, TimestampUtility
+                .asHistoricalRead(lastCommitTime), resource);
 
         if (targetDataServiceUUID == null)
             throw new IllegalArgumentException();
@@ -337,7 +338,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
          * 
          * FIXME Must apply overflowHandler - see AbstractBTree#rangeCopy.
          */
-        public Object apply(IIndex ndx) {
+        public Object apply(final IIndex ndx) {
 
             // the live index on which we are writing.
             final BTree dst = (BTree)ndx;

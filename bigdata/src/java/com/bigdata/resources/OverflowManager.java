@@ -154,6 +154,23 @@ abstract public class OverflowManager extends IndexManager {
      * Set based on {@link Options#MAXIMUM_MOVES_PER_TARGET}.
      */
     protected final int maximumMovesPerTarget;
+
+    /**
+     * The maximum #of sources for an index partition view before a compacting
+     * merge of the index partition will be triggered in preference to an
+     * incremental build.
+     * 
+     * @see Options#MAXIMUM_SOURCES_PER_VIEW_BEFORE_COMPACTING_MERGE
+     */
+    protected final int maximumSourcesPerViewBeforeCompactingMerge;
+    
+    /**
+     * The maximum #of compacting merge operations that will be performed during
+     * a single overflow event.
+     * 
+     * @see Options#MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW
+     */
+    protected final int maximumCompactingMergesPerOverflow;
     
     /**
      * The timeout for {@link #shutdown()} -or- ZERO (0L) to wait for ever.
@@ -227,9 +244,14 @@ abstract public class OverflowManager extends IndexManager {
     protected final AtomicLong asyncOverflowTaskCancelledCounter = new AtomicLong(0L);
 
     /**
-     * #of successful index partition build operations.
+     * #of successful index partition incremental build operations.
      */
-    protected final AtomicLong buildCounter = new AtomicLong(0L);
+    protected final AtomicLong incrementalBuildCounter = new AtomicLong(0L);
+
+    /**
+     * #of successful index partition compacting merge operations.
+     */
+    protected final AtomicLong compactingMergeCounter = new AtomicLong(0L);
 
     /**
      * #of successful index partition split operations.
@@ -298,10 +320,10 @@ abstract public class OverflowManager extends IndexManager {
         /**
          * Boolean property determines whether or not
          * {@link IResourceManager#overflow()} processing is enabled (default
-         * <code>true</code>). When disabled the journal will grow without
-         * bounds, {@link IndexSegment}s will never be generated and index
-         * partitions will not be split, joined nor moved away from this
-         * {@link ResourceManager}.
+         * {@value #DEFAULT_OVERFLOW_ENABLED}). When disabled the journal will
+         * grow without bounds, {@link IndexSegment}s will never be generated
+         * and index partitions will not be split, joined nor moved away from
+         * this {@link ResourceManager}.
          */
         String OVERFLOW_ENABLED = OverflowManager.class.getName()+".overflowEnabled";
 
@@ -311,12 +333,12 @@ abstract public class OverflowManager extends IndexManager {
          * Index partitions having no more than this many entries as reported by
          * a range count will be copied to the new journal during synchronous
          * overflow processing rather than building a new index segment from the
-         * buffered writes (default is <code>1000</code>). When ZERO (0),
-         * index partitions will not be copied during overflow processing
-         * (unless they are empty). While it is important to keep down the
-         * latency of synchronous overflow processing, small indices can be
-         * copied so quickly that it is worth it to avoid the heavier index
-         * segment build operation.
+         * buffered writes (default {@value #DEFAULT_COPY_INDEX_THRESHOLD}).
+         * When ZERO (0), index partitions will not be copied during overflow
+         * processing (unless they are empty). While it is important to keep
+         * down the latency of synchronous overflow processing, small indices
+         * can be copied so quickly that it is worth it to avoid the heavier
+         * index segment build operation.
          * 
          * @see #DEFAULT_COPY_INDEX_THRESHOLD
          */
@@ -327,7 +349,7 @@ abstract public class OverflowManager extends IndexManager {
         /**
          * The minimum #of active index partitions on a data service before the
          * resource manager will consider moving an index partition to another
-         * service (default <code>3</code>).
+         * service (default {@value #DEFAULT_MINIMUM_ACTIVE_INDEX_PARTITIONS}).
          * <p>
          * Note: This makes sure that we don't do a move if there are only a few
          * active index partitions on this service. This value is also used to
@@ -360,7 +382,7 @@ abstract public class OverflowManager extends IndexManager {
         /**
          * This is the maximum #of index partitions that the resource manager is
          * willing to move in a given overflow onto identified under-utilized
-         * service (default <code>3</code>).
+         * service (default {@value #DEFAULT_MAXIMUM_MOVES_PER_TARGET}).
          * <p>
          * Note: Index partitions are moved to the identified under-utilized
          * services using a round-robin approach which aids in distributing the
@@ -375,6 +397,58 @@ abstract public class OverflowManager extends IndexManager {
 
         String DEFAULT_MAXIMUM_MOVES_PER_TARGET = "3";
 
+        /**
+         * The maximum #of sources for an index partition view before a
+         * compacting merge of the index partition will be triggered in
+         * preference to an incremental build (default
+         * {@value #DEFAULT_MAXIMUM_SOURCES_PER_VIEW_BEFORE_COMPACTING_MERGE}).
+         * The minimum value is ONE (1) since the source view must always
+         * include the mutable {@link BTree}. When ONE (1), a compacting merge
+         * is always indicated.
+         * <p>
+         * Note: An index partition view is comprised of a mutable {@link BTree}
+         * on the live journal, zero or more mutable {@link BTree}s from
+         * historical journals, and zero or more {@link IndexSegment}s. An
+         * incremental build replaces the {@link BTree} from the old journal (as
+         * of the lastCommitTime for that journal) with an {@link IndexSegment}
+         * having the same data. A compacting merge replaces the <em>view</em>
+         * as of the lastCommitTime of the old journal.
+         */
+        String MAXIMUM_SOURCES_PER_VIEW_BEFORE_COMPACTING_MERGE = OverflowManager.class
+                .getName()
+                + ".maximumSourcesPerViewBeforeCompactingMerge";
+
+        String DEFAULT_MAXIMUM_SOURCES_PER_VIEW_BEFORE_COMPACTING_MERGE = "3";
+        
+        /**
+         * The maximum #of compacting merge operations that will be performed
+         * during a single overflow event (default
+         * {@value #DEFAULT_MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW}). A small
+         * value is normally appropriate and will reduce the amount of work done
+         * in any given overflow and help to stagger the compacting merges
+         * across different overflow events. Once this #of compacting merge
+         * tasks have been identified for a given overflow event, the remainder
+         * of the index partitions that are neither split, joined, moved, nor
+         * copied will use incremental builds. An incremental build is generally
+         * cheaper since it only copies the data on the mutable {@link BTree}
+         * for the lastCommitTime rather than the fused view. Either compacting
+         * merges or incremental builds are required in order for the old
+         * journals to eventually become releasable (otherwise they will remain
+         * part of the view, the #of components in the view will increase
+         * without bound, and you would eventually hit some hard limits).
+         * <p>
+         * Note: This may be set to ZERO (0) to disable compacting merges, but
+         * that is not recommended. If you disable both compacting merges and
+         * moves (or if there is only a single data service) then you will
+         * eventually developed index partition views with 100s of component
+         * indices and exceed various hard limits.
+         */
+        String MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW = OverflowManager.class
+                .getName()
+                + ".maximumCompactingMergesPerOverflow";
+        
+        String DEFAULT_MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW = "3";
+        
         /**
          * The timeout in milliseconds for asynchronous overflow processing to
          * complete (default {@link #DEFAULT_OVERFLOW_TIMEOUT}). Any overflow
@@ -430,7 +504,7 @@ abstract public class OverflowManager extends IndexManager {
             
         }
 
-        // index segment build threshold
+        // copyIndexThreshold
         {
 
             copyIndexThreshold = Integer.parseInt(properties
@@ -492,6 +566,45 @@ abstract public class OverflowManager extends IndexManager {
             
         }
 
+        {
+            maximumSourcesPerViewBeforeCompactingMerge = Integer.parseInt(properties.getProperty(
+                    Options.MAXIMUM_SOURCES_PER_VIEW_BEFORE_COMPACTING_MERGE,
+                    Options.DEFAULT_MAXIMUM_SOURCES_PER_VIEW_BEFORE_COMPACTING_MERGE));
+
+            if(INFO)
+                log.info(Options.MAXIMUM_SOURCES_PER_VIEW_BEFORE_COMPACTING_MERGE+ "="
+                    + maximumSourcesPerViewBeforeCompactingMerge);
+
+            if (maximumSourcesPerViewBeforeCompactingMerge < 1) {
+
+                throw new RuntimeException(
+                        Options.MAXIMUM_SOURCES_PER_VIEW_BEFORE_COMPACTING_MERGE
+                                + " must be GT ONE (1)");
+                
+            }
+            
+        }
+
+        {
+            
+            maximumCompactingMergesPerOverflow = Integer.parseInt(properties.getProperty(
+                    Options.MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW,
+                    Options.DEFAULT_MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW));
+
+            if (INFO)
+                log.info(Options.MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW + "="
+                        + maximumCompactingMergesPerOverflow);
+
+            if (maximumCompactingMergesPerOverflow < 0) {
+
+                throw new RuntimeException(
+                        Options.MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW
+                                + " must be non-negative");
+                
+            }
+            
+        }
+        
         // shutdownTimeout
         {
 

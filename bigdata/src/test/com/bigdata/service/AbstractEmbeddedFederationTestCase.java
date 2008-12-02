@@ -296,18 +296,20 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
      * 
      * @throws IOException
      */
-    protected long awaitOverflow(IDataService dataService,long priorOverflowCounter) throws IOException {
-        
-        log.info("\n**** Awaiting overflow: priorOverflowCounter="+priorOverflowCounter+", service=" + dataService);
+    protected long awaitOverflow(IDataService dataService,
+            long priorOverflowCounter) throws IOException {
+
+        log.info("\n**** Awaiting overflow: priorOverflowCounter="
+                + priorOverflowCounter + ", service=" + dataService);
 
         final long begin = System.currentTimeMillis();
 
         long newOverflowCounter;
-        
+
         while ((newOverflowCounter = dataService.getOverflowCounter()) == priorOverflowCounter) {
 
             try {
-                Thread.sleep(250/* ms */);
+                Thread.sleep(20/* ms */);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }

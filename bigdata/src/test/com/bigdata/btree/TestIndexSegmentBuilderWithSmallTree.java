@@ -148,7 +148,8 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTe
         final long commitTime = System.currentTimeMillis();
         
         new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
-                .rangeIterator(), 3/* m */, btree.getIndexMetadata(), commitTime).call();
+                .rangeIterator(), 3/* m */, btree.getIndexMetadata(), commitTime,
+                true/*compactingMerge*/).call();
 
          /*
           * Verify can load the index file and that the metadata
@@ -235,7 +236,8 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTe
 //        IndexSegmentBuilder.log.setLevel(Level.DEBUG); 
         
         new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
-                .rangeIterator(), 9/* m */, btree.getIndexMetadata(), commitTime).call();
+                .rangeIterator(), 9/* m */, btree.getIndexMetadata(), commitTime,
+                true/*compactingMerge*/).call();
 
         /*
          * Verify that we can load the index file and that the metadata
@@ -345,7 +347,8 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTe
         final long commitTime = System.currentTimeMillis();
         
         new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
-                .rangeIterator(), 10/* m */, btree.getIndexMetadata(), commitTime).call();
+                .rangeIterator(), 10/* m */, btree.getIndexMetadata(), commitTime,
+                true/*compactingMerge*/).call();
 
         /*
          * Verify that we can load the index file and that the metadata
@@ -443,7 +446,8 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTe
         final long commitTime = System.currentTimeMillis();
         
         new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
-                .rangeIterator(), 3/* m */, btree.getIndexMetadata(), commitTime).call();
+                .rangeIterator(), 3/* m */, btree.getIndexMetadata(), commitTime,
+                true/*compactingMerge*/).call();
         
 //        new IndexSegmentBuilder(outFile,tmpDir,btree,3,0.);
 
@@ -537,7 +541,8 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTe
         final long commitTime = System.currentTimeMillis();
         
         new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
-                .rangeIterator(), 3/* m */, btree.getIndexMetadata(), commitTime).call();
+                .rangeIterator(), 3/* m */, btree.getIndexMetadata(), commitTime,
+                true/*compactingMerge*/).call();
 
 //        new IndexSegmentBuilder(outFile,tmpDir,btree,3,0.);
 

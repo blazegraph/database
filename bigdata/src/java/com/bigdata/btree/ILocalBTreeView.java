@@ -38,6 +38,12 @@ package com.bigdata.btree;
 public interface ILocalBTreeView extends IIndex {
 
     /**
+     * The #of {@link AbstractBTree}s sources for the view. This will be ONE
+     * (1) if the view is a {@link BTree}.
+     */
+    public int getSourceCount();
+    
+    /**
      * The {@link BTree} that is absorbing writes for the view.
      */
     public BTree getMutableBTree();

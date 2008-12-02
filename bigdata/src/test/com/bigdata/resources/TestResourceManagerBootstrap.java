@@ -53,9 +53,6 @@ import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.resources.ResourceManager.Options;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.IDataService;
-import com.bigdata.service.ILoadBalancerService;
-import com.bigdata.service.IMetadataService;
 import com.bigdata.util.MillisecondTimestampFactory;
 
 /**
@@ -404,7 +401,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
                     final IndexSegmentBuilder builder = new IndexSegmentBuilder(
                             outFile, tmpDir, ndx.getEntryCount(), ndx
                                     .rangeIterator(), branchingFactor, ndx
-                                    .getIndexMetadata(), commitTime);
+                                    .getIndexMetadata(), commitTime, true/* compactingMerge */);
                     
                     builder.call();
 
@@ -575,7 +572,8 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
                     final IndexSegmentBuilder builder = new IndexSegmentBuilder(
                             outFile, tmpDir, (int) ndx.rangeCount(null, null), ndx
                                     .rangeIterator(null, null),
-                            branchingFactor, ndx.getIndexMetadata(), commitTime);
+                            branchingFactor, ndx
+                                    .getIndexMetadata(), commitTime, true/* compactingMerge */);
                     
                     builder.call();
 

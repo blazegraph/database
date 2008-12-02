@@ -105,6 +105,7 @@ public class TestIndexSegmentCheckpoint extends TestCase {
         final long addrFirstLeaf;
         final long addrLastLeaf;
         final long length;
+        final boolean compactingMerge = true; // @todo also test when false.
         final UUID segmentUUID = UUID.randomUUID();
         final long commitTime = System.currentTimeMillis();
         {
@@ -164,6 +165,7 @@ public class TestIndexSegmentCheckpoint extends TestCase {
                 addrFirstLeaf,//
                 addrLastLeaf,//
                 length,//
+                compactingMerge,//
                 segmentUUID,//
                 commitTime//
                 );
@@ -176,8 +178,8 @@ public class TestIndexSegmentCheckpoint extends TestCase {
                 offsetBits, height, nleaves, nnodes, nentries,
                 maxNodeOrLeafLength, offsetLeaves, extentLeaves, offsetNodes,
                 extentNodes, offsetBlobs, extentBlobs, addrRoot, addrMetadata,
-                addrBloom, addrFirstLeaf, addrLastLeaf, length, segmentUUID,
-                commitTime);
+                addrBloom, addrFirstLeaf, addrLastLeaf, length, compactingMerge,
+                segmentUUID, commitTime);
         
         System.err.println("Expected: "+expected);
         
@@ -244,6 +246,8 @@ public class TestIndexSegmentCheckpoint extends TestCase {
             assertEquals("addrBloom",addrBloom,actual.addrBloom);
 
             assertEquals("length",length,actual.length);
+
+            assertEquals("compactingMerge",compactingMerge,actual.compactingMerge);
 
             assertEquals("segmentUUID",segmentUUID,actual.segmentUUID);
 
