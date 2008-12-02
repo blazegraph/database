@@ -1332,18 +1332,18 @@ abstract public class OverflowManager extends IndexManager {
             
         }
 
-        /*
-         * Cause old resources to be deleted on the file system.
-         * 
-         * Note: This is run while we have a lock on the write executor service
-         * so that we can guarentee that no tasks are running with access to
-         * historical views which might be deleted when we purge old resources.
-         * 
-         * Note: If [postProcess == false] then ALL indices were copied to the
-         * new live journal and the old journal will be purged if
-         * [minReleaseTime == 0].
-         */
-        purgeOldResources();
+//        /*
+//         * Cause old resources to be deleted on the file system.
+//         * 
+//         * Note: This is run while we have a lock on the write executor service
+//         * so that we can guarentee that no tasks are running with access to
+//         * historical views which might be deleted when we purge old resources.
+//         * 
+//         * Note: If [postProcess == false] then ALL indices were copied to the
+//         * new live journal and the old journal will be purged if
+//         * [minReleaseTime == 0].
+//         */
+//        purgeOldResources();
         
         if(INFO)
             log.info("end");

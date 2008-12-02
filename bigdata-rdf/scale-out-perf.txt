@@ -3149,9 +3149,19 @@ Thanks,
 ------------------------------------------------------------
 Commit notes:
 
-- Reduce the CHUNK_TIMEOUT? E.g., from 1000ms to 10ms or 100ms?
+- Incremental builds (vs compact).  Compare performance on U10, etc.
+
+- DP run of U100 (1 machine) and U1000 (3 machines) with overflow and
+  splits enabled, but not moves.  Verify the LBS behavior.  The host
+  with TERM2ID should have the heaviest load.  The move targets will
+  be the more lightly loaded hosts.  Verify all collected host stats
+  and write collector for any stats that are missing.
+
+- DP run w/ moves enabled.  
 
 - Optimize mapping of access path tasks onto join sink tasks.
+
+- Reduce the CHUNK_TIMEOUT? E.g., from 1000ms to 10ms or 100ms?
 
 - Compute ideal splits based on the #of bytes per triple for LUBM for
   each statement index (100M index partition; SPO=9M, OSP=21M,

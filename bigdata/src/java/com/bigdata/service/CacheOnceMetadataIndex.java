@@ -146,7 +146,7 @@ public class CacheOnceMetadataIndex implements IMetadataIndex {
                 fromKey, //
                 toKey, //
                 0, // capacity
-                IRangeQuery.KEYS | IRangeQuery.VALS, //
+                IRangeQuery.KEYS | IRangeQuery.VALS | IRangeQuery.READONLY, //
                 null // filter
         );
 

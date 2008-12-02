@@ -43,6 +43,7 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -2394,9 +2395,8 @@ abstract public class StoreManager extends ResourceEvents implements
      * state for the index so it can not be used to read from arbitrary
      * historical commit points.
      * <p>
-     * Note: The caller MUST arrange for synchronization by pausing the
-     * {@link WriteExecutorService}. Typically this is invoked during
-     * {@link #doOverflow()}.
+     * The caller MUST hold the exclusive lock on the
+     * {@link WriteExecutorService}.
      * 
      * @throws IllegalStateException
      *             if the {@link StoreManager} is not running.
@@ -2569,6 +2569,11 @@ abstract public class StoreManager extends ResourceEvents implements
          */
         final Set<UUID> resourcesInUse = getResourcesForTimestamp(commitTimeToPreserve);
         
+        // @todo log @info
+        log.warn("Purging old resources: #bytes=" + getBytesUnderManagement()
+                + ", #journals=" + getManagedJournalCount() + ", #segments="
+                + getManagedIndexSegmentCount());
+
         /*
          * Delete anything that is: 
          * 
@@ -2580,6 +2585,11 @@ abstract public class StoreManager extends ResourceEvents implements
          */
         deleteUnusedResources(commitTimeToPreserve, resourcesInUse);
         
+        // @todo log @info
+        log.warn("Purged old resources: #bytes=" + getBytesUnderManagement()
+                + ", #journals=" + getManagedJournalCount() + ", #segments="
+                + getManagedIndexSegmentCount());
+
     }
     
     /**
@@ -2946,7 +2956,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
                 synchronized (journalIndex) {
 
-                    ITupleIterator<IResourceMetadata> itr = journalIndex
+                    final ITupleIterator<IResourceMetadata> itr = journalIndex
                             .rangeIterator(null/* fromKey */,
                                     null/* toKey */, 0/* capacity */,
                                     IRangeQuery.DEFAULT | IRangeQuery.CURSOR,
@@ -2954,7 +2964,7 @@ abstract public class StoreManager extends ResourceEvents implements
                     
                     while(itr.hasNext()) {
 
-                        IResourceMetadata md = itr.next().getObject();
+                        final IResourceMetadata md = itr.next().getObject();
                         
                         if(md.getUUID().equals(uuid)) {
                             
@@ -2974,7 +2984,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
                 synchronized (segmentIndex) {
 
-                    ITupleIterator<IResourceMetadata> itr = segmentIndex
+                    final ITupleIterator<IResourceMetadata> itr = segmentIndex
                             .rangeIterator(null/* fromKey */,
                                     null/* toKey */, 0/* capacity */,
                                     IRangeQuery.DEFAULT | IRangeQuery.CURSOR,
@@ -2982,7 +2992,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
                     while (itr.hasNext()) {
 
-                        IResourceMetadata md = itr.next().getObject();
+                        final IResourceMetadata md = itr.next().getObject();
 
                         if (md.getUUID().equals(uuid)) {
 
@@ -3279,14 +3289,15 @@ abstract public class StoreManager extends ResourceEvents implements
     }
 
     /**
-     * This attempts to pause the {@link WriteExecutorService} and then purges
-     * any resources that are no longer required based on
-     * {@link StoreManager.Options#MIN_RELEASE_AGE}.
+     * This attempts to obtain the exclusive lock for the
+     * {@link WriteExecutorService}. If successful, it purges any resources
+     * that are no longer required based on
+     * {@link StoreManager.Options#MIN_RELEASE_AGE} and optionally truncates the
+     * live journal such that no free space remains in the journal.
      * <p>
-     * Note: Resources are normally purged during synchronous overflow handling.
-     * However, asynchronous overflow handling can cause resources to no longer
-     * be needed as new index partition views are defined. This method MAY be
-     * used to trigger a release before the next overflow event.
+     * Note: Asynchronous overflow handling can cause resources to no longer be
+     * needed as new index partition views are defined. Therefore this method is
+     * normally invoked as an after action for asynchronous overflow.
      * 
      * @param timeout
      *            The timeout (in milliseconds) that the method will await the
@@ -3304,7 +3315,9 @@ abstract public class StoreManager extends ResourceEvents implements
      * 
      * @param truncateJournal
      *            When <code>true</code> the live journal will be truncated
-     *            such that no free space remains in the journal.
+     *            such that no free space remains in the journal. If writes are
+     *            directed to the live journal after it has been truncated then
+     *            it will transparently re-extended.
      * 
      * @throws IOException
      * @throws InterruptedException
@@ -3315,68 +3328,56 @@ abstract public class StoreManager extends ResourceEvents implements
         final WriteExecutorService writeService = getConcurrencyManager()
                 .getWriteService();
 
-        if (writeService.awaitPaused(1000/* ms */)) {
+        if (writeService.tryLock(timeout, TimeUnit.MILLISECONDS)) {
 
             try {
 
-                final StoreManager storeManager = this;
-
-                log.warn("Purging old resources: #bytes="
-                        + storeManager.getBytesUnderManagement()
-                        + ", #journals="
-                        + storeManager.getManagedJournalCount()
-                        + ", #segments="
-                        + storeManager.getManagedIndexSegmentCount());
-
-                storeManager.purgeOldResources();
-
-                log.warn("Purged old resources: #bytes="
-                        + storeManager.getBytesUnderManagement()
-                        + ", #journals="
-                        + storeManager.getManagedJournalCount()
-                        + ", #segments="
-                        + storeManager.getManagedIndexSegmentCount());
-
-                if (truncateJournal) {
-
-                    /*
-                     * Truncate the backing buffer such that there is no
-                     * remaining free space in the live journal.
-                     * 
-                     * Note: This MUST be done while we are holding the
-                     * exclusive lock on the write service.
-                     */
-
-                    final IBufferStrategy backingBuffer = storeManager
-                            .getLiveJournal().getBufferStrategy();
-
-                    final long oldExtent = backingBuffer.getExtent();
-
-                    final long newExtent = backingBuffer.getHeaderSize()
-                            + backingBuffer.getUserExtent();
-
-                    backingBuffer.truncate(newExtent);
-
-                    log.warn("Truncated the live journal: oldExtent="
-                            + oldExtent + ", newExtent=" + newExtent);
-
-                }
-
+                purgeOldResources();
+                
+                if(truncateJournal)
+                    _truncateJournal();
+            
                 return true;
-
+        
             } finally {
 
-                writeService.resume();
+                // release the lock.
+                writeService.unlock();
 
             }
 
         } else {
 
-            log.warn("Write service did not pause for us.");
+            log.warn("Write service did not pause: timeout=" + timeout);
 
             return false;
 
         }
+
+    }
+
+    /**
+     * Truncate the backing buffer such that there is no remaining free space in
+     * the live journal.
+     * <p>
+     * Note: The caller MUST hold the exclusive lock on the
+     * {@link WriteExecutorService}.
+     */
+    private void _truncateJournal() {
+
+        final IBufferStrategy backingBuffer = getLiveJournal()
+                .getBufferStrategy();
+
+        final long oldExtent = backingBuffer.getExtent();
+
+        log.warn("Truncating the live journal: oldExtent=" + oldExtent);
+
+        final long newExtent = backingBuffer.getHeaderSize()
+                + backingBuffer.getNextOffset();
+
+        backingBuffer.truncate(newExtent);
+
+        log.warn("Truncated the live journal: newExtent=" + newExtent);
 
     }
 
