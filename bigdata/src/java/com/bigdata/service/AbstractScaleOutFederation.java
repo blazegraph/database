@@ -493,6 +493,10 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
      *            to force the {@link DataService} to its minimum possible
      *            footprint given the configured
      *            {@link StoreManager#getMinReleaseAge()}.
+     * 
+     * @todo when overflow processing is enabled for the {@link MetadataService}
+     *       we will have to modify this to also trigger overflow for those
+     *       services.
      */
     public void forceOverflow(final boolean truncateJournal) {
         

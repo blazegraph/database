@@ -991,13 +991,13 @@ abstract public class DataService extends AbstractService
                 throw new IllegalArgumentException();
             
             // Choose READ_COMMITTED iff proc is read-only and UNISOLATED was requested.
-            final long startTime = (tx == ITx.UNISOLATED
+            final long timestamp = (tx == ITx.UNISOLATED
                         && proc.isReadOnly() ? ITx.READ_COMMITTED
                         : tx);
 
             // wrap the caller's task.
             final AbstractTask task = new IndexProcedureTask(
-                    concurrencyManager, startTime, name, proc);
+                    concurrencyManager, timestamp, name, proc);
             
             if(proc instanceof IDataServiceAwareProcedure) {
 
@@ -1147,9 +1147,9 @@ abstract public class DataService extends AbstractService
 //                        : tx);
 
             final RangeIteratorTask task = new RangeIteratorTask(
-                    concurrencyManager, tx, name, fromKey, toKey, capacity,
-                    flags, filter);
-    
+                    concurrencyManager, timestamp, name, fromKey, toKey,
+                    capacity, flags, filter);
+
             // submit the task and wait for it to complete.
             return (ResultSet) concurrencyManager.submit(task).get();
         
@@ -1427,25 +1427,25 @@ abstract public class DataService extends AbstractService
 
             if (resourceManager.isOverflowAllowed()) {
 
-                if(compactingMerge) {
-                    
+                if (compactingMerge) {
+
                     resourceManager.compactingMerge.set(true);
-                    
+
                 }
-                
+
                 // trigger overflow on the next group commit.
                 writeService.forceOverflow.set(true);
 
             }
 
             return null;
-            
+
         }
-        
+
     }
-    
+
     public long getOverflowCounter() throws IOException {
-    
+
         setupLoggingContext();
 
         try {

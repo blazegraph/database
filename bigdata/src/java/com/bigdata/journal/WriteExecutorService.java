@@ -223,9 +223,17 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * Support for pausing and resuming execution of new worker tasks.
      */
 
-    /** true iff nothing new should start. */
-    private boolean paused;
+    /**
+     * New tasks may begin to execute iff this counter is zero (0). It is
+     * incremented by {@link #pause()} and decremented by {@link #resume()}.
+     */
+    private int paused = 0;
 
+    /**
+     * Lock used for exclusive locks on the write service.
+     */
+    final protected ReentrantLock exclusiveLock = new ReentrantLock();
+    
     /**
      * Lock used for {@link Condition}s and to coordinate index checkpoints and
      * index rollbacks with the {@link AbstractTask}.
@@ -415,13 +423,16 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     /**
      * <code>true</code> iff the pause flag is set such that the write service
      * will queue up new tasks without allowing them to execute.
+     * <p>
+     * Note: The caller MUST hold the {@link #lock} if they want this test to be
+     * more than transiently valid.
      * 
      * @see #pause()
      * @see #resume()
      */
-    public boolean isPaused() {
+    private boolean isPaused() {
         
-        return paused;
+        return paused > 0;
         
     }
     
@@ -430,21 +441,21 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * {@link #beforeExecute(Thread, Runnable)}.
      * <p>
      * Note: This is not a very safe thing to do and therefore the operation is
-     * restricted to its use by this class. However, {@link #resume()} is
-     * exposed so that the {@link OverflowManager} can direct the
-     * {@link WriteExecutorService} to resume processing as soon as synchronous
-     * overflow is complete (concurrent to the startup of asynchronous
-     * processing).
+     * restricted to its use by this class. Use {@link #tryLock(long, TimeUnit)}
+     * and {@link #unlock()} instead.
      */
-    protected void pause() {
+    private void pause() {
 
-        log.debug("Pausing write service");
-        
         lock.lock();
         
         try {
 
-            paused = true;
+            if (paused++ == 0) {
+
+                if (DEBUG)
+                    log.debug("Pausing write service");
+
+            }
             
         } finally {
             
@@ -457,18 +468,26 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     /**
      * Notifies all paused tasks that they may now run.
      */
-    public void resume() {
-        
-        if(DEBUG)
-            log.debug("Resuming write service");
+    private void resume() {
         
         lock.lock();
         
         try {
-        
-            paused = false;
-            
-            unpaused.signalAll();
+
+            if (paused == 0) {
+
+                throw new IllegalStateException("Not paused");
+
+            }
+
+            if (--paused == 0) {
+
+                if (DEBUG)
+                    log.debug("Resuming write service");
+
+                unpaused.signalAll();
+
+            }
             
         } finally {
 
@@ -489,7 +508,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      *            is actually a {@link FutureTask}. See
      *            {@link AbstractExecutorService}.
      */
-    protected void beforeExecute(Thread t, Runnable r) {
+    protected void beforeExecute(final Thread t, final Runnable r) {
 
         // Note: [r] is the FutureTask.
         
@@ -497,8 +516,11 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         
         try {
 
-            while (paused)
+            while (isPaused()) {
+
                 unpaused.await();
+                
+            }
 
         } catch (InterruptedException ie) {
             
@@ -776,7 +798,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         
         sb.append("WriteExecutorService");
 
-        sb.append("{ paused="+paused);
+        sb.append("{ paused="+paused); // note: the raw counter value.
         
         sb.append(", nrunning="+nrunning);
 
@@ -980,6 +1002,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
         }
 
+        // true iff we acquire the exclusive lock for overflow processing.
+        boolean locked = false;
         try {
 
             /*
@@ -1012,24 +1036,55 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * synchronous overflow is NOT performed unless we were actually
              * able to await all running tasks (nrunning == 0).
              */
-            final boolean shouldOverflow = (forceOverflow.get() || resourceManager.shouldOverflow());
+            final boolean shouldOverflow = (forceOverflow.get() || resourceManager
+                    .shouldOverflow());
 
-            if (shouldOverflow)
-                overflowLog.info("Should overflow - will try to pause the write service.");
+            if (shouldOverflow && overflowLog.isInfoEnabled()) {
 
-            /*
-             * Wait for some or all running tasks to join the commit group.
-             */
-            waitForRunningTasks(shouldOverflow /* pauseWriteService */);
+                overflowLog
+                        .info("Should overflow - will try to pause the write service.");
 
-            // Note: this clears the interrupt flag!
-            if(currentThread.isInterrupted()) {
-                
-                log.warn("Interrupted awaiting other tasks to join the group commit.");
-                
-                // will not do group commit.
-                return false;
-                
+            }
+            {
+                // timestamp from which we measure the latency until the commit
+                // begins.
+                final long beginWait = System.currentTimeMillis();
+                if (shouldOverflow) {
+                    /*
+                     * Try to acquire the exclusive write lock so that we can do
+                     * synchronous overflow processing.
+                     * 
+                     * @todo config overflow exclusive lock timeout.
+                     */
+                    try {
+                        locked = tryLock(2000, TimeUnit.MILLISECONDS);
+                    } catch (InterruptedException ex) {
+                        log.warn("Interrupted awaiting exclusive write lock.");
+                        // will not do group commit.
+                        return false;
+                    }
+                } else {
+                    /*
+                     * Wait for some or all running tasks to join the commit
+                     * group for greater efficiency (packs more tasks into a
+                     * commit group by trading off some latency against the size
+                     * of the commit group).
+                     * 
+                     * Note: This will return normally unless interrupted.
+                     * 
+                     * @todo config group commit join timeout.
+                     */
+                    waitForRunningTasks(200/* timeout */,
+                            TimeUnit.MILLISECONDS);
+                }
+                {
+                    // update [maxCommitWaitingTime]
+                    final long endWait = System.currentTimeMillis();
+                    final long latencyUntilCommit = endWait - beginWait;
+                    if (latencyUntilCommit > maxCommitWaitingTime) {
+                        maxCommitWaitingTime = latencyUntilCommit;
+                    }
+                }
             }
             
             /*
@@ -1070,7 +1125,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             try {
                 
                 // commit the store (note: does NOT throw exceptions).
-                if (!commit()) {
+                if (!commit(locked)) {
 
                     // commit failed.
                     return false;
@@ -1148,11 +1203,12 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             groupCommit.set(false);
 
             /*
-             * Allow new tasks to run.
+             * If we obtained an exclusive lock on the write service then
+             * release it now.
              */
-            if(isPaused()) {
+            if(locked) {
 
-                resume();
+                unlock();
                 
             }
 
@@ -1163,107 +1219,68 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     }
 
     /**
-     * Wait a moment to let other tasks start, but if the queue is empty then we
-     * make that a very small moment to keep down latency for a single task that
+     * Wait a moment to let other tasks finish, but if the queue is empty then
+     * return immediately in order to keep down latency for a single task that
      * is run all by itself without anything else in the queue.
-     * <p>
-     * Note: This updates {@link #maxCommitWaitingTime} as a side-effect.
-     * 
-     * @param pauseWriteService
-     *            When <code>true</code>, an attempt will be made to pause
-     *            the write service such that there are no running tasks.
-     *            However, this is NOT a guarentee and the caller MUST test
-     *            {@link #nrunning} in order to determine whether or not any
-     *            tasks are still running.
      * 
      * @todo do NOT wait if the current task might exceeds its max latency from
      *       submit (likewise, do not start task if it has already execeeded its
      *       maximum latency from submit).
      */
-    private void waitForRunningTasks(final boolean pauseWriteService) throws InterruptedException {
+    private void waitForRunningTasks(final long timeout, final TimeUnit unit)
+            throws InterruptedException {
 
-        assert lock.isHeldByCurrentThread();
+        if (!lock.isHeldByCurrentThread())
+            throw new IllegalMonitorStateException();
+
+        final long beginWait = System.nanoTime();
+
+        long nanos = unit.toNanos(timeout);
         
-        assert !isPaused();
-
-        // timestamp from which we measure the latency until the commit begins.
-        final long beginWait = System.currentTimeMillis();
+        int nwaits = 0;
         
-        if (pauseWriteService) {
-
-            if (INFO)
-                log.info("Should overflow - will pause the write service.");
+        while (nanos > 0 && !getQueue().isEmpty()) {
 
             /*
-             * Pause the write service (no more tasks will start) and wait
-             * until there are no more tasks running.
+             * Wait on condition.
              * 
-             * Note: If this succeeds then the caller MUST resume() the
-             * write service. If it fails, then the write service is
-             * automatically resumed by error handling within awaitPaused().
+             * Note: throws InterruptedException
              */
+            waiting.await(10, TimeUnit.MICROSECONDS);
 
-            final long timeout = 2000; // ms
-
-            if (awaitPaused(timeout)) {
-
-                if (INFO)
-                    log.info("write service is paused: #running=" + nrunning);
-
-            }
-
-        } else {
-
-            int nwaits = 0;
-            while (true) {
-
-                final int queueSize = getQueue().size();
-                final int nrunning = this.nrunning.get();
-                final int nwrites = this.nwrites.get();
-                final int corePoolSize = getCorePoolSize();
-                final int maxPoolSize = getMaximumPoolSize();
-                final int poolSize = getPoolSize();
-                final long elapsedWait = System.currentTimeMillis() - beginWait;
-
-                if ((elapsedWait > 100 && queueSize == 0) || elapsedWait > 250) {
-
-                    // Don't wait any longer.
-
-                    if (INFO)
-                        log.info("Not waiting any longer: nwaits=" + nwaits
-                                + ", elapsed=" + elapsedWait + "ms, queueSize="
-                                + queueSize + ", nrunning=" + nrunning
-                                + ", nwrites=" + nwrites + ", corePoolSize="
-                                + corePoolSize + ", poolSize=" + poolSize
-                                + ", maxPoolSize=" + maxPoolSize);
-
-                    break;
-
-                }
-
-                /*
-                 * Note: if interrupted during sleep then the group commit will
-                 * abort.
-                 */
-
-                waiting.await(10, TimeUnit.MICROSECONDS);
-
-                nwaits++;
-
-            }
+            nanos -= (System.nanoTime() - beginWait);
+            
+            nwaits++;
 
         }
 
-        final long endWait = System.currentTimeMillis();
+        // Don't wait any longer.
+
+        if (INFO) {
+
+            final int queueSize = getQueue().size();
+            
+            final int nrunning = this.nrunning.get();
+            
+            final int nwrites = this.nwrites.get();
+            
+            final int corePoolSize = getCorePoolSize();
+            
+            final int maxPoolSize = getMaximumPoolSize();
+            
+            final int poolSize = getPoolSize();
+            
+            final long elapsedWait = TimeUnit.NANOSECONDS.toMillis(
+                    System.nanoTime() - beginWait);
+
+            log.info("Not waiting any longer: nwaits=" + nwaits
+                    + ", elapsed=" + elapsedWait + "ms, queueSize="
+                    + queueSize + ", nrunning=" + nrunning
+                    + ", nwrites=" + nwrites + ", corePoolSize="
+                    + corePoolSize + ", poolSize=" + poolSize
+                    + ", maxPoolSize=" + maxPoolSize);
+        }
         
-        final long latencyUntilCommit = endWait - beginWait;
-
-        if (latencyUntilCommit > maxCommitWaitingTime) {
-
-            maxCommitWaitingTime = latencyUntilCommit;
-
-        }
-
     }
         
 // /*
@@ -1440,100 +1457,231 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     }
     
     /**
-     * Pause the {@link WriteExecutorService} and wait until there are no more
-     * tasks running (eg, an exclusive lock on the write service as a whole).
+     * Acquires an exclusive lock on the write service.
      * <p>
-     * On a successful return (returns <code>true</code>) the write service
-     * will be paused and no tasks will be running. After a successful return
-     * the caller MUST ensure that the processing is {@link #resume() resumed}
-     * before relinquishing control.
+     * The write service is paused for up to <i>timeout</i> units. During that
+     * time no new tasks will start. The lock will be granted if all running
+     * tasks complete before the <i>timeout</i> expires.
      * <p>
-     * On an unsuccessful return (returns <code>false</code>) the write
-     * service will NOT be paused and there will be at least one task still
-     * running.
+     * Note: The exclusive write lock is granted using the same {@link #lock}
+     * that is used to coordinate all other activity of the write service. If
+     * the exclusive write lock is granted then the caller's thread will hold
+     * the {@link #lock} and MUST release the lock using {@link #unlock()}.
+     * <p>
+     * Note: When the exclusive lock is granted there will be NO running tasks
+     * and the write service will be paused. This ensures that no task can run
+     * on the write service and that groupCommit will not attempt to grab the
+     * lock itself.
      * 
      * @param timeout
-     *            The maximum amount of time to wait. Use {@link Long#MAX_VALUE}
-     *            to wait forever.
+     *            The timeout.
+     * @param unit
+     *            The unit in which the <i>timeout</i> is expressed.
+     * @return <code>true</code> iff the exclusive lock was acquired.
      * 
-     * @return true iff nothing is running.
+     * @throws InterruptedException
      */
-    public boolean awaitPaused(final long timeout) throws InterruptedException {
+    public boolean tryLock(final long timeout, final TimeUnit unit)
+            throws InterruptedException {
 
-        assert timeout >= 0L;
+        if(INFO)
+            log.info("timeout="+timeout+", unit="+unit);
         
-        assert ! isPaused(); 
+        final long begin = System.nanoTime();
         
-//        assert lock.isHeldByCurrentThread();
+        long nanos = unit.toNanos(timeout);
+        
+        boolean granted = false;
+        
         lock.lock();
 
         try {
-        
-        // notify the write service that new tasks MAY NOT run.
-        pause();
 
-        final long begin = System.currentTimeMillis();
-        
-        // wait for active tasks to complete.
-        int n;
-        while ((n = nrunning.get()) > 0) {
+            if (!exclusiveLock.tryLock(nanos, TimeUnit.NANOSECONDS)) {
 
-            final long elapsed = begin - System.currentTimeMillis();
-            
-            final long remaining = timeout - elapsed;
-            
-            if (remaining <= 0L) {
-
-                log.warn("timeout: elapsed=" + elapsed + ", nrunning=" + n);
+                // can't obtain the exclusive lock.
                 
-                resume();
-                
+                if(INFO)
+                    log.info("timeout");
+
                 return false;
-                
+
             }
-            
-            if (INFO)
-                log.info("There are " + n + " tasks running after " + elapsed
-                        + "ms.");
+
+            nanos -= (System.nanoTime() - begin);
             
             try {
 
                 /*
-                 * Each task that completes signals [waiting].
+                 * Do not permit new tasks to start.
                  * 
-                 * Note: While we specify a timeout equal to the time remaining
-                 * to limit the time that we will await other threads, this
-                 * thread will not resume until it has re-acquired the lock
-                 * which it releases temporarily while awaiting other threads to
-                 * signal it via [waiting].
+                 * Note: New tasks can't start while we hold the [lock], but
+                 * this also ensures that new tasks will not start if we have to
+                 * yield the lock during quiesce() or after we return from this
+                 * method (assuming that the write service was quiesced).
+                 * 
+                 * @todo should be a boolean if only used in tryLock() while
+                 * hold the exclusiveLock.
+                 */
+                pause();
+
+                /*
+                 * Wait up to the remaining time for the write service to
+                 * quiesce.
+                 */
+                granted = quiesce(nanos, TimeUnit.NANOSECONDS);
+
+                if (INFO)
+                    log.info(granted ? "granted" : "timeout");
+
+                return granted;
+
+            } finally {
+
+                /*
+                 * Note: If the write service quiesed during the specified
+                 * timeout then the exclusiveLock is granted and we return
+                 * without calling exclusiveLock.unlock().
                  */
 
-                waiting.await(remaining, TimeUnit.MILLISECONDS);
+                if (!granted) {
 
-            } catch (InterruptedException ex) {
+                    /*
+                     * Since the write service did not quiesce the exclusiveLock
+                     * WILL NOT be granted so we resume() the write service and
+                     * release the exclusiveLock.
+                     */
 
-                log.warn("Interrupted awaiting pause.");
+                    resume();
 
-                // resume processing.
-                resume();
+                    exclusiveLock.unlock();
 
-                throw ex;
-                
+                }
+
             }
+            
+        } finally {
+
+            lock.unlock();
 
         }
-        
-        if (INFO)
-            log.info("Write service is paused: #running=" + nrunning);
-        
-        return true;
-        
+
+    }
+    
+    /**
+     * Release the exclusive write lock.
+     * 
+     * @throws IllegalMonitorStateException
+     *             if the current thread does not own the lock.
+     */
+    public void unlock() {
+
+        lock.lock();
+
+        try {
+
+            /*
+             * Note: This ensures that the caller holds the [exclusiveLock]
+             * (otherwise it will throw an IllegalMonitorStateException) before
+             * allowing tasks to resume execution on the write service.
+             * 
+             * Note: We are already holding the [lock] so nothing can begin to
+             * execute until we release the [lock], which makes this operation
+             * atomic.
+             */
+            
+            exclusiveLock.unlock();
+            
+            resume();
+            
         } finally {
             
             lock.unlock();
             
         }
+        
+    }
+    
+    /**
+     * Wait until there are no more tasks running.
+     * 
+     * @param timeout
+     *            The maximum amount of time to wait. Use {@link Long#MAX_VALUE}
+     *            to wait forever.
+     * @param unit
+     *            The unit for <i>timeout</i>.
+     * 
+     * @return true iff nothing is running.
+     * 
+     * @throws IllegalStateException
+     *             if the write service is not paused.
+     * @throws IllegalMonitorStateException
+     *             if the caller does not hold the {@link #lock}.
+     */
+    private boolean quiesce(final long timeout, final TimeUnit unit)
+            throws InterruptedException {
 
+        if (!isPaused())
+            throw new IllegalStateException();
+        
+        if (!lock.isHeldByCurrentThread()) {
+            
+            // the caller does not hold the lock.
+            throw new IllegalMonitorStateException();
+            
+        }
+        
+        final long begin = System.nanoTime();
+
+        long nanos = unit.toNanos(timeout);
+
+        // wait for active tasks to complete, but no longer than the timeout.
+        while (nanos > 0L && nrunning.get() > 0) {
+
+            /*
+             * Each task that completes signals [waiting].
+             * 
+             * Note: While we specify a timeout equal to the time remaining to
+             * limit the time that we will await other threads, this thread will
+             * not resume until it has re-acquired the lock which it releases
+             * temporarily while awaiting other threads to signal it via
+             * [waiting].
+             * 
+             * Note: Throws InterruptedException
+             */
+
+            waiting.await(nanos, TimeUnit.NANOSECONDS);
+
+            nanos -= (System.nanoTime() - begin);
+
+        }
+
+        // elapsed wait time (ms) (for logging only).
+        final long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime()
+                - begin);
+
+        // #of tasks running (valid while we hold the lock).
+        final int n = nrunning.get();
+
+        if (n == 0) {
+        
+            // success.
+            
+            if (INFO)
+                log.info("Write service is paused: #running=" + n
+                        + ", elapsed=" + elapsed);
+
+            return true;
+
+        }
+
+        // timeout.
+
+        if (INFO)
+            log.info("timeout: elapsed=" + elapsed + ", nrunning=" + n);
+
+        return false;
+        
     }
     
     /**
@@ -1541,6 +1689,13 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * <p>
      * Note: This method does NOT throw anything. All exceptions are caught and
      * handled.
+     * 
+     * @param locked
+     *            Indicates whether or not the caller has obtained an exclusive
+     *            lock on the write service using
+     *            {@link #tryLock(long, TimeUnit)}, e.g., when the caller
+     *            intends to perform {@link #overflow()} processing after the
+     *            commit.
      * 
      * <h4>Pre-conditions</h4>
      * <ul>
@@ -1564,7 +1719,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * 
      * @return <code>true</code> iff the commit was successful.
      */
-    private boolean commit() {
+    private boolean commit(final boolean locked) {
 
         assert lock.isHeldByCurrentThread();
 
@@ -1581,7 +1736,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
          * any time, so you can see an exception thrown even though we check
          * that they are open as a pre-condition here.
          * 
-         * @todo why not an abort() here?
+         * @todo why not an abort() here? (because the journal is not accessible
+         * so there is nothing to rollback).
          */
 
         if(!resourceManager.isOpen()) {
@@ -1624,14 +1780,15 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * journal to commit.
              */
 
-            if (paused) {
+            if (locked) {
                 
                 /*
-                 * Note: the write service is paused before overflow processing
-                 * so this is the last commit before we overflow the journal.
+                 * Note: an exclusive lock is obtained before overflow
+                 * processing so this is the last commit before we overflow the
+                 * journal.
                  */
                 if (OVERFLOW_DEBUG)
-                    overflowLog.debug("before: "+journal.getRootBlockView());
+                    overflowLog.debug("before: " + journal.getRootBlockView());
                 
             }
 
@@ -1662,18 +1819,20 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 
             }
             
-            if (paused) {
+            if (locked) {
                 
                 /*
-                 * Note: the write service is paused before overflow processing
-                 * so this is the last commit before we overflow the journal.
+                 * Note: an exclusive lock is obtained before overflow
+                 * processing so this is the last commit before we overflow the
+                 * journal.
                  */
-                if(OVERFLOW_INFO)
-                overflowLog.info("commit: #writes=" + nwrites + ", timestamp="
-                        + timestamp + ", paused!");
-                
-                if(OVERFLOW_DEBUG)
-                overflowLog.debug("after : "+journal.getRootBlockView());
+
+                if (OVERFLOW_INFO)
+                    overflowLog.info("commit: #writes=" + nwrites
+                            + ", timestamp=" + timestamp + ", paused!");
+
+                if (OVERFLOW_DEBUG)
+                    overflowLog.debug("after : " + journal.getRootBlockView());
                 
             }
 
@@ -1905,8 +2064,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             // signal tasks awaiting [commit].
             commit.signalAll();
 
-            // resume execution of new tasks.
-            resume();
+//            // resume execution of new tasks.
+//            resume();
             
         } catch (Throwable t) {
 

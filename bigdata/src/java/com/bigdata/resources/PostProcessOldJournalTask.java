@@ -1758,6 +1758,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
             try {
 
+//                if(false) {
                 /*
                  * Once asynchronous processing is complete there are likely to
                  * be resources that can be released because their views have
@@ -1779,6 +1780,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                             .warn("Write service did not pause within timeout - will not purge resources now.");
 
                 }
+//                }
 
             } catch(InterruptedException ex) {
                 
