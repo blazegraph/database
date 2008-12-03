@@ -299,38 +299,36 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
     protected long awaitOverflow(IDataService dataService,
             long priorOverflowCounter) throws IOException {
 
-        log.info("\n**** Awaiting overflow: priorOverflowCounter="
-                + priorOverflowCounter + ", service=" + dataService);
-
         final long begin = System.currentTimeMillis();
 
         long newOverflowCounter;
 
         while ((newOverflowCounter = dataService.getOverflowCounter()) == priorOverflowCounter) {
 
-            try {
-                Thread.sleep(20/* ms */);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-
-            log.info("\nStill awaiting overflow: priorOverflowCounter="
-                    + priorOverflowCounter + ", dataService=" + dataService);
-
             final long elapsed = System.currentTimeMillis() - begin;
             
+            log.info("\n**** Awaiting overflow: priorOverflowCounter="
+                    + priorOverflowCounter + ", elapsed=" + elapsed
+                    + ", service=" + dataService);
+
             /*
              * Note: You can change this constant if you are debugging so that
              * the test will not terminate too soon, but change it back so that
              * the test will terminate quickly when run automatically.  The
              * value should be [2000] ms.
              */
-            if (elapsed > 2000) {
+            if (false&&elapsed > 2000) {
              
                 fail("No overflow after " + elapsed + "ms?");
                 
             }
             
+            try {
+                Thread.sleep(250/* ms */);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+
         }
 
         final long elapsed = System.currentTimeMillis() - begin;

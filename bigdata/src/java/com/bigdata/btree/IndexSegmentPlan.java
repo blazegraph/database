@@ -101,20 +101,29 @@ public class IndexSegmentPlan {
     final public int[][] numInNode;
 
     /**
-     * Create a plan for building a B+-Tree. The plan has only these two
-     * inputs. Everything else about the plan is deterministic based on
-     * those values.
+     * Create a plan for building a B+-Tree. The plan has only these two inputs.
+     * Everything else about the plan is deterministic based on those values.
      * 
      * @param m
-     *            The branching factor of the output tree (#of keys/values
-     *            for a leaf or the #of children for a node).
+     *            The branching factor of the output tree (#of keys/values for a
+     *            leaf or the #of children for a node).
      * @param nentries
      *            The #of entries in the tree.
+     * 
+     * @throws IllegalArgumentException
+     *             if the branching factor is less than
+     *             {@value Options#MIN_BRANCHING_FACTOR}.
+     * @throws IllegalArgumentException
+     *             if the #of index entries is negative (zero is allowed as a
+     *             special case).
      */
-    public IndexSegmentPlan(int m,int nentries) {
+    public IndexSegmentPlan(final int m, final int nentries) {
 
-        assert m >= Options.MIN_BRANCHING_FACTOR;
-        assert nentries > 0;
+        if (m < Options.MIN_BRANCHING_FACTOR)
+            throw new IllegalArgumentException();
+        
+        if (nentries < 0)
+            throw new IllegalArgumentException();
 
         // The branching factor of the output tree.
         this.m = m;
@@ -124,6 +133,26 @@ public class IndexSegmentPlan {
         
         // The minimum capacity of a leaf (or a node).
         m2 = (m+1)/2; 
+        
+        if(nentries == 0) {
+        
+            /*
+             * Special case for an empty tree.
+             */
+
+            if (INFO)
+                log.info("Empty tree.");
+            
+            nleaves = 0;
+            height = 0;
+            numInLeaf = new int[]{};
+            numInNode = new int[][]{};
+            numInLevel = new int[]{};
+            nnodes = 0;
+            
+            return;
+        
+        }
         
         // The #of leaves in the output tree.
         nleaves = (int)Math.ceil((double)nentries / (double)m); 
@@ -136,7 +165,7 @@ public class IndexSegmentPlan {
                     + ", nleaves=" + nleaves + ", height=" + height);
         
         // #of entries in each leaf.
-        numInLeaf = distributeKeys(m,m2,nleaves,nentries);
+        numInLeaf = distributeKeys(m, m2, nleaves, nentries);
 
         /*
          * Figure out how many nodes are in each level of the output tree. We

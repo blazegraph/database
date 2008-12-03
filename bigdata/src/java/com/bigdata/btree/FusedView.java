@@ -229,7 +229,7 @@ public class FusedView implements IIndex, ILocalBTreeView {
             
         }
         
-        for( int i=0; i<srcs.length; i++) {
+        for (int i = 0; i < srcs.length; i++) {
             
             if (srcs[i] == null)
                 throw new IllegalArgumentException("Source null @ index=" + i);
@@ -240,8 +240,8 @@ public class FusedView implements IIndex, ILocalBTreeView {
                         "Source does not maintain delete markers @ index=" + i);
 
             }
-                        
-            for(int j=0; j<i; j++) {
+
+            for (int j = 0; j < i; j++) {
                 
                 if (srcs[i] == srcs[j])
                     
@@ -281,21 +281,22 @@ public class FusedView implements IIndex, ILocalBTreeView {
                 bloomFilter = new FusedBloomFilter();
                 
             }
-            
+
         }
 
         return bloomFilter;
-        
+
     }
+
     private volatile IBloomFilter bloomFilter = null;
-    
+
     synchronized final public ICounterSet getCounters() {
 
         if (counterSet == null) {
 
             counterSet = new CounterSet();
 
-            for(int i=0; i<srcs.length; i++) {
+            for (int i = 0; i < srcs.length; i++) {
         
                 /*
                  * @todo might have to clone the counters from the index since
@@ -327,7 +328,7 @@ public class FusedView implements IIndex, ILocalBTreeView {
      * Resolves the old value against the view and then directs the write to the
      * first of the sources specified to the ctor.
      */
-    public byte[] insert(byte[] key, byte[] value) {
+    public byte[] insert(final byte[] key, final byte[] value) {
 
         final byte[] oldval = lookup(key);
         
@@ -368,7 +369,7 @@ public class FusedView implements IIndex, ILocalBTreeView {
      * first of the sources specified to the ctor. The remove is in fact treated
      * as writing a deleted marker into the index.
      */
-    public byte[] remove(byte[] key) {
+    public byte[] remove(final byte[] key) {
 
         /*
          * Slight optimization prevents remove() from writing on the index if
@@ -677,7 +678,7 @@ public class FusedView implements IIndex, ILocalBTreeView {
      * <p>
      * Note: When the {@link IRangeQuery#CURSOR} flag is specified, it is passed
      * through and an {@link ITupleCursor} is obtained for each source
-     * {@link AbstractBTree}. A {@link FusedTupleIterator} is then obtain that
+     * {@link AbstractBTree}. A {@link FusedTupleCursor} is then obtained which
      * implements the {@link ITupleCursor} extensions.
      * </p>
      */
@@ -875,8 +876,8 @@ public class FusedView implements IIndex, ILocalBTreeView {
     final public void submit(int fromIndex, int toIndex, byte[][] keys, byte[][] vals,
             AbstractIndexProcedureConstructor ctor, IResultHandler aggregator) {
 
-        Object result = ctor.newInstance(this, fromIndex, toIndex, keys, vals)
-                .apply(this);
+        final Object result = ctor.newInstance(this, fromIndex, toIndex, keys,
+                vals).apply(this);
 
         if (aggregator != null) {
 

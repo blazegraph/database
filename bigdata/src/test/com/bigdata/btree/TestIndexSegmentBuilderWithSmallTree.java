@@ -74,42 +74,6 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTe
 
     }
 
-    /**
-     * apply dump() as a structural validation of the tree.  note that we
-     * have to materialize the leaves in the generated index segment since
-     * dump does not materialize a child from its Addr if it is not already
-     * resident.
-     */
-    protected void dumpIndexSegment(IndexSegment seg) {
-
-        // materialize the leaves.
-        
-        ILeafCursor cursor = seg.newLeafCursor(SeekEnum.First);
-        
-        int n = 0;
-        while(cursor.next()!=null) {
-            n++;
-        }
-
-        cursor.last();
-        while(cursor.prior()!=null) {
-            n--;
-        }
-        
-        /*
-         * Note: n will be zero if the same number of leaves were visited in
-         * each direction.
-         */
-        assertEquals(0, n);
-        
-        // dump the tree to validate it.
-
-        System.err.println("dumping index segment");
-
-        assert seg.dump(Level.DEBUG, System.err);
-
-    }
-    
     /*
      * problem1
      */

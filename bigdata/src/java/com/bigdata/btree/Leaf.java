@@ -172,7 +172,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
      * 
      * @param btree A mutable btree.
      */
-    protected Leaf(BTree btree) {
+    protected Leaf(AbstractBTree btree) {
 
         super(btree, btree.branchingFactor, true /*dirty*/ );
 
@@ -1327,7 +1327,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
     public boolean dump(Level level, PrintStream out, int height, boolean recursive) {
 
-        boolean debug = level.toInt() <= Level.DEBUG.toInt();
+        final boolean debug = level.toInt() <= Level.DEBUG.toInt();
         
         // Set to false iff an inconsistency is detected.
         boolean ok = true;

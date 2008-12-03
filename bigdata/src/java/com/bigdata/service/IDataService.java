@@ -515,8 +515,12 @@ public interface IDataService extends IRemoteTxCommitProtocol, IService {
      * @param compactingMerge
      *            The purpose of this flag is to permit the caller to indicate
      *            that a compacting merge should be performed for all indices on
-     *            the data service whose data are not simply copied onto the new
-     *            journal during the next synchronous overflow.
+     *            the data service (at least, all indices whose data are not
+     *            simply copied onto the new journal) during the next
+     *            synchronous overflow. Note that compacting merges of indices
+     *            are performed automatically from time to time so this flag
+     *            exists mainly for people who want to force a compacting merge
+     *            for some reason.
      * 
      * @throws IOException
      * @throws InterruptedException

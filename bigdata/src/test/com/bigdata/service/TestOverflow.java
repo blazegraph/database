@@ -141,7 +141,16 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
 
         // Note: disables index partition moves.
         properties.setProperty(Options.MAXIMUM_MOVES_PER_TARGET, "0");
-        
+
+        /*
+         * Note: Together these two properties disable incremental index builds.
+         * We need to do that since a compacting build is required before the
+         * rangeCount() for the view will drop, which is a precondition for the
+         * JOIN.
+         */
+        properties.setProperty(Options.MAXIMUM_SOURCES_PER_VIEW_BEFORE_COMPACTING_MERGE, "1");
+        properties.setProperty(Options.MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW, ""+Integer.MAX_VALUE);
+
 //        properties.setProperty(Options.INITIAL_EXTENT, ""+1*Bytes.megabyte);
         
 //        properties.setProperty(Options.MAXIMUM_EXTENT, ""+1*Bytes.megabyte);
@@ -449,10 +458,10 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
          * Confirm index partitions were NOT joined.
          * 
          * Note: Even though we have deleted index entries the #of index entries
-         * in the partition WILL NOT be reduced until the next build task for
-         * that index partition. Therefore our post-overflow expectation is that
-         * an index build was performed and the #of index partitions WAS NOT
-         * changed.
+         * in the partition (as reported by rangeCount()) WILL NOT be reduced
+         * until the next build task for that index partition. Therefore our
+         * post-overflow expectation is that an index build was performed and
+         * the #of index partitions WAS NOT changed.
          */
         assertEquals("partitionCount", 2, getPartitionCount(name));
         

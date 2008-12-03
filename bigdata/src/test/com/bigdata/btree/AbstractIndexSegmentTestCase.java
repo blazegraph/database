@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import org.apache.log4j.Level;
+
 import com.bigdata.btree.IndexSegment.ImmutableLeafCursor;
 import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
 
@@ -52,6 +54,53 @@ public class AbstractIndexSegmentTestCase extends AbstractBTreeTestCase {
         super(name);
     }
 
+    /**
+     * apply dump() as a structural validation of the tree.  note that we
+     * have to materialize the leaves in the generated index segment since
+     * dump does not materialize a child from its Addr if it is not already
+     * resident.
+     */
+    protected void dumpIndexSegment(IndexSegment seg) {
+
+        // materialize the leaves.
+        
+        final ILeafCursor cursor = seg.newLeafCursor(SeekEnum.First);
+        
+        int n = 0;
+        while(cursor.next()!=null) {
+            n++;
+        }
+
+        cursor.last();
+        while(cursor.prior()!=null) {
+            n--;
+        }
+        
+        /*
+         * Note: n will be zero if the same number of leaves were visited in
+         * each direction.
+         */
+        assertEquals(0, n);
+        
+        /*
+         * Dump the tree to validate it.
+         * 
+         * Note: This will only dump the root node since the [cursor] for an
+         * IndexSegment does not materialize the intermediate nodes and dump()
+         * only dumps those nodes and leaves which are already materialized.
+         */
+
+        System.err.println("dumping index segment");
+
+        assert seg.dump(Level.DEBUG, System.err);
+
+        // dump the leaves in forward order.
+        cursor.first().dump(Level.DEBUG, System.err);
+        while(cursor.next()!=null) {
+            cursor.leaf().dump(Level.DEBUG, System.err);
+        }
+    }
+    
     /**
      * Test forward leaf scan.
      */

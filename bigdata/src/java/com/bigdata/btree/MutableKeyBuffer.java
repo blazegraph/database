@@ -144,7 +144,7 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
     /**
      * Returns a reference to the key at that index.
      */
-    final public byte[] getKey(int index) {
+    final public byte[] getKey(final int index) {
 
         /*
          * @todo nkeys is not always updated before using this method by the
@@ -157,7 +157,7 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
 
     }
 
-    final public int getLength(int index) {
+    final public int getLength(final int index) {
 
         assert index >= 0 && index < nkeys;
 
@@ -169,11 +169,11 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
 
     }
     
-    final public int copyKey(int index, DataOutput out) throws IOException {
+    final public int copyKey(final int index, final DataOutput out) throws IOException {
 
         assert index >= 0 && index < nkeys : "index="+index+" not in [0:"+nkeys+"]";
 
-        byte[] tmp = keys[index];
+        final byte[] tmp = keys[index];
 
         out.write(tmp, 0, tmp.length);
         
@@ -181,7 +181,7 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
         
     }
 
-    final public boolean isNull(int index) {
+    final public boolean isNull(final int index) {
         
         assert index >= 0 && index < keys.length;
         
@@ -342,7 +342,7 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
      * @todo if index==0 || index==nkeys-1 then update prefixLength, lazily
      *       compute prefix.
      */
-    final public int insert(int index, byte[] key) {
+    final public int insert(final int index, final byte[] key) {
         
         assert index >= 0 && index <= nkeys;
 
@@ -390,7 +390,7 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
      *       compute prefix (requires that the application never directly
      *       modifies keys).
      */
-    final public int remove(int index) {
+    final public int remove(final int index) {
 
         assert index >= 0 && index < nkeys;
         

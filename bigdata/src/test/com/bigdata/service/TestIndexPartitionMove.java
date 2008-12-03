@@ -80,6 +80,7 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
         
         Properties properties = new Properties( super.getProperties() );
         
+        // overrides Transient in the base class.
         properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
                 .toString());
 
@@ -92,6 +93,20 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
         // enable moves (one per target).
         properties.setProperty(ResourceManager.Options.MAXIMUM_MOVES_PER_TARGET,"1");
 
+        /*
+         * Note: Together these two properties disable incremental index builds
+         * (this test was written before incremental builds were implemented so
+         * this keeps the logic of the test intact).
+         */
+        properties.setProperty(Options.MAXIMUM_SOURCES_PER_VIEW_BEFORE_COMPACTING_MERGE, "1");
+        properties.setProperty(Options.MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW, ""+Integer.MAX_VALUE);
+
+        /*
+         * Note: Disables the initial round robin policy for the load balancer
+         * service so that it will use our fakes scores.
+         */
+        properties.setProperty(LoadBalancerService.Options.INITIAL_ROUND_ROBIN_UPDATE_COUNT, "0");
+        
 //        properties.setProperty(Options.INITIAL_EXTENT, ""+1*Bytes.megabyte);
         
 //        properties.setProperty(Options.MAXIMUM_EXTENT, ""+1*Bytes.megabyte);
@@ -285,11 +300,13 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
          */
         {
 
-            AbstractEmbeddedLoadBalancerService lbs = ((AbstractEmbeddedLoadBalancerService)((EmbeddedFederation)fed).getLoadBalancerService());
-
-            lbs.log.setLevel(Level.INFO);
+            // explicitly set the log level for the load balancer.
+            LoadBalancerService.log.setLevel(Level.INFO);
             
-            ServiceScore[] fakeServiceScores = new ServiceScore[2];
+            final AbstractEmbeddedLoadBalancerService lbs = ((AbstractEmbeddedLoadBalancerService) ((EmbeddedFederation) fed)
+                    .getLoadBalancerService());
+
+            final ServiceScore[] fakeServiceScores = new ServiceScore[2];
 
             fakeServiceScores[0] = new ServiceScore(
                     AbstractStatisticsCollector.fullyQualifiedHostName,
@@ -298,7 +315,8 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
             fakeServiceScores[1] = new ServiceScore(
                     AbstractStatisticsCollector.fullyQualifiedHostName,
                     dataService1.getServiceUUID(), 0.0/* rawScore */);
-            
+
+            // set the fake scores on the load balancer.
             lbs.setServiceScores(fakeServiceScores);
             
         }
@@ -379,8 +397,7 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
                         + ", nentries="
                         + groundTruth.getEntryCount()
                         + " ("
-                        + fed.getIndex(name, ITx.UNISOLATED).rangeCount(null,
-                                null) + ")");
+                        + fed.getIndex(name, ITx.UNISOLATED).rangeCount() + ")");
 
             }
         
@@ -416,7 +433,7 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
 
             while (itr.hasNext()) {
 
-                PartitionLocator locator = (PartitionLocator) SerializerUtil
+                final PartitionLocator locator = (PartitionLocator) SerializerUtil
                         .deserialize(itr.next().getValue());
 
                 System.err.println("locators["+n+"]="+locator);

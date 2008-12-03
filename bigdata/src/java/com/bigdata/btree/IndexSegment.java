@@ -216,8 +216,25 @@ public class IndexSegment extends AbstractBTree {
         this.leafCache = new WeakValueCache<Long, ImmutableLeaf>(
                 new LRUCache<Long, ImmutableLeaf>(fileStore.leafCacheSize));
 
-        // Read the root node.
-        this.root = readNodeOrLeaf(fileStore.getCheckpoint().addrRoot);
+        /*
+         * Read the root node.
+         * 
+         * Note: if this is an empty index segment then we actually create a new
+         * empty root leaf since there is nothing to be read from the file.
+         */
+        final IndexSegmentCheckpoint checkpoint = fileStore.getCheckpoint();
+        final long addrRoot = checkpoint.addrRoot;
+        if (addrRoot == 0L) {
+
+            // empty index segment; create an empty root leaf.
+            this.root = new ImmutableLeaf(this);
+            
+        } else {
+            
+            // read the root node/leaf from the file.
+            this.root = readNodeOrLeaf(addrRoot);
+            
+        }
 
         /*
          * Save reference to the optional bloom filter (it is read when the file
@@ -562,6 +579,20 @@ public class IndexSegment extends AbstractBTree {
              * known that this is the first leaf, and -1L otherwise.
              */
             public final long nextAddr;
+            
+            /**
+             * Ctor used when the {@link IndexSegment} is empty (no tuples) to
+             * create an empty (and immutable) root leaf.
+             * 
+             * @param btree
+             */
+            protected ImmutableLeaf(AbstractBTree btree) {
+                
+                super(btree);
+                
+                priorAddr = nextAddr = 0L;
+                
+            }
             
             /**
              * @param btree

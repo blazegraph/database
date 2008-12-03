@@ -173,6 +173,10 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestIndexSegmentCheckpoint.class );
         // test with small known examples in detail.
         suite.addTestSuite( TestIndexSegmentBuilderWithSmallTree.class );
+        // test fence posts for incremental builds with deleted index entries.
+        suite.addTestSuite( TestIndexSegmentBuilderWithIncrementalBuild.class );
+        // test fence posts for compacting merges with deleted index entries.
+        suite.addTestSuite( TestIndexSegmentBuilderWithCompactingMerge.class );
         // test iterators for the index segment.
         suite.addTestSuite(TestIndexSegmentCursors.class);
         // stress test with larger random input trees and a variety of branching factors.

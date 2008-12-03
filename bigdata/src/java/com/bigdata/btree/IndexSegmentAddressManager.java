@@ -114,7 +114,7 @@ public class IndexSegmentAddressManager extends WormAddressManager {
      * 
      * @return The region relative to which this address was encoded.
      */
-    final public IndexSegmentRegion getRegion(long addr) {
+    final public IndexSegmentRegion getRegion(final long addr) {
 
         // the encoded offset (the region is encoded in this value).
         final long encodedOffset = super.getOffset(addr);

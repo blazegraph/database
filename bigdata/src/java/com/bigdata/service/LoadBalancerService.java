@@ -211,8 +211,21 @@ abstract public class LoadBalancerService extends AbstractService
     
     /**
      * The #of {@link UpdateTask}s which have run so far.
+     * 
+     * @see Options#INITIAL_ROUND_ROBIN_UPDATE_COUNT
+     * 
+     * @see #getUnderUtilizedDataServices(int, int, UUID)
      */
-    protected int nupdates = 0;
+    protected long nupdates = 0;
+    
+    /**
+     * The #of updates during which
+     * {@link #getUnderUtilizedDataServices(int, int, UUID)} will apply a round
+     * robin policy.
+     * 
+     * @see Options#INITIAL_ROUND_ROBIN_UPDATE_COUNT
+     */
+    protected final long initialRoundRobinUpdateCount;
     
     /**
      * The directory in which the service will log the {@link CounterSet}s.
@@ -505,6 +518,23 @@ abstract public class LoadBalancerService extends AbstractService
      * @version $Id$
      */
     public interface Options {
+
+        /**
+         * The load balancer service will use a round robin approach to
+         * recommending under-utilized services until this the load balancer has
+         * re-computed the service scores N times (default
+         * {@value #DEFAULT_INITIAL_ROUND_ROBIN_UPDATE_COUNT}). This makes it
+         * more likely that the initial index partitions will be allocated on
+         * services on different hosts for a new federation, but it is really a
+         * hack since it depends entirely on the time elapsed since the load
+         * balancer service (re-)started. This "feature" may be disabled by
+         * setting this property to ZERO (0).
+         */
+        String INITIAL_ROUND_ROBIN_UPDATE_COUNT = LoadBalancerService.class
+                .getName()
+                + ".initialRoundRobinUpdateCount";
+
+        String DEFAULT_INITIAL_ROUND_ROBIN_UPDATE_COUNT = "10";
         
         /**
          * The delay between scheduled invocations of the {@link UpdateTask}.
@@ -621,6 +651,14 @@ abstract public class LoadBalancerService extends AbstractService
         // setup scheduled runnable for periodic updates of the service scores.
         // @todo move to start()?
         {
+
+            initialRoundRobinUpdateCount = Long.parseLong(properties
+                    .getProperty(Options.INITIAL_ROUND_ROBIN_UPDATE_COUNT,
+                            Options.DEFAULT_INITIAL_ROUND_ROBIN_UPDATE_COUNT));
+
+            if (INFO)
+                log.info(Options.INITIAL_ROUND_ROBIN_UPDATE_COUNT + "="
+                        + initialRoundRobinUpdateCount);
 
             final long delay = Long.parseLong(properties.getProperty(
                     Options.UPDATE_DELAY,
@@ -2040,9 +2078,9 @@ abstract public class LoadBalancerService extends AbstractService
 
     }
 
-    public UUID[] getUnderUtilizedDataServices(int minCount, int maxCount,
-            UUID exclude) throws IOException, TimeoutException,
-            InterruptedException {
+    public UUID[] getUnderUtilizedDataServices(final int minCount,
+            final int maxCount, final UUID exclude) throws IOException,
+            TimeoutException, InterruptedException {
 
         setupLoggingContext();
 
@@ -2058,7 +2096,7 @@ abstract public class LoadBalancerService extends AbstractService
 
             try {
 
-                if (nupdates < 10) {
+                if (nupdates < initialRoundRobinUpdateCount) {
 
                     /*
                      * Use a round-robin assignment for the first 5 minutes.
@@ -2240,9 +2278,18 @@ abstract public class LoadBalancerService extends AbstractService
         Arrays.sort(a);
 
         final int n; // = Math.min(maxCount, a.length);
-        if (a.length > minCount) {
-            // no more than the maxCount.
-            n = Math.min(a.length, maxCount);
+        if (minCount == 0 && maxCount == 0) {
+            /*
+             * When there are no constraints we want to make any recommendations
+             * that we can.
+             */
+            n = a.length;
+        } else if (a.length > minCount) {
+            /*
+             * No more than the maxCount (note that maxCount may be zero in
+             * which case we want to have no more than the minCount).
+             */
+            n = Math.min(a.length, Math.max(minCount, maxCount));
         } else {
             // no less than the minCount.
             n = minCount;
