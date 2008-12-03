@@ -163,16 +163,8 @@ public class AbstractResourceManagerTestCase extends
 
         };
 
-        localTransactionManager = new AbstractLocalTransactionManager(
-                resourceManager) {
-
-            public long nextTimestamp() {
-
-                return MillisecondTimestampFactory.nextMillis();
-                
-            }
-            
-        };
+        localTransactionManager = new MockLocalTransactionManager(
+                resourceManager);
         
         concurrencyManager = new ConcurrencyManager(properties,
                 localTransactionManager, resourceManager);

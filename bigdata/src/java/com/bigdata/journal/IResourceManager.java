@@ -217,6 +217,14 @@ public interface IResourceManager extends IServiceShutdown {
     public boolean shouldOverflow();
     
     /**
+     * <code>true</code> if overflow processing is enabled and
+     * <code>false</code> if overflow processing was disabled as a
+     * configuration option, in which case overflow processing can
+     * not be performed.
+     */
+    public boolean isOverflowEnabled();
+    
+    /**
      * Overflow processing creates a new journal, migrates the named indices on
      * the current journal the new journal, and continues operations on the new
      * journal. Typically this involves updating the view of the named indices

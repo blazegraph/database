@@ -107,7 +107,20 @@ public interface ILocalTransactionManager extends ITransactionManager, IServiceS
      * @throws RuntimeException
      *             if the service can not be resolved or the timestamp can not
      *             be obtained.
+     * 
+     * @see ITimestampService#nextTimestamp()
      */
     public long nextTimestampRobust();
     
+    /**
+     * Notify the global transaction manager that a commit has been performed
+     * with the given timestamp (which it assigned) and that it should update
+     * its lastCommitTime iff the given commitTime is GT its current
+     * lastCommitTime.
+     * 
+     * @param commitTime
+     *            The commit time.
+     */
+    public void notifyCommitRobust(long commitTime);
+
 }

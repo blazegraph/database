@@ -31,6 +31,7 @@ package com.bigdata.service;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.MDC;
 
@@ -75,6 +76,39 @@ abstract public class TimestampService extends AbstractService implements
     public long nextTimestamp() throws IOException {
         
         return MillisecondTimestampFactory.nextMillis();
+        
+    }
+    
+    public void notifyCommit(long commitTime) throws IOException {
+            
+        synchronized(lastCommitTime) {
+            
+            /*
+             * Note: commit time notifications can be overlap such that they
+             * appear out of sequence with respect to their values. This is Ok.
+             * We just ignore any older commit times. However we do need to be
+             * synchronized here such that the commit time notices themsevles
+             * are serialized in order for us not to miss any.
+             */
+            
+            if (lastCommitTime.get() < commitTime) {
+
+                lastCommitTime.set( commitTime );
+                
+            }
+            
+        }
+        
+    }
+    
+    /**
+     * The last (known) commit time.
+     */
+    private AtomicLong lastCommitTime = new AtomicLong(0L);
+    
+    public long lastCommitTime() throws IOException {
+        
+        return lastCommitTime.get();
         
     }
     

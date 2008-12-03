@@ -856,7 +856,7 @@ abstract public class OverflowManager extends IndexManager {
      *       old index on the old journal.
      */
     public Future<Object> overflow() {
-       
+
         assert overflowAllowed.get();
         
         final ConcurrencyManager concurrencyManager = (ConcurrencyManager) getConcurrencyManager();

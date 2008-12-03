@@ -944,25 +944,6 @@ Short term tasks:
 
    - StoreManager / IndexManager
 
-      - Done. Add counter for bytes under management on the
-        StoreManager.  I want to see bytes placed under management,
-        bytes for stores that have been deleted, and bytes for stores
-        that are remaining.  It would also be great to see the bytes
-        remaining on the volume where the data are stored in the same
-        view.
-
-      - Modify  LRU  to  purge  entries  older than  a  specified  age
-        (including an asych  daemon thread to make sure  that they get
-        purged even if the LRU is not being touched).  Do this for the
-        index segment cache in the IndexManager as well.
-
-      - Done. Better concurrency for openIndex, openStore, getJournal,
-        and getIndexOnStore
-
-      - Modify WeakValueCache to use ConcurrentHashMap and support an
-        atomic putIfAbsent operation.  This will reduce the latency
-        imposed when we need to re-open an index segment from a store.
-
       - Should recognize a "disk full" situation and shutdown the data
         service cleanly.
 
@@ -2731,42 +2712,6 @@ JOIN optimizations:
   then you only have the resources of that one machine for SPORelation
   self-joins.  But if those indices are on 3 machines then all 3 will
   be working the JOIN.
-    
-- Optimize resolution of locators for pipeline joins.
-  
-  We can request all the locators for a join task when the join task
-  is created and wait until they arrive before processing the source
-  binding chunks, which can already be read from the source join
-  tasks.
-
-  Unlike splits for lookup(), an output binding set can be mapped
-  across multiple index partitions.
-
-  We can easily optimize for the case where there is only a single
-  sink index partition since there will be only one sink and all
-  output binding sets will go to the same sink.
-
-  Once the access path tasks are ordered, the odds are very good that
-  the next output binding set will be mapped onto the same index
-  partition(s) as the last output binding set.
-
-  If the locator is kept as state then we have the left- and
-  right-separators can we can easily test to see if an output binding
-  set would lie within the same index partition.
-
-- Close out indices that have not been recently used in the
-  AbstractJournal and the IndexManager after a configurable timeout
-  (default 60 seconds).  This will help to keep down the resource
-  demands when large complex queries that touch a lot of data pass
-  through the system and cause many nodes and leaves to be buffered
-  for some timestamp but are not followed by additional queries so
-  those buffered data should then be released.
-
-- Fix JiniFederation#getLastCommitTime().  This should report the
-  timestamp of the last commit.  The commit protocol needs to notify
-  the timestamp service that it is accepting a commit time and abort
-  if that notice fails.  This will help us to keep the indices focused
-  on the actual lastCommitTime during query.
 
 - Compact serialization for ISolution[] and IBindingSet[] to reduce
   JDS IO costs. Everything is in place for this, but the custom
@@ -3149,46 +3094,45 @@ Thanks,
 ------------------------------------------------------------
 Commit notes:
 
-- Done. Bug fix for the IndexSegmentBuilder.  It was failing to copy
-  the delete markers or version timestamps.
+  * Verify that the lastCommitTime is being reported correctly for all
+    deployment scenarios since otherwise we will hold open lots of
+    index views that do not differ in their state (or fail to notice
+    commits!).  There are also potential problems during start up if
+    the timestamp service does not come online.
 
-- Done. Added a test suite for incremental index segment builds.
+    This can be most easily done by writing on System.err the views
+    that are being opened by the IndexManager. [Verified for EDS, but
+    also check JDS].
 
-- Done. Added a factory method to the IndexSegmentBuilder which
-  encapsulates the logic required to setup both incremental builds and
-  compacting merges.
+  * Modify LRU to close out old index views in order to recover RAM.
+    Changes are to AbstractJournal and the IndexManager. Use a
+    configurable timeout (default 60 seconds).  This will help to keep
+    down the resource demands when large complex queries that touch a
+    lot of data pass through the system and cause many nodes and
+    leaves to be buffered for some timestamp but are not followed by
+    additional queries so those buffered data should then be released.
+    This will also effect "hot" tests since they must be re-run within
+    a timeout in order to benefit from the data buffered by btree's
+    and not just by the disk.
 
-- Done. Bug fix in post-processing for overflow.  It was failing to
-  test for join or move tasks when a compacting merge was NOT
-  requested (the sense of the test in the code was reversed).
+    Modify LRU to purge entries older than a specified age (including
+    an asych daemon thread to make sure that they get purged even if
+    the LRU is not being touched).  Do this for the AbstractJournal
+    and the index segment cache in the IndexManager as well.
 
-- Done. Fixed problems with the split/join unit test.
+  * Optimize mapping of access path tasks onto join sink tasks since
+    we can't evaluate join performance with splits enabled until this
+    is done.
 
-- Done. Bug fix for load balancer behavior during the round robin
-  mode.  When minCount GT ZERO but maxCount EQ ZERO it was choosing
-  ZERO assignments.  Now it chooses minCount assignments in this case.
+  * Re-run unit tests.
 
-- Done. Added option to the load balancer to allow the round robin
-  policy to be explicitly disabled (or even used forever) by
-  specifying the #of updates during which that policy will be applied.
+  * Enable OVERFLOW and MOVES for EDS (in the code by having more than
+    one data service) and JDS (in the client.config file) and re-run
+    LUBM.  Do we get the right answers?  Note that the load balancer
+    behavior will be quite different for a cluster.
 
-- Done. When minCount==maxCount==0 and the load balancer is using the
-  round robin policy, it will now make recommendations for under
-  utilized services (it was returning an empty array).
-
-- Done. Fix the move test. 
-
-- Done. Added unit tests for a compacting merge when there are deleted
-  tuples and delete markers are enabled.  In particular, the test
-  covers the case where all tuples are deleted such that the net #of
-  tuples after a compacting merge is zero.
-
-- Done. Modified IndexSegmentBuilder, IndexSegment,
-  IndexSegmentCheckpoint to allow an empty index segment.  This
-  condition can arise when a compacting merge is performed on an index
-  (partition) whose tuples have all been deleted and is therefore
-  allowable.
-
+  - Reduce the CHUNK_TIMEOUT? E.g., from 1000ms to 10ms or 100ms?
+  
 - Cluster tools and service starter.
 
   - Need ability to start services on machines automatically and to
@@ -3196,6 +3140,13 @@ Commit notes:
     otherwise we can't readily operate on larger clusters.
 
   - Need ability to execute a command on all machines in a cluster.
+
+  - Very large data sets will require either the ability to
+    dynamically generate the partition of the data appropriate to each
+    client involved in the data load -or- a LOT of NAS.  It might also
+    be possible to compress the data when they are generated and then
+    decompress them dynamically during load but that will add extra
+    cost to the load (closure and query costs would not be effected).
 
 - Performance testing on DP for U10, U100, U1000 with
   split/join/move/build/merge.
@@ -3213,16 +3164,6 @@ Commit notes:
 
   - Examine memory demands when overflow is enabled.
 
-  - Optimize mapping of access path tasks onto join sink tasks (we
-    can't evaluate join performance with splits enabled until this is
-    done).
-
-  * Make sure that the lastCommitTime is being reported correctly
-    since otherwise we will hold open lots of index views that do not
-    differ in their state.
-
-  * Modify LRU to close out old index views in order to recover RAM.
-
   * Verify overflow w/ MOVE enabled fix the TERM2ID hotspot.
 
     Note: Splitting the TERM2ID index is not enough to get rid of the
@@ -3232,5 +3173,26 @@ Commit notes:
     the IOWAIT bottleneck until we MOVE some of the term2id index
     partitions onto a different machine.
 
-- Reduce the CHUNK_TIMEOUT? E.g., from 1000ms to 10ms or 100ms?
+============================================================
+    
+- Optimize resolution of locators for pipeline joins.
+  
+  We can request all the locators for a join task when the join task
+  is created and wait until they arrive before processing the source
+  binding chunks, which can already be read from the source join
+  tasks.
 
+  Unlike splits for lookup(), an output binding set can be mapped
+  across multiple index partitions.
+
+  We can easily optimize for the case where there is only a single
+  sink index partition since there will be only one sink and all
+  output binding sets will go to the same sink.
+
+  Once the access path tasks are ordered, the odds are very good that
+  the next output binding set will be mapped onto the same index
+  partition(s) as the last output binding set.
+
+  If the locator is kept as state then we have the left- and
+  right-separators can we can easily test to see if an output binding
+  set would lie within the same index partition.

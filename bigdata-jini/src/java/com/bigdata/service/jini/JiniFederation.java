@@ -55,7 +55,6 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.io.IStreamSerializer;
 import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.ITimestampService;
-import com.bigdata.journal.TimestampServiceUtil;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBuffer;
@@ -519,29 +518,27 @@ public class JiniFederation extends AbstractDistributedFederation implements
     }
 
     /**
-     * 
-     * FIXME This is returning the next possible timestamp rather than the
-     * timestamp of the last competed commit.
-     * <p>
-     * The {@link ITimestampService} must be extended to have explicit knowledge
-     * of commits (as part of its eventual role as a transaction manager
-     * service) and this method should query the {@link ITimestampService} for
-     * the timestamp of the last _completed_ commit (rather than the last
-     * timestamp assigned by the service). The notification of the commit
-     * protocol to the timestamp service can be asynchronous unless the commit
-     * is part of a transaction, in which case it needs to be synchronous.
-     * (There could be another method for the last transaction commit time. This
-     * method reflects commits by unisolated operations).
-     * <p>
-     * Dealing with this properly might need to wait for a 2-/3-phase commit
-     * protocol since the commit should fail if the timestamp service does not
-     * acknowledge the receipt of the commit time otherwise a client depending
-     * on the lastCommitTime to access the recently committed data would read
-     * from a prior commit point. On the other hand, this is not so bad as even
-     * a post-commit error will be noticed by the committer and there will
-     * normally be continued commits which would cause the lastCommitTime to
-     * advance anyway, thereby causing the commit point would commitTime was not
-     * noticed to be recorded.
+     * @todo The {@link ITimestampService} must have explicit knowledge of
+     *       commits (as part of its eventual role as a transaction manager
+     *       service) and this method should query the {@link ITimestampService}
+     *       for the timestamp of the last _completed_ commit (rather than the
+     *       last timestamp assigned by the service). The notification of the
+     *       commit protocol to the timestamp service can be asynchronous unless
+     *       the commit is part of a transaction, in which case it needs to be
+     *       synchronous. (There could be another method for the last
+     *       transaction commit time. This method reflects commits by unisolated
+     *       operations).
+     *       <p>
+     *       Dealing with this properly might need to wait for a 2-/3-phase
+     *       commit protocol since the commit should fail if the timestamp
+     *       service does not acknowledge the receipt of the commit time
+     *       otherwise a client depending on the lastCommitTime to access the
+     *       recently committed data would read from a prior commit point. On
+     *       the other hand, this is not so bad as even a post-commit error will
+     *       be noticed by the committer and there will normally be continued
+     *       commits which would cause the lastCommitTime to advance anyway,
+     *       thereby causing the commit point would commitTime was not noticed
+     *       to be recorded.
      */
     public long getLastCommitTime() {
 
@@ -549,7 +546,17 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
         if (timestampService != null) {
 
-            lastKnownCommitTime = TimestampServiceUtil.nextTimestamp(timestampService);
+            try {
+                
+                lastKnownCommitTime = timestampService.lastCommitTime();
+                
+            } catch (IOException e) {
+                
+                log.error("Can not reach the timestampService?", e);
+                
+                // fall through - report the lastKnownCommitTime.
+                
+            }
 
         }
 

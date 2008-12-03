@@ -120,6 +120,23 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 return MillisecondTimestampFactory.nextMillis();
 
             }
+            
+            /**
+             * Ignored - we always have the lastCommitTime on the root block so
+             * we don't need to look at this event.
+             */
+            public void notifyCommit(long commitTime) {
+                
+            }
+            
+            /**
+             * Reports the last commit time on the root block.
+             */
+            public long lastCommitTime() {
+                
+                return Journal.this.getLastCommitTime();
+                
+            }
 
         };
         
@@ -554,6 +571,23 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         return localTransactionManager.nextTimestampRobust();
     }
 
+    public void notifyCommit(long commitTime) throws IOException {
+        localTransactionManager.notifyCommit(commitTime);
+    }
+
+    public void notifyCommitRobust(long commitTime) {
+        localTransactionManager.notifyCommitRobust(commitTime);
+    }
+
+    /**
+     * Returns the last commit time on the root block.
+     */
+    public long lastCommitTime() {
+
+        return getLastCommitTime();
+        
+    }
+    
     public void prepared(ITx tx) throws IllegalStateException {
         localTransactionManager.prepared(tx);
     }
@@ -726,6 +760,15 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         return false;
 
+    }
+    
+    /**
+     * Note: This implementation always returns <code>false</code>.
+     */
+    public boolean isOverflowEnabled() {
+        
+        return false;
+        
     }
     
     public Future<Object> overflow() {

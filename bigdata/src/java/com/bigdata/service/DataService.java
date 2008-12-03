@@ -381,6 +381,36 @@ abstract public class DataService extends AbstractService
                 return timestampService.nextTimestamp();
                 
             }
+            
+            public void notifyCommit(long commitTime) throws IOException {
+                
+                // resolve the timestamp service.
+                final ITimestampService timestampService = DataService.this
+                        .getFederation().getTimestampService();
+
+                if (timestampService == null)
+                    throw new NullPointerException(
+                            "TimestampService not discovered");
+
+                // notify the timestamp service.
+                timestampService.notifyCommit(commitTime);
+                                
+            }
+            
+            public long lastCommitTime() throws IOException {
+                
+                // resolve the timestamp service.
+                final ITimestampService timestampService = DataService.this
+                        .getFederation().getTimestampService();
+
+                if (timestampService == null)
+                    throw new NullPointerException(
+                            "TimestampService not discovered");
+
+                // obtain from the timestamp service.
+                return timestampService.lastCommitTime();
+                
+            }
 
         };
 

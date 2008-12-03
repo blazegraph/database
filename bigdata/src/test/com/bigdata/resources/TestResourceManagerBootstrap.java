@@ -53,7 +53,6 @@ import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.resources.ResourceManager.Options;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.util.MillisecondTimestampFactory;
 
 /**
  * Bootstrap test suite for the {@link ResourceManager}.
@@ -75,7 +74,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
     public TestResourceManagerBootstrap(String name) {
         super(name);
     }
-
+    
     /**
      * Removes the per-test data directory.
      */
@@ -122,11 +121,11 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
 
     }
 
-    private long getNextTimestamp() {
-        
-        return MillisecondTimestampFactory.nextMillis();
-        
-    }
+//    private long getNextTimestamp() {
+//        
+//        return MillisecondTimestampFactory.nextMillis();
+//        
+//    }
     
     /**
      * Test creation of a new {@link ResourceManager}. This verifies the
@@ -145,16 +144,8 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
 
         ResourceManager resourceManager = new MyResourceManager(properties);
 
-        AbstractLocalTransactionManager localTransactionManager = new AbstractLocalTransactionManager(
-                resourceManager) {
-
-            public long nextTimestamp() {
-
-                return getNextTimestamp();
-
-            }
-
-        };
+        AbstractLocalTransactionManager localTransactionManager = new MockLocalTransactionManager(
+                resourceManager);
 
         ConcurrencyManager concurrencyManager = new ConcurrencyManager(
                 properties, localTransactionManager, resourceManager);
@@ -279,16 +270,8 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
 
         ResourceManager resourceManager = new MyResourceManager(properties);
 
-        AbstractLocalTransactionManager localTransactionManager = new AbstractLocalTransactionManager(
-                resourceManager) {
-
-            public long nextTimestamp() {
-
-                return getNextTimestamp();
-
-            }
-
-        };
+        AbstractLocalTransactionManager localTransactionManager = new MockLocalTransactionManager(
+                resourceManager);
 
         ConcurrencyManager concurrencyManager = new ConcurrencyManager(
                 properties, localTransactionManager, resourceManager);
@@ -425,16 +408,8 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
 
         ResourceManager resourceManager = new MyResourceManager(properties);
 
-        AbstractLocalTransactionManager localTransactionManager = new AbstractLocalTransactionManager(
-                resourceManager) {
-
-            public long nextTimestamp() {
-
-                return getNextTimestamp();
-
-            }
-
-        };
+        AbstractLocalTransactionManager localTransactionManager = new MockLocalTransactionManager(
+                resourceManager);
 
         ConcurrencyManager concurrencyManager = new ConcurrencyManager(
                 properties, localTransactionManager, resourceManager);
@@ -662,17 +637,9 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
 
         ResourceManager resourceManager = new MyResourceManager(properties);
         
-        AbstractLocalTransactionManager localTransactionManager = new AbstractLocalTransactionManager(
-                resourceManager) {
-
-            public long nextTimestamp() {
-
-                return getNextTimestamp();
-
-            }
-
-        };
-
+        AbstractLocalTransactionManager localTransactionManager = new MockLocalTransactionManager(
+                resourceManager);
+        
         ConcurrencyManager concurrencyManager = new ConcurrencyManager(
                 properties, localTransactionManager, resourceManager);
 
