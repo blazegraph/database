@@ -242,7 +242,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
          * Note: This used to be 20k, but chunks of chunks works better than
          * just a large chunk.
          */
-        String DEFAULT_CHUNK_CAPACITY = "200";
+        String DEFAULT_CHUNK_CAPACITY = "100";
 
         /**
          * The timeout in milliseconds that the {@link BlockingBuffer} will wait

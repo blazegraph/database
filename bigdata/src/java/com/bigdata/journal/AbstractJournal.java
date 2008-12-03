@@ -1592,9 +1592,30 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
     
     public long commit() {
         
-        final long commitTime = getLocalTransactionManager().nextTimestampRobust();
+        final ILocalTransactionManager transactionManager = getLocalTransactionManager();
         
-        return commitNow( commitTime );
+        /*
+         * Get timestamp that will be assigned to this commit (RMI if the
+         * journal is part of a distributed federation).
+         */
+        final long commitTime = transactionManager.nextTimestampRobust();
+        
+        if (commitNow(commitTime) != 0L) {
+
+            /*
+             * Did commit data so we need to notify the federation that it must
+             * advance its global lastCommitTime.
+             * 
+             * FIXME This protocol is not robust since if we fail to notify the
+             * federation there is no way to rollback the commit. In fact we
+             * need something like a 2/3-phase commit for this to be robust.
+             */
+            
+            transactionManager.notifyCommitRobust(commitTime);
+            
+        }
+
+        return commitTime;
         
     }
 

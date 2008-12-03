@@ -1035,9 +1035,13 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * therefore set [true] if we need to pause the write service. Also,
              * synchronous overflow is NOT performed unless we were actually
              * able to await all running tasks (nrunning == 0).
+             * 
+             * Note: Overflow processing is simply not permitted if it is not
+             * enabled for the resource manager. However, if it is enabled then
+             * overflow processing can be forced using [forceOverflow].
              */
-            final boolean shouldOverflow = (forceOverflow.get() || resourceManager
-                    .shouldOverflow());
+            final boolean shouldOverflow = resourceManager.isOverflowEnabled()
+                    && (forceOverflow.get() || resourceManager.shouldOverflow());
 
             if (shouldOverflow && overflowLog.isInfoEnabled()) {
 
@@ -1428,8 +1432,6 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         
         try {
 
-            overflowLog.info("Doing overflow");
-        
 //            /*
 //             * @todo should the active set be empty? that is, have all tasks
 //             * waiting on commit reached a state where they will neither effect
@@ -1441,8 +1443,6 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         
             noverflow++;
             
-            overflowLog.info("Did overflow");
-
         } catch (Throwable t) {
 
             log.error("Overflow error", t);

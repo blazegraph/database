@@ -42,7 +42,7 @@ public class TimestampServiceUtil {
 
     protected static Logger log = Logger.getLogger(TimestampServiceUtil.class);
     
-    static public long nextTimestamp(ITimestampService service) {
+    static public long nextTimestamp(final ITimestampService service) {
 
         if (service == null)
             throw new IllegalArgumentException();

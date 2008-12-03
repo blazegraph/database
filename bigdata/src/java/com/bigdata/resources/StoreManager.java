@@ -1290,6 +1290,17 @@ abstract public class StoreManager extends ResourceEvents implements
 
             }
 
+            /*
+             * Notify the timestamp service of the last commit time for the live
+             * journal for this data service. This will be zero (0L) iff this is
+             * a new journal on a new data service. This notification is
+             * required to allow clients that use the global lastCommitTime to
+             * pose queries after restart of a federation.
+             */
+
+            getConcurrencyManager().getTransactionManager().notifyCommitRobust(
+                    liveJournalRef.get().getLastCommitTime());
+            
         }
 
     }
@@ -1873,6 +1884,25 @@ abstract public class StoreManager extends ResourceEvents implements
 
         }
 
+        public void notifyCommit(long commitTime) {
+            
+            getLocalTransactionManager().notifyCommitRobust(commitTime);
+            
+        }
+        
+        /**
+         * Delegates to the federation. Local federation implementations have
+         * direct access to the root block on the live journal for their data
+         * service(s). Distributed federations rely on the timestamp service to
+         * process {@link #notifyCommit(long)} events in order to report the
+         * most recent global commit time.
+         */
+        public long lastCommitTime() {
+            
+            return getFederation().getLastCommitTime();
+            
+        }
+        
         public ILocalTransactionManager getLocalTransactionManager() {
 
             return getConcurrencyManager().getTransactionManager();
@@ -2248,7 +2278,9 @@ abstract public class StoreManager extends ResourceEvents implements
      * <p>
      * Note: the {@link ILocalTransactionManager} handles the "robust" semantics
      * for discoverying the timestamp service and obtaining the next timestamp
-     * from that service.
+     * from that service. This delegates to that class. It is present here
+     * because many pieces of the {@link ResourceManager} and its layers use
+     * {@link #nextTimestampRobust()} and its presence here is a convenient.
      */
     protected long nextTimestampRobust() {
 
@@ -2258,7 +2290,7 @@ abstract public class StoreManager extends ResourceEvents implements
         return transactionManager.nextTimestampRobust();
 
     }
-
+    
     public void deleteResources() {
 
         assertNotOpen();

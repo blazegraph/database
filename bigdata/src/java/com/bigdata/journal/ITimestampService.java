@@ -120,4 +120,26 @@ public interface ITimestampService extends Remote {
      */
     public long nextTimestamp() throws IOException;
 
+    /**
+     * Notify the global transaction manager that a commit has been performed
+     * with the given timestamp (which it assigned) and that it should update
+     * its lastCommitTime iff the given commitTime is GT its current
+     * lastCommitTime.
+     * 
+     * @param commitTime
+     *            The commit time.
+     * 
+     * @throws IOException
+     */
+    public void notifyCommit(long commitTime) throws IOException;
+
+    /**
+     * Return the last commit time reported to the {@link ITimestampService}.
+     * 
+     * @return The last known commit time.
+     * 
+     * @throws IOException
+     */
+    public long lastCommitTime() throws IOException;
+    
 }

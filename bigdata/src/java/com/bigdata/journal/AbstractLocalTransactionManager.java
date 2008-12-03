@@ -6,7 +6,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
@@ -159,7 +158,7 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility i
      */
     public void activateTx(ITx tx) throws IllegalStateException {
 
-        Long timestamp = tx.getStartTimestamp();
+        final Long timestamp = tx.getStartTimestamp();
 
         if (activeTx.containsKey(timestamp)) {
 
@@ -188,9 +187,9 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility i
      */
     public void prepared(ITx tx) throws IllegalStateException {
 
-        Long id = tx.getStartTimestamp();
+        final Long id = tx.getStartTimestamp();
 
-        ITx tx2 = activeTx.remove(id);
+        final ITx tx2 = activeTx.remove(id);
 
         if (tx2 == null)
             throw new IllegalStateException("Not active: tx=" + tx);
@@ -221,11 +220,11 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility i
         assert tx != null;
         assert tx.isComplete();
 
-        Long id = tx.getStartTimestamp();
+        final Long id = tx.getStartTimestamp();
 
-        ITx txActive = activeTx.remove(id);
+        final ITx txActive = activeTx.remove(id);
 
-        ITx txPrepared = preparedTx.remove(id);
+        final ITx txPrepared = preparedTx.remove(id);
 
         if (txActive == null && txPrepared == null) {
 
@@ -276,16 +275,11 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility i
      * assignment). If necessary, this will cause the caller to block until a
      * suitable timestamp is available.
      */
-    public long newTx(IsolationEnum level) {
+    public long newTx(final IsolationEnum level) {
 
         final ILocalTransactionManager transactionManager = this;
 
-        final long startTime;
-        try {
-            startTime = nextTimestamp();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        final long startTime = nextTimestampRobust();
         
         switch (level) {
         
@@ -305,7 +299,9 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility i
         }
 
         default:
+
             throw new AssertionError("Unknown isolation level: " + level);
+        
         }
 
     }
@@ -319,9 +315,9 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility i
      * @param ts
      *            The transaction identifier (aka start time).
      */
-    public void abort(long ts) {
+    public void abort(final long ts) {
 
-        ITx tx = getTx(ts);
+        final ITx tx = getTx(ts);
 
         if (tx == null) {
 
@@ -364,9 +360,9 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility i
      *                that can not be validated is automatically aborted. The
      *                caller MAY re-execute the transaction.
      */
-    public long commit(long ts) throws ValidationError {
+    public long commit(final long ts) throws ValidationError {
 
-        ITx tx = getTx(ts);
+        final ITx tx = getTx(ts);
 
         if (tx == null) {
 
@@ -479,7 +475,8 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility i
          */
         public Object doTask() throws Exception {
 
-            log.info("resource="+Arrays.toString(getResource()));
+            if(INFO)
+                log.info("resource="+Arrays.toString(getResource()));
             
             /*
              * The commit time is assigned when we prepare the transaction.
@@ -527,33 +524,25 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility i
         
     }
 
-//    /**
-//     * Return the {@link ITimestampService}. Depending on the deployment
-//     * scenario this may be either this object, another service in the same JVM,
-//     * or a remote service.
-//     * 
-//     * @return The {@link ITimestampService} -or- <code>null</code> if the
-//     *         {@link ITimestampService} has not been discovered.
-//     * 
-//     * @throws IllegalStateException
-//     *             if the service is shutdown.
-//     */
-//    abstract public ITimestampService getTimestampService();
+    /**
+     * Delay between attempts reach the remote service (ms).
+     */
+    final long delay = 10L;
+    
+    /**
+     * #of attempts to reach the remote service.
+     * 
+     * Note: delay*maxtries == 1000ms of trying before we give up.
+     * 
+     * If this is not enough, then consider adding an optional parameter giving
+     * the time the caller will wait and letting the StoreManager wait longer
+     * during startup to discover the timestamp service.
+     */
+    final int maxtries = 100; 
     
     public long nextTimestampRobust() {
 
         final long begin = System.currentTimeMillis();
-        
-        // delay between attemps to obtain a timestamp (ms).
-        final long delay = 100L;
-        
-        /* #of attempts - a total of 1000ms of trying before we give up.
-         * 
-         * if this is not enough, then consider adding an optional parameter
-         * giving the time the caller will wait and letting the StoreManager
-         * wait longer during startup to discover the timestamp service.
-         */
-        final int maxtries = 10; 
         
         IOException cause = null;
 
@@ -562,26 +551,6 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility i
         for (ntries = 1; ntries <= maxtries; ntries++) {
 
             try {
-
-//                final ITimestampService timestampService = getTimestampService();
-//
-//                if (timestampService == null) {
-//
-//                    try {
-//
-//                        Thread.sleep(100/* ms */);
-//                        
-//                    } catch (InterruptedException e) {
-//                        
-//                        throw new RuntimeException(
-//                                "Interrupted awaiting timestamp service discovery: "
-//                                        + e);
-//                        
-//                    }
-//                    
-//                }
-//
-//                return timestampService.nextTimestamp();
 
                 return nextTimestamp();
                 
@@ -615,6 +584,60 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility i
         final long elapsed = System.currentTimeMillis() - begin;
 
         final String msg = "Could not get timestamp after " + ntries
+                + " tries and " + elapsed + "ms";
+
+        log.error(msg, cause);
+
+        throw new RuntimeException(msg, cause);
+        
+    }
+
+    public void notifyCommitRobust(final long commitTime) {
+        
+        final long begin = System.currentTimeMillis();
+        
+        IOException cause = null;
+
+        int ntries;
+
+        for (ntries = 1; ntries <= maxtries; ntries++) {
+
+            try {
+
+                notifyCommit(commitTime);
+                
+                return;
+                
+            } catch (NullPointerException e) {
+                
+                log.warn("Timestamp service not discovered? : " + e /*, e*/);
+
+                try {
+
+                    Thread.sleep(delay/* ms */);
+
+                } catch (InterruptedException e2) {
+
+                    throw new RuntimeException(
+                            "Interrupted awaiting timestamp service discovery: "
+                                    + e2);
+
+                }
+                
+            } catch (IOException e) {
+
+                log.warn("Problem with timestamp service? : ntries=" + ntries
+                        + ", " + e, e);
+
+                cause = e;
+
+            }
+
+        }
+
+        final long elapsed = System.currentTimeMillis() - begin;
+
+        final String msg = "Could not notify timestamp service after " + ntries
                 + " tries and " + elapsed + "ms";
 
         log.error(msg, cause);
