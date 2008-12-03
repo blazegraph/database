@@ -1641,7 +1641,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
 
         if (tuple == null || !tuple.getValuesRequested())
             throw new IllegalArgumentException();
-        
+
         counters.ngetKey++;
 
         getRoot().valueAt(index, tuple);
@@ -1661,50 +1661,49 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
      * If delete markers are not being used, then the cost is equal to the cost
      * of {@link #rangeCount(byte[], byte[])}.
      */
-    final public long rangeCountExact(byte[] fromKey, byte[] toKey) {
-        
-        if (metadata.getDeleteMarkers()) {
+    final public long rangeCountExact(final byte[] fromKey, final byte[] toKey) {
+
+        if (!metadata.getDeleteMarkers()) {
 
             /*
-             * The use of delete markers means that index entries are not
-             * removed immediately but rather a delete flag is set. This is
-             * always true for the scale-out indices because delete markers are
-             * used to support index partition views. It is also true for
-             * indices that can support transactions regardless or whether or
-             * not the database is using scale-out indices. In any case, if you
-             * want an exact range count when delete markers are in use then you
-             * need to actually visit every tuple in the index, which is what
-             * this code does. Note that the [flags] are 0 since we do not need
-             * either the KEYS or VALS. We are just interested in the #of tuples
-             * that the iterator is willing to visit.
+             * Delete markers are not in use, therefore rangeCount() will report
+             * the exact count.
              */
 
-            long n = 0L;
+            return rangeCount(fromKey, toKey);
 
-            final Iterator itr = rangeIterator(fromKey, toKey,
-                    0/* capacity */, 0/* flags */, null/* filter */);
+        }
+        
+        /*
+         * The use of delete markers means that index entries are not removed
+         * immediately but rather a delete flag is set. This is always true for
+         * the scale-out indices because delete markers are used to support
+         * index partition views. It is also true for indices that can support
+         * transactions regardless or whether or not the database is using
+         * scale-out indices. In any case, if you want an exact range count when
+         * delete markers are in use then you need to actually visit every tuple
+         * in the index, which is what this code does. Note that the [flags] are
+         * 0 since we do not need either the KEYS or VALS. We are just
+         * interested in the #of tuples that the iterator is willing to visit.
+         */
 
-            while (itr.hasNext()) {
+        long n = 0L;
 
-                itr.next();
-                
-                n++;
+        final Iterator itr = rangeIterator(fromKey, toKey, 0/* capacity */,
+                0/* flags */, null/* filter */);
 
-            }
+        while (itr.hasNext()) {
 
-            return n;
+            itr.next();
+
+            n++;
 
         }
 
-        /*
-         * Either an exact count is not required or delete markers are not in
-         * use and therefore rangeCount() will report the exact count.
-         */
-
-        return rangeCount(fromKey, toKey);
+        return n;
 
     }
-    
+
     final public long rangeCount() {
         
         return rangeCount(null, null);
@@ -1768,6 +1767,57 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
         int ret = toIndex - fromIndex;
 
         return ret;
+
+    }
+
+    /**
+     * An exact range count that includes any deleted tuples.
+     * <p>
+     * Note: {@link #rangeCountExact(byte[], byte[])} DOES NOT count deleted
+     * tuples. Therefore its logic its logic here but this method also sets the
+     * {@link IRangeQuery#DELETED} flag so that we count both the deleted and
+     * the non-deleted tuples.
+     * 
+     * @param fromKey
+     * @param toKey
+     * 
+     * @return
+     * 
+     * @see #rangeCountExact(byte[], byte[])
+     */
+    public long rangeCountExactWithDeleted(final byte[] fromKey,
+            final byte[] toKey) {
+        
+        if (fromKey == null && toKey == null) {
+
+            /*
+             * In this case the entryCount() is exact and will report both
+             * deleted and undeleted tuples (assuming that delete markers are
+             * enabled).
+             */
+
+            return getEntryCount();
+
+        }
+
+        /*
+         * Only a key-range will be used. 
+         */
+
+        long n = 0L;
+
+        final Iterator itr = rangeIterator(fromKey, toKey, 0/* capacity */,
+                IRangeQuery.DELETED/* flags */, null/* filter */);
+
+        while (itr.hasNext()) {
+
+            itr.next();
+
+            n++;
+
+        }
+
+        return n;
 
     }
 

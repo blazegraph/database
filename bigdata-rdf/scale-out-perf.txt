@@ -3149,31 +3149,88 @@ Thanks,
 ------------------------------------------------------------
 Commit notes:
 
-- Incremental builds (vs compact).  Compare performance on U10, etc.
+- Done. Bug fix for the IndexSegmentBuilder.  It was failing to copy
+  the delete markers or version timestamps.
 
-- DP run of U100 (1 machine) and U1000 (3 machines) with overflow and
+- Done. Added a test suite for incremental index segment builds.
+
+- Done. Added a factory method to the IndexSegmentBuilder which
+  encapsulates the logic required to setup both incremental builds and
+  compacting merges.
+
+- Done. Bug fix in post-processing for overflow.  It was failing to
+  test for join or move tasks when a compacting merge was NOT
+  requested (the sense of the test in the code was reversed).
+
+- Done. Fixed problems with the split/join unit test.
+
+- Done. Bug fix for load balancer behavior during the round robin
+  mode.  When minCount GT ZERO but maxCount EQ ZERO it was choosing
+  ZERO assignments.  Now it chooses minCount assignments in this case.
+
+- Done. Added option to the load balancer to allow the round robin
+  policy to be explicitly disabled (or even used forever) by
+  specifying the #of updates during which that policy will be applied.
+
+- Done. When minCount==maxCount==0 and the load balancer is using the
+  round robin policy, it will now make recommendations for under
+  utilized services (it was returning an empty array).
+
+- Done. Fix the move test. 
+
+- Done. Added unit tests for a compacting merge when there are deleted
+  tuples and delete markers are enabled.  In particular, the test
+  covers the case where all tuples are deleted such that the net #of
+  tuples after a compacting merge is zero.
+
+- Done. Modified IndexSegmentBuilder, IndexSegment,
+  IndexSegmentCheckpoint to allow an empty index segment.  This
+  condition can arise when a compacting merge is performed on an index
+  (partition) whose tuples have all been deleted and is therefore
+  allowable.
+
+- Cluster tools and service starter.
+
+  - Need ability to start services on machines automatically and to
+    initiate a distributed operation such as a data load since
+    otherwise we can't readily operate on larger clusters.
+
+  - Need ability to execute a command on all machines in a cluster.
+
+- Performance testing on DP for U10, U100, U1000 with
+  split/join/move/build/merge.
+
+  DP run of U100 (1 machine) and U1000 (3 machines) with overflow and
   splits enabled, but not moves.  Verify the LBS behavior.  The host
   with TERM2ID should have the heaviest load.  The move targets will
   be the more lightly loaded hosts.  Verify all collected host stats
   and write collector for any stats that are missing.
 
-- DP run w/ moves enabled.  
+  - Do an LTS run for each of these cases.  This will give us a
+    baseline for load and query performance and "ground truth" for
+    query correctness.  Only U100 and U1000 need to be run on the
+    cluster as we can get U10 easily on a laptop.
 
-- Optimize mapping of access path tasks onto join sink tasks.
+  - Examine memory demands when overflow is enabled.
+
+  - Optimize mapping of access path tasks onto join sink tasks (we
+    can't evaluate join performance with splits enabled until this is
+    done).
+
+  * Make sure that the lastCommitTime is being reported correctly
+    since otherwise we will hold open lots of index views that do not
+    differ in their state.
+
+  * Modify LRU to close out old index views in order to recover RAM.
+
+  * Verify overflow w/ MOVE enabled fix the TERM2ID hotspot.
+
+    Note: Splitting the TERM2ID index is not enough to get rid of the
+    hotspot on that index.  While greater concurrency would be allowed
+    for writers, and while the hotspot was for writers, the bottleneck
+    was in fact IOWAIT and splitting the TERM2ID index will not reduce
+    the IOWAIT bottleneck until we MOVE some of the term2id index
+    partitions onto a different machine.
 
 - Reduce the CHUNK_TIMEOUT? E.g., from 1000ms to 10ms or 100ms?
 
-- Compute ideal splits based on the #of bytes per triple for LUBM for
-  each statement index (100M index partition; SPO=9M, OSP=21M,
-  POS=8M).
-
-  Are those values the same for different LUBM datasets? 
-
-  Are they the same for non-LUBM data sets?  (Probably not.)
-
-- Does splitting the TERM2ID index get rid of the hotspot on that
-  index? Probably not.  While greater concurrency would be allowed for
-  writers, and while the hotspot was for writers, the bottleneck was
-  in fact IOWAIT and splitting the TERM2ID index will not reduce the
-  IOWAIT bottleneck until we move some of the term2id index partitions
-  onto a different machine.

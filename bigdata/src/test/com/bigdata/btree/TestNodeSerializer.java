@@ -35,7 +35,6 @@ import java.util.UUID;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
@@ -348,27 +347,34 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
      */
     public void testStress() {
      
-        int ntrials = 20;
-        int nnodes = 1000;
+        final int ntrials = 20;
         
-        doStressTest( ntrials,nnodes);
-        
+        final int nnodes = 500;
+
+        doStressTest(ntrials, nnodes);
+
     }
 
     /**
      * Run a stress test.
+     * <p>
+     * Note: You may run out of heap space during the test for large branching
+     * factors when combined with a large #of nodes.
      * 
      * @param ntrials
      *            The #of trials. Each trial has a random slotSize and
-     *            branchingFactor.  50% of the trials (on average) will
-     *            use record compression.
+     *            branchingFactor. 50% of the trials (on average) will use
+     *            record compression.
      * @param nnodes
      *            The #of random nodes per trial.
      */
-    public void doStressTest(int ntrials,int nnodes) {
+    public void doStressTest(final int ntrials, final int nnodes) {
 
-        // Some branching factors to choose from.
-        int[] branchingFactors = new int[] { 3, 4, 8, 16, 27, 32, 48, 64, 96, 99, 112, 128, 256, 512, 1024, 4096 };
+        /*
+         * Some branching factors to choose from.
+         */
+        final int[] branchingFactors = new int[] { 3, 4, 8, 16, 27, 32, 48, 64,
+                96, 99, 112, 128, 256, 512, 1024, 4096};
 //        int[] branchingFactors = new int[] {4096};
         
         for (int trial = 0; trial < ntrials; trial++) {
@@ -376,15 +382,15 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
             // Choose the branching factor randomly.
             final int branchingFactor = branchingFactors[r.nextInt(branchingFactors.length)];
 
-            BTree ndx = getBTree(branchingFactor);
+            final BTree ndx = getBTree(branchingFactor);
 
             System.err.println("Trial " + trial + " of " + ntrials
                     + " : testing " + nnodes
                     + " random nodes:  branchingFactor=" + branchingFactor);
             
-            for( int i=0; i<nnodes; i++ ) {
-                
-                AbstractNode expected = getRandomNodeOrLeaf(ndx);
+            for (int i = 0; i < nnodes; i++) {
+
+                final AbstractNode expected = getRandomNodeOrLeaf(ndx);
                 
                 doRoundTripTest( false, ndx, expected);
                 

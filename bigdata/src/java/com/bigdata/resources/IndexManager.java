@@ -39,7 +39,6 @@ import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
@@ -1141,10 +1140,10 @@ abstract public class IndexManager extends StoreManager {
      *            lastCommitTime of the old journal after an
      *            {@link #overflow(boolean, boolean)} operation.
      * @param fromKey
-     *            The lowest key that will be counted (inclusive). When
+     *            The lowest key that will be included (inclusive). When
      *            <code>null</code> there is no lower bound.
      * @param toKey
-     *            The first key that will not be counted (exclusive). When
+     *            The first key that will not be included (exclusive). When
      *            <code>null</code> there is no upper bound.
      * 
      * @return A {@link BuildResult} identifying the new {@link IndexSegment}
@@ -1165,96 +1164,13 @@ abstract public class IndexManager extends StoreManager {
         
         try {
 
-            if (name == null)
-                throw new IllegalArgumentException();
-
-            if (src == null)
-                throw new IllegalArgumentException();
-
-            if (outFile == null)
-                throw new IllegalArgumentException();
-
-            if (createTime <= 0L)
-                throw new IllegalArgumentException();
+            // new builder.
+            final IndexSegmentBuilder builder = IndexSegmentBuilder
+                    .newInstance(name, src, outFile, tmpDir, compactingMerge,
+                            createTime, fromKey, toKey);
 
             // metadata for that index / index partition.
             indexMetadata = src.getIndexMetadata();
-
-            /*
-             * Use the range iterator to get an exact entry count for the view.
-             * 
-             * @todo We need the exact entry count for the IndexSegmentBuilder
-             * since requires the exact #of index entries when it creates its
-             * plan for populating the index segment. IndexSegmentBulder should
-             * be modified so that it can handle an estimate that is NOT LESS
-             * THAN the actual #of tuples that will be written into the
-             * IndexSegment. This change will mean that a compacting merge can
-             * generate an IndexSegment that is not "perfect" and some of whose
-             * nodes or leaves might even underflow. However it should be good
-             * enough and faster to produce. [actually, the range count will
-             * cause the nodes to be pre-materialized and buffered so it might
-             * be only very (VERY) slightly faster.]
-             * 
-             * @todo This is truncating to int. drive through long range count.
-             */
-            final int nentries;
-            final int flags;
-            if(compactingMerge) {
-
-                /*
-                 * For a compacting merge the delete markers are ignored so they
-                 * will NOT be transferred to the new index segment.
-                 */
-                
-                flags = IRangeQuery.DEFAULT;
-
-                nentries = (int) src.rangeCountExact(fromKey, toKey);
-
-                if (INFO)
-                    log.info("Compacting merge: name=" + name
-                            + ", non-deleted index entries=" + nentries);
-                
-            } else {
-
-                /*
-                 * For an incremental build the deleted tuples are propagated to
-                 * the new index segment. This is required in order for the fact
-                 * that those tuples were deleted as of the commitTime to be
-                 * retained by the generated index segment.
-                 * 
-                 * @todo unit test for this.
-                 */
-
-                flags = IRangeQuery.DEFAULT | IRangeQuery.DELETED;
-
-                // Note: An incremental build always reads from a BTree.
-//                nentries = ((BTree) src).getEntryCount();
-                nentries = (int) src.rangeCountExact(fromKey, toKey);
-                
-                if (INFO)
-                    log.info("Incremental build: name=" + name
-                            + ", all index entries=" + nentries);
-                
-            }
-            
-            /*
-             * Iterator reading the source tuples to be copied to the index
-             * segment.
-             */
-            final ITupleIterator itr = src.rangeIterator(fromKey, toKey,
-                    0/* capacity */, flags, null/* filter */);
-
-            // Setup the index segment build operation.
-            final IndexSegmentBuilder builder = new IndexSegmentBuilder(//
-                    outFile, //
-                    getTmpDir(), //
-                    nentries,//
-                    itr, //
-                    indexMetadata.getIndexSegmentBranchingFactor(),//
-                    indexMetadata,//
-                    createTime,//
-                    compactingMerge//
-            );
 
             // build the index segment.
             builder.call();
@@ -1262,19 +1178,14 @@ abstract public class IndexManager extends StoreManager {
             // report event
             notifyIndexSegmentBuildEvent(builder);
 
-            /*
-             * Describe the index segment.
-             */
-            // final long length = outFile.length();
+            // Describe the index segment.
             segmentMetadata = new SegmentMetadata(//
                     outFile, //
                     builder.segmentUUID, //
                     createTime //
             );
 
-            /*
-             * Notify the resource manager so that it can find this file.
-             */
+            // Notify the resource manager so that it can find this file.
             addResource(segmentMetadata, outFile);
 
         } catch (Throwable t) {
@@ -1307,8 +1218,9 @@ abstract public class IndexManager extends StoreManager {
         
         try {
 
-            if(INFO) log.info("built index segment: "+name+", file="+outFile);
-            
+            if (INFO)
+                log.info("built index segment: " + name + ", file=" + outFile);
+
             return new BuildResult(name, indexMetadata, segmentMetadata);
 
         } catch (Throwable t) {

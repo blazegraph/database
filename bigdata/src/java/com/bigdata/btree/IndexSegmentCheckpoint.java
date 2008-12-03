@@ -577,20 +577,62 @@ public class IndexSegmentCheckpoint {
         if (height < 0)
             throw new RootBlockException("height=" + height);
         
-        // always at least one leaf.
-//        assert nleaves > 0;
+        // must be non-negative.
+        if (nentries < 0)
+            throw new RootBlockException("nentries=" + nentries);
+        
+        if (nentries == 0) {
+
+            /*
+             * Empty index segment.
+             */
+
+            if (nleaves != 0)
+                throw new RootBlockException("empty index but nleaves="
+                        + nleaves);
+
+            if (nnodes != 0)
+                throw new RootBlockException("empty index but nnodes="
+                        + nnodes);
+        
+            if (maxNodeOrLeafLength != 0)
+                throw new RootBlockException(
+                        "empty index but maxNodeOrLeafLength="
+                                + maxNodeOrLeafLength);
+            
+            if (extentLeaves != 0L)
+                throw new RootBlockException("empty index but extentLeaves="
+                        + extentLeaves);
+
+            if (offsetLeaves != 0L)
+                throw new RootBlockException("empty index but offsetLeaves="
+                        + offsetLeaves);
+
+            if (extentNodes != 0L)
+                throw new RootBlockException("empty index but extentNodes="
+                        + extentNodes);
+
+            if (offsetNodes != 0L)
+                throw new RootBlockException("empty index but offsetNodes="
+                        + offsetNodes);
+            
+            if (addrFirstLeaf != 0L)
+                throw new RootBlockException("empty index but addrFirstLeaf="
+                        + addrFirstLeaf);
+            
+            if (addrLastLeaf != 0L)
+                throw new RootBlockException("empty index but addrLastLeaf="
+                        + addrLastLeaf);
+            
+        } else {
+        
         if (nleaves <= 0)
             throw new RootBlockException("nleaves=" + nleaves);
         
         // zero nodes is Ok - the B+Tree may be just a root leaf.
-//        assert nnodes >= 0;
         if (nnodes < 0)
             throw new RootBlockException("nnodes=" + nnodes);
         
-        // index may not be empty.
-//        assert nentries > 0;
-        if (nentries <= 0)
-            throw new RootBlockException("nentries=" + nentries);
 //        // #entries must fit within the tree height.
 //        assert nentries <= Math.pow(branchingFactor,height+1);
         
@@ -708,6 +750,8 @@ public class IndexSegmentCheckpoint {
 //            assert am.getOffset(addrRoot) < length;
         }
 
+        }
+        
         /*
          * @todo validate the blob, bloom, and metadata addresses and the
          * first/last leaf addresses as well and the total length of the file.

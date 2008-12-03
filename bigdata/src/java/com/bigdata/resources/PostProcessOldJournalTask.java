@@ -541,7 +541,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             
             // the name2addr view as of that commit time.
             final ITupleIterator itr = oldJournal.getName2Addr(lastCommitTime)
-                    .rangeIterator(null, null);
+                    .rangeIterator();
 
             assert used.isEmpty() : "There are " + used.size()
                     + " used index partitions";
@@ -561,7 +561,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * the mutable BTree but the full view).
                  */
                 final IIndex view = resourceManager.getIndex(name,
-                        -lastCommitTime);
+                        TimestampUtility.asHistoricalRead(lastCommitTime));
 
                 if (view == null) {
 
@@ -583,8 +583,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                         .getPartitionMetadata();
 
                 if (INFO)
-                    log.info("Considering join: name=" + name + ", entryCount="
-                            + view.rangeCount(null, null) + ", pmd=" + pmd);
+                    log.info("Considering join: name=" + name + ", rangeCount="
+                            + view.rangeCount() + ", pmd=" + pmd);
                 
                 if (splitHandler != null
                         && pmd.getRightSeparatorKey() != null
@@ -621,9 +621,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                     }
 
-                    tmp.insert(pmd.getLeftSeparatorKey(), SerializerUtil.serialize(pmd));
+                    tmp.insert(pmd.getLeftSeparatorKey(), SerializerUtil
+                            .serialize(pmd));
 
-                    if(INFO)
+                    if (INFO)
                         log.info("join candidate: " + name);
 
                     njoin++;
@@ -999,26 +1000,33 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         final UUID[] underUtilizedDataServiceUUIDs;
         try {
 
-            // request under utilized data services (RMI).
-
+            // the UUID of this data service.
             final UUID excludeUUID = resourceManager.getDataServiceUUID();
             
-            underUtilizedDataServiceUUIDs = resourceManager
-                    .getFederation().getLoadBalancerService()
+            // request under utilized data service UUIDs (RMI).
+            underUtilizedDataServiceUUIDs = loadBalancerService
                     .getUnderUtilizedDataServices(//
                             0, // minCount - no lower bound.
                             0, // maxCount - no upper bound.
                             excludeUUID // exclude this data service.
                             );
 
-        } catch (Exception ex) {
+        } catch (Throwable t) {
 
-            log.warn("Could not obtain target service UUIDs: ", ex);
+            log.warn("Could not obtain target service UUIDs: ", t);
 
             return EMPTY_LIST;
 
         }
 
+        if (underUtilizedDataServiceUUIDs.length == 0) {
+
+            log.warn("Load balancer does not report any underutilized services.");
+
+            return EMPTY_LIST;
+            
+        }
+        
         /*
          * The maximum #of index partition moves that we will attempt. This will
          * be zero if there are no under-utilized services onto which we can
@@ -1170,13 +1178,29 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * present a coherent view of that index partition.
      * <p>
      * 
-     * <h2> Build </h2>
+     * <h2> Compacting Merge </h2>
      * 
-     * A build is performed when there are buffered writes, when the buffered
-     * writes were not simply copied onto the new journal during the atomic
-     * overflow operation, and when the index partition is neither overcapacity
-     * (split) nor undercapacity (joined). Also, we do not do a build if the
-     * index partitions will be moved.
+     * A compacting merge is performed when there are buffered writes, when the
+     * buffered writes were not simply copied onto the new journal during the
+     * atomic overflow operation, when the index partition is neither
+     * overcapacity (split) nor undercapacity (joined), and when the #of source
+     * index components for the index partition exceeds some threshold (~4).
+     * Also, we do not do a build if the index partitions will be moved.
+     * 
+     * <h2> Incremental Build </h2>
+     * 
+     * A incremental build is performed when there are buffered writes, when the
+     * buffered writes were not simply copied onto the new journal during the
+     * atomic overflow operation, when the index partition is neither
+     * overcapacity (split) nor undercapacity (joined), and when there are fewer
+     * than some threshold (~4) #of components in the index partition view.
+     * Also, we do not do a build if the index partitions will be moved.
+     * <p>
+     * An incremental build is generally faster than a compacting merge because
+     * it only copies those writes that were buffered on the mutable
+     * {@link BTree}. However, an incremental build must copy ALL tuples,
+     * including deleted tuples, so it can do more work and does not cause the
+     * rangeCount() to be reduced since the deleted tuples are preserved.
      * 
      * <h2> Split </h2>
      * 
@@ -1260,26 +1284,12 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * 
      * FIXME codify the suggestions when nearing DISK exhaustion into code.
      * 
-     * FIXME add partial build whose source is just the checkpoint record
-     * corresponding to the lastCommitTime of the BTree on the old journal. This
-     * can be much faster to build than a full view since the latter includes
-     * all data in the index (partition). The index segment should be modified
-     * to flag full vs partial builds and also to indicate the source for the
-     * build (the view definition) in order to facilitate re-builds of scale-out
-     * indices from their component files.
-     * 
      * FIXME modify move to be a (full or partial) build followed by a copy of
      * the index segment(s) in the view to the target data service and finally
      * followed by the atomic update, which will copy over any tuples that have
      * been buffered on the live journal. Assuming that it is more expensive to
      * do copy all tuples individually (even in batch) then should reduce the
      * cost of the move. Try it out both ways.
-     * 
-     * FIXME limit the #of full builds choosing partial builds instead. Full
-     * builds could be choosen instead when the #of index segments is greater
-     * than some parameter ~ 5. Full builds will also reduce the amount of data
-     * transferred for a move (there will be less overwritten tuples) but will
-     * incur more latency for the build.
      */
     protected List<AbstractTask> chooseTasks() throws Exception {
 
@@ -1302,7 +1312,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         final boolean compactingMerge = resourceManager.compactingMerge
                 .getAndSet(false); 
         
-        if (compactingMerge) {
+        if (!compactingMerge) {
 
             /*
              * Note: When a compacting merge is requested we do not consider
@@ -1462,6 +1472,19 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             // handler decides when and where to split an index partition.
             final ISplitHandler splitHandler = indexMetadata.getSplitHandler();
 
+            // #of sources in the view (very fast).
+            final int sourceCount = view.getSourceCount();
+            
+            // range count for the view (fast).
+            final long rangeCount = view.rangeCount();
+
+            // BTree's directly maintained entry count (very fast).
+            final int entryCount = btree.getEntryCount(); 
+            
+            final String details = ", entryCount=" + entryCount
+                    + ", rangeCount=" + rangeCount + ", sourceCount="
+                    + sourceCount;
+            
             if (copied.contains(name)) {
 
                 /*
@@ -1469,10 +1492,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * new journal so we do not need to do a build.
                  */
 
-                putUsed(name, "wasCopied(name=" + name + ")");
+                putUsed(name, "wasCopied(name=" + name + details +")");
 
                 if (INFO)
-                    log.info("was  copied : " + name + ", counter="
+                    log.info("was  copied : " + name + details + ", counter="
                             + view.getCounter().get() + ", checkpoint="
                             + btree.getCheckpoint());
 
@@ -1494,10 +1517,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 // add to set of tasks to be run.
                 tasks.add(task);
 
-                putUsed(name, "willSplit(name=" + name + ")");
+                putUsed(name, "willSplit(name=" + name + details + ")");
 
                 if (INFO)
-                    log.info("will split  : " + name + ", counter="
+                    log.info("will split  : " + name + details + ", counter="
                             + view.getCounter().get() + ", checkpoint="
                             + btree.getCheckpoint());
 
@@ -1521,12 +1544,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 // add to set of tasks to be run.
                 tasks.add(task);
 
-                putUsed(name, "willCompact(name=" + name + ", #sources="
-                        + view.getSourceCount() + ")");
+                putUsed(name, "willCompact(name=" + name + details + ")");
 
                 if (INFO)
-                    log.info("will compact  : " + name + ", #sources="
-                            + view.getSourceCount() + ", counter="
+                    log.info("will compact  : " + name + details + ", counter="
                             + view.getCounter().get() + ", checkpoint="
                             + btree.getCheckpoint());
 
@@ -1548,12 +1569,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 // add to set of tasks to be run.
                 tasks.add(task);
 
-                putUsed(name, "willBuild(name=" + name + ", #sources="
-                        + view.getSourceCount() + ")");
+                putUsed(name, "willBuild(name=" + name + details + ")");
 
                 if (INFO)
-                    log.info("will build: " + name + ", #sources="
-                            + view.getSourceCount() + ", counter="
+                    log.info("will build: " + name + details + ", counter="
                             + view.getCounter().get() + ", checkpoint="
                             + btree.getCheckpoint());
 

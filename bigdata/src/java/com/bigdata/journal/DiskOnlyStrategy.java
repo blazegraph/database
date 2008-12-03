@@ -2174,6 +2174,9 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
     synchronized public long transferTo(RandomAccessFile out)
             throws IOException {
         
+        if (out == null)
+            throw new IllegalArgumentException();
+        
         /*
          * Note: Force the write cache to the disk so that all the data we want
          * to transfer from channel to channel are actually on the source

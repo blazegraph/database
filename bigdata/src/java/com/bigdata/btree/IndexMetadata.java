@@ -808,7 +808,16 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * <code>false</code> the index entry will be removed from the index
      * immediately.
      * <p>
-     * Delete markers MUST be enabled to use scale-out indices.
+     * Delete markers MUST be enabled to use scale-out indices. Index partition
+     * views depend on an ordered array of {@link AbstractBTree}s. The presence
+     * of a delete marker provides an indication of a deleted index entry and is
+     * used to prevent reading of index entries for the same key which might
+     * exist in an earlier {@link AbstractBTree} which is part of the same index
+     * partition view.
+     * <p>
+     * Delete markers MUST be enabled for transaction support where they play a
+     * similar role recording within the write set of the transaction the fact
+     * that an index entry has been deleted.
      */
     public final boolean getDeleteMarkers() {return deleteMarkers;}
     

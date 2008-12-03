@@ -2033,10 +2033,24 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param actual
      */
     public static void assertSameEntryIterator(IIndex expected, IIndex actual) {
-        
-        final ITupleIterator expectedItr = expected.rangeIterator(null,null);
 
-        final ITupleIterator actualItr = actual.rangeIterator(null,null);
+        final ITupleIterator expectedItr = expected.rangeIterator(null, null);
+
+        final ITupleIterator actualItr = actual.rangeIterator(null, null);
+
+        assertSameEntryIterator(expectedItr, actualItr);
+
+    }
+    
+    /**
+     * Verifies that the iterators visit tuples having the same data in the same
+     * order.
+     * 
+     * @param expectedItr
+     * @param actualItr
+     */
+    public static void assertSameEntryIterator(
+            final ITupleIterator expectedItr, final ITupleIterator actualItr) { 
         
         long nvisited = 0L;
         
@@ -2052,19 +2066,23 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
             if(!BytesUtil.bytesEqual(expectedTuple.getKey(), actualTuple.getKey())) {
                 
-                fail("Wrong key: nvisited=" + nvisited + ", expecting="
-                        + BytesUtil.toString(expectedTuple.getKey())
+                fail("Wrong key: nvisited=" + nvisited + ", expected="
+                        +expectedTuple
+//                        + BytesUtil.toString(expectedTuple.getKey())
                         + ", actual="
-                        + BytesUtil.toString(actualTuple.getKey()));
+                        +actualTuple);
+//                        + BytesUtil.toString(actualTuple.getKey()));
                         
             }
             
             if(!BytesUtil.bytesEqual(expectedTuple.getValue(), actualTuple.getValue())) {
                 
-                fail("Wrong value: nvisited=" + nvisited + ", expecting="
-                        + BytesUtil.toString(expectedTuple.getValue())
+                fail("Wrong value: nvisited=" + nvisited + ", expected="
+                        +expectedTuple
+//                        + BytesUtil.toString(expectedTuple.getValue())
                         + ", actual="
-                        + BytesUtil.toString(actualTuple.getValue()));
+                        +actualTuple);
+//                        + BytesUtil.toString(actualTuple.getValue()));
                         
             }
             
