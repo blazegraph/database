@@ -390,6 +390,7 @@ final public class WeakValueCache<K,T>
          * object, then speed is very important for _cache.
          */
         
+        // Note: when _cache is an LRU this re-orders the entry in the LRU (if it exists). 
         IWeakRefCacheEntry<K,T> entry = _cache.get( oid );
         
         final Object value = ( entry == null ? null : entry.getObject() );

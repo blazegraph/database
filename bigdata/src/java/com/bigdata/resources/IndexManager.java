@@ -31,6 +31,7 @@ package com.bigdata.resources;
 import java.io.File;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 
 import org.apache.log4j.Logger;
@@ -46,8 +47,9 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.btree.ReadCommittedView;
+import com.bigdata.cache.ConcurrentWeakValueCache;
+import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.cache.LRUCache;
-import com.bigdata.cache.WeakValueCache;
 import com.bigdata.concurrent.NamedLock;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.journal.AbstractJournal;
@@ -166,6 +168,18 @@ abstract public class IndexManager extends StoreManager {
         String DEFAULT_INDEX_CACHE_CAPACITY = "20";
 
         /**
+         * The time in milliseconds before an entry in the index cache will be
+         * cleared from the backing {@link HardReferenceQueue} (default
+         * {@value #DEFAULT_INDEX_CACHE_TIMEOUT}). This property controls how
+         * long the index cache will retain an {@link IIndex} which has not been
+         * recently used. This is in contrast to the cache capacity.
+         */
+        String INDEX_CACHE_TIMEOUT = IndexManager.class.getName()
+                + ".indexCacheTimeout";
+
+        String DEFAULT_INDEX_CACHE_TIMEOUT = ""+(60*1000); // One minute.
+        
+        /**
          * The capacity of the LRU cache of open {@link IndexSegment}s. The
          * capacity of this cache indirectly controls how many
          * {@link IndexSegment}s will be held open. The main reason for keeping
@@ -198,6 +212,19 @@ abstract public class IndexManager extends StoreManager {
          */
         String DEFAULT_INDEX_SEGMENT_CACHE_CAPACITY = "60";
 
+        /**
+         * The time in milliseconds before an entry in the index segment cache
+         * will be cleared from the backing {@link HardReferenceQueue} (default
+         * {@value #DEFAULT_INDEX_SEGMENT_CACHE_TIMEOUT}). This property
+         * controls how long the index segment cache will retain an
+         * {@link IndexSegment} which has not been recently used. This is in
+         * contrast to the cache capacity.
+         */
+        String INDEX_SEGMENT_CACHE_TIMEOUT = IndexManager.class.getName()
+                + ".indexCacheTimeout";
+
+        String DEFAULT_INDEX_SEGMENT_CACHE_TIMEOUT = ""+(60*1000); // One minute.
+
     }
     
     /**
@@ -205,17 +232,25 @@ abstract public class IndexManager extends StoreManager {
      * <p>
      * Map from the name and timestamp of an index to a weak reference for the
      * corresponding {@link IIndex}. Entries will be cleared from this map
-     * after they have become only weakly reachable.
+     * after they have become only weakly reachable. Entries are associated with
+     * a timestamp based on their last use and entries whose timestamp exceeds
+     * the {@link Options#INDEX_CACHE_TIMEOUT} will be cleared from the backing
+     * {@link HardReferenceQueue}. If they become weakly reachable they will
+     * then be cleared from the cache as well.
      * <p>
-     * Note: The capacity of the backing hard reference LRU effects how many
-     * _clean_ indices can be held in the cache. Dirty indices remain strongly
-     * reachable owing to their existence in the {@link Name2Addr#commitList}.
+     * Note: The capacity of the backing {@link HardReferenceQueue} effects how
+     * many _clean_ indices can be held in the cache. Dirty indices remain
+     * strongly reachable owing to their existence in the
+     * {@link Name2Addr#commitList}.
      * <p>
      * Note: {@link ITx#READ_COMMITTED} indices MUST NOT be allowed into this
      * cache. Each time there is a commit for a given {@link BTree}, the
      * {@link ITx#READ_COMMITTED} view of that {@link BTree} needs to be
      * replaced by the most recently committed view, which is a different
      * {@link BTree} object and is loaded from a different checkpoint record.
+     * 
+     * @see Options#INDEX_CACHE_CAPACITY
+     * @see Options#INDEX_CACHE_TIMEOUT
      * 
      * @todo alternatively, if such views are allowed in then this cache must be
      *       encapsulated by logic that examines the view when the timestamp is
@@ -224,19 +259,17 @@ abstract public class IndexManager extends StoreManager {
      *       then the entire view needs to be regenerated since the index view
      *       definition (index segments in use) might have changed as well.
      */
-    final private WeakValueCache<NT, IIndex> indexCache;
+//    final private WeakValueCache<NT, IIndex> indexCache;
+    final private ConcurrentWeakValueCache<NT, IIndex> indexCache;
     
     /**
-     * A canonicalizing cache for {@link IndexSegment}.
+     * A canonicalizing cache for {@link IndexSegment}s.
      * 
      * @see Options#INDEX_SEGMENT_CACHE_CAPACITY
-     * 
-     * @todo make sure this cache purges entries that have not been touched in
-     *       the last N seconds, where N might be 60.
-     * 
-     * @todo do we really need this if we also have {@link #indexCache}?
+     * @see Options#INDEX_SEGMENT_CACHE_TIMEOUT
      */
-    final private WeakValueCache<UUID, IndexSegment> indexSegmentCache;
+    final private ConcurrentWeakValueCache<UUID, IndexSegment> indexSegmentCache;
+//    final private WeakValueCache<UUID, IndexSegment> indexSegmentCache;
 
     /**
      * Provides locks on a per-{name+timestamp} basis for higher concurrency.
@@ -370,9 +403,6 @@ abstract public class IndexManager extends StoreManager {
         
         super(properties);
      
-        /*
-         * indexCacheCapacity
-         */
         {
             
             final int indexCacheCapacity = Integer.parseInt(properties.getProperty(
@@ -385,11 +415,29 @@ abstract public class IndexManager extends StoreManager {
 
             if (indexCacheCapacity <= 0)
                 throw new RuntimeException(Options.INDEX_CACHE_CAPACITY
-                        + " must be non-negative");
+                        + " must be positive");
 
-            indexCache = new WeakValueCache<NT, IIndex>(
-                    new LRUCache<NT, IIndex>(indexCacheCapacity));
-         
+            final long indexCacheTimeout = Long.parseLong(properties
+                    .getProperty(Options.INDEX_CACHE_TIMEOUT,
+                            Options.DEFAULT_INDEX_CACHE_TIMEOUT));
+
+            if (INFO)
+                log.info(Options.INDEX_CACHE_TIMEOUT + "=" + indexCacheTimeout); 
+
+            if (indexCacheTimeout < 0)
+                throw new RuntimeException(Options.INDEX_CACHE_CAPACITY
+                        + " must be non-negative");
+            
+//            indexCache = new WeakValueCache<NT, IIndex>(
+//                    new LRUCache<NT, IIndex>(indexCacheCapacity));
+
+            indexCache = new ConcurrentWeakValueCache<NT, IIndex>(
+                    new HardReferenceQueue<IIndex>(null/* evictListener */,
+                            indexCacheCapacity,
+                            HardReferenceQueue.DEFAULT_NSCAN,
+                            TimeUnit.MILLISECONDS.toNanos(indexCacheTimeout)),
+                    .75f/* loadFactor */, 16/* concurrencyLevel */, true/* removeClearedEntries */);
+
         }
         
         /*
@@ -407,15 +455,36 @@ abstract public class IndexManager extends StoreManager {
 
             if (indexSegmentCacheCapacity <= 0)
                 throw new RuntimeException(Options.INDEX_SEGMENT_CACHE_CAPACITY
+                        + " must be positive");
+
+            final long indexSegmentCacheTimeout = Long.parseLong(properties
+                    .getProperty(Options.INDEX_SEGMENT_CACHE_TIMEOUT,
+                            Options.DEFAULT_INDEX_SEGMENT_CACHE_TIMEOUT));
+
+            if (INFO)
+                log.info(Options.INDEX_SEGMENT_CACHE_TIMEOUT + "="
+                        + indexSegmentCacheTimeout);
+
+            if (indexSegmentCacheTimeout < 0)
+                throw new RuntimeException(Options.INDEX_SEGMENT_CACHE_CAPACITY
                         + " must be non-negative");
 
-            indexSegmentCache = new WeakValueCache<UUID, IndexSegment>(
-//                    WeakValueCache.INITIAL_CAPACITY,//
-//                    WeakValueCache.LOAD_FACTOR, //
-                    new LRUCache<UUID, IndexSegment>(indexSegmentCacheCapacity)
-//                    new WeakCacheEntryFactory<UUID,IndexSegment>()
-//                    new ClearReferenceListener()
-                    );
+            indexSegmentCache = new ConcurrentWeakValueCache<UUID, IndexSegment>(
+                    new HardReferenceQueue<IndexSegment>(
+                            null/* evictListener */,
+                            indexSegmentCacheCapacity,
+                            HardReferenceQueue.DEFAULT_NSCAN,
+                            TimeUnit.MILLISECONDS
+                                    .toNanos(indexSegmentCacheTimeout)),
+                    .75f/* loadFactor */, 16/* concurrencyLevel */, true/* removeClearedEntries */);
+
+//            indexSegmentCache = new WeakValueCache<UUID, IndexSegment>(
+////                    WeakValueCache.INITIAL_CAPACITY,//
+////                    WeakValueCache.LOAD_FACTOR, //
+//                    new LRUCache<UUID, IndexSegment>(indexSegmentCacheCapacity)
+////                    new WeakCacheEntryFactory<UUID,IndexSegment>()
+////                    new ClearReferenceListener()
+//                    );
 
         }
 
@@ -605,8 +674,9 @@ abstract public class IndexManager extends StoreManager {
                         // Open an index segment.
                         seg = segStore.loadIndexSegment();
 
-                        indexSegmentCache
-                                .put(storeUUID, seg, false/* dirty */);
+                        indexSegmentCache.put(storeUUID, seg);
+//                        indexSegmentCache
+//                                .put(storeUUID, seg, false/* dirty */);
 
                     }
                     
@@ -1031,7 +1101,8 @@ abstract public class IndexManager extends StoreManager {
 
                 synchronized (indexCache) {
 
-                    indexCache.put(nt, tmp, true/* dirty */);
+//                    indexCache.put(nt, tmp, true/* dirty */);
+                    indexCache.put(nt, tmp);
 
                 }
 

@@ -40,12 +40,12 @@ import com.bigdata.cache.HardReferenceQueue.HardReferenceQueueEvictionListener;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestHardReferenceCache extends TestCase2 {
+public class TestHardReferenceQueue extends TestCase2 {
 
-    public TestHardReferenceCache() {
+    public TestHardReferenceQueue() {
     }
     
-    public TestHardReferenceCache(String name) {
+    public TestHardReferenceQueue(String name) {
         
         super(name);
         

@@ -30,6 +30,7 @@ package com.bigdata.resources;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Collections;
@@ -54,6 +55,8 @@ import org.apache.commons.io.FileSystemUtils;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bfs.BigdataFileSystem;
+import com.bigdata.btree.AbstractBTree;
+import com.bigdata.btree.AbstractNode;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
@@ -62,8 +65,9 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentStore;
-import com.bigdata.cache.LRUCache;
-import com.bigdata.cache.WeakValueCache;
+import com.bigdata.cache.ConcurrentWeakValueCache;
+import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.cache.IValueAge;
 import com.bigdata.concurrent.NamedLock;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.SerializerUtil;
@@ -256,12 +260,25 @@ abstract public class StoreManager extends ResourceEvents implements
          * @todo define maximum age on the LRU and the delay between sweeps of
          *       the LRU
          */
-        String STORE_CACHE_CAPACITY = StoreManager.class.getName()+".storeCacheCapacity";
+        String STORE_CACHE_CAPACITY = StoreManager.class.getName()
+                + ".storeCacheCapacity";
 
         /**
          * The default for the {@link #STORE_CACHE_CAPACITY} option.
          */
         String DEFAULT_STORE_CACHE_CAPACITY = "20";
+
+        /**
+         * The time in milliseconds before an entry in the store cache will be
+         * cleared from the backing {@link HardReferenceQueue} (default
+         * {@value #DEFAULT_STORE_CACHE_TIMEOUT}). This property controls how
+         * long the store cache will retain an {@link IRawStore} which has not
+         * been recently used. This is in contrast to the cache capacity.
+         */
+        String STORE_CACHE_TIMEOUT = StoreManager.class.getName()
+                + ".storeCacheTimeout";
+
+        String DEFAULT_STORE_CACHE_TIMEOUT = "" + (60 * 1000); // One minute.
 
         /**
          * A boolean property whose value determines whether or not startup will
@@ -359,11 +376,10 @@ abstract public class StoreManager extends ResourceEvents implements
      * {@link IndexSegmentStore} is the key in our map!
      * 
      * @see Options#STORE_CACHE_CAPACITY
-     * 
-     * @todo purges entries that have not been touched in the last N seconds,
-     *       where N might be 60.
+     * @see Options#STORE_CACHE_TIMEOUT
      */
-    final protected WeakValueCache<UUID, IRawStore> storeCache;
+//    final protected WeakValueCache<UUID, IRawStore> storeCache;
+    final protected ConcurrentWeakValueCache<UUID, IRawStore> storeCache;
 
     /**
      * Provides locks on a per-{resourceUUID} basis for higher concurrency.
@@ -662,7 +678,7 @@ abstract public class StoreManager extends ResourceEvents implements
      * 
      * @see http://commons.apache.org/io/api-release/org/apache/commons/io/FileSystemUtils.html
      */
-    private long getFreeSpace(File dir) {
+    private long getFreeSpace(final File dir) {
         
         try {
 
@@ -714,7 +730,7 @@ abstract public class StoreManager extends ResourceEvents implements
      * 
      * @see Startup
      */
-    protected StoreManager(Properties properties) {
+    protected StoreManager(final Properties properties) {
 
         if (properties == null)
             throw new IllegalArgumentException();
@@ -749,10 +765,31 @@ abstract public class StoreManager extends ResourceEvents implements
 
             if (storeCacheCapacity <= 0)
                 throw new RuntimeException(Options.STORE_CACHE_CAPACITY
-                        + " must be non-negative");
+                        + " must be positive");
 
-            storeCache = new WeakValueCache<UUID, IRawStore>(
-                    new LRUCache<UUID, IRawStore>(storeCacheCapacity));
+            final long storeCacheTimeout = Long.parseLong(properties
+                    .getProperty(Options.STORE_CACHE_TIMEOUT,
+                            Options.DEFAULT_STORE_CACHE_TIMEOUT));
+
+            if (INFO)
+                log.info(Options.STORE_CACHE_TIMEOUT + "=" + storeCacheTimeout); 
+
+            if (storeCacheTimeout < 0)
+                throw new RuntimeException(Options.STORE_CACHE_CAPACITY
+                        + " must be non-negative");
+            
+//            indexCache = new WeakValueCache<NT, IIndex>(
+//                    new LRUCache<NT, IIndex>(indexCacheCapacity));
+
+            storeCache = new ConcurrentWeakValueCache<UUID, IRawStore>(
+                    new HardReferenceQueue<IRawStore>(null/* evictListener */,
+                            storeCacheCapacity,
+                            HardReferenceQueue.DEFAULT_NSCAN,
+                            TimeUnit.MILLISECONDS.toNanos(storeCacheTimeout)),
+                    .75f/* loadFactor */, 16/* concurrencyLevel */, true/* removeClearedEntries */);
+            
+//            storeCache = new WeakValueCache<UUID, IRawStore>(
+//                    new LRUCache<UUID, IRawStore>(storeCacheCapacity));
 
         }
 
@@ -1273,8 +1310,8 @@ abstract public class StoreManager extends ResourceEvents implements
                      * Note: Not synchronized() since we are single-threaded
                      * during startup.
                      */
-                    storeCache
-                            .put(tmp.getRootBlockView().getUUID(), tmp, false/* dirty */);
+                    storeCache.put(tmp.getRootBlockView().getUUID(), tmp);
+                    // storeCache.put(tmp.getRootBlockView().getUUID(), tmp, false/* dirty */);
 
                     if (Thread.interrupted())
                         throw new InterruptedException();
@@ -1661,12 +1698,21 @@ abstract public class StoreManager extends ResourceEvents implements
      */
     private void closeStores() {
 
-        final Iterator<IRawStore> itr = storeCache.iterator();
+//        final Iterator<IRawStore> itr = storeCache.iterator();
 
+        final Iterator<WeakReference<IRawStore>> itr = storeCache.iterator();
+        
         while (itr.hasNext()) {
 
-            final IRawStore store = itr.next();
+//            final IRawStore store = itr.next();
+            
+            final IRawStore store = itr.next().get();
 
+            if (store == null) {
+                // weak reference has been cleared.
+                continue;
+            }
+            
             try {
                 store.close();
             } catch (Exception ex) {
@@ -1861,7 +1907,7 @@ abstract public class StoreManager extends ResourceEvents implements
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public class ManagedJournal extends AbstractJournal {
+    public class ManagedJournal extends AbstractJournal implements IValueAge {
 
         /**
          * Note: Each instance of the {@link ManagedJournal} reuses the SAME
@@ -1952,6 +1998,26 @@ abstract public class StoreManager extends ResourceEvents implements
             
         }
         
+        /*
+         * API used to report how long it has been since the store was last
+         * used. This is used to clear stores are not in active use from the
+         * value cache, which helps us to better manage RAM.
+         */
+        
+        final public void touch() {
+        
+            timestamp = System.nanoTime();
+            
+        }
+        
+        final public long timestamp() {
+            
+            return timestamp;
+            
+        }
+        
+        private long timestamp = System.nanoTime();
+
     }
 
     /**
@@ -2257,7 +2323,8 @@ abstract public class StoreManager extends ResourceEvents implements
             // cache the reference.
             synchronized(storeCache) {
 
-                storeCache.put(uuid, store, false/* dirty */);
+                storeCache.put(uuid, store);//, false/* dirty */);
+//                storeCache.put(uuid, store, false/* dirty */);
                 
             }
 
@@ -2433,7 +2500,7 @@ abstract public class StoreManager extends ResourceEvents implements
      * @throws IllegalStateException
      *             if the {@link StoreManager} is not running.
      */
-    public void purgeOldResources() {
+    private void purgeOldResources() {
 
         assertRunning();
 

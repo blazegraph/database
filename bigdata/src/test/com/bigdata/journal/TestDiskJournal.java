@@ -128,7 +128,7 @@ public class TestDiskJournal extends AbstractJournalTestCase {
         assertFalse("isFullyBuffered", bufferStrategy.isFullyBuffered());
 //        assertEquals(Options.FILE, properties.getProperty(Options.FILE),
 //                bufferStrategy.file.toString());
-        assertEquals(Options.INITIAL_EXTENT, Options.DEFAULT_INITIAL_EXTENT,
+        assertEquals(Options.INITIAL_EXTENT, Long.parseLong(Options.DEFAULT_INITIAL_EXTENT),
                 bufferStrategy.getInitialExtent());
         assertEquals(Options.MAXIMUM_EXTENT, 0L/*soft limit for disk mode*/,
                 bufferStrategy.getMaximumExtent());

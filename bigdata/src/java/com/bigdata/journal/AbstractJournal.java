@@ -278,9 +278,10 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      * @see Options#LIVE_INDEX_CACHE_CAPACITY
      */
     private final int liveIndexCacheCapacity;
-    
+
     /**
-     * The configured capacity for the LRU baching the {@link #historicalIndexCache}.
+     * The configured capacity for the LRU backing the
+     * {@link #historicalIndexCache}.
      * 
      * @see Options#HISTORICAL_INDEX_CACHE_CAPACITY
      */
@@ -367,7 +368,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      * 
      * @see #getName2Addr()
      */
-    public IIndex getName2Addr(long commitTime) {
+    public IIndex getName2Addr(final long commitTime) {
         
         final ICommitRecord commitRecord = getCommitRecord(commitTime);
         
@@ -1600,21 +1601,31 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
          */
         final long commitTime = transactionManager.nextTimestampRobust();
         
-        if (commitNow(commitTime) != 0L) {
+        // do the commit.
+        final long commitTime2 = commitNow(commitTime);
 
-            /*
-             * Did commit data so we need to notify the federation that it must
-             * advance its global lastCommitTime.
-             * 
-             * FIXME This protocol is not robust since if we fail to notify the
-             * federation there is no way to rollback the commit. In fact we
-             * need something like a 2/3-phase commit for this to be robust.
-             */
+        if (commitTime2 == 0L) {
+
+            // Nothing to commit.
             
-            transactionManager.notifyCommitRobust(commitTime);
+            return 0L;
             
         }
-
+        
+        // commitNow() should return either 0L or the commitTime we gave it.
+        assert commitTime2 == commitTime;
+        
+        /*
+         * Committed data so we need to notify the federation that it must
+         * advance its global lastCommitTime.
+         * 
+         * FIXME This protocol is not robust since if we fail to notify the
+         * federation there is no way to rollback the commit. In fact we need
+         * something like a 2/3-phase commit for this to be robust.
+         */
+        
+        transactionManager.notifyCommitRobust(commitTime);
+            
         return commitTime;
         
     }

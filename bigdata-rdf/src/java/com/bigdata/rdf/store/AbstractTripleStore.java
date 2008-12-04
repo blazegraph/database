@@ -1078,7 +1078,12 @@ abstract public class AbstractTripleStore extends
 
             if (lexicon) {
 
-                getLexiconRelation().destroy();
+                {
+                    final LexiconRelation lex = getLexiconRelation();
+
+                    if (lex != null)
+                        lex.destroy();
+                }
 
                 lexiconRelation = null;
                 
@@ -1090,7 +1095,12 @@ abstract public class AbstractTripleStore extends
                 
             }
 
-            getSPORelation().destroy();
+            {
+                final SPORelation spo = getSPORelation();
+
+                if (spo != null)
+                    spo.destroy();
+            }
 
             spoRelation = null;
             

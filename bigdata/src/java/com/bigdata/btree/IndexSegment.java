@@ -90,6 +90,29 @@ public class IndexSegment extends AbstractBTree {
     }
 
     /**
+     * Note: This is synchronized in order to prevent a concurrent process from
+     * closing the {@link IndexSegment} during this method. In particular,
+     * {@link #getEntryCount()} uses the {@link IndexSegmentCheckpoint} and that
+     * is only available while the {@link IndexSegmentStore} is open.
+     */
+    public String toString() {
+
+        // make sure the fileStore will remain open.
+        synchronized(fileStore) {
+
+            // make sure the indexSegment will remain open.
+            synchronized(this) {
+                
+                // super class.  getEntry() will reopen the index iff necessary.
+                return super.toString();
+                
+            }
+            
+        }
+        
+    }
+    
+    /**
      * Open a read-only index segment.
      * 
      * @param fileStore

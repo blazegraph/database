@@ -1352,9 +1352,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
          * journal).
          */
 
-        final boolean allowSplits = !compactingMerge;
-        
-        tasks.addAll(chooseIndexPartitionSplitBuildOrCompact(allowSplits));
+        tasks.addAll(chooseIndexPartitionSplitBuildOrCompact(compactingMerge));
 
         // log the selected post-processing decisions at a high level.
         {
@@ -1391,13 +1389,14 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * 
      * </ul>
      * 
-     * @param allowSplits
-     *            May be used to disallow splits.
+     * @param compactingMerge
+     *            When <code>true</code> a compacting merge will be performed
+     *            for all index partitions.
      * 
      * @return The list of tasks.
      */
     protected List<AbstractTask> chooseIndexPartitionSplitBuildOrCompact(
-            final boolean allowSplits) {
+            final boolean compactingMerge) {
 
         // counters : must sum to ndone as post-condition.
         int ndone = 0; // for each named index we process
@@ -1501,7 +1500,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                 nskip++;
 
-            } else if (allowSplits && splitHandler != null
+            } else if (!compactingMerge && splitHandler != null
                     && splitHandler.shouldSplit(view)) {
 
                 /*
@@ -1526,8 +1525,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                 nsplit++;
 
-            } else if (ncompact < resourceManager.maximumCompactingMergesPerOverflow
-                    && view.getSourceCount() >= resourceManager.maximumSourcesPerViewBeforeCompactingMerge
+            } else if (compactingMerge
+                    || (ncompact < resourceManager.maximumCompactingMergesPerOverflow && view
+                            .getSourceCount() >= resourceManager.maximumSourcesPerViewBeforeCompactingMerge)
                     ) {
 
                 /*
@@ -1558,6 +1558,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 /*
                  * Incremental build.
                  */
+                
+                assert !compactingMerge;
 
                 // the file to be generated.
                 final File outFile = resourceManager

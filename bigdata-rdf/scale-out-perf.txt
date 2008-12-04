@@ -2868,16 +2868,11 @@ JOIN optimizations:
     the first predicate that does NOT use an expander and then map
     that predicate across the index partitions.
 
+- Reduce the CHUNK_TIMEOUT? E.g., from 1000ms to 10ms or 100ms?
+
 - try vtune 9.1 on java 6.  does this work?  If not then try a
   different profiler since we have to switch to java 6 for
   ExecutorService API changes and problems with 1.5 compilers.
-
-- It would be nice if the index segment builds could use the upper
-  bound on the #of index entries for the plan.
-
-  An incremental index build knows the exact #of index entries a
-  priori since delete index entries must be carried forward until a
-  compacting merge.
 
 ============================================================
 Bloom filter
@@ -2892,6 +2887,9 @@ Bloom filter
   more index segments).
 
 - Write unit tests when there are multiple index partitions.
+
+- We do not need a bloom for an empty btree until there is an insert.
+  Since the btree is empty we KNOW that the key will be "not found".
 
 ============================================================ 
 
@@ -2979,6 +2977,24 @@ Conferences and papers:
      Final Version Due: Jun 20, 2009 
 
      http://www.wikicfp.com/cfp/servlet/event.showcfp?eventid=3737&copyownerid=2
+Announcement:
+
+     metaweb, eossys, BradB, SteveC, BerryM & SkipM, EmanM, DanK,
+     JohnC, SteveH, BrandN, MillsD, largeTripleStores wiki, blog,
+     project news, JimF, BenB, GeorgeF, Radar Networks, SethE.
+
+Conferences:
+
+     Cloud computing:
+
+     Grid:
+
+     Semantic Web:
+
+     OSCON:
+
+     EmergingTech?
+
 ------------------------------------------------------------
 
 -Xmx500m -server -Xrunjavaperf:cg -Dlog4j.configuration=file:src/resources/logging/log4j.properties -Djava.security.policy=policy.all -cp "bigdata-lubm.jar;lib/ctc_utils-5-4-2005.jar;lib/cweb-commons-1.1-b2-dev.jar;lib/cweb-extser-0.1-b2-dev.jar;lib/cweb-junit-ext-1.1-b3-dev.jar;lib/junit-3.8.1.jar;lib/lgpl-utils-1.0-b3-dev.jar;lib/log4j-1.2.8.jar;lib/apache/commons-io-1.4.jar;lib/icu/icu4j-3_6.jar;lib/lucene/lucene-analyzers-2.2.0.jar;lib/lucene/lucene-core-2.2.0.jar;lib/unimi/colt-1.2.0.jar;lib/unimi/fastutil-5.1.4.jar;lib/slf4j-api-1.4.3.jar;lib/slf4j-log4j12-1.4.3.jar;lib/openrdf-sesame-2.2-onejar.jar;lib/jini/classserver.jar;lib/jini/jini-core.jar;lib/jini/jini-ext.jar;lib/jini/jsk-lib.jar;lib/jini/jsk-platform.jar;lib/jini/jsk-resources.jar;lib/jini/reggie.jar;lib/jini/start.jar;lib/jini/sun-util.jar;lib/jini/tools.jar" edu.lehigh.swat.bench.ubt.Test query src/java/edu/lehigh/swat/bench/ubt/bigdata/config.kb.bigdata src/java/edu/lehigh/swat/bench/ubt/bigdata/config.query.sparql
@@ -3077,6 +3093,14 @@ Caused by: org.openrdf.rio.UnsupportedRDFormatException: No parser factory avail
 	... 6 more
 ------------------------------------------------------------
 
+Problem in com.bigdata.rdf.rules.TestCompareFullAndFastClosure for
+LDS.  Compains that historical read is not supports on a temporary
+store.  The test runs fine for LTS.  I am not clear how the LDS setup
+differs such that this is failing (it fails when attempting to compute
+the closure of a data set loaded via the data loader).
+
+------------------------------------------------------------
+
 concurrencyee-interest@altair.cs.oswego.edu and also check this link
 for more active sites to post: http://gee.cs.oswego.edu/dl/
 
@@ -3094,44 +3118,57 @@ Thanks,
 ------------------------------------------------------------
 Commit notes:
 
-  * Verify that the lastCommitTime is being reported correctly for all
-    deployment scenarios since otherwise we will hold open lots of
-    index views that do not differ in their state (or fail to notice
-    commits!).  There are also potential problems during start up if
-    the timestamp service does not come online.
+- Close out old indices.  This has been deferred for the Journal,
+  Name2Addr, and the resource locator until I can get some more
+  feedback on how well the change is performing in the IndexManager.
+  This just seems safer for now, but there is a risk that indices will
+  not actually be closed if they are open in the historical index
+  cache or the live index cache.  Likewise, release of old relation
+  views is also important.
 
-    This can be most easily done by writing on System.err the views
-    that are being opened by the IndexManager. [Verified for EDS, but
-    also check JDS].
+    defer. Name2Addr (live index cache)
 
-  * Modify LRU to close out old index views in order to recover RAM.
-    Changes are to AbstractJournal and the IndexManager. Use a
-    configurable timeout (default 60 seconds).  This will help to keep
-    down the resource demands when large complex queries that touch a
-    lot of data pass through the system and cause many nodes and
-    leaves to be buffered for some timestamp but are not followed by
-    additional queries so those buffered data should then be released.
-    This will also effect "hot" tests since they must be re-run within
-    a timeout in order to benefit from the data buffered by btree's
-    and not just by the disk.
+    defer. AbstractJournal (historical index cache)
 
-    Modify LRU to purge entries older than a specified age (including
-    an asych daemon thread to make sure that they get purged even if
-    the LRU is not being touched).  Do this for the AbstractJournal
-    and the index segment cache in the IndexManager as well.
+    defer. DefaultResourceLocator's cache.
 
-  * Optimize mapping of access path tasks onto join sink tasks since
+    defer. AbstractIndexCache. Used by the federation for the recently
+    accessed indices and their metadata indices. Should be using a
+    concurrent weak value cache anyway.
+
+  ============================================================
+  
+  * [must be done before collecting closure times on the cluster.]
+
+    Optimize mapping of access path tasks onto join sink tasks since
     we can't evaluate join performance with splits enabled until this
     is done.
 
-  * Re-run unit tests.
+    We can request all the locators for a join task when the join task
+    is created and wait until they arrive before processing the source
+    binding chunks, which can already be read from the source join
+    tasks.
 
-  * Enable OVERFLOW and MOVES for EDS (in the code by having more than
-    one data service) and JDS (in the client.config file) and re-run
-    LUBM.  Do we get the right answers?  Note that the load balancer
-    behavior will be quite different for a cluster.
+    Unlike splits for lookup(), an output binding set can be mapped
+    across multiple index partitions.
 
-  - Reduce the CHUNK_TIMEOUT? E.g., from 1000ms to 10ms or 100ms?
+    We can easily optimize for the case where there is only a single
+    sink index partition since there will be only one sink and all
+    output binding sets will go to the same sink.
+
+    Once the access path tasks are ordered, the odds are very good
+    that the next output binding set will be mapped onto the same
+    index partition(s) as the last output binding set.
+
+    If the locator is kept as state then we have the left- and
+    right-separators can we can easily test to see if an output
+    binding set would lie within the same index partition.
+
+  * Re-run unit tests (after changes to LRU also).
+
+  * Done. Enable OVERFLOW and MOVES for EDS (in the code by having
+    more than one data service) and JDS (in the client.config file)
+    and re-run LUBM.  Do we get the right answers?
   
 - Cluster tools and service starter.
 
@@ -3148,6 +3185,15 @@ Commit notes:
     decompress them dynamically during load but that will add extra
     cost to the load (closure and query costs would not be effected).
 
+  - It may be useful to restart the LBS from time to time or to
+    directly enter load scores for its hosts and services. That might
+    make it easier to verify its behavior.
+
+  - Should be able to resume the load from a log indicating which
+    files have already been loaded.  This may be important for a long
+    running process if we hit very rare bugs that would otherwise
+    require a full restart.
+
 - Performance testing on DP for U10, U100, U1000 with
   split/join/move/build/merge.
 
@@ -3162,7 +3208,14 @@ Commit notes:
     query correctness.  Only U100 and U1000 need to be run on the
     cluster as we can get U10 easily on a laptop.
 
+  - Verify that MIN_RELEASE_AGE is zero.
+
+  - Verify that OVERFLOW_ENABLED is true.
+
   - Examine memory demands when overflow is enabled.
+
+  - Why can't I blast the binary image of an index segment through a
+    socket for a MOVE?
 
   * Verify overflow w/ MOVE enabled fix the TERM2ID hotspot.
 
@@ -3172,27 +3225,3 @@ Commit notes:
     was in fact IOWAIT and splitting the TERM2ID index will not reduce
     the IOWAIT bottleneck until we MOVE some of the term2id index
     partitions onto a different machine.
-
-============================================================
-    
-- Optimize resolution of locators for pipeline joins.
-  
-  We can request all the locators for a join task when the join task
-  is created and wait until they arrive before processing the source
-  binding chunks, which can already be read from the source join
-  tasks.
-
-  Unlike splits for lookup(), an output binding set can be mapped
-  across multiple index partitions.
-
-  We can easily optimize for the case where there is only a single
-  sink index partition since there will be only one sink and all
-  output binding sets will go to the same sink.
-
-  Once the access path tasks are ordered, the odds are very good that
-  the next output binding set will be mapped onto the same index
-  partition(s) as the last output binding set.
-
-  If the locator is kept as state then we have the left- and
-  right-separators can we can easily test to see if an output binding
-  set would lie within the same index partition.
