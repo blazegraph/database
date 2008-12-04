@@ -2646,36 +2646,6 @@ OVERFLOW
   temporary drive space and some duplication during index builds, etc.
   Maybe a 1.2 multiplier on top of that?
 
-- Experiment with a variety of branching factors for the index
-  segments and make sure that the bloom filter is making it onto the
-  index segment. [obs. on EDS U50 on laptop].
-
-- Test w/ overflow enabled on EDS, comparing total #of statements and
-  terms to the ground truth as reported by LTS.
-
-  *** One solution was lost for EDS U10 on Q6 and Q14 (the statement
-      pattern scans)?!?  This is odd since the statement count agrees
-      with the LTS U10 data load and since the result is repeatable
-      even after a compacting merge when all data is in a single index
-      segment per index.
-
-  Test first with move disabled and a single data service.  Note that
-  with move disabled we can still observe most effects of scale-out
-  with up to one machine per index, including any issues with locator
-  splits and efficiencies in the lookup of locators for joins, etc.
-  
-  Do this with normal split points in order to assess the size of the
-  resulting index partitions.  This can be done on U10.
-
-  Do this with a low initial and maximum extent and small split
-  configuration in order to stress the overflow mechanisms.  This can
-  be done on U5 or U10.
-
-  Test with move enabled and more than one data service, probably on
-  the DP.  Note that I still have to write some performance counter
-  collection code for Linux, but there might be enough to get by for
-  now.
-
 - Generate U1500 and U8000 (running).
 
   Load U1500 data set and collect query performance times.
@@ -2712,13 +2682,6 @@ JOIN optimizations:
   then you only have the resources of that one machine for SPORelation
   self-joins.  But if those indices are on 3 machines then all 3 will
   be working the JOIN.
-
-- Compact serialization for ISolution[] and IBindingSet[] to reduce
-  JDS IO costs. Everything is in place for this, but the custom
-  serializers still need to be written and tuned.
-
-- Run JDS query under the performance analyzer and look for
-  interesting things.
 
 - Full text search queries with SLICE are slow, but the full text
   index itself is fast.  The problem is that we overgenerate solutions
@@ -2763,28 +2726,6 @@ JOIN optimizations:
       operation.  The read would allocate the buffers for each read
       request and would issue a scatter/gather request with those
       buffers.  
-
-- Tuning parameters
-
-    - Review the default chunk capacity (1000) but we are actually
-      using 100 in all of our query runs.  Is this used for anything
-      except query?  Well, it would be used for closure.  How much of
-      a difference between 100 and 1000 for closure performance?  For
-      query, I believe that most of the difference emerges when a
-      SLICE is used.
-
-    - Try lowering the fullyBufferedReadThreshold to the
-      chunkCapacity.  How is that for query (not much of an effect)?
-      For closure (larger joins).
-
-    - Try reducing the latency of the write service to 0 if nothing is
-      in the queue and to 10ms if there is something in the queue.
-      The chance for tasks to complete is really during each commit
-      since they are running asynchronously.  This will have the most
-      effect on the federation with its auto-commit semantics.
-
-    - Try various values of chunk size and maxparallel for pipeline
-      joins.
   
 - JoinMaster
 
@@ -2867,8 +2808,6 @@ JOIN optimizations:
     DistributedJoinMaster needs to consume predicates until it finds
     the first predicate that does NOT use an expander and then map
     that predicate across the index partitions.
-
-- Reduce the CHUNK_TIMEOUT? E.g., from 1000ms to 10ms or 100ms?
 
 - try vtune 9.1 on java 6.  does this work?  If not then try a
   different profiler since we have to switch to java 6 for
@@ -3118,31 +3057,9 @@ Thanks,
 ------------------------------------------------------------
 Commit notes:
 
-- Close out old indices.  This has been deferred for the Journal,
-  Name2Addr, and the resource locator until I can get some more
-  feedback on how well the change is performing in the IndexManager.
-  This just seems safer for now, but there is a risk that indices will
-  not actually be closed if they are open in the historical index
-  cache or the live index cache.  Likewise, release of old relation
-  views is also important.
-
-    defer. Name2Addr (live index cache)
-
-    defer. AbstractJournal (historical index cache)
-
-    defer. DefaultResourceLocator's cache.
-
-    defer. AbstractIndexCache. Used by the federation for the recently
-    accessed indices and their metadata indices. Should be using a
-    concurrent weak value cache anyway.
-
-  ============================================================
-  
-  * [must be done before collecting closure times on the cluster.]
-
-    Optimize mapping of access path tasks onto join sink tasks since
-    we can't evaluate join performance with splits enabled until this
-    is done.
+- (***) Optimize mapping of access path tasks onto join sink tasks
+  since we can't evaluate query or CLOSURE performance with splits
+  enabled until this is done.
 
     We can request all the locators for a join task when the join task
     is created and wait until they arrive before processing the source
@@ -3163,8 +3080,6 @@ Commit notes:
     If the locator is kept as state then we have the left- and
     right-separators can we can easily test to see if an output
     binding set would lie within the same index partition.
-
-  * Re-run unit tests (after changes to LRU also).
 
   * Done. Enable OVERFLOW and MOVES for EDS (in the code by having
     more than one data service) and JDS (in the client.config file)
@@ -3194,8 +3109,8 @@ Commit notes:
     running process if we hit very rare bugs that would otherwise
     require a full restart.
 
-- Performance testing on DP for U10, U100, U1000 with
-  split/join/move/build/merge.
+- Performance testing on DP for U10, U100, U1000 with split / join /
+  move / build / merge.
 
   DP run of U100 (1 machine) and U1000 (3 machines) with overflow and
   splits enabled, but not moves.  Verify the LBS behavior.  The host
@@ -3212,7 +3127,12 @@ Commit notes:
 
   - Verify that OVERFLOW_ENABLED is true.
 
-  - Examine memory demands when overflow is enabled.
+  - Compact serialization for ISolution[] and IBindingSet[] to reduce
+    JDS IO costs. Everything is in place for this, but the custom
+    serializers still need to be written and tuned.
+
+  - Run JDS query under the performance analyzer and look for
+    interesting things.
 
   - Why can't I blast the binary image of an index segment through a
     socket for a MOVE?
@@ -3225,3 +3145,52 @@ Commit notes:
     was in fact IOWAIT and splitting the TERM2ID index will not reduce
     the IOWAIT bottleneck until we MOVE some of the term2id index
     partitions onto a different machine.
+
+  - Tuning:
+
+    - Examine memory demands when overflow is enabled and choices for
+      the storeCache, indexCache, and indexSegmentCache capacity and
+      timeout values.
+
+    - Try lowering the fullyBufferedReadThreshold to the
+      chunkCapacity.  How is that for query (not much of an effect)?
+      For closure (larger joins).
+
+    - Try reducing the latency of the write service to 0 if nothing is
+      in the queue and to 10ms if there is something in the queue.
+      The chance for tasks to complete is really during each commit
+      since they are running asynchronously.  This will have the most
+      effect on the federation with its auto-commit semantics.
+
+    - Try various values of chunk size and maxparallel for pipeline
+      joins.
+
+    - Reduce the CHUNK_TIMEOUT? E.g., from 1000ms to 10ms or 100ms?
+
+    - Try different branching factors for the index segments.
+
+  ----------------------------------------
+
+- Close out old indices.  This has been deferred for the Journal,
+  Name2Addr, and the resource locator until I can get some more
+  feedback on how well the change is performing in the IndexManager.
+  This just seems safer for now, but there is a risk that indices will
+  not actually be closed if they are open in the historical index
+  cache or the live index cache.  Likewise, release of old relation
+  views is also important.
+
+    defer. Name2Addr (live index cache)
+
+    defer. AbstractJournal (historical index cache)
+
+    defer. DefaultResourceLocator's cache.
+
+    defer. AbstractIndexCache. Used by the federation for the recently
+    accessed indices and their metadata indices. Should be using a
+    concurrent weak value cache anyway.
+
+** Look into a bug where an index can not be loaded because the
+   backing journal has been released.  This appears to be related to
+   the changes to the storeCache, indexCache, and indexSegmentCache.
+   The problem is not consistent, but it does seem to show up
+   consistently for longer runs, e.g., loading U50 for JDS.

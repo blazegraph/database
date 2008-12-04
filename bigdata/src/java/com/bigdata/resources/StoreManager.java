@@ -55,8 +55,6 @@ import org.apache.commons.io.FileSystemUtils;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bfs.BigdataFileSystem;
-import com.bigdata.btree.AbstractBTree;
-import com.bigdata.btree.AbstractNode;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
@@ -1307,8 +1305,7 @@ abstract public class StoreManager extends ResourceEvents implements
                     /*
                      * Add to set of open stores.
                      * 
-                     * Note: Not synchronized() since we are single-threaded
-                     * during startup.
+                     * Note: single-threaded during startup.
                      */
                     storeCache.put(tmp.getRootBlockView().getUUID(), tmp);
                     // storeCache.put(tmp.getRootBlockView().getUUID(), tmp, false/* dirty */);
@@ -1693,8 +1690,6 @@ abstract public class StoreManager extends ResourceEvents implements
      * Closes ALL open store files.
      * <p>
      * Note: This is invoked by {@link #shutdown()} and {@link #shutdownNow()}.
-     * We do not need to synchronize on {@link #storeCache} since those methods
-     * are already synchronized.
      */
     private void closeStores() {
 
@@ -1808,7 +1803,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
         final UUID uuid = resourceMetadata.getUUID();
 
-        synchronized (storeCache) {
+//        synchronized (storeCache) {
         
             if (storeCache.get(uuid) != null) {
 
@@ -1817,7 +1812,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
             }
         
-        }
+//        }
 
         final long extent;
         if (!isTransient) {
@@ -1918,19 +1913,26 @@ abstract public class StoreManager extends ResourceEvents implements
          * 
          * @see AbstractJournal#closeForWrites(long)
          */
-        protected ManagedJournal(Properties properties) {
+        protected ManagedJournal(final Properties properties) {
 
             super(properties, writeCache);
 
         }
 
+        public String toString() {
+            
+            return getClass().getName() + "{file=" + getFile() + ", uuid="
+                    + getRootBlockView().getUUID() + "}";
+            
+        }
+        
         public long nextTimestamp() {
 
             return StoreManager.this.nextTimestampRobust();
 
         }
 
-        public void notifyCommit(long commitTime) {
+        public void notifyCommit(final long commitTime) {
             
             getLocalTransactionManager().notifyCommitRobust(commitTime);
             
@@ -2132,6 +2134,11 @@ abstract public class StoreManager extends ResourceEvents implements
      *             if <i>uuid</i> is <code>null</code>.
      * @throws RuntimeException
      *             if something goes wrong.
+     * 
+     * @todo it seems that we always have the {@link IResourceMetadata} on hand
+     *       when we need to (re-)open a store so it might be nice to pass that
+     *       in as it would make for more informative error messages when
+     *       something goes wrong.
      */
     public IRawStore openStore(final UUID uuid) {
 
@@ -2155,17 +2162,14 @@ abstract public class StoreManager extends ResourceEvents implements
 
             /*
              * Check to see if the given resource is already open.
-             * 
-             * Note: [storeCache] is not thread-safe, so we synchronize on it
-             * explicitly.
              */
 
             IRawStore store;
-            synchronized(storeCache) {
+//            synchronized(storeCache) {
                 
                 store = storeCache.get(uuid);
                 
-            }
+//            }
 
             if (store != null) {
 
@@ -2321,12 +2325,12 @@ abstract public class StoreManager extends ResourceEvents implements
             }
 
             // cache the reference.
-            synchronized(storeCache) {
+//            synchronized(storeCache) {
 
                 storeCache.put(uuid, store);//, false/* dirty */);
 //                storeCache.put(uuid, store, false/* dirty */);
                 
-            }
+//            }
 
             // return the reference to the open store.
             return store;
@@ -2986,6 +2990,10 @@ abstract public class StoreManager extends ResourceEvents implements
                 
 //                try {
 
+                /*
+                 * @todo why not trap an IllegalStateException if the store is
+                 * not open or if it is concurrently closed?
+                 */
                     store.close();
                     
 //                } catch(Throwable t) {
