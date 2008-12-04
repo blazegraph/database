@@ -797,7 +797,24 @@ abstract public class IndexManager extends StoreManager {
 
                 final IResourceMetadata resource = a[i];
 
-                final IRawStore store = openStore(resource.getUUID());
+                final IRawStore store;
+                try {
+                    
+                    store = openStore(resource.getUUID());
+                    
+                } catch (NoSuchStoreException ex) {
+                    
+                    /*
+                     * There is dependency for that index that is on a resource
+                     * (a ManagedJournal or IndexSegment) that is no longer
+                     * available.
+                     */
+                    
+                    throw new RuntimeException("Could not load index: name="
+                            + name + ", timestamp=" + timestamp
+                            + " from resource=" + resource.getFile(), ex);
+                    
+                }
 
                 /*
                  * Interpret UNISOLATED and READ_COMMITTED for a historical
@@ -899,7 +916,7 @@ abstract public class IndexManager extends StoreManager {
             if (timestamp != ITx.READ_COMMITTED) {
              
                 // test the indexCache.
-                synchronized (indexCache) {
+//                synchronized (indexCache) {
 
                     final IIndex ndx = indexCache.get(nt);
 
@@ -912,7 +929,7 @@ abstract public class IndexManager extends StoreManager {
 
                     }
 
-                }
+//                }
                 
             }
 
@@ -1099,12 +1116,12 @@ abstract public class IndexManager extends StoreManager {
                 if (INFO)
                     log.info("Adding to cache: " + nt);
 
-                synchronized (indexCache) {
+//                synchronized (indexCache) {
 
 //                    indexCache.put(nt, tmp, true/* dirty */);
                     indexCache.put(nt, tmp);
 
-                }
+//                }
 
             }
             

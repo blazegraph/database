@@ -865,6 +865,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
         sb.append(", n="+getEntryCount());
         
         sb.append(", h="+getHeight());
+
+        sb.append(", lastCommitTime="+getLastCommitTime());
         
         sb.append("}");
         
