@@ -40,6 +40,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.cache.IValueAge;
 import com.bigdata.config.Configuration;
 import com.bigdata.config.IValidator;
 import com.bigdata.config.IntegerValidator;
@@ -65,7 +66,8 @@ import com.bigdata.service.MetadataService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
+public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
+        IValueAge {
 
     /**
      * Logger.
@@ -185,8 +187,11 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
      * A read-only view of the checkpoint record for the index segment.
      */
     public final IndexSegmentCheckpoint getCheckpoint() {
+
+        if (checkpoint == null)
+            throw new IllegalStateException();
         
-        assertOpen();
+//        assertOpen();
 
         return checkpoint;
         
@@ -465,11 +470,15 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             // open the file.
             this.raf = new RandomAccessFile(file, "r");
 
-            // read the checkpoint record from the file.
-            this.checkpoint = new IndexSegmentCheckpoint(raf);
+            if (checkpoint == null) {
+                
+                // read the checkpoint record from the file.
+                this.checkpoint = new IndexSegmentCheckpoint(raf);
 
-            if (INFO)
-                log.info(checkpoint.toString());
+                if (INFO)
+                    log.info(checkpoint.toString());
+
+            }
 
             // handles transparent decoding of offsets within regions.
             this.addressManager = new IndexSegmentAddressManager(checkpoint);
@@ -675,7 +684,11 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             
         }
 
-        checkpoint = null;
+        /*
+         * Note: Don't deallocate. It is small and holds useful metadata such as
+         * the #of index entries that we would always like to have on hand.
+         */
+//        checkpoint = null;
 
         metadata = null;
 
@@ -1303,4 +1316,24 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         return addressManager.unpackAddr(in);
     }
     
+    /*
+     * API used to report how long it has been since the store was last
+     * used. This is used to clear stores are not in active use from the
+     * value cache, which helps us to better manage RAM.
+     */
+    
+    final public void touch() {
+    
+        timestamp = System.nanoTime();
+        
+    }
+    
+    final public long timestamp() {
+        
+        return timestamp;
+        
+    }
+    
+    private long timestamp = System.nanoTime();
+
 }

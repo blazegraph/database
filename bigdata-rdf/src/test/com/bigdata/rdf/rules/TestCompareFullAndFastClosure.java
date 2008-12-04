@@ -63,6 +63,10 @@ import com.bigdata.rdf.store.AbstractTripleStore.Options;
  * fast closure program for some known data sets (does not test truth
  * maintenance under assertion and retraction or the justifications).
  * 
+ * @todo also compare pipeline vs nested subquery closure (but only for LTS and
+ *       LDS as nested subquery is too slow for EDS and JDS - or compare to LTS
+ *       nested subquery for the EDS and JDS cases).
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

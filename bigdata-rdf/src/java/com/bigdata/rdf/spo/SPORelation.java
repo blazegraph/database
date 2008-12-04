@@ -728,6 +728,11 @@ public class SPORelation extends AbstractRelation<ISPO> {
          * Note: I have no idea how the the cache could cause the kb to loose
          * track of what is inferred and what was explicit. This may be a red
          * herring.
+         * 
+         * Note: The cache semantics for put() were actually putIfAbsent() when
+         * this problem was noticed. Perhaps the problem was related to those
+         * semantics since the access path in the cache would not be replaced if
+         * there was already an entry for a given predicate?
          */
         if (getTimestamp() == ITx.UNISOLATED) {
 

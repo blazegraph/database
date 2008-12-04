@@ -56,7 +56,7 @@ public class TestAll extends TestCase {
         
         TestSuite retval = new TestSuite("cache");
         
-        retval.addTestSuite(TestHardReferenceCache.class);
+        retval.addTestSuite(TestHardReferenceQueue.class);
         
 //        // Test all ICacheEntry implementations.
 //        retval.addTestSuite( TestCacheEntry.class );

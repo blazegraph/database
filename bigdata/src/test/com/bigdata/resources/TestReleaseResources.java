@@ -264,7 +264,19 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             // did overflow.
             assertEquals(1,resourceManager.getOverflowCount());
 
-            // should have been closed (and deleted) during sync. overflow processing.
+            // should have been closed for writes during sync. overflow processing.
+            assertTrue(j0.isOpen());
+            assertTrue(j0.isReadOnly());
+            
+            /*
+             * Purge old resources. If the index was copied to the new journal
+             * then there should be no dependency on the old journal and it
+             * should be deleted.
+             */
+            resourceManager
+                    .purgeOldResources(1000/* ms */, false/*truncateJournal*/);
+            
+            // verify that the old journal is no longer open.
             assertFalse(j0.isOpen());
 
             // verify unwilling to open the store with that UUID.

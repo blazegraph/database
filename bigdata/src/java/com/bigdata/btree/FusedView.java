@@ -39,6 +39,7 @@ import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
 import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
 import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.proc.ISimpleIndexProcedure;
+import com.bigdata.cache.IValueAge;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.isolation.IsolatedFusedView;
@@ -65,7 +66,7 @@ import com.bigdata.service.Split;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class FusedView implements IIndex, ILocalBTreeView {
+public class FusedView implements IIndex, ILocalBTreeView, IValueAge {
 
     protected static final Logger log = Logger.getLogger(FusedView.class);
 
@@ -432,7 +433,7 @@ public class FusedView implements IIndex, ILocalBTreeView {
      * Return the first value for the key in an ordered search of the trees in
      * the view.
      */
-    final public byte[] lookup(byte[] key) {
+    final public byte[] lookup(final byte[] key) {
 
         final Tuple tuple = lookup(key, lookupTuple.get());
 
@@ -509,9 +510,10 @@ public class FusedView implements IIndex, ILocalBTreeView {
      * 
      * @return <i>tuple</i> iff an index entry was found under that <i>key</i>.
      */
-    final protected Tuple lookup(int startIndex, final byte[] key, final Tuple tuple) {
+    final protected Tuple lookup(final int startIndex, final byte[] key,
+            final Tuple tuple) {
 
-        for( int i=0; i<srcs.length; i++) {
+        for (int i = 0; i < srcs.length; i++) {
 
             if( srcs[i].lookup(key, tuple) == null) {
                 
@@ -536,7 +538,7 @@ public class FusedView implements IIndex, ILocalBTreeView {
      * true iff the first {@link AbstractBTree} with an index entry under the
      * key is non-deleted.
      */
-    final public boolean contains(byte[] key) {
+    final public boolean contains(final byte[] key) {
 
         final Tuple tuple = lookup(key, containsTuple.get());
         
@@ -578,7 +580,7 @@ public class FusedView implements IIndex, ILocalBTreeView {
      * @todo watch for overflow of {@link Long#MAX_VALUE}
      */
     final public long rangeCount() {
-        
+
         long count = 0;
         
         for (int i = 0; i < srcs.length; i++) {
@@ -601,7 +603,7 @@ public class FusedView implements IIndex, ILocalBTreeView {
      * @todo watch for overflow of {@link Long#MAX_VALUE}
      */
     final public long rangeCount(byte[] fromKey, byte[] toKey) {
-        
+
         long count = 0;
         
         for (int i = 0; i < srcs.length; i++) {
@@ -619,7 +621,7 @@ public class FusedView implements IIndex, ILocalBTreeView {
      * 
      * @todo watch for overflow of {@link Long#MAX_VALUE}
      */
-    final public long rangeCountExact(byte[] fromKey, byte[] toKey) {
+    final public long rangeCountExact(final byte[] fromKey, final byte[] toKey) {
 
         final ITupleIterator itr = rangeIterator(fromKey, toKey,
                 0/* capacity */, 0/* flags */, null/* filter */);
@@ -862,7 +864,7 @@ public class FusedView implements IIndex, ILocalBTreeView {
     final public void submit(byte[] fromKey, byte[] toKey,
             final IKeyRangeIndexProcedure proc, final IResultHandler handler) {
 
-        Object result = proc.apply(this);
+        final Object result = proc.apply(this);
         
         if (handler != null) {
             
@@ -955,4 +957,24 @@ public class FusedView implements IIndex, ILocalBTreeView {
         
     }
 
+    /*
+     * API used to report how long it has been since the BTree was last used.
+     * This is used to clear BTrees that are not in active use from a variety of
+     * caches. This helps us to better manage RAM.
+     */
+
+    final public void touch() {
+        
+        timestamp = System.nanoTime();
+        
+    }
+    
+    final public long timestamp() {
+        
+        return timestamp;
+        
+    }
+    
+    private long timestamp = System.nanoTime();
+    
 }

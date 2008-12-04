@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.cache;
 
+import java.util.concurrent.TimeUnit;
+
 /**
  * <p>
  * A cache for hard references using an LRU policy. References are simply
@@ -36,18 +38,30 @@ package com.bigdata.cache;
  * persistent identifier. The {@link HardReferenceQueue} has a capacity that
  * determines the #of hard references that may be cached before an object is
  * evicted from the cache. Objects may be stored multiple times on the cache but
- * the nscan most recent references are always tested before appending a reference
- * to the cache in order to minimize cache churn when an object is touched
- * repeatedly in close succession. Likewise, eviction does not mean that the
- * object is no longer on the hard reference cache, nor does eviction mean that
- * no hard references to the object exist within the VM. However, eviction is
- * nevertheless used to drive persistence of the object. Since an object may be
- * evicted multiple times without being updated in between evictions, this
+ * the nscan most recent references are always tested before appending a
+ * reference to the cache in order to minimize cache churn when an object is
+ * touched repeatedly in close succession. Likewise, eviction does not mean that
+ * the object is no longer on the hard reference cache, nor does eviction mean
+ * that no hard references to the object exist within the VM. However, eviction
+ * is nevertheless used to drive persistence of the object. Since an object may
+ * be evicted multiple times without being updated in between evictions, this
  * requires the object to implement a protocol for determining whether or not it
  * is dirty. Eviction is then contigent on that protocol and the dirty state of
  * the object is reset when it is serialized for eviction. In combination with
  * the object's dirty protocol, the hard reference cache can substitute for a
  * commit list.
+ * </p>
+ * <p>
+ * Clearing of stale entries is accomplished when a value is added to the
+ * {@link HardReferenceQueue}. If the value implements the {@link IValueAge}
+ * interface, then the tail of the queue is tested and any entry on the tail
+ * whose age as reported by that interface exceeds a timeout is evicted. This
+ * continues until we reach the first value on the tail of the queue whose age
+ * is greater than the timeout. This behavior is enabled if a non-ZERO timeout
+ * is specified and then only if the generic type of the objects in the queue
+ * extends {@link IValueAge}. Note that old references WILL NOT be cleared
+ * until {@link #append(Object)} is invoked. You can force clearing of old
+ * references to occur at least periodically using {@link #evictStaleRefs(long)}.
  * </p>
  * <p>
  * Note: This implementation is NOT synchronized.
@@ -56,7 +70,8 @@ package com.bigdata.cache;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @param <T> The reference type stored in the cache.
+ * @param <T>
+ *            The reference type stored in the cache.
  */
 public class HardReferenceQueue<T> {
 
@@ -95,6 +110,12 @@ public class HardReferenceQueue<T> {
     private final int nscan;
     
     /**
+     * The timeout (in nanoseconds) for an entry in the queue. When ZERO (0L),
+     * the timeout is disabled.
+     */
+    private final long timeout;
+    
+    /**
      * Defaults the #of references to scan on append requests to 10.
      * 
      * @param listener
@@ -106,11 +127,19 @@ public class HardReferenceQueue<T> {
     public HardReferenceQueue(HardReferenceQueueEvictionListener<T> listener,
             int capacity) {
         
-        this( listener, capacity, 10);
+        this( listener, capacity, DEFAULT_NSCAN);
         
     }
     
     /**
+     * A resonable default for the #of references on the head of the queue that
+     * should be tested before a reference is appended to the queue.
+     */
+    public static transient final int DEFAULT_NSCAN = 10;
+    
+    /**
+     * Ctor with NO timeout.
+     * 
      * @param listener
      *            The listener on which cache evictions are reported (optional).
      * @param capacity
@@ -126,8 +155,37 @@ public class HardReferenceQueue<T> {
      */
     public HardReferenceQueue(final HardReferenceQueueEvictionListener<T> listener,
             final int capacity, final int nscan) {
+        
+        this(listener, capacity, nscan, 0L/* timeout */);
+        
+    }
+    
+    /**
+     * Fully specified ctor.
+     * 
+     * @param listener
+     *            The listener on which cache evictions are reported (optional).
+     * @param capacity
+     *            The maximum #of references that can be stored on the cache.
+     *            There is no guarentee that all stored references are distinct.
+     * @param nscan
+     *            The #of references to scan from the MRU position before
+     *            appended a reference to the cache. Scanning is used to reduce
+     *            the chance that references that are touched several times in
+     *            near succession from entering the cache more than once. The
+     *            #of reference tests trads off against the latency of adding a
+     *            reference to the cache.
+     * @param timeout
+     *            The timeout (in nanoseconds) for an entry in the queue. When
+     *            ZERO (0L), the timeout is disabled. See {@link IValueAge}.
+     *            The timeout behavior is only available when the references
+     *            stored in the queue implement {@link IValueAge}.
+     */
+    public HardReferenceQueue(
+            final HardReferenceQueueEvictionListener<T> listener,
+            final int capacity, final int nscan, final long timeout) {
 
-//        if (listener == null)
+// if (listener == null)
 //            throw new IllegalArgumentException();
 
         if (capacity <= 0)
@@ -143,6 +201,8 @@ public class HardReferenceQueue<T> {
         this.nscan = nscan;
         
         this.refs = (T[])new Object[capacity];
+        
+        this.timeout = timeout;
         
     }
 
@@ -170,6 +230,17 @@ public class HardReferenceQueue<T> {
     final public int nscan() {
         
         return nscan;
+        
+    }
+    
+    /**
+     * The timeout (in nanoseconds) for an entry in the queue. When ZERO (0L),
+     * the timeout is disabled. Note that the timeout is only applied when the
+     * references in the queue implement {@link IValueAge}.
+     */
+    public final long timeout() {
+        
+        return timeout;
         
     }
     
@@ -215,9 +286,10 @@ public class HardReferenceQueue<T> {
      * @return True iff the reference was added to the cache and false iff the
      *         reference was found in a scan of the nscan MRU cache entries.
      */
-    final public boolean append(T ref) {
+    final public boolean append(final T ref) {
         
-        if( ref == null ) throw new IllegalArgumentException();
+        if (ref == null)
+            throw new IllegalArgumentException();
         
         /*
          * Scan the last nscan references for this reference. If found, return
@@ -229,6 +301,16 @@ public class HardReferenceQueue<T> {
 
         }
         
+        if (timeout != 0L && ref instanceof IValueAge) {
+            
+            // touch the new reference
+            ((IValueAge)ref).touch();
+            
+            // evict any stale references.
+            evictStaleRefs(timeout);
+            
+        }
+
         if (count == capacity) {
 
             /*
@@ -255,6 +337,37 @@ public class HardReferenceQueue<T> {
         
     }
 
+    /**
+     * Examine references backwards from the tail, evicting any that have become
+     * stale (too long since they were last touched).
+     * 
+     * @param timeout
+     *            The timeout in nanoseconds.
+     */
+    final public void evictStaleRefs(final long timeout) {
+
+        final long now = System.nanoTime();
+        
+        while( count > 0 ) {
+
+            final long timestamp = ((IValueAge) refs[tail]).timestamp();
+
+            final long age = now - timestamp;
+            
+            if (age < timeout)
+                break;
+
+            System.err.println("Clearing reference: age="
+                    + TimeUnit.NANOSECONDS.toMillis(age) + ", "
+                    + refs[tail]);
+
+            // evict the tail.
+            evict();
+            
+        }
+        
+    }
+    
     /**
      * Evict the LRU reference. This is a NOP iff the cache is empty.
      * 
@@ -288,7 +401,7 @@ public class HardReferenceQueue<T> {
      *            When <code>true</code> the references are explicitly set to
      *            <code>null</code> which can facilitate garbage collection.
      */
-    final public void clear(boolean clearRefs ) {
+    final public void clear(final boolean clearRefs) {
      
         if( clearRefs ) {
 
@@ -497,11 +610,11 @@ public class HardReferenceQueue<T> {
      */
     protected T[] toArray() {
         
-        T[] ary = (T[])new Object[count];
+        final T[] ary = (T[])new Object[count];
         
-        for( int n=0, i=tail; n<count; n++ ) {
+        for (int n = 0, i = tail; n < count; n++) {
             
-            T ref = refs[ i ];
+            final T ref = refs[ i ];
             
             assert ref != null;
             

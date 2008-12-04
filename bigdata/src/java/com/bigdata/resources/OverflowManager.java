@@ -1082,8 +1082,8 @@ abstract public class OverflowManager extends IndexManager {
             addResource(newJournal.getResourceMetadata(), newJournal.getFile());
             
             // add to the cache.
-            storeCache.put(newJournal.getRootBlockView().getUUID(), newJournal,
-                    false/* dirty */);
+            storeCache.put(newJournal.getRootBlockView().getUUID(), newJournal);
+//                    false/* dirty */);
 
             // atomic cutover.
             this.liveJournalRef.set( newJournal );
