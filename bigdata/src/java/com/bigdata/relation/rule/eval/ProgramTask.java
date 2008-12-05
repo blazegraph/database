@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.rule.eval;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.Iterator;
 import java.util.concurrent.Callable;
@@ -289,6 +290,24 @@ public class ProgramTask implements IProgramTask,
                     
                 }
                 
+                if (indexManager instanceof IBigdataFederation) {
+
+                    /*
+                     * Reset the release time to 0L after the ProgramTask is
+                     * finished so that we are no longer holding onto any historical
+                     * views.
+                     * 
+                     * FIXME This is a hack. We should be using a read-historical
+                     * transaction and letting the transaction manager handle the
+                     * release time for us. See my notes in executeMutation() for
+                     * more on this.
+                     */
+
+                    ((IBigdataFederation) indexManager).getTimestampService()
+                            .setReleaseTime(0L/* releaseTime */);
+                    
+                }
+
                 return totals.mutationCount.get();
                 
             } else {
@@ -469,8 +488,65 @@ public class ProgramTask implements IProgramTask,
              * effects?
              */
             
+            final long lastCommitTime = indexManager.getLastCommitTime();
+
+            // the timestamp that we will read on for this step.
             joinNexusFactory.setReadTimestamp(TimestampUtility
-                    .asHistoricalRead(indexManager.getLastCommitTime()));
+                    .asHistoricalRead(lastCommitTime));
+
+            try {
+                
+                /*
+                 * Allow the data services to release data for older views.
+                 * 
+                 * FIXME This is being done in order to prevent the release of
+                 * data associated with the [readTimestamp] while the rule(s)
+                 * are reading on those views. In fact, the rules should be
+                 * using a read-historical transaction and releasing the
+                 * transaction when they are finished which would allow the
+                 * transaction manager to take responsibility for globally
+                 * determining the releaseTime for the federation. In the
+                 * absence of that facility, this has been hacked so that we can
+                 * do scale-out closure without having our views disrupted by
+                 * overflow allowing resources to be purge that are in use by
+                 * those views. Basically, we are declaring a read lock.
+                 * 
+                 * The problem discussed here can be readily observed if you
+                 * attempt the closure of a large data set (U20 may do it, U50
+                 * will) or if you reduce the journal extent so that overflow is
+                 * triggered more frequently, in which case you may be able to
+                 * demonstrate the problem with a much smaller data set.
+                 * 
+                 * Also note that this is globally advancing the release time.
+                 * This means that you can not compute closure for two different
+                 * RDF DBs within the same federation at the same time.
+                 * 
+                 * Also see the code that resets the release time to 0L after
+                 * the ProgramTask is finished.
+                 */
+                
+                if (lastCommitTime != 0L) {
+
+                    /*
+                     * There is some committed state, so update the release time
+                     * such that the timestamp specified by [lastCommitTime]
+                     * does not get released.
+                     */
+                    
+                    final long releaseTime = lastCommitTime - 1;
+
+                    log.warn("readLock: releaseTime="+releaseTime);
+                    
+                    ((IBigdataFederation) indexManager).getTimestampService()
+                            .setReleaseTime(releaseTime);
+
+                }
+
+            } catch (IOException e) {
+            
+                throw new RuntimeException(e);
+                
+            }
             
         }
 

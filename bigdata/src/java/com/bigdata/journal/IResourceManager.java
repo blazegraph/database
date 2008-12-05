@@ -258,29 +258,6 @@ public interface IResourceManager extends IServiceShutdown {
     public void deleteResources();
 
     /**
-     * Notify the {@link IResourceManager} that resources MAY be released as of
-     * this timestamp (and therefore implying that you will be unable to read
-     * resources as of that timestamp in the future).
-     * <p>
-     * This method is used by the {@link ITransactionManager} to notify the
-     * {@link IResourceManager} as the earliest running transactions commit and
-     * the maximum read-behind point is advanced.
-     * 
-     * @param releaseTime
-     *            A historical timestamp, typically a transaction identifier
-     *            that has completed and whose resources may now be reclaimed.
-     *            Resources whose lastCommitTime is LTE this timestamp MAY be
-     *            released (deleted) by the resource manager. Note that the
-     *            createTime of an {@link IndexSegmentStore} is equivalent to
-     *            its lastCommitTime.
-     * 
-     * @throws IllegalArgumentException
-     *             if there is an attempt to set the release time to an earlier
-     *             time (the release time can only increase).
-     */
-    public void setReleaseTime(long releaseTime);
-    
-    /**
      * Return the file on which a new {@link IndexSegment} should be written.
      * The file will exist but will have zero length.
      * 

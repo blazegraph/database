@@ -89,8 +89,8 @@ abstract public class AbstractTx implements ITx {
     final private int hashCode;
     
     /**
-     * The commit time assigned to this transaction and zero if the transaction
-     * has not prepared or is not writable.
+     * The commit time assigned to this transaction and ZERO (0L) if the
+     * transaction has not prepared or is not writable.
      */
     private long commitTime = 0L;
     
@@ -107,9 +107,12 @@ abstract public class AbstractTx implements ITx {
     
     private RunState runState;
 
-    protected AbstractTx(ILocalTransactionManager transactionManager,
-            IResourceManager resourceManager, long startTime,
-            IsolationEnum level) {
+    protected AbstractTx(//
+            final ILocalTransactionManager transactionManager,
+            final IResourceManager resourceManager,//
+            final long startTime,//
+            final IsolationEnum level//
+            ) {
         
         if (transactionManager == null)
             throw new IllegalArgumentException();
@@ -117,7 +120,11 @@ abstract public class AbstractTx implements ITx {
         if (resourceManager == null)
             throw new IllegalArgumentException();
         
-        assert startTime != 0L;
+        if (startTime == ITx.UNISOLATED)
+            throw new IllegalArgumentException();
+
+        if (startTime == ITx.READ_COMMITTED)
+            throw new IllegalArgumentException();
         
         this.transactionManager = transactionManager;
         
@@ -156,9 +163,9 @@ abstract public class AbstractTx implements ITx {
      * @param o
      *            Another transaction object.
      */
-    final public boolean equals(ITx o) {
+    final public boolean equals(final ITx o) {
         
-        return this == o || startTime == o.getStartTimestamp();
+        return this == o || (o != null && startTime == o.getStartTimestamp());
         
     }
     
@@ -198,7 +205,7 @@ abstract public class AbstractTx implements ITx {
      */
     final public String toString() {
         
-        return ""+startTime;
+        return Long.toString(startTime);
         
     }
 
@@ -478,7 +485,7 @@ abstract public class AbstractTx implements ITx {
      * successfully prepared and hence is known to have validated successfully.
      * The default implementation is a NOP.
      */
-    protected void mergeOntoGlobalState(long commitTime) {
+    protected void mergeOntoGlobalState(final long commitTime) {
     
         assert lock.isHeldByCurrentThread();
         

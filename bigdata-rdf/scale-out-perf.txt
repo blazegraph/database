@@ -1072,6 +1072,31 @@ per-query basis.
          KB).
 
 ============================================================
+Replication
+
+Some notes on replication and failover for data services.
+
+When a physical data service fails the replication manager drops it
+from the set of failover services and begins an asynchronous process
+to bring the replication count for that logical data service up to the
+target value.
+
+The clients should get physical data service UUIDs from the
+replication manager, not this method. This method should be replaced
+by <code>getLogicalDataServiceUUID()</code>. Clients should discover
+the replication manager and use it to translate a logical data service
+UUID into one or more phsyical data service proxies.
+
+The replication manager should hold replication state for key-ranges
+of scale-out indices. A new scale-out index will be provisioned with a
+single key-range on the replication manager and a (configured) default
+replication factor.
+
+Data services should be placed into groups for management purposes.
+There should be a distinct group for the metadata services since their
+data should not be co-mingled with the regular data services.
+
+============================================================
 
    - Done.  Either never retry an error task when the queue is likely
      to be full or make the retry itself robust.  Otherwise the CDL
@@ -2934,6 +2959,21 @@ Conferences:
 
      EmergingTech?
 
+MULTICONF-09, http://www.promoteresearch.org/
+
+  - International Conference on Enterprise Information Systems and Web
+    Technologies (EISWT-09)
+
+  - International Conference on High Performance Computing, Networking
+    and Communication Systems (HPCNCS-09)
+
+  - International Conference on Information Security and Privacy (ISP-09)
+
+  - International Conference on Recent Advances in Information
+    Technology and Applications (RAITA-09)
+
+
+
 ------------------------------------------------------------
 
 -Xmx500m -server -Xrunjavaperf:cg -Dlog4j.configuration=file:src/resources/logging/log4j.properties -Djava.security.policy=policy.all -cp "bigdata-lubm.jar;lib/ctc_utils-5-4-2005.jar;lib/cweb-commons-1.1-b2-dev.jar;lib/cweb-extser-0.1-b2-dev.jar;lib/cweb-junit-ext-1.1-b3-dev.jar;lib/junit-3.8.1.jar;lib/lgpl-utils-1.0-b3-dev.jar;lib/log4j-1.2.8.jar;lib/apache/commons-io-1.4.jar;lib/icu/icu4j-3_6.jar;lib/lucene/lucene-analyzers-2.2.0.jar;lib/lucene/lucene-core-2.2.0.jar;lib/unimi/colt-1.2.0.jar;lib/unimi/fastutil-5.1.4.jar;lib/slf4j-api-1.4.3.jar;lib/slf4j-log4j12-1.4.3.jar;lib/openrdf-sesame-2.2-onejar.jar;lib/jini/classserver.jar;lib/jini/jini-core.jar;lib/jini/jini-ext.jar;lib/jini/jsk-lib.jar;lib/jini/jsk-platform.jar;lib/jini/jsk-resources.jar;lib/jini/reggie.jar;lib/jini/start.jar;lib/jini/sun-util.jar;lib/jini/tools.jar" edu.lehigh.swat.bench.ubt.Test query src/java/edu/lehigh/swat/bench/ubt/bigdata/config.kb.bigdata src/java/edu/lehigh/swat/bench/ubt/bigdata/config.query.sparql
@@ -3118,6 +3158,116 @@ Commit notes:
   be the more lightly loaded hosts.  Verify all collected host stats
   and write collector for any stats that are missing.
 
+  * The closure operation must be executed by a single host, not all
+    three. [well, it might work, but it would be very weird.]  I can
+    either fix this (e.g., global lock service based on zookeeper) or
+    I can work around it by doing a load first followed by a closure
+    and then followed by query.  Both closure and query need to be run
+    by a single client while load can be run by multiple clients that
+    divide the work among themselves.  The other way to work around
+    this is to have a single client do the load, but that won't scale
+    to 16 machines.
+
+  * (Partly resolved, but not I can't get it to release all releasable
+    resources.)
+
+    Look into a bug where an index can not be loaded because the
+    backing journal has been released.  This appears to be related to
+    the changes to the storeCache, indexCache, and indexSegmentCache.
+    The problem is not consistent, but it does seem to show up
+    consistently for longer runs, e.g., loading U50 for JDS.
+
+    I am seeing this on U10 w/ 50M journal extents and overflow
+    enabled.  It may be that the view was redefined before the index
+    segment was on hand since it appeared to be looking for an index
+    segment with a filename implying a later creation date.  Or
+    perhaps the wrong index segment was deleted during a purge?
+
+	    SPO 35472
+
+	    I was doing a compact on that index.
+
+	    The index segment file was built and added to the store
+	    manager.
+
+	    purge ran.
+
+	    The index segment file was deleted during purge.
+
+	    The task requested the unisolated view, which had cleared
+	    been updated to use the index segment, but the index
+	    segment had been deleted.
+
+	    The problem is that the releaseTime was set to
+	    [lastCommitTime-1] and the purge was run against the state
+	    before the commit, which is an error.  The logic choose
+	    the wrong commit point and therefore computed the wrong
+	    set of dependencies which left the newest view out in the
+	    cold.
+
+WARN : 305687 overflowService1 overflowService
+com.bigdata.resources.PostProcessOldJournalTask.call(PostProcessOldJournalTask.java:1653):
+done: overflowCounter=8, lastCommitTime=1228508366843, elapsed=24265ms
+
+WARN : 305687 overflowService1 overflowService
+com.bigdata.resources.StoreManager.getCommitTimeStrictlyGreaterThan(StoreManager.java:3250):
+commitPoint=1228508365953 for releaseTime=1228508365952
+
+lastCommitTime       =1228508366843
+commitPointToPreserve=1228508365953
+          releaseTime=1228508365952
+
+	  The problem is that I need to retain all resources whose
+	  createTime is GTE the releaseTime as well as those actually
+	  in use as of that releaseTime!
+
+	  Ah. The code tries to do exactly that.  There was a fence
+	  post (GT vs GTE), but that is not the problem.
+
+	  The index segment was in fact created from a timestamp
+	  *after* the release time - it was created from the
+	  lastCommitTime as of the synchronous overflow event.
+
+	  Maybe the problem is that we can't release any resources
+	  created from the lastCommitTime on the old journal?  Is this
+	  somehow more likely to happen during closure than during
+	  load?
+
+    > The problem is that the commitTimeToPreserve is GT than
+      lastCommitTime for the old journal (on overflow).  This means
+      that resources built from the old journal during asynchronous
+      overflow processing are not being protected from release.
+
+      However, if I use the lastOverflowTime instead, then purge is
+      not able to release resources that are no longer necessary.
+      E.g., after a load+closure operation when the read lock has been
+      released.
+
+      It seems like I need to do more work on identifying resources
+      that were generated from the lastCommitTime on the old journal
+      and allow them to be released when not required by either a read
+      lock (releaseTime) or by minReleaseAge.
+
+
+    Note: As a work around, see if I can simply set the timeout to 0L
+    to disable time-based closure of stores and indices.  If that
+    works then I can make that the default until I debug this issue.
+
+    I could even rollback these changes... but maybe no need?
+
+  - Manage the resources better, e.g., buffering fewer nodes, as the
+    #of hosted indices increases for a data service.  This could be
+    done either statically or dynamically, which should provide much
+    better performance.
+
+    Performance appears to drop to a crawl once the data service is
+    near the JVM memory limits.
+
+  - Choose the index partitions to compact based on the #of sources
+    (and possibly the rangeCount) NOT just the order in which they are
+    visited by the itr since that is an alpha order and has a
+    sustained bias.
+
   - Do an LTS run for each of these cases.  This will give us a
     baseline for load and query performance and "ground truth" for
     query correctness.  Only U100 and U1000 need to be run on the
@@ -3188,9 +3338,3 @@ Commit notes:
     defer. AbstractIndexCache. Used by the federation for the recently
     accessed indices and their metadata indices. Should be using a
     concurrent weak value cache anyway.
-
-** Look into a bug where an index can not be loaded because the
-   backing journal has been released.  This appears to be related to
-   the changes to the storeCache, indexCache, and indexSegmentCache.
-   The problem is not consistent, but it does seem to show up
-   consistently for longer runs, e.g., loading U50 for JDS.

@@ -83,6 +83,12 @@ public class LocalDataServiceFederation extends AbstractFederation {
                 
             }
             
+            public void setReleaseTime(final long releaseTime) {
+                
+                dataService.setReleaseTime(releaseTime);
+                
+            }
+            
         }.start();
         
         resourceLockManager = new AbstractEmbeddedResourceLockManager(UUID.randomUUID(),

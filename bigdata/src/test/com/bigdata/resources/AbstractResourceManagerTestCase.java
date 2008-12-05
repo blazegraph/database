@@ -388,6 +388,11 @@ public class AbstractResourceManagerTestCase extends
             return false;
         }
 
+        public void setReleaseTime(long releaseTime) {
+            // TODO Auto-generated method stub
+            
+        }
+
     }
 
     /**

@@ -254,8 +254,6 @@ public interface IRawStore extends IAddressManager, IStoreSerializer {
     /**
      * The backing file -or- <code>null</code> if there is no backing file
      * for the store.
-     * 
-     * @todo replace with {@link #getResourceMetadata()}? 
      */
     public File getFile();
     

@@ -57,6 +57,19 @@ public class TimestampUtility {
         return "tx(" + timestamp + ")";
 
     }
+    
+    /**
+     * True iff the timestamp is a possible commit time (GT ZERO).
+     * 
+     * @param timestamp
+     *            The timestamp.
+     * @return
+     */
+    static public boolean isCommitTime(long timestamp) {
+        
+        return timestamp > 0;
+        
+    }
 
     static public boolean isHistoricalRead(long timestamp) {
         

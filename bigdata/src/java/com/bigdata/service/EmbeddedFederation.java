@@ -723,6 +723,16 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
 
         }
         
+        public void setReleaseTime(final long releaseTime) {
+            
+            for (DataService ds : dataService) {
+
+                ds.setReleaseTime(releaseTime);
+                
+            }
+            
+        }
+        
     }
     
 //    public IMetadataIndex getMetadataIndex(String name, long timestamp) {

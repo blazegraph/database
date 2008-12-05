@@ -44,4 +44,10 @@ class MockLocalTransactionManager extends AbstractLocalTransactionManager {
     
     private volatile long lastCommitTime = 0L;
 
+    public void setReleaseTime(final long releaseTime) {
+        
+        // NOP.
+        
+    }
+    
 }

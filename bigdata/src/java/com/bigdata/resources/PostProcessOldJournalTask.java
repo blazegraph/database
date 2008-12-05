@@ -107,23 +107,6 @@ import com.bigdata.util.InnerCause;
  * that they will obtain the appropriate locks as necessary on the named
  * indices.
  * 
- * @todo write alternative to the "build" task (which is basically a full
- *       compacting merge) that builds an index segment from the buffered writes
- *       on the journal and updates the view. This would let the #of index
- *       segments grow before performing a full compacting merge on the index
- *       partition. The advantage is that we only need to consider the buffered
- *       writes for the index partition vs a full key range scan of the fused
- *       view for the index partition. This lighter weight operation will copy
- *       any deleted index entries in the btree write buffer as of the
- *       lastCommitState of the old journal, but it will typically copy less
- *       data than was buffered since overwrites will reduce to a single index
- *       entry.
- *       <P>
- *       Think of a pithy name, such as "compact" vs "build" or "build" vs
- *       "buffer". The distinction could also be "full compacting merge" vs
- *       "compacting merge" but "merge" sounds too close to "join" for me and
- *       those labels are too long.
- * 
  * @todo consider side-effects of post-processing tasks (build, split, join, or
  *       move ) on a distributed index rebuild operation. It is possible that
  *       the new index partitions may have been defined (but not yet registered
@@ -1284,7 +1267,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * 
      * FIXME codify the suggestions when nearing DISK exhaustion into code.
      * 
-     * FIXME modify move to be a (full or partial) build followed by a copy of
+     * FIXME modify MOVE to be a (full or partial) build followed by a copy of
      * the index segment(s) in the view to the target data service and finally
      * followed by the atomic update, which will copy over any tuples that have
      * been buffered on the live journal. Assuming that it is more expensive to
@@ -1634,121 +1617,28 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
         final long begin = System.currentTimeMillis();
         
-        final Thread currentThread = Thread.currentThread();
-        
         try {
 
             if (INFO)
                 log.info("begin");
 
-            if(currentThread.isInterrupted()) return null;
-            
             tmpStore = new TemporaryRawStore();
-            
-            if(currentThread.isInterrupted()) return null;
             
             if(INFO) {
                 
                 // The pre-condition views.
                 log.info("\npre-condition views: overflowCounter="
-                        + resourceManager.overflowCounter.get() + "\n"
-                        + resourceManager.listIndexPartitions(-lastCommitTime));
+                        + resourceManager.overflowCounter.get()
+                        + "\n"
+                        + resourceManager.listIndexPartitions(TimestampUtility
+                                .asHistoricalRead(lastCommitTime)));
                 
             }
             
-            if(currentThread.isInterrupted()) return null;
-            
+            // choose the tasks to be run.
             final List<AbstractTask> tasks = chooseTasks();
             
-            if(currentThread.isInterrupted()) return null;
-            
-            // runTasks()
-            {
-                if(INFO)
-                log.info("begin : will run "+tasks.size()+" update tasks");
-
-                /*
-                 * Submit all tasks, awaiting their completion.
-                 * 
-                 * Note: The update tasks should be relatively fast, excepting possibly
-                 * moves of a hot index partition since there could be a lot of buffered
-                 * writes.
-                 */
-                final List<Future> futures = resourceManager
-                        .getConcurrencyManager().invokeAll(tasks,
-                                resourceManager.overflowTimeout,
-                                TimeUnit.MILLISECONDS);
-
-                if(currentThread.isInterrupted()) return null;
-
-                // Note: list is 1:1 correlated with [futures].
-                final Iterator<AbstractTask> titr = tasks.iterator();
-                
-                // verify that all tasks completed successfully.
-                for (Future<? extends Object> f : futures) {
-
-                    // the task for that future.
-                    final AbstractTask task = titr.next();
-                    
-                    /*
-                     * Note: An error here MAY be ignored. The index partition
-                     * will remain coherent and valid but its view will continue
-                     * to have a dependency on the old journal until a
-                     * post-processing task for that index partition succeeds.
-                     */
-                    try {
-
-                        if(currentThread.isInterrupted()) return null;
-                        
-                        /*
-                         * Note: Don't wait long - we already gave the tasks a
-                         * chance to complete up above. If the overflowTimeout
-                         * has elapsed then the rest of the tasks were probably
-                         * cancelled in anycase.
-                         */
-
-                        f.get(100, TimeUnit.MILLISECONDS);
-                        
-                    } catch(Throwable t) {
-
-                        if(t instanceof CancellationException) {
-                            
-                            log.warn("Task cancelled: task="+task+" : "+t);
-                            
-                            resourceManager.asyncOverflowTaskCancelledCounter.incrementAndGet();
-                            
-                        } else if(isNormalShutdown(t)) { 
-                            
-                            log.warn("Normal shutdown? : task="+task+" : "+t);
-                            
-                        } else {
-                        
-                            resourceManager.asyncOverflowTaskFailedCounter.incrementAndGet();
-
-                            log.error("Task failed: task="+task+" : "+t, t);
-                            
-                        }
-                        
-                        continue;
-                        
-                    }
-
-                }
-
-                if(INFO)
-                    log.info("end");
-
-            }
-            
-            if(currentThread.isInterrupted()) return null;
-            
-            if(!resourceManager.isRunning()) {
-                
-                log.warn("Resource manager no longer running.");
-                
-                return null;
-                
-            }
+            runTasks(tasks);
             
             /*
              * Note: At this point we have the history as of the lastCommitTime
@@ -1757,23 +1647,25 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * handle the old journal, all new writes are on the live index.
              */
 
+            final long elapsed = System.currentTimeMillis() - begin;
+
             final long overflowCounter = resourceManager.overflowCounter
                     .incrementAndGet();
 
-            final long elapsed = System.currentTimeMillis()-begin;
-            
-            if(INFO) {
-                
-                log.info("done: overflowCounter=" + overflowCounter
-                        + ", elapsed=" + elapsed + "ms");
-                
-                // The post-condition views.
-                log.info("\npost-condition views: overflowCounter="
-                        + resourceManager.overflowCounter.get() + "\n"
-                        + resourceManager.listIndexPartitions(ITx.UNISOLATED));
-                
-            }
+            log.warn("done: overflowCounter=" + overflowCounter
+                    + ", lastCommitTime="
+                    + resourceManager.getLiveJournal().getLastCommitTime()
+                    + ", elapsed=" + elapsed + "ms");
 
+            // The post-condition views.
+//            if(INFO)
+                log.warn("\npost-condition views: overflowCounter="
+                    + resourceManager.overflowCounter.get() + "\n"
+                    + resourceManager.listIndexPartitions(ITx.UNISOLATED));
+
+            // purge resources that are no longer required.
+            purgeOldResources();
+            
             return null;
             
         } catch(Throwable t) {
@@ -1813,45 +1705,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     log.warn(t.getMessage(), t);
                 }
 
-            }
-
-            try {
-
-//                if(false) {
-                /*
-                 * Once asynchronous processing is complete there are likely to
-                 * be resources that can be released because their views have
-                 * been redefined, typically by a compacting merge. This
-                 * attempts to release any resources that are no longer
-                 * required.
-                 */
-                
-                if (resourceManager
-                        .purgeOldResources(1000/* timeout */, false/* truncateJournal */)) {
-
-                    if (INFO)
-                        log
-                                .info("Purged old resources after asynchronous overflow.");
-
-                } else {
-
-                    log
-                            .warn("Write service did not pause within timeout - will not purge resources now.");
-
-                }
-//                }
-
-            } catch(InterruptedException ex) {
-                
-                // Ignore.
-
-            } catch(Throwable t) {
-                
-                // log and ignore.
-                log.error("Problem purging old resources?", t);
-                
-            } finally {
-                
                 // enable overflow again as a post-condition.
                 if (!resourceManager.overflowAllowed.compareAndSet(
                         false/* expect */, true/* set */)) {
@@ -1866,6 +1719,113 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
     }
 
+    /**
+     * Submit all tasks, awaiting their completion and check their futures for
+     * errors.
+     * <p>
+     * Note: The update tasks should be relatively fast, excepting possibly
+     * moves of a hot index partition since there could be a lot of buffered
+     * writes.
+     * 
+     * @throws InterruptedException
+     */
+    protected void runTasks(final List<AbstractTask> tasks)
+            throws InterruptedException {
+
+        if (INFO)
+            log.info("begin : will run " + tasks.size() + " update tasks");
+
+        /*
+         * Note: On return tasks that are not completed are cancelled.
+         */
+        final List<Future> futures = resourceManager.getConcurrencyManager()
+                .invokeAll(tasks, resourceManager.overflowTimeout,
+                        TimeUnit.MILLISECONDS);
+
+        // Note: list is 1:1 correlated with [futures].
+        final Iterator<AbstractTask> titr = tasks.iterator();
+
+        // verify that all tasks completed successfully.
+        for (Future<? extends Object> f : futures) {
+
+            // the task for that future.
+            final AbstractTask task = titr.next();
+
+            /*
+             * Note: An error here MAY be ignored. The index partition will
+             * remain coherent and valid but its view will continue to have a
+             * dependency on the old journal until a post-processing task for
+             * that index partition succeeds.
+             */
+            try {
+
+                /*
+                 * Non-blocking: all tasks have already either completed or been
+                 * cancelled.
+                 */
+
+                f.get();
+
+            } catch (Throwable t) {
+
+                if (t instanceof CancellationException) {
+
+                    log.warn("Task cancelled: task=" + task + " : " + t);
+
+                    resourceManager.asyncOverflowTaskCancelledCounter
+                            .incrementAndGet();
+
+                } else if (isNormalShutdown(t)) {
+
+                    log.warn("Normal shutdown? : task=" + task + " : " + t);
+
+                } else {
+
+                    resourceManager.asyncOverflowTaskFailedCounter
+                            .incrementAndGet();
+
+                    log.error("Task failed: task=" + task + " : " + t, t);
+
+                }
+
+                continue;
+
+            }
+
+        }
+
+        if (INFO)
+            log.info("end");
+
+    }
+    
+    /**
+     * Attempts to purge resources that are no longer required.
+     * <p>
+     * Note: Once asynchronous processing is complete there are likely to be
+     * resources that can be released because their views have been redefined,
+     * typically by a compacting merge.
+     */
+    protected void purgeOldResources() {
+
+        try {
+
+            resourceManager
+                    .purgeOldResources(1000/* timeout */, false/* truncateJournal */);
+
+        } catch (InterruptedException ex) {
+
+            // Ignore.
+
+        } catch (Throwable t) {
+
+            // log and ignore.
+            log.error("Problem purging old resources?", t);
+
+        }
+        
+    }
+    
     /**
      * These are all good indicators that the data service was shutdown.
      */

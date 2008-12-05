@@ -2479,6 +2479,10 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
          * the queue. Since the reference counter will therefore be positive if
          * the node is selected for eviction, eviction will not cause the node
          * to be made persistent.
+         * 
+         * Note that only mutable BTrees may have dirty nodes and the mutable
+         * BTree is NOT thread-safe so we do not need to use synchronization or
+         * an AtomicInteger for the referenceCount field.
          */
 
         assert ndistinctOnWriteRetentionQueue >= 0;

@@ -65,8 +65,10 @@ public interface ITx {
      * which they read. However, when a process runs a series of
      * {@link AbstractTask}s with read-committed isolation the view of the
      * index in each distinct task will change if concurrenct processes commit
-     * writes on the index. Further, an index itself can appear or disappear if
-     * concurrent processes drop or register that index.
+     * writes on the index (some constructs, such as the scale-out iterators,
+     * provide read-consistent views for the last commit time). Further, an
+     * index itself can appear or disappear if concurrent processes drop or
+     * register that index.
      * <p>
      * A read-committed transaction imposes fewer constraints on when old
      * resources (historical journals and index segments) may be released. For

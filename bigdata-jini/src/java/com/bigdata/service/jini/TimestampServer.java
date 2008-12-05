@@ -185,7 +185,7 @@ public class TimestampServer extends AbstractServer {
             
             try {
                 
-                InetAddress clientAddr = ((ClientHost) ServerContext
+                final InetAddress clientAddr = ((ClientHost) ServerContext
                         .getServerContextElement(ClientHost.class))
                         .getClientHost();
                 

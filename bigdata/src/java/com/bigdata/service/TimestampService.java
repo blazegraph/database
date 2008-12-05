@@ -28,10 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
-import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.MDC;
 
@@ -73,15 +71,21 @@ abstract public class TimestampService extends AbstractService implements
         
     }
 
-    public long nextTimestamp() throws IOException {
+    final public long nextTimestamp() {
         
         return MillisecondTimestampFactory.nextMillis();
         
     }
     
-    public void notifyCommit(long commitTime) throws IOException {
+    final public long lastCommitTime() {
+        
+        return lastCommitTime;
+        
+    }
+    
+    final public void notifyCommit(final long commitTime) {
             
-        synchronized(lastCommitTime) {
+        synchronized(lastCommitTimeLock) {
             
             /*
              * Note: commit time notifications can be overlap such that they
@@ -91,9 +95,9 @@ abstract public class TimestampService extends AbstractService implements
              * are serialized in order for us not to miss any.
              */
             
-            if (lastCommitTime.get() < commitTime) {
+            if (lastCommitTime < commitTime) {
 
-                lastCommitTime.set( commitTime );
+                lastCommitTime = commitTime;
                 
             }
             
@@ -103,12 +107,27 @@ abstract public class TimestampService extends AbstractService implements
     
     /**
      * The last (known) commit time.
+     * 
+     * @todo must be restart safe.  can be obtained by querying data services
+     * or written in a local file.
      */
-    private AtomicLong lastCommitTime = new AtomicLong(0L);
-    
-    public long lastCommitTime() throws IOException {
+    private long lastCommitTime = 0L;
+    private final Object lastCommitTimeLock = new Object();
+
+    /**
+     * Notifies all data services of the new release time.
+     */
+    public void setReleaseTime(final long releaseTime) {
         
-        return lastCommitTime.get();
+        final IBigdataFederation fed = getFederation();
+        
+        final UUID[] a = fed.getDataServiceUUIDs(0/*maxCount*/);
+        
+        for(UUID serviceUUID : a) {
+            
+            fed.getDataService(serviceUUID).setReleaseTime(releaseTime);
+            
+        }
         
     }
     

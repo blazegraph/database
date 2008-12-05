@@ -29,6 +29,8 @@ package com.bigdata.cache;
 
 import java.util.concurrent.TimeUnit;
 
+import org.apache.log4j.Logger;
+
 /**
  * <p>
  * A cache for hard references using an LRU policy. References are simply
@@ -75,6 +77,10 @@ import java.util.concurrent.TimeUnit;
  */
 public class HardReferenceQueue<T> {
 
+    protected static final Logger log = Logger.getLogger(HardReferenceQueue.class);
+    
+    protected static final boolean INFO = log.isInfoEnabled(); 
+    
     /**
      * The listener to which cache eviction notices are reported.
      */
@@ -357,9 +363,10 @@ public class HardReferenceQueue<T> {
             if (age < timeout)
                 break;
 
-            System.err.println("Clearing reference: age="
-                    + TimeUnit.NANOSECONDS.toMillis(age) + ", "
-                    + refs[tail]);
+            if (INFO)
+                log.info("Clearing reference: age="
+                        + TimeUnit.NANOSECONDS.toMillis(age) + ", "
+                        + refs[tail]);
 
             // evict the tail.
             evict();

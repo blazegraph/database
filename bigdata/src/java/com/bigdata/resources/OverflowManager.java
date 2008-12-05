@@ -989,15 +989,17 @@ abstract public class OverflowManager extends IndexManager {
         // @todo uncomment.
         System.err.println("OverflowManager::doSynchronousOverflow: "+getLiveJournal().getFile());
         
+        final AbstractJournal oldJournal = getLiveJournal();
+        final ManagedJournal newJournal;
+
+        final long lastCommitTime = oldJournal.getRootBlockView().getLastCommitTime();
+
         /*
          * Note: We assign the same timestamp to the createTime of the new
          * journal and the closeTime of the old journal.
          */
         final long createTime = nextTimestampRobust();
         final long closeTime = createTime;
-        
-        final AbstractJournal oldJournal = getLiveJournal();
-        final ManagedJournal newJournal;
 
         /*
          * Close out the old journal.
@@ -1096,6 +1098,9 @@ abstract public class OverflowManager extends IndexManager {
             bytesUnderManagement.addAndGet(oldJournal.getBufferStrategy().getExtent());
             bytesUnderManagement.addAndGet(-newJournal.getBufferStrategy().getExtent());
             
+            // note the lastCommitTime on the old journal.
+            lastOverflowTime = lastCommitTime;
+            
             if (INFO)
                 log.info("New live journal: " + newJournal.getFile());
 
@@ -1123,7 +1128,6 @@ abstract public class OverflowManager extends IndexManager {
         int numIndicesNonZeroCopy = 0;
         // Maximum #of non-zero indices that we will copy over.
         final int maxNonZeroCopy = 100; // @todo config
-        final long lastCommitTime = oldJournal.getRootBlockView().getLastCommitTime();
         final long firstCommitTime;
         {
 

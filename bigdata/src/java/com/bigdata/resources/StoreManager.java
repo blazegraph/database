@@ -574,6 +574,12 @@ abstract public class StoreManager extends ResourceEvents implements
     protected long lastCommitTimePreserved = 0L;
 
     /**
+     * The last commit time corresponding to the last synchronous overflow event
+     * and ZERO (0L) until there has been a synchronous overflow event.
+     */
+    protected long lastOverflowTime = 0L;
+
+    /**
      * Resources MUST be at least this many milliseconds before they may be
      * deleted.
      * <p>
@@ -1790,18 +1796,18 @@ abstract public class StoreManager extends ResourceEvents implements
             final File file
             ) {
 
-        if(INFO) log.info("addResource(uuid=" + resourceMetadata.getUUID()
-                + ", file=" + file);
-        
-        assertOpen();
-
         if (resourceMetadata == null)
             throw new IllegalArgumentException();
 
         if (file == null && !isTransient)
             throw new IllegalArgumentException();
 
+        assertOpen();
+
         final UUID uuid = resourceMetadata.getUUID();
+
+        if (INFO)
+            log.info("file=" + file + ", uuid=" + uuid);
 
 //        synchronized (storeCache) {
         
@@ -1921,8 +1927,20 @@ abstract public class StoreManager extends ResourceEvents implements
 
         public String toString() {
             
-            return getClass().getName() + "{file=" + getFile() + ", uuid="
-                    + getRootBlockView().getUUID() + "}";
+            /*
+             * Note: Should not depend on any state that might be unreachable,
+             * e.g., because the store is not open, etc.
+             */
+            
+            final IRootBlockView rootBlock = getRootBlockView();
+            
+            return getClass().getName()
+                    + "{file="
+                    + getFile()
+                    + ", open="
+                    + isOpen()
+                    + (rootBlock != null ? ", uuid="
+                            + getRootBlockView().getUUID() : "") + "}";
             
         }
         
@@ -1950,7 +1968,19 @@ abstract public class StoreManager extends ResourceEvents implements
             return getFederation().getLastCommitTime();
             
         }
-        
+
+        /**
+         * Ignored.
+         */
+        public void setReleaseTime(long releaseTime) throws IOException {
+            
+            if (releaseTime < 0)
+                throw new IllegalArgumentException();
+            
+            // ignored.
+            
+        }
+
         public ILocalTransactionManager getLocalTransactionManager() {
 
             return getConcurrencyManager().getTransactionManager();
@@ -2138,7 +2168,8 @@ abstract public class StoreManager extends ResourceEvents implements
      * @todo it seems that we always have the {@link IResourceMetadata} on hand
      *       when we need to (re-)open a store so it might be nice to pass that
      *       in as it would make for more informative error messages when
-     *       something goes wrong.
+     *       something goes wrong (except that I was planning to drop the file
+     *       name from that interface).
      */
     public IRawStore openStore(final UUID uuid) {
 
@@ -2431,37 +2462,18 @@ abstract public class StoreManager extends ResourceEvents implements
 
         assertOpen();
 
-        if (INFO)
-            log.info("Updating the releaseTime: old=" + this.releaseTime
-                    + ", new=" + this.releaseTime);
+        if (releaseTime < 0L) {
 
-        if (releaseTime < this.releaseTime) {
-
-            throw new IllegalArgumentException(
-                    "The release time can only move forward: releaseTime="
-                            + this.releaseTime + ", but given " + releaseTime);
-
-        }
-
-        // Note: RMI call.
-        final long currentTime = nextTimestampRobust();
-        
-        if(releaseTime>currentTime) {
-            
-            throw new IllegalArgumentException(
-                    "The release time is in the future: releaseTime="
-                            + releaseTime + ", but currentTime=" + currentTime);
+            throw new IllegalArgumentException();
             
         }
-        
+
         this.releaseTime = releaseTime;
-
+        
     }
 
     /**
      * Return the last value set with {@link #setReleaseTime(long)}.
-     * 
-     * @return
      */
     public long getReleaseTime() {
 
@@ -2522,6 +2534,32 @@ abstract public class StoreManager extends ResourceEvents implements
             
             return;
 
+        }
+
+        /*
+         * The last commit time on record in the live journal.
+         * 
+         * Note: This used to be invoked during synchronous overflow so the
+         * [lastCommitTime] was in fact the last commit time on the OLD journal.
+         * However, this is now invoked at arbitrary times (as long as there is
+         * a lock on the write service) so we really need to use the
+         * [lastOverflowTime] here to have the same semantics.
+         */
+        final long lastOverflowTime = this.lastOverflowTime;
+//        final long lastCommitTime = getLiveJournal().getRootBlockView().getLastCommitTime(); 
+
+        if (lastOverflowTime == 0L) {
+            
+            /*
+             * Resources can only be purged after an overflow event. When we are
+             * still on the 1st journal there has been no overflow and so we can
+             * not purge anything.
+             */
+            
+            log.info("Can not purge resources until the first overflow.");
+            
+            return;
+            
         }
 
         // the current time (RMI).
@@ -2604,11 +2642,6 @@ abstract public class StoreManager extends ResourceEvents implements
         }
         
         /*
-         * The last commit time on record in the live journal.
-         */
-        final long lastCommitTime = getLiveJournal().getRootBlockView().getLastCommitTime(); 
-
-        /*
          * Find the commitTime that we are going to preserve.
          */
         final long commitTimeToPreserve;
@@ -2618,31 +2651,41 @@ abstract public class StoreManager extends ResourceEvents implements
              * If the computed [releaseTime] is before the first commit record
              * on the earliest available journal then we use the
              * [firstCommitTime] on that journal instead.
+             * 
+             * @todo Why? It would seem that there was nothing that could be
+             * deleted in this case and that we could just return immediately.
              */
 
-            if (INFO)
-                log
-                        .info("Choosing commitTimeToPreserve as the firstCommitTime for the earliest journal: "
-                                + firstCommitTime);
+//            if (INFO)
+//                log
+//                        .info("Choosing commitTimeToPreserve as the firstCommitTime for the earliest journal: "
+//                                + firstCommitTime);
+//            
+//            commitTimeToPreserve = firstCommitTime;
             
-            commitTimeToPreserve = firstCommitTime;
+            // Nothing to do.
+            
+            if (INFO)
+                log.info("Release time is earlier than any commit time.");
+            
+            return;
 
-        } else if (releaseTime > lastCommitTime ) {
+        } else if (releaseTime > lastOverflowTime ) {
 
             /*
              * If the computed [releaseTime] is after the last commit record
              * then we choose the [lastCommitTime] instead.
              * 
              * Note: This situation can arise when the [minReleaseAge] is small
-             * or zero as the [currentTime] can be after the lastCommitTime.
+             * or zero.
              */
 
             if (INFO)
                 log
-                        .info("Choosing commitTimeToPreserve as the lastCommitTime for the live journal: "
-                                + lastCommitTime);
+                        .info("Choosing commitTimeToPreserve as the lastOverflowTime: "
+                                + lastOverflowTime);
             
-            commitTimeToPreserve = lastCommitTime;
+            commitTimeToPreserve = lastOverflowTime;
 
         } else {
 
@@ -2653,7 +2696,8 @@ abstract public class StoreManager extends ResourceEvents implements
 
             if (INFO)
                 log
-                        .info("Choosing commitTimeToPreserve as the first commitTime GT the releaseTime: "+releaseTime);
+                        .info("Choosing commitTimeToPreserve as the first commitTime GT the releaseTime: "
+                                + releaseTime);
 
             commitTimeToPreserve = getCommitTimeStrictlyGreaterThan(releaseTime);
         
@@ -2755,25 +2799,32 @@ abstract public class StoreManager extends ResourceEvents implements
                 // the create timestamp for that resource.
                 final long createTime = resourceMetadata.getCreateTime();
 
-                if (createTime > commitTimeToPreserve) {
+                if (createTime >= commitTimeToPreserve) {
 
                     /*
                      * Do NOT delete any resources whose createTime is GTE the
                      * given commit time.
                      */
+
+                    if (INFO)
+                        log
+                                .info("Stopping at resource GTE commitTime to preserve: createTime="
+                                        + createTime
+                                        + ", file="
+                                        + resourceMetadata.getFile());
                     
                     break;
-                    
+
                 }
-                
+
                 final UUID uuid = resourceMetadata.getUUID();
 
                 if (resourcesInUse.contains(uuid)) {
-                    
+
                     // still required as of that timestamp.
-                    
+
                     continue;
-                    
+
                 }
 
                 if (INFO)
@@ -2782,8 +2833,8 @@ abstract public class StoreManager extends ResourceEvents implements
                 try {
 
                     deleteResource(uuid, true/* isJournal */, true/* callerWillRemoveFromIndex */);
-                    
-                } catch(Throwable t) {
+
+                } catch (Throwable t) {
 
                     // log error and keep going.
                     
@@ -2850,13 +2901,20 @@ abstract public class StoreManager extends ResourceEvents implements
                 // the create timestamp for that resource.
                 final long createTime = resourceMetadata.getCreateTime();
 
-                if (createTime > commitTimeToPreserve) {
+                if (createTime >= commitTimeToPreserve) {
 
                     /*
                      * Do NOT delete any resources whose createTime is GTE the
                      * given commit time.
                      */
                     
+                    if (INFO)
+                        log
+                                .info("Stopping at resource GTE commitTime to preserve: createTime="
+                                        + createTime
+                                        + ", file="
+                                        + resourceMetadata.getFile());
+
                     break;
                     
                 }
@@ -2871,23 +2929,23 @@ abstract public class StoreManager extends ResourceEvents implements
                     
                 }
 
-                if(INFO)
+                if (INFO)
                     log.info("Will delete: " + resourceMetadata);
 
                 try {
-                
-                // delete the backing file.
-                deleteResource(uuid, false/* isJournal */, true/* callerWillRemoveFromIndex */);
-                
-                } catch(Throwable t) {
-                    
+
+                    // delete the backing file.
+                    deleteResource(uuid, false/* isJournal */, true/* callerWillRemoveFromIndex */);
+
+                } catch (Throwable t) {
+
                     // log error and keep going.
                     log.error("Could not delete segment: " + t, t);
-                    
+
                 }
-                
-//                // add to set for batch remove.
-//                keys.add(segmentIndex.getKey(resourceMetadata.getCreateTime(), uuid));
+
+                // // add to set for batch remove.
+// keys.add(segmentIndex.getKey(resourceMetadata.getCreateTime(), uuid));
               
                 // remove from the [segmentIndex]
                 itr.remove();
@@ -3005,15 +3063,18 @@ abstract public class StoreManager extends ResourceEvents implements
             }
 
         }
-
+        
         /*
          * delete the backing file.
          */
-//        try
         {
 
             final File file = resourceFiles.remove(uuid);
 
+            if (INFO)
+                log.info("removeResource: file=" + file + ", uuid=" + uuid
+                        + ", isJournal=" + isJournal);
+            
             if (file == null) {
 
                 /*
@@ -3025,34 +3086,28 @@ abstract public class StoreManager extends ResourceEvents implements
 
                 throw new NoSuchStoreException(uuid);
 
-            } else {
-
-                if (!file.exists()) {
-
-                    throw new RuntimeException("Not found: " + file);
-
-                }
-                
-                final long length = file.length();
-                
-                if (!file.delete()) {
-
-                    throw new RuntimeException("Could not delete: " + file);
-
-                }
-
-                // track #of bytes deleted since startup.
-                bytesDeleted.addAndGet(length);
-                
-                // track #of bytes still under management.
-                bytesUnderManagement.addAndGet(-length);
-                
             }
 
-//        } catch(Throwable t) {
-//            
-//            log.error(t.getMessage(), t);
-            
+            if (!file.exists()) {
+
+                throw new RuntimeException("Not found: " + file);
+
+            }
+
+            final long length = file.length();
+
+            if (!file.delete()) {
+
+                throw new RuntimeException("Could not delete: " + file);
+
+            }
+
+            // track #of bytes deleted since startup.
+            bytesDeleted.addAndGet(length);
+
+            // track #of bytes still under management.
+            bytesUnderManagement.addAndGet(-length);
+
         }
 
         if (!callerWillRemoveFromIndex) {
@@ -3228,7 +3283,10 @@ abstract public class StoreManager extends ResourceEvents implements
              * point, we need to recursively invoke ourselves when the close
              * time of this journal.
              */
-            
+
+            log.warn("Exmaining prior journal (fence post): closeTime="
+                    + closeTime + ", releaseTime=" + releaseTime);
+
             return getCommitTimeStrictlyGreaterThan(closeTime);
             
         }
@@ -3240,7 +3298,8 @@ abstract public class StoreManager extends ResourceEvents implements
         
         final long commitTime = commitRecord.getTimestamp();
         
-        log.warn("commitPoint="+commitTime+" for releaseTime="+releaseTime);
+        log.warn("commitPoint=" + commitTime + " for releaseTime="
+                + releaseTime);
         
         assert commitTime > releaseTime;
     
@@ -3316,6 +3375,10 @@ abstract public class StoreManager extends ResourceEvents implements
                 // add to set of in-use resources.
                 uuids.add(tmp.getUUID());
 
+                if(INFO)
+                    log.info(indexMetadata.getName() + " uses " + tmp.getFile()
+                        + ", createTime=" + tmp.getCreateTime());
+                
             }
 
         }

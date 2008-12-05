@@ -50,6 +50,13 @@ import com.bigdata.journal.ValidationError;
 public interface IRemoteTxCommitProtocol extends Remote {
 
     /**
+     * Notify a data service that it may release data required to support views
+     * for the specified release time (basically, this releases any read locks
+     * on views for timestamps up to and including the specified release time).
+     */
+    public void setReleaseTime(long releaseTime);
+    
+    /**
      * Request commit of the transaction write set.
      */
     public long commit(long tx) throws ValidationError, IOException;

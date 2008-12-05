@@ -138,6 +138,12 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 
             }
 
+            public void setReleaseTime(final long releaseTime) {
+                
+                Journal.this.setReleaseTime(releaseTime);
+                
+            }
+            
         };
         
         concurrencyManager = new ConcurrencyManager(properties, this, this);
@@ -781,10 +787,16 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * This request is always ignored for a {@link Journal} since it does not
      * have any resources to manage.
      */
-    public void setReleaseTime(long timestamp) {
+    public void setReleaseTime(final long releaseTime) {
 
-        if (INFO)
-            log.info("Request ignored for Journal: timestamp="+timestamp);
+        if (releaseTime < 0L) {
+
+            // Not a timestamp.
+            throw new IllegalArgumentException();
+            
+        }
+
+        // ignored.
         
     }
 

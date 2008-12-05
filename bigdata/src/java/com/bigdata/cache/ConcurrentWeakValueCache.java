@@ -302,9 +302,9 @@ public class ConcurrentWeakValueCache<K, V> {
             synchronized (queue) {
 
                 // put onto the hard reference queue.
-                if(queue.append(v) && v instanceof IValueAge) {
+                if(queue.append(v) && INFO && v instanceof IValueAge) {
 
-                    System.err.println("put: key="+k+", val="+v);
+                    log.info("put: key="+k+", val="+v);
                     
                 }
 
@@ -367,9 +367,9 @@ public class ConcurrentWeakValueCache<K, V> {
                     synchronized (queue) {
 
                         // put the new value onto the hard reference queue.
-                        if(queue.append(v) && v instanceof IValueAge) {
+                        if(queue.append(v) && INFO && v instanceof IValueAge) {
 
-                            System.err.println("put: key="+k+", val="+v);
+                            log.info("put: key="+k+", val="+v);
                             
                         }
 
@@ -388,9 +388,9 @@ public class ConcurrentWeakValueCache<K, V> {
                 synchronized (queue) {
 
                     // put it onto the hard reference queue.
-                    if(queue.append(v) && v instanceof IValueAge) {
+                    if(queue.append(v) && INFO && v instanceof IValueAge) {
 
-                        System.err.println("put: key="+k+", val="+v);
+                        log.info("put: key="+k+", val="+v);
                         
                     }
 

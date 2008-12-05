@@ -354,6 +354,10 @@ abstract public class ResourceManager extends OverflowManager implements IResour
                     public void sample() {setValue(releaseTime);}
                 });
 
+                tmp.addCounter("Last Overflow Time ", new Instrument<Long>(){
+                    public void sample() {setValue(lastOverflowTime);}
+                });
+
                 tmp.addCounter("Last Commit Time Preserved", new Instrument<Long>(){
                     public void sample() {setValue(lastCommitTimePreserved);}
                 });

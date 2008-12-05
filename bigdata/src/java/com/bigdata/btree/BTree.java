@@ -1019,7 +1019,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter,
      * @throws UnsupportedOperationException
      *             if the index is read-only.
      */
-    final public void setIndexMetadata(IndexMetadata indexMetadata) {
+    final public void setIndexMetadata(final IndexMetadata indexMetadata) {
         
         assertNotReadOnly();
 
