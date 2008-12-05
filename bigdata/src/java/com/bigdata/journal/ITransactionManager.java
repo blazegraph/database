@@ -43,14 +43,15 @@ import com.bigdata.service.IDataService;
  * The underlying concurrency control mechanism is Multi-Version Concurrency
  * Control (MVCC). There are no "write locks" per say. Instead, a transaction
  * reads from a historical commit point identified by its assigned start time
- * and writes on an isolated write set visible only to that transaction. When a
- * read-write transaction commits, its write set is validated against the then
- * current committed state of the database. If validation succeeds, the isolated
- * write set is merged down onto the database. Otherwise the transaction is
- * aborted and its write set is discarded.
+ * (-startTime is a timestamp which identifies the commit point) and writes on
+ * an isolated write set visible only to that transaction. When a read-write
+ * transaction commits, its write set is validated against the then current
+ * committed state of the database. If validation succeeds, the isolated write
+ * set is merged down onto the database. Otherwise the transaction is aborted
+ * and its write set is discarded.
  * </p>
  * <p>
- * A transaction will impose "read locks" on the resources required for the
+ * A transaction imposes "read locks" on the resources required for the
  * historical state of the database from which that transaction is reading.
  * Those resources will not be released until the transaction is complete or
  * aborted (the transaction manager MAY choose to abort a read in order to
@@ -77,13 +78,31 @@ import com.bigdata.service.IDataService;
  * an {@link ITransactionManager} will cause the resources necessary to support
  * that read to be retained until the transaction has completed. The value
  * <code>-startTime</code> MAY be used to perform a lightweight read-only
- * operation without coordination with the {@link ITransactionManager} but
+ * operations without coordination with the {@link ITransactionManager} but
  * resources MAY be released since no read "locks" have been declared.
  * </p>
+ * A transaction identifier serves to uniquely distinguish transactions. The
+ * practice is to assign transaction identifies based on the timestamp of their
+ * view and to reverse the sign for read-write transaction identifiers are
+ * negative values (essentially negative timestamps) while commit times are
+ * positive values (timestamps). Successive read-write transactions must be
+ * assigned transaction identifiers whose absolute value is strictly increasing -
+ * this requirement is introduced by the MVCC protocol. There are special values
+ * for {@link ITx#UNISOLATED} and {@link ITx#READ_COMMITTED} operations, which
+ * are not transactions at all.
+ * <p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+ * FIXME My recommendation based on the above is to go with a centralized time
+ * service and to use a heartbeat to drive distributed commits of both isolated
+ * and unisolated transactions. the group commit protocol can wait for a
+ * suitable heartbeat to make the data restart safe.
+ * 
+ * @todo The transaction server should make sure that time does not go backwards
+ *       when it starts up (with respect to the last time that it issued).
+ *       
  * @todo Since the overall concurrency control algorithm is MVCC, the
  *       {@link ITransactionManager} becomes aware of the required locks during
  *       the active {@link ITx#isActive()} phase of the transaction. By the time

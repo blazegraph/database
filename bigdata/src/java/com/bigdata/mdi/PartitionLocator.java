@@ -160,53 +160,6 @@ public class PartitionLocator implements IPartitionMetadata, Externalizable {
         
     }
     
-//    /**
-//     * The ordered list of data services on which the data for this partition
-//     * will be written and from which the data for this partition may be read.
-//     * The first data service is always the primary. Writes SHOULD be pipelined
-//     * from the primary to the secondaries in the same order as they appear in
-//     * this array.
-//     * 
-//     * @todo There is redundency in the partition locators as stored today in
-//     *       the metadata index. Instead of storing an array of data service
-//     *       UUIDs per index partition, there should be a UUID that identifies a
-//     *       logical data service. For each logical data service there are one
-//     *       or more physical data service instances. The first instance is the
-//     *       primary physical data service, or just the primary data service.
-//     *       The remaining instances are failover data services. You can read
-//     *       from a failover data service, but you can only write on the primary
-//     *       data service.
-//     *       <p>
-//     *       When a physical data service fails the replication manager drops it
-//     *       from the set of failover services and begins an asynchronous
-//     *       process to bring the replication count for that logical data
-//     *       service up to the target value.
-//     *       <p>
-//     *       The clients should get physical data service UUIDs from the
-//     *       replication manager, not this method. This method should be
-//     *       replaced by <code>getLogicalDataServiceUUID()</code>. Clients
-//     *       should discover the replication manager and use it to translate a
-//     *       logical data service UUID into one or more phsyical data service
-//     *       proxies.
-//     *       <p>
-//     * @todo The replication manager should hold replication state for
-//     *       key-ranges of scale-out indices. A new scale-out index will be
-//     *       provisioned with a single key-range on the replication manager and
-//     *       a (configured) default replication factor.
-//     *       <p>
-//     * @todo Data services should be placed into groups for management purposes.
-//     *       There should be a distinct group for the metadata services since
-//     *       their data should not be co-mingled with the regular data services.
-//     *       <p>
-//     * 
-//     * @return An array of the data service identifiers.
-//     */
-//    final public UUID[] getDataServices() {
-//        
-//        return dataServices;
-//        
-//    }
-    
     final public byte[] getLeftSeparatorKey() {
 
         return leftSeparatorKey;

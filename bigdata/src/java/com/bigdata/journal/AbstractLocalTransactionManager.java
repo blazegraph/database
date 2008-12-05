@@ -34,8 +34,8 @@ import com.bigdata.util.InnerCause;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractLocalTransactionManager extends TimestampUtility implements
-        ILocalTransactionManager {
+abstract public class AbstractLocalTransactionManager extends TimestampUtility
+        implements ILocalTransactionManager {
 
     /**
      * Logger.
@@ -156,7 +156,7 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility i
      * @todo test for transactions that have already been completed? that would
      *       represent a protocol error in the transaction manager service.
      */
-    public void activateTx(ITx tx) throws IllegalStateException {
+    public void activateTx(final ITx tx) throws IllegalStateException {
 
         final Long timestamp = tx.getStartTimestamp();
 
@@ -185,24 +185,24 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility i
      * 
      * @throws IllegalStateException
      */
-    public void prepared(ITx tx) throws IllegalStateException {
+    public void prepared(final ITx tx) throws IllegalStateException {
 
-        final Long id = tx.getStartTimestamp();
+        final Long startTime = tx.getStartTimestamp();
 
-        final ITx tx2 = activeTx.remove(id);
+        final ITx tx2 = activeTx.remove(startTime);
 
         if (tx2 == null)
             throw new IllegalStateException("Not active: tx=" + tx);
 
         assert tx == tx2;
 
-        if (preparedTx.containsKey(id)) {
+        if (preparedTx.containsKey(startTime)) {
 
             throw new IllegalStateException("Already preparing: tx=" + tx);
         
         }
 
-        preparedTx.put(id, tx);
+        preparedTx.put(startTime, tx);
 
     }
 
@@ -215,16 +215,16 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility i
      * 
      * @throws IllegalStateException
      */
-    public void completedTx(ITx tx) throws IllegalStateException {
+    public void completedTx(final ITx tx) throws IllegalStateException {
 
         assert tx != null;
         assert tx.isComplete();
 
-        final Long id = tx.getStartTimestamp();
+        final Long startTime = tx.getStartTimestamp();
 
-        final ITx txActive = activeTx.remove(id);
+        final ITx txActive = activeTx.remove(startTime);
 
-        final ITx txPrepared = preparedTx.remove(id);
+        final ITx txPrepared = preparedTx.remove(startTime);
 
         if (txActive == null && txPrepared == null) {
 
@@ -245,8 +245,10 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility i
      *         the start time is not mapped to either an active or prepared
      *         transaction.
      */
-    public ITx getTx(long startTime) {
+    public ITx getTx(final long startTime) {
 
+        // @todo lock to prevent concurrent decl or state change for the tx?
+        
         ITx tx = activeTx.get(startTime);
 
         if (tx == null) {

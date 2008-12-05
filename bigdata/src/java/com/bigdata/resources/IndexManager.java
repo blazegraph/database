@@ -1155,19 +1155,19 @@ abstract public class IndexManager extends StoreManager {
 
         if (timestamp == ITx.UNISOLATED || timestamp == ITx.READ_COMMITTED) {
 
-            timestamp = getLiveJournal().getRootBlockView().getLastCommitTime();
+            timestamp = getLiveJournal().getLastCommitTime();
 
         }
         
-        StringBuilder sb = new StringBuilder();
+        final StringBuilder sb = new StringBuilder();
 
         final AbstractJournal journal = getJournal(timestamp);
         
         sb.append("timestamp="+timestamp+"\njournal="+journal.getResourceMetadata());
 
         // historical view of Name2Addr as of that timestamp.
-        final ITupleIterator itr = journal.getName2Addr(timestamp).rangeIterator(
-                null, null);
+        final ITupleIterator itr = journal.getName2Addr(timestamp)
+                .rangeIterator();
         
         while (itr.hasNext()) {
 

@@ -39,7 +39,7 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.Tuple;
-import com.bigdata.journal.ITx;
+import com.bigdata.journal.TimestampUtility;
 
 /**
  * <p>
@@ -122,11 +122,11 @@ public class IsolatedFusedView extends FusedView {
      * @param groundState
      *            The historical ground state.
      */
-    public IsolatedFusedView(long timestamp, AbstractBTree[] sources ) {
+    public IsolatedFusedView(final long timestamp, AbstractBTree[] sources ) {
         
         super(sources);
 
-        if (timestamp <= ITx.UNISOLATED)
+        if (!TimestampUtility.isCommitTime(timestamp))
             throw new IllegalStateException();
 
         this.startTime = timestamp;
@@ -143,12 +143,12 @@ public class IsolatedFusedView extends FusedView {
         writeSet = (BTree) sources[0];
 
         // verify all sources support timestamps.
-        for(int i=0; i<sources.length; i++) {
-            
+        for (int i = 0; i < sources.length; i++) {
+
             if (!sources[i].getIndexMetadata().getVersionTimestamps()) {
-                
+
                 throw new IllegalArgumentException();
-                
+
             }
             
         }
@@ -561,7 +561,7 @@ public class IsolatedFusedView extends FusedView {
 
             while (tmpItr.hasNext()) {
 
-                ITuple tuple = tmpItr.next();
+                final ITuple tuple = tmpItr.next();
                 
                 if(tuple.isDeletedVersion()) {
                 
@@ -645,7 +645,7 @@ public class IsolatedFusedView extends FusedView {
         while (itr.hasNext()) {
 
             // The index entry in the isolated write set.
-            ITuple entry = itr.next();
+            final ITuple entry = itr.next();
 
             // The corresponding key.
             final byte[] key = entry.getKey();

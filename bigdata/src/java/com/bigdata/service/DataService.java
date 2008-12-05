@@ -412,6 +412,12 @@ abstract public class DataService extends AbstractService
                 
             }
 
+            public void setReleaseTime(long releaseTime) {
+
+                DataService.this.setReleaseTime(releaseTime);
+                
+            }
+
         };
 
         concurrencyManager = new ConcurrencyManager(properties,
@@ -751,6 +757,22 @@ abstract public class DataService extends AbstractService
     /*
      * ITxCommitProtocol.
      */
+    
+    public void setReleaseTime(final long releaseTime) {
+        
+        setupLoggingContext();
+        
+        try {
+            
+            getResourceManager().setReleaseTime(releaseTime);
+            
+        } finally {
+            
+            clearLoggingContext();
+            
+        }
+        
+    }
     
     public long commit(long tx) throws IOException {
         

@@ -125,6 +125,21 @@ public class CompactingMergeTask extends
             // submit task and wait for it to complete @todo config timeout?
             concurrencyManager.submit(task).get();
 
+            /*
+             * Verify that the view was updated. If the atomic update task runs
+             * correctly then it will replace the IndexMetadata object on the
+             * mutable BTree with a new view containing only the live journal
+             * and the new index segment (for a compacting merge). We verify
+             * that right now to make sure that the state change to the BTree
+             * was noticed and resulted in a commit before returning control to
+             * us here.
+             * 
+             * @todo comment this out or replicate for the index build task also?
+             */
+            concurrencyManager.submit(
+                    new VerifyAtomicUpdateTask(resourceManager,
+                            concurrencyManager, name, indexUUID, result)).get();
+            
         } catch (Throwable t) {
 
             // delete the generated index segment.
@@ -140,6 +155,100 @@ public class CompactingMergeTask extends
 
     }
 
+    /**
+     * A paranoia test that verifies that the definition of the view was in fact
+     * updated.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static private class VerifyAtomicUpdateTask extends
+            AbstractResourceManagerTask<Void> {
+
+        final protected BuildResult buildResult;
+
+        /**
+         * @param resourceManager
+         * @param concurrencyManager
+         * @param resource
+         * @param buildResult
+         */
+        public VerifyAtomicUpdateTask(ResourceManager resourceManager,
+                IConcurrencyManager concurrencyManager, String resource,
+                UUID indexUUID, BuildResult buildResult) {
+
+            super(resourceManager, ITx.UNISOLATED, resource);
+
+            if (buildResult == null)
+                throw new IllegalArgumentException();
+
+            this.buildResult = buildResult;
+
+            assert resource.equals(buildResult.name);
+
+        }
+
+        /**
+         * Verify that the update was correctly registered on the mutable
+         * {@link BTree}.
+         * 
+         * @return <code>null</code>
+         */
+        @Override
+        protected Void doTask() throws Exception {
+
+            if (resourceManager.isOverflowAllowed())
+                throw new IllegalStateException();
+
+            final SegmentMetadata segmentMetadata = buildResult.segmentMetadata;
+
+            // the correct view definition.
+            final IResourceMetadata[] expected = new IResourceMetadata[] {
+                    // the live journal.
+                    getJournal().getResourceMetadata(),
+                    // the newly built index segment.
+                    segmentMetadata
+                    };
+
+            /*
+             * Open the unisolated B+Tree on the live journal that is absorbing
+             * writes and verify the definition of the view.
+             */
+            final ILocalBTreeView view = (ILocalBTreeView) getIndex(getOnlyResource());
+
+            // The live B+Tree.
+            final BTree btree = view.getMutableBTree();
+
+            final LocalPartitionMetadata pmd = btree.getIndexMetadata().getPartitionMetadata();
+            
+            final IResourceMetadata[] actual = pmd.getResources();
+            
+            if (expected.length != actual.length) {
+                
+                throw new RuntimeException("expected=" + expected
+                        + ", but actual=" + actual);
+                
+            }
+            
+            for(int i=0; i<expected.length; i++) {
+                
+                if(!expected[i].equals(actual[i])) {
+
+                    throw new RuntimeException("Differs at index=" + i
+                            + ", expected=" + expected + ", but actual="
+                            + actual);
+
+                }
+                
+            }
+            
+            return null;
+            
+        }
+
+    }
+    
+    
     /**
      * <p>
      * The source view is pre-overflow (the last writes are on the old journal)

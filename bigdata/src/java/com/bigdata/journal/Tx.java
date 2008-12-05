@@ -54,18 +54,17 @@ import com.bigdata.resources.ResourceManager;
  * <p>
  * The write set of a transaction is written onto a {@link TemporaryRawStore}.
  * Therefore the size limit on the transaction write set is currently 2G, but
- * the transaction will run in memory up to 100M. The {@link TemporaryRawStore}
- * is closed and any backing file is deleted as soon as the transaction
- * completes.
+ * the transaction will be buffered in memory until the store exceeds its write
+ * cache size and creates a backing file on the disk. The store is closed and
+ * any backing file is deleted as soon as the transaction completes.
  * </p>
  * <p>
- * Each {@link IsolatedFusedView} is local to a transaction and is backed by its
- * own store. This means that concurrent transactions can execute without
- * synchronization (real concurrency) up to the point where they
- * {@link #prepare()}. We do not need a read-lock on the indices isolated by
- * the transaction since they are <em>historical</em> states that will not
- * receive concurrent updates. This might prove to be a nice way to leverage
- * multiple processors / cores on a data server.
+ * Each {@link IsolatedFusedView} is local to a transaction and is backed by the
+ * temporary store for that transaction. This means that concurrent transactions
+ * can execute without synchronization (real concurrency) up to the point where
+ * they {@link #prepare()}. We do not need a read-lock on the indices isolated
+ * by the transaction since they are <em>historical</em> states that will not
+ * receive concurrent updates.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -87,9 +86,6 @@ import com.bigdata.resources.ResourceManager;
  *       delegation strategy so that I can trap attempts to access an isolated
  *       index once the transaction is no longer active. define "active" as up
  *       to the point where a "commit" or "abort" is _requested_ for the tx.
- * 
- * @todo Support transactions where the indices isolated by the transactions are
- *       {@link PartitionedIndexView}es.
  * 
  * @todo The various public methods on this API that have {@link RunState}
  *       constraints all eagerly force an abort when invoked from an illegal
@@ -146,8 +142,12 @@ public class Tx extends AbstractTx implements ITx {
      *            When true the transaction will reject writes and
      *            {@link #prepare()} and {@link #commit()} will be NOPs.
      */
-    public Tx(ILocalTransactionManager transactionManager,
-            IResourceManager resourceManager, long startTime, boolean readOnly) {
+    public Tx(//
+            final ILocalTransactionManager transactionManager,//
+            final IResourceManager resourceManager, //
+            final long startTime,//
+            final boolean readOnly//
+            ) {
 
         super(transactionManager, resourceManager, startTime,
                 readOnly ? IsolationEnum.ReadOnly : IsolationEnum.ReadWrite);
@@ -248,16 +248,16 @@ public class Tx extends AbstractTx implements ITx {
          * for all isolated btrees, if(!validate()) return false;
          */
 
-        Iterator<Map.Entry<String, IIndex>> itr = indices.entrySet()
+        final Iterator<Map.Entry<String, IIndex>> itr = indices.entrySet()
                 .iterator();
 
         while (itr.hasNext()) {
 
-            Map.Entry<String, IIndex> entry = itr.next();
+            final Map.Entry<String, IIndex> entry = itr.next();
 
-            String name = entry.getKey();
+            final String name = entry.getKey();
 
-            IsolatedFusedView isolated = (IsolatedFusedView) entry.getValue();
+            final IsolatedFusedView isolated = (IsolatedFusedView) entry.getValue();
 
             /*
              * Note: this is the live version of the named index. We need to
@@ -396,7 +396,7 @@ public class Tx extends AbstractTx implements ITx {
      * @exception IllegalStateException
      *                if the transaction is not active.
      */
-    public IIndex getIndex(String name) {
+    public IIndex getIndex(final String name) {
 
         if (name == null)
             throw new IllegalArgumentException();
@@ -554,11 +554,11 @@ public class Tx extends AbstractTx implements ITx {
 
             }
 
-            Iterator<IIndex> itr = indices.values().iterator();
+            final Iterator<IIndex> itr = indices.values().iterator();
 
             while (itr.hasNext()) {
 
-                IsolatedFusedView ndx = (IsolatedFusedView) itr.next();
+                final IsolatedFusedView ndx = (IsolatedFusedView) itr.next();
 
                 if (!ndx.isEmptyWriteSet()) {
 

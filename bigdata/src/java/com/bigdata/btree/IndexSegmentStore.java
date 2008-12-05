@@ -102,6 +102,11 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
     protected final File file;
 
     /**
+     * The mode that will be used to open the {@link #file} .
+     */
+    protected static final String mode = "r"; 
+    
+    /**
      * Used to correct decode region-based addresses. The
      * {@link IndexSegmentBuilder} encodes region-based addresses using
      * {@link IndexSegmentRegion}. Those addresses are then transparently
@@ -141,7 +146,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
     /**
      * A read-only view of the checkpoint record for the index segment.
      */
-    private IndexSegmentCheckpoint checkpoint;
+    private final IndexSegmentCheckpoint checkpoint;
 
     /**
      * The metadata record for the index segment.
@@ -341,7 +346,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      * @throws RootBlockException
      *             if the root block is invalid.
      */
-    public IndexSegmentStore(Properties properties) {
+    public IndexSegmentStore(final Properties properties) {
 
         if (properties == null)
             throw new IllegalArgumentException();
@@ -361,8 +366,25 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
 
             }
 
-            file = new File(val);
+            this.file = new File(val);
             
+            try {
+                
+                // open the file.
+                this.raf = new RandomAccessFile(file, mode);
+
+                // read the checkpoint record from the file.
+                this.checkpoint = new IndexSegmentCheckpoint(raf);
+                
+            } catch (IOException ex) {
+
+                throw new RuntimeException(ex);
+                
+            }
+
+            if (INFO)
+                log.info(checkpoint.toString());
+
         }
         
         reopen();
@@ -419,15 +441,21 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
     }
 
     public String toString() {
-        
+
+        /*
+         * Note: Only depends on final fields.
+         */
         // @todo add filename if filename dropped from resourcemetadata.
         return getResourceMetadata().toString();
         
     }
 
     public IResourceMetadata getResourceMetadata() {
-        
-        if(!open) reopen();
+
+        /*
+         * Note: Only depends on final fields.
+         */
+//        if(!open) reopen();
 
         return new SegmentMetadata(file, //checkpoint.length,
                 checkpoint.segmentUUID, checkpoint.commitTime);
@@ -452,31 +480,25 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
         if (open)
             throw new IllegalStateException("Already open.");
         
-        if (!file.exists()) {
-
-            throw new RuntimeException("File does not exist: "
-                    + file.getAbsoluteFile());
-
-        }
+//        if (!file.exists()) {
+//
+//            throw new RuntimeException("File does not exist: "
+//                    + file.getAbsoluteFile());
+//
+//        }
         
-        /*
-         * This should already be null (see close()), but make sure reference is
-         * cleared first.
-         */
-        raf = null;
+//        /*
+//         * This should already be null (see close()), but make sure reference is
+//         * cleared first.
+//         */
+//        raf = null;
 
         try {
 
             // open the file.
-            this.raf = new RandomAccessFile(file, "r");
+            if (this.raf == null) {
 
-            if (checkpoint == null) {
-                
-                // read the checkpoint record from the file.
-                this.checkpoint = new IndexSegmentCheckpoint(raf);
-
-                if (INFO)
-                    log.info(checkpoint.toString());
+                this.raf = new RandomAccessFile(file, mode);
 
             }
 

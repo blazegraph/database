@@ -187,6 +187,11 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      * split, or remove operation. This mechanism also helps to defer IOs since
      * IO can not occur until the last reference to the node is evicted from the
      * queue.
+     * <p>
+     * Note that only mutable {@link BTree}s may have dirty nodes and the
+     * {@link BTree} is NOT thread-safe for writers so we do not need to use
+     * synchronization or an AtomicInteger for the {@link #referenceCount}
+     * field.
      */
     protected int referenceCount = 0;
 

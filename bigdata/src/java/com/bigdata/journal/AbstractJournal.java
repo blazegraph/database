@@ -1194,7 +1194,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
             
     }
     
-    public File getFile() {
+    final public File getFile() {
         
         return _bufferStrategy.getFile();
         
