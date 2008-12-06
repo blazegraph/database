@@ -874,12 +874,6 @@ public class SplitIndexPartitionTask extends
             /*
              * Notify the metadata service that the index partition has been
              * split.
-             * 
-             * @todo Is it possible for the dataServiceUUIDs[] that we have
-             * locally to be out of sync with the one in the locator on the
-             * metadata service? If so, then the metadata service needs to
-             * ignore that field when validating the oldLocator that we form
-             * below.
              */
             resourceManager.getFederation().getMetadataService().splitIndexPartition(
                     src.getIndexMetadata().getName(),//

@@ -268,6 +268,10 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
          * {@link IndexSegment} will incur NO disk hits for the nodes and only
          * one disk hit per visited leaf.
          * 
+         * @todo The default for this this be an option in the
+         *       {@link IndexMetadata} so that buffering may be controlled on a
+         *       per scale-out-index basis but turned off if desired by 
+         * 
          * @see #DEFAULT_BUFFER_NODES
          */
         String BUFFER_NODES = IndexSegment.class.getName()+".bufferNodes";
@@ -275,7 +279,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
         /**
          * @see #BUFFER_NODES
          */
-        String DEFAULT_BUFFER_NODES = "true";
+        String DEFAULT_BUFFER_NODES = "false";
      
         /**
          * The size of the LRU cache backing the weak reference cache for leaves
