@@ -171,7 +171,7 @@ abstract public class AbstractKeyRangeIndexProcedure extends
      *         partition IFF <i>pmd</i> is non-<code>null</code> AND the
      *         <i>fromKey</i> is LT the leftSeparator key.
      */
-    public static byte[] constrainFromKey(byte[] fromKey, ISeparatorKeys pmd) {
+    public static byte[] constrainFromKey(byte[] fromKey, final ISeparatorKeys pmd) {
 
         if (pmd == null)
             return fromKey;
@@ -211,7 +211,7 @@ abstract public class AbstractKeyRangeIndexProcedure extends
      *         partition IFF <i>pmd</i> is non-<code>null</code> AND the
      *         <i>toKey</i> is GT the rightSeparator key.
      */
-    public static byte[] constrainToKey(byte[] toKey, ISeparatorKeys pmd) {
+    public static byte[] constrainToKey(byte[] toKey, final ISeparatorKeys pmd) {
 
         if (pmd == null)
             return toKey;

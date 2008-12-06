@@ -48,6 +48,7 @@ import com.bigdata.btree.filter.FilterConstructor;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.filter.ITupleFilter;
 import com.bigdata.btree.filter.TupleFilter;
+import com.bigdata.btree.proc.AbstractKeyRangeIndexProcedure;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.LocalPartitionMetadata;
@@ -95,6 +96,12 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
     /** Predicate (the resource name on the predicate is the relation namespace). */
     protected final IPredicate<R> predicate;
 
+    /**
+     * The description of the index partition iff the {@link #predicate} is
+     * constrained to an index partition and <code>null</code> otherwise.
+     */
+    final LocalPartitionMetadata pmd;
+    
     /**
      * Index order (the relation namespace plus the index order and the option
      * partitionId constraint on the predicate identify the index).
@@ -189,15 +196,38 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
     protected void setFromKey(byte[] fromKey) {
         
         assertNotInitialized();
-        
+
+        if (pmd != null) {
+
+            /*
+             * The predicate is constrained to an index partition, so constrain
+             * the fromKey so that it lies within that index partition.
+             */
+            
+            fromKey = AbstractKeyRangeIndexProcedure.constrainFromKey(fromKey,
+                    pmd);
+
+        }
+
         this.fromKey = fromKey;
-        
+
     }
     
     protected void setToKey(byte[] toKey) {
         
         assertNotInitialized();
         
+        if (pmd != null) {
+
+            /*
+             * The predicate is constrained to an index partition, so constrain
+             * the toKey so that it lies within that index partition.
+             */
+            
+            toKey = AbstractKeyRangeIndexProcedure.constrainFromKey(toKey, pmd);
+
+        }
+
         this.toKey = toKey;
         
     }
@@ -273,7 +303,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
              * the correct index partition.
              */
             
-            final LocalPartitionMetadata pmd = ndx.getIndexMetadata().getPartitionMetadata();
+            pmd = ndx.getIndexMetadata().getPartitionMetadata();
 
             if (pmd == null)
                 throw new IllegalArgumentException("Not an index partition");
@@ -284,6 +314,12 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
                         + partitionId + ", but have " + pmd.getPartitionId());
                 
             }
+            
+        } else {
+            
+            // The predicate is not constrained to an index partition.
+            
+            pmd = null;
             
         }
 
