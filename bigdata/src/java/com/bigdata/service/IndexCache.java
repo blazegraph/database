@@ -13,9 +13,10 @@ public class IndexCache extends AbstractIndexCache<ClientIndexView>{
     
     private final AbstractScaleOutFederation fed;
     
-    public IndexCache(final AbstractScaleOutFederation fed, final int capacity) {
-        
-        super(capacity);
+    public IndexCache(final AbstractScaleOutFederation fed, final int capacity,
+            final long timeout) {
+
+        super(capacity, timeout);
 
         if (fed == null)
             throw new IllegalArgumentException();

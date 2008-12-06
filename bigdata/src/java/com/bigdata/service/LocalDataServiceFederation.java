@@ -72,7 +72,7 @@ public class LocalDataServiceFederation extends AbstractFederation {
         
         // indexCache
         indexCache = new DataServiceIndexCache(this, client
-                .getIndexCacheCapacity());
+                .getIndexCacheCapacity(), client.getIndexCacheTimeout());
         
         timestampService = new AbstractEmbeddedTimestampService(UUID.randomUUID(),
                 properties) {
@@ -559,9 +559,10 @@ public class LocalDataServiceFederation extends AbstractFederation {
          * @param fed
          * @param capacity
          */
-        protected DataServiceIndexCache(LocalDataServiceFederation fed, int capacity) {
-           
-            super(capacity);
+        protected DataServiceIndexCache(LocalDataServiceFederation fed,
+                int capacity, long timeout) {
+
+            super(capacity, timeout);
 
             if (fed == null)
                 throw new IllegalArgumentException();

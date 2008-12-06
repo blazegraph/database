@@ -779,7 +779,7 @@ abstract public class StoreManager extends ResourceEvents implements
                 log.info(Options.STORE_CACHE_TIMEOUT + "=" + storeCacheTimeout); 
 
             if (storeCacheTimeout < 0)
-                throw new RuntimeException(Options.STORE_CACHE_CAPACITY
+                throw new RuntimeException(Options.STORE_CACHE_TIMEOUT
                         + " must be non-negative");
             
 //            indexCache = new WeakValueCache<NT, IIndex>(

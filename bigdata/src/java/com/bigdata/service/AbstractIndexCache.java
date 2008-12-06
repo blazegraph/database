@@ -1,6 +1,9 @@
 package com.bigdata.service;
 
+import java.lang.ref.WeakReference;
 import java.util.Iterator;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 
 import org.apache.log4j.Logger;
@@ -8,9 +11,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.cache.ConcurrentWeakValueCache;
-import com.bigdata.cache.ICacheEntry;
-import com.bigdata.cache.LRUCache;
-import com.bigdata.cache.WeakValueCache;
+import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.concurrent.NamedLock;
 import com.bigdata.journal.ITx;
 import com.bigdata.util.NT;
@@ -40,11 +41,9 @@ abstract public class AbstractIndexCache<T extends IRangeQuery> {
      * <p>
      * Note: The "dirty" flag associated with the object in this cache is
      * ignored.
-     * 
-     * FIXME modify to use {@link ConcurrentWeakValueCache} which will impose
-     * less lock contention.
      */
-    final private WeakValueCache<NT, T> indexCache;
+//    final private WeakValueCache<NT, T> indexCache;
+    final private ConcurrentWeakValueCache<NT, T> indexCache;
 
     final private NamedLock<NT> indexCacheLock = new NamedLock<NT>();
 
@@ -52,10 +51,22 @@ abstract public class AbstractIndexCache<T extends IRangeQuery> {
      * 
      * @param capacity
      *            The capacity of the backing LRU hard reference cache.
+     * @param timeout
+     *            The timeout in milliseconds for stale entries in the cache.
+     * 
+     * @see IBigdataClient.Options#CLIENT_INDEX_CACHE_CAPACITY
+     * @see IBigdataClient.Options#CLIENT_INDEX_CACHE_TIMEOUT
      */
-    protected AbstractIndexCache(int capacity) {
+    protected AbstractIndexCache(final int capacity, final long timeout) {
 
-        indexCache = new WeakValueCache<NT, T>(new LRUCache<NT, T>(capacity));
+//        indexCache = new WeakValueCache<NT, T>(new LRUCache<NT, T>(capacity));
+
+        indexCache = new ConcurrentWeakValueCache<NT, T>(
+                new HardReferenceQueue<T>(null/* evictListener */,
+                        capacity,
+                        HardReferenceQueue.DEFAULT_NSCAN,
+                        TimeUnit.MILLISECONDS.toNanos(timeout)),
+                .75f/* loadFactor */, 16/* concurrencyLevel */, true/* removeClearedEntries */);
 
     }
 
@@ -129,7 +140,8 @@ abstract public class AbstractIndexCache<T extends IRangeQuery> {
                 }
 
                 // add to the cache.
-                indexCache.put(nt, ndx, false/* dirty */);
+//                indexCache.put(nt, ndx, false/* dirty */);
+                indexCache.put(nt, ndx);
 
                 if (INFO)
                     log.info("name=" + name + " @ "
@@ -170,13 +182,30 @@ abstract public class AbstractIndexCache<T extends IRangeQuery> {
 
         synchronized (indexCache) {
 
-            final Iterator<ICacheEntry<NT, T>> itr = indexCache.entryIterator();
+//            final Iterator<ICacheEntry<NT, T>> itr = indexCache.entryIterator();
+            final Iterator<Map.Entry<NT, WeakReference<T>>> itr = indexCache.entryIterator();
 
             while (itr.hasNext()) {
 
-                final ICacheEntry<NT, T> entry = itr.next();
+//                final ICacheEntry<NT, T> entry = itr.next();
+                final Map.Entry<NT, WeakReference<T>> entry = itr.next();
 
-                //                    final T ndx = entry.getObject();
+                final T ndx = entry.getValue().get();
+                
+                if(ndx == null) {
+                    
+                    /*
+                     * The entry under the key has been cleared so we just skip
+                     * over this entry. Entries associated with a value whose
+                     * weak reference has been cleared will be automatically
+                     * removed from the map - we don't need to worry about them
+                     * here.
+                     */
+
+                    continue;
+                    
+                }
+                
                 final NT nt = entry.getKey();
 
                 if (name.equals(nt.getName())) {

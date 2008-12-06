@@ -26,9 +26,9 @@ public class MetadataIndexCache extends AbstractIndexCache<IMetadataIndex>{
     private final AbstractScaleOutFederation fed;
 
     public MetadataIndexCache(final AbstractScaleOutFederation fed,
-            final int capacity) {
+            final int capacity, final long timeout) {
         
-        super(capacity);
+        super(capacity, timeout);
 
         if (fed == null)
             throw new IllegalArgumentException();

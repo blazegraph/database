@@ -3391,7 +3391,7 @@ commitPointToPreserve=1228508365953
 
     defer. DefaultResourceLocator's cache.
 
-    defer. AbstractIndexCache. Used by the federation for the recently
+    Done. AbstractIndexCache. Used by the federation for the recently
     accessed indices and their metadata indices. Should be using a
     concurrent weak value cache anyway.
 
