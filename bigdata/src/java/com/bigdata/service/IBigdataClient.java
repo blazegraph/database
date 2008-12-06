@@ -31,6 +31,7 @@ import java.util.Properties;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.proc.IIndexProcedure;
+import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.IIndexStore;
@@ -179,6 +180,14 @@ public interface IBigdataClient {
      * @see Options#CLIENT_INDEX_CACHE_CAPACITY
      */
     public int getIndexCacheCapacity();
+
+    /**
+     * The timeout in milliseconds for stale entries in the client's
+     * {@link IIndex} proxy cache.
+     * 
+     * @see Options#CLIENT_INDEX_CACHE_TIMEOUT
+     */
+    public long getIndexCacheTimeout();
 
     /**
      * <code>true</code> iff performance counters will be collected for the
@@ -341,7 +350,19 @@ public interface IBigdataClient {
          * The default for the {@link #CLIENT_INDEX_CACHE_CAPACITY} option.
          */
         String DEFAULT_CLIENT_INDEX_CACHE_CAPACITY = "20";
-        
+
+        /**
+         * The time in milliseconds before an entry in the clients index cache
+         * will be cleared from the backing {@link HardReferenceQueue} (default
+         * {@value #DEFAULT_INDEX_CACHE_TIMEOUT}). This property controls how
+         * long the client's index cache will retain an {@link IIndex} which has
+         * not been recently used. This is in contrast to the cache capacity.
+         */
+        String CLIENT_INDEX_CACHE_TIMEOUT = IBigdataClient.class.getName()
+                + ".indexCacheTimeout";
+
+        String DEFAULT_CLIENT_INDEX_CACHE_TIMEOUT = ""+(60*1000); // One minute.
+
         /**
          * The maximum extent for a {@link TemporaryStore} before a new
          * {@link TemporaryStore} will be created by

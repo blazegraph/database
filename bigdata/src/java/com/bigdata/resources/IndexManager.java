@@ -425,7 +425,7 @@ abstract public class IndexManager extends StoreManager {
                 log.info(Options.INDEX_CACHE_TIMEOUT + "=" + indexCacheTimeout); 
 
             if (indexCacheTimeout < 0)
-                throw new RuntimeException(Options.INDEX_CACHE_CAPACITY
+                throw new RuntimeException(Options.INDEX_CACHE_TIMEOUT
                         + " must be non-negative");
             
 //            indexCache = new WeakValueCache<NT, IIndex>(
@@ -466,7 +466,7 @@ abstract public class IndexManager extends StoreManager {
                         + indexSegmentCacheTimeout);
 
             if (indexSegmentCacheTimeout < 0)
-                throw new RuntimeException(Options.INDEX_SEGMENT_CACHE_CAPACITY
+                throw new RuntimeException(Options.INDEX_SEGMENT_CACHE_TIMEOUT
                         + " must be non-negative");
 
             indexSegmentCache = new ConcurrentWeakValueCache<UUID, IndexSegment>(

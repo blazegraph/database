@@ -4,6 +4,7 @@ import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.log4j.Logger;
@@ -495,12 +496,23 @@ public class ConcurrentWeakValueCache<K, V> {
 
     /**
      * An iterator that visits the weak reference values in the map. You must
-     * test each weak reference in order to determine whether or its its value
-     * has been cleared as of the moment that you request that value.
+     * test each weak reference in order to determine whether its value has been
+     * cleared as of the moment that you request that value.
      */
     public Iterator<WeakReference<V>> iterator() {
 
         return map.values().iterator();
+        
+    }
+    
+    /**
+     * An iterator that visits the entries in the map. You must test the weak
+     * reference for each entry in order to determine whether its value has been
+     * cleared as of the moment that you request that value.
+     */
+    public Iterator<Map.Entry<K,WeakReference<V>>> entryIterator() {
+
+        return map.entrySet().iterator();
         
     }
     

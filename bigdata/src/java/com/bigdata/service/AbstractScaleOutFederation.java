@@ -76,10 +76,11 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
        
         super(client);
         
-        indexCache = new IndexCache(this, client.getIndexCacheCapacity());
+        indexCache = new IndexCache(this, client.getIndexCacheCapacity(),
+                client.getIndexCacheTimeout());
 
         metadataIndexCache = new MetadataIndexCache(this, client
-                .getIndexCacheCapacity());
+                .getIndexCacheCapacity(), client.getIndexCacheTimeout());
         
         final Properties properties = client.getProperties();
         
