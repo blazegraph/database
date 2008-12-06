@@ -26,6 +26,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.lexicon;
 
+import org.openrdf.model.impl.ValueFactoryImpl;
+
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.compression.IDataSerializer;
@@ -180,7 +182,9 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
                         else
                             suffix = '?';
 
-                        final BigdataValueSerializer valSer = new BigdataValueSerializer(null);
+                        // note: solely for de-serialization of values for error logging.
+                        final BigdataValueSerializer valSer = new BigdataValueSerializer(
+                                new ValueFactoryImpl());
                         log.error("id=" + id + suffix);
                         log.error("val=" + BytesUtil.toString(val));
                         log.error("oldval=" + BytesUtil.toString(oldval));

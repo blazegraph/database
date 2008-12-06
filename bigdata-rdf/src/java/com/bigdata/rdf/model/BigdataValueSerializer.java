@@ -87,7 +87,7 @@ public class BigdataValueSerializer<V extends Value> {
      * @param valueFactory
      *            The value factory.
      */
-    public BigdataValueSerializer(ValueFactory valueFactory) {
+    public BigdataValueSerializer(final ValueFactory valueFactory) {
 
         if (valueFactory == null)
             throw new IllegalArgumentException();
