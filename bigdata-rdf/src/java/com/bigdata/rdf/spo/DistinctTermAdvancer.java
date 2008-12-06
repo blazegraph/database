@@ -73,7 +73,7 @@ public class DistinctTermAdvancer extends Advancer<SPO> {
     }
 
     @Override
-    protected void advance(ITuple<SPO> tuple) {
+    protected void advance(final ITuple<SPO> tuple) {
 
         if (keyBuilder == null) {
 

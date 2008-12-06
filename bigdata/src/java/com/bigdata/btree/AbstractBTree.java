@@ -899,7 +899,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
      * 
      * @throws IllegalArgumentException
      *             if the key is <code>null</code>
-     * @throws RuntimeException
+     * @throws KeyOutOfRangeException
      *             if the key does not lie within the index partition.
      */
     protected boolean rangeCheck(final byte[] key, final boolean allowUpperBound) {
@@ -923,9 +923,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
 
         if (BytesUtil.compareBytes(key, leftSeparatorKey) < 0) {
 
-            throw new RuntimeException("KeyBeforePartition: key="
-                    + BytesUtil.toString(key) + ", pmd=" + pmd
-                    + ", storeFile=" + getStore().getFile());
+            throw new KeyBeforePartitionException(key, allowUpperBound,
+                    pmd, getStore().getFile());
 
         }
 
@@ -940,12 +939,9 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
                     // key less than or equal to the exclusive upper bound.
 
                 } else {
-                    
-                    throw new RuntimeException("KeyAfterPartition: key="
-                            + BytesUtil.toString(key) + ", allowUpperBound="
-                            + allowUpperBound + ", pmd=" + pmd + ", storeFile="
-                            + getStore().getFile());
-                }
+
+                    throw new KeyAfterPartitionException(key, allowUpperBound,
+                            pmd, getStore().getFile());                }
 
             } else {
 
@@ -954,11 +950,10 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
                     // key strictly less than the exclusive upper bound.
                     
                 } else {
-                    
-                    throw new RuntimeException("KeyAfterPartition: key="
-                            + BytesUtil.toString(key) + ", allowUpperBound="
-                            + allowUpperBound + ", pmd=" + pmd + ", storeFile="
-                            + getStore().getFile());
+
+                    throw new KeyAfterPartitionException(key, allowUpperBound,
+                            pmd, getStore().getFile());
+
                 }
                 
             }

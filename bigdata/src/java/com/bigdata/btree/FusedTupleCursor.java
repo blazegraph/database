@@ -428,7 +428,7 @@ public class FusedTupleCursor<E> extends FusedTupleIterator<ITupleCursor<E>, E>
 
     }
     
-    public ITuple<E> seek(byte[] key) {
+    public ITuple<E> seek(final byte[] key) {
         
         // clear last visited.
         lastVisited = -1;
@@ -480,8 +480,9 @@ public class FusedTupleCursor<E> extends FusedTupleIterator<ITupleCursor<E>, E>
                      * request deleted tuples. In this case seek(byte[]) must
                      * return null.
                      */
-                    log.info("Skipping deleted: source=" + current + ", tuple="
-                            + sourceTuple[current]);
+                    if (INFO)
+                        log.info("Skipping deleted: source=" + current
+                                + ", tuple=" + sourceTuple[current]);
 
                     /*
                      * Clear tuples from other sources having the same key as the

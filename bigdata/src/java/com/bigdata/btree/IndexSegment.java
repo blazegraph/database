@@ -978,13 +978,13 @@ public class IndexSegment extends AbstractBTree {
             
         }
         
-        public ImmutableLeafCursor(byte[] key) {
+        public ImmutableLeafCursor(final byte[] key) {
             
             seek(key);
             
         }
 
-        public ImmutableLeaf seek(byte[] key) {
+        public ImmutableLeaf seek(final byte[] key) {
             
             leaf = findLeaf(key);
             
@@ -992,7 +992,7 @@ public class IndexSegment extends AbstractBTree {
             
         }
         
-        public ImmutableLeaf seek(ILeafCursor<ImmutableLeaf> src) {
+        public ImmutableLeaf seek(final ILeafCursor<ImmutableLeaf> src) {
             
             if (src == null)
                 throw new IllegalArgumentException();

@@ -193,7 +193,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         
     }
     
-    protected void setFromKey(byte[] fromKey) {
+    protected void setFromKey(final byte[] fromKey) {
         
         assertNotInitialized();
 
@@ -204,16 +204,18 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
              * the fromKey so that it lies within that index partition.
              */
             
-            fromKey = AbstractKeyRangeIndexProcedure.constrainFromKey(fromKey,
+            this.fromKey = AbstractKeyRangeIndexProcedure.constrainFromKey(fromKey,
                     pmd);
 
-        }
+        } else {
 
-        this.fromKey = fromKey;
+            this.fromKey = fromKey;
+            
+        }
 
     }
     
-    protected void setToKey(byte[] toKey) {
+    protected void setToKey(final byte[] toKey) {
         
         assertNotInitialized();
         
@@ -224,11 +226,13 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
              * the toKey so that it lies within that index partition.
              */
             
-            toKey = AbstractKeyRangeIndexProcedure.constrainFromKey(toKey, pmd);
+            this.toKey = AbstractKeyRangeIndexProcedure.constrainToKey(toKey, pmd);
 
+        } else {
+
+            this.toKey = toKey;
+            
         }
-
-        this.toKey = toKey;
         
     }
     

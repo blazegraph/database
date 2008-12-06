@@ -81,8 +81,13 @@ public interface ITupleCursor<E> extends ITupleIterator<E> {
      *         visitable in the index and <code>null</code> otherwise.
      * 
      * @throws IllegalArgumentException
-     *             if the key lies outside of the optional key-range constraint
-     *             on the cursor or on the index partition.
+     *             if the key is <code>null</code>.
+     * @throws KeyOutOfRangeException
+     *             if the key lies outside of the optional constrain on the
+     *             {@link ITupleCursor}.
+     * @throws KeyOutOfRangeException
+     *             if the key lies outside of the key-range constraint on an
+     *             index partition.
      */
     ITuple<E> seek(byte[] key);
     
