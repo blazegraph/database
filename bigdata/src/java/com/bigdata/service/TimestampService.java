@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
+import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -123,9 +124,19 @@ abstract public class TimestampService extends AbstractService implements
         
         final UUID[] a = fed.getDataServiceUUIDs(0/*maxCount*/);
         
+        // @todo notify services in parallel?
+        // @todo robustness if IOException?
         for(UUID serviceUUID : a) {
             
-            fed.getDataService(serviceUUID).setReleaseTime(releaseTime);
+            try {
+                
+                fed.getDataService(serviceUUID).setReleaseTime(releaseTime);
+                
+            } catch(IOException ex) {
+ 
+                throw new RuntimeException(ex);
+                
+            }
             
         }
         

@@ -54,7 +54,7 @@ public interface IRemoteTxCommitProtocol extends Remote {
      * for the specified release time (basically, this releases any read locks
      * on views for timestamps up to and including the specified release time).
      */
-    public void setReleaseTime(long releaseTime);
+    public void setReleaseTime(long releaseTime) throws IOException;
     
     /**
      * Request commit of the transaction write set.
