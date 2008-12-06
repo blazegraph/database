@@ -35,6 +35,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -57,12 +58,19 @@ import com.bigdata.service.MetadataService;
 import com.bigdata.service.RawDataServiceTupleIterator;
 
 /**
- * Historical read task is used to copy a view of an index partition as of the
- * lastCommitTime of old journal to another {@link IDataService}. After this
- * task has been run you must run an {@link ITx#UNISOLATED}
- * {@link AtomicUpdateMoveIndexPartitionTask} in order to atomically migrate any
- * writes on the live journal to the target {@link IDataService} and update the
- * {@link MetadataIndex}.
+ * Task moves an index partition to another {@link IDataService}.
+ * <p>
+ * This task runs as a historical read operation and copy the view of the index
+ * partition as of the lastCommitTime of old journal to another
+ * {@link IDataService}. Once that historical view has been copied, this task
+ * then submits an {@link AtomicUpdateMoveIndexPartitionTask}. The atomic
+ * update is an {@link ITx#UNISOLATED} operation. It is responsible copying any
+ * writes buffered for the index partition on the live journal to the target
+ * {@link IDataService} and then updating the {@link MetadataIndex}. Once the
+ * atomic update task is finished, clients will discover that the source index
+ * partition does not exist. When they query the {@link MetadataService} they
+ * will discover that the key(-range) is now handled by the new index partition
+ * on the target {@link IDataService}.
  * <p>
  * Note: This task is run on the target {@link IDataService} and it copies the
  * data from the source {@link IDataService}. This allows us to use standard
@@ -71,12 +79,12 @@ import com.bigdata.service.RawDataServiceTupleIterator;
  * {@link IDataService} since it needs to obtain an exclusive lock on the index
  * partition that is being moved in order to prevent concurrent writes during
  * the atomic cutover. For the same reason, the
- * {@link AtomicUpdateMoveIndexPartitionTask} can not use standard {@link IRangeQuery}
- * operations. Instead, it initiates a series of data transfers while holding
- * onto the exclusive lock until the target {@link IDataService} has the current
- * state of the index partition. At that point is notifies the
- * {@link IMetadataService} to perform the atomic cutover to the new index
- * partition.
+ * {@link AtomicUpdateMoveIndexPartitionTask} can not use standard
+ * {@link IRangeQuery} operations. Instead, it initiates a series of data
+ * transfers while holding onto the exclusive lock until the target
+ * {@link IDataService} has the current state of the index partition. At that
+ * point it notifies the {@link IMetadataService} to perform the atomic cutover
+ * to the new index partition.
  * <p>
  * Note: This task does NOT cause any resources associated with the current view
  * of the index partition to be released on the source {@link IDataService}.
@@ -91,7 +99,15 @@ import com.bigdata.service.RawDataServiceTupleIterator;
  */
 public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResult> {
     
+    /**
+     * Last commit time on the old journal.
+     */
     private final long lastCommitTime;
+
+    /**
+     * {@link UUID} of the target {@link IDataService} (the one to which the index
+     * partition will be moved).
+     */
     private final UUID targetDataServiceUUID;
 
     /**
@@ -103,9 +119,12 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
      * @param targetDataServiceUUID
      *            The UUID for the target data service.
      */
-    public MoveIndexPartitionTask(ResourceManager resourceManager,
-            long lastCommitTime,
-            String resource, UUID targetDataServiceUUID) {
+    public MoveIndexPartitionTask(//
+            final ResourceManager resourceManager,//
+            final long lastCommitTime,//
+            final String resource, //
+            final UUID targetDataServiceUUID//
+            ) {
 
         super(resourceManager, TimestampUtility
                 .asHistoricalRead(lastCommitTime), resource);
@@ -126,8 +145,9 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
     }
 
     /**
-     * FIXME Improve error handling for this task. See the build and split tasks
-     * for examples.
+     * Copies the historical writes to the target data service and then issues
+     * the atomic update task to copy any buffered writes on the live journal
+     * and update the {@link MetadataService}.
      */
     @Override
     protected MoveResult doTask() throws Exception {
@@ -136,7 +156,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
             throw new IllegalStateException();
 
         // view of the source index partition.
-        final IIndex src = getIndex(getOnlyResource());
+        final ILocalBTreeView src = (ILocalBTreeView)getIndex(getOnlyResource());
         
         // clone metadata.
         final IndexMetadata newMetadata = src.getIndexMetadata().clone();
@@ -157,23 +177,51 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
                 oldpmd.getRightSeparatorKey(),//
                 /*
                  * Note: This is [null] to indicate that the resource metadata
-                 * needs to be filled in by the target data service when the
-                 * new index partition is registered.
+                 * needs to be filled in by the target data service when the new
+                 * index partition is registered. It will be populated with the
+                 * resource metadata description for the live journal on that
+                 * data service.
                  */
                 null,
                 oldpmd.getHistory()+
                 "move("+oldpmd.getPartitionId()+"->"+newPartitionId+") "
                 ));
 
+        // logging information.
+        {
+            
+            // #of sources in the view (very fast).
+            final int sourceCount = src.getSourceCount();
+            
+            // range count for the view (fast).
+            final long rangeCount = src.rangeCount();
+
+            // BTree's directly maintained entry count (very fast).
+            final int entryCount = src.getMutableBTree().getEntryCount(); 
+            
+            final String details = ", entryCount=" + entryCount
+                    + ", rangeCount=" + rangeCount + ", sourceCount="
+                    + sourceCount;
+
+            log.warn("name=" + getOnlyResource() + ": move("
+                    + oldpmd.getPartitionId() + "->" + newPartitionId + ")"
+                    + details);
+            
+        }
         
         // the data service on which we will register the new index partition.
         final IDataService targetDataService = resourceManager
                 .getFederation().getDataService(targetDataServiceUUID);
 
+        // the name of the index partition on this data service.
         final String sourceIndexName = getOnlyResource();
 
-        final UUID[] sourceDataServiceUUIDs = resourceManager.getDataServiceUUIDs();
-        
+        /*
+         * The name of the index partition on the target data service.
+         * 
+         * Note: The index partition is assigned a new partition identifier when
+         * it is moved. Hence it is really a new index partition.
+         */
         final String targetIndexName = DataService.getIndexPartitionName(
                 scaleOutIndexName, newPartitionId);
        
@@ -185,6 +233,10 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
          * and RegisterIndexTask.
          */
         targetDataService.registerIndex(targetIndexName, newMetadata);
+        if (INFO)
+            log
+                    .info("Registered new index partition on target data service: targetIndexName="
+                            + targetIndexName);
 
         /*
          * Run procedure on the target data service that will copy data from the
@@ -192,9 +244,11 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
          * (on the target data service) as of the [lastCommitTime] of the old
          * journal.
          */
-        targetDataService.submit(ITx.UNISOLATED, targetIndexName,
-                new CopyIndexPartitionProcedure(sourceDataServiceUUIDs,
-                        sourceIndexName, lastCommitTime));
+        targetDataService
+                .submit(ITx.UNISOLATED, targetIndexName,
+                        new CopyIndexPartitionProcedure(resourceManager
+                                .getDataServiceUUID(), sourceIndexName,
+                                lastCommitTime));
         
         /*
          * At this point the historical view as of the [lastCommitTime] has been
@@ -205,23 +259,74 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
          * state of the index partition and then atomically switch over to the
          * new index partition.
          */
-        
-        final MoveResult result = new MoveResult(sourceIndexName, src
-                .getIndexMetadata(), targetDataServiceUUID, newPartitionId);
-        
-        final AbstractTask<Long> task = new AtomicUpdateMoveIndexPartitionTask(
-                resourceManager, result.name, result);
 
-        // submit atomic update and await completion @todo config timeout.
+        final LocalPartitionMetadata pmd = src.getIndexMetadata()
+                .getPartitionMetadata();
+
+        final PartitionLocator oldLocator = new PartitionLocator(//
+                pmd.getPartitionId(),//
+                resourceManager.getDataServiceUUID(),//
+                pmd.getLeftSeparatorKey(),//
+                pmd.getRightSeparatorKey()//
+        );
+
+        final PartitionLocator newLocator = new PartitionLocator(
+                newPartitionId,//
+                targetDataServiceUUID,//
+                pmd.getLeftSeparatorKey(),//
+                pmd.getRightSeparatorKey()//
+        );
+
+        final MoveResult moveResult = new MoveResult(sourceIndexName, src
+                .getIndexMetadata(), targetDataServiceUUID, newPartitionId,
+                oldLocator, newLocator);
+
+        final AbstractTask<Long> task = new AtomicUpdateMoveIndexPartitionTask(
+                resourceManager, moveResult.name, moveResult);
+
+        /*
+         * Submit atomic update task and await completion
+         * 
+         * @todo config timeout.
+         * 
+         * @todo If this task (the caller) is interrupted while the atomic
+         * update task is running then the atomic update task will not notice
+         * the interrupt since it runs in a different thread. This is true for
+         * all of the atomic update tasks when we chain them from the task that
+         * prepares for the update. This is mainly an issue for responsivness to
+         * the timeout since this task can not notice its interrupt (and
+         * therefore the post-processing will not terminate) until its atomic
+         * update task completes.
+         * 
+         * @todo If this task fails then we need to examine the metadata service
+         * and restore the oldLocator for the partition if it had been updated
+         * before the task failed. This correcting action is required for a
+         * failed move to have no (long-term) side-effects.
+         */
+
         concurrencyManager.submit(task).get();
         
-        return result;
+        log.warn("Successfully moved index partition: source="
+                + sourceIndexName + ", target=" + targetIndexName);
+        
+        return moveResult;
         
     }
 
     /**
      * Procedure copies data from the old index partition to the new index
-     * partition.
+     * partition. This runs as an {@link ITx#UNISOLATED} operations on the
+     * target {@link IDataService}. It is {@link ITx#UNISOLATED} because it
+     * must write on the new index partition.
+     * <p>
+     * Note: This procedure only copies the view as of the lastCommitTime. It
+     * does NOT copy deleted tuples since the historical views for the source
+     * index partition will remain on the source data service. In this sense,
+     * this operation is much like a compacting merge.
+     * <p>
+     * Note: This is an {@link IDataServiceAwareProcedure} so it can resolve the
+     * {@link UUID} of the source {@link IDataService} and issue requests to
+     * that source {@link IDataService}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -234,13 +339,13 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
          */
         private static final long serialVersionUID = 8024224972159862036L;
 
-        private UUID[] sourceDataServiceUUIDs;
-        private String sourceIndexName;
-        private long lastCommitTime;
+        private final UUID sourceDataServiceUUID;
+        private final String sourceIndexName;
+        private final long lastCommitTime;
 
         private transient DataService dataService;
         
-        public void setDataService(DataService dataService) {
+        public void setDataService(final DataService dataService) {
 
             if (dataService == null)
                 throw new IllegalArgumentException();
@@ -273,12 +378,12 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
             
         }
         
-        /**
-         * De-serialization ctor.
-         */
-        public CopyIndexPartitionProcedure() {
-            
-        }
+//        /**
+//         * De-serialization ctor.
+//         */
+//        public CopyIndexPartitionProcedure() {
+//            
+//        }
         
         /**
          * @param sourceDataServiceUUIDs
@@ -286,38 +391,16 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
          * @param lastCommitTime
          * 
          */
-        public CopyIndexPartitionProcedure(UUID[] sourceDataServiceUUIDs,
-                String sourceIndexName, long lastCommitTime) {
+        public CopyIndexPartitionProcedure(final UUID sourceDataServiceUUID,
+                final String sourceIndexName, final long lastCommitTime) {
 
-            if (sourceDataServiceUUIDs == null) {
-
+            if (sourceDataServiceUUID == null)
                 throw new IllegalArgumentException();
-
-            }
-
-            if (sourceDataServiceUUIDs.length == 0) {
-
-                throw new IllegalArgumentException();
-
-            }
-
-            for(int i=0; i<sourceDataServiceUUIDs.length; i++) {
-                
-                if(sourceDataServiceUUIDs[i]==null) {
-                    
-                    throw new IllegalArgumentException();
-                    
-                }
-                
-            }
             
-            if (sourceIndexName == null) {
-
+            if (sourceIndexName == null)
                 throw new IllegalArgumentException();
-                
-            }
             
-            this.sourceDataServiceUUIDs = sourceDataServiceUUIDs;
+            this.sourceDataServiceUUID = sourceDataServiceUUID;
             
             this.sourceIndexName = sourceIndexName; 
             
@@ -347,7 +430,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
             final IBigdataFederation fed = getDataService().getFederation();
             final IMetadataService metadataService = fed.getMetadataService();
             assert metadataService != null;
-            final IDataService sourceDataService = fed.getDataService(sourceDataServiceUUIDs[0]);
+            final IDataService sourceDataService = fed.getDataService(sourceDataServiceUUID);
             assert sourceDataService != null;
             
             // iterator reading from the (remote) source index partition.
@@ -359,7 +442,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
                     null, // fromKey
                     null, // toKey
                     0,    // capacity
-                    IRangeQuery.KEYS | IRangeQuery.VALS,//
+                    IRangeQuery.KEYS | IRangeQuery.VALS,// Note: deleted entries NOT copied!
                     null  // filter
                     );
 
@@ -381,7 +464,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
                    
                    dst.insert(key, val, false/* delete */, timestamp, null/* tuple */);
 
-                } else {
+               } else {
 
                     dst.insert(key, val);
                    
@@ -402,43 +485,46 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
     }
 
     /**
-     * Unisolated task is executed on the source data service once the historical
-     * state of an index partitions as of the lastCommitTime of the old journal has
-     * been copied to the target data service. The target index partition identified
-     * by the {@link MoveResult} MUST already exist and MUST have been populated
-     * with the state of the source index partition view as of the lastCommitTime of
-     * the old journal. The task copies any writes that have been buffered for the
-     * index partition on the source data service to the target data service and
-     * then does an atomic update of the {@link MetadataIndex} while it is holding
-     * an exclusive lock on the source index partition.
+     * Unisolated task is executed on the source data service once the
+     * historical state of an index partitions as of the lastCommitTime of the
+     * old journal has been copied to the target data service. The target index
+     * partition identified by the {@link MoveResult} MUST already exist and
+     * MUST have been populated with the state of the source index partition
+     * view as of the lastCommitTime of the old journal. The task copies any
+     * writes that have been buffered for the index partition on the source data
+     * service to the target data service and then does an atomic update of the
+     * {@link MetadataService} while it is holding an exclusive lock on the
+     * source index partition.
      * <p>
-     * Tasks executing after this one will discover that the source index partition
-     * no longer exists as of the timestamp when this task commits. Clients that
-     * submit tasks for the source index partition will be notified that it no
-     * longer exists. When the client queries the {@link MetadataService} it will
-     * discover that the key range has been assigned to a new index partition - the
-     * one on the target data service.
+     * Tasks executing after this one will discover that the source index
+     * partition no longer exists as of the timestamp when this task commits.
+     * Clients that submit tasks for the source index partition will be notified
+     * that it no longer exists. When the client queries the
+     * {@link MetadataService} it will discover that the key range has been
+     * assigned to a new index partition - the one on the target data service.
      * <p>
      * Note: This task runs as {@link ITx#UNISOLATED} since it MUST have an
-     * exclusive lock in order to ensure that the buffered writes are transferred to
-     * the target index partition without allowing concurrent writes on the source
-     * index partition. This means that the target index partition WILL NOT be able
-     * to issue read-requests against the live view of source index partition since
-     * this task already holds the necessary lock. Therefore this task instead sends
-     * zero or more {@link ResultSet}s containing the buffered writes to the target
-     * index partition.
+     * exclusive lock in order to ensure that the buffered writes are
+     * transferred to the target index partition without allowing concurrent
+     * writes on the source index partition. This means that the target index
+     * partition WILL NOT be able to issue read-requests against the live view
+     * of source index partition since this task already holds the necessary
+     * lock. Therefore this task instead sends zero or more {@link ResultSet}s
+     * containing the buffered writes to the target index partition.
      * <p>
-     * Note: The {@link ResultSet} data structure is used since it carries "delete
-     * markers" and version timestamps as well as the keys and values. The delete
-     * markers MUST be transferred in case the buffered writes include deletes of
-     * index entries as of the lastCommitTime on the old journal. If the index
-     * supports transactions then the version timestamps MUST be preserved since
-     * they are the basis for validation of transaction write sets.
+     * Note: The {@link ResultSet} data structure is used since it carries
+     * "delete markers" and version timestamps as well as the keys and values.
+     * The delete markers MUST be transferred in case the buffered writes
+     * include deletes of index entries as of the lastCommitTime on the old
+     * journal. If the index supports transactions then the version timestamps
+     * MUST be preserved since they are the basis for validation of transaction
+     * write sets.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static public class AtomicUpdateMoveIndexPartitionTask extends AbstractResourceManagerTask<Long> {
+    static public class AtomicUpdateMoveIndexPartitionTask extends
+            AbstractResourceManagerTask<Long> {
 
         final private MoveResult moveResult;
 
@@ -449,8 +535,11 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
          * @param moveResult
          *            The target index partition.
          */
-        public AtomicUpdateMoveIndexPartitionTask(ResourceManager resourceManager,
-                String resource, MoveResult moveResult) {
+        public AtomicUpdateMoveIndexPartitionTask(
+                final ResourceManager resourceManager, //
+                final String resource,//
+                final MoveResult moveResult //
+                ) {
 
             super(resourceManager, ITx.UNISOLATED, resource);
 
@@ -473,8 +562,6 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
             final IDataService targetDataService = resourceManager
                     .getFederation().getDataService(moveResult.targetDataServiceUUID);
             
-            final int capacity = 10000;
-            
             final IIndex src = getIndex(getOnlyResource());
 
             final String scaleOutIndexName = src.getIndexMetadata().getName();
@@ -482,11 +569,16 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
             final String targetIndexName = DataService.getIndexPartitionName(
                     scaleOutIndexName, moveResult.newPartitionId);
 
+            log.warn("Copying buffered writes: targeIndexName="
+                    + targetIndexName + ", oldLocator=" + moveResult.oldLocator
+                    + ", newLocator=" + moveResult.newLocator);
+
             int nchunks = 0; // #of passes.
             long ncopied = 0; // #of tuples copied.
             byte[] fromKey = null; // updated after each pass.
             final byte[] toKey = null; // upper bound is fixed.
             final int flags = IRangeQuery.ALL;
+            final int capacity = 10000; // chunk size.
             
             while (true) {
                 
@@ -502,11 +594,14 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
 
                 final int limit = (rangeCount > capacity ? capacity : rangeCount);
 
-                // iterator reading from the unisolated view.
+                /*
+                 * Iterator reading from the unisolated view of the source index
+                 * partition.
+                 */
                 final ITupleIterator itr = src.rangeIterator(fromKey, toKey, limit,
                         flags, null/*filter*/);
                 
-                // Build result set from the iterator.
+                // Build a result set from the iterator.
                 final ResultSet rset = new ResultSet(src, capacity, flags, itr);
 
                 /*
@@ -535,38 +630,35 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
 
                 /*
                  * Update to the next key to be copied.
+                 * 
+                 * @todo there may be a fence post here if the index uses a
+                 * fixed length successor semantics for the key. It might be
+                 * safer to use [fromKey = rset.getLastKey()]. This would have
+                 * the effect the last tuple in each result set being copied
+                 * again as the first tuple in the next result set, but that is
+                 * of little consequence.
                  */
                 fromKey = BytesUtil.successor(rset.getLastKey());
                 
             }
 
-            // drop the old index partition.
+            /*
+             * Drop the old index partition. This action will be rolled back
+             * automatically if this task fails so the source index partition
+             * will remain available if the move fails.
+             */
             getJournal().dropIndex(getOnlyResource());
             
-            final LocalPartitionMetadata pmd = src.getIndexMetadata()
-                    .getPartitionMetadata();
-            
-            final PartitionLocator oldLocator = new PartitionLocator(
-                    pmd.getPartitionId(),//
-                    resourceManager.getDataServiceUUID(),//
-                    pmd.getLeftSeparatorKey(),//
-                    pmd.getRightSeparatorKey()//
-                    );
-            
-            final PartitionLocator newLocator = new PartitionLocator(
-                    moveResult.newPartitionId,//
-                    moveResult.targetDataServiceUUID,//
-                    pmd.getLeftSeparatorKey(),//
-                    pmd.getRightSeparatorKey()//
-                    );
-            
-            if(INFO)
-                log.info("Updating metadata index: name=" + scaleOutIndexName
-                    + ", oldLocator=" + oldLocator + ", newLocator=" + newLocator);
+//            if (INFO)
+//                log.info
+            log.warn("Updating metadata index: name=" + scaleOutIndexName
+                        + ", oldLocator=" + moveResult.oldLocator
+                        + ", newLocator=" + moveResult.newLocator);
 
             // atomic update on the metadata server.
-            resourceManager.getFederation().getMetadataService().moveIndexPartition(
-                    scaleOutIndexName, oldLocator, newLocator);
+            resourceManager.getFederation().getMetadataService()
+                    .moveIndexPartition(scaleOutIndexName,
+                            moveResult.oldLocator, moveResult.newLocator);
             
             // will notify tasks that index partition has moved.
             resourceManager.setIndexPartitionGone(getOnlyResource(),
@@ -575,6 +667,16 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
             // notify successful index partition move.
             resourceManager.moveCounter.incrementAndGet();
 
+            /*
+             * Note: The new index partition will not be usable until (and
+             * unless) this task commits.
+             * 
+             * @todo Since the metadata service has already been successfully
+             * updated we need to rollback the change on the metadata service if
+             * the commit fails for this task.  That really needs to be done by
+             * the caller
+             */
+            
             return ncopied;
             
         }
@@ -600,16 +702,16 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
          */
         private static final long serialVersionUID = -7715086561289117891L;
 
-        private ResultSet rset;
+        private final ResultSet rset;
         
-        /**
-         * De-serialization ctor.
-         */
-        public CopyBufferedWritesProcedure() {
-            
-        }
+//        /**
+//         * De-serialization ctor.
+//         */
+//        public CopyBufferedWritesProcedure() {
+//            
+//        }
 
-        public CopyBufferedWritesProcedure(ResultSet rset) {
+        public CopyBufferedWritesProcedure(final ResultSet rset) {
         
             if (rset == null)
                 throw new IllegalArgumentException();
@@ -624,7 +726,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
             
         }
         
-        public Object apply(IIndex ndx) {
+        public Object apply(final IIndex ndx) {
             
             assert rset != null;
          
@@ -672,7 +774,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
 
             }
             
-            for(int i=0; i<n; i++) {
+            for (int i = 0; i < n; i++) {
                 
                 final byte[] key = rset.getKey(i);
                 

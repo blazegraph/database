@@ -550,9 +550,6 @@ abstract public class MetadataService extends DataService implements
                 /*
                  * Sanity check failed - old locator not equal to the locator
                  * found under that key in the metadata index.
-                 * 
-                 * @todo differences in just the data service failover chain
-                 * are probably not important and might be ignored.
                  */
 
                 throw new RuntimeException("Expected different locator: name="
