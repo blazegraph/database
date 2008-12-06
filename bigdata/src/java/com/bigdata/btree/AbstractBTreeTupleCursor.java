@@ -56,7 +56,12 @@ import com.bigdata.mdi.LocalPartitionMetadata;
 abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extends Leaf, E>
         implements ITupleCursor2<E> {
 
-    protected static final Logger log = Logger.getLogger(AbstractBTreeTupleCursor.class);
+    protected static final Logger log = Logger
+            .getLogger(AbstractBTreeTupleCursor.class);
+
+    protected static final boolean INFO = log.isInfoEnabled();
+
+    protected static final boolean DEBUG = log.isDebugEnabled();
     
     /*
      * Some frequently used log messages.
@@ -260,7 +265,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 
             if (BytesUtil.compareBytes(key, fromKey) < 0) {
 
-                if (log.isDebugEnabled()) {
+                if (DEBUG) {
 
                     log.debug("key=" + BytesUtil.toString(key) + " LT fromKey"
                             + BytesUtil.toString(fromKey));
@@ -278,7 +283,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 
             if (BytesUtil.compareBytes(key, toKey) >= 0) {
 
-                if (log.isDebugEnabled()) {
+                if (DEBUG) {
 
                     log.debug("key=" + BytesUtil.toString(key) + " GTE toKey"
                             + BytesUtil.toString(toKey));
@@ -451,16 +456,23 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
      *            in the leaf).
      * 
      * @return The new {@link ICursorPosition}.
+     * 
+     * @throws IllegalArgumentException
+     *             if the key is <code>null</code>.
+     * @throws KeyOutOfRangeException
+     *             if the key lies outside of the optional constrain on the
+     *             {@link ITupleCursor}.
      */
     @SuppressWarnings("unchecked")
-    final protected AbstractCursorPosition<L,E> newPosition(byte[] key) {
+    final protected AbstractCursorPosition<L,E> newPosition(final byte[] key) {
         
         if (key == null)
             throw new IllegalArgumentException();
 
         if (!rangeCheck(key))
-            throw new IllegalArgumentException(
-                    "key lies outside of the legal range");
+            throw new KeyOutOfRangeException("key=" + BytesUtil.toString(key)
+                    + ", fromKey=" + BytesUtil.toString(fromKey) + ", toKey="
+                    + BytesUtil.toString(toKey));
 
         final ILeafCursor<L> leafCursor = btree.newLeafCursor(key);
 
@@ -572,7 +584,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         
         if(!isCursorPositionDefined()) {
 
-            if (log.isDebugEnabled())
+            if (DEBUG)
                 log.debug(LOG_NO_CURSOR_POSITION);
 
             // the cursor position is not defined.
@@ -588,7 +600,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         
         if(!isCursorPositionDefined()) {
          
-            if (log.isDebugEnabled())
+            if (DEBUG)
                 log.debug(LOG_NO_CURSOR_POSITION);
             
             // the cursor position is not defined.
@@ -619,7 +631,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
             // discard the current position since we have scanned beyond the end of the index / key range.
             currentPosition = null;
             
-            if (log.isDebugEnabled())
+            if (DEBUG)
                 log.debug(LOG_NO_CURSOR_POSITION);
 
             // Nothing visitable.
@@ -646,7 +658,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
             // discard the current position since we have scanned beyond the start of the index / key range.
             currentPosition = null;
             
-            if (log.isDebugEnabled())
+            if (DEBUG)
                 log.debug(LOG_NO_CURSOR_POSITION);
 
             // Nothing visitable.
@@ -669,12 +681,12 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         
     }
     
-    public ITuple<E> seek(byte[] key) {
+    public ITuple<E> seek(final byte[] key) {
 
         if (key == null)
             throw new IllegalArgumentException();
 
-        if (log.isDebugEnabled())
+        if (DEBUG)
             log.debug("key="+BytesUtil.toString(key));
         
 //        // clear references since no longer valid.
@@ -708,7 +720,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 //        if (!pos.forwardScan(skipCurrent)) {
 //
 //            // no visitable predecessor.
-//            if (log.isDebugEnabled())
+//            if (DEBUG)
 //                log.debug(LOG_NO_PREDECESSOR);
 //
 //            return null;
@@ -739,7 +751,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 //        if (!pos.reverseScan(skipCurrent)) {
 //
 //            // no visitable predecessor.
-//            if (log.isDebugEnabled())
+//            if (DEBUG)
 //                log.debug(LOG_NO_PREDECESSOR);
 //
 //            return null;
@@ -761,7 +773,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
             
             // Cursor position is not defined.
             
-            if(log.isDebugEnabled())
+            if(DEBUG)
                 log.debug(LOG_NO_CURSOR_POSITION);
             
             return null;
@@ -773,7 +785,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 //            // no visitable successor.
 //            currentPosition = null;
             
-            if (log.isDebugEnabled())
+            if (DEBUG)
                 log.debug(LOG_NO_SUCCESSOR);
 
             return null;
@@ -870,7 +882,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         
         if (!pos.forwardScan(skipCurrent,true/*testOnly*/)) {
 
-            if (log.isDebugEnabled())
+            if (DEBUG)
                 log.debug(LOG_NO_SUCCESSOR);
 
             // nothing visitable.
@@ -878,7 +890,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 
         }
 
-        if (log.isDebugEnabled())
+        if (DEBUG)
             log.debug(pos.toString());
 
         // found something visitable.
@@ -897,7 +909,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
             
             // Cursor position is not defined.
             
-            if(log.isDebugEnabled())
+            if(DEBUG)
                 log.debug(LOG_NO_CURSOR_POSITION);
 
             return null;
@@ -906,7 +918,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         
         if(!currentPosition.reverseScan(true/*skipCurrent*/,false/*testOnly*/)) {
             
-            if (log.isDebugEnabled())
+            if (DEBUG)
                 log.debug(LOG_NO_PREDECESSOR);
 
             return null;
@@ -1003,7 +1015,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 
         if (!pos.reverseScan(skipCurrent,true/*testOnly*/)) {
 
-            if (log.isDebugEnabled())
+            if (DEBUG)
                 log.debug(LOG_NO_PREDECESSOR);
 
             // nothing visitable.
@@ -1011,7 +1023,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 
         }
 
-        if (log.isDebugEnabled())
+        if (DEBUG)
             log.debug(pos.toString());
         
         // found something visitable.
@@ -1051,7 +1063,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         // the key for the last visited tuple.
         final byte[] key = currentKey();
         
-        if (log.isDebugEnabled())
+        if (DEBUG)
             log.debug("key="+BytesUtil.toString(key));
         
         /*
@@ -1431,7 +1443,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
             
             if(!isVisitableTuple()) {
                 
-                if (log.isDebugEnabled())
+                if (DEBUG)
                     log.debug(LOG_CURSOR_POSITION_NOT_VISITABLE);
 
                 return null;
@@ -1440,7 +1452,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
             
             tuple.copy(index, leafCursor.leaf()); // Note: increments [tuple.nvisited] !!!
 
-            if(log.isDebugEnabled()) {
+            if(DEBUG) {
                 
                 log.debug(tuple.toString());
                 
@@ -1579,7 +1591,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 //                if (BytesUtil.compareBytesWithLenAndOffset(0, tlen, a, 0,
 //                        fromKey.length, fromKey) < 0) {
 
-//                    if (log.isDebugEnabled()) {
+//                    if (DEBUG) {
 //
 //                        log.debug("key=" + BytesUtil.toString(key) + " LT fromKey"
 //                                + BytesUtil.toString(fromKey));
@@ -1599,7 +1611,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 //                if (BytesUtil.compareBytesWithLenAndOffset(0, tlen, a, 0,
 //                        toKey.length, toKey) >= 0) {
 
-//                    if (log.isDebugEnabled()) {
+//                    if (DEBUG) {
 //
 //                        log.debug("key=" + BytesUtil.toString(key) + " GTE toKey"
 //                                + BytesUtil.toString(toKey));
@@ -1763,7 +1775,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 
             }
             
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info(LOG_NO_SUCCESSOR);
             
             // no visitable tuple.
@@ -1883,7 +1895,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 
             }
             
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info(LOG_NO_PREDECESSOR);
             
             // no visitable tuple.
@@ -2039,7 +2051,8 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
             // the key corresponding to the cursor position.
             final byte[] key = getKey();
 
-            if(log.isInfoEnabled()) log.info("Relocating leaf: key="+BytesUtil.toString(key));
+            if (INFO)
+                log.info("Relocating leaf: key=" + BytesUtil.toString(key));
             
             /*
              * Re-locate the leaf and re-egister the cursor position as a

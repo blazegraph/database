@@ -3120,16 +3120,14 @@ Commit notes:
     If the locator is kept as state then we have the left- and
     right-separators can we can easily test to see if an output
     binding set would lie within the same index partition.
-
-  * Done. Enable OVERFLOW and MOVES for EDS (in the code by having
-    more than one data service) and JDS (in the client.config file)
-    and re-run LUBM.  Do we get the right answers?
   
 - Cluster tools and service starter.
 
   - Need ability to start services on machines automatically and to
     initiate a distributed operation such as a data load since
     otherwise we can't readily operate on larger clusters.
+
+  - Global resource locks and barriers using zookeeper.
 
   - Need ability to execute a command on all machines in a cluster.
 
@@ -3248,20 +3246,35 @@ commitPointToPreserve=1228508365953
       and allow them to be released when not required by either a read
       lock (releaseTime) or by minReleaseAge.
 
+    - Following a load and several aborted passes at closure on U50 I
+      have a number of index segments for the statement indices that
+      are not being purged.  This may reflect a failure during restart
+      to examine the index segments and verify whether they belong to
+      any view that we wish to preserve.  Note that index segments are
+      created before they are incorporated into a view, so this could
+      be the result of several builds.
 
-    Note: As a work around, see if I can simply set the timeout to 0L
-    to disable time-based closure of stores and indices.  If that
-    works then I can make that the default until I debug this issue.
+    - On restart,make sure that the [releaseTime] and
+      [lastOverflowTime] are either set or are *safe* such that a
+      purge (either explicitly requested or requested following the
+      next overflow event) does not cause resources to be removed that
+      should have been preserved.  One approach is to make the
+      [releaseTime] a restart safe property and to restore the
+      lastOverflowTime from the lastCommitTime of the next-to-last
+      journal on restart.  Another is to refuse a purge until we have
+      been notified by the transaction manager of the desired
+      releaseTime since readLocks may have changed while the data
+      service was done.
 
-    I could even rollback these changes... but maybe no need?
+    - Write a unit test for purge before, during and after the 1st
+      overflow and after a restart.  Before, there should be nothing
+      to release.  During, the views that are being constructed should
+      remain safe.  After, we should be able to achieve a compact
+      footprint for the data service.
 
-  - Manage the resources better, e.g., buffering fewer nodes, as the
-    #of hosted indices increases for a data service.  This could be
-    done either statically or dynamically, which should provide much
-    better performance.
-
-    Performance appears to drop to a crawl once the data service is
-    near the JVM memory limits.
+      After restart, the release time needs to be set before we allow
+      a purge and the lastOverflowTime needs to be set from the
+      lastCommitTime of the next-to-last journal.
 
   - Choose the index partitions to compact based on the #of sources
     (and possibly the rangeCount) NOT just the order in which they are
@@ -3273,20 +3286,6 @@ commitPointToPreserve=1228508365953
     query correctness.  Only U100 and U1000 need to be run on the
     cluster as we can get U10 easily on a laptop.
 
-  - Verify that MIN_RELEASE_AGE is zero.
-
-  - Verify that OVERFLOW_ENABLED is true.
-
-  - Compact serialization for ISolution[] and IBindingSet[] to reduce
-    JDS IO costs. Everything is in place for this, but the custom
-    serializers still need to be written and tuned.
-
-  - Run JDS query under the performance analyzer and look for
-    interesting things.
-
-  - Why can't I blast the binary image of an index segment through a
-    socket for a MOVE?
-
   * Verify overflow w/ MOVE enabled fix the TERM2ID hotspot.
 
     Note: Splitting the TERM2ID index is not enough to get rid of the
@@ -3296,11 +3295,62 @@ commitPointToPreserve=1228508365953
     the IOWAIT bottleneck until we MOVE some of the term2id index
     partitions onto a different machine.
 
+  * It appears that new writes always for the RDF load always go into
+    the most recently created index partition, which then gets split.
+    I have seen this for at least the OSP and SPO index on U50.  The
+    POS index does not have this behavior.
+
+    It's pretty clear that this is an artifact of how term identifiers
+    are assigned.  During data load we get new subjects and new
+    objects, but we tend to get all of the predicates up front.  This
+    means that the subject identifiers and the object identifiers for
+    new statements tend to be larger than the previously encountered
+    values, hence they go into the last index partition for SPO and
+    OSP.
+
+    I would think that there will still be writes on the other index
+    partitions for those indices as you might either encounter other
+    statements about the same subject or other statements about the
+    same object, but that depends on the grouping of the data that is
+    being loaded.
+
+    This might also be an LUBM artifact.  I need to examine the
+    TERM2ID index more carefully.  If all the writes there are going
+    into the last index partition then that would explain why the term
+    identifiers are monotonically increasing since each index
+    partition has its own "space" for term identifiers which would
+    otherwise lead to writes in more than just the last index
+    partition of the SPO and OSP indices.
+
   - Tuning:
+
+    - Compact serialization for ISolution[] and IBindingSet[] to
+      reduce JDS IO costs. Everything is in place for this, but the
+      custom serializers still need to be written and tuned.
+
+    - Run JDS query under the performance analyzer and look for
+      interesting things.
+
+    - Why can't I blast the binary image of an index segment through a
+      socket for a MOVE?
 
     - Examine memory demands when overflow is enabled and choices for
       the storeCache, indexCache, and indexSegmentCache capacity and
       timeout values.
+
+    - Either lower or dynamically set the capacity of the read
+      retention queue for indices.  This is very important for
+      scale-out as the RAM demands otherwise grow far too fast.
+      However, we do want a large read retention queue both for
+      scale-up and early on for a data service when the #of active
+      indices is small since that will give better performance.
+
+      The total RAM for buffered nodes needs to be linked to the
+      maximum memory for the JVM and the real memory for the machine
+      before the JVM would being to swap.  If we assume that the admin
+      does not set the maximum JVM memory too high, then we can use it
+      as a proxy for both.  When we approach the maximum available RAM
+      we need to back down on the read retention queues.
 
     - Try lowering the fullyBufferedReadThreshold to the
       chunkCapacity.  How is that for query (not much of an effect)?
@@ -3338,3 +3388,5 @@ commitPointToPreserve=1228508365953
     defer. AbstractIndexCache. Used by the federation for the recently
     accessed indices and their metadata indices. Should be using a
     concurrent weak value cache anyway.
+
+------------------------------------------------------------

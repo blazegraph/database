@@ -937,7 +937,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * 
      * @return An iterator visiting the distinct term identifiers.
      */
-    public IChunkedIterator<Long> distinctTermScan(IKeyOrder<ISPO> keyOrder) {
+    public IChunkedIterator<Long> distinctTermScan(final IKeyOrder<ISPO> keyOrder) {
 
         return distinctTermScan(keyOrder,/* termIdFilter */null);
         
@@ -977,7 +977,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
                 private static final long serialVersionUID = 1L;
 
                 @Override
-                protected boolean isValid(ITuple<SPO> tuple) {
+                protected boolean isValid(final ITuple<SPO> tuple) {
 
                     final long id = KeyBuilder.decodeLong(tuple
                             .getKeyBuffer().array(), 0);
