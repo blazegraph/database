@@ -3353,6 +3353,11 @@ commitPointToPreserve=1228508365953
       as a proxy for both.  When we approach the maximum available RAM
       we need to back down on the read retention queues.
 
+    - The write retention queue is currently imposing a minimum #of
+      buffered nodes.  It should be disabled for a read-only index so
+      that we can better control the buffering for indices that are
+      not absorbing writes.
+
     - Try lowering the fullyBufferedReadThreshold to the
       chunkCapacity.  How is that for query (not much of an effect)?
       For closure (larger joins).
