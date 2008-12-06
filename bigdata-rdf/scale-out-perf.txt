@@ -1992,10 +1992,11 @@ Snapshot release:
   - (defer) Optimize by assigning variables in a rule a positional
     index and use a long[] for bindings for SPORelation self-joins.
 
-  - Verify that the distinct term scan can correctly advance across
-    index partition boundaries.  One way to do this is by setting a
-    very small split point and then loading a known data set,
-    computing its closure, and comparing it to ground truth.
+  - Write a unit test for the distinct term scan to verify that it can
+    correctly advance across index partition boundaries.  One way to
+    do this is by setting a very small split point and then loading a
+    known data set, computing its closure, and comparing it to ground
+    truth.
 
   - performance testing for owl:sameAs processing at scale.
 
@@ -3390,3 +3391,12 @@ commitPointToPreserve=1228508365953
     concurrent weak value cache anyway.
 
 ------------------------------------------------------------
+
+Warnings from the LBS on Windows platform:
+
+WARN : 301460 com.bigdata.service.EmbeddedFederation$EmbeddedLoadBalancerServiceImpl.updateService1         com.bigdata.service.LoadBalancerService$UpdateTask.getAverageValueForMinutes(LoadBalancerService.java:1504): Could not read double value: counterSet=/dpp2-wrkst13.dpp2.org, counter=CPU/% Processor Time
+WARN : 301460 com.bigdata.service.EmbeddedFederation$EmbeddedLoadBalancerServiceImpl.updateService1         com.bigdata.service.LoadBalancerService$UpdateTask.updateServiceScores(LoadBalancerService.java:1154): Service is not active: /dpp2-wrkst13.dpp2.org/service/com.bigdata.journal.IResourceLockService/a5ac4288-bd16-463f-839d-bb0dd53341cb
+WARN : 301460 com.bigdata.service.EmbeddedFederation$EmbeddedLoadBalancerServiceImpl.updateService1         com.bigdata.service.LoadBalancerService$UpdateTask.updateServiceScores(LoadBalancerService.java:1154): Service is not active: /dpp2-wrkst13.dpp2.org/service/com.bigdata.journal.ITimestampService/a202bcdf-24e9-465f-9f32-32b49fb22fd8
+WARN : 301569 com.bigdata.service.EmbeddedFederation$EmbeddedLoadBalancerServiceImpl.updateService1         com.bigdata.service.LoadBalancerService$UpdateTask.updateServiceScores(LoadBalancerService.java:1154): Service is not active: /dpp2-wrkst13.dpp2.org/service/com.bigdata.service.EmbeddedClient/4012a55f-58d5-4fea-9e1c-8237712a707a
+WARN : 301569 com.bigdata.service.EmbeddedFederation$EmbeddedLoadBalancerServiceImpl.updateService1         com.bigdata.service.LoadBalancerService$UpdateTask.updateServiceScores(LoadBalancerService.java:1154): Service is not active: /dpp2-wrkst13.dpp2.org/service/com.bigdata.service.ILoadBalancerService/5d13e5b0-6bbd-44fe-a841-2a1355f17c87
+WARN : 301569 com.bigdata.service.EmbeddedFederation$EmbeddedLoadBalancerServiceImpl.updateService1         com.bigdata.service.LoadBalancerService$UpdateTask.updateServiceScores(LoadBalancerService.java:1154): Service is not active: /dpp2-wrkst13.dpp2.org/service/com.bigdata.service.IMetadataService/ba57b624-f179-412b-a576-d4300073e7c3
