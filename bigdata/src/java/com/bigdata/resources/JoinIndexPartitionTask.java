@@ -36,6 +36,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
@@ -75,7 +76,8 @@ public class JoinIndexPartitionTask extends
     protected JoinIndexPartitionTask(ResourceManager resourceManager,
             long lastCommitTime, String[] resources) {
 
-        super(resourceManager, -lastCommitTime, resources);
+        super(resourceManager, TimestampUtility
+                .asHistoricalRead(lastCommitTime), resources);
 
     }
 
@@ -102,6 +104,15 @@ public class JoinIndexPartitionTask extends
 
         }
 
+        if (newMetadata.getPartitionMetadata().getSourcePartitionId() != -1) {
+
+            throw new IllegalStateException(
+                    "Join not allowed during move: sourcePartitionId="
+                            + newMetadata.getPartitionMetadata()
+                                    .getSourcePartitionId());
+            
+        }
+            
         /*
          * Make a note of the expected left separator for the next partition.
          * The first time through the loop this is just the left separator for
@@ -218,6 +229,7 @@ public class JoinIndexPartitionTask extends
 
         newMetadata.setPartitionMetadata(new LocalPartitionMetadata(//
                 partitionId,//
+                -1, // Note: join not allowed during move.
                 oldpmd[0].getLeftSeparatorKey(),//
                 oldpmd[resources.length - 1].getRightSeparatorKey(),//
                 new IResourceMetadata[] {//

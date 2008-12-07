@@ -510,7 +510,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         metadata.setTupleSerializer(tupleSer);
         
         // override the BTree class.
-        metadata.setClassName(NoEvictionBTree.class.getName());
+        metadata.setBTreeClassName(NoEvictionBTree.class.getName());
         
         return (NoEvictionBTree) BTree.create(store,metadata);
         

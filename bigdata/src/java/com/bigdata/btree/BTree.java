@@ -1288,7 +1288,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter,
          */
         try {
             
-            final Class cl = Class.forName(metadata.getClassName());
+            final Class cl = Class.forName(metadata.getBTreeClassName());
             
             /*
              * Note: A NoSuchMethodException thrown here means that you did not

@@ -111,8 +111,8 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
 
             // must be an index partition.
             indexMetadata.setPartitionMetadata(new LocalPartitionMetadata(
-                    // partitionId (arbitrary since no metadata index).
-                    0,//
+                    0, // partitionId.
+                    -1, // not a move.
                     new byte[] {}, // leftSeparator
                     null, // rightSeparator
                     new IResourceMetadata[] {//

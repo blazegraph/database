@@ -3255,28 +3255,6 @@ commitPointToPreserve=1228508365953
       created before they are incorporated into a view, so this could
       be the result of several builds.
 
-    - On restart,make sure that the [releaseTime] and
-      [lastOverflowTime] are either set or are *safe* such that a
-      purge (either explicitly requested or requested following the
-      next overflow event) does not cause resources to be removed that
-      should have been preserved.  One approach is to make the
-      [releaseTime] a restart safe property and to restore the
-      lastOverflowTime from the lastCommitTime of the next-to-last
-      journal on restart.  Another is to refuse a purge until we have
-      been notified by the transaction manager of the desired
-      releaseTime since readLocks may have changed while the data
-      service was done.
-
-    - Write a unit test for purge before, during and after the 1st
-      overflow and after a restart.  Before, there should be nothing
-      to release.  During, the views that are being constructed should
-      remain safe.  After, we should be able to achieve a compact
-      footprint for the data service.
-
-      After restart, the release time needs to be set before we allow
-      a purge and the lastOverflowTime needs to be set from the
-      lastCommitTime of the next-to-last journal.
-
   - Choose the index partitions to compact based on the #of sources
     (and possibly the rangeCount) NOT just the order in which they are
     visited by the itr since that is an alpha order and has a
@@ -3397,18 +3375,3 @@ commitPointToPreserve=1228508365953
     defer. AbstractJournal (historical index cache)
 
     defer. DefaultResourceLocator's cache.
-
-    Done. AbstractIndexCache. Used by the federation for the recently
-    accessed indices and their metadata indices. Should be using a
-    concurrent weak value cache anyway.
-
-------------------------------------------------------------
-
-Warnings from the LBS on Windows platform:
-
-WARN : 301460 com.bigdata.service.EmbeddedFederation$EmbeddedLoadBalancerServiceImpl.updateService1         com.bigdata.service.LoadBalancerService$UpdateTask.getAverageValueForMinutes(LoadBalancerService.java:1504): Could not read double value: counterSet=/dpp2-wrkst13.dpp2.org, counter=CPU/% Processor Time
-WARN : 301460 com.bigdata.service.EmbeddedFederation$EmbeddedLoadBalancerServiceImpl.updateService1         com.bigdata.service.LoadBalancerService$UpdateTask.updateServiceScores(LoadBalancerService.java:1154): Service is not active: /dpp2-wrkst13.dpp2.org/service/com.bigdata.journal.IResourceLockService/a5ac4288-bd16-463f-839d-bb0dd53341cb
-WARN : 301460 com.bigdata.service.EmbeddedFederation$EmbeddedLoadBalancerServiceImpl.updateService1         com.bigdata.service.LoadBalancerService$UpdateTask.updateServiceScores(LoadBalancerService.java:1154): Service is not active: /dpp2-wrkst13.dpp2.org/service/com.bigdata.journal.ITimestampService/a202bcdf-24e9-465f-9f32-32b49fb22fd8
-WARN : 301569 com.bigdata.service.EmbeddedFederation$EmbeddedLoadBalancerServiceImpl.updateService1         com.bigdata.service.LoadBalancerService$UpdateTask.updateServiceScores(LoadBalancerService.java:1154): Service is not active: /dpp2-wrkst13.dpp2.org/service/com.bigdata.service.EmbeddedClient/4012a55f-58d5-4fea-9e1c-8237712a707a
-WARN : 301569 com.bigdata.service.EmbeddedFederation$EmbeddedLoadBalancerServiceImpl.updateService1         com.bigdata.service.LoadBalancerService$UpdateTask.updateServiceScores(LoadBalancerService.java:1154): Service is not active: /dpp2-wrkst13.dpp2.org/service/com.bigdata.service.ILoadBalancerService/5d13e5b0-6bbd-44fe-a841-2a1355f17c87
-WARN : 301569 com.bigdata.service.EmbeddedFederation$EmbeddedLoadBalancerServiceImpl.updateService1         com.bigdata.service.LoadBalancerService$UpdateTask.updateServiceScores(LoadBalancerService.java:1154): Service is not active: /dpp2-wrkst13.dpp2.org/service/com.bigdata.service.IMetadataService/ba57b624-f179-412b-a576-d4300073e7c3

@@ -73,7 +73,8 @@ public class TestIndexPartitionFencePosts extends AbstractBTreeTestCase {
         metadata.setDeleteMarkers(true);
 
         metadata.setPartitionMetadata(new LocalPartitionMetadata(//
-                0,// partitionId,
+                0, // partitionId,
+                -1, // not a move.
                 new byte[]{}, // leftSeparator
                 null, // rightSeparator
                 null, // no resource descriptions.

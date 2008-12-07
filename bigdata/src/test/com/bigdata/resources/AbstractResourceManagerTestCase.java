@@ -74,7 +74,6 @@ import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.sparse.SparseRowStore;
-import com.bigdata.util.MillisecondTimestampFactory;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -404,6 +403,8 @@ public class AbstractResourceManagerTestCase extends
      */
     protected class MockFederation implements IBigdataFederation {
 
+        private final MockMetadataService metadataService = new MockMetadataService();
+        
         public void destroy() {
 
             
@@ -477,7 +478,8 @@ public class AbstractResourceManagerTestCase extends
 
         public IMetadataService getMetadataService() {
 
-            return null;
+            return metadataService;
+            
         }
 
         public ITimestampService getTimestampService() {
@@ -573,8 +575,8 @@ public class AbstractResourceManagerTestCase extends
 
             // must be an index partition.
             indexMetadata.setPartitionMetadata(new LocalPartitionMetadata(
-                    // partitionId (arbitrary since no metadata index).
-                    0,//
+                    0, // partitionId
+                    -1, // not a move.
                     new byte[] {}, // leftSeparator
                     null, // rightSeparator
                     new IResourceMetadata[] {//

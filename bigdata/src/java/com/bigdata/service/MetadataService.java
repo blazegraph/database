@@ -1132,6 +1132,7 @@ abstract public class MetadataService extends DataService implements
                 // override the partition metadata.
                 md.setPartitionMetadata(new LocalPartitionMetadata(
                         pmd.getPartitionId(),//
+                        -1, // we are creating a new index, not moving an index partition.
                         leftSeparator,//
                         rightSeparator,//
                         /*

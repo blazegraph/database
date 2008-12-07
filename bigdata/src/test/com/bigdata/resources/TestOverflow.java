@@ -117,6 +117,7 @@ public class TestOverflow extends AbstractResourceManagerTestCase {
 
             indexMetadata.setPartitionMetadata(new LocalPartitionMetadata(//
                     0, // partitionId
+                    -1, // not a move.
                     new byte[]{}, // leftSeparator.
                     null, // rightSeparator.
                     new IResourceMetadata[]{

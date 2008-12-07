@@ -2368,6 +2368,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                 metadata.setPartitionMetadata(//
                         new LocalPartitionMetadata(//
                                 pmd.getPartitionId(),//
+                                pmd.getSourcePartitionId(),//
                                 pmd.getLeftSeparatorKey(),//
                                 pmd.getRightSeparatorKey(),//
                                 new IResourceMetadata[] {//

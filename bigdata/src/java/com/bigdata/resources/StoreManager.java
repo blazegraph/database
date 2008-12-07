@@ -37,6 +37,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -104,6 +106,15 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * segments), including the logic to compute the effective release time for the
  * managed resources and to release those resources by deleting them from the
  * file system.
+ * 
+ * @todo Write a unit test for purge before, during and after the 1st overflow
+ *       and after a restart. Before, there should be nothing to release.
+ *       During, the views that are being constructed should remain safe. After,
+ *       we should be able to achieve a compact footprint for the data service.
+ * 
+ * @todo After restart, the release time needs to be set before we allow a purge
+ *       and the lastOverflowTime needs to be set from the lastCommitTime of the
+ *       next-to-last journal.
  * 
  * @todo There is neither a "CREATE_TEMP_DIR" and "DELETE_ON_CLOSE" does not
  *       remove all directories created during setup. One of the consequences is
@@ -1172,165 +1183,16 @@ abstract public class StoreManager extends ResourceEvents implements
             }
 
             /*
-             * Open the "live" journal.
+             * Open the live journal.
              */
-            {
+            openLiveJournal();
 
-                if(INFO)
-                    log.info("Creating/opening the live journal: dataDir="
-                        + dataDir);
-
-                if (Thread.interrupted())
-                    throw new InterruptedException();
-
-                final Properties p = getProperties();
-                final File file;
-                final boolean newJournal;
-
-                if (journalIndex.getEntryCount() == 0) {
-
-                    /*
-                     * There are no existing journal files. Create new journal
-                     * using a unique filename in the appropriate subdirectory
-                     * of the data directory.
-                     * 
-                     * @todo this is not using the temp filename mechanism in a
-                     * manner that truely guarentees an atomic file create. The
-                     * CREATE_TEMP_FILE option should probably be extended with
-                     * a CREATE_DIR option that allows you to override the
-                     * directory in which the journal is created. That will
-                     * allow the atomic creation of the journal in the desired
-                     * directory without changing the existing semantics for
-                     * CREATE_TEMP_FILE.
-                     * 
-                     * See OverflowManager#doOverflow() which has very similar
-                     * logic with the same problem.
-                     */
-
-                    if(INFO)
-                        log
-                                .info("Creating initial journal: dataDir="
-                                        + dataDir);
-
-                    // unique file name for new journal.
-                    if (isTransient) {
-
-                        file = null;
-
-                    } else {
-
-                        try {
-
-                            file = File.createTempFile("journal", // prefix
-                                    Options.JNL,// suffix
-                                    journalsDir // directory
-                                    ).getCanonicalFile();
-
-                        } catch (IOException e) {
-
-                            throw new RuntimeException(e);
-
-                        }
-
-                        // delete temp file.
-                        file.delete();
-
-                    }
-
-                    /*
-                     * Set the createTime on the new journal resource.
-                     */
-                    p.setProperty(Options.CREATE_TIME, Long
-                            .toString(nextTimestampRobust()));
-
-                    newJournal = true;
-
-                } else {
-
-                    /*
-                     * There is at least one pre-existing journal file, so we
-                     * open the one with the largest timestamp - this will be
-                     * the most current journal and the one that will receive
-                     * writes until it overflows.
-                     */
-
-                    // resource metadata for journal with the largest
-                    // timestamp.
-                    final IResourceMetadata resource = journalIndex
-                            .find(Long.MAX_VALUE);
-
-                    if(INFO)
-                        log.info("Will open as live journal: " + resource);
-
-                    assert resource != null : "No resource? : timestamp="
-                            + Long.MAX_VALUE;
-
-                    // lookup absolute file for that resource.
-                    file = resourceFiles.get(resource.getUUID());
-
-                    if (file == null) {
-
-                        throw new NoSuchStoreException(resource.getUUID());
-                        
-                    }
-
-                    if(INFO)
-                        log.info("Opening most recent journal: " + file
-                                + ", resource=" + resource);
-
-                    newJournal = false;
-
-                }
-
-                if (!isTransient) {
-
-                    assert file.isAbsolute() : "Path must be absolute: " + file;
-
-                    p.setProperty(Options.FILE, file.toString());
-
-                }
-
-                if(INFO)
-                    log.info("Open/create of live journal: newJournal="
-                            + newJournal + ", file=" + file);
-
-                // Create/open journal.
-                {
-                    
-                if (Thread.interrupted())
-                        throw new InterruptedException();
-
-                    final ManagedJournal tmp = new ManagedJournal(p);
-
-                    if (newJournal) {
-
-                        // add to the set of managed resources.
-                        addResource(tmp.getResourceMetadata(), tmp.getFile());
-
-                    }
-
-                    /*
-                     * Add to set of open stores.
-                     * 
-                     * Note: single-threaded during startup.
-                     */
-                    storeCache.put(tmp.getRootBlockView().getUUID(), tmp);
-                    // storeCache.put(tmp.getRootBlockView().getUUID(), tmp, false/* dirty */);
-
-                    if (Thread.interrupted())
-                        throw new InterruptedException();
-
-                    liveJournalRef.set(tmp);
-                    
-                    /*
-                     * Subtract out the #of bytes in the live journal.
-                     */
-                    bytesUnderManagement.addAndGet(-tmp.getBufferStrategy().getExtent());
-                    
-                }
-
-            }
-
+            /*
+             * Purge any index partition moves which did not complete before
+             * shutdown.
+             */
+            purgeIncompleteMoves();
+            
             /*
              * Notify the timestamp service of the last commit time for the live
              * journal for this data service. This will be zero (0L) iff this is
@@ -1344,6 +1206,233 @@ abstract public class StoreManager extends ResourceEvents implements
             
         }
 
+        /**
+         * Open the "live" journal.
+         */
+        private void openLiveJournal() throws InterruptedException {
+
+            if (INFO)
+                log.info("Creating/opening the live journal: dataDir="
+                        + dataDir);
+
+            if (Thread.interrupted())
+                throw new InterruptedException();
+
+            final Properties p = getProperties();
+            final File file;
+            final boolean newJournal;
+
+            if (journalIndex.getEntryCount() == 0) {
+
+                /*
+                 * There are no existing journal files. Create new journal using
+                 * a unique filename in the appropriate subdirectory of the data
+                 * directory.
+                 * 
+                 * @todo this is not using the temp filename mechanism in a
+                 * manner that truely guarentees an atomic file create. The
+                 * CREATE_TEMP_FILE option should probably be extended with a
+                 * CREATE_DIR option that allows you to override the directory
+                 * in which the journal is created. That will allow the atomic
+                 * creation of the journal in the desired directory without
+                 * changing the existing semantics for CREATE_TEMP_FILE.
+                 * 
+                 * See OverflowManager#doOverflow() which has very similar logic
+                 * with the same problem.
+                 */
+
+                if (INFO)
+                    log.info("Creating initial journal: dataDir=" + dataDir);
+
+                // unique file name for new journal.
+                if (isTransient) {
+
+                    file = null;
+
+                } else {
+
+                    try {
+
+                        file = File.createTempFile("journal", // prefix
+                                Options.JNL,// suffix
+                                journalsDir // directory
+                                ).getCanonicalFile();
+
+                    } catch (IOException e) {
+
+                        throw new RuntimeException(e);
+
+                    }
+
+                    // delete temp file.
+                    file.delete();
+
+                }
+
+                /*
+                 * Set the createTime on the new journal resource.
+                 */
+                p.setProperty(Options.CREATE_TIME, Long
+                        .toString(nextTimestampRobust()));
+
+                newJournal = true;
+
+            } else {
+
+                /*
+                 * There is at least one pre-existing journal file, so we open
+                 * the one with the largest timestamp - this will be the most
+                 * current journal and the one that will receive writes until it
+                 * overflows.
+                 */
+
+                // resource metadata for journal with the largest
+                // timestamp.
+                final IResourceMetadata resource = journalIndex
+                        .find(Long.MAX_VALUE);
+
+                if (INFO)
+                    log.info("Will open as live journal: " + resource);
+
+                assert resource != null : "No resource? : timestamp="
+                        + Long.MAX_VALUE;
+
+                // lookup absolute file for that resource.
+                file = resourceFiles.get(resource.getUUID());
+
+                if (file == null) {
+
+                    throw new NoSuchStoreException(resource.getUUID());
+
+                }
+
+                if (INFO)
+                    log.info("Opening most recent journal: " + file
+                            + ", resource=" + resource);
+
+                newJournal = false;
+
+            }
+
+            if (!isTransient) {
+
+                assert file.isAbsolute() : "Path must be absolute: " + file;
+
+                p.setProperty(Options.FILE, file.toString());
+
+            }
+
+            if (INFO)
+                log.info("Open/create of live journal: newJournal="
+                        + newJournal + ", file=" + file);
+
+            // Create/open journal.
+            {
+
+                if (Thread.interrupted())
+                    throw new InterruptedException();
+
+                final ManagedJournal tmp = new ManagedJournal(p);
+
+                if (newJournal) {
+
+                    // add to the set of managed resources.
+                    addResource(tmp.getResourceMetadata(), tmp.getFile());
+
+                }
+
+                /*
+                 * Add to set of open stores.
+                 * 
+                 * Note: single-threaded during startup.
+                 */
+                storeCache.put(tmp.getRootBlockView().getUUID(), tmp);
+                // storeCache.put(tmp.getRootBlockView().getUUID(), tmp, false/*
+                // dirty */);
+
+                if (Thread.interrupted())
+                    throw new InterruptedException();
+
+                liveJournalRef.set(tmp);
+
+                /*
+                 * Subtract out the #of bytes in the live journal.
+                 */
+                bytesUnderManagement.addAndGet(-tmp.getBufferStrategy()
+                        .getExtent());
+
+            }
+
+        }
+        
+        /**
+         * Purge any index partition moves which did not complete successfully
+         * on restart. These index partitions are identified by scanning the
+         * indices registered on the live journal. If an index has
+         * <code>sourcePartitionId != -1</code> in its
+         * {@link LocalPartitionMetadata} then the index was being moved onto
+         * this {@link IDataService} when the service was shutdown. The index
+         * (together with any {@link IndexSegment} resources that are identified
+         * in its {@link LocalPartitionMetadata}) is deleted.
+         * 
+         * @todo write a unit test for this feature.
+         */
+        private void purgeIncompleteMoves() {
+            
+            final ManagedJournal liveJournal = liveJournalRef.get();
+            
+            // using read-committed view of Name2Addr
+            final ITupleIterator itr = liveJournal.getName2Addr()
+                    .rangeIterator();
+
+            // the list of indices that will be dropped.
+            final List<String> toDrop = new LinkedList<String>();
+            
+            while (itr.hasNext()) {
+
+                final ITuple tuple = itr.next();
+
+                final Entry entry = EntrySerializer.INSTANCE
+                        .deserialize(new DataInputBuffer(tuple.getValue()));
+
+                /*
+                 * Open the mutable btree on the journal (not the full view of
+                 * that index).
+                 */
+                final BTree btree = (BTree) liveJournal.getIndex(entry.checkpointAddr);
+                
+                final LocalPartitionMetadata pmd = btree.getIndexMetadata().getPartitionMetadata();
+                
+                if (pmd != null && pmd.getSourcePartitionId() != -1) {
+
+                    final String name = btree.getIndexMetadata().getName();
+
+                    log
+                            .warn("Incomplete index partition move - will remove index and segments: name="
+                                    + name);
+
+                    for (IResourceMetadata resource : pmd.getResources()) {
+
+                        if (resource.isIndexSegment()) {
+
+                            deleteResource(resource.getUUID(), false/* isJournal */);
+
+                        }
+                        
+                    }
+                    
+                }
+
+                for(String name : toDrop) {
+
+                    liveJournal.dropIndex(name);
+                    
+                }
+                
+            }
+            
+        }
+        
     }
 
     /**
@@ -1591,14 +1680,6 @@ abstract public class StoreManager extends ResourceEvents implements
 
         } else if (len > 0 && name.endsWith(Options.SEG)) {
 
-//            final Properties p = new Properties();
-//
-//            p.setProperty(IndexSegmentStore.Options.SEGMENT_FILE, file
-//                    .getAbsolutePath());
-//
-//            // Note: disables buffering nodes during the scan.
-//            p.setProperty(IndexSegmentStore.Options.BUFFER_NODES, "false");
-
             /*
              * Attempt to open the index segment.
              */
@@ -1632,7 +1713,17 @@ abstract public class StoreManager extends ResourceEvents implements
 
             } finally {
 
-                segStore.close();
+                if(segStore.isOpen()) {
+
+                    /*
+                     * Note: opening the segment with [load == false] does not
+                     * really open anything so you do not need to close the
+                     * segment afterwards. I've put the conditional logic here
+                     * just in case that changes.
+                     */
+                    segStore.close();
+                    
+                }
 
             }
 

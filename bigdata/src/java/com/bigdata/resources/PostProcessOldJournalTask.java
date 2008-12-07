@@ -82,18 +82,19 @@ import com.bigdata.util.InnerCause;
  * and the metadata index</li>
  * </ol>
  * <p>
- * Processing is divided into three stages:
+ * Processing is divided into two stages:
  * <dl>
  * <dt>{@link #chooseTasks()}</dt>
  * <dd>This stage examines the named indices and decides what action (if any)
  * will be applied to each index partition.</dd>
  * <dt>{@link #runTasks()}</dt>
  * <dd>This stage reads on the historical state of the named index partitions,
- * building, splitting, joining, or moving their data as appropriate.</dd>
- * <dt>{@link #atomicUpdates()}</dt>
- * <dd>This stage runs tasks using {@link ITx#UNISOLATED} operations on the
- * live journal to make atomic updates to the index partition definitions and to
- * the {@link MetadataIndex} and/or a remote data service where necessary</dd>
+ * building, splitting, joining, or moving their data as appropriate. When each
+ * task is finished, it submits and awaits the completion of an
+ * {@link AbstractAtomicUpdateTask}. The atomic update tasks run using
+ * {@link ITx#UNISOLATED} operations on the live journal to make atomic updates
+ * to the index partition definitions and to the {@link MetadataService} and/or
+ * a remote data service where necessary</dd>
  * </dl>
  * <p>
  * Note: This task is invoked after an
@@ -564,6 +565,21 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 // index partition metadata
                 final LocalPartitionMetadata pmd = indexMetadata
                         .getPartitionMetadata();
+
+                if (pmd.getSourcePartitionId() != -1) {
+
+                    /*
+                     * This index is currently being moved onto this data
+                     * service so it is NOT a candidate for a split, join, or
+                     * move.
+                     */
+
+                    log.warn("Skipping index: name=" + name
+                            + ", reason=moveInProgress");
+
+                    continue;
+
+                }
 
                 if (INFO)
                     log.info("Considering join: name=" + name + ", rangeCount="
@@ -1095,14 +1111,16 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 
             }
             
-            if (resourceManager.getIndexOnStore(score.name, lastCommitTime,
-                    oldJournal) == null) {
+            final BTree btree = (BTree) resourceManager.getIndexOnStore(
+                    score.name, lastCommitTime, oldJournal);
+            
+            if ( btree == null) {
 
                 /*
                  * Note: The counters are accumulated over the live of the
-                 * journal. This tells us that the named index dropped sometimes
-                 * during the live of that old journal. Since it is gone we skip
-                 * over it here.
+                 * journal. This tells us that the named index was dropped
+                 * sometimes during the life cycle of that old journal. Since it
+                 * is gone we skip over it here.
                  */
                 
                 if (INFO)
@@ -1110,6 +1128,29 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                             + ", reason=dropped");
                 
                 continue;
+                
+            }
+
+            {
+            
+                final LocalPartitionMetadata pmd = btree.getIndexMetadata()
+                        .getPartitionMetadata();
+
+                if (pmd.getSourcePartitionId() != -1) {
+
+                    /*
+                     * This index is currently being moved onto this data
+                     * service so it is NOT a candidate for a split, join, or
+                     * move.
+                     */
+                    
+                    log
+                            .warn("Skipping index: name=" + name
+                                    + ", reason=moveInProgress");
+                 
+                    continue;
+                    
+                }
                 
             }
             
@@ -1265,14 +1306,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * manager MAY aggressively release old resources, even at the expense of
      * forcing transactions to abort.
      * 
-     * FIXME codify the suggestions when nearing DISK exhaustion into code.
-     * 
-     * FIXME modify MOVE to be a (full or partial) build followed by a copy of
-     * the index segment(s) in the view to the target data service and finally
-     * followed by the atomic update, which will copy over any tuples that have
-     * been buffered on the live journal. Assuming that it is more expensive to
-     * do copy all tuples individually (even in batch) then should reduce the
-     * cost of the move. Try it out both ways.
+     * FIXME implement suggestions for handling cases when we are nearing DISK
+     * exhaustion.
      */
     protected List<AbstractTask> chooseTasks() throws Exception {
 
@@ -1454,6 +1489,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             // handler decides when and where to split an index partition.
             final ISplitHandler splitHandler = indexMetadata.getSplitHandler();
 
+            // index partition metadata
+            final LocalPartitionMetadata pmd = indexMetadata
+                    .getPartitionMetadata();
+
             // #of sources in the view (very fast).
             final int sourceCount = view.getSourceCount();
             
@@ -1483,11 +1522,17 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                 nskip++;
 
-            } else if (!compactingMerge && splitHandler != null
-                    && splitHandler.shouldSplit(view)) {
+            } else if (!compactingMerge && pmd.getSourcePartitionId() == -1
+                    && splitHandler != null && splitHandler.shouldSplit(view)) {
 
                 /*
                  * Do an index split task.
+                 * 
+                 * Note: Split is NOT allowed if the index is currently being
+                 * moved onto this data service. Split, join, and move are all
+                 * disallowed until the index partition move is complete since
+                 * each of them would cause the index partition to become
+                 * invalidated.
                  */
 
                 final AbstractTask task = new SplitIndexPartitionTask(

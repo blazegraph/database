@@ -50,6 +50,7 @@ import com.bigdata.io.SerializerUtil;
 import com.bigdata.isolation.IConflictResolver;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.mdi.LocalPartitionMetadata;
+import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.DefaultSplitHandler;
@@ -450,6 +451,21 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          */
         
         /**
+         * The name of a class derived from {@link BTree} that will be used to
+         * re-load the index. Note that index partitions are in general views
+         * (of one or more resources). Therefore only unpartitioned indices can
+         * be meaningfully specialized solely in terms of the {@link BTree} base
+         * class.
+         * 
+         * @todo in order to provide a similar specialization mechanism for
+         *       scale-out indices you would need to specify the class name for
+         *       the {@link IndexSegment} and the {@link FusedView}. You might
+         *       also need to override the {@link Checkpoint} class - for
+         *       example the {@link MetadataIndex} does this.
+         */
+        String BTREE_CLASS_NAME = BTree.class.getName()+".className";
+        
+        /**
          * The name of an optional property whose value specifies the branching
          * factor for a mutable {@link BTree}.
          * 
@@ -662,7 +678,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     private int readRetentionQueueCapacity;
     private int readRetentionQueueScan;
     private LocalPartitionMetadata pmd;
-    private String className;
+    private String btreeClassName;
     private String checkpointClassName;
     private IAddressSerializer addrSer;
     private IDataSerializer nodeKeySer;
@@ -866,28 +882,37 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * {@link BTree} is not part of a scale-out index. This is updated when the
      * view composition for the index partition is changed.
      */
-    public final LocalPartitionMetadata getPartitionMetadata() {return pmd;}
+    public final LocalPartitionMetadata getPartitionMetadata() {
+    
+        return pmd;
+        
+    }
     
     /**
      * The name of a class derived from {@link BTree} that will be used to
-     * re-load the index.
+     * re-load the index. Note that index partitions are in general views (of
+     * one or more resources). Therefore only unpartitioned indices can be
+     * meaningfully specialized solely in terms of the {@link BTree} base class.
      * 
-     * @todo allow class name for the index segment as well or encourage a view
-     *       of the object rather than subclassing for specialized behaviors
-     *       e.g., using a delegate model for {@link IIndex}? Note that index
-     *       partitions are in general views (of one or more resources).
-     *       Therefore only unpartitioned indices can be meaningfully
-     *       specialized in terms of the {@link BTree} base class.
+     * @see Options#BTREE_CLASS_NAME
      */
-    public final String getClassName() {return className;}
+    public final String getBTreeClassName() {
+
+        return btreeClassName;
+
+    }
 
     /**
      * The name of the {@link Checkpoint} class used by the index. This may be
      * overriden to store additional state with each {@link Checkpoint} record.
      */
-    public final String getCheckpointClassName() {return checkpointClassName;}
+    public final String getCheckpointClassName() {
 
-    public final void setCheckpointClassName(String className) {
+        return checkpointClassName;
+        
+    }
+
+    public final void setCheckpointClassName(final String className) {
         
         if (className == null)
             throw new IllegalArgumentException();
@@ -1068,12 +1093,12 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
     }
 
-    public void setClassName(String className) {
+    public void setBTreeClassName(final String className) {
 
         if (className == null)
             throw new IllegalArgumentException();
 
-        this.className = className;
+        this.btreeClassName = className;
         
     }
 
@@ -1304,8 +1329,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         // Note: default assumes NOT an index partition.
         this.pmd = null;
         
-        this.className = BTree.class.getName();
-        
+        this.btreeClassName = getProperty(indexManager, properties, namespace,
+                Options.BTREE_CLASS_NAME, BTree.class.getName().toString());
+
         this.checkpointClassName = Checkpoint.class.getName();
         
         /*
@@ -1455,7 +1481,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         sb.append(", branchingFactor=" + branchingFactor);
         sb.append(", indexSegmentBranchingFactor=" + indexSegmentBranchingFactor);
         sb.append(", pmd=" + pmd);
-        sb.append(", class=" + className);
+        sb.append(", class=" + btreeClassName);
         sb.append(", checkpointClass=" + checkpointClassName);
         sb.append(", childAddrSerializer=" + addrSer.getClass().getName());
         sb.append(", nodeKeySerializer=" + nodeKeySer.getClass().getName());
@@ -1520,7 +1546,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         pmd = (LocalPartitionMetadata)in.readObject();
         
-        className = in.readUTF();
+        btreeClassName = in.readUTF();
         
         checkpointClassName = in.readUTF();
         
@@ -1584,7 +1610,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         out.writeObject(pmd);
         
-        out.writeUTF(className);
+        out.writeUTF(btreeClassName);
 
         out.writeUTF(checkpointClassName);
         

@@ -59,6 +59,7 @@ import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.StoreManager;
+import com.bigdata.service.DataService;
 import com.bigdata.service.MetadataService;
 
 /**
@@ -114,7 +115,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      * decoded by this class. The {@link IndexSegment} itself knows nothing
      * about this entire slight of hand.
      */
-    private IndexSegmentAddressManager addressManager;
+    private final IndexSegmentAddressManager addressManager;
     
 //    /**
 //     * See {@link IndexMetadata.Options#INDEX_SEGMENT_BUFFER_NODES}.
@@ -152,13 +153,8 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
     /**
      * The metadata record for the index segment.
      */
-    private IndexMetadata metadata;
+    private final IndexMetadata metadata;
 
-    /**
-     * The index name.
-     */
-    private String namespace;
-    
     /**
      * The optional bloom filter.
      */
@@ -206,10 +202,6 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
     /**
      * The {@link IndexMetadata} record for the {@link IndexSegment}.
      * <p>
-     * Note: The {@link IndexMetadata#getBranchingFactor()} for the
-     * {@link IndexSegment} is overriden by the value of the
-     * {@link IndexMetadata#getIndexSegmentBranchingFactor()}.
-     * <p>
      * Note: The {@link IndexMetadata#getPartitionMetadata()} always reports
      * that {@link LocalPartitionMetadata#getResources()} is <code>null</code>.
      * This is because the {@link BTree} on the {@link AbstractJournal} defines
@@ -219,8 +211,6 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      * index partition view.
      */
     public final IndexMetadata getIndexMetadata() {
-    
-        assertOpen();
         
         return metadata;
         
@@ -308,6 +298,12 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
                 // read the checkpoint record from the file.
                 this.checkpoint = new IndexSegmentCheckpoint(raf);
                 
+                // handles transparent decoding of offsets within regions.
+                this.addressManager = new IndexSegmentAddressManager(checkpoint);
+                
+                // Read the metadata record.
+                this.metadata = readMetadata();
+                
             } catch (IOException ex) {
 
                 throw new RuntimeException(ex);
@@ -369,7 +365,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
         
         if(open) {
 
-            final String name = MetadataService.getIndexPartitionName(metadata
+            final String name = DataService.getIndexPartitionName(metadata
                     .getName(), metadata.getPartitionMetadata()
                     .getPartitionId());
 
@@ -445,15 +441,6 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
 
             }
 
-            // handles transparent decoding of offsets within regions.
-            this.addressManager = new IndexSegmentAddressManager(checkpoint);
-            
-            // Read the metadata record.
-            this.metadata = readMetadata();
-
-            // The index name.
-            namespace = metadata.getName();
-            
             final boolean bufferNodes = metadata.getIndexSegmentBufferNodes();
 
             /*
@@ -513,7 +500,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
         
         try {
             
-            final Class cl = Class.forName(metadata.getClassName());
+            final Class cl = Class.forName(metadata.getBTreeClassName());
             
             final Constructor ctor = cl
                     .getConstructor(new Class[] { IndexSegmentStore.class });
@@ -651,7 +638,12 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
          */
 //        checkpoint = null;
 
-        metadata = null;
+        /*
+         * Note: Don't deallocate. Relatively small and it holds some important
+         * metadata. By reading this during the ctor we do not have to force the
+         * entire index segment to be loaded just to access the index metadata.
+         */
+//        metadata = null;
 
         bloomFilter = null;
         
@@ -675,7 +667,11 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
     
     synchronized public void destroy() {
         
-        close();
+        if(isOpen()) {
+
+            close();
+            
+        }
 
         deleteResources();
         
@@ -695,7 +691,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
     
     final public long size() {
 
-        assertOpen();
+//        assertOpen();
         
         return checkpoint.length;
         
@@ -826,7 +822,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      * read against the disk is the best indication that we have that we will
      * NOT want to read that region again soon.
      */
-    public ByteBuffer read(long addr) {
+    public ByteBuffer read(final long addr) {
 
         assertOpen();
         

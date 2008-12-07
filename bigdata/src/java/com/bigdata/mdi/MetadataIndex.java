@@ -172,7 +172,7 @@ public class MetadataIndex extends BTree implements IMetadataIndex {
          * Override the implementation class.
          */
         
-        metadata.setClassName(MetadataIndex.class.getName());
+        metadata.setBTreeClassName(MetadataIndex.class.getName());
 
         /*
          * Override the checkpoint record implementation class.
