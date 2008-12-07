@@ -30,7 +30,6 @@ package com.bigdata.btree;
 
 import java.io.File;
 import java.nio.ByteBuffer;
-import java.util.Properties;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -124,7 +123,7 @@ public class DumpIndexSegment {
 
     }
 
-    static void dumpIndexSegment(File file) {
+    static void dumpIndexSegment(final File file) {
 
         /*
          * Note: These options also require you to turn up the logging level in
@@ -135,12 +134,12 @@ public class DumpIndexSegment {
         boolean dumpNodeState = true; // @todo command line option
         boolean dumpLeafState = true;// @todo command line option
 
-        Properties properties = new Properties();
+//        Properties properties = new Properties();
+//
+//        properties.setProperty(IndexSegmentStore.Options.SEGMENT_FILE,
+//                file.getPath());
 
-        properties.setProperty(IndexSegmentStore.Options.SEGMENT_FILE,
-                file.getPath());
-
-        IndexSegmentStore store = new IndexSegmentStore(properties);
+        final IndexSegmentStore store = new IndexSegmentStore(file);
 
         // dump the checkpoint record, index metadata record, etc.
         dumpHeaders(store);

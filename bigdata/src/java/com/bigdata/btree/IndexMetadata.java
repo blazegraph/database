@@ -40,10 +40,12 @@ import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.compression.PrefixSerializer;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
+import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.config.Configuration;
 import com.bigdata.config.IValidator;
 import com.bigdata.config.IntegerRangeValidator;
 import com.bigdata.config.IntegerValidator;
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.isolation.IConflictResolver;
 import com.bigdata.journal.IIndexManager;
@@ -240,7 +242,38 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     public static interface Options {
 
         /*
-         * Options that apply to fused views as well as to AbstractBTrees.
+         * Constants.
+         */
+        
+        /**
+         * The minimum allowed branching factor (3). The branching factor may be
+         * odd or even.
+         */
+        int MIN_BRANCHING_FACTOR = 3;
+
+        /**
+         * A reasonable maximum branching factor for a {@link BTree}.
+         */
+        int MAX_BTREE_BRANCHING_FACTOR = 1024;
+
+        /**
+         * A reasonable maximum branching factor for an {@link IndexSegment}.
+         */
+        int MAX_INDEX_SEGMENT_BRANCHING_FACTOR = 10240;
+        
+        /**
+         * The minimum write retention queue capacity is two (2) in order to
+         * avoid cache evictions of the leaves participating in a split.
+         */
+        int MIN_WRITE_RETENTION_QUEUE_CAPACITY = 2;
+        
+        /**
+         * A reasonable maximum write retention queue capacity.
+         */
+        int MAX_WRITE_RETENTION_QUEUE_CAPACITY = 2000;
+        
+         /*
+         * Options that apply to FusedViews as well as to AbstractBTrees.
          * 
          * Note: These options are in the package namespace.
          */
@@ -308,9 +341,15 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * that some workloads could benefit from a larger value, this leads to
          * higher commit latency and can therefore have a broad impact on
          * performance.
-         * <p>
-         * Note: For historical reasons, the write rentention queue is used for
-         * both {@link BTree} and {@link IndexSegment}.
+         * 
+         * @todo For historical reasons, the write rentention queue is used for
+         *       both {@link BTree} and {@link IndexSegment}. However, the code
+         *       should be modified such that the write retention queue is ONLY
+         *       use for mutable {@link BTree}s and the read-rentention queue
+         *       should be either provisioned dynamically or separately for
+         *       {@link IndexSegment}s and {@link BTree}s. (The
+         *       read-rentention queue would be used for both read-only and
+         *       mutable {@link BTree}s.)
          */
         String WRITE_RETENTION_QUEUE_CAPACITY = com.bigdata.btree.AbstractBTree.class
                 .getPackage().getName()
@@ -351,18 +390,21 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * off of the queue even if it can not collect the node reference
          * itself.
          * 
-         * @todo The size of the read rentention queue could also be set
-         *       dynamically, e.g., as a function of the depth of the BTree and
-         *       the branching factor. Since the BTree depth only changes during
-         *       index writes, and since index writes are single-threaded, it
-         *       would not be difficult to re-provision this to a larger
-         *       capacity when the root is split or joined. To avoid needless
-         *       effort, there should be a minimum queue capacity that is used
-         *       up to depth=2/3. If the queue capacity is set to n=~5-10% of
-         *       the maximum possible #of nodes in a btree of a given depth,
-         *       then we can compute the capacity dynamically based on that
-         *       parameter. And of course it can be easily provisioned when the
-         *       BTree is {@link #reopen()}ed.
+         * @todo The size of the read rentention queue should be set dynamically
+         *       as a function of the depth of the BTree (or the #of nodes and
+         *       leaves), the branching factor, and the RAM available to the
+         *       HOST (w/o swapping) and to the JVM. For a mutable {@link BTree}
+         *       the depth changes only slowly, but the other factors are always
+         *       changing. Regardless, changing the read-retention queue size is
+         *       never a problem as cleared references will never cause a
+         *       strongly reachable node to be released.
+         *       <p>
+         *       To avoid needless effort, there should be a minimum queue
+         *       capacity that is used up to depth=2/3. If the queue capacity is
+         *       set to n=~5-10% of the maximum possible #of nodes in a btree of
+         *       a given depth, then we can compute the capacity dynamically
+         *       based on that parameter. And of course it can be easily
+         *       provisioned when the BTree is {@link #reopen()}ed.
          */
         String READ_RETENTION_QUEUE_CAPACITY = com.bigdata.btree.AbstractBTree.class
                 .getPackage().getName()
@@ -378,69 +420,21 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                 .getPackage().getName()
                 + ".readRetentionQueue.scan"; 
 
-        /**
-         * The minimum write retention queue capacity is two (2) in order to
-         * avoid cache evictions of the leaves participating in a split.
-         */
-        int MIN_WRITE_RETENTION_QUEUE_CAPACITY = 2;
-        
-        /**
-         * A reasonable maximum write retention queue capacity.
-         */
-        int MAX_WRITE_RETENTION_QUEUE_CAPACITY = 2000;
-        
         String DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY = "500";
 
         String DEFAULT_WRITE_RETENTION_QUEUE_SCAN = "20";
 
+        /**
+         * @todo very different defaults make sense for scale-up vs scale-out
+         *       unless the actual capacity is determined dynamically.
+         *       <p>
+         *       It might make sense to give an "importance" factor to each
+         *       index so that performance critical indices can buffer more data
+         *       even when the host has less RAM available.
+         */
         String DEFAULT_READ_RETENTION_QUEUE_CAPACITY = "10000";
 
         String DEFAULT_READ_RETENTION_QUEUE_SCAN = "20";
-
-        /*
-         * Split handler properties.
-         * 
-         * @see DefaultSplitHandler
-         * 
-         * Note: Use these settings to trigger splits sooner and thus enter the
-         * more interesting regions of the phase space more quickly BUT DO NOT
-         * use these settings for deployment!
-         * 
-         * final int minimumEntryCount = 1 * Bytes.kilobyte32; (or 10k)
-         * 
-         * final int entryCountPerSplit = 5 * Bytes.megabyte32; (or 50k)
-         */
-        
-        String SPLIT_HANDLER_MIN_ENTRY_COUNT = DefaultSplitHandler.class
-                .getName()
-                + ".minimumEntryCount";
-
-        String SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT = DefaultSplitHandler.class
-                .getName()
-                + ".entryCountPerSplit";
-
-        String SPLIT_HANDLER_OVER_CAPACITY_MULTIPLIER = DefaultSplitHandler.class
-                .getName()
-                + ".overCapacityMultiplier";
-
-        String SPLIT_HANDLER_UNDER_CAPACITY_MULTIPLIER = DefaultSplitHandler.class
-                .getName()
-                + ".underCapacityMultiplier";
-
-        String SPLIT_HANDLER_SAMPLE_RATE = DefaultSplitHandler.class.getName()
-                + ".sampleRate";
-
-        String DEFAULT_SPLIT_HANDLER_MIN_ENTRY_COUNT = ""
-                + (500 * Bytes.kilobyte32);
-
-        String DEFAULT_SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT = ""
-                + (1 * Bytes.megabyte32);
-
-        String DEFAULT_SPLIT_HANDLER_OVER_CAPACITY_MULTIPLIER = "1.5";
-
-        String DEFAULT_SPLIT_HANDLER_UNDER_CAPACITY_MULTIPLIER = ".75";
-
-        String DEFAULT_SPLIT_HANDLER_SAMPLE_RATE = "20"; 
 
         /*
          * Options that are valid for any AbstractBTree but which are not
@@ -497,21 +491,116 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         String DEFAULT_INDEX_SEGMENT_BRANCHING_FACTOR = "512";
 
         /**
-         * The minimum allowed branching factor (3). The branching factor may be
-         * odd or even.
+         * When <code>true</code> an attempt will be made to fully buffer the
+         * nodes (but not the leaves) of the {@link IndexSegment} (default
+         * {@value #DEFAULT_INDEX_SEGMENT_BUFFER_NODES}). The nodes in the
+         * {@link IndexSegment} are serialized in a contiguous region by the
+         * {@link IndexSegmentBuilder}. That region may be fully buffered when
+         * the {@link IndexSegment} is opened, in which case queries against the
+         * {@link IndexSegment} will incur NO disk hits for the nodes and only
+         * one disk hit per visited leaf.
+         * <p>
+         * Note: The nodes are read into a buffer allocated from the
+         * {@link DirectBufferPool}. If the size of the nodes region in the
+         * {@link IndexSegmentStore} file exceeds the capacity of the buffers
+         * managed by the {@link DirectBufferPool}, then the nodes WILL NOT be
+         * buffered. The {@link DirectBufferPool} is used both for efficiency
+         * and because a bug dealing with temporary direct buffers would
+         * otherwise cause the C heap to be exhausted!
+         * 
+         * @see #DEFAULT_INDEX_SEGMENT_BUFFER_NODES
          */
-        int MIN_BRANCHING_FACTOR = 3;
-
-        /**
-         * A reasonable maximum branching factor for a {@link BTree}.
-         */
-        int MAX_BTREE_BRANCHING_FACTOR = 1024;
-
-        /**
-         * A reasonable maximum branching factor for an {@link IndexSegment}.
-         */
-        int MAX_INDEX_SEGMENT_BRANCHING_FACTOR = 10240;
+        String INDEX_SEGMENT_BUFFER_NODES = IndexSegment.class.getName()
+                + ".bufferNodes";
         
+        /**
+         * @see #BUFFER_NODES
+         */
+        String DEFAULT_INDEX_SEGMENT_BUFFER_NODES = "false";
+     
+        /**
+         * The size of the LRU cache backing the weak reference cache for leaves
+         * (default {@value #DEFAULT_LEAF_CACHE_SIZE}).
+         * <p>
+         * While the {@link AbstractBTree} already provides caching for nodes
+         * and leaves based on navigation down the hierarchy from the root node,
+         * the {@link IndexSegment} uses an additional leaf cache to optimize
+         * access to leaves based on the double-linked list connecting the
+         * leaves.
+         * <p>
+         * A larger value will tend to retain leaves longer at the expense of
+         * consuming more RAM when many parts of the {@link IndexSegment} are
+         * hot.
+         * 
+         * @todo The {@link #READ_RETENTION_QUEUE_CAPACITY} for index segments
+         *       should probably be much smaller than for a mutable btree for
+         *       several reasons. First, the {@link IndexSegment}'s iterators
+         *       DO NOT use navigation of the nodes from the root for prior/next
+         *       operations. Second, it is possible to fully buffer the nodes
+         *       region for an {@link IndexSegment}. Third, the branching
+         *       factor for an {@link IndexSegment} is normally larger and the
+         *       effect of the read-retention queue capacity and the leaf cache
+         *       size are related to the branching factor.
+         * 
+         * @todo Use a timeout and a {@link ConcurrentWeakValueCache} for this
+         *       cache?
+         * 
+         * @todo allow zero (0) to disable the cache?
+         */
+        String INDEX_SEGMENT_LEAF_CACHE_CAPACITY = IndexSegment.class.getName()
+                + ".leafCacheCapacity";
+        
+        /**
+         * 
+         * @see #INDEX_SEGMENT_LEAF_CACHE_CAPACITY
+         */
+        String DEFAULT_INDEX_SEGMENT_LEAF_CACHE_CAPACITY = "100";
+        
+        /*
+         * Split handler properties.
+         * 
+         * @see DefaultSplitHandler
+         * 
+         * Note: Use these settings to trigger splits sooner and thus enter the
+         * more interesting regions of the phase space more quickly BUT DO NOT
+         * use these settings for deployment!
+         * 
+         * final int minimumEntryCount = 1 * Bytes.kilobyte32; (or 10k)
+         * 
+         * final int entryCountPerSplit = 5 * Bytes.megabyte32; (or 50k)
+         */
+        
+        String SPLIT_HANDLER_MIN_ENTRY_COUNT = DefaultSplitHandler.class
+                .getName()
+                + ".minimumEntryCount";
+
+        String SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT = DefaultSplitHandler.class
+                .getName()
+                + ".entryCountPerSplit";
+
+        String SPLIT_HANDLER_OVER_CAPACITY_MULTIPLIER = DefaultSplitHandler.class
+                .getName()
+                + ".overCapacityMultiplier";
+
+        String SPLIT_HANDLER_UNDER_CAPACITY_MULTIPLIER = DefaultSplitHandler.class
+                .getName()
+                + ".underCapacityMultiplier";
+
+        String SPLIT_HANDLER_SAMPLE_RATE = DefaultSplitHandler.class.getName()
+                + ".sampleRate";
+
+        String DEFAULT_SPLIT_HANDLER_MIN_ENTRY_COUNT = ""
+                + (500 * Bytes.kilobyte32);
+
+        String DEFAULT_SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT = ""
+                + (1 * Bytes.megabyte32);
+
+        String DEFAULT_SPLIT_HANDLER_OVER_CAPACITY_MULTIPLIER = "1.5";
+
+        String DEFAULT_SPLIT_HANDLER_UNDER_CAPACITY_MULTIPLIER = ".75";
+
+        String DEFAULT_SPLIT_HANDLER_SAMPLE_RATE = "20"; 
+
     }
     
     /**
@@ -568,7 +657,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     private UUID indexUUID;
     private String name;
     private int branchingFactor;
-    private int indexSegmentBranchingFactor;
     private int writeRetentionQueueCapacity;
     private int writeRetentionQueueScan;
     private int readRetentionQueueCapacity;
@@ -586,6 +674,14 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     private IOverflowHandler overflowHandler;
     private ISplitHandler splitHandler;
 //    private Object historyPolicy;
+
+    /* 
+     * IndexSegment fields.
+     */
+    
+    private int indexSegmentBranchingFactor;
+    private boolean indexSegmentBufferNodes;
+    private int indexSegmentLeafCacheCapacity;
 
     /**
      * The unique identifier for the (scale-out) index whose data is stored in
@@ -623,7 +719,11 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * The branching factor for the read-only {@link IndexSegment}s is
      * generally much larger in order to reduce the number of disk seeks.
      */
-    public final int getBranchingFactor() {return branchingFactor;}
+    public final int getBranchingFactor() {
+    
+        return branchingFactor;
+        
+    }
     
     /**
      * The branching factor used when building an {@link IndexSegment} (default
@@ -651,7 +751,54 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * values stored in the index; and (c) the key, value, and record
      * compression options in use.
      */
-    public final int getIndexSegmentBranchingFactor() {return indexSegmentBranchingFactor;}
+    public final int getIndexSegmentBranchingFactor() {
+
+        return indexSegmentBranchingFactor;
+        
+    }
+    
+    /**
+     * Return <code>true</code> iff the nodes region for the
+     * {@link IndexSegment} should be fully buffered by the
+     * {@link IndexSegmentStore}.
+     * 
+     * @see Options#INDEX_DEFAULT_SEGMENT_BUFFER_NODES
+     */
+    public final boolean getIndexSegmentBufferNodes() {
+        
+        return indexSegmentBufferNodes;
+        
+    }
+
+    public final void setIndexSegmentBufferNodes(boolean newValue) {
+        
+        this.indexSegmentBufferNodes = newValue;
+        
+    }
+    
+    /**
+     * Return the capacity of the LRU cache of leaves for an
+     * {@link IndexSegment}.
+     * 
+     * @see Options#INDEX_SEGMENT_LEAF_CACHE_CAPACITY
+     */
+    public final int getIndexSegmentLeafCacheCapacity() {
+        
+        return indexSegmentLeafCacheCapacity;
+        
+    }
+
+    public final void setIndexSegmentLeafCacheCapacity(final int newValue) {
+        
+        if (newValue <= 0) {
+            
+            throw new IllegalArgumentException();
+            
+        }
+        
+        this.indexSegmentLeafCacheCapacity = newValue;
+        
+    }
     
     /**
      * @see Options#WRITE_RETENTION_QUEUE_CAPACITY
@@ -1143,6 +1290,17 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                 Options.DEFAULT_READ_RETENTION_QUEUE_SCAN,
                 IntegerValidator.GTE_ZERO);
 
+        this.indexSegmentBufferNodes = Boolean.parseBoolean(getProperty(
+                indexManager, properties, namespace,
+                Options.INDEX_SEGMENT_BUFFER_NODES,
+                Options.DEFAULT_INDEX_SEGMENT_BUFFER_NODES));
+
+        this.indexSegmentLeafCacheCapacity = getProperty(indexManager,
+                properties, namespace,
+                Options.INDEX_SEGMENT_LEAF_CACHE_CAPACITY,
+                Options.DEFAULT_INDEX_SEGMENT_LEAF_CACHE_CAPACITY,
+                IntegerValidator.GT_ZERO);
+
         // Note: default assumes NOT an index partition.
         this.pmd = null;
         
@@ -1352,8 +1510,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         branchingFactor = (int)LongPacker.unpackLong(in);
 
-        indexSegmentBranchingFactor = (int)LongPacker.unpackLong(in);
-
         writeRetentionQueueCapacity = (int)LongPacker.unpackLong(in);
         
         writeRetentionQueueScan = (int)LongPacker.unpackLong(in);
@@ -1386,6 +1542,16 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         splitHandler = (ISplitHandler)in.readObject();
 
+        /*
+         * IndexSegment.
+         */
+
+        indexSegmentBranchingFactor = (int)LongPacker.unpackLong(in);
+
+        indexSegmentLeafCacheCapacity = (int)LongPacker.unpackLong(in);
+        
+        indexSegmentBufferNodes = in.readBoolean();
+
     }
 
     public void writeExternal(ObjectOutput out) throws IOException {
@@ -1407,8 +1573,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         out.writeLong(indexUUID.getLeastSignificantBits());
         
         LongPacker.packLong(out, branchingFactor);
-
-        LongPacker.packLong(out, indexSegmentBranchingFactor);
 
         LongPacker.packLong(out, writeRetentionQueueCapacity);
 
@@ -1442,6 +1606,16 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         out.writeObject(splitHandler);
 
+        /*
+         * IndexSegment.
+         */
+
+        LongPacker.packLong(out, indexSegmentBranchingFactor);
+
+        LongPacker.packLong(out, indexSegmentLeafCacheCapacity);
+        
+        out.writeBoolean(indexSegmentBufferNodes);
+        
     }
 
     /**

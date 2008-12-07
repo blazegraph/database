@@ -151,8 +151,9 @@ abstract public class StoreManager extends ResourceEvents implements
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static interface Options extends com.bigdata.journal.Options,
-            IndexSegmentStore.Options {
+    public static interface Options extends com.bigdata.journal.Options
+//            , IndexSegmentStore.Options
+            {
 
         /**
          * The property whose value is the name of the directory in which the
@@ -1590,13 +1591,13 @@ abstract public class StoreManager extends ResourceEvents implements
 
         } else if (len > 0 && name.endsWith(Options.SEG)) {
 
-            final Properties p = new Properties();
-
-            p.setProperty(IndexSegmentStore.Options.SEGMENT_FILE, file
-                    .getAbsolutePath());
-
-            // Note: disables buffering nodes during the scan.
-            p.setProperty(IndexSegmentStore.Options.BUFFER_NODES, "false");
+//            final Properties p = new Properties();
+//
+//            p.setProperty(IndexSegmentStore.Options.SEGMENT_FILE, file
+//                    .getAbsolutePath());
+//
+//            // Note: disables buffering nodes during the scan.
+//            p.setProperty(IndexSegmentStore.Options.BUFFER_NODES, "false");
 
             /*
              * Attempt to open the index segment.
@@ -1604,7 +1605,7 @@ abstract public class StoreManager extends ResourceEvents implements
             final IndexSegmentStore segStore;
             try {
 
-                segStore = new IndexSegmentStore(p);
+                segStore = new IndexSegmentStore(file, false/* load */);
 
             } catch (Exception ex) {
 

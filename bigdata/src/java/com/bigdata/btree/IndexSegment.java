@@ -237,7 +237,8 @@ public class IndexSegment extends AbstractBTree {
         }
 
         this.leafCache = new WeakValueCache<Long, ImmutableLeaf>(
-                new LRUCache<Long, ImmutableLeaf>(fileStore.leafCacheSize));
+                new LRUCache<Long, ImmutableLeaf>(
+                        fileStore.getIndexMetadata().getIndexSegmentLeafCacheCapacity()));
 
         /*
          * Read the root node.

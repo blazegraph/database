@@ -123,11 +123,11 @@ public class TestAddDeleteResource extends AbstractResourceManagerTestCase {
         final BuildResult buildResult;
         {
 
-            Properties p = new Properties();
+//            Properties p = new Properties();
             
-            p.setProperty(IndexSegmentStore.Options.SEGMENT_FILE, File
-                    .createTempFile("segment_1", Journal.Options.SEG,
-                            resourceManager.dataDir).toString());
+//            p.setProperty(IndexSegmentStore.Options.SEGMENT_FILE, File
+//                    .createTempFile("segment_1", Journal.Options.SEG,
+//                            resourceManager.dataDir).toString());
             
             final String INDEX_NAME = "test index";
             

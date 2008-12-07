@@ -31,7 +31,7 @@ package com.bigdata.service;
 import java.util.UUID;
 
 /**
- * Basic delegate for services that ened to override the service UUID and
+ * Basic delegate for services that need to override the service UUID and
  * service interface reported to the {@link ILoadBalancerService}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
