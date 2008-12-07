@@ -93,6 +93,86 @@ import com.bigdata.service.RawDataServiceTupleIterator;
  * commit points for the index partition on the live journal before the atomic
  * cutover to the new {@link IDataService} - those historical commit points MUST
  * be preserved until the release policy for those views has been satisified.
+ * <p>
+ * Note: The MOVE task MUST be explicitly coordinated with the target
+ * {@link IDataService}. Failure to coordinate the move results in an error
+ * message reported by the {@link MetadataService} indicating that the wrong
+ * partition locator was found under the key. The cause is a MOVE operation
+ * during which the target data service undergoes concurrent synchronous (and
+ * then asynchronous) overflow. What happens is the
+ * {@link MoveIndexPartitionTask} registers the new index partition on the
+ * target data service. One registered on the {@link IDataService}, the index
+ * partition it is visible during synchronous overflow BEFORE the MOVE is
+ * complete and BEFORE the index is registered with the {@link MetadataService}
+ * and hence discoverable to clients. If the target {@link IDataService} then
+ * undergoes synchronous and asynchronous overflow and chooses an action which
+ * would change the index partition definition (split, join, or move) WHILE the
+ * index partition is still being moved onto the target {@link IDataService}
+ * THEN the MOVE is not atomic and the definition of the index partition in the
+ * {@link MetadataService} will not coherently reflect either the MOVE or the
+ * action choosen by the target {@link IDataService}, depending on which one
+ * makes its atomic update first.
+ * <p>
+ * The target {@link IDataService} MAY undergo both synchronous and asynchronous
+ * overflow as {@link IDataService}s are designed to allow continued writes
+ * during those operations. Further, it MAY choose to copy, build, or compact
+ * the index partition while it is being moved. However, it MUST NOT choose any
+ * action (split, join, or move) that would change the index partition
+ * definition until the move is complete (whether it ends in success or
+ * failure).
+ * <p>
+ * This issue is addressed by the following protocol:
+ * <ol>
+ * 
+ * <li>The source {@link IDataService} notifies the target {@link IDataService}
+ * that is wishes to move an index partition onto that {@link IDataService}.
+ * The target may choose to disallow the move, in which case the source will
+ * choose either another target or a different action for that index partition.
+ * This choice is not restart safe for either service.</li>
+ * 
+ * <li>When the target allows the move, the {@link MoveIndexPartitionTask}
+ * explicitly notifies the target when it runs. If the target disallows the
+ * operation then the {@link MoveIndexPartitionTask} will fail.</li>
+ * 
+ * <li>If the target allows the operation, then it posts a notice for the
+ * target index partition indicating that it has been only conditionally
+ * registered pending the completion of the MOVE. This notice is used to
+ * restrict the allowable actions by the target {@link IDataService} to those
+ * which do not change the index partition definition (copy, build, or merge).
+ * Further, any index partition found on restart by the target
+ * {@link IDataService} for which such notice is posted will be deleted as it
+ * was never successfully put into play (this prevents partial moves from
+ * accumulating state which could not otherwise be released.)</li>
+ * 
+ * <li>The atomic update task causes the notice to be removed as one of its
+ * last actions, thereby allowing the target {@link IDataService} to use
+ * operations that could re-define the index parition (split, join, move) and
+ * also preventing the target index partition from being deleted on restart.
+ * </li>
+ * 
+ * <li>If the atomic update task fails, then: (a) if the target index partition
+ * has already been recorded in the {@link MetadataService} then that definition
+ * MUST be rolled back; and (b) the target {@link IDataService} MUST be informed
+ * so that it can drop the index partition since its data will never be used and
+ * is not even visible to the {@link MetadataService}. </li>
+ * 
+ * </ol>
+ * 
+ * @todo This could be addressed w/ zookeeper, but it might be nice not to have
+ *       that dependency for basic operations. Still, it is a distributed lock /
+ *       queue problem.
+ *       <p>
+ *       Where to record the "moveInProgress" indicator and how to coordinate
+ *       with the index registration?
+ *       <p>
+ *       There must be a global lock in order to prevent clients from accessing
+ *       the new index partition definition on the {@link MetadataService}
+ *       before the atomic update task completes. Likewise, if the atomic update
+ *       task fails and the {@link MetadataService} has already been updated,
+ *       then we need to rollback the change to the {@link MetadataService}
+ *       (replacing the new index partition locator with the old one). Note that
+ *       the source index partition is not dropped until the atomic update task
+ *       completes successfully.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

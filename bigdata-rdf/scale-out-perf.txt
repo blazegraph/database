@@ -3323,42 +3323,6 @@ commitPointToPreserve=1228508365953
     otherwise lead to writes in more than just the last index
     partition of the SPO and OSP indices.
 
-  * MOVE index partition bug.  The symptom is an error message
-    reported by the metadataService indicating that the wrong
-    partition locator was found under the key.  The cause is a MOVE
-    operation during which the target data service undergoes
-    concurrent synchronous (and then asynchronous) overflow. What
-    happens is the MOVE has registered the new index partition on the
-    target data service where it is visible during synchronous
-    overflow BEFORE the MOVE is complete.  Synchronous overflow itself
-    is not a problem, but the asynchronous overflow can choose to
-    split or move the index partition WHILE it is still being moved
-    onto the target data service.  Thus the MOVE is not atomic.
-
-    There are several problems here that need to be addressed:
-    
-    1. We can not simply disallow overflow for the target data service
-       since that could lead to DEADLOCK if a cycle forms in which
-       data services target one another for MOVEs (those cycles may
-       indicate bad move choices, but we can't risk deadlock in any
-       case).
-
-    2. The read-historical task that registers the new index partition
-       on the target data service could explicitly add the index
-       partition to a list of index partitions that may only be
-       handled by copy or build tasks (compact does not make sense
-       since there will be only a single source for the view; move is
-       downright stupid since we are trying to move the index
-       partition onto the target; and split/join will cause problems
-       because it _redefines_ the index partition (as does move). The
-       re-definition of the index partition concurrent with the move
-       is exactly the cause of the problem.
-
-    3. If the MOVE fails, then the target data service MUST be
-       informed so that it can drop the index partition since its data
-       will never be used and is not even visible to the metadata
-       service.  That must be a restart safe action.
-
   - Tuning:
 
     - Compact serialization for ISolution[] and IBindingSet[] to
