@@ -453,6 +453,7 @@ public class CompactingMergeTask extends
             // describe the index partition.
             indexMetadata.setPartitionMetadata(new LocalPartitionMetadata(//
                     currentpmd.getPartitionId(),//
+                    currentpmd.getSourcePartitionId(),//
                     currentpmd.getLeftSeparatorKey(),//
                     currentpmd.getRightSeparatorKey(),//
                     newResources, //

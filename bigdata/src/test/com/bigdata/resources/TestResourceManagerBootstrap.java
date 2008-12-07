@@ -532,12 +532,12 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
                 final long commitTime = journal.commit();
 
                 // create index segment from btree on journal.
-                final int partId = 0;
+                final int partitionId = 0;
                 {
 
                     // name the output file.
                     final File outFile = File.createTempFile(//
-                            indexMetadata.getName()+"_"+partId, // prefix 
+                            indexMetadata.getName()+"_"+partitionId, // prefix 
                             Options.SEG, // suffix
                             segmentsDir // directory
                             );
@@ -565,28 +565,11 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
                 
                 // describe the index partition.
                 indexMetadata.setPartitionMetadata(new LocalPartitionMetadata(
-                        partId,//
+                        partitionId,//
+                        -1, // not a move.
                         new byte[]{}, // left separator (first valid key)
                         null,         // right separator (no upper bound)
                         /*
-                         * FIXME Originally I listed the journal first for the
-                         * reasons below. However, in all other uses of index
-                         * segments they are built once the journal is closed
-                         * out and the rule that is enforced is that the
-                         * createTime of the resources needs to in reverse order
-                         * (most recent to oldest) - this is the same as the
-                         * view ordering when we read on a FusedView of an
-                         * index.
-                         * 
-                         * However, in this case, the journal is still open and
-                         * still receiving writes and hence must be first in any
-                         * view created after the index segment. This points out
-                         * that there is perhaps no general rule that can be
-                         * enforced on createTime alone. Perhaps I need to
-                         * simply remove that constraint in
-                         * LocalPartitionMetadata and let the system be more
-                         * flexible.
-                         * 
                          * Note: The journal gets listed first since it can
                          * continue to receive writes and therefore logically
                          * comes before the index segment in the resource

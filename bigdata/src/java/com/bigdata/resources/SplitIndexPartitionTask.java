@@ -17,6 +17,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
@@ -72,7 +73,8 @@ public class SplitIndexPartitionTask extends
             long lastCommitTime,
             String resource) {
 
-        super(resourceManager, -lastCommitTime, resource);
+        super(resourceManager, TimestampUtility
+                .asHistoricalRead(lastCommitTime), resource);
 
         this.lastCommitTime = lastCommitTime;
 
@@ -90,7 +92,7 @@ public class SplitIndexPartitionTask extends
      * @param splits
      *            The recommended split points.
      */
-    protected void validateSplits(IIndex src, Split[] splits) {
+    protected void validateSplits(final IIndex src, final Split[] splits) {
 
         final IndexMetadata indexMetadata = src.getIndexMetadata();
 
@@ -222,22 +224,43 @@ public class SplitIndexPartitionTask extends
         final String name = getOnlyResource();
                 
         // Note: fused view for the source index partition.
-        final IIndex src = getIndex(name);
+        final ILocalBTreeView src = (ILocalBTreeView)getIndex(name);
         
         if (INFO) {
             
             // note: the mutable btree - accessed here for debugging only.
-            final BTree btree = ((ILocalBTreeView) src).getMutableBTree();
+            final BTree btree = src.getMutableBTree();
 
             log.info("src=" + name + ",counter=" + src.getCounter().get()
                     + ",checkpoint=" + btree.getCheckpoint());
 
         }
         
-//        final long createTime = Math.abs(startTime);
-        
+// final long createTime = Math.abs(startTime);
+
         final IndexMetadata indexMetadata = src.getIndexMetadata();
-        
+
+        {
+
+            final LocalPartitionMetadata oldpmd = indexMetadata
+                    .getPartitionMetadata();
+
+            if (oldpmd == null) {
+
+                throw new IllegalStateException("Not an index partition.");
+
+            }
+
+            if (oldpmd.getSourcePartitionId() != -1) {
+
+                throw new IllegalStateException(
+                        "Split not allowed during move: sourcePartitionId="
+                                + oldpmd.getSourcePartitionId());
+
+            }
+            
+        }
+
         // The name of the scale-out index.
         final String scaleOutIndexName = indexMetadata.getName();
 
@@ -740,6 +763,14 @@ public class SplitIndexPartitionTask extends
             final LocalPartitionMetadata oldpmd = (LocalPartitionMetadata) src
                     .getIndexMetadata().getPartitionMetadata();
 
+            if(oldpmd.getSourcePartitionId()!=-1) {
+
+                throw new IllegalStateException(
+                        "Split not allowed during move: sourcePartitionId="
+                                + oldpmd.getSourcePartitionId());
+
+            }
+            
             final Split[] splits = splitResult.splits;
             
             final PartitionLocator[] locators = new PartitionLocator[splits.length];
@@ -789,6 +820,7 @@ public class SplitIndexPartitionTask extends
                  */
                 md.setPartitionMetadata(new LocalPartitionMetadata(
                         pmd.getPartitionId(),//
+                        -1, // Note: Split not allowed during move.
                         pmd.getLeftSeparatorKey(),//
                         pmd.getRightSeparatorKey(),//
                         new IResourceMetadata[] {//

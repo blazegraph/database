@@ -599,6 +599,14 @@ public class DefaultSplitHandler implements ISplitHandler {
 
         // The metadata for the index partition that is being split. 
         final LocalPartitionMetadata oldpmd = ndx.getIndexMetadata().getPartitionMetadata();
+
+        if (oldpmd.getSourcePartitionId() != -1) {
+            
+            throw new IllegalStateException(
+                    "Split not allowed during move: sourcePartitionId="
+                            + oldpmd.getSourcePartitionId());
+            
+        }
         
         // index into the samples[].
         int j = 0;
@@ -700,7 +708,10 @@ public class DefaultSplitHandler implements ISplitHandler {
             }
 
             final LocalPartitionMetadata pmd = new LocalPartitionMetadata(
-                    partitionId, fromKey, toKey,
+                    partitionId,
+                    -1, // Note: split not allowed during move.
+                    fromKey,//
+                    toKey,//
                     /*
                      * Note: no resources for an index segment
                      */

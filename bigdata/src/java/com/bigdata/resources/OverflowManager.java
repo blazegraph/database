@@ -1142,7 +1142,7 @@ abstract public class OverflowManager extends IndexManager {
             numIndices = (int) oldJournal.getName2Addr().rangeCount(null,null);
 
             // using read-committed view of Name2Addr
-            final ITupleIterator itr = oldJournal.getName2Addr().rangeIterator(null,null);
+            final ITupleIterator itr = oldJournal.getName2Addr().rangeIterator();
 
             while (itr.hasNext()) {
 
@@ -1237,12 +1237,16 @@ abstract public class OverflowManager extends IndexManager {
                     indexMetadata
                             .setPartitionMetadata(new LocalPartitionMetadata(
                                     oldpmd.getPartitionId(),//
+                                    oldpmd.getSourcePartitionId(),//
                                     oldpmd.getLeftSeparatorKey(),//
                                     oldpmd.getRightSeparatorKey(),//
                                     newResources, //
                                     oldpmd.getHistory()+
-                                    "copy(lastCommitTime="+lastCommitTime+",entryCount="+entryCount+",counter="+oldBTree.getCounter().get()+") "
-                            ));
+                                    "copy(lastCommitTime="
+                                            + lastCommitTime + ",entryCount="
+                                            + entryCount + ",counter="
+                                            + oldBTree.getCounter().get()
+                                            + ") "));
 
                 } else {
 
@@ -1277,12 +1281,16 @@ abstract public class OverflowManager extends IndexManager {
                     indexMetadata
                             .setPartitionMetadata(new LocalPartitionMetadata(
                                     oldpmd.getPartitionId(),//
+                                    oldpmd.getSourcePartitionId(),//
                                     oldpmd.getLeftSeparatorKey(),//
                                     oldpmd.getRightSeparatorKey(),//
                                     newResources, //
                                     oldpmd.getHistory()+
-                                    "overflow(lastCommitTime="+lastCommitTime+",entryCount="+entryCount+",counter="+oldBTree.getCounter().get()+") "
-                            ));
+                                    "overflow(lastCommitTime="
+                                            + lastCommitTime + ",entryCount="
+                                            + entryCount + ",counter="
+                                            + oldBTree.getCounter().get()
+                                            + ") "));
 
                 }
 

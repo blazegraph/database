@@ -82,7 +82,7 @@ public class CommitRecordIndex extends BTree {
     
         IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
         
-        metadata.setClassName(CommitRecordIndex.class.getName());
+        metadata.setBTreeClassName(CommitRecordIndex.class.getName());
         
         return (CommitRecordIndex) BTree.create(store, metadata);
         

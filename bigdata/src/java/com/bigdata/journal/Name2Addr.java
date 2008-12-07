@@ -36,7 +36,6 @@ import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
@@ -111,14 +110,12 @@ public class Name2Addr extends BTree {
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final static protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final static protected boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final static protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final static protected boolean DEBUG = log.isDebugEnabled();
 
     /**
      * Cache of added/retrieved btrees by _name_. This cache is ONLY used by the
@@ -317,11 +314,11 @@ public class Name2Addr extends BTree {
      * 
      * @return The new instance.
      */
-    static public Name2Addr create(IRawStore store) {
+    static public Name2Addr create(final IRawStore store) {
     
-        IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
         
-        metadata.setClassName(Name2Addr.class.getName());
+        metadata.setBTreeClassName(Name2Addr.class.getName());
         
         return (Name2Addr) BTree.create(store, metadata);
         
@@ -376,7 +373,7 @@ public class Name2Addr extends BTree {
      * 
      * @see Options#LIVE_INDEX_CACHE_CAPACITY
      */
-    protected void setupCache(int cacheCapacity) {
+    protected void setupCache(final int cacheCapacity) {
         
         if (indexCache != null) {
 
@@ -404,7 +401,7 @@ public class Name2Addr extends BTree {
      * @param name
      *            The index name.
      */
-    synchronized public boolean willCommit(String name) {
+    synchronized public boolean willCommit(final String name) {
 
         assertUnisolatedInstance();
 
@@ -482,11 +479,12 @@ public class Name2Addr extends BTree {
         }
 
         // for each entry in the snapshot of the commit list.
-        for(int i=0; i<a.length; i++) {
+        for (int i = 0; i < a.length; i++) {
             
             final DirtyListener l = a[i];
             
-            if(INFO) log.info("Will commit: "+l.name);
+            if (INFO)
+                log.info("Will commit: " + l.name);
             
             final long checkpointAddr;
             if (l.needsCheckpoint) {
@@ -589,7 +587,7 @@ public class Name2Addr extends BTree {
      *            
      * @return The corresponding key.
      */
-    protected byte[] getKey(String name) {
+    protected byte[] getKey(final String name) {
 
         return KeyBuilder.asSortKey(name);
 
@@ -612,7 +610,7 @@ public class Name2Addr extends BTree {
      *             if this is not the {@link ITx#UNISOLATED} {@link Name2Addr}
      *             instance.
      */
-    public BTree getIndex(String name) {
+    public BTree getIndex(final String name) {
 
         assertUnisolatedInstance();
 
@@ -716,7 +714,7 @@ public class Name2Addr extends BTree {
      * @return The {@link Entry} for the named index -or- <code>null</code> if
      *         there is no entry for that <i>name</i>.
      */
-    public Entry getEntry(String name) {
+    public Entry getEntry(final String name) {
 
         // lookup in the index.
         final byte[] val = super.lookup(getKey(name));
@@ -751,7 +749,7 @@ public class Name2Addr extends BTree {
      * @exception IndexExistsException
      *                if there is already an index registered under that name.
      */
-    synchronized public void registerIndex(String name, BTree btree) {
+    synchronized public void registerIndex(final String name, final BTree btree) {
 
         assertUnisolatedInstance();
 
@@ -806,8 +804,8 @@ public class Name2Addr extends BTree {
      *            {@link BTree#writeCheckpoint()} the index rather than just
      *            updating the {@link Entry} from {@link BTree#getCheckpoint()}
      */
-    synchronized protected void putOnCommitList(String name, BTree btree,
-            boolean needsCheckpoint) {
+    synchronized protected void putOnCommitList(final String name,
+            final BTree btree, final boolean needsCheckpoint) {
 
         assertUnisolatedInstance();
 
@@ -848,8 +846,8 @@ public class Name2Addr extends BTree {
      * @param replace
      *            If an existing entry for that name may be replaced.
      */
-    synchronized protected void putIndexCache(String name, BTree btree,
-            boolean replace) {
+    synchronized protected void putIndexCache(final String name,
+            final BTree btree, final boolean replace) {
 
         assertUnisolatedInstance();
         
@@ -882,7 +880,7 @@ public class Name2Addr extends BTree {
      *            
      * @return The index iff it was found in the cache.
      */
-    synchronized protected BTree getIndexCache(String name) {
+    synchronized protected BTree getIndexCache(final String name) {
         
         assertUnisolatedInstance();
         
@@ -902,7 +900,7 @@ public class Name2Addr extends BTree {
      * @exception NoSuchIndexException
      *                if the index does not exist.
      */
-    synchronized public void dropIndex(String name) {
+    synchronized public void dropIndex(final String name) {
 
         assertUnisolatedInstance();
 
@@ -1031,7 +1029,8 @@ public class Name2Addr extends BTree {
          */
         public final long commitTime;
 
-        public Entry(String name, long checkpointAddr, long commitTime) {
+        public Entry(final String name, final long checkpointAddr,
+                final long commitTime) {
             
             this.name = name;
             
@@ -1042,9 +1041,10 @@ public class Name2Addr extends BTree {
         }
         
         public String toString() {
-            
-            return "Entry{name=" + name + ",checkpointAddr=" + checkpointAddr + ",commitTime=" + commitTime + "}";
-            
+
+            return "Entry{name=" + name + ",checkpointAddr=" + checkpointAddr
+                    + ",commitTime=" + commitTime + "}";
+
         }
         
     }
@@ -1063,16 +1063,16 @@ public class Name2Addr extends BTree {
 
         }
 
-        public byte[] serialize(Entry entry) {
+        public byte[] serialize(final Entry entry) {
 
             try {
 
                 // estimate capacity
                 final int capacity = Bytes.SIZEOF_LONG + entry.name.length() * 2;
                 
-                ByteArrayOutputStream baos = new ByteArrayOutputStream(capacity);
+                final ByteArrayOutputStream baos = new ByteArrayOutputStream(capacity);
                 
-                DataOutput os = new DataOutputStream(baos);
+                final DataOutput os = new DataOutputStream(baos);
 
                 os.writeLong(entry.commitTime);
 
@@ -1090,7 +1090,7 @@ public class Name2Addr extends BTree {
 
         }
 
-        public Entry deserialize(DataInput in) {
+        public Entry deserialize(final DataInput in) {
 
             try {
 

@@ -337,7 +337,7 @@ public class TestRestartSafe extends ProxyTestCase<Journal> {
                 metadata.setBranchingFactor( m );
                 
                 // Note: override implementation class.
-                metadata.setClassName(MyBTree.class.getName());
+                metadata.setBTreeClassName(MyBTree.class.getName());
                 
                 btree = (MyBTree)BTree.create(journal, metadata);
                 

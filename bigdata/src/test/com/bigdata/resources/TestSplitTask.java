@@ -100,7 +100,8 @@ public class TestSplitTask extends AbstractResourceManagerTestCase {
             
             // must be an index partition.
             indexMetadata.setPartitionMetadata(new LocalPartitionMetadata(
-                    0, // partitionId (arbitrary since no metadata index).
+                    0, // partitionId.
+                    -1, // not a move.
                     new byte[]{}, //leftSeparator
                     null, // rightSeparator
                     new IResourceMetadata[]{resourceManager.getLiveJournal().getResourceMetadata()},
@@ -188,7 +189,7 @@ public class TestSplitTask extends AbstractResourceManagerTestCase {
         try {
             resourceManager.getIndex(name, ITx.UNISOLATED);
         } catch(StaleLocatorException ex) {
-            assertEquals("split",ex.getReason());
+            assertEquals(StaleLocatorReason.Split,ex.getReason());
         }
 
         /*

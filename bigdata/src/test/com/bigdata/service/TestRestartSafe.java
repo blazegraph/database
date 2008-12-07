@@ -120,7 +120,7 @@ public class TestRestartSafe extends AbstractEmbeddedFederationTestCase {
         final IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
 
         metadata.setDeleteMarkers(true);
-
+        
         final UUID indexUUID = fed.registerIndex(metadata, new byte[][]{//
                 new byte[]{},
                 new byte[]{5}
@@ -289,17 +289,17 @@ public class TestRestartSafe extends AbstractEmbeddedFederationTestCase {
          */
         {
 
-            IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
+            final IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
 
-            assertEquals(nentries, ndx.rangeCount(null, null));
+            assertEquals(nentries, ndx.rangeCount());
 
-            ITupleIterator itr = ndx.rangeIterator(null, null);
+            final ITupleIterator itr = ndx.rangeIterator();
             
             int i = 0;
             
             while(itr.hasNext()) {
                 
-                ITuple tuple = itr.next();
+                final ITuple tuple = itr.next();
                 
                 assertEquals(keys[i],tuple.getKey());
 

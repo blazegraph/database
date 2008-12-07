@@ -686,6 +686,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                 this.metadata.setPartitionMetadata(
                         new LocalPartitionMetadata(//
                                 pmd.getPartitionId(),//
+                                pmd.getSourcePartitionId(),//
                                 pmd.getLeftSeparatorKey(),//
                                 pmd.getRightSeparatorKey(),//
                                 null, // No resource metadata.
@@ -730,7 +731,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
          * BTree and IndexSegment or we should allow the subclass to be named
          * for both the mutable btree and the read-only index segment.
          */
-        this.metadata.setClassName(IndexSegment.class.getName());
+        this.metadata.setBTreeClassName(IndexSegment.class.getName());
 
         this.addressManager = new WormAddressManager(offsetBits);
         

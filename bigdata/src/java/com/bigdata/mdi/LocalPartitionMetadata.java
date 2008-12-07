@@ -41,8 +41,8 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.resources.MoveIndexPartitionTask;
 import com.bigdata.service.DataService;
-
 
 /**
  * An immutable object providing metadata about a local index partition,
@@ -72,6 +72,12 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
      */
     private int partitionId;
 
+    /**
+     * 
+     * @see #getSourcePartitionId()
+     */
+    private int sourcePartitionId;
+    
     /**
      * 
      */
@@ -135,11 +141,28 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
         
     }
     
+//    public LocalPartitionMetadata(//
+//            final int partitionId,//
+//            final byte[] leftSeparatorKey,//
+//            final byte[] rightSeparatorKey,// 
+//            final IResourceMetadata[] resources,//
+//            final String history
+//            ) {
+//        
+//        this(partitionId, -1/* sourcePartitionId */, leftSeparatorKey,
+//                rightSeparatorKey, resources, history);
+//        
+//    }
+    
     /**
      * 
-     * @param partId
+     * @param partitionId
      *            The unique partition identifier assigned by the
      *            {@link MetadataIndex}.
+     * @param sourcePartitionId
+     *            <code>-1</code> unless this index partition is the target
+     *            for a move, in which case this is the partition identifier of
+     *            the source index partition.
      * @param leftSeparatorKey
      *            The first key that can enter this index partition. The left
      *            separator key for the first index partition is always
@@ -172,11 +195,12 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
      *            serialized in order to prevent it from growing without bound.
      */
     public LocalPartitionMetadata(//
-            int partitionId,//
-            byte[] leftSeparatorKey,//
-            byte[] rightSeparatorKey,// 
-            IResourceMetadata[] resources,//
-            String history
+            final int partitionId,//
+            final int sourcePartitionId,//
+            final byte[] leftSeparatorKey,//
+            final byte[] rightSeparatorKey,// 
+            final IResourceMetadata[] resources,//
+            final String history
             ) {
 
         /*
@@ -185,6 +209,8 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
         
         this.partitionId = partitionId;
 
+        this.sourcePartitionId = sourcePartitionId;
+        
         this.leftSeparatorKey = leftSeparatorKey;
 
         this.rightSeparatorKey = rightSeparatorKey;
@@ -241,15 +267,34 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
 
             /*
              * Scan from 1 to n-1 - these are historical resources
-             * (non-writable). Each successive entry in the resources[] should
-             * have an earlier createTime (smaller number) than the one that
-             * follows it.
+             * (non-writable). resources[0] is always the live journal. The
+             * other resources may be either historical journals or index
+             * segments.
+             * 
+             * The order of the array is the order of the view. Reads on a
+             * FusedView will process the resources in the order in which they
+             * are specified by this array.
+             * 
+             * The live journal gets listed first since it can continue to
+             * receive writes and therefore logically comes before any other
+             * resource in the ordering since any writes on the live index on
+             * the journal will be more recent than the data on the index
+             * segment.
+             * 
+             * Normally, each successive entry in the resources[] will have an
+             * earlier createTime (smaller number) than the one that follows it.
+             * However, there is one exception. The createTime of the live
+             * journal MAY be less than the createTime of index segments created
+             * from that journal - this will be true if those indices are
+             * created from a historical view found on that journal and put into
+             * play while the journal is still the live journal. To work around
+             * this we start at the 2nd entry in the array.
              */
-            {
+            if (resources.length > 2) {
 
-                long lastTimestamp = resources[0].getCreateTime();
+                long lastTimestamp = resources[1/*2ndEntry*/].getCreateTime();
 
-                for (int i = 1; i < resources.length; i++) {
+                for (int i = 2/* 3rd entry */; i < resources.length; i++) {
 
                     // createTime of the resource.
                     final long thisTimestamp = resources[i].getCreateTime();
@@ -274,6 +319,24 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
     final public int getPartitionId() {
         
         return partitionId;
+        
+    }
+
+    /**
+     * <code>-1</code> unless this index partition is the target for a move,
+     * in which case this is the partition identifier of the source index
+     * partition and the move operation has not been completed. This property is
+     * used to prevent the target data service from de-defining the index
+     * partition using a split, join or move operation while the MOVE operation
+     * is proceeding. The property is cleared to <code>-1</code> (which is an
+     * invalid index partition identifier) once the move has been completed
+     * successfully.
+     * 
+     * @see MoveIndexPartitionTask
+     */
+    final public int getSourcePartitionId() {
+        
+        return sourcePartitionId;
         
     }
     
@@ -377,6 +440,7 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
 
         return 
         "{ partitionId="+partitionId+
+        (sourcePartitionId!=-1?", sourcePartitionId="+sourcePartitionId:"")+
         ", leftSeparator="+BytesUtil.toString(leftSeparatorKey)+
         ", rightSeparator="+BytesUtil.toString(rightSeparatorKey)+
         ", resourceMetadata="+Arrays.toString(resources)+
@@ -403,6 +467,8 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
         }
 
         partitionId = (int) LongPacker.unpackLong(in);
+
+        sourcePartitionId = in.readInt(); // MAY be -1.
         
         final int nresources = ShortPacker.unpackShort(in);
         
@@ -456,6 +522,8 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
         ShortPacker.packShort(out, VERSION0);
 
         LongPacker.packLong(out, partitionId);
+        
+        out.writeInt(sourcePartitionId); // MAY be -1.
         
         final int nresources = (resources == null ? 0 : resources.length);
         

@@ -68,7 +68,7 @@ public class IndexSegmentIndex extends BTree {
     
         IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
         
-        metadata.setClassName(IndexSegmentIndex.class.getName());
+        metadata.setBTreeClassName(IndexSegmentIndex.class.getName());
         
         return (IndexSegmentIndex) BTree.create(store, metadata);
         

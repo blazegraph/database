@@ -66,7 +66,7 @@ public class JournalIndex extends BTree {
     
         IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
         
-        metadata.setClassName(JournalIndex.class.getName());
+        metadata.setBTreeClassName(JournalIndex.class.getName());
         
         return (JournalIndex) BTree.create(store, metadata);
         

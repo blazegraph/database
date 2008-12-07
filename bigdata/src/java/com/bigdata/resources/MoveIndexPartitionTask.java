@@ -124,55 +124,50 @@ import com.bigdata.service.RawDataServiceTupleIterator;
  * This issue is addressed by the following protocol:
  * <ol>
  * 
- * <li>The source {@link IDataService} notifies the target {@link IDataService}
- * that is wishes to move an index partition onto that {@link IDataService}.
- * The target may choose to disallow the move, in which case the source will
- * choose either another target or a different action for that index partition.
- * This choice is not restart safe for either service.</li>
+ * <li>The {@link MoveIndexPartitionTask} set the
+ * <code>sourcePartitionId</code> on the {@link LocalPartitionMetadata} when
+ * it registers the index partition on the target {@link IDataService}. When
+ * <code>sourcePartitionId != -1</code>. the target {@link IDataService} is
+ * restricted to for that index partition to overflows actions which do not
+ * change the index partition definition (copy, build, or merge). Further, any
+ * index partition found on restart whose by the target {@link IDataService}
+ * whose <code>sourcePartitionId != -1</code> is deleted as it was never
+ * successfully put into play (this prevents partial moves from accumulating
+ * state which could not otherwise be released.)</li>
  * 
- * <li>When the target allows the move, the {@link MoveIndexPartitionTask}
- * explicitly notifies the target when it runs. If the target disallows the
- * operation then the {@link MoveIndexPartitionTask} will fail.</li>
- * 
- * <li>If the target allows the operation, then it posts a notice for the
- * target index partition indicating that it has been only conditionally
- * registered pending the completion of the MOVE. This notice is used to
- * restrict the allowable actions by the target {@link IDataService} to those
- * which do not change the index partition definition (copy, build, or merge).
- * Further, any index partition found on restart by the target
- * {@link IDataService} for which such notice is posted will be deleted as it
- * was never successfully put into play (this prevents partial moves from
- * accumulating state which could not otherwise be released.)</li>
- * 
- * <li>The atomic update task causes the notice to be removed as one of its
- * last actions, thereby allowing the target {@link IDataService} to use
- * operations that could re-define the index parition (split, join, move) and
- * also preventing the target index partition from being deleted on restart.
- * </li>
- * 
- * <li>If the atomic update task fails, then: (a) if the target index partition
- * has already been recorded in the {@link MetadataService} then that definition
- * MUST be rolled back; and (b) the target {@link IDataService} MUST be informed
- * so that it can drop the index partition since its data will never be used and
- * is not even visible to the {@link MetadataService}. </li>
+ * <li>The atomic update task causes the <code>sourcePartitionId</code> to be
+ * set to <code>-1</code> as one of its last actions, thereby allowing the
+ * target {@link IDataService} to use operations that could re-define the index
+ * parition (split, join, move) and also preventing the target index partition
+ * from being deleted on restart. </li>
  * 
  * </ol>
  * 
- * @todo This could be addressed w/ zookeeper, but it might be nice not to have
- *       that dependency for basic operations. Still, it is a distributed lock /
- *       queue problem.
- *       <p>
- *       Where to record the "moveInProgress" indicator and how to coordinate
- *       with the index registration?
- *       <p>
- *       There must be a global lock in order to prevent clients from accessing
- *       the new index partition definition on the {@link MetadataService}
- *       before the atomic update task completes. Likewise, if the atomic update
- *       task fails and the {@link MetadataService} has already been updated,
- *       then we need to rollback the change to the {@link MetadataService}
- *       (replacing the new index partition locator with the old one). Note that
- *       the source index partition is not dropped until the atomic update task
- *       completes successfully.
+ * @todo If the atomic update task fails, then: (a) if the target index
+ *       partition has already been recorded in the {@link MetadataService} then
+ *       that definition MUST be rolled back; and (b) the target index partition
+ *       MUST be dropped from the target {@link IDataService} since its data
+ *       will never be used and is not even visible to the
+ *       {@link MetadataService}.
+ * 
+ * @todo In order to make MOVE atomic we need a more robust mechanism. This
+ *       could be addressed w/ zookeeper. In particular, there must be a global
+ *       lock in order to prevent clients from accessing the new index partition
+ *       definition on the {@link MetadataService} before the atomic update task
+ *       completes. Likewise, if the atomic update task fails and the
+ *       {@link MetadataService} has already been updated, then we need to
+ *       rollback the change to the {@link MetadataService} (replacing the new
+ *       index partition locator with the old one). Note that the source index
+ *       partition is not dropped until the atomic update task completes
+ *       successfully.
+ * 
+ * @todo MOVE could also be a (full or partial) build followed by a copy of the
+ *       index segment(s) in the view to the target data service and finally
+ *       followed by the atomic update, which would copy over any tuples that
+ *       have been buffered on the live journal. This could be much less
+ *       expensive (depending on the state of the source index partition) and
+ *       the data to be moved could be blasted across a socket. Try it out both
+ *       ways.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -253,6 +248,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
 
         newMetadata.setPartitionMetadata(new LocalPartitionMetadata(//
                 newPartitionId,//
+                oldpmd.getPartitionId(),// The source partition identifier.
                 oldpmd.getLeftSeparatorKey(),//
                 oldpmd.getRightSeparatorKey(),//
                 /*
@@ -754,7 +750,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
              * @todo Since the metadata service has already been successfully
              * updated we need to rollback the change on the metadata service if
              * the commit fails for this task.  That really needs to be done by
-             * the caller
+             * the caller.
              */
             
             return ncopied;
@@ -767,7 +763,8 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
      * Task copies data described in a {@link ResultSet} onto the target index
      * partition. This task is invoked by the
      * {@link AtomicUpdateMoveIndexPartitionTask} while the latter holds an
-     * exclusive lock on the source index partition.
+     * exclusive lock on the source index partition.  The task itself runs
+     * on the target {@link IDataService}.
      * <p>
      * Note: This task does not handle re-directs. The target index partition
      * MUST be on the target data service.
@@ -890,6 +887,45 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
                 
             }
 
+            if(rset.isExhausted()) {
+                
+                /*
+                 * The result set is exhausted, which means that we are done
+                 * copying tuples from the source index partition. At this point
+                 * we set [sourcePartitionId = -1] on the target index partition
+                 * as an indication that the MOVE operation is complete.
+                 * 
+                 * @todo this needs to be done atomically while holding a global
+                 * lock. See various other notes in this source file about
+                 * making MOVE robust.
+                 */
+                
+                final LocalPartitionMetadata oldpmd = dst.getIndexMetadata()
+                        .getPartitionMetadata();
+                
+                if (oldpmd.getSourcePartitionId() == -1) {
+
+                    throw new IllegalStateException(
+                            "Expecting the sourcePartitionId to be set.");
+
+                }
+                
+                final LocalPartitionMetadata newpmd = new LocalPartitionMetadata(
+                        oldpmd.getPartitionId(),//
+                        -1, // Note: MOVE is complete.
+                        oldpmd.getLeftSeparatorKey(),//
+                        oldpmd.getRightSeparatorKey(),//
+                        oldpmd.getResources(),//
+                        oldpmd.getHistory()
+                        );
+
+                dst.getIndexMetadata().setPartitionMetadata(newpmd);
+                
+                log.warn("Move finished: cleared sourcePartitionId: name="
+                        + dst.getIndexMetadata().getName());
+                
+            }
+            
             return null;
             
         }
