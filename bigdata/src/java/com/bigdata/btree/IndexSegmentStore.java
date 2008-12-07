@@ -58,6 +58,7 @@ import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.resources.StoreManager;
 import com.bigdata.service.MetadataService;
 
 /**
@@ -82,19 +83,19 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
 
     protected static final boolean DEBUG = log.isDebugEnabled();
 
-    /**
-     * A clone of the properties specified to the ctor.
-     */
-    private final Properties properties;
-    
-    /**
-     * An object wrapping the properties specified to the ctor.
-     */
-    public Properties getProperties() {
-        
-        return new Properties( properties );
-        
-    }
+//    /**
+//     * A clone of the properties specified to the ctor.
+//     */
+//    private final Properties properties;
+//    
+//    /**
+//     * An object wrapping the properties specified to the ctor.
+//     */
+//    public Properties getProperties() {
+//        
+//        return new Properties( properties );
+//        
+//    }
 
     /**
      * The file containing the index segment.
@@ -115,15 +116,15 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      */
     private IndexSegmentAddressManager addressManager;
     
-    /**
-     * See {@link Options#BUFFER_NODES}.
-     */
-    private boolean bufferNodes;
-    
-    /**
-     * See {@link Options#LEAF_CACHE_SIZE}
-     */
-    protected int leafCacheSize;
+//    /**
+//     * See {@link IndexMetadata.Options#INDEX_SEGMENT_BUFFER_NODES}.
+//     */
+//    private boolean bufferNodes;
+//    
+//    /**
+//     * See {@link IndexMetadata.Options#INDEX_SEGMENT_LEAF_CACHE_SIZE}
+//     */
+//    protected int leafCacheSize;
     
     /**
      * An optional <strong>direct</strong> {@link ByteBuffer} containing a disk
@@ -244,82 +245,15 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      */
     private boolean open = false;
 
-    /**
-     * Options understood by the {@link IndexSegmentStore}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public interface Options {
-        
-        /**
-         * The name of the file to be opened.
-         */
-        String SEGMENT_FILE = IndexSegment.class.getName()+".segmentFile";
-        
-        /**
-         * When <code>true</code> an attempt will be made to fully buffer the
-         * index nodes (but not the leaves) using a buffer allocated from the
-         * {@link DirectBufferPool} (default {@value #DEFAULT_BUFFER_NODES}).
-         * <p>
-         * Note: The nodes in the {@link IndexSegment} are serialized in a
-         * contiguous region by the {@link IndexSegmentBuilder}. That region
-         * may be fully buffered, in which case queries against the
-         * {@link IndexSegment} will incur NO disk hits for the nodes and only
-         * one disk hit per visited leaf.
-         * 
-         * @todo The default for this this be an option in the
-         *       {@link IndexMetadata} so that buffering may be controlled on a
-         *       per scale-out-index basis but turned off if desired by 
-         * 
-         * @see #DEFAULT_BUFFER_NODES
-         */
-        String BUFFER_NODES = IndexSegment.class.getName()+".bufferNodes";
-        
-        /**
-         * @see #BUFFER_NODES
-         */
-        String DEFAULT_BUFFER_NODES = "false";
-     
-        /**
-         * The size of the LRU cache backing the weak reference cache for leaves
-         * (default {@value #DEFAULT_LEAF_CACHE_SIZE}).
-         * <p>
-         * While the {@link AbstractBTree} already provides caching for nodes
-         * and leaves based on navigation down the hierarchy from the root node,
-         * the {@link IndexSegment} uses an additional leaf cache to optimize
-         * access to leaves based on the double-linked list connecting the
-         * leaves.
-         * <p>
-         * A larger value will tend to retain leaves longer at the expense of
-         * consuming more RAM when many parts of the {@link IndexSegment} are
-         * hot.
-         */
-        String LEAF_CACHE_SIZE = IndexSegment.class.getName()+".leafCacheSize";
-        
-        /**
-         * 
-         * @see #LEAF_CACHE_SIZE
-         */
-        String DEFAULT_LEAF_CACHE_SIZE = "100";
-        
-    }
-    
-    /**
-     * Used solely to align the old ctor with the new.
-     */
-    private static Properties getDefaultProperties(final File file) {
-
-        if (file == null)
-            throw new IllegalArgumentException();
-
-        Properties p = new Properties();
-        
-        p.setProperty(Options.SEGMENT_FILE, file.toString());
-        
-        return p;
-        
-    }
+//    /**
+//     * Options understood by the {@link IndexSegmentStore}.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    public interface Options {
+//        
+//    }
     
     /**
      * Open a read-only store containing an {@link IndexSegment} using the
@@ -328,10 +262,10 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      * @param file
      *            The name of the store file.
      */
-    public IndexSegmentStore(File file) {
+    public IndexSegmentStore(final File file) {
 
-        this( getDefaultProperties(file));
-
+        this(file, true);
+        
     }
     
     /**
@@ -339,10 +273,16 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      * <p>
      * Note: If an exception is thrown then the backing file will be closed.
      * 
-     * @param properties
-     *            The properties. See {@link Options}.
+     * @param file
+     *            The file
+     * @param load
+     *            <code>true</code> iff you want to load the
+     *            {@link IndexSegment} from the store at this time.
+     *            <code>false</code> if you do not need the
+     *            {@link IndexSegment} right now. Note that the
+     *            {@link IndexSegment} will be transparently (re-)opened as
+     *            necessary.
      * 
-     * @see Options
      * @see #loadIndexSegment()
      * 
      * @throws RuntimeException
@@ -350,27 +290,15 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      * @throws RootBlockException
      *             if the root block is invalid.
      */
-    public IndexSegmentStore(final Properties properties) {
+    public IndexSegmentStore(final File file, final boolean load) {
 
-        if (properties == null)
+        if (file == null)
             throw new IllegalArgumentException();
-
-        // clone to avoid side effects from modifications by the caller.
-        this.properties = (Properties) properties.clone();
 
         // segmentFile
         {
 
-            final String val = properties.getProperty(Options.SEGMENT_FILE);
-
-            if (val == null) {
-
-                throw new RuntimeException("Required property not found: "
-                        + Options.SEGMENT_FILE);
-
-            }
-
-            this.file = new File(val);
+            this.file = file;
             
             try {
                 
@@ -391,33 +319,44 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
 
         }
         
-        reopen();
+        if(load) {
+
+            /*
+             * Load the index segment from the store.
+             * 
+             * Note: This will occur automatically if any requests are made that
+             * need to drill through to the index segment.
+             */
+            
+            reopen();
+            
+        }
 
     }
 
-    /**
-     * @see Configuration#getProperty(IIndexManager, Properties, String, String,
-     *      String)
-     */
-    protected String getProperty(final String globalName,
-            final String defaultValue) {
-
-        return Configuration.getProperty(null/* indexManager */, properties,
-                namespace, globalName, defaultValue);
-
-    }
-
-    /**
-     * @see Configuration#getProperty(IIndexManager, Properties, String, String,
-     *      String, IValidator)
-     */
-    protected <E> E getProperty(final String globalName,
-            final String defaultValue, IValidator<E> validator) {
-
-        return Configuration.getProperty(null/* indexManager */, properties,
-                namespace, globalName, defaultValue, validator);
-
-    }
+//    /**
+//     * @see Configuration#getProperty(IIndexManager, Properties, String, String,
+//     *      String)
+//     */
+//    protected String getProperty(final String globalName,
+//            final String defaultValue) {
+//
+//        return Configuration.getProperty(null/* indexManager */, properties,
+//                namespace, globalName, defaultValue);
+//
+//    }
+//
+//    /**
+//     * @see Configuration#getProperty(IIndexManager, Properties, String, String,
+//     *      String, IValidator)
+//     */
+//    protected <E> E getProperty(final String globalName,
+//            final String defaultValue, IValidator<E> validator) {
+//
+//        return Configuration.getProperty(null/* indexManager */, properties,
+//                namespace, globalName, defaultValue, validator);
+//
+//    }
 
     /**
      * Closes out the {@link IndexSegmentStore} iff it is still open.
@@ -515,11 +454,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
             // The index name.
             namespace = metadata.getName();
             
-            leafCacheSize = getProperty(Options.LEAF_CACHE_SIZE,
-                    Options.DEFAULT_LEAF_CACHE_SIZE, IntegerValidator.GT_ZERO);
-
-            bufferNodes = Boolean.parseBoolean(getProperty(
-                    Options.BUFFER_NODES, Options.DEFAULT_BUFFER_NODES));
+            final boolean bufferNodes = metadata.getIndexSegmentBufferNodes();
 
             /*
              * Read the index nodes from the file into a buffer. If there are no
@@ -578,12 +513,12 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
         
         try {
             
-            Class cl = Class.forName(metadata.getClassName());
+            final Class cl = Class.forName(metadata.getClassName());
             
-            Constructor ctor = cl
+            final Constructor ctor = cl
                     .getConstructor(new Class[] { IndexSegmentStore.class });
 
-            IndexSegment seg = (IndexSegment) ctor
+            final IndexSegment seg = (IndexSegment) ctor
                     .newInstance(new Object[] { this });
             
             return seg;
