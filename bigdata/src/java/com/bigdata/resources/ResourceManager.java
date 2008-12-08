@@ -161,33 +161,33 @@ abstract public class ResourceManager extends OverflowManager implements IResour
                     }
                 });
 
-                tmp.addCounter("Index Partition Incremental Build Count", new Instrument<Long>() {
+                tmp.addCounter("Index Partition Build Count", new Instrument<Long>() {
                     public void sample() {
-                        setValue(incrementalBuildCounter.get());
+                        setValue(indexPartitionBuildCounter.get());
                     }
                 });
                 
-                tmp.addCounter("Index Partition Compacting Merge Count", new Instrument<Long>() {
+                tmp.addCounter("Index Partition Merge Count", new Instrument<Long>() {
                     public void sample() {
-                        setValue(compactingMergeCounter.get());
+                        setValue(indexPartitionMergeCounter.get());
                     }
                 });
                 
                 tmp.addCounter("Index Partition Split Count", new Instrument<Long>() {
                     public void sample() {
-                        setValue(splitCounter.get());
+                        setValue(indexPartitionSplitCounter.get());
                     }
                 });
 
                 tmp.addCounter("Index Partition Join Count", new Instrument<Long>() {
                     public void sample() {
-                        setValue(joinCounter.get());
+                        setValue(indexPartitionJoinCounter.get());
                     }
                 });
 
                 tmp.addCounter("Index Partition Move Count", new Instrument<Long>() {
                     public void sample() {
-                        setValue(moveCounter.get());
+                        setValue(indexPartitionMoveCounter.get());
                     }
                 });
 

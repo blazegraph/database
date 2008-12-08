@@ -141,13 +141,6 @@ import com.bigdata.service.RawDataServiceTupleIterator;
  * 
  * </ol>
  * 
- * @todo If the atomic update task fails, then: (a) if the target index
- *       partition has already been recorded in the {@link MetadataService} then
- *       that definition MUST be rolled back; and (b) the target index partition
- *       MUST be dropped from the target {@link IDataService} since its data
- *       will never be used and is not even visible to the
- *       {@link MetadataService}.
- * 
  * @todo In order to make MOVE atomic we need a more robust mechanism. This
  *       could be addressed w/ zookeeper. In particular, there must be a global
  *       lock in order to prevent clients from accessing the new index partition
@@ -275,7 +268,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
                 ));
 
         // logging information.
-        {
+        if(INFO) {
             
             // #of sources in the view (very fast).
             final int sourceCount = src.getSourceCount();
@@ -290,7 +283,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
                     + ", rangeCount=" + rangeCount + ", sourceCount="
                     + sourceCount;
 
-            log.warn("name=" + getOnlyResource() + ": move("
+            log.info("name=" + getOnlyResource() + ": move("
                     + oldpmd.getPartitionId() + "->" + newPartitionId + ")"
                     + details);
             
@@ -479,8 +472,9 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
             
         }
         
-        log.warn("Successfully moved index partition: source="
-                + sourceIndexName + ", target=" + targetIndexName);
+        if (INFO)
+            log.info("Successfully moved index partition: source="
+                    + sourceIndexName + ", target=" + targetIndexName);
         
         return moveResult;
         
@@ -742,9 +736,11 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
             final String targetIndexName = DataService.getIndexPartitionName(
                     scaleOutIndexName, moveResult.newPartitionId);
 
-            log.warn("Copying buffered writes: targeIndexName="
-                    + targetIndexName + ", oldLocator=" + moveResult.oldLocator
-                    + ", newLocator=" + moveResult.newLocator);
+            if (INFO)
+                log.info("Copying buffered writes: targeIndexName="
+                        + targetIndexName + ", oldLocator="
+                        + moveResult.oldLocator + ", newLocator="
+                        + moveResult.newLocator);
 
             int nchunks = 0; // #of passes.
             long ncopied = 0; // #of tuples copied.
@@ -823,9 +819,8 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
              */
             getJournal().dropIndex(getOnlyResource());
             
-//            if (INFO)
-//                log.info
-            log.warn("Updating metadata index: name=" + scaleOutIndexName
+            if (INFO)
+                log.info("Updating metadata index: name=" + scaleOutIndexName
                         + ", oldLocator=" + moveResult.oldLocator
                         + ", newLocator=" + moveResult.newLocator);
 
@@ -842,7 +837,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
                     StaleLocatorReason.Move);
             
             // notify successful index partition move.
-            resourceManager.moveCounter.incrementAndGet();
+            resourceManager.indexPartitionMoveCounter.incrementAndGet();
 
             /*
              * Note: The new index partition will not be usable until (and
@@ -1025,9 +1020,11 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
                 // set the new index metadata on the live btree.
                 dst.setIndexMetadata(indexMetadata);
                 
-                log.warn("Move finished: cleared sourcePartitionId: name="
-                        + dst.getIndexMetadata().getName());
+                if (INFO)
+                    log.info("Move finished: cleared sourcePartitionId: name="
+                            + dst.getIndexMetadata().getName());
                 
+                // make sure that the BTree will be included in the commit.
                 assert dst.needsCheckpoint() : "name="+dst.getIndexMetadata().getName();
                 
             }

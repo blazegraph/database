@@ -1,6 +1,7 @@
 package com.bigdata.resources;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedChannelException;
@@ -574,8 +575,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                      * move.
                      */
 
-                    log.warn("Skipping index: name=" + name
-                            + ", reason=moveInProgress");
+                    if(INFO)
+                        log.info("Skipping index: name=" + name
+                                + ", reason=moveInProgress");
 
                     continue;
 
@@ -883,13 +885,23 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                                 sourceIndexName, targetDataServiceUUID,
                                 newPartitionId);
 
+                        // get the target service name.
+                        String targetDataServiceName;
+                        try {
+                            targetDataServiceName = resourceManager.getFederation()
+                                    .getDataService(targetDataServiceUUID)
+                                    .getServiceName();
+                        } catch (Throwable t) {
+                            targetDataServiceName = targetDataServiceUUID.toString();
+                        }
+
                         tasks.add(task);
 
                         putUsed(resources[0], "willMoveToJoinWithRightSibling" +//
                                 "( "+sourceIndexName+" -> "+targetIndexName+//
                                 ", leftSibling=" + resources[0] +//
                                 ", rightSibling=" + resources[1] + //
-                                ", targetService=" + targetDataServiceUUID +// 
+                                ", targetService=" + targetDataServiceName +// 
                                 ")");
 
                         nmove++;
@@ -1204,9 +1216,19 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 final UUID targetDataServiceUUID = underUtilizedDataServiceUUIDs[nmove
                         % underUtilizedDataServiceUUIDs.length];
 
+                // get the target service name.
+                String targetDataServiceName;
+                try {
+                    targetDataServiceName = resourceManager.getFederation()
+                            .getDataService(targetDataServiceUUID)
+                            .getServiceName();
+                } catch (Throwable t) {
+                    targetDataServiceName = targetDataServiceUUID.toString();
+                }
+                
                 if (INFO)
                     log.info("Will move " + name + " to dataService="
-                            + targetDataServiceUUID);
+                            + targetDataServiceName);
 
                 // name of the corresponding scale-out index.
                 final String scaleOutIndexName = btree.getIndexMetadata().getName();
@@ -1221,9 +1243,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                         targetDataServiceUUID, newPartitionId);
 
                 tasks.add(task);
-
+                
                 putUsed(name, "willMove(" + name + " -> " + targetName
-                        + ", targetService=" + targetDataServiceUUID + ")");
+                        + ", targetService=" + targetDataServiceName + ")");
 
                 nmove++;
 
@@ -1428,9 +1450,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             }
             log.warn("\nlastCommitTime=" + lastCommitTime + sb);
         }
-
-        if (INFO)
-            log.info("end");
 
         return tasks;
 
@@ -1748,8 +1767,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     + ", elapsed=" + elapsed + "ms");
 
             // The post-condition views.
-//            if(INFO)
-                log.warn("\npost-condition views: overflowCounter="
+            if(INFO)
+                log.info("\npost-condition views: overflowCounter="
                     + resourceManager.overflowCounter.get() + "\n"
                     + resourceManager.listIndexPartitions(ITx.UNISOLATED));
 

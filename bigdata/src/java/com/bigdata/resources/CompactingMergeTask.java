@@ -490,7 +490,7 @@ public class CompactingMergeTask extends
 //            }
 
             // notify successful index partition build.
-            resourceManager.compactingMergeCounter.incrementAndGet();
+            resourceManager.indexPartitionMergeCounter.incrementAndGet();
             
             return null;
 

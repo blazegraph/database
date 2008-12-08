@@ -926,7 +926,7 @@ public class SplitIndexPartitionTask extends
                     StaleLocatorReason.Split);
            
             // notify successful index partition split.
-            resourceManager.splitCounter.incrementAndGet();
+            resourceManager.indexPartitionSplitCounter.incrementAndGet();
 
             return null;
             
