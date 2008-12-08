@@ -566,113 +566,113 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
     private long lastKnownCommitTime;
 
-    /**
-     * Extended to allow the client to be configured with the <em>name</em> of
-     * the {@link DataService} on which a named scale-out index will be
-     * registered using the pattern
-     * <code>register.<i>name</i> = serviceName</code>, where <i>name</i>
-     * is the fully qualified name of the scale-out index and <i>serviceName</i>
-     * is the name of a {@link DataService} as reported by
-     * {@link IService#getServiceName()} and specified in the configuration file
-     * for that service.
-     */
-    public void registerIndex(IndexMetadata metadata) {
-        
-        // the name of the scale-out index.
-        final String indexName = metadata.getName();
-
-        final String serviceName = getClient().getProperties().getProperty(
-                "register." + indexName);
-
-        if (serviceName == null) {
-        
-            // default behavior.
-            super.registerIndex(metadata);
-        
-            return;
-        
-        }
-
-        // lookup the named service.
-        final ServiceItem[] serviceItems = dataServicesClient.serviceMap
-                .getServiceItems(1,
-
-                new ServiceItemFilter() {
-
-                    public boolean check(ServiceItem serviceItem) {
-
-                        final Entry[] a = serviceItem.attributeSets;
-
-                        for (Entry entry : a) {
-
-                            if (!(entry instanceof Name))
-                                continue;
-
-                            if (serviceName.equals(((Name) entry).name)) {
-
-                                // found the named service.
-                                return true;
-
-                            }
-
-                        }
-
-                        return false;
-
-                    }
-
-                });
-
-        if (serviceItems.length == 0) {
-
-            log.warn("Could not locate service: " + serviceName
-                    + " for index: " + indexName);
-
-            // default behavior.
-            super.registerIndex(metadata);
-
-            return;
-
-        }
-
-        // there will be only one value in the array (maxCount==1)
-        final ServiceItem serviceItem = serviceItems[0];
-
-        final IDataService service;
-        try {
-            
-            service = (IDataService)serviceItem.service;
-            
-        } catch(ClassCastException ex) {
-            
-            log.error("Not a data service: "+serviceName);
-            
-            // default behavior.
-            super.registerIndex(metadata);
-            
-            return;
-            
-        }
-
-        final UUID uuid;
-        try {
-            
-            uuid = service.getServiceUUID();
-            
-        } catch (IOException ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
-
-        if (INFO)
-            log.info("Registering index=" + indexName + " on service="
-                    + serviceName);
-        
-        // register on the service having that service name.
-        registerIndex(metadata, uuid);
-        
-    }
+//    /**
+//     * Extended to allow the client to be configured with the <em>name</em> of
+//     * the {@link DataService} on which a named scale-out index will be
+//     * registered using the pattern
+//     * <code>register.<i>name</i> = serviceName</code>, where <i>name</i>
+//     * is the fully qualified name of the scale-out index and <i>serviceName</i>
+//     * is the name of a {@link DataService} as reported by
+//     * {@link IService#getServiceName()} and specified in the configuration file
+//     * for that service.
+//     */
+//    public void registerIndex(final IndexMetadata metadata) {
+//        
+//        // the name of the scale-out index.
+//        final String indexName = metadata.getName();
+//
+//        final String serviceName = getClient().getProperties().getProperty(
+//                "register." + indexName);
+//
+//        if (serviceName == null) {
+//        
+//            // default behavior.
+//            super.registerIndex(metadata);
+//        
+//            return;
+//        
+//        }
+//
+//        // lookup the named service.
+//        final ServiceItem[] serviceItems = dataServicesClient.serviceMap
+//                .getServiceItems(1,
+//
+//                new ServiceItemFilter() {
+//
+//                    public boolean check(ServiceItem serviceItem) {
+//
+//                        final Entry[] a = serviceItem.attributeSets;
+//
+//                        for (Entry entry : a) {
+//
+//                            if (!(entry instanceof Name))
+//                                continue;
+//
+//                            if (serviceName.equals(((Name) entry).name)) {
+//
+//                                // found the named service.
+//                                return true;
+//
+//                            }
+//
+//                        }
+//
+//                        return false;
+//
+//                    }
+//
+//                });
+//
+//        if (serviceItems.length == 0) {
+//
+//            log.warn("Could not locate service: " + serviceName
+//                    + " for index: " + indexName);
+//
+//            // default behavior.
+//            super.registerIndex(metadata);
+//
+//            return;
+//
+//        }
+//
+//        // there will be only one value in the array (maxCount==1)
+//        final ServiceItem serviceItem = serviceItems[0];
+//
+//        final IDataService service;
+//        try {
+//            
+//            service = (IDataService)serviceItem.service;
+//            
+//        } catch(ClassCastException ex) {
+//            
+//            log.error("Not a data service: "+serviceName);
+//            
+//            // default behavior.
+//            super.registerIndex(metadata);
+//            
+//            return;
+//            
+//        }
+//
+//        final UUID uuid;
+//        try {
+//            
+//            uuid = service.getServiceUUID();
+//            
+//        } catch (IOException ex) {
+//            
+//            throw new RuntimeException(ex);
+//            
+//        }
+//
+//        if (INFO)
+//            log.info("Registering index=" + indexName + " on service="
+//                    + serviceName);
+//        
+//        // register on the service having that service name.
+//        registerIndex(metadata, uuid);
+//        
+//    }
     
     /**
      * Note: The invocation layer factory is reused for each exported proxy (but

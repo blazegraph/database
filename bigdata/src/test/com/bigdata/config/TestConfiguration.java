@@ -95,23 +95,25 @@ public class TestConfiguration extends TestCase {
 
         final String namespace = "foo.baz";
         
-        // local property name.
-        final String localName = "bar";
+//        // local property name.
+//        final String localName = "bar";
 
         // global property name.
-        final String globalName = "bigdata."+localName;
+        final String globalName = "bigdata.bar";
         
         final String defaultValue = "goo";
         
-        final String namespaceOverride = "boo";
+        final String overrideValue = "boo";
         
         assertEquals(defaultValue, Configuration.getProperty(indexManager,
                 properties, namespace, globalName, defaultValue));
         
-        properties.setProperty(Configuration.BNS + Configuration.DOT
-                + namespace+Configuration.DOT+localName, namespaceOverride);
-        
-        assertEquals(namespaceOverride, Configuration.getProperty(indexManager,
+        final String overrideName = Configuration.getOverrideProperty(
+                namespace, globalName);
+
+        properties.setProperty(overrideName, overrideValue);
+
+        assertEquals(overrideValue, Configuration.getProperty(indexManager,
                 properties, namespace, globalName, defaultValue));
         
     }
@@ -128,23 +130,25 @@ public class TestConfiguration extends TestCase {
 
         final String namespace = "foo.baz";
 
-        // local property name.
-        final String localName = "bar";
+//        // local property name.
+//        final String localName = "bar";
 
         // global property name.
-        final String globalName = "bigdata." + localName;
+        final String globalName = "bigdata.bar";
 
         final String defaultValue = "goo";
 
-        final String namespaceOverride = "boo";
+        final String overrideName = Configuration.getOverrideProperty(
+                namespace, globalName);
+        
+        final String overrideValue = "boo";
 
         assertEquals(defaultValue, Configuration.getProperty(indexManager,
                 properties, namespace, globalName, defaultValue));
 
-        properties.setProperty(Configuration.BNS + Configuration.DOT + "foo"
-                + Configuration.DOT + localName, namespaceOverride);
+        properties.setProperty(overrideName, overrideValue);
 
-        assertEquals(namespaceOverride, Configuration.getProperty(indexManager,
+        assertEquals(overrideValue, Configuration.getProperty(indexManager,
                 properties, namespace, globalName, defaultValue));
         
     }

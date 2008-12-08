@@ -541,6 +541,7 @@ public class DataServicesClient {
      * 
      * @param name
      *            The service name.
+     *            
      * @return The {@link IDataService} -or- <code>null</code> if there is
      *         none in the cache and a remote lookup times out.
      */
