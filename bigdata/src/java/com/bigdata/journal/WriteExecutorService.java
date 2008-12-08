@@ -1074,6 +1074,10 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                      * commit group by trading off some latency against the size
                      * of the commit group).
                      * 
+                     * Note: If we do not wait (yielding the lock) at least once
+                     * then the task which is performing the group will be the
+                     * only task in the commit group!
+                     * 
                      * Note: This will return normally unless interrupted.
                      * 
                      * @todo config group commit join timeout.
@@ -1248,8 +1252,13 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             /*
              * Wait on condition.
              * 
+             * Note: This yields the [lock] and permits other tasks to join the
+             * commit group. If we do not wait at least ONCE then the task
+             * running the commit will be the ONLY task in the commit group!
+             * 
              * Note: throws InterruptedException
              */
+
             waiting.await(10, TimeUnit.MICROSECONDS);
 
             nanos -= (System.nanoTime() - beginWait);
