@@ -2,6 +2,7 @@ package com.bigdata.resources;
 
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
+import com.bigdata.service.DataService;
 
 /**
  * Abstract base class for results when post-processing a named index
@@ -13,8 +14,9 @@ import com.bigdata.btree.IndexSegment;
 public abstract class AbstractResult {
 
     /**
-     * The name under which the processed index partition was registered
-     * (this is typically different from the name of the scale-out index).
+     * The name under which the processed index partition was registered.
+     * 
+     * @see DataService#getIndexPartitionName(String, int)
      */
     public final String name;
 

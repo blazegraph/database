@@ -1,6 +1,7 @@
 package com.bigdata.resources;
 
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.mdi.PartitionLocator;
@@ -13,13 +14,20 @@ import com.bigdata.mdi.PartitionLocator;
  */
 public class MoveResult extends AbstractResult {
 
-    final UUID targetDataServiceUUID;
+    final public UUID targetDataServiceUUID;
 
-    final int newPartitionId;
+    final public int newPartitionId;
 
-    final PartitionLocator oldLocator;
-    final PartitionLocator newLocator;
+    final public PartitionLocator oldLocator;
+    final public PartitionLocator newLocator;
 
+    /**
+     * <code>false</code> until the target index partition is registered in
+     * the MDS. This is used to decide whether or not we need to rollback a
+     * change in the MDS if the atomic update task fails during the commit.
+     */
+    final protected AtomicBoolean registeredInMDS = new AtomicBoolean(false);
+    
     /**
      * @param name
      * @param indexMetadata

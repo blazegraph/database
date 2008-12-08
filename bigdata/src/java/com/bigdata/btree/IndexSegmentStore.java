@@ -34,16 +34,12 @@ import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
-import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.cache.IValueAge;
-import com.bigdata.config.Configuration;
-import com.bigdata.config.IValidator;
-import com.bigdata.config.IntegerValidator;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
@@ -51,7 +47,6 @@ import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.RootBlockException;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
@@ -60,7 +55,6 @@ import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.StoreManager;
 import com.bigdata.service.DataService;
-import com.bigdata.service.MetadataService;
 
 /**
  * A read-only store backed by a file containing a single {@link IndexSegment}.
@@ -153,12 +147,12 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
     /**
      * The metadata record for the index segment.
      */
-    private final IndexMetadata metadata;
+    private final IndexMetadata indexMetadata;
 
-    /**
-     * The optional bloom filter.
-     */
-    private BloomFilter bloomFilter;
+//    /**
+//     * The optional bloom filter.
+//     */
+//    private BloomFilter bloomFilter;
     
     protected void assertOpen() {
 
@@ -212,23 +206,23 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      */
     public final IndexMetadata getIndexMetadata() {
         
-        return metadata;
+        return indexMetadata;
         
     }
 
-    /**
-     * Return the optional bloom filter.
-     * 
-     * @return The bloom filter -or- <code>null</code> iff the bloom filter
-     *         was not requested when the {@link IndexSegment} was built.
-     */
-    public final BloomFilter getBloomFilter() {
-        
-        assertOpen();
-        
-        return bloomFilter;
-        
-    }
+//    /**
+//     * Return the optional bloom filter.
+//     * 
+//     * @return The bloom filter -or- <code>null</code> iff the bloom filter
+//     *         was not requested when the {@link IndexSegment} was built.
+//     */
+//    public final BloomFilter getBloomFilter() {
+//        
+//        assertOpen();
+//        
+//        return bloomFilter;
+//        
+//    }
     
     /**
      * True iff the store is open.
@@ -246,32 +240,17 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
 //    }
     
     /**
-     * Open a read-only store containing an {@link IndexSegment} using the
-     * default properties.
-     * 
-     * @param file
-     *            The name of the store file.
-     */
-    public IndexSegmentStore(final File file) {
-
-        this(file, true);
-        
-    }
-    
-    /**
-     * Open a read-only store containing an {@link IndexSegment}.
+     * Open a read-only store containing an {@link IndexSegment}, but does not
+     * load the {@link IndexSegment} from the store.
      * <p>
      * Note: If an exception is thrown then the backing file will be closed.
+     * <p>
+     * Note: Normally access to {@link IndexSegmentStore}s is mediated by the
+     * {@link StoreManager} which imposes a canonicalizing weak value cache to
+     * ensure that we do not double-open an {@link IndexSegmentStore}.
      * 
      * @param file
      *            The file
-     * @param load
-     *            <code>true</code> iff you want to load the
-     *            {@link IndexSegment} from the store at this time.
-     *            <code>false</code> if you do not need the
-     *            {@link IndexSegment} right now. Note that the
-     *            {@link IndexSegment} will be transparently (re-)opened as
-     *            necessary.
      * 
      * @see #loadIndexSegment()
      * 
@@ -280,7 +259,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      * @throws RootBlockException
      *             if the root block is invalid.
      */
-    public IndexSegmentStore(final File file, final boolean load) {
+    public IndexSegmentStore(final File file) {
 
         if (file == null)
             throw new IllegalArgumentException();
@@ -302,9 +281,26 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
                 this.addressManager = new IndexSegmentAddressManager(checkpoint);
                 
                 // Read the metadata record.
-                this.metadata = readMetadata();
+                this.indexMetadata = readMetadata();
                 
             } catch (IOException ex) {
+
+                if (raf != null) {
+
+                    try {
+
+                        // close the backing file on error during open.
+                        raf.close();
+                    
+                    } catch (Throwable t) {
+                    
+                        log.warn("Ignored: " + t);
+
+                        // fall through.
+                        
+                    }
+
+                }
 
                 throw new RuntimeException(ex);
                 
@@ -315,44 +311,13 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
 
         }
         
-        if(load) {
-
-            /*
-             * Load the index segment from the store.
-             * 
-             * Note: This will occur automatically if any requests are made that
-             * need to drill through to the index segment.
-             */
-            
-            reopen();
-            
-        }
+        /*
+         * Mark as open so that we can use read(long addr) to read other
+         * data (the root node/leaf).
+         */
+        this.open = true;
 
     }
-
-//    /**
-//     * @see Configuration#getProperty(IIndexManager, Properties, String, String,
-//     *      String)
-//     */
-//    protected String getProperty(final String globalName,
-//            final String defaultValue) {
-//
-//        return Configuration.getProperty(null/* indexManager */, properties,
-//                namespace, globalName, defaultValue);
-//
-//    }
-//
-//    /**
-//     * @see Configuration#getProperty(IIndexManager, Properties, String, String,
-//     *      String, IValidator)
-//     */
-//    protected <E> E getProperty(final String globalName,
-//            final String defaultValue, IValidator<E> validator) {
-//
-//        return Configuration.getProperty(null/* indexManager */, properties,
-//                namespace, globalName, defaultValue, validator);
-//
-//    }
 
     /**
      * Closes out the {@link IndexSegmentStore} iff it is still open.
@@ -365,8 +330,8 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
         
         if(open) {
 
-            final String name = DataService.getIndexPartitionName(metadata
-                    .getName(), metadata.getPartitionMetadata()
+            final String name = DataService.getIndexPartitionName(indexMetadata
+                    .getName(), indexMetadata.getPartitionMetadata()
                     .getPartitionId());
 
             if (INFO)
@@ -441,28 +406,28 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
 
             }
 
-            final boolean bufferNodes = metadata.getIndexSegmentBufferNodes();
-
-            /*
-             * Read the index nodes from the file into a buffer. If there are no
-             * index nodes (that is if everything fits in the root leaf of the
-             * index) then we skip this step.
-             * 
-             * Note: We always read in the root in IndexSegment#_open() and hold
-             * a hard reference to the root while the IndexSegment is open.
-             */
-            if (checkpoint.nnodes > 0 && bufferNodes) {
-
-                bufferIndexNodes();
-
-            }
-
-            if (checkpoint.addrBloom != 0L) {
-
-                // Read in the optional bloom filter from its addr.
-                this.bloomFilter = readBloomFilter();
-
-            }
+//            final boolean bufferNodes = metadata.getIndexSegmentBufferNodes();
+//
+//            /*
+//             * Read the index nodes from the file into a buffer. If there are no
+//             * index nodes (that is if everything fits in the root leaf of the
+//             * index) then we skip this step.
+//             * 
+//             * Note: We always read in the root in IndexSegment#_open() and hold
+//             * a hard reference to the root while the IndexSegment is open.
+//             */
+//            if (checkpoint.nnodes > 0 && bufferNodes) {
+//
+//                bufferIndexNodes();
+//
+//            }
+//
+//            if (checkpoint.addrBloom != 0L) {
+//
+//                // Read in the optional bloom filter from its addr.
+//                this.bloomFilter = readBloomFilter();
+//
+//            }
 
             /*
              * Mark as open so that we can use read(long addr) to read other
@@ -490,6 +455,10 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      * <i>className</i>(IndexSegmentFileStore store)
      * 
      * </code>
+     * <p>
+     * Note: Normally access to {@link IndexSegment}s is mediated by the
+     * {@link StoreManager} which imposes a canonicalizing weak value cache to
+     * ensure that we do not double-open an {@link IndexSegment}.
      * 
      * @param store
      *            The store.
@@ -500,7 +469,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
         
         try {
             
-            final Class cl = Class.forName(metadata.getBTreeClassName());
+            final Class cl = Class.forName(indexMetadata.getBTreeClassName());
             
             final Constructor ctor = cl
                     .getConstructor(new Class[] { IndexSegmentStore.class });
@@ -645,7 +614,8 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
          */
 //        metadata = null;
 
-        bloomFilter = null;
+        // Note: field was moved to IndexSegment.
+//        bloomFilter = null;
         
         open = false;
 
@@ -787,7 +757,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
                 
                 tmp.addCounter("name", new Instrument<String>() {
                     protected void sample() {
-                        final IndexMetadata md = metadata;
+                        final IndexMetadata md = indexMetadata;
                         if (md != null) {
                             setValue(md.getName());
                         }
@@ -796,7 +766,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
 
                 tmp.addCounter("index UUID", new Instrument<String>() {
                     protected void sample() {
-                        final IndexMetadata md = metadata;
+                        final IndexMetadata md = indexMetadata;
                         if (md != null) {
                             setValue(md.getIndexUUID().toString());
                         }
@@ -1034,7 +1004,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      * Note: If the nodes could not be buffered then reads against the nodes
      * will read through to the backing file.
      */
-    private void bufferIndexNodes() throws IOException {
+    protected void bufferIndexNodes() throws IOException {
 
         if (buf_nodes != null) {
 
@@ -1142,7 +1112,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      * @return The bloom filter -or- <code>null</code> if the bloom filter was
      *         not constructed when the {@link IndexSegment} was built.
      */
-    private BloomFilter readBloomFilter() throws IOException {
+    protected BloomFilter readBloomFilter() throws IOException {
 
         final long addr = checkpoint.addrBloom;
         

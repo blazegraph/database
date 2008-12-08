@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
+import java.io.IOException;
+
 import com.bigdata.btree.AbstractBTreeTupleCursor.AbstractCursorPosition;
 import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
 import com.bigdata.cache.LRUCache;
@@ -162,7 +164,7 @@ public class IndexSegment extends AbstractBTree {
         // close the backing file (can be re-opened).
         fileStore.close();
 
-//        // release the optional bloom filter.
+//        // release the optional bloom filter (done by the base class).
 //        bloomFilter = null;
         
         // release the leaf cache.
@@ -240,13 +242,43 @@ public class IndexSegment extends AbstractBTree {
                 new LRUCache<Long, ImmutableLeaf>(
                         fileStore.getIndexMetadata().getIndexSegmentLeafCacheCapacity()));
 
+        // the checkpoint record (read when the backing store is opened).
+        final IndexSegmentCheckpoint checkpoint = fileStore.getCheckpoint();
+
+        // true iff we should fully buffer the nodes region of the index
+        // segment.
+        final boolean bufferNodes = metadata.getIndexSegmentBufferNodes();
+
+        if (checkpoint.nnodes > 0 && bufferNodes) {
+
+            try {
+
+                /*
+                 * Read the index nodes from the file into a buffer. If there
+                 * are no index nodes (that is if everything fits in the root
+                 * leaf of the index) then we skip this step.
+                 * 
+                 * Note: We always read in the root in IndexSegment#_open() and
+                 * hold a hard reference to the root while the IndexSegment is
+                 * open.
+                 */
+                
+                fileStore.bufferIndexNodes();
+                
+            } catch (IOException ex) {
+
+                throw new RuntimeException(ex);
+
+            }
+
+        }
+
         /*
          * Read the root node.
          * 
          * Note: if this is an empty index segment then we actually create a new
          * empty root leaf since there is nothing to be read from the file.
          */
-        final IndexSegmentCheckpoint checkpoint = fileStore.getCheckpoint();
         final long addrRoot = checkpoint.addrRoot;
         if (addrRoot == 0L) {
 
@@ -260,11 +292,22 @@ public class IndexSegment extends AbstractBTree {
             
         }
 
-        /*
-         * Save reference to the optional bloom filter (it is read when the file
-         * is opened).
-         */
-        bloomFilter = fileStore.getBloomFilter();
+        if (checkpoint.addrBloom != 0L) {
+
+            try {
+
+                /*
+                 * Read the optional bloom filter from the backing store.
+                 */
+                bloomFilter = fileStore.readBloomFilter();
+
+            } catch (IOException ex) {
+
+                throw new RuntimeException(ex);
+
+            }
+
+        }
         
         // report on the event.
         ResourceManager.openIndexSegment(null/* name */, fileStore.getFile()

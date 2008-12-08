@@ -79,11 +79,13 @@ public final class SystemUtil
         m_processors = procs;
         m_cpuInfo = info;
 
+        if(log.isInfoEnabled()) {
         log.info("architecture: "+m_architecture);
         log.info("operating system: "+m_osName);
         log.info("operation system version: "+m_osVersion);
         log.info("#processors: "+m_processors);
         log.info("cpu info: "+m_cpuInfo);
+        }
 
     }
 
