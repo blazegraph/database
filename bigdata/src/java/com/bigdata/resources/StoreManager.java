@@ -1384,8 +1384,7 @@ abstract public class StoreManager extends ResourceEvents implements
          */
         private void purgeIncompleteMoves() {
 
-            // FIXME write unit tests and enable.
-            final boolean reallyDelete = false;
+            final boolean reallyDelete = true;
 
             final ManagedJournal liveJournal = liveJournalRef.get();
             
