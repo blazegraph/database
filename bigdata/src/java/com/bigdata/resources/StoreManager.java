@@ -155,9 +155,6 @@ abstract public class StoreManager extends ResourceEvents implements
      * <p>
      * Note: See {@link com.bigdata.journal.Options} for options that may be
      * applied when opening an {@link AbstractJournal}.
-     * <p>
-     * Note: See {@link IndexSegmentStore.Options} for options that may be
-     * applied when opening an {@link IndexSegment}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -1194,6 +1191,11 @@ abstract public class StoreManager extends ResourceEvents implements
             purgeIncompleteMoves();
             
             /*
+             * Purge any resources that we no longer require.
+             */
+            purgeOldResources();
+            
+            /*
              * Notify the timestamp service of the last commit time for the live
              * journal for this data service. This will be zero (0L) iff this is
              * a new journal on a new data service. This notification is
@@ -1376,9 +1378,15 @@ abstract public class StoreManager extends ResourceEvents implements
          * in its {@link LocalPartitionMetadata}) is deleted.
          * 
          * @todo write a unit test for this feature.
+         * 
+         * @todo test MDS to verify that the index partition flagged as an
+         *       incomplete move is not registered as part of scale-out index?
          */
         private void purgeIncompleteMoves() {
-            
+
+            // FIXME write unit tests and enable.
+            final boolean reallyDelete = false;
+
             final ManagedJournal liveJournal = liveJournalRef.get();
             
             // using read-committed view of Name2Addr
@@ -1401,36 +1409,67 @@ abstract public class StoreManager extends ResourceEvents implements
                  */
                 final BTree btree = (BTree) liveJournal.getIndex(entry.checkpointAddr);
                 
+                final String name = btree.getIndexMetadata().getName();
+
                 final LocalPartitionMetadata pmd = btree.getIndexMetadata().getPartitionMetadata();
-                
-                if (pmd != null && pmd.getSourcePartitionId() != -1) {
 
-                    final String name = btree.getIndexMetadata().getName();
+                if (pmd != null) {
 
-                    log
-                            .warn("Incomplete index partition move - will remove index and segments: name="
-                                    + name);
+//                    System.err.println("\nname=" + name + "\npmd=" + pmd);
 
-                    for (IResourceMetadata resource : pmd.getResources()) {
+                    if (pmd.getSourcePartitionId() != -1) {
 
-                        if (resource.isIndexSegment()) {
+                        log.warn("Incomplete index partition move: name="
+                                + name + ", pmd=" + pmd);
 
-                            deleteResource(resource.getUUID(), false/* isJournal */);
+                        for (IResourceMetadata resource : pmd.getResources()) {
+
+                            if (resource.isIndexSegment()) {
+
+                                final File file = resourceFiles.get(resource.getUUID());
+                                
+//                                final File file = new File(segmentsDir,
+//                                        resource.getFile());
+
+                                log.warn("Deleting index segment: " + file);
+
+                                if (file.exists()) {
+
+                                    if (reallyDelete) {
+
+                                        deleteResource(resource.getUUID(),
+                                                false/* isJournal */);
+
+                                    }
+
+                                } else {
+
+                                    log.warn("Could not locate file: " + file);
+                                    
+                                }
+
+                            }
 
                         }
-                        
+
                     }
-                    
+
                 }
 
-                for(String name : toDrop) {
+                if (!toDrop.isEmpty() && reallyDelete) {
 
-                    liveJournal.dropIndex(name);
-                    
+                    for (String s : toDrop) {
+
+                        liveJournal.dropIndex(s);
+
+                    }
+
+                    liveJournal.commit();
+
                 }
-                
+
             }
-            
+
         }
         
     }
@@ -1686,7 +1725,7 @@ abstract public class StoreManager extends ResourceEvents implements
             final IndexSegmentStore segStore;
             try {
 
-                segStore = new IndexSegmentStore(file, false/* load */);
+                segStore = new IndexSegmentStore(file);
 
             } catch (Exception ex) {
 
@@ -2604,13 +2643,8 @@ abstract public class StoreManager extends ResourceEvents implements
      * <p>
      * The caller MUST hold the exclusive lock on the
      * {@link WriteExecutorService}.
-     * 
-     * @throws IllegalStateException
-     *             if the {@link StoreManager} is not running.
      */
     private void purgeOldResources() {
-
-        assertRunning();
 
         if (minReleaseAge == Long.MAX_VALUE) {
 
@@ -3112,8 +3146,15 @@ abstract public class StoreManager extends ResourceEvents implements
                 + isJournal + ", callerWillRemoveFromIndex="
                 + callerWillRemoveFromIndex);
         
-        // can't close out the live journal!
-        if (uuid == getLiveJournal().getRootBlockView().getUUID()) {
+        if (uuid == liveJournalRef.get().getRootBlockView().getUUID()) {
+
+            /*
+             * Can't close out the live journal!
+             * 
+             * Note: using the reference directly since invoked during startup
+             * to delete index segments left lying around if there is an
+             * incomplete move.
+             */
 
             throw new IllegalArgumentException();
             
@@ -3583,6 +3624,8 @@ abstract public class StoreManager extends ResourceEvents implements
      * 
      * @throws IOException
      * @throws InterruptedException
+     * @throws IllegalStateException
+     *             if the {@link StoreManager} is not running.
      */
     public boolean purgeOldResources(final long timeout,
             final boolean truncateJournal) throws InterruptedException {
@@ -3592,12 +3635,19 @@ abstract public class StoreManager extends ResourceEvents implements
 
         if (writeService.tryLock(timeout, TimeUnit.MILLISECONDS)) {
 
+            assertRunning();
+
             try {
 
                 purgeOldResources();
                 
-                if(truncateJournal)
+                if(truncateJournal) {
+
+                    assertRunning();
+                    
                     _truncateJournal();
+                    
+                }
             
                 return true;
         

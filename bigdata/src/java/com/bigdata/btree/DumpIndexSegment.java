@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.apache.log4j.Level;
@@ -69,8 +70,10 @@ public class DumpIndexSegment {
      *            the name of a n {@link IndexSegmentStore} file and
      *            <code>level is the name of the {@link Level} to be used
      *            for the {@link AbstractBTree#dumpLog}</code>
+     *            
+     * @throws IOException 
      */
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         
         if(args.length==0) {
          
@@ -123,7 +126,7 @@ public class DumpIndexSegment {
 
     }
 
-    static void dumpIndexSegment(final File file) {
+    static void dumpIndexSegment(final File file) throws IOException {
 
         /*
          * Note: These options also require you to turn up the logging level in
@@ -189,7 +192,7 @@ public class DumpIndexSegment {
 
     }
 
-    static void dumpHeaders(IndexSegmentStore store) {
+    static void dumpHeaders(IndexSegmentStore store) throws IOException {
 
         System.out.println("file        : " + store.getFile());
 
@@ -199,7 +202,7 @@ public class DumpIndexSegment {
         
         System.out.println("bloomFilter : "
                 + (store.getCheckpoint().addrBloom != IRawStore.NULL ? store
-                        .getBloomFilter().toString() : "N/A"));
+                        .readBloomFilter().toString() : "N/A"));
         
     }
     

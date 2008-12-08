@@ -871,16 +871,26 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                                 .getIndexPartitionName(scaleOutIndexName, pmd
                                         .getPartitionId());
 
+                        // obtain new partition identifier from the metadata service (RMI)
+                        final int newPartitionId = nextPartitionId(scaleOutIndexName);
+
+                        final String targetIndexName = DataService
+                                .getIndexPartitionName(scaleOutIndexName,
+                                        newPartitionId);
+                        
                         final AbstractTask task = new MoveIndexPartitionTask(
                                 resourceManager, lastCommitTime,
-                                sourceIndexName, targetDataServiceUUID);
+                                sourceIndexName, targetDataServiceUUID,
+                                newPartitionId);
 
                         tasks.add(task);
 
-                        putUsed(resources[0], "willMoveToJoinWith(leftSibling="
-                                + resources[0] + ",rightSibling="
-                                + resources[1] + ",target="
-                                + targetDataServiceUUID + ")");
+                        putUsed(resources[0], "willMoveToJoinWithRightSibling" +//
+                                "( "+sourceIndexName+" -> "+targetIndexName+//
+                                ", leftSibling=" + resources[0] +//
+                                ", rightSibling=" + resources[1] + //
+                                ", targetService=" + targetDataServiceUUID +// 
+                                ")");
 
                         nmove++;
                         
@@ -898,6 +908,33 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
         return tasks;
         
+    }
+
+    /**
+     * Requests a new index partition identifier from the
+     * {@link MetadataService} for the specified scale-out index (RMI).
+     * 
+     * @return The new index partition identifier.
+     * 
+     * @throws RuntimeException
+     *             if something goes wrong.
+     */
+    protected int nextPartitionId(final String scaleOutIndexName) {
+
+        try {
+
+            // obtain new partition identifier from the metadata service (RMI)
+            final int newPartitionId = resourceManager.getFederation()
+                    .getMetadataService().nextPartitionId(scaleOutIndexName);
+
+            return newPartitionId;
+        
+        } catch(Throwable t) {
+            
+            throw new RuntimeException(t);
+            
+        }
+ 
     }
     
     protected List<AbstractTask> chooseIndexPartitionMoves() {
@@ -1170,15 +1207,23 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 if (INFO)
                     log.info("Will move " + name + " to dataService="
                             + targetDataServiceUUID);
+
+                // name of the corresponding scale-out index.
+                final String scaleOutIndexName = btree.getIndexMetadata().getName();
+                        
+                final int newPartitionId = nextPartitionId(scaleOutIndexName);
+                
+                final String targetName = DataService.getIndexPartitionName(
+                        scaleOutIndexName, newPartitionId);
                 
                 final AbstractTask task = new MoveIndexPartitionTask(
                         resourceManager, lastCommitTime, name,
-                        targetDataServiceUUID);
+                        targetDataServiceUUID, newPartitionId);
 
                 tasks.add(task);
 
-                putUsed(name, "willMove(name=" + name + ",target="
-                        + targetDataServiceUUID + ")");
+                putUsed(name, "willMove(" + name + " -> " + targetName
+                        + ", targetService=" + targetDataServiceUUID + ")");
 
                 nmove++;
 
