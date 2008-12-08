@@ -80,6 +80,7 @@ import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.Var;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.AbstractSolutionBuffer.InsertSolutionBuffer;
+import com.bigdata.resources.DefaultSplitHandler;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IClientIndex;
 import com.bigdata.striterator.ChunkedWrappedIterator;
@@ -528,7 +529,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
     /**
      * Overrides for the statement indices.
      */
-    protected IndexMetadata getStatementIndexMetadata(SPOKeyOrder keyOrder) {
+    protected IndexMetadata getStatementIndexMetadata(final SPOKeyOrder keyOrder) {
 
         final IndexMetadata metadata = newIndexMetadata(getFQN(keyOrder));
         
@@ -624,7 +625,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
     /**
      * Overrides for the {@link IRawTripleStore#getJustificationIndex()}.
      */
-    protected IndexMetadata getJustIndexMetadata(String name) {
+    protected IndexMetadata getJustIndexMetadata(final String name) {
 
         final IndexMetadata metadata = newIndexMetadata(name);
 

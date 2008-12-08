@@ -129,6 +129,10 @@ import com.bigdata.util.concurrent.QueueStatisticsTask.IQueueCounters;
  *       SNMP aware applications. In this context we could report both the
  *       original counters (as averaged) and the massaged metrics on which we
  *       plan to make decisions.
+ * 
+ * @todo Would it make sense to replace the counters XML mechanism with MXBeans
+ *       specific to bigdata and additional MXBeans for performance counters for
+ *       the operating system?
  */
 abstract public class LoadBalancerService extends AbstractService
     implements ILoadBalancerService, IServiceShutdown {
