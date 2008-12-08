@@ -35,6 +35,7 @@ import java.util.Properties;
 import java.util.UUID;
 
 import org.CognitiveWeb.extser.LongPacker;
+import org.apache.log4j.Logger;
 
 import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.compression.PrefixSerializer;
@@ -54,8 +55,10 @@ import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.DefaultSplitHandler;
+import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IDataService;
 import com.bigdata.sparse.SparseRowStore;
 
 /**
@@ -206,6 +209,10 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
     private static final long serialVersionUID = 4370669592664382720L;
     
+    protected static final Logger log = Logger.getLogger(IndexMetadata.class);
+
+    protected static final boolean INFO = log.isInfoEnabled();
+    
     /**
      * Options and their defaults for the {@link com.bigdata.btree} package and
      * the {@link BTree} and {@link IndexSegment} classes. Options that apply
@@ -312,7 +319,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * different data service instances and an arbitrary instance having the
          * desired name will be used if more than one instance is assigned the
          * same name). The default behavior is to select a data service using
-         * the load balancer, which is done automatically if
+         * the load balancer, which is done automatically by
+         * {@link IBigdataFederation#registerIndex(IndexMetadata, UUID)} if
          * {@link IndexMetadata#getInitialDataServiceUUID()} returns
          * <code>null</code>.
          */
@@ -651,6 +659,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * instance, so no additional lookups are performed during de-serialization.
      * 
      * @see Options#INITIAL_DATA_SERVICE
+     * @see AbstractFederation#registerIndex(IndexMetadata, UUID)
      */
     public UUID getInitialDataServiceUUID() {
         
@@ -1279,20 +1288,74 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
             throw new IllegalArgumentException();
         
         this.name = namespace;
-        
+
         this.indexUUID = indexUUID;
-        
+
+        {
+
+            final String val = getProperty(indexManager, properties, namespace,
+                    Options.INITIAL_DATA_SERVICE, null/* default */);
+
+            if (val != null) {
+
+                /*
+                 * Attempt to interpret the value as either a UUID or the name of 
+                 * a data service joined with the federation.
+                 */
+                
+                UUID uuid = null;
+                try {
+
+                    uuid = UUID.fromString(val);
+                    
+                } catch (Throwable t) {
+                
+                    // Not a UUID.
+                    
+                    if (INFO)
+                        log.info("Not a UUID: " + val);
+                    
+                    // Ignore & fall through.
+                    
+                }
+                
+                if (uuid == null && indexManager != null
+                        && indexManager instanceof IBigdataFederation) {
+
+                    final IBigdataFederation fed = (IBigdataFederation) indexManager;
+
+                    final IDataService dataService = fed
+                            .getDataServiceByName(val);
+
+                    if (dataService != null) {
+
+                        try {
+
+                            uuid = dataService.getServiceUUID();
+
+                        } catch (IOException ex) {
+
+                            log.warn("Could not get serviceUUID", ex);
+
+                            // ignore and fall through.
+
+                        }
+                        
+                    }
+                    
+                }
+             
+                this.initialDataServiceUUID = uuid;
+                
+            }
+            
+        }
+
         this.branchingFactor = getProperty(indexManager, properties, namespace,
                 Options.BTREE_BRANCHING_FACTOR,
                 Options.DEFAULT_BTREE_BRANCHING_FACTOR,
                 new IntegerRangeValidator(Options.MIN_BRANCHING_FACTOR,
                         Options.MAX_BTREE_BRANCHING_FACTOR));
-
-        this.indexSegmentBranchingFactor = getProperty(indexManager,
-                properties, namespace, Options.INDEX_SEGMENT_BRANCHING_FACTOR,
-                Options.DEFAULT_INDEX_SEGMENT_BRANCHING_FACTOR,
-                new IntegerRangeValidator(Options.MIN_BRANCHING_FACTOR,
-                        Options.MAX_INDEX_SEGMENT_BRANCHING_FACTOR));
 
         this.writeRetentionQueueCapacity = getProperty(indexManager,
                 properties, namespace, Options.WRITE_RETENTION_QUEUE_CAPACITY,
@@ -1314,6 +1377,12 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                 properties, namespace, Options.READ_RETENTION_QUEUE_SCAN,
                 Options.DEFAULT_READ_RETENTION_QUEUE_SCAN,
                 IntegerValidator.GTE_ZERO);
+
+        this.indexSegmentBranchingFactor = getProperty(indexManager,
+                properties, namespace, Options.INDEX_SEGMENT_BRANCHING_FACTOR,
+                Options.DEFAULT_INDEX_SEGMENT_BRANCHING_FACTOR,
+                new IntegerRangeValidator(Options.MIN_BRANCHING_FACTOR,
+                        Options.MAX_INDEX_SEGMENT_BRANCHING_FACTOR));
 
         this.indexSegmentBufferNodes = Boolean.parseBoolean(getProperty(
                 indexManager, properties, namespace,
@@ -1478,8 +1547,10 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         // persistent
         sb.append(", name=" + (name == null ? "N/A" : name));
         sb.append(", indexUUID=" + indexUUID);
+        if (initialDataServiceUUID != null) {
+            sb.append(", initialDataServiceUUID=" + initialDataServiceUUID);
+        }
         sb.append(", branchingFactor=" + branchingFactor);
-        sb.append(", indexSegmentBranchingFactor=" + indexSegmentBranchingFactor);
         sb.append(", pmd=" + pmd);
         sb.append(", class=" + btreeClassName);
         sb.append(", checkpointClass=" + checkpointClassName);
@@ -1500,6 +1571,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         sb.append(", splitHandler="
                 + (splitHandler == null ? "N/A" : splitHandler.getClass()
                         .getName()));
+        sb.append(", indexSegmentBranchingFactor=" + indexSegmentBranchingFactor);
+        sb.append(", indexSegmentBufferNodes=" + indexSegmentBufferNodes);
+        sb.append(", indexSegmentLeafCacheCapacity=" + indexSegmentLeafCacheCapacity);
 
         return sb.toString();
         

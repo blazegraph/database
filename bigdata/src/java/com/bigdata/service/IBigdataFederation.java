@@ -218,9 +218,15 @@ public interface IBigdataFederation extends IIndexManager {
      *            name of the scale-out index).
      * @param dataServiceUUID
      *            The data service identifier (optional). When <code>null</code>,
-     *            a data service will be selected automatically.
+     *            a data service will be selected automatically. If
+     *            {@link IndexMetadata.Options#INITIAL_DATA_SERVICE} was
+     *            specified, then the identified service will be used. Otherwise
+     *            an underutilized service will be selected using the
+     *            {@link ILoadBalancerService}.
      * 
      * @return The UUID of the registered index.
+     * 
+     * @see IndexMetadata.Options#INITIAL_DATA_SERVICE
      * 
      * @todo change to void return
      */

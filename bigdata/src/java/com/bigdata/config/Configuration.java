@@ -34,6 +34,7 @@ import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.RelationSchema;
@@ -80,7 +81,7 @@ public class Configuration {
     /**
      * The prefix for namespace specific property value overrides.
      */
-    public static final transient String BNS = "com.bigdata.namespace";
+    public static final transient String NAMESPACE = "com.bigdata.namespace";
 
     /**
      * The namespace separator character.
@@ -98,25 +99,29 @@ public class Configuration {
      * the caller and will be used if the value is not overriden using any of
      * the other methods.</li>
      * 
-     * <li>The default value may be globally overriden using the fully
-     * qualified name of the property (its <i>globalName</i>). For example, you
-     * can override {@link IndexMetadata#getBranchingFactor()} for all indices
-     * by specifying a value for
+     * <li>The default value may be globally overriden using the property name.
+     * For example, you can override the default branching factor for all
+     * {@link BTree}s by specifying a value for
      * {@link IndexMetadata.Options#BTREE_BRANCHING_FACTOR}. In general, the
-     * name of the global property is declared by an interface. </li>
+     * name of the property is declared by an interface along with its default
+     * value. </li>
      * 
      * <li>Any value may be overriden by a value that is specific to the
-     * <i>namespace</i> or to any prefix of that <i>namespace</i> which can be
-     * formed by chopping off the namespace at a {@link #DOT}. For example, you
-     * can override the branching factor property for an index named
+     * <i>namespace</i> (or to any prefix of that <i>namespace</i> which can
+     * be formed by chopping off the namespace at a {@link #DOT}). For example,
+     * you can override the branching factor property for an index named
      * <code>foo.myIndex</code> by specifying a value for the property name
-     * <code>bigdata.namespace.foo.myIndex.branchingFactor</code> or you can
+     * <code>com.bigdata.namespace.foo.myIndex.com.bigdata.btree.BTree.branchingFactor</code> ({@value #NAMESPACE}
+     * is the {@link #NAMESPACE} prefix for overrides, <code>foo.myIndex</code>
+     * is the name of the index, and
+     * {@value IndexMetadata.Options#BTREE_BRANCHING_FACTOR} is the name of the
+     * property that will be overriden for that index). Alternatively you can
      * override the branching factor for all indices in the "foo" relation by
      * specifying a value for the property name
-     * <code>bigdata.namespace.foo.branchingFactor</code>. When an override
-     * is specified in this manner, the <em>localName</em> of the property is
-     * formed by retaining the last component of the corresponding global name
-     * of the property.</li>
+     * <code>com.bigdata.namespace.foo.com.bigdata.btree.BTree.branchingFactor</code>.
+     * Note: You can use {@link #getOverrideProperty(String, String)} to form
+     * these property names automatically, including from within a Jini
+     * configuration file.</li>
      * 
      * </ol>
      * 
@@ -127,9 +132,8 @@ public class Configuration {
      *            will be resolved.
      * @param namespace
      *            The namespace of the index, relation, etc (optional).
-     * @param globalName
-     *            The fully qualified name of the property whose default value
-     *            is requested.
+     * @param propertyName
+     *            The name of the property whose default value is requested.
      * @param defaultValue
      *            The value for that property that will be returned if the
      *            default has not been overriden as described above (optional).
@@ -140,10 +144,10 @@ public class Configuration {
      */
     public static String getProperty(final IIndexManager indexManager,
             final Properties properties, final String namespace,
-            final String globalName, final String defaultValue) {
+            final String propertyName, final String defaultValue) {
     
         final NV nv = getProperty2(indexManager, properties, namespace,
-                globalName, defaultValue);
+                propertyName, defaultValue);
         
         if(nv == null) return null;
         
@@ -178,7 +182,7 @@ public class Configuration {
         String key = null;
         String val = null;
 
-        final String localName = getLocalName(globalName);
+        final String localName = globalName;//getLocalName(globalName);
 
         /*
          * Look for a namespace match, or a match on any prefix of the namespace
@@ -188,7 +192,7 @@ public class Configuration {
         if (namespace != null) {
             
             // right size the buffer.
-            final StringBuilder sb = new StringBuilder(BNS.length() + 1
+            final StringBuilder sb = new StringBuilder(NAMESPACE.length() + 1
                     + namespace.length() + 1 + localName.length());
 
             /*
@@ -200,7 +204,7 @@ public class Configuration {
             while (prefix.length() > 0) {
 
                 sb.setLength(0); // reset each time.
-                sb.append(BNS);
+                sb.append(NAMESPACE);
                 sb.append(DOT);
                 sb.append(prefix);
                 sb.append(DOT);
@@ -290,25 +294,25 @@ public class Configuration {
         
     }
     
-    /**
-     * Return the last component of the globalName.
-     * <p>
-     * Note: If '.' does not appear, then lastIndexOf == -1 and beginIndex :=
-     * lastIndexOf + 1 == 0, so the localName will be the same as the
-     * globalName.
-     * 
-     * @param globalName
-     *            The global name of some property.
-     */
-    static protected String getLocalName(String globalName) {
-
-        final int lastIndexOf = globalName.lastIndexOf(DOT);
-
-        final String localName = globalName.substring(lastIndexOf + 1);
-
-        return localName;
-            
-    }
+//    /**
+//     * Return the last component of the globalName.
+//     * <p>
+//     * Note: If '.' does not appear, then lastIndexOf == -1 and beginIndex :=
+//     * lastIndexOf + 1 == 0, so the localName will be the same as the
+//     * globalName.
+//     * 
+//     * @param globalName
+//     *            The global name of some property.
+//     */
+//    static protected String getLocalName(String globalName) {
+//
+//        final int lastIndexOf = globalName.lastIndexOf(DOT);
+//
+//        final String localName = globalName.substring(lastIndexOf + 1);
+//
+//        return localName;
+//            
+//    }
     
     /**
      * Resolve the value to a {@link DataService} {@link UUID}.
@@ -386,5 +390,33 @@ public class Configuration {
         return null;
 
     }
-    
+
+    /**
+     * Return the name that can be used to overrride the specified property for
+     * the given namespace.
+     * 
+     * @param namespace
+     *            The namespace (of an index, relation, etc).
+     * @param property
+     *            The global property name.
+     *            
+     * @return The name that is used to override that property for that
+     *         namespace.
+     */
+    public static String getOverrideProperty(final String namespace,
+            final String property) {
+        
+        final String override = NAMESPACE + DOT + namespace + DOT + property;
+        
+        if(INFO) {
+            
+            log.info("namespace=" + namespace + ", property=" + property
+                    + ", override=" + override);
+
+        }
+
+        return override;
+
+    }
+
 }

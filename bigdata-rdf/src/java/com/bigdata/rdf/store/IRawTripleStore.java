@@ -32,7 +32,6 @@ import org.openrdf.model.Value;
 import com.bigdata.btree.IIndex;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.lexicon.ITermIdCodes;
-import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.StatementEnum;
@@ -61,14 +60,14 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
     /**
      * Value used for a "NULL" term identifier.
      */
-    public static final long NULL = 0L;
+    long NULL = 0L;
     
     /**
      * The #of terms in a statement (3 is a triple store, 4 is a quad store).
      * 
      * @todo use this constant throughout and then change over to a quad store.
      */
-    public static final int N = 3;
+    int N = 3;
 
     /**
      * Constant appended to the database namespace to obtain the
@@ -80,28 +79,7 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      * Constant appended to the database namespace to obtain the
      * {@link LexiconRelation}'s namespace.
      */
-    String NAME_LEXICON_RELATION = ".lexicon.";
-    
-    /**
-     * The name of the index mapping terms to term identifiers.
-     * 
-     * @todo deprecate by {@link LexiconKeyOrder}
-     */
-    static final public String name_term2Id = LexiconKeyOrder.TERM2ID.toString();
-    
-    /**
-     * The name of the index mapping term identifiers to terms.
-     */
-    static final public String name_id2Term = LexiconKeyOrder.ID2TERM.toString();
-
-    /*
-     * The names of the various statement indices. 
-     */
-    
-    /**@todo deprecate by {@link SPOKeyOrder}*/
-    static final public String name_spo = SPOKeyOrder.SPO.toString();
-    static final public String name_pos = SPOKeyOrder.POS.toString();
-    static final public String name_osp = SPOKeyOrder.OSP.toString();
+    String NAME_LEXICON_RELATION = ".lex.";
     
     /**
      * The name of the optional index in which {@link Justification}s are

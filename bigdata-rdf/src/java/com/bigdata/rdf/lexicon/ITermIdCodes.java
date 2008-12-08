@@ -31,14 +31,12 @@ import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 
-import com.bigdata.rdf.store.IRawTripleStore;
-
 /**
  * An interface that defines bit masks that are applied to the low bits of the
  * assigned term identifiers and which indicate directly (without consulting the
  * term index) whether a term is a URI, Literal, BNode, or Statement. This is
  * used to quickly test the type of a term identifier without requiring the term
- * value to be materialized from the {@link IRawTripleStore#name_id2Term} index.
+ * value to be materialized from the {@link LexiconKeyOrder#ID2TERM} index.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
