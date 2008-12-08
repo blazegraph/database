@@ -1006,6 +1006,10 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
 
                 }
                 
+                // clone the current metadata record for the live index.
+                final IndexMetadata indexMetadata = dst.getIndexMetadata().clone();
+
+                // clear the sourcePartitionId.
                 final LocalPartitionMetadata newpmd = new LocalPartitionMetadata(
                         oldpmd.getPartitionId(),//
                         -1, // Note: MOVE is complete.
@@ -1015,10 +1019,16 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
                         oldpmd.getHistory()
                         );
 
-                dst.getIndexMetadata().setPartitionMetadata(newpmd);
+                // set the new partition metadata on the index metadata.
+                indexMetadata.setPartitionMetadata(newpmd);
+                
+                // set the new index metadata on the live btree.
+                dst.setIndexMetadata(indexMetadata);
                 
                 log.warn("Move finished: cleared sourcePartitionId: name="
                         + dst.getIndexMetadata().getName());
+                
+                assert dst.needsCheckpoint() : "name="+dst.getIndexMetadata().getName();
                 
             }
             
