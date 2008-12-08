@@ -40,7 +40,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
-import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -67,8 +66,6 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
-import com.bigdata.btree.filter.IFilterConstructor;
-import com.bigdata.btree.filter.ITupleFilter;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.IConcurrencyManager;
@@ -143,14 +140,12 @@ import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 import com.bigdata.relation.rule.eval.ISolution;
-import com.bigdata.resources.OverflowManager;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.search.IHit;
 import com.bigdata.service.AbstractEmbeddedDataService;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IClientIndex;
-import com.bigdata.service.IDataService;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ChunkedConvertingIterator;
 import com.bigdata.striterator.DelegateChunkedIterator;
@@ -170,28 +165,11 @@ import com.bigdata.striterator.IKeyOrder;
  * it is easy to write new rules. Those {@link IRule}s can be introduced using
  * custom {@link BaseClosure} implementations. See {@link Options#CLOSURE_CLASS}.
  * 
- * @todo sesame 2.x TCK (technology compatibility kit).
- * 
- * @todo retest on 1B+ triples (single host single threaded and concurrent data
- *       load and scale-out architecture with concurrent data load and policy
- *       for deciding which host loads which source files).
- * 
- * @todo test on 10, 20, 40, ... nodes using dynamic partitioning and scale-out
- *       indices.
- * 
- * @todo examine role for semi joins (join indices) - these can be declared for
- *       various predicate combinations and then maintained, effectively by
- *       rules using the existing TM mechanisms.
+ * @todo Run the Sesame 2.x TCK (technology compatibility kit).
  * 
  * @todo Support rules (IF TripleExpr THEN ...) This is basically encapsulating
  *       the rule execution layer.
  * 
- * @todo Replace IElementFilter with ITupleFilter or ITupleFilter[].
- *       <p>
- *       This will allow us to use the prefix scan and distinct term scans
- *       directly from an IRule by specifying the appropriate predicate
- *       filter(s)
- *       
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -253,8 +231,7 @@ abstract public class AbstractTripleStore extends
      * The purpose of statement identifiers is to allow statements about
      * statements without recourse to RDF style reification.
      * 
-     * @todo by {@link SPORelation#statementIdentifiers} or keep this here and
-     *       resolve it from {@link SPORelation}?
+     * @see Options#STATEMENT_IDENTIFIERS
      */
     final protected boolean statementIdentifiers;
     
@@ -301,17 +278,16 @@ abstract public class AbstractTripleStore extends
     }
     
     /**
-     * Return true iff the fully bound statement is an axiom.
+     * Return <code>true</code> iff the fully bound statement is an axiom.
      * 
      * @param s
+     *            The term identifier for the subject position.
      * @param p
+     *            The term identifier for the predicate position.
      * @param o
-     * 
-     * @return
-     * 
-     * @todo longs or ISPO?
+     *            The term identifier for the object position.
      */
-    public boolean isAxiom(long s, long p, long o) {
+    public boolean isAxiom(final long s, final long p, final long o) {
         
         return getAxioms().isAxiom(s, p, o);
         
@@ -331,9 +307,6 @@ abstract public class AbstractTripleStore extends
      * automatically be retracted if a statement they describe is retracted (a
      * micro form of truth maintenance that is always enabled when statement
      * identifiers are enabled).
-     * 
-     * @todo by {@link SPORelation#statementIdentifiers} or keep this here and
-     *       resolve it from {@link SPORelation}?
      */
     public boolean getStatementIdentifiers() {
         
@@ -393,7 +366,7 @@ abstract public class AbstractTripleStore extends
     /**
      * Configuration options.
      * 
-     * @todo refactor options to {@link SPORelation} and {@link LexiconRelation}.
+     * @todo refactor options to/from {@link SPORelation} and {@link LexiconRelation}?
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -556,41 +529,6 @@ abstract public class AbstractTripleStore extends
         String BLOOM_FILTER = AbstractTripleStore.class.getName() + ".bloomFilter";
         
         String DEFAULT_BLOOM_FILTER = "false";
-        
-//        /**
-//         * Optional property gives the {@link UUID} of the {@link IDataService}
-//         * on which the indices for the {@link LexiconRelation} will be
-//         * registered. This property only used for {@link IBigdataFederation}s
-//         * and only when {@link IBigdataFederation#isScaleOut()} is
-//         * <code>true</code> (it is ignored for temporary stores created when
-//         * the deployment is scale-out since the temporary stores use a
-//         * different index manager).
-//         * <p>
-//         * Note: You can lock the {@link LexiconRelation} onto a specific
-//         * {@link IDataService} using this option if you also disable
-//         * {@link OverflowManager.Options#MAXIMUM_MOVES_PER_TARGET} or disable
-//         * {@link OverflowManager.Options#OVERFLOW_ENABLED} for the specified
-//         * {@link IDataService}.
-//         * 
-//         * @see FullTextIndex.Options#DATA_SERVICE_UUID
-//         */
-//        String LEXICON_RELATION_DATA_SERVICE_UUID = "LexiconRelation.dataServiceUUID";
-//
-//        /**
-//         * Optional property gives the {@link UUID} of the {@link IDataService}
-//         * on which the indices for the {@link SPORelation} will be registered.
-//         * This property only used for {@link IBigdataFederation}s and only
-//         * when {@link IBigdataFederation#isScaleOut()} is <code>true</code>
-//         * (it is ignored for temporary stores created when the deployment is
-//         * scale-out since the temporary stores use a different index manager).
-//         * <p>
-//         * Note: You can lock the {@link SPORelation} onto a specific
-//         * {@link IDataService} using this option if you also disable
-//         * {@link OverflowManager.Options#MAXIMUM_MOVES_PER_TARGET} or disable
-//         * {@link OverflowManager.Options#OVERFLOW_ENABLED} for the specified
-//         * {@link IDataService}.
-//         */
-//        String SPO_RELATION_DATA_SERVICE_UUID = "SPORelation.dataServiceUUID";
         
         /**
          * When <code>true</code> (default {@value Options#DEFAULT_JUSTIFY}),
@@ -1459,44 +1397,38 @@ abstract public class AbstractTripleStore extends
      * Note: In order to get the #of explicit statements in the repository we
      * have to actually do a range scan and figure out for each statement
      * whether or not it is explicit.
-     * 
-     * @todo Re-write using an {@link ITupleFilter} that gets evaluated local to
-     *       the statement indices and avoids sending back either the keys or
-     *       the values. All we need is the count of the #of tuples that
-     *       satisify an {@link ExplicitSPOFilter}. This will have to be
-     *       written to the {@link IAccessPath#rangeIterator()} method either
-     *       that method will have to accept a {@link IFilterConstructor} or we
-     *       can generate an {@link SPOPredicate} and specify a predicate
-     *       constraint that will do what we want directly.
      */
     public long getExplicitStatementCount() {
 
-        long n = 0;
-
-        final IChunkedOrderedIterator<ISPO> itr = getAccessPath(SPOKeyOrder.SPO,
-                ExplicitSPOFilter.INSTANCE).iterator();
-
-        try {
-
-            while (itr.hasNext()) {
-
-                final ISPO[] chunk = itr.nextChunk();
-
-                n += chunk.length;
-
-            }
-
-            return n;
-
-        } finally {
-
-            itr.close();
-            
-        }
+        return getAccessPath(SPOKeyOrder.SPO, ExplicitSPOFilter.INSTANCE)
+                .rangeCount(true/* exact */);
+        
+//        long n = 0;
+//
+//        final IChunkedOrderedIterator<ISPO> itr = getAccessPath(SPOKeyOrder.SPO,
+//                ExplicitSPOFilter.INSTANCE).iterator();
+//
+//        try {
+//
+//            while (itr.hasNext()) {
+//
+//                final ISPO[] chunk = itr.nextChunk();
+//
+//                n += chunk.length;
+//
+//            }
+//
+//            return n;
+//
+//        } finally {
+//
+//            itr.close();
+//            
+//        }
         
     }
     
-    final public long getStatementCount(boolean exact) {
+    final public long getStatementCount(final boolean exact) {
 
         final IIndex ndx = getSPOIndex();
 
@@ -1589,7 +1521,7 @@ abstract public class AbstractTripleStore extends
     /**
      * Delegates to the batch API.
      */
-    public long addTerm(Value value) {
+    public long addTerm(final Value value) {
 
         final BigdataValue[] terms = new BigdataValue[] {//
 
@@ -1603,13 +1535,13 @@ abstract public class AbstractTripleStore extends
 
     }
 
-    final public BigdataValue getTerm(long id) {
+    final public BigdataValue getTerm(final long id) {
 
         return getLexiconRelation().getTerm(id);
 
     }
 
-    final public long getTermId(Value value) {
+    final public long getTermId(final Value value) {
 
         return getLexiconRelation().getTermId(value);
         
@@ -2662,8 +2594,11 @@ abstract public class AbstractTripleStore extends
      * @todo method signature could be changed to accept the source access path
      *       for the read and then just write on the database
      */
-    public long copyStatements(AbstractTripleStore dst, IElementFilter<ISPO> filter,
-            boolean copyJustifications) {
+    public long copyStatements(//
+            final AbstractTripleStore dst,//
+            final IElementFilter<ISPO> filter,//
+            final boolean copyJustifications//
+            ) {
 
         if (dst == this)
             throw new IllegalArgumentException();
@@ -3029,8 +2964,10 @@ abstract public class AbstractTripleStore extends
      *       enabled since you have to serialize incremental TM operations
      *       anyway.)
      */
-    public long removeStatements(IChunkedOrderedIterator<ISPO> itr,
-            boolean computeClosureForStatementIdentifiers) {
+    public long removeStatements(//
+            IChunkedOrderedIterator<ISPO> itr,
+            final boolean computeClosureForStatementIdentifiers//
+            ) {
 
         if (itr == null)
             throw new IllegalArgumentException();
@@ -3172,7 +3109,9 @@ abstract public class AbstractTripleStore extends
          * writers because it is backed by a TemporaryStore and not a Journal
          * (with its concurrency controls). This is handled in AccessPath by
          * always using a fully buffered iterator(), so we do not really gain
-         * the ability to scale-up from the TempTripleStore.
+         * the ability to scale-up from the TempTripleStore (we could create the
+         * TempTripleStore on a Journal using Temporary buffer mode and get the
+         * concurrency controls).
          */
         long statementCount0;
         long statementCount1;
@@ -3273,8 +3212,8 @@ abstract public class AbstractTripleStore extends
      *       when a data typed literal or a URI is used (typed query).
      */
     @SuppressWarnings("unchecked")
-    public Iterator<IHit> textSearch(String languageCode, String text)
-            throws InterruptedException {
+    public Iterator<IHit> textSearch(final String languageCode,
+            final String text) throws InterruptedException {
 
         return getSearchEngine().search(text, languageCode);
 
