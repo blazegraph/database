@@ -790,6 +790,72 @@ Short term tasks:
        capacity.  (The run may have been out of disk space by the time
        these errors emerged.)
 
+     * It would be useful to have AND as well as OR semantics for
+       "filter=".
+
+     * Change the TITLE for the httpd counter view to the hostname and
+       the last component of the path, e.g.:
+
+	    hostname  ... serviceIFace ... lastComponent
+
+       Or use the last 60 characters of the path, etc.  The point is to
+       have titles that are somewhat easier to figure out.
+
+     * It could be useful to have a view by serviceIface rather than
+       host.  This could be assembled dynamically by a scan of the
+       services across the hosts.
+
+     - The IndexManager view of the LBS needs to aggregate some key
+       statistics by index across the index partitions including the #of
+       index entries on the data service and the time spent on the index
+       (perhaps broken down by IO, serialization, key search, etc., but
+       definately the aggregate time).  I am just not getting enough
+       information from this view and digging down makes it too
+       difficult to get the gestalt state of the indices without copying
+       a correlated view of the counters into Excel.
+
+     - Done. Review the per-service scores, but I really need to have
+       more than one service on a host for this.  It should probably be
+       using a response time measure, e.g., averageQueuingTime.
+
+     - Done (problem was timestamp parsing since only the time of day
+       was being reported, not the UTC time - it now uses the system
+       clock). Now I am not seeing any host CPU scores aggregated by the
+       load balancer.
+
+     - Done. The normalized [score] is not being computed for hosts or
+       services (it is always zero).
+
+     - ResourceManager's performance counters do not reveal
+       read-historical indices (or read-committed?), just those where
+       we write on the index.  This makes the index metadata
+       unavailable during read-only runs, such as the lubm benchmark.
+
+     - use the service name for the performance counter paths, however
+       this can be a problem if service names are modified over time or
+       simply not unique, so maybe make that an option?
+
+     - support performance counter collection, aggregation, httpd
+       service and periodic counter set logging for LTS, which means
+       for the Journal.
+
+     - Add by task reporting of performance counters (#of invocations,
+       time, and RMI latency if available).
+
+       Counters that aggregate across all instances of the same type of
+       task submitted by the client against some service.  There needs
+       to be some handshaking with the service that is executing the
+       task in order for this data to be collected.  E.g., in
+       beforeExecute() and afterExecute().  Those methods need to track
+       a subset of timing data by the Class of the task that is being
+       executed.  The resulting Map<Class,TaskCounters> needs to be
+       reported out by the client along with the rest of the counters
+       collected for that service (reported by the
+       QueueStatisticsTask).
+
+       private final Map<Class, TaskCounters> taskCountersByProc = new
+       HashMap<Class, TaskCounters>();
+      
    - Admin UI
    
      - It would be nice to be able to drill down into the index data,
@@ -1425,18 +1491,6 @@ Main issues:
 
 ============================================================
 
-(*) Index and other performance tuning.
-
-    (-) The best branching factor for an Index Segment is probably
-        limited by the best branching factor for query (or closure)
-        benchmarks.  For the triple store, this looks like it is 256
-        since closure performance takes a beating after that.
-
-    (*) Try co-threading the forward index writes for the statements
-	with the reverse index writes for the term identifiers.
-
-============================================================
-
 (*) Scale-out performance
 
     - Estimate parameters for the scale-out model.
@@ -1605,24 +1659,8 @@ JF-U100-host23-2DS:  ******** RUNNING NOW *********
     Running JF U100 on host3 right now to get some data on queue
     behavior with dynamic index partitioning.  Some questions are:
 
-    - Change the default split point and verify build and split
-      behavior on both the workstation and the server using U100 and
-      one data service.
-
-    - Do I need to increase the client timeout for Jini?  It seems
-      that I probably do.  Perhaps double it to 40 seconds?  Or
-      perhaps make the default much longer (1 minute, 5 minutes or
-      infinite) since tasks could be queued up.
-
-    - Are good decisions being made with regard to build and split of
-      index partitions?
-
     - Are good decisions being made with regard to index partition
       moves?
-
-    * Configure to hold more indices open per data service.  This
-      should be done in the bigdata.properties files for each data
-      service.
 
     * Observe the metadata service response time and verify that it
       does not become a bottleneck since the current implementation is
@@ -1659,8 +1697,6 @@ JF-U100-host23-2DS:  ******** RUNNING NOW *********
       of hardware add and hardware fail tests).
 
 ============================================================
-
-
 - Scale-out scripts
 
     - Script to collect nohups, config files, and counters in a
@@ -1715,73 +1751,6 @@ JF-U100-host23-2DS:  ******** RUNNING NOW *********
 
 - Overflow processing
 
-   *** If overflow processing is taken so long then there is a
-       problem.  Perhaps there needs to be an alternative that lies
-       between an index partition "copy" and a full compacting build,
-       e.g., an incremental build that lets us discard the old
-       journal.  It would generate an index segment having just the
-       last committed state for the BTree absorbing writes for that
-       index partition on the old journal.  The view of the index
-       partition on the new journal would be updated when the task was
-       complete.  A full build would have the effect of combining the
-       history from several such incremental builds.
-
-       Likewise, we may need to trade off how many splits we perform
-       choosing to do incremental builds instead to keep down the
-       total processing time/costs for asynchronous overflow
-       processing.
-
-       Can an analysis of the queue concurrency with locks held help
-       decide whether some index partition should be moved to another
-       data service?
-
-   - Done. Asynch overflow needs to report the index and task for each
-     failure as part of the exception.
-
-   - Done. Metadata service needs to report the scale-out index name
-     (or the index partition name) for "No such locator" errors.
-
-   - Done. Add the createTime to the live journal counters.
-
-   - Done. Move the LBS counters from /var/log/bigdata to
-     /var/bigdata.  Update scripts in CVS and on the server and the
-     script documentation.
-
-   * It would be useful to have AND as well as OR semantics for
-     "filter=".
-
-   * Change the TITLE for the httpd counter view to the hostname and
-     the last component of the path, e.g.:
-
-	  hostname  ... serviceIFace ... lastComponent
-
-     Or use the last 60 characters of the path, etc.  The point is to
-     have titles that are somewhat easier to figure out.
-
-   * It could be useful to have a view by serviceIface rather than
-     host.  This could be assembled dynamically by a scan of the
-     services across the hosts.
-
-   - The IndexManager view of the LBS needs to aggregate some key
-     statistics by index across the index partitions including the #of
-     index entries on the data service and the time spent on the index
-     (perhaps broken down by IO, serialization, key search, etc., but
-     definately the aggregate time).  I am just not getting enough
-     information from this view and digging down makes it too
-     difficult to get the gestalt state of the indices without copying
-     a correlated view of the counters into Excel.
-
-   - Done. Review the per-service scores, but I really need to have
-     more than one service on a host for this.  It should probably be
-     using a response time measure, e.g., averageQueuingTime.
-
-   - Done (problem was timestamp parsing since only the time of day
-     was being reported, not the UTC time - it now uses the system
-     clock). Now I am not seeing any host CPU scores aggregated by the
-     load balancer.
-
-   - Done. The normalized [score] is not being computed for hosts or
-     services (it is always zero).
 
  - TemporaryRawStore abuse.  
       
@@ -2333,39 +2302,6 @@ Reduce GC drivers for U1000
   problem does not show up for the LDS, just EDS.
 
 ============================================================
-Performance counters
-
-    - ResourceManager's performance counters do not reveal
-      read-historical indices (or read-committed?), just those where
-      we write on the index.  This makes the index metadata
-      unavailable during read-only runs, such as the lubm benchmark.
-
-    - use the service name for the performance counter paths, however
-      this can be a problem if service names are modified over time or
-      simply not unique, so maybe make that an option?
-
-    - support performance counter collection, aggregation, httpd
-      service and periodic counter set logging for LTS, which means
-      for the Journal.
-
-    - Add by task reporting of performance counters (#of invocations,
-      time, and RMI latency if available).
-
-      Counters that aggregate across all instances of the same type of
-      task submitted by the client against some service.  There needs
-      to be some handshaking with the service that is executing the
-      task in order for this data to be collected.  E.g., in
-      beforeExecute() and afterExecute().  Those methods need to track
-      a subset of timing data by the Class of the task that is being
-      executed.  The resulting Map<Class,TaskCounters> needs to be
-      reported out by the client along with the rest of the counters
-      collected for that service (reported by the
-      QueueStatisticsTask).
-     
-      private final Map<Class, TaskCounters> taskCountersByProc = new
-      HashMap<Class, TaskCounters>();
-
-============================================================
 Benchmarks
 
 *** Get a SYSTAP (~100 documents) and NGA benchmark (~1000+) data set
@@ -2609,12 +2545,6 @@ Performance tuning
 
   - Modify AbstractStepTask to use the ExecutionHelper.
 
-  - Modify AbstractIndexCache to use ConcurrentWeakValueCache.  This
-    is necessary in order for the move of the locator scan out of the
-    ClientIndexView to not cause an undesirable contention for access
-    to a resource that used to be a local hard reference (for most
-    cases).
-
 ============================================================
 
 - MikeP
@@ -2644,19 +2574,6 @@ supplied to Sail.evaluate() as a seperate map of key-value pairs.
 Comments?
 
 Arjohn
-============================================================
-Various:
-
-- Abstract general relation support out of RDFJoinNexus(Factory).
-
-- Some errors remain in the bigdata and perhaps the bigdata-rdf test
-  suites which should be resolved.
-
-- Negative transaction identifiers?
-
-- Possible problems where IIndexManager and Properties are not being
-  passed along to the IndexMetadata ctor: GlobalRowStoreHelper,
-  MetadataIndexMetadata, 
 
 ============================================================
 OVERFLOW

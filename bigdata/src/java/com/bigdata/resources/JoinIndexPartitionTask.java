@@ -433,7 +433,7 @@ public class JoinIndexPartitionTask extends
             }
 
             // notify successful index partition join.
-            resourceManager.joinCounter.incrementAndGet();
+            resourceManager.indexPartitionJoinCounter.incrementAndGet();
 
             return null;
 

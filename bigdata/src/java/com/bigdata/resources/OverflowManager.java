@@ -246,27 +246,27 @@ abstract public class OverflowManager extends IndexManager {
     /**
      * #of successful index partition incremental build operations.
      */
-    protected final AtomicLong incrementalBuildCounter = new AtomicLong(0L);
+    protected final AtomicLong indexPartitionBuildCounter = new AtomicLong(0L);
 
     /**
      * #of successful index partition compacting merge operations.
      */
-    protected final AtomicLong compactingMergeCounter = new AtomicLong(0L);
+    protected final AtomicLong indexPartitionMergeCounter = new AtomicLong(0L);
 
     /**
      * #of successful index partition split operations.
      */
-    protected final AtomicLong splitCounter = new AtomicLong(0L);
+    protected final AtomicLong indexPartitionSplitCounter = new AtomicLong(0L);
     
     /**
      * #of successful index partition join operations.
      */
-    protected final AtomicLong joinCounter = new AtomicLong(0L);
+    protected final AtomicLong indexPartitionJoinCounter = new AtomicLong(0L);
     
     /**
      * #of successful index partition move operations.
      */
-    protected final AtomicLong moveCounter = new AtomicLong(0L);
+    protected final AtomicLong indexPartitionMoveCounter = new AtomicLong(0L);
     
     /**
      * The timeout for asynchronous overflow processing.

@@ -1242,7 +1242,7 @@ abstract public class LoadBalancerService extends AbstractService
          * <p>
          * The correct response for heavy swapping is to alert an admin to
          * shutdown one or more processes on that host. <strong>If you do not
-         * have failover provisioned for your data services then don't shutdown
+         * have failover provisioned for your data services then DO NOT shutdown
          * data services or you WILL loose data!</strong>
          * <p>
          * Note: If we are not getting critical counters for some host then we
@@ -1262,14 +1262,16 @@ abstract public class LoadBalancerService extends AbstractService
          * 
          * @return The computed host score.
          */
-        protected HostScore computeScore(String hostname,
-                ICounterSet hostCounterSet) {
+        protected HostScore computeScore(final String hostname,
+                final ICounterSet hostCounterSet) {
 
             /*
              * Is the host swapping heavily?
              * 
              * @todo if heavy swapping persists then lower the score even
              * further.
+             * 
+             * FIXME majorFaultsPerSecond is not being collected for linux. 
              */
             final double majorFaultsPerSec = getCurrentValue(hostCounterSet,
                     IRequiredHostCounters.Memory_majorFaultsPerSecond, 0d/* default */);

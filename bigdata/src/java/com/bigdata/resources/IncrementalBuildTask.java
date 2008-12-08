@@ -383,7 +383,7 @@ public class IncrementalBuildTask extends
             assert btree.needsCheckpoint();
 
             // notify successful index partition build.
-            resourceManager.incrementalBuildCounter.incrementAndGet();
+            resourceManager.indexPartitionBuildCounter.incrementAndGet();
             
             return null;
 
