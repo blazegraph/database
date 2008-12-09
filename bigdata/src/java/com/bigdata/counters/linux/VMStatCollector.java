@@ -460,7 +460,8 @@ public class VMStatCollector extends AbstractProcessCollector implements
             if (expected == null)
                 throw new IllegalArgumentException();
  
-            if(field<0) throw new IllegalArgumentException();
+            if (field < 0)
+                throw new IllegalArgumentException();
             
             if (field >= fields.length)
                 log.error("There are only " + fields.length
