@@ -90,6 +90,16 @@ public interface IHostCounters extends IRequiredHostCounters {
     String Memory_minorFaultsPerSec = Memory + ps
             + "Minor Faults per Second";
 
+    /**
+     * The #of bytes of swap space that are in use (vmstat).
+     */
+    String Memory_SwapUsed = Memory + ps + "Swap Bytes Used";
+    
+    /**
+     * The #of bytes of idle memory (vmstat).
+     */
+    String Memory_Idle = Memory + ps + "Idle Bytes";
+    
     /*
      * PhysicalDisk
      */

@@ -1271,7 +1271,10 @@ abstract public class LoadBalancerService extends AbstractService
              * @todo if heavy swapping persists then lower the score even
              * further.
              * 
-             * FIXME majorFaultsPerSecond is not being collected for linux. 
+             * FIXME majorFaultsPerSecond is not being collected for linux.
+             * 
+             * @todo The % of the physical memory and the % of the swap space
+             * that have been used are also strong indicators.
              */
             final double majorFaultsPerSec = getCurrentValue(hostCounterSet,
                     IRequiredHostCounters.Memory_majorFaultsPerSecond, 0d/* default */);
