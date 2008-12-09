@@ -18,12 +18,12 @@ public abstract class AbstractProcessReader implements Runnable {
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected static boolean DEBUG = log.isInfoEnabled();
+    final protected static boolean DEBUG = log.isDebugEnabled();
 
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected static boolean INFO = log.isDebugEnabled();
+    final protected static boolean INFO = log.isInfoEnabled();
 
     /**
      * The {@link InputStream} from which the output of the process will be

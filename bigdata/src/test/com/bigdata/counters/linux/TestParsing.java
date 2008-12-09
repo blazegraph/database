@@ -32,7 +32,9 @@ import java.text.DateFormat;
 import java.text.ParseException;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.regex.Pattern;
 
+import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
 
 /**
@@ -101,6 +103,102 @@ public class TestParsing extends TestCase2 {
         } catch (ParseException e) {
 
             log.error("Could not parse?");
+
+        }
+
+    }
+
+    /**
+     * Test based on some sample data.
+     */
+    public void test_vmstat_header_and_data_parse() {
+       
+        final Pattern pattern = VMStatCollector.pattern;
+
+        final String header =//
+            "  r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st";
+
+        final String data =//
+            "  1  0     96 178580 206520 1170604   56   12     0     7    1    0  1  0 99  3  0";
+
+        // test header parse.
+        {
+            final String[] fields = pattern.split(header.trim(), 0/* limit */);
+
+            for (int i = 0; i < fields.length; i++) {
+
+                System.err.println("fields[" + i + "]=[" + fields[i] + "]");
+                
+            }
+            
+            assertField(header, fields, 2, "swpd");
+            assertField(header, fields, 3, "free");
+
+            assertField(header, fields, 6, "si");
+            assertField(header, fields, 7, "so");
+
+            assertField(header, fields, 12, "us");
+            assertField(header, fields, 13, "sy");
+            assertField(header, fields, 14, "id");
+            assertField(header, fields, 15, "wa");
+        }
+        
+        // test data parse.
+        {
+            final String[] fields = pattern.split(data.trim(), 0/* limit */);
+
+            assertField(data, fields, 2, "96");
+            assertField(data, fields, 3, "178580");
+
+            assertField(data, fields, 6, "56");
+            assertField(data, fields, 7, "12");
+
+            assertField(data, fields, 12, "1");
+            assertField(data, fields, 13, "0");
+            assertField(data, fields, 14, "99");
+            assertField(data, fields, 15, "3");
+        }
+
+    }
+    
+
+    /**
+     * Used to verify that the header corresponds to our expectations. Logs
+     * errors when the expectations are not met.
+     * 
+     * @param header
+     *            The header line.
+     * @param fields
+     *            The fields parsed from that header.
+     * @param field
+     *            The field number in [0:#fields-1].
+     * @param expected
+     *            The expected value of the header for that field.
+     */
+    static protected void assertField(final String header,
+            final String[] fields, final int field, final String expected) {
+
+        if (header == null)
+            throw new IllegalArgumentException();
+
+        if (fields == null)
+            throw new IllegalArgumentException();
+
+        if (expected == null)
+            throw new IllegalArgumentException();
+
+        if (field < 0)
+            throw new IllegalArgumentException();
+
+        if (field >= fields.length)
+            throw new AssertionFailedError("There are only " + fields.length
+                    + " fields, but field=" + field + "\n" + header);
+
+        if (!expected.equals(fields[field])) {
+
+            throw new AssertionFailedError("Expected field=" + field
+                    + " to be [" + expected + "], actual=" + fields[field]
+                    + "\n" + header);
 
         }
 

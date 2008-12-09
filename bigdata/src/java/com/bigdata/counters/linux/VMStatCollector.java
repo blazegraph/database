@@ -156,7 +156,7 @@ public class VMStatCollector extends AbstractProcessCollector implements
      * The {@link Pattern} used to split apart the rows read from
      * <code>vmstat</code>.
      */
-    final protected Pattern pattern = Pattern.compile("\\s*");
+    final protected static Pattern pattern = Pattern.compile("\\s+");
 
     /**
      * 
@@ -305,6 +305,10 @@ public class VMStatCollector extends AbstractProcessCollector implements
             
         }
 
+        /**
+         * 
+         * @see TestParsing#test_vmstat_header_and_data_parse()
+         */
         @Override
         protected void readProcess() throws Exception {
             
@@ -338,21 +342,8 @@ public class VMStatCollector extends AbstractProcessCollector implements
 
                 header = readLine();
 
-                final String[] fields = pattern.split(header, 0/* limit */);
-
                 if (INFO)
                     log.info("header: " + header);
-
-                assertField(header, fields, 2, "swpd");
-                assertField(header, fields, 3, "free");
-                
-                assertField(header, fields, 6, "si");
-                assertField(header, fields, 7, "so");
-                
-                assertField(header, fields, 12, "us");
-                assertField(header, fields, 13, "sy");
-                assertField(header, fields, 14, "id");
-                assertField(header, fields, 15, "wa");
 
             }
 
@@ -371,7 +362,7 @@ public class VMStatCollector extends AbstractProcessCollector implements
                     // timestamp
                     lastModified = System.currentTimeMillis();
 
-                    final String[] fields = pattern.split(data, 0/* limit */);
+                    final String[] fields = pattern.split(data.trim(), 0/* limit */);
 
                     final String swpd = fields[2];
                     final String free = fields[3];
@@ -435,47 +426,5 @@ public class VMStatCollector extends AbstractProcessCollector implements
 
         }
 
-        /**
-         * Used to verify that the header corresponds to our expectations. Logs
-         * errors when the expectations are not met.
-         * 
-         * @param header
-         *            The header line.
-         * @param fields
-         *            The fields parsed from that header.
-         * @param field
-         *            The field number in [0:#fields-1].
-         * @param expected
-         *            The expected value of the header for that field.
-         */
-        protected void assertField(final String header, final String[] fields,
-                final int field, final String expected) {
-            
-            if (header == null)
-                throw new IllegalArgumentException();
-            
-            if (fields == null)
-                throw new IllegalArgumentException();
-
-            if (expected == null)
-                throw new IllegalArgumentException();
- 
-            if (field < 0)
-                throw new IllegalArgumentException();
-            
-            if (field >= fields.length)
-                log.error("There are only " + fields.length
-                        + " fields, but field=" + field + "\n" + header);
-            
-            if (!expected.equals(fields[field])) {
-
-                log.error("Expected field=" + field + " to be [" + expected
-                        + "], actual=" + fields[field] + "\n" + header);
-                
-            }
-            
-        }
-        
     }
-
 }
