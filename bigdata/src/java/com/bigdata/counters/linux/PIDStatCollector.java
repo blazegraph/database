@@ -29,7 +29,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.counters.linux;
 
 import java.io.IOException;
-import java.text.DateFormat;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -613,11 +612,5 @@ public class PIDStatCollector extends AbstractProcessCollector implements
         }
 
     }
-    
-    /**
-     * Used to parse the timestamp associated with each row of the [pidstat]
-     * output.
-     */
-    protected final DateFormat f = SysstatUtil.newDateFormat();
     
 }

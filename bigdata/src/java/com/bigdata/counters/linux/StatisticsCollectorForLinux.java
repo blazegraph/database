@@ -6,19 +6,13 @@ import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 
 /**
- * Collection of host performance data using the <code>sysstat</code> suite.
+ * Collection of host performance data using <code>vmstat</code> and
+ * <code>sysstat</code> suite.
  * 
  * @see http://pagesperso-orange.fr/sebastien.godard/
  * 
  * @todo configuration parameters to locate the sysstat utilities (normally
  *       installed into /usr/bin).
- * 
- * <pre>
- *   vmstat
- *   procs -----------memory---------- ---swap-- -----io---- --system-- -----cpu------
- *    r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st
- *    0  0  19088 1099996 210388 2130812    0    0    26    17    0    0  5  2 92  1  0
- * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -51,33 +45,56 @@ public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
      */
     protected final String processName;
 
-    /** reports on the host CPU utilization. */
+    /**
+     * Reports on the host CPU utilization (these data are also available using
+     * vmstat).
+     */
     protected SarCpuUtilizationCollector sar1;
 
-    /** reports on process performance counters (CPU, MEM, IO). */
+    /**
+     * Reports on the host page faults, swap space and can report CPU
+     * utilization.
+     */
+    protected VMStatCollector vmstat;
+
+    /**
+     * reports on process performance counters (CPU, MEM, IO).
+     */
     protected PIDStatCollector pidstat;
 
     public void start() {
-
-        log.info("starting collectors");
+        
+        if (INFO)
+            log.info("starting collectors");
         
         super.start();
         
-        sar1.start();
+        if (sar1 != null)
+            sar1.start();
 
-        pidstat.start();
+        if (vmstat != null)
+            vmstat.start();
+        
+        if (pidstat != null)
+            pidstat.start();
 
     }
 
     public void stop() {
 
-        log.info("stopping collectors");
+        if (INFO)
+            log.info("stopping collectors");
         
         super.stop();
-        
-        sar1.stop();
 
-        pidstat.stop();
+        if (sar1 != null)
+            sar1.stop();
+
+        if (vmstat != null)
+            vmstat.stop();
+
+        if (pidstat != null)
+            pidstat.stop();
 
     }
     
@@ -89,18 +106,42 @@ public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
         
         if( ! countersAdded ) {
 
-            /*
-             * These are per-host counters. We attach them under the fully
-             * qualified hostname.
-             */
-            root.makePath(fullyQualifiedHostName).attach( sar1.getCounters() );
+            if (sar1 != null) {
+             
+                /*
+                 * These are per-host counters. We attach them under the fully
+                 * qualified hostname.
+                 */
 
-            /*
-             * These are per-process counters. We attach them under a path
-             * described by the fully qualified hostname followed by the process
-             * name.
-             */
-            root.makePath(fullyQualifiedHostName+ps+processName).attach( pidstat.getCounters() );
+                root.makePath(fullyQualifiedHostName)
+                        .attach(sar1.getCounters());
+                
+            }
+
+            if (vmstat != null) {
+
+                /*
+                 * These are per-host counters. We attach them under the fully
+                 * qualified hostname.
+                 */
+
+                root.makePath(fullyQualifiedHostName).attach(
+                        vmstat.getCounters());
+        
+            }
+            
+            if (pidstat != null) {
+            
+                /*
+                 * These are per-process counters. We attach them under a path
+                 * described by the fully qualified hostname followed by the process
+                 * name.
+                 */
+
+                root.makePath(fullyQualifiedHostName + ps + processName)
+                        .attach(pidstat.getCounters());
+
+            }
             
             countersAdded = true;
             
@@ -120,7 +161,8 @@ public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
      *            {@link UUID}) whose per-process performance counters are to
      *            be collected.
      */
-    public StatisticsCollectorForLinux(int interval, String processName) {
+    public StatisticsCollectorForLinux(final int interval,
+            final String processName) {
 
         super(interval);
 
@@ -129,9 +171,22 @@ public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
         
         this.processName = processName;
         
-        // host wide collection
-        sar1 = new SarCpuUtilizationCollector(interval,kernelVersion);
+        final boolean collectCPUStatsWithSAR = false;
+        
+        if(collectCPUStatsWithSAR) {
 
+            // host wide collection
+            sar1 = new SarCpuUtilizationCollector(interval,kernelVersion);
+        
+        } else {
+            
+            sar1 = null;
+            
+        }
+
+        // host wide collection
+        vmstat = new VMStatCollector(interval, !collectCPUStatsWithSAR);
+        
         // process specific collection.
         pidstat = new PIDStatCollector(pid, interval, kernelVersion);
 

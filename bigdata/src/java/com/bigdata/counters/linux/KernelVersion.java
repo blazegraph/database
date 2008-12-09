@@ -28,9 +28,9 @@ public class KernelVersion {
     public final int major;
     public final int minor;
     
-    public KernelVersion(String val) {
+    public KernelVersion(final String val) {
         
-        String[] x = val.split("[\\.]");
+        final String[] x = val.split("[\\.]");
         
         assert x.length >= 2 : "Not a kernel version? "+val;
         

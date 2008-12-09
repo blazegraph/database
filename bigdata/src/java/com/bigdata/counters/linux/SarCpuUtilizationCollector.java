@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters.linux;
 
-import java.text.DateFormat;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -159,9 +158,15 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
      * The timestamp associated with the most recently collected values.
      */
     private long lastModified = System.currentTimeMillis();
-    
-    public SarCpuUtilizationCollector(int interval,
-            KernelVersion kernelVersion) {
+
+    /**
+     * 
+     * @param interval
+     *            The reporting interval in seconds.
+     * @param kernelVersion
+     */
+    public SarCpuUtilizationCollector(final int interval,
+            final KernelVersion kernelVersion) {
 
         super(interval);
 
@@ -169,7 +174,7 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
     
     public List<String> getCommand() {
 
-        List<String> command = new LinkedList<String>();
+        final List<String> command = new LinkedList<String>();
         
         command.add("/usr/bin/sar");
 
@@ -422,11 +427,4 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
 
     }
     
-    /**
-     * Used to parse the timestamp associated with each row of the [pidstat]
-     * output.
-     */
-    protected final DateFormat f = SysstatUtil.newDateFormat();
-    
 }
-
