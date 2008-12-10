@@ -6,10 +6,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.ArrayList;
+import java.text.NumberFormat;
 import java.util.Arrays;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.Vector;
@@ -18,7 +17,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
@@ -39,6 +37,7 @@ import com.bigdata.journal.ConcurrencyManager.IConcurrencyManagerCounters;
 import com.bigdata.service.DataService.IDataServiceCounters;
 import com.bigdata.service.mapred.IMapService;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.concurrent.QueueStatisticsTask;
 import com.bigdata.util.concurrent.QueueStatisticsTask.IQueueCounters;
 
 /**
@@ -121,10 +120,6 @@ import com.bigdata.util.concurrent.QueueStatisticsTask.IQueueCounters;
  *       <p>
  *       http://net-snmp.sourceforge.net/ (Un*x and Windows SNMP support).
  * 
- * @todo performance testing links: Grinder, etc.
- *       <p>
- *       http://www.opensourcetesting.org/performance.php
- * 
  * @todo Consider an SNMP adaptor for the clients so that they can report to
  *       SNMP aware applications. In this context we could report both the
  *       original counters (as averaged) and the massaged metrics on which we
@@ -160,9 +155,9 @@ abstract public class LoadBalancerService extends AbstractService
      * Service join timeout in milliseconds - used when we need to wait for a
      * service to join before we can recommend an under-utilized service.
      * 
-     * @todo config
+     * @see Options#SERVICE_JOIN_TIMEOUT
      */
-    final protected long JOIN_TIMEOUT = 3 * 1000;
+    final protected long serviceJoinTimeout;
 
     /**
      * Lock is used to control access to data structures that are not
@@ -230,6 +225,11 @@ abstract public class LoadBalancerService extends AbstractService
      * @see Options#INITIAL_ROUND_ROBIN_UPDATE_COUNT
      */
     protected final long initialRoundRobinUpdateCount;
+
+    /**
+     * Used to make round-robin assignments.
+     */
+    private final RoundRobinServiceLoadHelper roundRobinServiceLoadHelper;
     
     /**
      * The directory in which the service will log the {@link CounterSet}s.
@@ -251,250 +251,6 @@ abstract public class LoadBalancerService extends AbstractService
     }
     
     /**
-     * Per-host metadata and a score for that host which gets updated
-     * periodically by {@link UpdateTask}. {@link HostScore}s are a
-     * <em>resource utilization</em> measure. They are higher for a host which
-     * is more highly utilized. There are several ways to look at the score,
-     * including the {@link #rawScore}, the {@link #rank}, and the
-     * {@link #drank normalized double-precision rank}. The ranks move in the
-     * same direction as the {@link #rawScore}s - a higher rank indicates
-     * higher utilization. The least utilized host is always rank zero (0). The
-     * most utilized host is always in the last rank.
-     * 
-     * @todo We carry some additional metadata for hosts that bears on the
-     *       question of whether or not the host might be subject to non-linear
-     *       performance degredation. The most important bits of information are
-     *       whether or not the host is swapping heavily, since that will bring
-     *       performance to a standstill, and whether or not the host is about
-     *       to run out of disk space, since that can cause all services on the
-     *       host to suddenly fail.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static protected class HostScore implements Comparable<HostScore> {
-
-        public final String hostname;
-
-        /** The raw score computed for that service. */
-        public final double rawScore;
-        /** The normalized score computed for that service. */
-        public double score;
-        /** The rank in [0:#scored].  This is an index into the Scores[]. */
-        public int rank = -1;
-        /** The normalized double precision rank in [0.0:1.0]. */
-        public double drank = -1d;
-        
-        /**
-         * Constructor variant used when you do not have performance counters
-         * for the host and could not compute its rawScore.
-         * 
-         * @param hostname
-         */
-        public HostScore(String hostname) {
-            
-            this(hostname,0d);
-            
-        }
-        
-        /**
-         * Constructor variant used when you have computed the rawStore.
-         * 
-         * @param hostname
-         * @param rawScore
-         */
-        public HostScore(String hostname, double rawScore) {
-            
-            assert hostname != null;
-            
-            assert hostname.length() > 0;
-            
-            this.hostname = hostname;
-            
-            this.rawScore = rawScore;
-            
-        }
-        
-        public String toString() {
-            
-            return "HostScore{hostname=" + hostname + ", rawScore=" + rawScore
-                    + ", score=" + score + ", rank=" + rank + ", drank="
-                    + drank + "}";
-            
-        }
-        
-        /**
-         * Places elements into order by ascending {@link #rawScore} (aka
-         * increasing utilization). The {@link #hostname} is used to break any
-         * ties.
-         */
-        public int compareTo(HostScore arg0) {
-            
-            if(rawScore < arg0.rawScore) {
-                
-                return -1;
-                
-            } else if(rawScore> arg0.rawScore ) {
-                
-                return 1;
-                
-            }
-            
-            return hostname.compareTo(arg0.hostname);
-            
-        }
-
-        /**
-         * Normalizes a raw score in the context of totals for some host.
-         * 
-         * @param rawScore
-         *            The raw score.
-         * @param totalRawScore
-         *            The raw score computed from the totals.
-         *            
-         * @return The normalized score.
-         */
-        static public double normalize(double rawScore, double totalRawScore ) {
-            
-            if(totalRawScore == 0d) {
-                
-                return 0d;
-                
-            }
-            
-            return rawScore / totalRawScore;
-            
-        }
-
-    }
-    
-    /**
-     * Per-service metadata and a score for that service which gets updated
-     * periodically by the {@link UpdateTask}. {@link ServiceScore}s are a
-     * <em>resource utilization</em> measure. They are higher for a service
-     * which is more highly utilized. There are several ways to look at the
-     * score, including the {@link #rawScore}, the {@link #rank}, and the
-     * {@link #drank normalized double-precision rank}. The ranks move in the
-     * same direction as the {@link #rawScore}s - a higher rank indicates
-     * higher utilization. The least utilized service is always rank zero (0).
-     * The most utilized service is always in the last rank.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static protected class ServiceScore implements Comparable<ServiceScore> {
-        
-        public final String hostname;
-        
-        public final UUID serviceUUID;
-        
-        public final String serviceName;
-        
-        /** The raw score computed for that service. */
-        public final double rawScore;
-        /** The normalized score computed for that service. */
-        public double score;
-        /** The rank in [0:#scored].  This is an index into the Scores[]. */
-        public int rank = -1;
-        /** The normalized double precision rank in [0.0:1.0]. */
-        public double drank = -1d;
-        
-        /**
-         * Constructor variant used when you do not have performance counters
-         * for the service and could not compute its rawScore.
-         * 
-         * @param hostname
-         * @param serviceUUID
-         */
-        public ServiceScore(String hostname, UUID serviceUUID, String serviceName) {
-
-            this(hostname, serviceUUID, serviceName, 0d);
-
-        }
-
-        /**
-         * Constructor variant used when you have computed the rawStore.
-         * 
-         * @param hostname
-         * @param serviceUUID
-         * @param rawScore
-         */
-        public ServiceScore(String hostname, UUID serviceUUID, String serviceName, double rawScore) {
-            
-            if (hostname == null)
-                throw new IllegalArgumentException();
-            
-            if (serviceUUID == null)
-                throw new IllegalArgumentException();
-            
-            if (serviceName == null)
-                throw new IllegalArgumentException();
-            
-            this.hostname = hostname;
-         
-            this.serviceUUID = serviceUUID;
-            
-            this.serviceName = serviceName;
-            
-            this.rawScore = rawScore;
-            
-        }
-        
-        public String toString() {
-            
-            return "ServiceScore{hostname=" + hostname + ", serviceUUID="
-                    + serviceUUID + ", serviceName="
-                    + (serviceName == null ? "N/A" : serviceName)
-                    + ", rawScore=" + rawScore + ", score=" + score + ", rank="
-                    + rank + ", drank=" + drank + "}";
-            
-        }
-        
-        /**
-         * Places elements into order by ascending {@link #rawScore}. The
-         * {@link #serviceUUID} is used to break any ties.
-         */
-        public int compareTo(ServiceScore arg0) {
-            
-            if(rawScore < arg0.rawScore) {
-                
-                return -1;
-                
-            } else if(rawScore> arg0.rawScore ) {
-                
-                return 1;
-                
-            }
-            
-            return serviceUUID.compareTo(arg0.serviceUUID);
-            
-        }
-
-        /**
-         * Normalizes a raw score in the context of totals for some service.
-         * 
-         * @param rawScore
-         *            The raw score.
-         * @param totalRawScore
-         *            The raw score computed from the totals.
-         *            
-         * @return The normalized score.
-         */
-        static public double normalize(double rawScore, double totalRawScore ) {
-            
-            if(totalRawScore == 0d) {
-                
-                return 0d;
-                
-            }
-            
-            return rawScore / totalRawScore;
-            
-        }
-
-    }
-
-    /**
      * Return the canonical hostname of the client in the context of a RMI
      * request. If the request is not remote then return the canonical hostname
      * for this host.
@@ -509,20 +265,32 @@ abstract public class LoadBalancerService extends AbstractService
     /**
      * The delay between writes of the {@link CounterSet} on a log file.
      */
-    private final long logDelayMillis; 
+    private final long logDelayMillis;
+
     /**
      * The #of distinct log files to retain.
      */
     private final long logMaxFiles;
+
     /**
      * Time that the {@link CounterSet} was last written onto a log file.
      */
     private long logLastMillis = System.currentTimeMillis();
+
     /**
      * A one-up counter of the #of times the {@link CounterSet} was written onto
      * a log file.
      */
     private int logFileCount = 0;
+
+    /**
+     * The #of minutes of history that will be smoothed into an average when
+     * {@link UpdateTask} updates the {@link HostScore}s and the
+     * {@link ServiceScore}s.
+     * 
+     * @see Options#HISTORY_MINUTES
+     */
+    protected final int historyMinutes;
     
     /**
      * Options understood by the {@link LoadBalancerService}.
@@ -569,7 +337,19 @@ abstract public class LoadBalancerService extends AbstractService
          * The default {@link #UPDATE_DELAY}.
          */
         String DEFAULT_UPDATE_DELAY = ""+(60*1000);
-     
+
+        /**
+         * The #of minutes of history that will be smoothed into an average when
+         * {@link UpdateTask} updates the {@link HostScore}s and the
+         * {@link ServiceScore}s (default {@value #DEFAULT_HISTORY_MINUTES}).
+         * 
+         * @see QueueStatisticsTask
+         */
+        String HISTORY_MINUTES = LoadBalancerService.class.getName()
+                + ".historyMinutes"; 
+
+        String DEFAULT_HISTORY_MINUTES = "5";
+        
         /**
          * The path of the directory where the load balancer will log a copy of
          * the counters every time it runs its {@link UpdateTask}. By default
@@ -598,6 +378,15 @@ abstract public class LoadBalancerService extends AbstractService
 
         String DEFAULT_LOG_MAX_FILES = "" + 24 * 7;
 
+        /**
+         * Service join timeout in milliseconds - used when we need to wait for
+         * a service to join before we can recommend an under-utilized service.
+         */
+        String SERVICE_JOIN_TIMEOUT = LoadBalancerService.class.getName()
+                + ".serviceJoinTimeout";
+
+        String DEFAULT_SERVICE_JOIN_TIMEOUT = "" + (3 * 1000);
+        
     }
 
     /**
@@ -661,8 +450,40 @@ abstract public class LoadBalancerService extends AbstractService
 
         }
         
+        {
+            
+            historyMinutes = Integer.parseInt(properties.getProperty(
+                    Options.HISTORY_MINUTES,
+                    Options.DEFAULT_HISTORY_MINUTES));
+            
+            if (INFO)
+                log.info(Options.HISTORY_MINUTES+ "="
+                        + historyMinutes);
+            
+            // a reasonable range check.
+            if (historyMinutes <= 0 || historyMinutes > 60)
+                throw new RuntimeException(Options.HISTORY_MINUTES
+                        + " must be in [1:60].");
+            
+        }
+
+        {
+            
+            serviceJoinTimeout = Long.parseLong(properties.getProperty(
+                    Options.SERVICE_JOIN_TIMEOUT,
+                    Options.DEFAULT_SERVICE_JOIN_TIMEOUT));
+            
+            if (INFO)
+                log.info(Options.SERVICE_JOIN_TIMEOUT + "="
+                        + serviceJoinTimeout);
+            
+            if (serviceJoinTimeout <= 0L)
+                throw new RuntimeException(Options.SERVICE_JOIN_TIMEOUT
+                        + " must be positive.");
+            
+        }
+        
         // setup scheduled runnable for periodic updates of the service scores.
-        // @todo move to start()?
         {
 
             initialRoundRobinUpdateCount = Long.parseLong(properties
@@ -673,6 +494,8 @@ abstract public class LoadBalancerService extends AbstractService
                 log.info(Options.INITIAL_ROUND_ROBIN_UPDATE_COUNT + "="
                         + initialRoundRobinUpdateCount);
 
+            this.roundRobinServiceLoadHelper = new RoundRobinServiceLoadHelper();
+            
             final long delay = Long.parseLong(properties.getProperty(
                     Options.UPDATE_DELAY,
                     Options.DEFAULT_UPDATE_DELAY));
@@ -775,10 +598,8 @@ abstract public class LoadBalancerService extends AbstractService
      * @param a
      *            The new service scores.
      */
-    protected void setHostScores(HostScore[] a) {
+    protected void setHostScores(final HostScore[] a) {
 
-        if(INFO) log.info("#hostScores=" + a.length);
-        
         /*
          * sort scores into ascending order (least utilized to most utilized).
          */
@@ -796,7 +617,7 @@ abstract public class LoadBalancerService extends AbstractService
         }
         
         /*
-         * compute normalized score, rank, and drank.
+         * Compute normalized score, rank, and drank.
          */
         for (int i = 0; i < a.length; i++) {
             
@@ -812,7 +633,7 @@ abstract public class LoadBalancerService extends AbstractService
             activeHosts.put(score.hostname, score);
 
             if (INFO)
-                log.info(score.toString()); //@todo debug?
+                log.info(score.toString());
             
         }
         
@@ -826,8 +647,6 @@ abstract public class LoadBalancerService extends AbstractService
         
         // Atomic replace of the old scores.
         LoadBalancerService.this.hostScores.set( a );
-
-        if(INFO) log.info("Updated scores for "+a.length+" hosts");
      
     }
     
@@ -837,12 +656,10 @@ abstract public class LoadBalancerService extends AbstractService
      * @param a
      *            The new service scores.
      */
-    protected void setServiceScores(ServiceScore[] a) {
-        
-        if(INFO) log.info("#serviceScores=" + a.length);
+    protected void setServiceScores(final ServiceScore[] a) {
         
         /*
-         * sort scores into ascending order (least utilized to most utilized).
+         * Sort scores into ascending order (least utilized to most utilized).
          */
         Arrays.sort(a);
 
@@ -866,31 +683,28 @@ abstract public class LoadBalancerService extends AbstractService
             
             score.rank = i;
             
-            score.drank = ((double)i)/a.length;
-           
+            score.drank = ((double) i) / a.length;
+
             score.score = HostScore.normalize(score.rawScore, totalRawScore);
 
             // update score in global map.
             activeDataServices.put(score.serviceUUID, score);
 
             if (INFO)
-                log.info(score.toString()); //@todo debug?
+                log.info(score.toString());
 
         }
         
-        if(INFO) {
-            
+        if (INFO) {
+
             log.info("The most active service was: " + a[a.length - 1]);
 
             log.info("The least active service was: " + a[0]);
-            
-        }
-        
-        // Atomic replace of the old scores.
-        LoadBalancerService.this.serviceScores.set( a );
 
-        if (INFO)
-            log.info("Updated scores for " + a.length + " services");
+        }
+
+        // Atomic replace of the old scores.
+        LoadBalancerService.this.serviceScores.set(a);
 
     }
     
@@ -932,14 +746,10 @@ abstract public class LoadBalancerService extends AbstractService
          */
         final protected Logger log = Logger.getLogger(UpdateTask.class);
 
-        /**
-         * True iff the {@link #log} level is INFO or less.
-         */
         final protected boolean INFO = log.isInfoEnabled();
 
-        /** @todo configure how much history to use for averages. */
-        final int TEN_MINUTES = 10;
-        
+        final protected boolean DEBUG = log.isDebugEnabled();
+
         public UpdateTask() {
         }
         
@@ -978,7 +788,8 @@ abstract public class LoadBalancerService extends AbstractService
 
             if(activeHosts.isEmpty()) {
                 
-                log.warn("No active hosts");
+                if (INFO)
+                    log.info("No active hosts");
                 
                 return;
                 
@@ -1004,7 +815,8 @@ abstract public class LoadBalancerService extends AbstractService
                 if(!activeHosts.containsKey(hostname)) {
 
                     // Host is not active.
-                    if(INFO) log.info("Host is not active: "+hostname);
+                    if (DEBUG)
+                        log.debug("Host is not active: " + hostname);
                     
                     continue;
                     
@@ -1068,12 +880,18 @@ abstract public class LoadBalancerService extends AbstractService
 
         /**
          * (Re-)compute the utilization score for each active service.
+         * <p>
+         * Note: There is a dependency on
+         * {@link AbstractFederation#getServiceCounterPathPrefix(UUID, Class, String)}.
+         * This method assumes that the service {@link UUID} is found in a
+         * specific place in the constructed path.
          */
         protected void updateServiceScores() {
             
             if(activeDataServices.isEmpty()) {
                 
-                log.warn("No active services");
+                if (INFO)
+                    log.info("No active services");
                 
                 LoadBalancerService.this.serviceScores.set( null );
                 
@@ -1104,8 +922,9 @@ abstract public class LoadBalancerService extends AbstractService
                 if (hostScore == null) {
 
                     // Host is not active.
-                    if(INFO) log.info("Host is not active: " + hostname);
-                    
+                    if (INFO)
+                        log.info("Host is not active: " + hostname);
+
                     continue;
                     
                 }
@@ -1142,7 +961,12 @@ abstract public class LoadBalancerService extends AbstractService
                         final CounterSet serviceCounterSet = (CounterSet) itrs
                                 .next();
 
-                        // Note: name on serviceCounterSet is the serviceUUID.
+                        /*
+                         * Note: [name] on serviceCounterSet is the serviceUUID.
+                         * 
+                         * Note: This creates a dependency on
+                         * AbstractFederation#getServiceCounterPathPrefix(...)
+                         */
                         final String serviceName = serviceCounterSet.getName();
                         final UUID serviceUUID;
                         try {
@@ -1160,12 +984,10 @@ abstract public class LoadBalancerService extends AbstractService
                         if (!activeDataServices.containsKey(serviceUUID)) {
 
                             /*
-                             * @todo I am seeing some services reported here as
-                             * not active???
+                             * Note: Only data services are entered in this map,
+                             * so this filters out the non-dataServices from the
+                             * load balancer's computations.
                              */
-
-                            log.warn("Service is not active: "
-                                    + serviceCounterSet.getPath());
 
                             continue;
 
@@ -1197,8 +1019,9 @@ abstract public class LoadBalancerService extends AbstractService
 
                             if (score == null) {
 
-                                log.info("Service leave during update task: "
-                                        + serviceCounterSet.getPath());
+                                if (INFO)
+                                    log.info("Service leave during update task: "
+                                                    + serviceCounterSet.getPath());
 
                                 continue;
 
@@ -1280,12 +1103,10 @@ abstract public class LoadBalancerService extends AbstractService
              * @todo if heavy swapping persists then lower the score even
              * further.
              * 
-             * 
-             * 
              * @todo The % of the physical memory and the % of the swap space
              * that have been used are also strong indicators.
              */
-            final double majorFaultsPerSec = getCurrentValue(hostCounterSet,
+            final int majorFaultsPerSec = (int) getCurrentValue(hostCounterSet,
                     IRequiredHostCounters.Memory_majorFaultsPerSecond, 0d/* default */);
 
             /*
@@ -1293,7 +1114,14 @@ abstract public class LoadBalancerService extends AbstractService
              * 
              * FIXME Really needs to check on each partition on which we have a
              * data service (dataDir). This is available to us now, as is the
-             * free disk space for the tmpDir for each data service.
+             * free disk space for the tmpDir for each data service. [The global
+             * counter is not being reported under linux right now.] [We really
+             * want to know both the swap space remaining and the data (or at
+             * least local disk) space remaining, and it is a bit tricky to know
+             * which device corresponds to swap and to the data for any given
+             * host.] We could also get a measure of NAS remaining, but that is
+             * likely to be shared over a cluster so not that relevant to the
+             * LBS.
              * 
              * @todo this will issue a warning for a windows host on which a
              * service is just starting up. For some reason, it takes a few
@@ -1316,7 +1144,7 @@ abstract public class LoadBalancerService extends AbstractService
              */
             final double percentProcessorIdle = 1d - getAverageValueForMinutes(
                     hostCounterSet, IHostCounters.CPU_PercentProcessorTime,
-                    .5d, TEN_MINUTES);
+                    .5d, historyMinutes);
 
             /*
              * The percent of the time that the CPUs are idle when there is an
@@ -1324,30 +1152,22 @@ abstract public class LoadBalancerService extends AbstractService
              */
             final double percentIOWait = getAverageValueForMinutes(
                     hostCounterSet, IHostCounters.CPU_PercentIOWait,
-                    .01d/* default */, TEN_MINUTES);
+                    .01d/* default */, historyMinutes);
 
             /*
-             * @todo This reflects the disk IO utilization primarily through
-             * induced IOWAIT. Play around with other forumulas too.
+             * Note: This reflects the disk IO utilization primarily through
+             * IOWAIT.
+             * 
+             * @todo Play around with other forumulas too.
              */
-            double rawScore = (1d + percentIOWait * 100d)
+            double adjustedRawScore;
+            final double baseRawScore = adjustedRawScore = (1d + percentIOWait * 100d)
                     / (1d + percentProcessorIdle);
-
-            if (INFO) {
-                log.info("hostname="+hostname+", majorFaultsPerSec="+majorFaultsPerSec);
-                log.info("hostname="+hostname+", percentDiskSpaceFree="+percentDiskFreeSpace);
-                log.info("hostname="+hostname+", percentProcessorIdle="+percentProcessorIdle);
-                log.info("hostname="+hostname+", percentIOWait="+percentIOWait);
-                log.info("hostname=" + hostname + " : rawScore(" + rawScore
-                        + ") = (1d + percentIOWait(" + percentIOWait
-                        + ") * 100d) / (1d + percentProcessorIdle("
-                        + percentProcessorIdle + ")");
-            }
 
             if (majorFaultsPerSec > 50) {
 
                 // much higher utilization if the host is swapping heavily.
-                rawScore *= 10;
+                adjustedRawScore *= 10;
 
                 log.warn("hostname=" + hostname
                                 + " : swapping heavily: pages/sec="
@@ -1356,7 +1176,7 @@ abstract public class LoadBalancerService extends AbstractService
             } else if (majorFaultsPerSec > 10) {
 
                 // higher utilization if the host is swapping.
-                rawScore *= 2d;
+                adjustedRawScore *= 2d;
 
                 log.warn("hostname=" + hostname + " : swapping: pages/sec="
                         + majorFaultsPerSec);
@@ -1366,7 +1186,7 @@ abstract public class LoadBalancerService extends AbstractService
             if (percentDiskFreeSpace < .05) {
 
                 // much higher utilization if the host is very short on disk.
-                rawScore *= 10d;
+                adjustedRawScore *= 10d;
 
                 log.warn("hostname=" + hostname
                         + " : very short on disk: freeSpace="
@@ -1375,24 +1195,61 @@ abstract public class LoadBalancerService extends AbstractService
             } else if (percentDiskFreeSpace < .10) {
 
                 // higher utilization if the host is short on disk.
-                rawScore *= 2d;
+                adjustedRawScore *= 2d;
 
                 log.warn("hostname=" + hostname
                         + " : is short on disk: freeSpace="
                         + percentDiskFreeSpace * 100 + "%");
 
             }
-            
-            if(INFO) {
-                
-                log.info("hostname="+hostname+" : final rawScore="+rawScore);
-                
+
+            if (INFO) {
+
+                log.info("hostname=" + hostname + " : adjustedRawScore("
+                        + scoreFormat.format(adjustedRawScore)
+                        + "), baseRawScore(" + scoreFormat.format(baseRawScore)
+                        + ") = (1d + percentIOWait("
+                        + percentFormat.format(percentIOWait)
+                        + ") * 100d) / (1d + percentProcessorIdle("
+                        + percentFormat.format(percentProcessorIdle)
+                        + "), majorFaultsPerSec=" + majorFaultsPerSec
+                        + ", percentProcessorIdle="
+                        + percentFormat.format(percentProcessorIdle));
+
             }
             
-            final HostScore hostScore = new HostScore(hostname, rawScore);
+            final HostScore hostScore = new HostScore(hostname, adjustedRawScore);
 
             return hostScore;
 
+        }
+        
+        /**
+         * Format for the computed scores.
+         */
+        final NumberFormat scoreFormat;
+        {
+            scoreFormat = NumberFormat.getInstance();
+            scoreFormat.setMaximumFractionDigits(2);
+            scoreFormat.setMinimumIntegerDigits(1);
+        }
+        /**
+         * Format for percentages such as <code>IO Wait</code> where the
+         * values are in [0.00:1.00].
+         */
+        final NumberFormat percentFormat;
+        {
+            percentFormat = NumberFormat.getInstance();
+            percentFormat.setMaximumFractionDigits(2);
+            percentFormat.setMinimumIntegerDigits(1);
+        }
+        
+        /**
+         * Format for elapsed times measured in milliseconds.
+         */
+        final NumberFormat millisFormat;
+        {
+           millisFormat = NumberFormat.getIntegerInstance();
         }
         
         /**
@@ -1416,8 +1273,9 @@ abstract public class LoadBalancerService extends AbstractService
          * 
          * @return The computed score for that service.
          */
-        protected ServiceScore computeScore(HostScore hostScore, UUID serviceUUID,
-                ICounterSet hostCounterSet, ICounterSet serviceCounterSet) {
+        protected ServiceScore computeScore(final HostScore hostScore,
+                final UUID serviceUUID, final ICounterSet hostCounterSet,
+                final ICounterSet serviceCounterSet) {
 
             assert hostScore != null;
             assert serviceUUID != null;
@@ -1428,9 +1286,11 @@ abstract public class LoadBalancerService extends AbstractService
             assert hostScore.rank != -1 : hostScore.toString();
             
             /*
-             * A simple approximation based on the average task queuing time
-             * (how long it takes a task to execute on the service) for the
-             * unisolated write service.
+             * The average task queue length for the unisolated write service.
+             * This is a good measure of the write burden of the service and we
+             * use writes to drive load balancing decisions. This is in contrast
+             * to high availability for readers, where readers can be directed
+             * to failover instances.
              * 
              * @todo There is a lot more that can be considered and under linux
              * we have access to per-process counters for CPU, DISK, and MEMORY.
@@ -1439,12 +1299,12 @@ abstract public class LoadBalancerService extends AbstractService
             final double averageTaskQueuingTime = getAverageValueForMinutes(
                     hostCounterSet, IDataServiceCounters.concurrencyManager
                             + ps + IConcurrencyManagerCounters.writeService
-                            + ps + IQueueCounters.averageTaskQueuingTime,
-                    100d/* ms */, TEN_MINUTES);
+                            + ps + IQueueCounters.averageQueueLength,
+                    100d/* ms */, historyMinutes);
 
             final double rawScore = (averageTaskQueuingTime + 1) * (hostScore.score + 1);
 
-            // resolve the service name.
+            // resolve the service name : @todo refactor RMI out of this method.
             String serviceName = "N/A";
             try {
                 serviceName = getFederation().getDataService(serviceUUID)
@@ -1456,10 +1316,12 @@ abstract public class LoadBalancerService extends AbstractService
             if (INFO) {
              
                 log.info("serviceName=" + serviceName + ", serviceUUID="
-                        + serviceUUID + ", rawScore(" + rawScore + ") = ("
+                        + serviceUUID + ", rawScore("
+                        + scoreFormat.format(rawScore) + ") = ("
                         + IQueueCounters.averageTaskQueuingTime + "("
-                        + averageTaskQueuingTime + ")+1) * (hostScore("
-                        + hostScore.score + ")+1)");
+                        + millisFormat.format(averageTaskQueuingTime)
+                        + ")+1) * (hostScore("
+                        + scoreFormat.format(hostScore.score) + ")+1)");
                 
             }
 
@@ -1476,7 +1338,7 @@ abstract public class LoadBalancerService extends AbstractService
             assert counterSet != null;
             assert path != null;
 
-            ICounter c = (ICounter) counterSet.getPath(path);
+            final ICounter c = (ICounter) counterSet.getPath(path);
 
             if (c == null)
                 return defaultValue;
@@ -1508,13 +1370,14 @@ abstract public class LoadBalancerService extends AbstractService
          * @param minutes
          * @return
          */
-        protected double getAverageValueForMinutes(ICounterSet counterSet, String path,
-                double defaultValue, int minutes) {
+        protected double getAverageValueForMinutes(
+                final ICounterSet counterSet, final String path,
+                final double defaultValue, final int minutes) {
 
             assert counterSet != null;
             assert path != null;
 
-            ICounter c = (ICounter) counterSet.getPath(path);
+            final ICounter c = (ICounter) counterSet.getPath(path);
 
             if (c == null)
                 return defaultValue;
@@ -1566,9 +1429,9 @@ abstract public class LoadBalancerService extends AbstractService
             // per-host scores.
             {
 
-                if (INFO)
-                    log.info("Will setup counters for " + activeHosts.size()
-                            + " hosts");
+//                if (INFO)
+//                    log.info("Will setup counters for " + activeHosts.size()
+//                            + " hosts");
                 
                 final CounterSet tmp = serviceRoot.makePath("hosts");
 
@@ -1580,8 +1443,8 @@ abstract public class LoadBalancerService extends AbstractService
 
                         if (tmp.getChild(hn) == null) {
 
-                            if (INFO)
-                                log.info("Adding counter for host: " + hn);
+//                            if (INFO)
+//                                log.info("Adding counter for host: " + hn);
                             
                             tmp.addCounter(hn, new HistoryInstrument<String>(new String[]{}));
                             
@@ -1613,9 +1476,9 @@ abstract public class LoadBalancerService extends AbstractService
             // per-service scores.
             {
                 
-                if (INFO)
-                    log.info("Will setup counters for " + activeDataServices.size()
-                            + " services");
+//                if (INFO)
+//                    log.info("Will setup counters for " + activeDataServices.size()
+//                            + " services");
 
                 final CounterSet tmp = serviceRoot.makePath("services");
 
@@ -1627,8 +1490,8 @@ abstract public class LoadBalancerService extends AbstractService
 
                         if (tmp.getChild(uuidStr) == null) {
 
-                            if(INFO)
-                                log.info("Adding counter for service: "+uuidStr);
+//                            if(INFO)
+//                                log.info("Adding counter for service: "+uuidStr);
 
                             tmp.addCounter(uuidStr, new HistoryInstrument<String>(new String[]{}));
                             
@@ -1675,9 +1538,6 @@ abstract public class LoadBalancerService extends AbstractService
                 
                 final String basename = "" + (logFileCount % logMaxFiles);
 
-                if(INFO)
-                    log.info("Writing counters on: "+basename);
-
                 LoadBalancerService.this.logCounters(basename);
 
                 logFileCount++;
@@ -1699,8 +1559,8 @@ abstract public class LoadBalancerService extends AbstractService
      * 
      * @throws IOException
      */
-    protected void logCounters(String basename) {
-        
+    protected void logCounters(final String basename) {
+
         final File file = new File(logDir, "counters" + basename + ".xml");
 
         if (INFO)
@@ -1771,12 +1631,13 @@ abstract public class LoadBalancerService extends AbstractService
             log.info("serviceUUID=" + serviceUUID + ", serviceIface="
                     + serviceIface + ", hostname=" + hostname);
         
-        String serviceName = "N/A";
+        String serviceName = "N/A";//@todo should really be passed in to avoid boundback RMI.
+        if (IDataService.class == serviceIface) {
         try {
             serviceName = getFederation().getDataService(serviceUUID).getServiceName();
         } catch(Throwable t) {
             log.warn(t.getMessage(),t);
-        }
+        }}
         
         lock.lock();
 
@@ -1971,8 +1832,8 @@ abstract public class LoadBalancerService extends AbstractService
                 
     }
 
-    public boolean isHighlyUtilizedDataService(UUID serviceUUID) throws IOException
-    {
+    public boolean isHighlyUtilizedDataService(final UUID serviceUUID)
+            throws IOException {
     
         setupLoggingContext();
 
@@ -2010,7 +1871,8 @@ abstract public class LoadBalancerService extends AbstractService
         
     }
 
-    public boolean isUnderUtilizedDataService(UUID serviceUUID) throws IOException {
+    public boolean isUnderUtilizedDataService(final UUID serviceUUID)
+            throws IOException {
 
         setupLoggingContext();
         
@@ -2038,7 +1900,7 @@ abstract public class LoadBalancerService extends AbstractService
 
             }
           
-            return isUnderUtilizedDataService(score,scores);
+            return isUnderUtilizedDataService(score, scores);
             
         } finally {
             
@@ -2140,24 +2002,24 @@ abstract public class LoadBalancerService extends AbstractService
                 if (nupdates < initialRoundRobinUpdateCount) {
 
                     /*
-                     * Use a round-robin assignment for the first 5 minutes.
-                     * 
-                     * @todo this is a hack for starting a new federation and
-                     * allocating services on that federation.
+                     * Use a round-robin assignment for the first N updates
+                     * while the LBS develops some history on the hosts and
+                     * services.
                      */
-                    return getUnderUtilizedDataServicesRoundRobin(minCount,
-                            maxCount, exclude);
-                
+                    return roundRobinServiceLoadHelper.getUnderUtilizedDataServices(
+                            minCount, maxCount, exclude);
+
                 }
-                
+
                 final ServiceScore[] scores = this.serviceScores.get();
 
-                if (scores == null) {
-                    
+                if (scores == null || scores.length == 0) {
+
                     if (minCount == 0) {
 
-                        if(INFO) log.info("No scores, minCount is zero - will return null.");
-                        
+                        if (INFO)
+                            log.info("No scores, minCount is zero - will return null.");
+
                         return null;
                         
                     }
@@ -2166,30 +2028,29 @@ abstract public class LoadBalancerService extends AbstractService
                      * Scores are not available immediately. This will await a
                      * non-excluded service join and then return the
                      * "under-utilized" services without reference to computed
-                     * service scores. This path is always used when the load
-                     * balancer first starts up since it will not have scores
-                     * for at least one pass of the UpdateTask.
+                     * service scores. This path is used when the load balancer
+                     * first starts up (unless the round robin is enabled) since
+                     * it will not have scores for at least one pass of the
+                     * UpdateTask.
                      */
 
-                    return getUnderUtilizedDataServicesWithoutScores(minCount,
-                            maxCount, exclude);
+                    return new ServiceLoadHelperWithoutScores()
+                            .getUnderUtilizedDataServices(minCount, maxCount,
+                                    exclude);
 
                 }
 
                 /*
-                 * Handle the case when we have the scores on hand.
-                 * 
                  * Note: if[minCount] is non-zero, then [knownGood] is set to a
                  * service that is (a) not excluded and (b) active. This is the
-                 * fallback service that we will recommend if minCount is
-                 * non-zero and we are using the scores and all of a sudden it
-                 * looks like there are no active services to recommend. This
-                 * basically codifies a decision point where we accept that this
-                 * service is active. We choose this as the first active and
-                 * non- excluded service so that it will be as under-utilized as
-                 * possible.
+                 * fallback service that we will recommend if minCount is non-zero
+                 * and we are using the scores and all of a sudden it looks like
+                 * there are no active services to recommend. This basically
+                 * codifies a decision point where we accept that this service is
+                 * active. We choose this as the first active and non- excluded
+                 * service so that it will be as under-utilized as possible.
                  */
-                
+
                 UUID knownGood = null;
                 if (minCount > 0 && exclude != null) {
                     
@@ -2205,9 +2066,11 @@ abstract public class LoadBalancerService extends AbstractService
                         
                         if(exclude.equals(serviceUUID)) continue;
                         
-                        if(!activeDataServices.containsKey(serviceUUID)) continue;
+                        if (!activeDataServices.containsKey(serviceUUID))
+                            continue;
                         
-                        if(knownGood==null) knownGood = serviceUUID;
+                        if (knownGood == null)
+                            knownGood = serviceUUID;
                         
                         nok++;
                         
@@ -2220,20 +2083,22 @@ abstract public class LoadBalancerService extends AbstractService
                          * non-excluded services, use the variant that does not
                          * use scores and that awaits a service join.
                          */
-                        
-                        return getUnderUtilizedDataServicesWithoutScores(minCount,
-                                maxCount, exclude);
+
+                        return new ServiceLoadHelperWithoutScores()
+                                .getUnderUtilizedDataServices(minCount,
+                                        maxCount, exclude);
                         
                     }
                     
                 }
-                
+
                 /*
                  * Use the scores to compute the under-utilized services. 
                  */
-                
-                return getUnderUtilizedDataServicesWithScores(minCount,
-                        maxCount, exclude, knownGood, scores);
+
+                return new ServiceLoadHelperWithScores(knownGood, scores)
+                        .getUnderUtilizedDataServices(minCount, maxCount,
+                                exclude);
 
             } finally {
 
@@ -2250,365 +2115,117 @@ abstract public class LoadBalancerService extends AbstractService
     }
 
     /**
-     * Issues {@link UUID}s using a round-robin over those that are joined. For
-     * this purpose, the joined {@link DataService}s are appended to an ordered
-     * set. The index of the most recently assigned service is maintained in a
-     * counter. Services that leave are removed from the set, but we do not
-     * bother to adjust the counter. We always return the {@link UUID} of the
-     * service at index MOD N, where N is the #of services that are joined at
-     * the time that this method looks at the set. We then post-increment the
-     * counter.
-     * <p>
-     * The round-robin allocate strategy is a good choice where there is little
-     * real data on the services, or when there is a set of services whose
-     * scores place them into an equivalence class such that we have no
-     * principled reason for preferring one service over another among those in
-     * the equivalence class.
+     * Integration with the {@link LoadBalancerService}.
      * 
-     * @throws TimeoutException
-     * @throws InterruptedException
-     * 
-     * @todo develop the concept of equivalence classes further. divide the
-     *       joined services into a set of equivalence classes. parameterize
-     *       this method to accept an equivalence class. always apply this
-     *       method when drawing from an equivalence class.
-     * 
-     * @todo there should be unit tests for this. in particular, we need a test
-     *       when minCount=maxCount=1 and there are N=2 and N GT 2 data services
-     *       to verify correct round robin assignment.
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
      */
-    protected UUID[] getUnderUtilizedDataServicesRoundRobin(int minCount,
-            int maxCount, UUID exclude) throws InterruptedException,
-            TimeoutException {
+    protected class RoundRobinServiceLoadHelper extends
+            AbstractRoundRobinServiceLoadHelper {
 
-        /*
-         * Note: In order to reduce the state that we track I've coded this to
-         * build the UUID[] array on demand from the joined services and then
-         * sort the UUIDs. This gives us a single additional item of state over
-         * that already recorded by the load balancer - the counter itself. This
-         * is just a pragmatic hack to get a round-robin behavior into place.
-         */
+        protected UUID[] awaitServices(int minCount, long timeout)
+                throws InterruptedException, TimeoutException {
 
-        if (INFO)
-            log.info("minCount=" + minCount + ", maxCount=" + maxCount
-                    + ", exclude=" + exclude);
-        
-        /*
-         * Note: I've reduced this to only demand a single data service. If more
-         * are available then they are returned. If none are available then we
-         * can not proceed. If only one is available, then it will be assigned
-         * for each of the requested minCount UUIDs.
-         */
-        final long timeout = 10000;// ms.
-        UUID[] a = ((AbstractScaleOutFederation) getFederation())
-                .awaitServices(1,
-                        //minCount == 0 ? 1 : minCount/* minCount */,
-                        timeout);
-
-        if (a.length == 1 && exclude != null && a[0] == exclude) {
-
-            /*
-             * Make sure that we have at least one unexcluded service.
-             */
-            
-            a = ((AbstractScaleOutFederation) getFederation()).awaitServices(
-                    2 /* minCount */, timeout);
-            
-        }
-
-        Arrays.sort(a);
-
-        final int n; // = Math.min(maxCount, a.length);
-        if (minCount == 0 && maxCount == 0) {
-            /*
-             * When there are no constraints we want to make any recommendations
-             * that we can.
-             */
-            n = a.length;
-        } else if (a.length > minCount) {
-            /*
-             * No more than the maxCount (note that maxCount may be zero in
-             * which case we want to have no more than the minCount).
-             */
-            n = Math.min(a.length, Math.max(minCount, maxCount));
-        } else {
-            // no less than the minCount.
-            n = minCount;
-        }
-        
-        final UUID[] b = new UUID[ n ];
-
-        if(INFO) {
-            
-            log.info("Have "+a.length+" data services and will make "+n+" assignments.");
-            
-        }
-        
-        int i = 0;
-        while(i < b.length) {
-            
-            final UUID uuid = a[roundRobinIndex.getAndIncrement() % a.length];
-            
-            assert uuid != null;
-            
-            if (uuid == exclude)
-                continue;
-
-            b[i++] = uuid;
+            return ((AbstractScaleOutFederation) LoadBalancerService.this
+                    .getFederation()).awaitServices(minCount, timeout);
 
         }
-        
-        if(INFO) {
-            
-            log.info("Assigned UUIDs: "+Arrays.toString(b));
-            
-        }
-        
-        return b;
-        
+
     }
-    private final AtomicInteger roundRobinIndex = new AtomicInteger();
-    
+
     /**
-     * Computes the under-utilized services in the case where where <i>minCount</i>
-     * is non-zero and we do not have pre-computed {@link #serviceScores} on hand. If
-     * there are also no active services, then this awaits the join of at least
-     * one service. Once it has at least one service that is not the optionally
-     * <i>exclude</i>d service, it returns the "under-utilized" services.
+     * Integration with the {@link LoadBalancerService}.
      * 
-     * @throws TimeoutException
-     *             If the result could not be obtained before the timeout was
-     *             triggered.
-     * 
-     * @throws InterruptedException
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
      */
-    protected UUID[] getUnderUtilizedDataServicesWithoutScores(int minCount,
-            int maxCount, UUID exclude) throws TimeoutException,
-            InterruptedException {
+    protected class ServiceLoadHelperWithoutScores extends
+            AbstractServiceLoadHelperWithoutScores {
 
-        if(INFO) 
-            log.info("begin");
-        
-        final long begin = System.currentTimeMillis();
+        public ServiceLoadHelperWithoutScores() {
 
-        while (true) {
-
-            final long elapsed = System.currentTimeMillis() - begin;
-
-            if (elapsed > JOIN_TIMEOUT) {
-
-                log.warn("Timeout waiting for service to join.");
-                
-                throw new TimeoutException();
-                
-            }
-
-            // all services that we know about right now.
-            final UUID[] knownServiceUUIDs = activeDataServices.keySet().toArray(
-                    new UUID[] {});
-
-            if (knownServiceUUIDs.length == 0) {
-
-                // await a join.
-                joined.await(100, TimeUnit.MILLISECONDS);
-
-                continue;
-
-            }
-
-            /*
-             * Scan and see if we have anything left after verifying that the
-             * service is still on our "live" list and after excluding this the
-             * option [exclude] service.
-             */
-
-            int nok = 0;
-
-            for (int i = 0; i < knownServiceUUIDs.length; i++) {
-
-                if (exclude != null && exclude.equals(knownServiceUUIDs[i])) {
-
-                    knownServiceUUIDs[i] = null;
-
-                    continue;
-
-                }
-
-                if (!activeDataServices.containsKey(knownServiceUUIDs[i])) {
-
-                    knownServiceUUIDs[i] = null;
-
-                    continue;
-
-                }
-
-                nok++;
-
-            }
-
-            if (nok <= 0) {
-
-                // await a join.
-                joined.await(100, TimeUnit.MILLISECONDS);
-
-                continue;
-
-            }
-
-            /*
-             * Now that we have at least one UUID, populate the return array.
-             * 
-             * Note: We return at least minCount UUIDs, even if we have to
-             * return the same UUID in each slot.
-             */
-
-            final UUID[] uuids = new UUID[Math.max(minCount, nok)];
-
-            int n = 0, i = 0;
-
-            while (n < uuids.length) {
-
-                UUID tmp = knownServiceUUIDs[i++ % knownServiceUUIDs.length];
-
-                if (tmp == null)
-                    continue;
-
-                uuids[n++] = tmp;
-
-            }
-
-            return uuids;
+            super(serviceJoinTimeout);
 
         }
-        
+
+        @Override
+        protected void awaitJoin(long timeout, TimeUnit unit) throws InterruptedException {
+
+            // await a join.
+            joined.await(timeout, unit);
+            
+        }
+
+        @Override
+        protected UUID[] getActiveServices() {
+            
+            return activeDataServices.keySet().toArray(new UUID[] {});
+            
+        }
+
+        @Override
+        protected boolean isActiveDataService(UUID serviceUUID) {
+
+            return activeDataServices.containsKey(serviceUUID);
+
+        }
+
+        @Override
+        protected boolean isUnderUtilizedDataService(ServiceScore score,
+                ServiceScore[] scores) {
+
+            return LoadBalancerService.this.isHighlyUtilizedDataService(score,
+                    scores);
+            
+        }
+
     }
     
     /**
-     * Handles the case when we have per-service scores.
-     * <p>
-     * Note: Pre-condition: the service scores must exist and there must be at
-     * least one active service with a score that is not excluded.
+     * Integration with the {@link LoadBalancerService}.
      * 
-     * @param minCount
-     * @param maxCount
-     * @param exclude
-     * @param knownGood
-     *            The service that we will recommend iff minCount is non-zero
-     *            and it does not appear that there are any active and
-     *            non-excluded services.
-     * @param scores
-     *            The service scores.
-     * @return
-     * 
-     * @throws TimeoutException
-     * @throws InterruptedException
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
      */
-    protected UUID[] getUnderUtilizedDataServicesWithScores(int minCount,
-            int maxCount, UUID exclude, UUID knownGood, ServiceScore[] scores)
-            throws TimeoutException, InterruptedException {
+    protected class ServiceLoadHelperWithScores extends
+            AbstractServiceLoadHelperWithScores {
 
-        if(INFO)
-            log.info("begin");
-        
-        final long begin = System.currentTimeMillis();
+        public ServiceLoadHelperWithScores(final UUID knownGood,
+                final ServiceScore[] scores) {
 
-        while (true) {
+            super(serviceJoinTimeout, knownGood, scores);
 
-            final long elapsed = System.currentTimeMillis() - begin;
+        }
 
-            if (elapsed > JOIN_TIMEOUT)
-                throw new TimeoutException();
+        @Override
+        protected void awaitJoin(long timeout, TimeUnit unit) throws InterruptedException {
 
-            /*
-             * Decide on the set of active services that we consider to be
-             * under-utilized based on their scores. When maxCount is non-zero,
-             * this set will be no larger than maxCount. When maxCount is zero
-             * the set will contain all services that satisify the
-             * "under-utilized" criteria.
-             */
-            final List<UUID> underUtilized = new ArrayList<UUID>(Math.max(
-                    minCount, maxCount));
+            // await a join.
+            joined.await(timeout, unit);
             
-            int nok = 0;
-            for(int i=0; i<scores.length; i++) {
-                
-                final ServiceScore score = scores[i];
+        }
 
-                // excluded?
-                if (score.serviceUUID.equals(exclude))
-                    continue;
-
-                // not active?
-                if (!activeDataServices.containsKey(score.serviceUUID))
-                    continue;
-                
-                if (isUnderUtilizedDataService(score,scores)) {
-
-                    underUtilized.add(score.serviceUUID);
-
-                    nok++;
-
-                }
-
-                if (maxCount > 0 && nok >= maxCount) {
-
-                    if(INFO) log.info("Satisifed maxCount=" + maxCount);
-
-                    break;
-
-                }
-
-                if (minCount > 0 && maxCount == 0 && nok >= minCount) {
-
-                    if(INFO) log.info("Satisifed minCount=" + minCount);
-
-                    break;
-
-                }
-
-            }
-
-            if (INFO)
-                log.info("Found " + underUtilized.size()
-                        + " under-utilized and non-excluded services");
+        @Override
+        protected UUID[] getActiveServices() {
             
-            if(minCount > 0 && underUtilized.isEmpty()) {
-
-                /*
-                 * Since we did not find anything we default to the one service
-                 * that the caller provided to us as our fallback. This service
-                 * might not be under-utilized and it might no longer be active,
-                 * but it is the service that we are going to return.
-                 */
-                
-                assert knownGood != null;
-
-                log.warn("Will report fallback service: "+knownGood);
-                
-                underUtilized.add(knownGood);
-                
-            }
+            return activeDataServices.keySet().toArray(new UUID[] {});
             
-            /*
-             * Populate the return array, choosing at least minCount services
-             * and repeating services if necessary.
-             * 
-             * Note: We return at least minCount UUIDs, even if we have to
-             * return the same UUID in each slot.
-             */
+        }
 
-            final UUID[] uuids = new UUID[Math.max(minCount, nok)];
+        @Override
+        protected boolean isActiveDataService(UUID serviceUUID) {
 
-            int n = 0, i = 0;
+            return activeDataServices.containsKey(serviceUUID);
 
-            while (n < uuids.length) {
+        }
 
-                uuids[n++] = underUtilized.get(i++ % nok);
+        @Override
+        protected boolean isUnderUtilizedDataService(ServiceScore score,
+                ServiceScore[] scores) {
 
-            }
+            return LoadBalancerService.this.isHighlyUtilizedDataService(score,
+                    scores);
             
-            return uuids;
-
         }
 
     }

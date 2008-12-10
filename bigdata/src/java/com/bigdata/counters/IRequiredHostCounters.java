@@ -93,18 +93,30 @@ public interface IRequiredHostCounters extends ICounterHierarchy {
      * LogicalDisk
      */
     
-    /** Percentage of the disk space that is free (unused) [0.0:1.0]. */
+    /**
+     * Percentage of the disk space that is free (unused) [0.0:1.0].
+     * 
+     * @todo This should only be monitoring local disk since NAS will typically
+     *       be shared across a cluster and hence of its space remaining will be
+     *       of little use to the LBS.
+     *       <p>
+     *       It will probably require platform specific configuration to select
+     *       only the appropriate devices (which would also address the above
+     *       concern).
+     * 
+     * @todo not collected under linux.
+     */
     String LogicalDisk_PercentFreeSpace = LogicalDisk + ps + "% Free Space";
 
     /*
      * PhysicalDisk
      */
     
-    /** Disk bytes read per second for the host. */
+    /** Disk bytes read per second for the host (vmstat). */
     String PhysicalDisk_BytesReadPerSec = PhysicalDisk + ps
             + "Bytes Read Per Second";
 
-    /** Disk bytes written per second for the host. */
+    /** Disk bytes written per second for the host (vmstat). */
     String PhysicalDisk_BytesWrittenPerSec = PhysicalDisk + ps
             + "Bytes Written Per Second";
 

@@ -52,6 +52,7 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.resources.ResourceManager.Options;
+import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 
 /**
@@ -731,6 +732,12 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
         }
 
         public IBigdataFederation getFederation() {
+
+            throw new UnsupportedOperationException();
+
+        }
+
+        public DataService getDataService() {
 
             throw new UnsupportedOperationException();
 

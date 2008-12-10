@@ -249,6 +249,12 @@ abstract public class DataService extends AbstractService
                                 
             }
             
+            public DataService getDataService() {
+                
+                return DataService.this;
+                
+            }
+            
             public UUID getDataServiceUUID() {
 
                 return DataService.this.getServiceUUID();

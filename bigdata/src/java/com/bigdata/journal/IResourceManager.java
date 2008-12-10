@@ -273,12 +273,21 @@ public interface IResourceManager extends IServiceShutdown {
      * being managed.
      */
     public UUID getDataServiceUUID();
-
+    
+    /**
+     * The local {@link DataService} whose resources are being managed.
+     * 
+     * @throws UnsupportedOperationException
+     *             if the {@link IResourceManager} is not part of an
+     *             {@link IBigdataFederation}.
+     */
+    public DataService getDataService();
+    
     /**
      * The federation whose resources are being managed.
      * 
      * @throws UnsupportedOperationException
-     *             if the {@link ResourceManager} is not part of an
+     *             if the {@link IResourceManager} is not part of an
      *             {@link IBigdataFederation}.
      */
     public IBigdataFederation getFederation();
@@ -287,6 +296,8 @@ public interface IResourceManager extends IServiceShutdown {
      * Return the ordered {@link UUID}[] of the physical {@link IDataService}
      * failover chain for the logical {@link IDataService} whose resources are
      * under management by this class.
+     * 
+     * @todo not used right now.  might go away.
      */
     public UUID[] getDataServiceUUIDs();
 

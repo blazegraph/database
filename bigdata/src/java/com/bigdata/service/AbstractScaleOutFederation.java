@@ -397,7 +397,7 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
      * @return An array #of the {@link UUID}s of the {@link IDataService}s
      *         that have been discovered by <em>this</em> client. Note that at
      *         least <i>minDataServices</i> elements will be present in this
-     *         array but that ALL discovered data services may be reported.
+     *         array but that ALL discovered data services MAY be reported.
      * 
      * @throws IllegalArgumentException
      *             if <i>minDataServices</i> is non-positive.

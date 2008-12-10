@@ -626,8 +626,23 @@ abstract public class OverflowManager extends IndexManager {
 
         if(overflowEnabled) {
 
+            /*
+             * Obtain the service name so that we can include it in the
+             * overflowService thread name (if possible).
+             */
+            String serviceName = null;
+            try {
+                serviceName = getDataService().getServiceName();
+            } catch(UnsupportedOperationException ex) {
+                // ignore.
+            } catch(Throwable t) {
+                log.warn(t.getMessage(),t);
+            }
+         
             overflowService = Executors.newFixedThreadPool(1,
-                    new DaemonThreadFactory("overflowService"));
+                    new DaemonThreadFactory((serviceName == null ? ""
+                            : serviceName + "-")
+                            + "overflowService"));
          
             /*
              * Note: The core thread is pre-started so that the MDC logging
@@ -637,7 +652,7 @@ abstract public class OverflowManager extends IndexManager {
              * up the log which is otherwise (even more) confusing.
              */
             
-            ((ThreadPoolExecutor)overflowService).prestartCoreThread();
+            ((ThreadPoolExecutor) overflowService).prestartCoreThread();
             
         } else {
             

@@ -40,6 +40,14 @@ import java.util.UUID;
 public interface IFederationDelegate {
 
     /**
+     * Return a name for the service.  It is up to administrators to ensure that
+     * service names are unique.
+     * 
+     * @return A name for the service.
+     */
+    public String getServiceName();
+    
+    /**
      * Return the class or interface that is the most interesting facet of the
      * client and which will be used to identify this client in the performance
      * counters reported to the {@link ILoadBalancerService}.

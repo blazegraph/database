@@ -51,6 +51,12 @@ public class DefaultServiceFederationDelegate<T extends AbstractService>
         
     }
     
+    public String getServiceName() {
+        
+        return service.getServiceName();
+        
+    }
+    
     public UUID getServiceUUID() {
         
         return service.getServiceUUID();

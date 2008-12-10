@@ -526,7 +526,7 @@ public class History<T> {
      *             than a 60 minute average if the reporting period is minutes
      *             and the capacity is 60.
      */
-    synchronized public T getAverage(int nperiods) {
+    synchronized public T getAverage(final int nperiods) {
 
         if (!isNumeric()) {
 

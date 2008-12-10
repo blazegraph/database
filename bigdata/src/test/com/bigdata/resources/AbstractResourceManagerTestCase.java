@@ -67,6 +67,7 @@ import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.resources.ResourceManager.Options;
+import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IClientIndex;
@@ -144,6 +145,12 @@ public class AbstractResourceManagerTestCase extends
             public IBigdataFederation getFederation() {
                 
                 return fed;
+                
+            }
+            
+            public DataService getDataService() {
+                
+                throw new UnsupportedOperationException();
                 
             }
             
