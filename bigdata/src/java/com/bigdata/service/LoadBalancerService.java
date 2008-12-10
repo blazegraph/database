@@ -1296,13 +1296,19 @@ abstract public class LoadBalancerService extends AbstractService
              * we have access to per-process counters for CPU, DISK, and MEMORY.
              */
 
-            final double averageTaskQueuingTime = getAverageValueForMinutes(
+            final double averageQueueLength = getAverageValueForMinutes(
                     hostCounterSet, IDataServiceCounters.concurrencyManager
                             + ps + IConcurrencyManagerCounters.writeService
                             + ps + IQueueCounters.averageQueueLength,
                     100d/* ms */, historyMinutes);
 
-            final double rawScore = (averageTaskQueuingTime + 1) * (hostScore.score + 1);
+            final double averageQueueingTime = getAverageValueForMinutes(
+                    hostCounterSet, IDataServiceCounters.concurrencyManager
+                            + ps + IConcurrencyManagerCounters.writeService
+                            + ps + IQueueCounters.averageQueuingTime,
+                    100d/* ms */, historyMinutes);
+
+            final double rawScore = (averageQueueLength + 1) * (hostScore.score + 1);
 
             // resolve the service name : @todo refactor RMI out of this method.
             String serviceName = "N/A";
@@ -1316,11 +1322,13 @@ abstract public class LoadBalancerService extends AbstractService
             if (INFO) {
              
                 log.info("serviceName=" + serviceName + ", serviceUUID="
-                        + serviceUUID + ", rawScore("
-                        + scoreFormat.format(rawScore) + ") = ("
-                        + IQueueCounters.averageTaskQueuingTime + "("
-                        + millisFormat.format(averageTaskQueuingTime)
-                        + ")+1) * (hostScore("
+                        + serviceUUID + ", averageQueueLength="
+                        + averageQueueLength + ", averageQueueingTime="
+                        + millisFormat.format(averageQueueingTime)
+                        + ", rawScore("
+                        + scoreFormat.format(rawScore)
+                        + ") = (" + averageQueueLength + "("
+                        + averageQueueLength + ")+1) * (hostScore("
                         + scoreFormat.format(hostScore.score) + ")+1)");
                 
             }
