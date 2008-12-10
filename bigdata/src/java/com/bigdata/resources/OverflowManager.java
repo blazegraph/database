@@ -140,8 +140,6 @@ abstract public class OverflowManager extends IndexManager {
 
     /**
      * Set based on {@link Options#COPY_INDEX_THRESHOLD}.
-     * 
-     * @todo make this a per-index option on {@link IndexMetadata}?
      */
     final int copyIndexThreshold;
     
@@ -372,12 +370,15 @@ abstract public class OverflowManager extends IndexManager {
          * However, since only the current state of the index partition is
          * moved, not its history, moving index partitions which are only the
          * target for historical reads will not reduce the load on the service.
+         * Instead, read burdens are reduced using replication.
          * 
          * @see #DEFAULT_MINIMUM_ACTIVE_INDEX_PARTITIONS
          */
-        String MINIMUM_ACTIVE_INDEX_PARTITIONS = OverflowManager.class.getName()+".minimumActiveIndexPartitions";
+        String MINIMUM_ACTIVE_INDEX_PARTITIONS = OverflowManager.class
+                .getName()
+                + ".minimumActiveIndexPartitions";
 
-        String DEFAULT_MINIMUM_ACTIVE_INDEX_PARTITIONS = "3";
+        String DEFAULT_MINIMUM_ACTIVE_INDEX_PARTITIONS = "1";
 
         /**
          * This is the maximum #of index partitions that the resource manager is
@@ -393,7 +394,8 @@ abstract public class OverflowManager extends IndexManager {
          * 
          * @see #DEFAULT_MAXIMUM_MOVES_PER_TARGET
          */
-        String MAXIMUM_MOVES_PER_TARGET = OverflowManager.class.getName()+".maximumMovesPerTarget";
+        String MAXIMUM_MOVES_PER_TARGET = OverflowManager.class.getName()
+                + ".maximumMovesPerTarget";
 
         String DEFAULT_MAXIMUM_MOVES_PER_TARGET = "3";
 
