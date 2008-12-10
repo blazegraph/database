@@ -71,6 +71,9 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("bigdata services");
 
+        // tests of the round-robin aspects of the LBS (isolated behaviors).
+        suite.addTestSuite(TestLoadBalancerRoundRobin.class);
+        
         // tests of the metadata index.
         suite.addTestSuite( TestMetadataIndex.class );
         

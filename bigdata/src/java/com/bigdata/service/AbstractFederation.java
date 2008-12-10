@@ -375,7 +375,8 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
              */
 
             AbstractStatisticsCollector.addBasicServiceOrClientCounters(
-                    serviceRoot, getServiceIface(), client.getProperties());
+                    serviceRoot, getServiceName(), getServiceIface(), client
+                            .getProperties());
 
         }
 
@@ -664,6 +665,15 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
         
     }
 
+    /**
+     * Delegated.
+     */
+    public String getServiceName() {
+    
+        return client.getDelegate().getServiceName();
+        
+    }
+    
     /**
      * Delegated.
      */

@@ -239,6 +239,8 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      * @param serviceRoot
      *            The {@link CounterSet} corresponding to the service (or
      *            client).
+     * @param serviceName
+     *            The name of the service.
      * @param serviceIface
      *            The class or interface that best represents the service or
      *            client.
@@ -246,7 +248,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      *            The properties used to configure that service or client.
      */
     static public void addBasicServiceOrClientCounters(CounterSet serviceRoot,
-            Class serviceIface, Properties properties) {
+            String serviceName, Class serviceIface, Properties properties) {
         
         // Service info.
         {
@@ -255,6 +257,9 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
 
             serviceInfoSet.addCounter("Service Type",
                     new OneShotInstrument<String>(serviceIface.getName()));
+
+            serviceInfoSet.addCounter("Service Name",
+                    new OneShotInstrument<String>(serviceName));
 
             AbstractStatisticsCollector.addServiceProperties(serviceInfoSet,
                     properties);

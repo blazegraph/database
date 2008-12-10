@@ -119,7 +119,7 @@ public interface ILoadBalancerService extends IService {
      *            The optional {@link UUID} of a data service to be excluded
      *            from the returned set.
      * 
-     * @return Up to <i>limit</i> under-utilized services -or-
+     * @return Up to <i>maxCount</i> under-utilized services -or-
      *         <code>null</code> IFF no services are recommended at this time
      *         as needing additional load.
      * 

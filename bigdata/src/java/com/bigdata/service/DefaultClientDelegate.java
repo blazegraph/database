@@ -1,6 +1,9 @@
 package com.bigdata.service;
 
+import java.net.InetAddress;
 import java.util.UUID;
+
+import com.bigdata.counters.AbstractStatisticsCollector;
 
 /**
  * Default {@link IFederationDelegate} implementation used by a standard client.
@@ -31,6 +34,13 @@ public class DefaultClientDelegate implements IFederationDelegate {
 
     }
 
+    public String getServiceName() {
+        
+        return fed.getClient().getClass().getName() + "@"
+                + AbstractStatisticsCollector.fullyQualifiedHostName;
+        
+    }
+    
     public Class getServiceIface() {
 
         return fed.getClient().getClass();

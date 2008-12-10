@@ -51,6 +51,7 @@ import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.StaleLocatorReason;
 import com.bigdata.service.AbstractEmbeddedResourceLockManager;
 import com.bigdata.service.AbstractFederation;
+import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
@@ -820,6 +821,16 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
     }
     
+    /**
+     * @throws UnsupportedOperationException
+     *             always.
+     */
+    public DataService getDataService() {
+
+        throw new UnsupportedOperationException();
+        
+    }
+
     /**
      * @throws UnsupportedOperationException
      *             always.

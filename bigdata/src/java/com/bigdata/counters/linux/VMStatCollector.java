@@ -192,8 +192,6 @@ public class VMStatCollector extends AbstractProcessCollector implements
 
     /**
      * Declares the counters that we will collect
-     * 
-     * @todo bi (blocks in) and bo (block out)?
      */
     synchronized public CounterSet getCounters() {
         
@@ -221,15 +219,31 @@ public class VMStatCollector extends AbstractProcessCollector implements
              * 
              * @todo where do I get the amount of swap space available?
              */
-            inst.add(new DI(IHostCounters.Memory_SwapUsed, 1024d));
+            inst.add(new DI(IHostCounters.Memory_SwapBytesUsed, 1024d));
 
             /*
              * Note: [free] is "the amount of idle memory". The counter is
              * reported in 1024 byte blocks, so we convert to bytes using a
              * scaling factor.
              */
-            inst.add(new DI(IHostCounters.Memory_Idle, 1024d));
+            inst.add(new DI(IHostCounters.Memory_Bytes_Free, 1024d));
 
+            /*
+             * Note: [bi] is "the blocks received from a device / second". The
+             * counter is reported in 1024 byte blocks, so we convert to bytes
+             * using a scaling factor.
+             */
+            inst.add(new DI(IRequiredHostCounters.PhysicalDisk_BytesReadPerSec,
+                    1024d));
+            
+            /*
+             * Note: [bo] is "the blocks sent to a device / second". The counter
+             * is reported in 1024 byte blocks, so we convert to bytes using a
+             * scaling factor.
+             */
+            inst.add(new DI(IRequiredHostCounters.PhysicalDisk_BytesWrittenPerSec,
+                    1024d));
+            
             if (cpuStats) {
 
                 /*
@@ -370,6 +384,9 @@ public class VMStatCollector extends AbstractProcessCollector implements
                     final String si = fields[6];
                     final String so = fields[7];
 
+                    final String bi = fields[8];
+                    final String bo = fields[9];
+
                     final String user = fields[12];
                     final String system = fields[13];
                     final String idle = fields[14];
@@ -378,19 +395,25 @@ public class VMStatCollector extends AbstractProcessCollector implements
 
                     if (INFO)
                         log.info("\nswpd=" + swpd + ", free=" + free + ", si="
-                                + si + ", so=" + so + ", %user=" + user
-                                + ", %system=" + system + ", idle=" + idle
-                                + ", iowait=" + iowait + "\n" + header + "\n"
-                                + data);
+                                + si + ", so=" + so + ", bi=" + bi + ", bo="
+                                + bo + ", %user=" + user + ", %system="
+                                + system + ", idle=" + idle + ", iowait="
+                                + iowait + "\n" + header + "\n" + data);
 
-                    vals.put(IHostCounters.Memory_SwapUsed, Double
+                    vals.put(IHostCounters.Memory_SwapBytesUsed, Double
                             .parseDouble(swpd));
 
-                    vals.put(IHostCounters.Memory_Idle, Double
+                    vals.put(IHostCounters.Memory_Bytes_Free, Double
                             .parseDouble(free));
 
-                    vals.put(IHostCounters.Memory_majorFaultsPerSecond, Double
+                    vals.put(IRequiredHostCounters.Memory_majorFaultsPerSecond, Double
                             .parseDouble(si));
+
+                    vals.put(IRequiredHostCounters.PhysicalDisk_BytesReadPerSec, Double
+                            .parseDouble(bi));
+
+                    vals.put(IRequiredHostCounters.PhysicalDisk_BytesWrittenPerSec, Double
+                            .parseDouble(bo));
 
                     if (cpuStats) {
 
