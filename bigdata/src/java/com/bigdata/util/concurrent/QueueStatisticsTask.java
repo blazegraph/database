@@ -170,9 +170,6 @@ public class QueueStatisticsTask implements Runnable {
     private long commitWaitingTime = 0L;
     private long commitServiceTime = 0L;
 
-    // FIXME aka throughput (1000d/queueingTime).
-    private double averageTasksPerSecond = 0d;
-    
     /**
      * Moving average in milliseconds of the time a task waits on a queue
      * pending execution.
@@ -233,7 +230,7 @@ public class QueueStatisticsTask implements Runnable {
      * task and its completion including any time spent waiting for resource
      * locks, commit processing and any time spent servicing that task.
      * 
-     * @see IQueueCounters#averageTaskQueuingTime
+     * @see IQueueCounters#averageQueuingTime
      */
     public final Instrument<Double> averageTaskQueuingTimeInst = new Instrument<Double>() {
         
@@ -744,7 +741,7 @@ public class QueueStatisticsTask implements Runnable {
             counterSet.addCounter(IQueueCounters.averageTaskServiceTime,
                     averageTaskServiceTimeInst);
 
-            counterSet.addCounter(IQueueCounters.averageTaskQueuingTime,
+            counterSet.addCounter(IQueueCounters.averageQueuingTime,
                     averageTaskQueuingTimeInst);
             
         }
@@ -916,7 +913,7 @@ public class QueueStatisticsTask implements Runnable {
          * resource locks, commit processing and any time spent servicing that
          * task.
          */
-        String averageTaskQueuingTime = "Average Task Queuing Time";
+        String averageQueuingTime = "Average Task Queuing Time";
 
         /**
          * Moving average in milliseconds of the time that the task that
