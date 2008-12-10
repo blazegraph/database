@@ -1297,16 +1297,16 @@ abstract public class LoadBalancerService extends AbstractService
              */
 
             final double averageQueueLength = getAverageValueForMinutes(
-                    hostCounterSet, IDataServiceCounters.concurrencyManager
+                    serviceCounterSet, IDataServiceCounters.concurrencyManager
                             + ps + IConcurrencyManagerCounters.writeService
                             + ps + IQueueCounters.averageQueueLength,
-                    100d/* ms */, historyMinutes);
+                    0d/* default (queueLength) */, historyMinutes);
 
             final double averageQueueingTime = getAverageValueForMinutes(
-                    hostCounterSet, IDataServiceCounters.concurrencyManager
+                    serviceCounterSet, IDataServiceCounters.concurrencyManager
                             + ps + IConcurrencyManagerCounters.writeService
                             + ps + IQueueCounters.averageQueuingTime,
-                    100d/* ms */, historyMinutes);
+                    100d/* default (ms) */, historyMinutes);
 
             final double rawScore = (averageQueueLength + 1) * (hostScore.score + 1);
 
