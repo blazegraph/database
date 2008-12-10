@@ -1,7 +1,6 @@
 package com.bigdata.resources;
 
 import java.io.File;
-import java.io.IOException;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedChannelException;
@@ -1040,6 +1039,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
          */
         final int maxMovesPerTarget = resourceManager.maximumMovesPerTarget;
 
+        // the UUID of this data service.
+        final UUID sourceServiceUUID = resourceManager.getDataServiceUUID();
         /*
          * Obtain some data service UUIDs onto which we will try and offload
          * some index partitions iff this data service is deemed to be highly
@@ -1048,15 +1049,12 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         final UUID[] underUtilizedDataServiceUUIDs;
         try {
 
-            // the UUID of this data service.
-            final UUID excludeUUID = resourceManager.getDataServiceUUID();
-            
             // request under utilized data service UUIDs (RMI).
             underUtilizedDataServiceUUIDs = loadBalancerService
                     .getUnderUtilizedDataServices(//
                             0, // minCount - no lower bound.
                             0, // maxCount - no upper bound.
-                            excludeUUID // exclude this data service.
+                            sourceServiceUUID // exclude this data service.
                             );
 
         } catch (Throwable t) {
@@ -1120,11 +1118,11 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
 //        if(INFO)
 //            log.info
-            log.warn
-            ("Considering index partition moves: #targetServices="
+            log.warn("Considering index partition moves: #targetServices="
                 + underUtilizedDataServiceUUIDs.length + ", maxMovesPerTarget="
-                + maxMovesPerTarget + ", maxMoves=" + maxMoves + ", nactive="
-                + nactive);
+                + maxMovesPerTarget + ", nactive=" + nactive + ", maxMoves="
+                + maxMoves + ", sourceService="+sourceServiceUUID+", targetServices="
+                + Arrays.toString(underUtilizedDataServiceUUIDs));
         
         int nmove = 0;
         
@@ -1218,6 +1216,24 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 // choose target using round robin among candidates.
                 final UUID targetDataServiceUUID = underUtilizedDataServiceUUIDs[nmove
                         % underUtilizedDataServiceUUIDs.length];
+                
+                if (targetDataServiceUUID == sourceServiceUUID) {
+
+                    log
+                            .error("LBS included the source data service in the set of possible targets: source="
+                                    + sourceServiceUUID
+                                    + ", targets="
+                                    + Arrays
+                                            .toString(underUtilizedDataServiceUUIDs));
+                    
+                    /*
+                     * Note: by continuing here we will not do a move for this
+                     * index partition (it would throw an exception) but we will
+                     * at least consider the next index partition for a move.
+                     */
+                    continue;
+                    
+                }
 
                 // get the target service name.
                 String targetDataServiceName;

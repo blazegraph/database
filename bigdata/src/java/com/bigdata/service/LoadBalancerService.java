@@ -315,7 +315,11 @@ abstract public class LoadBalancerService extends AbstractService
                 .getName()
                 + ".initialRoundRobinUpdateCount";
 
-        String DEFAULT_INITIAL_ROUND_ROBIN_UPDATE_COUNT = "10";
+        /**
+         * Note: this value should be on the order of
+         * {@link #DEFAULT_HISTORY_MINUTES}
+         */
+        String DEFAULT_INITIAL_ROUND_ROBIN_UPDATE_COUNT = "5";
         
         /**
          * The delay between scheduled invocations of the {@link UpdateTask}.
@@ -1286,11 +1290,19 @@ abstract public class LoadBalancerService extends AbstractService
             assert hostScore.rank != -1 : hostScore.toString();
             
             /*
-             * The average task queue length for the unisolated write service.
-             * This is a good measure of the write burden of the service and we
-             * use writes to drive load balancing decisions. This is in contrast
-             * to high availability for readers, where readers can be directed
-             * to failover instances.
+             * The average queuing time for the unisolated write service is used
+             * as the primary indicator of the write load of the service. The
+             * average queueing time is preferred to the average queue length as
+             * the queueing time is directly correlated to the throughput of the
+             * service.
+             * 
+             * Note: We use the measure of write load to drive load balancing
+             * decisions. This is in contrast to high availability for readers,
+             * where readers can be directed to failover instances.
+             * 
+             * @todo verify that the queueing time measurement in millis is
+             * sufficient rather than nanos as queuing times can become quite
+             * short.
              * 
              * @todo There is a lot more that can be considered and under linux
              * we have access to per-process counters for CPU, DISK, and MEMORY.
@@ -1321,15 +1333,14 @@ abstract public class LoadBalancerService extends AbstractService
             
             if (INFO) {
              
-                log.info("serviceName=" + serviceName + ", serviceUUID="
-                        + serviceUUID + ", averageQueueLength="
-                        + averageQueueLength + ", averageQueueingTime="
-                        + millisFormat.format(averageQueueingTime)
-                        + ", rawScore("
-                        + scoreFormat.format(rawScore)
-                        + ") = (" + averageQueueLength + "("
-                        + averageQueueLength + ")+1) * (hostScore("
-                        + scoreFormat.format(hostScore.score) + ")+1)");
+                log.info("serviceName=" + serviceName//
+                        + ", serviceUUID=" + serviceUUID //
+                        + ", averageQueueLength=" + averageQueueLength//
+                        + ", averageQueueingTime=" + millisFormat.format(averageQueueingTime)
+                        + ", rawScore(" + scoreFormat.format(rawScore) + ") "//
+                        + "= (averageQueueingTime("+ averageQueueingTime+ ") + 1) "//
+                        + "* (hostScore("+ scoreFormat.format(hostScore.score) + ") + 1)"//
+                        );
                 
             }
 
@@ -2019,6 +2030,10 @@ abstract public class LoadBalancerService extends AbstractService
 
                 }
 
+                /*
+                 * Scores for the services in ascending order (least utilized to
+                 * most utilized).
+                 */
                 final ServiceScore[] scores = this.serviceScores.get();
 
                 if (scores == null || scores.length == 0) {
@@ -2051,12 +2066,13 @@ abstract public class LoadBalancerService extends AbstractService
                 /*
                  * Note: if[minCount] is non-zero, then [knownGood] is set to a
                  * service that is (a) not excluded and (b) active. This is the
-                 * fallback service that we will recommend if minCount is non-zero
-                 * and we are using the scores and all of a sudden it looks like
-                 * there are no active services to recommend. This basically
-                 * codifies a decision point where we accept that this service is
-                 * active. We choose this as the first active and non- excluded
-                 * service so that it will be as under-utilized as possible.
+                 * fallback service that we will recommend if minCount is
+                 * non-zero and we are using the scores and all of a sudden it
+                 * looks like there are no active services to recommend. This
+                 * basically codifies a decision point where we accept that this
+                 * service is active. We choose this as the first active and
+                 * non-excluded service so that it will be as under-utilized as
+                 * possible.
                  */
 
                 UUID knownGood = null;

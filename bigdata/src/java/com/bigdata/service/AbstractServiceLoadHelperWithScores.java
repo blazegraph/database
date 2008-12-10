@@ -63,7 +63,8 @@ abstract public class AbstractServiceLoadHelperWithScores extends
      *            A service that is known to be active and NOT excluded from the
      *            request to be posed.
      * @param scores
-     *            The current service scores (snapshot).
+     *            Scores for the services in ascending order (least utilized to
+     *            most utilized).
      */
     protected AbstractServiceLoadHelperWithScores(final long joinTimeout,
             final UUID knownGood, final ServiceScore[] scores) {
@@ -116,8 +117,8 @@ abstract public class AbstractServiceLoadHelperWithScores extends
          * will contain all services that satisify the "under-utilized"
          * criteria.
          */
-        final List<UUID> underUtilized = new ArrayList<UUID>(Math.max(minCount,
-                maxCount));
+        final List<UUID> underUtilized = new ArrayList<UUID>(Math.max(
+                scores.length, Math.max(minCount, maxCount)));
 
         int nok = 0;
         for (int i = 0; i < scores.length; i++) {
