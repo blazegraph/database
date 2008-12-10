@@ -310,11 +310,11 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
 
             fakeServiceScores[0] = new ServiceScore(
                     AbstractStatisticsCollector.fullyQualifiedHostName,
-                    dataService0.getServiceUUID(), 1.0/* rawScore */);
+                    dataService0.getServiceUUID(), "dataService0", 1.0/* rawScore */);
 
             fakeServiceScores[1] = new ServiceScore(
                     AbstractStatisticsCollector.fullyQualifiedHostName,
-                    dataService1.getServiceUUID(), 0.0/* rawScore */);
+                    dataService1.getServiceUUID(), "dataService1", 0.0/* rawScore */);
 
             // set the fake scores on the load balancer.
             lbs.setServiceScores(fakeServiceScores);
