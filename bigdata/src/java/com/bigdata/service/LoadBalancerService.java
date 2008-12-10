@@ -388,6 +388,8 @@ abstract public class LoadBalancerService extends AbstractService
         
         public final UUID serviceUUID;
         
+        public final String serviceName;
+        
         /** The raw score computed for that service. */
         public final double rawScore;
         /** The normalized score computed for that service. */
@@ -404,9 +406,9 @@ abstract public class LoadBalancerService extends AbstractService
          * @param hostname
          * @param serviceUUID
          */
-        public ServiceScore(String hostname, UUID serviceUUID) {
+        public ServiceScore(String hostname, UUID serviceUUID, String serviceName) {
 
-            this(hostname, serviceUUID, 0d);
+            this(hostname, serviceUUID, serviceName, 0d);
 
         }
 
@@ -417,7 +419,7 @@ abstract public class LoadBalancerService extends AbstractService
          * @param serviceUUID
          * @param rawScore
          */
-        public ServiceScore(String hostname, UUID serviceUUID, double rawScore) {
+        public ServiceScore(String hostname, UUID serviceUUID, String serviceName, double rawScore) {
             
             if (hostname == null)
                 throw new IllegalArgumentException();
@@ -425,9 +427,14 @@ abstract public class LoadBalancerService extends AbstractService
             if (serviceUUID == null)
                 throw new IllegalArgumentException();
             
+            if (serviceName == null)
+                throw new IllegalArgumentException();
+            
             this.hostname = hostname;
          
             this.serviceUUID = serviceUUID;
+            
+            this.serviceName = serviceName;
             
             this.rawScore = rawScore;
             
@@ -436,8 +443,10 @@ abstract public class LoadBalancerService extends AbstractService
         public String toString() {
             
             return "ServiceScore{hostname=" + hostname + ", serviceUUID="
-                    + serviceUUID + ", rawScore=" + rawScore + ", score="
-                    + score + ", rank=" + rank + ", drank=" + drank + "}";
+                    + serviceUUID + ", serviceName="
+                    + (serviceName == null ? "N/A" : serviceName)
+                    + ", rawScore=" + rawScore + ", score=" + score + ", rank="
+                    + rank + ", drank=" + drank + "}";
             
         }
         
@@ -1271,7 +1280,7 @@ abstract public class LoadBalancerService extends AbstractService
              * @todo if heavy swapping persists then lower the score even
              * further.
              * 
-             * FIXME majorFaultsPerSecond is not being collected for linux.
+             * 
              * 
              * @todo The % of the physical memory and the % of the swap space
              * that have been used are also strong indicators.
@@ -1435,9 +1444,19 @@ abstract public class LoadBalancerService extends AbstractService
 
             final double rawScore = (averageTaskQueuingTime + 1) * (hostScore.score + 1);
 
+            // resolve the service name.
+            String serviceName = "N/A";
+            try {
+                serviceName = getFederation().getDataService(serviceUUID)
+                        .getServiceName();
+            } catch (Throwable t) {
+                log.warn(t.getMessage(), t);
+            }
+            
             if (INFO) {
              
-                log.info("rawScore(" + rawScore + ") = ("
+                log.info("serviceName=" + serviceName + ", serviceUUID="
+                        + serviceUUID + ", rawScore(" + rawScore + ") = ("
                         + IQueueCounters.averageTaskQueuingTime + "("
                         + averageTaskQueuingTime + ")+1) * (hostScore("
                         + hostScore.score + ")+1)");
@@ -1445,7 +1464,7 @@ abstract public class LoadBalancerService extends AbstractService
             }
 
             final ServiceScore score = new ServiceScore(hostScore.hostname,
-                    serviceUUID, rawScore);
+                    serviceUUID, serviceName, rawScore);
             
             return score;
             
@@ -1752,6 +1771,13 @@ abstract public class LoadBalancerService extends AbstractService
             log.info("serviceUUID=" + serviceUUID + ", serviceIface="
                     + serviceIface + ", hostname=" + hostname);
         
+        String serviceName = "N/A";
+        try {
+            serviceName = getFederation().getDataService(serviceUUID).getServiceName();
+        } catch(Throwable t) {
+            log.warn(t.getMessage(),t);
+        }
+        
         lock.lock();
 
         try {
@@ -1772,7 +1798,7 @@ abstract public class LoadBalancerService extends AbstractService
                  * we only make load balancing decisions for the data services.
                  */
                 if (activeDataServices.putIfAbsent(serviceUUID,
-                        new ServiceScore(hostname, serviceUUID)) == null) {
+                        new ServiceScore(hostname, serviceUUID, serviceName)) == null) {
 
                     if (INFO)
                         log.info("Data service join: hostname=" + hostname
@@ -1830,7 +1856,7 @@ abstract public class LoadBalancerService extends AbstractService
      * @see IFederationDelegate#serviceLeave(UUID)
      * @see #join(UUID, Class, String)
      */
-    public void leave(UUID serviceUUID) {
+    public void leave(final UUID serviceUUID) {
 
         if (INFO)
             log.info("serviceUUID=" + serviceUUID);
@@ -1957,7 +1983,7 @@ abstract public class LoadBalancerService extends AbstractService
             // No scores yet?
             if (scores == null) {
 
-                log.info("No scores yet");
+                if(INFO) log.info("No scores yet");
 
                 return false;
 
@@ -1995,7 +2021,7 @@ abstract public class LoadBalancerService extends AbstractService
             // No scores yet?
             if (scores == null) {
 
-                log.info("No scores yet");
+                if(INFO) log.info("No scores yet");
 
                 return false;
 
@@ -2022,12 +2048,15 @@ abstract public class LoadBalancerService extends AbstractService
 
     }
 
-    protected boolean isHighlyUtilizedDataService(ServiceScore score,
-            ServiceScore[] scores) {
+    protected boolean isHighlyUtilizedDataService(final ServiceScore score,
+            final ServiceScore[] scores) {
 
-        assert score != null;
-        assert scores != null;
-        
+        if (score == null)
+            throw new IllegalArgumentException();
+
+        if (scores == null)
+            throw new IllegalArgumentException();
+
         boolean highlyUtilized = false;
 
         if (score.drank > .8) {
@@ -2051,11 +2080,14 @@ abstract public class LoadBalancerService extends AbstractService
 
     }
 
-    protected boolean isUnderUtilizedDataService(ServiceScore score,
-            ServiceScore[] scores) {
+    protected boolean isUnderUtilizedDataService(final ServiceScore score,
+            final ServiceScore[] scores) {
 
-        assert score != null;
-        assert scores != null;
+        if (score == null)
+            throw new IllegalArgumentException();
+
+        if (scores == null)
+            throw new IllegalArgumentException();
 
         boolean underUtilized = false;
 

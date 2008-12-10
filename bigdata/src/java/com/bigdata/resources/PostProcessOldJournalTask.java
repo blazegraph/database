@@ -1024,8 +1024,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
         if (!highlyUtilizedService || nactive <= minActiveIndexPartitions) {
 
-            if(INFO)
-            log.info("Preconditions for move not satisified: highlyUtilized="
+//            if(INFO)
+            log.warn("Preconditions for move not satisified: highlyUtilized="
                     + highlyUtilizedService + ", nactive=" + nactive
                     + ", minActive=" + minActiveIndexPartitions);
             
@@ -1118,8 +1118,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
          * begin moving index partitions off of this data service.
          */
 
-        if(INFO)
-            log.info("Considering index partition moves: #targetServices="
+//        if(INFO)
+//            log.info
+            log.warn
+            ("Considering index partition moves: #targetServices="
                 + underUtilizedDataServiceUUIDs.length + ", maxMovesPerTarget="
                 + maxMovesPerTarget + ", maxMoves=" + maxMoves + ", nactive="
                 + nactive);
@@ -1146,7 +1148,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             if (reason != null) {
                 
                 /*
-                 * Note: The counters are accumulated over the live of the
+                 * Note: The counters are accumulated over the life of the
                  * journal. This tells us that the named index was moved, split,
                  * or joined sometimes during the live of that old journal.
                  * Since it is gone we skip over it here.
@@ -1203,8 +1205,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 
             }
             
-            if (INFO)
-                log.info("Considering move candidate: " + score);
+//            if (INFO)
+//                log.info
+                log.warn("Considering move candidate: " + score);
             
             if (score.drank > .3 && score.drank < .8) {
 
