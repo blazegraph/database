@@ -20,6 +20,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
@@ -1057,9 +1058,21 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                             sourceServiceUUID // exclude this data service.
                             );
 
+        } catch (TimeoutException t) {
+            
+            log.warn(t.getMessage());
+            
+            return EMPTY_LIST;
+
+        } catch (InterruptedException t) {
+
+            log.warn(t.getMessage());
+
+            return EMPTY_LIST;
+            
         } catch (Throwable t) {
 
-            log.warn("Could not obtain target service UUIDs: ", t);
+            log.error("Could not obtain target service UUIDs: ", t);
 
             return EMPTY_LIST;
 
