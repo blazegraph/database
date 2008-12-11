@@ -99,6 +99,42 @@ abstract public class ResourceManager extends OverflowManager implements IResour
     final protected static boolean INFO = log.isInfoEnabled();
 
     /**
+     * Interface defines and documents the counters and counter namespaces for
+     * the {@link ResourceManager}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static interface IResourceManagerCounters
+        extends IOverflowManagerCounters, IIndexManagerCounters, IStoreManagerCounters {
+    
+        /**
+         * The namespace for counters pertaining to the {@link OverflowManager}.
+         */
+        String OverflowManager = "Overflow Manager";
+        
+        /**
+         * The namespace for counters pertaining to the {@link IndexManager}.
+         */
+        String IndexManager = "Index Manager";
+        
+        /** 
+         * The namespace for counters pertaining to the {@link StoreManager}.
+         */
+        String StoreManager = "Store Manager";
+
+        /**
+         * The namespace for counters pertaining to the live
+         * {@link ManagedJournal}.
+         * <p>
+         * Note: these counters are detached and reattached to the new live
+         * journal during overflow processing.
+         */
+        String LiveJournal = "Live Journal";
+        
+    }
+
+    /**
      * Return the {@link CounterSet}.
      */
     synchronized public CounterSet getCounters() {
@@ -117,104 +153,133 @@ abstract public class ResourceManager extends OverflowManager implements IResour
             // OverflowManager
             {
 
-                final CounterSet tmp = root.makePath("Overflow Manager");
+                final CounterSet tmp = root
+                        .makePath(IResourceManagerCounters.OverflowManager);
 
-                tmp.addCounter("Overflow Enabled", new Instrument<Boolean>() {
-                    public void sample() {
-                        setValue(isOverflowEnabled());
-                    }
-                });
-                
-                tmp.addCounter("Overflow Allowed", new Instrument<Boolean>() {
-                    public void sample() {
-                        setValue(isOverflowAllowed());
-                    }
-                });
-                
-                tmp.addCounter("Should Overflow", new Instrument<Boolean>() {
-                    public void sample() {
-                        setValue(shouldOverflow());
-                    }
-                });
-                
-                tmp.addCounter("Overflow Count", new Instrument<Long>() {
-                    public void sample() {
-                        setValue(getOverflowCount());
-                    }
-                });
-                
-                tmp.addCounter("Asynchronous Overflow Failed Count", new Instrument<Long>() {
-                    public void sample() {
-                        setValue(asyncOverflowFailedCounter.get());
-                    }
-                });
-                
-                tmp.addCounter("Asynchronous Overflow Task Failed Count", new Instrument<Long>() {
-                    public void sample() {
-                        setValue(asyncOverflowTaskFailedCounter.get());
-                    }
-                });
+                tmp.addCounter(IOverflowManagerCounters.OverflowEnabled,
+                        new Instrument<Boolean>() {
+                            public void sample() {
+                                setValue(isOverflowEnabled());
+                            }
+                        });
 
-                tmp.addCounter("Asynchronous Overflow Task Cancelled Count", new Instrument<Long>() {
-                    public void sample() {
-                        setValue(asyncOverflowTaskCancelledCounter.get());
-                    }
-                });
+                tmp.addCounter(IOverflowManagerCounters.OverflowAllowed,
+                        new Instrument<Boolean>() {
+                            public void sample() {
+                                setValue(isOverflowAllowed());
+                            }
+                        });
 
-                tmp.addCounter("Index Partition Build Count", new Instrument<Long>() {
-                    public void sample() {
-                        setValue(indexPartitionBuildCounter.get());
-                    }
-                });
-                
-                tmp.addCounter("Index Partition Merge Count", new Instrument<Long>() {
-                    public void sample() {
-                        setValue(indexPartitionMergeCounter.get());
-                    }
-                });
-                
-                tmp.addCounter("Index Partition Split Count", new Instrument<Long>() {
-                    public void sample() {
-                        setValue(indexPartitionSplitCounter.get());
-                    }
-                });
+                tmp.addCounter(IOverflowManagerCounters.ShouldOverflow,
+                        new Instrument<Boolean>() {
+                            public void sample() {
+                                setValue(shouldOverflow());
+                            }
+                        });
 
-                tmp.addCounter("Index Partition Join Count", new Instrument<Long>() {
-                    public void sample() {
-                        setValue(indexPartitionJoinCounter.get());
-                    }
-                });
+                tmp.addCounter(IOverflowManagerCounters.OverflowCount,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue(getOverflowCount());
+                            }
+                        });
 
-                tmp.addCounter("Index Partition Move Count", new Instrument<Long>() {
-                    public void sample() {
-                        setValue(indexPartitionMoveCounter.get());
-                    }
-                });
+                tmp
+                        .addCounter(
+                                IOverflowManagerCounters.AsynchronousOverflowFailedCount,
+                                new Instrument<Long>() {
+                                    public void sample() {
+                                        setValue(asyncOverflowFailedCounter
+                                                .get());
+                                    }
+                                });
 
-                tmp.addCounter("Index Partition Receive Count", new Instrument<Long>() {
-                    public void sample() {
-                        setValue(indexPartitionReceiveCounter.get());
-                    }
-                });
+                tmp
+                        .addCounter(
+                                IOverflowManagerCounters.AsynchronousOverflowTaskFailedCount,
+                                new Instrument<Long>() {
+                                    public void sample() {
+                                        setValue(asyncOverflowTaskFailedCounter
+                                                .get());
+                                    }
+                                });
+
+                tmp
+                        .addCounter(
+                                IOverflowManagerCounters.AsynchronousOverflowTaskCancelledCount,
+                                new Instrument<Long>() {
+                                    public void sample() {
+                                        setValue(asyncOverflowTaskCancelledCounter
+                                                .get());
+                                    }
+                                });
+
+                tmp.addCounter(
+                        IOverflowManagerCounters.IndexPartitionBuildCount,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue(indexPartitionBuildCounter.get());
+                            }
+                        });
+
+                tmp.addCounter(
+                        IOverflowManagerCounters.IndexPartitionMergeCount,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue(indexPartitionMergeCounter.get());
+                            }
+                        });
+
+                tmp.addCounter(
+                        IOverflowManagerCounters.IndexPartitionSplitCount,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue(indexPartitionSplitCounter.get());
+                            }
+                        });
+
+                tmp.addCounter(
+                        IOverflowManagerCounters.IndexPartitionJoinCount,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue(indexPartitionJoinCounter.get());
+                            }
+                        });
+
+                tmp.addCounter(
+                        IOverflowManagerCounters.IndexPartitionMoveCount,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue(indexPartitionMoveCounter.get());
+                            }
+                        });
+
+                tmp.addCounter(
+                        IOverflowManagerCounters.IndexPartitionReceiveCount,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue(indexPartitionReceiveCounter.get());
+                            }
+                        });
 
             }
-            
+
             // IndexManager
             {
                 
-                final CounterSet tmp = root.makePath("Index Manager");
+                final CounterSet tmp = root.makePath(IResourceManagerCounters.IndexManager);
 
                 // save a reference.
                 indexManagerRoot = tmp;
                 
-                tmp.addCounter("Stale Locator Cache Capacity",
+                tmp.addCounter(IIndexManagerCounters.StaleLocatorCacheCapacity,
                         new Instrument<Integer>() {
                             public void sample() {
                                 setValue(staleLocatorCache.capacity());
                             }
                         });
                 
-                tmp.addCounter("Stale Locator Cache Size",
+                tmp.addCounter(IIndexManagerCounters.StaleLocatorCacheSize,
                         new Instrument<Integer>() {
                             public void sample() {
                                 setValue(getStaleLocatorCount());
@@ -222,7 +287,7 @@ abstract public class ResourceManager extends OverflowManager implements IResour
                         });
                 
                 if(true)
-                    tmp.addCounter("Stale Locators",
+                    tmp.addCounter(IIndexManagerCounters.StaleLocators,
                         new Instrument<String>() {
                         public void sample() {
                             final StringBuilder sb = new StringBuilder();
@@ -242,134 +307,196 @@ abstract public class ResourceManager extends OverflowManager implements IResour
                         }
                     });
                 
-                tmp.addCounter("Index Cache Size",
-                        new Instrument<Integer>() {
-                            public void sample() {
-                                setValue(getIndexCacheSize());
-                            }
-                        });
-                
-                tmp.addCounter("Index Cache Capacity",
+                tmp.addCounter(IIndexManagerCounters.IndexCacheCapacity,
                         new Instrument<Integer>() {
                             public void sample() {
                                 setValue(getIndexCacheCapacity());
                             }
                         });
                 
-                tmp.addCounter("Index Segment Cache Size",
+                tmp.addCounter(IIndexManagerCounters.IndexCacheSize,
                         new Instrument<Integer>() {
                             public void sample() {
-                                setValue(getIndexSegmentCacheSize());
+                                setValue(getIndexCacheSize());
                             }
                         });
                 
-                tmp.addCounter("Index Segment Cache Capacity",
+                tmp.addCounter(IIndexManagerCounters.IndexSegmentCacheCapacity,
                         new Instrument<Integer>() {
                             public void sample() {
                                 setValue(getIndexSegmentCacheCapacity());
                             }
                         });
                 
+                tmp.addCounter(IIndexManagerCounters.IndexSegmentCacheSize,
+                        new Instrument<Integer>() {
+                            public void sample() {
+                                setValue(getIndexSegmentCacheSize());
+                            }
+                        });
+
             }
 
             // StoreManager
             {
-                
-                final CounterSet tmp = root.makePath("Store Manager");
 
-                tmp.addCounter("DataDir", new Instrument<String>() {
-                    public void sample() {
-                        setValue(dataDir==null?"N/A":dataDir.getAbsolutePath());
-                    }
-                });
+                final CounterSet tmp = root
+                        .makePath(IResourceManagerCounters.StoreManager);
 
-                tmp.addCounter("isOpen", new Instrument<Boolean>(){
-                    public void sample() {setValue(isOpen());}
-                });
-                
-                tmp.addCounter("isStarting", new Instrument<Boolean>(){
-                    public void sample() {setValue(isStarting());}
-                });
+                tmp.addCounter(IStoreManagerCounters.DataDir,
+                        new Instrument<String>() {
+                            public void sample() {
+                                setValue(dataDir == null ? "N/A" : dataDir
+                                        .getAbsolutePath());
+                            }
+                        });
 
-                tmp.addCounter("isRunning", new Instrument<Boolean>(){
-                    public void sample() {setValue(isRunning());}
-                });
+                tmp.addCounter(IStoreManagerCounters.TmpDir,
+                        new Instrument<String>() {
+                            public void sample() {
+                                setValue(tmpDir == null ? "N/A" : tmpDir
+                                        .getAbsolutePath());
+                            }
+                        });
 
-                tmp.addCounter("Store Cache Capacity",
+                tmp.addCounter(IStoreManagerCounters.IsOpen,
+                        new Instrument<Boolean>() {
+                            public void sample() {
+                                setValue(isOpen());
+                            }
+                        });
+
+                tmp.addCounter(IStoreManagerCounters.IsStarting,
+                        new Instrument<Boolean>() {
+                            public void sample() {
+                                setValue(isStarting());
+                            }
+                        });
+
+                tmp.addCounter(IStoreManagerCounters.IsRunning,
+                        new Instrument<Boolean>() {
+                            public void sample() {
+                                setValue(isRunning());
+                            }
+                        });
+
+                tmp.addCounter(IStoreManagerCounters.StoreCacheCapacity,
                         new OneShotInstrument<Integer>(storeCache.capacity()));
 
-                tmp.addCounter("Store Cache Size", new Instrument<Long>(){
-                    public void sample() {setValue((long)getStoreCacheSize());}
-                });
+                tmp.addCounter(IStoreManagerCounters.StoreCacheSize,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue((long) getStoreCacheSize());
+                            }
+                        });
 
-                tmp.addCounter("Managed Journal Count", new Instrument<Long>(){
-                    public void sample() {setValue((long)getManagedJournalCount());}
-                });
+                tmp.addCounter(IStoreManagerCounters.ManagedJournalCount,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue((long) getManagedJournalCount());
+                            }
+                        });
 
-                tmp.addCounter("Managed Segment Store Count", new Instrument<Long>(){
-                    public void sample() {setValue((long)getManagedIndexSegmentCount());}
-                });
+                tmp.addCounter(IStoreManagerCounters.ManagedSegmentStoreCount,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue((long) getManagedIndexSegmentCount());
+                            }
+                        });
 
-                tmp.addCounter("Journal (Re-)open Count", new Instrument<Long>(){
-                    public void sample() {setValue(journalReopenCount.get());}
-                });
+                tmp.addCounter(IStoreManagerCounters.JournalReopenCount,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue(journalReopenCount.get());
+                            }
+                        });
 
-                tmp.addCounter("Segment Store (Re-)open Count", new Instrument<Long>(){
-                    public void sample() {setValue(segmentStoreReopenCount.get());}
-                });
+                tmp.addCounter(IStoreManagerCounters.SegmentStoreReopenCount,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue(segmentStoreReopenCount.get());
+                            }
+                        });
 
-                tmp.addCounter("Journal Delete Count", new Instrument<Long>(){
-                    public void sample() {setValue(journalDeleteCount.get());}
-                });
+                tmp.addCounter(IStoreManagerCounters.JournalDeleteCount,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue(journalDeleteCount.get());
+                            }
+                        });
 
-                tmp.addCounter("Segment Store Delete Count", new Instrument<Long>(){
-                    public void sample() {setValue(segmentStoreDeleteCount.get());}
-                });
+                tmp.addCounter(IStoreManagerCounters.SegmentStoreDeleteCount,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue(segmentStoreDeleteCount.get());
+                            }
+                        });
 
-                tmp.addCounter("Bytes Under Management", new Instrument<Long>(){
-                    public void sample() {
+                tmp.addCounter(IStoreManagerCounters.BytesUnderManagement,
+                        new Instrument<Long>() {
+                            public void sample() {
                                 if (isRunning()) {
                                     setValue(getBytesUnderManagement());
                                 }
                             }
                         });
-                
-                tmp.addCounter("Bytes Deleted", new Instrument<Long>(){
-                    public void sample() {
-                        setValue(bytesDeleted.get());
-                    }
-                });
 
-                tmp.addCounter("Free Space on Data Volume", new Instrument<Long>(){
-                    public void sample() {
-                        if(!isTransient())
-                        setValue(getDataDirFreeSpace());
-                    }
-                });
+                tmp.addCounter(IStoreManagerCounters.BytesDeleted,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue(bytesDeleted.get());
+                            }
+                        });
 
-                tmp.addCounter("Free Space on Temp Volume", new Instrument<Long>(){
-                    public void sample() {
-                        setValue(getTempDirFreeSpace());
-                    }
-                });
+                tmp.addCounter(IStoreManagerCounters.DataDirBytesAvailable,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                if (!isTransient())
+                                    setValue(getDataDirFreeSpace());
+                            }
+                        });
 
-                tmp.addCounter("Minimum Release Age",
+                tmp.addCounter(IStoreManagerCounters.TmpDirBytesAvailable,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue(getTempDirFreeSpace());
+                            }
+                        });
+
+                tmp.addCounter(
+                        IStoreManagerCounters.MaximumJournalSizeAtOverflow,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue(maximumJournalSizeAtOverflow);
+                            }
+                        });
+
+                tmp.addCounter(IStoreManagerCounters.MinimumReleaseAge,
                         new OneShotInstrument<Long>(minReleaseAge));
 
-                tmp.addCounter("Release Time", new Instrument<Long>(){
-                    public void sample() {setValue(releaseTime);}
-                });
+                tmp.addCounter(IStoreManagerCounters.ReleaseTime,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue(releaseTime);
+                            }
+                        });
 
-                tmp.addCounter("Last Overflow Time ", new Instrument<Long>(){
-                    public void sample() {setValue(lastOverflowTime);}
-                });
+                tmp.addCounter(IStoreManagerCounters.LastOverflowTime,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue(lastOverflowTime);
+                            }
+                        });
 
-                tmp.addCounter("Last Commit Time Preserved", new Instrument<Long>(){
-                    public void sample() {setValue(lastCommitTimePreserved);}
-                });
+                tmp.addCounter(IStoreManagerCounters.LastCommitTimePreserved,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue(lastCommitTimePreserved);
+                            }
+                        });
 
             }
-            
+
             /*
              * Note: these counters are detached and reattached to the new live
              * journal during overflow processing.
@@ -388,15 +515,17 @@ abstract public class ResourceManager extends OverflowManager implements IResour
              * counter set for the ResourceManager is not currently defined
              * until the StoreManager is running...
              */
-            root.makePath("Live Journal").attach(getLiveJournal().getCounters());
-                        
+            root.makePath(IResourceManagerCounters.LiveJournal).attach(
+                    getLiveJournal().getCounters());
+
         }
-        
+
         return root;
-        
+
     }
+
     private CounterSet root;
-    
+
     /**
      * The counter set that corresponds to the {@link IndexManager}.
      */

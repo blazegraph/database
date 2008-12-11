@@ -1253,6 +1253,35 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
     }
     
     /**
+     * Truncate the backing buffer such that there is no remaining free space in
+     * the journal.
+     * <p>
+     * Note: The caller MUST have exclusive write access to the journal. When
+     * the {@link ConcurrencyManager} is used, that means that the caller MUST
+     * have an exclusive lock on the {@link WriteExecutorService}.
+     */
+    public void truncate() {
+
+        assertOpen();
+        
+        if (isReadOnly())
+            throw new IllegalStateException();
+        
+        final IBufferStrategy backingBuffer = getBufferStrategy();
+
+        final long oldExtent = backingBuffer.getExtent();
+
+        final long newExtent = backingBuffer.getHeaderSize()
+                + backingBuffer.getNextOffset();
+
+        backingBuffer.truncate(newExtent);
+
+        if (INFO)
+            log.info("oldExtent=" + oldExtent + ", newExtent=" + newExtent);
+
+    }
+
+    /**
      * Restart safe conversion of the store into a read-only store with the
      * specified <i>closeTime</i>.
      * <p>
@@ -1264,7 +1293,9 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      * a new journal. This has advantages over closing the journal directly
      * including that it does not disturb concurrent readers.
      * <p>
-     * Note: The caller MUST have exclusive write access to the journal.
+     * Note: The caller MUST have exclusive write access to the journal. When
+     * the {@link ConcurrencyManager} is used, that means that the caller MUST
+     * have an exclusive lock on the {@link WriteExecutorService}.
      * <p>
      * Note: This does NOT perform a commit - any uncommitted writes will be
      * discarded.
@@ -1273,10 +1304,11 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      *             If there are no commits on the journal.
      * 
      * @todo There should also be an option to convert a journal from
-     * {@link BufferMode#Direct} to {@link BufferMode#Disk}. We would want to
-     * do that not when the journal is sealed but as soon as asynchronous
-     * overflow processing is done. Ideally this will not require us to close
-     * and reopen the journal since that will disturb concurrent readers.
+     *       {@link BufferMode#Direct} to {@link BufferMode#Disk}. We would
+     *       want to do that not when the journal is sealed but as soon as
+     *       asynchronous overflow processing is done. Ideally this will not
+     *       require us to close and reopen the journal since that will disturb
+     *       concurrent readers.
      */
     public void closeForWrites(long closeTime) {
         
@@ -1295,6 +1327,9 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
             throw new IllegalStateException("No commits on journal");
 
         }
+
+        // release any unused space.
+        truncate();
         
         /*
          * Create the final root block.

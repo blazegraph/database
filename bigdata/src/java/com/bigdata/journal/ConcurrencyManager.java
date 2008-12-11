@@ -881,12 +881,12 @@ public class ConcurrencyManager implements IConcurrencyManager {
         /**
          * The service to which historical read tasks are submitted.
          */
-        String readService = "Read Service";
+        String ReadService = "Read Service";
 
         /**
          * The service to which isolated write tasks are submitted.
          */
-        String txWriteService = "Transaction Write Service";
+        String TXWriteService = "Transaction Write Service";
         
         /**
          * The service to which {@link ITx#UNISOLATED} tasks are submitted. This
@@ -900,7 +900,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
          * The {@link LockManager} that manages the resource locks for the
          * {@link #writeService}.
          */
-        String writeServiceLockManager = writeService + ICounterSet.pathSeparator + "LockManager";
+        String WriteServiceLockManager = writeService + ICounterSet.pathSeparator + "LockManager";
         
     }
     
@@ -946,7 +946,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
                 // readService
                 {
                     readServiceQueueStatisticsTask.addCounters(countersRoot
-                            .makePath(IConcurrencyManagerCounters.readService));
+                            .makePath(IConcurrencyManagerCounters.ReadService));
 
                 }
 
@@ -955,7 +955,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
                     txWriteServiceQueueStatisticsTask
                             .addCounters(countersRoot
-                                    .makePath(IConcurrencyManagerCounters.txWriteService));
+                                    .makePath(IConcurrencyManagerCounters.TXWriteService));
 
                 }
 
@@ -972,7 +972,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
                     countersRoot
                             .makePath(
-                                    IConcurrencyManagerCounters.writeServiceLockManager)
+                                    IConcurrencyManagerCounters.WriteServiceLockManager)
                             .attach(writeService.getLockManager().getCounters());
 
                 }

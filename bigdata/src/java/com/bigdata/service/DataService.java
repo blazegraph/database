@@ -736,12 +736,17 @@ abstract public class DataService extends AbstractService
 
     /**
      * Interface defines and documents the counters and counter namespaces
-     * reported by the {@link DataService}.
+     * reported by the {@link DataService} and the various services which it
+     * uses.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static interface IDataServiceCounters {
+    public static interface IDataServiceCounters extends
+            ConcurrencyManager.IConcurrencyManagerCounters,
+//            ...TransactionManager.XXXCounters,
+            ResourceManager.IResourceManagerCounters
+            {
        
         /**
          * The namespace for the counters pertaining to the {@link ConcurrencyManager}.

@@ -91,33 +91,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * post-processing, but is automatically re-enabled once post-processing
  * completes.
  * 
- * @todo recommend setting the
- *       {@link com.bigdata.journal.Options#INITIAL_EXTENT} to the
- *       {@link com.bigdata.journal.Options#MAXIMUM_EXTENT} in minimize the
- *       likelyhood of having to extend the journal and in order to keep the
- *       allocation size on the file system large to minimize fragmentation?
- *       <p>
- *       Also, consider moving the target journal size up to 500M.
- *       <p>
- *       Note: The choice of the #of offset bits governs both the maximum #of
- *       records (indirectly through the maximum byte offset) and the maximum
- *       record length (directly).
- *       <p>
- *       A scale-up deployment based on a {@link ResourceManager} can address a
- *       very large index either by using more offset bits and never overflowing
- *       the journal or by using fewer offset bits and a series of journals and
- *       migrating data off of the journals onto index segments. Since there is
- *       no {@link MetadataIndex} the cost of a full compacting merge for an
- *       index grows as a function of the total index size. This makes full
- *       compacting merges increasingly impractical for large indices.
- *       <p>
- *       However, a scale-out deployment based on an {@link IBigdataFederation}
- *       supports key-range partitioned indices regardless of whether it is an
- *       {@link EmbeddedFederation} or a distributed federation. This
- *       means that the cost of a full compacting merge for an index partition
- *       is capped by the size limits we place on index partitions regardless of
- *       the total size of the scale-out index.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -427,7 +400,7 @@ abstract public class OverflowManager extends IndexManager {
                 + ".maximumSourcesPerViewBeforeCompactingMerge";
 
         String DEFAULT_MAXIMUM_SOURCES_PER_VIEW_BEFORE_COMPACTING_MERGE = "3";
-        
+
         /**
          * The maximum #of compacting merge operations that will be performed
          * during a single overflow event (default
@@ -454,9 +427,9 @@ abstract public class OverflowManager extends IndexManager {
         String MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW = OverflowManager.class
                 .getName()
                 + ".maximumCompactingMergesPerOverflow";
-        
+
         String DEFAULT_MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW = "3";
-        
+
         /**
          * The timeout in milliseconds for asynchronous overflow processing to
          * complete (default {@link #DEFAULT_OVERFLOW_TIMEOUT}). Any overflow
@@ -469,14 +442,102 @@ abstract public class OverflowManager extends IndexManager {
          * Otherwise clients continue to use the old view of the index
          * partition.
          */
-        String OVERFLOW_TIMEOUT = OverflowManager.class.getName()+".timeout";
-        
+        String OVERFLOW_TIMEOUT = OverflowManager.class.getName() + ".timeout";
+
         /**
          * The default timeout in milliseconds for asynchronous overflow
          * processing (equivalent to 20 minutes).
          */
         String DEFAULT_OVERFLOW_TIMEOUT = "" + 20 * 1000 * 60L; // 20 minutes.
-        
+
+    }
+
+    /**
+     * Performance counters for the {@link OverflowManager}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static interface IOverflowManagerCounters {
+
+        /**
+         * <code>true</code> iff overflow processing is enabled as a
+         * configuration option.
+         */
+        String OverflowEnabled = "Overflow Enabled";
+
+        /**
+         * <code>true</code> iff overflow processing is currently permitted.
+         */
+        String OverflowAllowed = "Overflow Allowed";
+
+        /**
+         * <code>true</code> iff synchronous overflow should be initiated
+         * based on an examination of the state of the live journal and whether
+         * or not overflow processing is enabled and currently allowed.
+         */
+        String ShouldOverflow = "Should Overflow";
+
+        /**
+         * The #of overflow events that have taken place. This counter is
+         * incremented each time the entire overflow operation is complete,
+         * including any post-processing of the old journal.
+         */
+        String OverflowCount = "Overflow Count";
+
+        /**
+         * The #of asynchronous overflow operations which have failed.
+         */
+        String AsynchronousOverflowFailedCount = "Asynchronous Overflow Failed Count";
+
+        /**
+         * The #of asynchronous overflow tasks (split, join, merge, etc) which
+         * have failed.
+         */
+        String AsynchronousOverflowTaskFailedCount = "Asynchronous Overflow Task Failed Count";
+
+        /**
+         * The #of asynchronous overflow tasks (split, join, merge, etc) that
+         * were cancelled due to timeout.
+         */
+        String AsynchronousOverflowTaskCancelledCount = "Asynchronous Overflow Task Cancelled Count";
+
+        /**
+         * The #of index partition build operations which have completed
+         * successfully.
+         */
+        String IndexPartitionBuildCount = "Index Partition Build Count";
+
+        /**
+         * The #of index partition merge (compacting merge) operations which
+         * have completed successfully.
+         */
+        String IndexPartitionMergeCount = "Index Partition Merge Count";
+
+        /**
+         * The #of index partition split operations which have completed
+         * successfully.
+         */
+        String IndexPartitionSplitCount = "Index Partition Split Count";
+
+        /**
+         * The #of index partition join operations which have completed
+         * successfully.
+         */
+        String IndexPartitionJoinCount = "Index Partition Join Count";
+
+        /**
+         * The #of index partition move operations which have completed
+         * successfully.
+         */
+        String IndexPartitionMoveCount = "Index Partition Move Count";
+
+        /**
+         * The #of index partitions received by this data service in response to
+         * an index partition move from another data service.
+         */
+        String IndexPartitionReceiveCount = "Index Partition Receive Count";
+
     }
     
     /**
@@ -1009,8 +1070,7 @@ abstract public class OverflowManager extends IndexManager {
         if (INFO)
             log.info("begin");
 
-        // @todo uncomment.
-        System.err.println("OverflowManager::doSynchronousOverflow: "+getLiveJournal().getFile());
+//        System.err.println("OverflowManager::doSynchronousOverflow: "+getLiveJournal().getFile());
         
         final AbstractJournal oldJournal = getLiveJournal();
         final ManagedJournal newJournal;
@@ -1046,6 +1106,13 @@ abstract public class OverflowManager extends IndexManager {
             if (INFO)
                 log.info("Closed out the old journal.");
 
+            if (maximumJournalSizeAtOverflow < oldJournal.size()) {
+
+                maximumJournalSizeAtOverflow = oldJournal.getBufferStrategy()
+                        .getExtent();
+                
+            }
+            
         }
 
         /*

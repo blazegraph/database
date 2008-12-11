@@ -117,9 +117,9 @@ import com.bigdata.util.InnerCause;
  *       operations should produce incoherent results so it should be possible
  *       to restore a coherent state of the metadata index by picking and
  *       choosing carefully. The biggest danger is choosing a new index
- *       partition which does not yet have all of its state on hand. There may
- *       need to be some flag to note when the index partition goes live so that
- *       we never select it for the rebuild until it is complete.
+ *       partition which does not yet have all of its state on hand, but we have
+ *       the {@link LocalPartitionMetadata#getSourcePartitionId()} which
+ *       captures that.
  * 
  * @todo if an index partition is moved (or split or joined) while an active
  *       transaction has a write set for that index partition on a data service
@@ -164,6 +164,12 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      */
     private final Set<String> copied; 
     
+    /**
+     * @todo This was used for what is in my opinion an unreasonable attempt to
+     *       have the {@link PostProcessOldJournalTask} scale to very large #ofs
+     *       of indices on the live journal.  Simpler in-memory data structures
+     *       would work just fine.
+     */
     private IRawStore tmpStore;
 
 //    /** Aggregated counters for the named indices. */ 
@@ -1865,10 +1871,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
     /**
      * Submit all tasks, awaiting their completion and check their futures for
      * errors.
-     * <p>
-     * Note: The update tasks should be relatively fast, excepting possibly
-     * moves of a hot index partition since there could be a lot of buffered
-     * writes.
      * 
      * @throws InterruptedException
      */

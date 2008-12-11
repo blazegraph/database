@@ -34,6 +34,11 @@ import com.bigdata.rawstore.Bytes;
  * which case the {@link TemporaryRawStore} holds a reference to the buffer and
  * releases it back to those pool when it is finalized) or the buffer is
  * immediately released back to this pool.
+ * <p>
+ * Note: Precisey because of the bug which motivates this class, we DO NOT
+ * release buffers back to the JVM. This means that the size of a
+ * {@link DirectBufferPool} can only increase, but at least you get to (re-)use
+ * the memory that you have allocated rather than leaking it to the native heap.
  * 
  * @see http://bugs.sun.com/bugdatabase/view_bug.do;jsessionid=8fab76d1d4479fffffffffa5abfb09c719a30?bug_id=6210541
  * 

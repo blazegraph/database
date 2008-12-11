@@ -68,15 +68,11 @@ public interface IResourceManager extends IServiceShutdown {
 
     /**
      * The directory for temporary files.
-     * 
-     * @see Options#TMP_DIR
      */
     public File getTmpDir();
 
     /**
      * The directory for managed resources.
-     * 
-     * @see com.bigdata.resources.ResourceManager.Options#DATA_DIR
      */
     public File getDataDir();
     
