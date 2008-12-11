@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
@@ -209,6 +210,11 @@ abstract public class AbstractServiceLoadHelperWithScores extends
 
         }
 
+        if (INFO)
+            log.info("Reporting " + uuids.length
+                    + " under-utilized and non-excluded services: "
+                    + Arrays.toString(uuids));
+        
         return uuids;
 
     }
