@@ -1230,7 +1230,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 final UUID targetDataServiceUUID = underUtilizedDataServiceUUIDs[nmove
                         % underUtilizedDataServiceUUIDs.length];
                 
-                if (targetDataServiceUUID == sourceServiceUUID) {
+                if (sourceServiceUUID.equals(targetDataServiceUUID)) {
 
                     log
                             .error("LBS included the source data service in the set of possible targets: source="
@@ -1244,6 +1244,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                      * index partition (it would throw an exception) but we will
                      * at least consider the next index partition for a move.
                      */
+                    
                     continue;
                     
                 }
