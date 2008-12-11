@@ -54,7 +54,6 @@ import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.StoreManager;
-import com.bigdata.service.DataService;
 
 /**
  * A read-only store backed by a file containing a single {@link IndexSegment}.
@@ -330,14 +329,6 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
         
         if(open) {
 
-            final String name = DataService.getIndexPartitionName(indexMetadata
-                    .getName(), indexMetadata.getPartitionMetadata()
-                    .getPartitionId());
-
-            if (INFO)
-                log.info("Closing index segment store: " + name + ", file="
-                        + getFile());
-            
             _close();
             
         }
@@ -618,7 +609,10 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
 //        bloomFilter = null;
         
         open = false;
-
+        
+        if (INFO)
+            log.info("Closed: file=" + getFile());
+        
     }
     
     synchronized public void deleteResources() {
@@ -1008,19 +1002,19 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
 
         if (buf_nodes != null) {
 
-            throw new IllegalStateException("Node buffer already allocated");
+            throw new IllegalStateException();
             
         }
         
         if(checkpoint.nnodes == 0) {
         
-            throw new IllegalStateException("No nodes.");
+            throw new IllegalStateException();
             
         }
 
         if(checkpoint.offsetNodes == 0L) {
             
-            throw new IllegalStateException("No nodes.");
+            throw new IllegalStateException();
             
         }
 

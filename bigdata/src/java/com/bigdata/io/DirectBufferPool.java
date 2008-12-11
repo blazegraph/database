@@ -45,6 +45,8 @@ public class DirectBufferPool {
     protected static final Logger log = Logger
             .getLogger(DirectBufferPool.class);
 
+    protected static final boolean INFO = log.isInfoEnabled();
+
     /**
      * Note: This is NOT a weak reference colletion since the JVM will leak
      * native memory.
@@ -157,18 +159,20 @@ public class DirectBufferPool {
          * it good practice to use
          * {@link DirectBufferPool#acquire(long, TimeUnit)} with a timeout.
          */
-        String POOL_CAPACITY = "bigdata.DirectBufferPool.poolCapacity";
+        String POOL_CAPACITY = DirectBufferPool.class.getName()
+                + ".poolCapacity";
 
         /**
          * The default pool capacity (no limit).
          */
-        String DEFAULT_POOL_CAPACITY = ""+Integer.MAX_VALUE;
+        String DEFAULT_POOL_CAPACITY = "" + Integer.MAX_VALUE;
 
         /**
          * The capacity in bytes of the direct {@link ByteBuffer} instances
          * allocated and managed by the {@link DirectBufferPool} ({@link #DEFAULT_BUFFER_CAPACITY}).
          */
-        String BUFFER_CAPACITY = "bigdata.DirectBufferPool.bufferSize";
+        String BUFFER_CAPACITY = DirectBufferPool.class.getName()
+                + ".bufferSize";
 
         /**
          * The default capacity of the allocated buffers.
@@ -191,12 +195,14 @@ public class DirectBufferPool {
         final int poolCapacity = Integer.parseInt(System.getProperty(
                 Options.POOL_CAPACITY, Options.DEFAULT_POOL_CAPACITY));
 
-        log.info(Options.POOL_CAPACITY+"="+poolCapacity);
-        
+        if(INFO)
+            log.info(Options.POOL_CAPACITY + "=" + poolCapacity);
+
         final int bufferCapacity = Integer.parseInt(System.getProperty(
                 Options.BUFFER_CAPACITY, Options.DEFAULT_BUFFER_CAPACITY));
 
-        log.info(Options.BUFFER_CAPACITY+"="+bufferCapacity);
+        if (INFO)
+            log.info(Options.BUFFER_CAPACITY + "=" + bufferCapacity);
 
         INSTANCE = new DirectBufferPool(
                 poolCapacity,
@@ -244,7 +250,7 @@ public class DirectBufferPool {
      *            The capacity of the {@link ByteBuffer}s managed by this
      *            pool.
      */
-    DirectBufferPool(int poolCapacity, int bufferCapacity) {
+    DirectBufferPool(final int poolCapacity, final int bufferCapacity) {
 
         if (poolCapacity <= 0)
             throw new IllegalArgumentException();
@@ -289,7 +295,8 @@ public class DirectBufferPool {
     public ByteBuffer acquire(long timeout, TimeUnit unit)
             throws InterruptedException, TimeoutException {
 
-        log.info("");
+        if(INFO)
+            log.info("");
 
         lock.lock();
 
@@ -337,7 +344,8 @@ public class DirectBufferPool {
     public void release(final ByteBuffer b, long timeout, TimeUnit units)
             throws InterruptedException {
 
-        log.info("");
+        if(INFO)
+            log.info("");
 
         if (b == null)
             throw new IllegalArgumentException();
@@ -390,7 +398,8 @@ public class DirectBufferPool {
 
         assert lock.isHeldByCurrentThread();
 
-        log.info("");
+        if(INFO)
+            log.info("");
 
         try {
 
