@@ -267,6 +267,12 @@ abstract public class OverflowManager extends IndexManager {
     protected final AtomicLong indexPartitionMoveCounter = new AtomicLong(0L);
     
     /**
+     * #of successful index partition move operations where this service was
+     * the target of the move (it received the index partition).
+     */
+    protected final AtomicLong indexPartitionReceiveCounter = new AtomicLong(0L);
+    
+    /**
      * The timeout for asynchronous overflow processing.
      * 
      * @see Options#OVERFLOW_TIMEOUT

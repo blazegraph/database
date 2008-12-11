@@ -246,6 +246,22 @@ public class ConcurrencyManager implements IConcurrencyManager {
          */
         public static final String DEFAULT_WRITE_SERVICE_QUEUE_CAPACITY = "1000";
         
+        /**
+         * The timeout in milliseconds that the the {@link WriteExecutorService}
+         * will await other tasks to join the commit group (default
+         * {@value #DEFAULT_WRITE_SERVICE_GROUP_COMMIT_TIMEOUT}). When ZERO
+         * (0), group commit is disabled since the first task to join the commit
+         * group will NOT wait for other tasks and the commit group will
+         * therefore always consist of a single task.
+         * 
+         * @see #DEFAULT_WRITE_SERVICE_GROUP_COMMIT_TIMEOUT
+         */
+        String WRITE_SERVICE_GROUP_COMMIT_TIMEOUT = ConcurrencyManager.class
+                .getName()
+                + ".writeService.groupCommitTimeout";
+
+        String DEFAULT_WRITE_SERVICE_GROUP_COMMIT_TIMEOUT = "100";
+        
     }
 
     /**
@@ -744,6 +760,17 @@ public class ConcurrencyManager implements IConcurrencyManager {
                                     + "=" + writeServicePrestart);
 
             }
+
+            final long groupCommitTimeout = Long
+                    .parseLong(properties
+                            .getProperty(
+                                    ConcurrencyManager.Options.WRITE_SERVICE_GROUP_COMMIT_TIMEOUT,
+                                    ConcurrencyManager.Options.DEFAULT_WRITE_SERVICE_GROUP_COMMIT_TIMEOUT));
+
+            if (INFO)
+                log
+                        .info(ConcurrencyManager.Options.WRITE_SERVICE_GROUP_COMMIT_TIMEOUT
+                                + "=" + groupCommitTimeout);
             
             final BlockingQueue<Runnable> queue =
                 ((writeServiceQueueCapacity == 0 || writeServiceQueueCapacity > 5000)
@@ -754,7 +781,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
             writeService = new WriteExecutorService(resourceManager,
                     writeServiceCorePoolSize, writeServiceMaximumPoolSize,
                     queue, new DaemonThreadFactory(getClass().getName()
-                            + ".writeService"));
+                            + ".writeService"), groupCommitTimeout);
 
             if (writeServicePrestart) {
 
