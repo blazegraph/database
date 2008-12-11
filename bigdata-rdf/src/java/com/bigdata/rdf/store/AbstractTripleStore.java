@@ -71,6 +71,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
+import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.axioms.Axioms;
@@ -164,6 +165,22 @@ import com.bigdata.striterator.IKeyOrder;
  * <code>owl:equivalentClass</code>. The {@link IRule}s are declarative, and
  * it is easy to write new rules. Those {@link IRule}s can be introduced using
  * custom {@link BaseClosure} implementations. See {@link Options#CLOSURE_CLASS}.
+ * 
+ * @todo When using a read-historical views for a very large scale-out triple
+ *       store on an {@link IBigdataFederation} with concurrent writes (or
+ *       concurrent overflow of data services) can cause exceptions to be thrown
+ *       if resources required for the view are simultaneously released. This is
+ *       most likely to occur for operations that must traverse all tuples in a
+ *       scale-out index, such as {@link #getExactStatementCount()} or
+ *       {@link #getExactStatementCount()}.
+ *       <p>
+ *       The workaround is to use {@link ITimestampService#setReleaseTime(long)}
+ *       to ensure that the data for the historical view are not released during
+ *       the operation.
+ *       <p>
+ *       The fix will be the use of a read-historical <em>transaction</em>
+ *       which will explictly coordinate the release time for the
+ *       {@link IBigdataFederation}.
  * 
  * @todo Run the Sesame 2.x TCK (technology compatibility kit).
  * 
@@ -1270,7 +1287,7 @@ abstract public class AbstractTripleStore extends
 
     final public long getExactStatementCount() {
         
-        return getStatementCount(true/*exact*/);
+        return getStatementCount(true/* exact */);
         
     }
 
