@@ -1217,8 +1217,8 @@ abstract public class LoadBalancerService extends AbstractService
                         + ") * 100d) / (1d + percentProcessorIdle("
                         + percentFormat.format(percentProcessorIdle)
                         + "), majorFaultsPerSec=" + majorFaultsPerSec
-                        + ", percentProcessorIdle="
-                        + percentFormat.format(percentProcessorIdle));
+                        + ", percentDiskSpaceFree"
+                        + percentFormat.format(percentDiskFreeSpace));
 
             }
             
