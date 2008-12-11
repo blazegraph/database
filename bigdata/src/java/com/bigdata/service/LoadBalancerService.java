@@ -316,8 +316,9 @@ abstract public class LoadBalancerService extends AbstractService
                 + ".initialRoundRobinUpdateCount";
 
         /**
-         * Note: this value should be on the order of
-         * {@link #DEFAULT_HISTORY_MINUTES}
+         * The default gives you a few minutes after you setup the federation in
+         * which newly registered indices will be allocated based on a
+         * round-robin.
          */
         String DEFAULT_INITIAL_ROUND_ROBIN_UPDATE_COUNT = "5";
         
