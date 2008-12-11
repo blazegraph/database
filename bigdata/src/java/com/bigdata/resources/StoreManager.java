@@ -427,7 +427,7 @@ abstract public class StoreManager extends ResourceEvents implements
      * @see com.bigdata.journal.Options#WRITE_CACHE_CAPACITY
      * @see DiskOnlyStrategy
      */
-    protected final ByteBuffer writeCache;
+    private ByteBuffer writeCache;
 
     /**
      * A atomic hard reference to the live journal.
@@ -1529,6 +1529,9 @@ abstract public class StoreManager extends ResourceEvents implements
             log.warn(ex.getMessage(), ex);
         }
 
+        // release the write cache.
+        writeCache = null;
+        
     }
 
     synchronized public void shutdownNow() {
@@ -1563,6 +1566,9 @@ abstract public class StoreManager extends ResourceEvents implements
         } catch (Exception ex) {
             log.warn(ex.getMessage(), ex);
         }
+
+        // release the write cache.
+        writeCache = null;
 
     }
 

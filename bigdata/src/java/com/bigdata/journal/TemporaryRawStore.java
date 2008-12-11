@@ -254,10 +254,10 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
             
                 if (buf.isOpen()) {
 
-                    if (INFO)
-                        log.info("Finalizing temp store");
-
                     close();
+
+                    if (INFO)
+                        log.info("Finalized temp store");
 
                 }
 
