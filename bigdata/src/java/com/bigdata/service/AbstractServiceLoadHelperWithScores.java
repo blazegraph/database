@@ -101,8 +101,9 @@ abstract public class AbstractServiceLoadHelperWithScores extends
      * @throws TimeoutException
      * @throws InterruptedException
      */
-    public UUID[] getUnderUtilizedDataServices(int minCount, int maxCount,
-            UUID exclude) throws TimeoutException, InterruptedException {
+    public UUID[] getUnderUtilizedDataServices(final int minCount,
+            final int maxCount, final UUID exclude) throws TimeoutException,
+            InterruptedException {
 
         if (exclude != null && knownGood.equals(exclude)) {
 
@@ -196,7 +197,15 @@ abstract public class AbstractServiceLoadHelperWithScores extends
 
         while (n < uuids.length) {
 
-            uuids[n++] = underUtilized.get(i++ % nok);
+            final UUID tmp = underUtilized.get(i++ % nok);
+            
+            if (tmp == null)
+                throw new AssertionError();
+            
+            if (exclude != null && tmp.equals(exclude))
+                throw new AssertionError();
+            
+            uuids[n++] = tmp;
 
         }
 
