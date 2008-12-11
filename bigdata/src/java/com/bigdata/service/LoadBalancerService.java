@@ -1312,13 +1312,13 @@ abstract public class LoadBalancerService extends AbstractService
             final double averageQueueLength = getAverageValueForMinutes(
                     serviceCounterSet, IDataServiceCounters.concurrencyManager
                             + ps + IConcurrencyManagerCounters.writeService
-                            + ps + IQueueCounters.averageQueueLength,
+                            + ps + IQueueCounters.AverageQueueLength,
                     0d/* default (queueLength) */, historyMinutes);
 
             final double averageQueueingTime = getAverageValueForMinutes(
                     serviceCounterSet, IDataServiceCounters.concurrencyManager
                             + ps + IConcurrencyManagerCounters.writeService
-                            + ps + IQueueCounters.averageQueuingTime,
+                            + ps + IQueueCounters.AverageQueuingTime,
                     100d/* default (ms) */, historyMinutes);
 
             final double rawScore = (averageQueueLength + 1) * (hostScore.score + 1);
@@ -2015,154 +2015,14 @@ abstract public class LoadBalancerService extends AbstractService
             if (maxCount < 0)
                 throw new IllegalArgumentException();
 
-            if (INFO)
-                log.info("minCount=" + minCount + ", maxCount=" + maxCount
-                        + ", exclude=" + exclude);
+            final UUID[] uuids;
             
             lock.lock();
 
             try {
 
-                if (nupdates < initialRoundRobinUpdateCount) {
-
-                    /*
-                     * Use a round-robin assignment for the first N updates
-                     * while the LBS develops some history on the hosts and
-                     * services.
-                     */
-                    return roundRobinServiceLoadHelper.getUnderUtilizedDataServices(
-                            minCount, maxCount, exclude);
-
-                }
-
-                /*
-                 * Scores for the services in ascending order (least utilized to
-                 * most utilized).
-                 */
-                final ServiceScore[] scores = this.serviceScores.get();
-
-                if (scores == null || scores.length == 0) {
-
-                    if (minCount == 0) {
-
-                        if (INFO)
-                            log.info("No scores, minCount is zero - will return null.");
-
-                        return null;
-                        
-                    }
-
-                    /*
-                     * Scores are not available immediately. This will await a
-                     * non-excluded service join and then return the
-                     * "under-utilized" services without reference to computed
-                     * service scores. This path is used when the load balancer
-                     * first starts up (unless the round robin is enabled) since
-                     * it will not have scores for at least one pass of the
-                     * UpdateTask.
-                     */
-
-                    return new ServiceLoadHelperWithoutScores()
-                            .getUnderUtilizedDataServices(minCount, maxCount,
-                                    exclude);
-
-                }
-
-                /*
-                 * Count the #of non-excluded active services - this is [nok].
-                 * 
-                 * Note: [knownGood] is set to a service that (a) is not
-                 * excluded; and (b) is active. This is the fallback service
-                 * that we will recommend if minCount is non-zero and we are
-                 * using the scores and all of a sudden it looks like there are
-                 * no active services to recommend. This basically codifies a
-                 * decision point where we accept that this service is active.
-                 * We choose this as the first active and non-excluded service
-                 * so that it will be as under-utilized as possible.
-                 */
-                int nok = 0;
-                UUID knownGood = null;
-                for (int i = 0; i < scores.length && nok < 1; i++) {
-
-                    final UUID serviceUUID = scores[i].serviceUUID;
-
-                    if (exclude != null && exclude.equals(serviceUUID))
-                        continue;
-
-                    if (!activeDataServices.containsKey(serviceUUID))
-                        continue;
-
-                    if (knownGood == null)
-                        knownGood = serviceUUID;
-
-                    nok++;
-
-                }
-
-                if (nok == 0) {
-
-                    /*
-                     * There are no non-excluded active services.
-                     */
-
-                    if(INFO)
-                        log.info("No non-excluded services.");
-                    
-                    if (minCount == 0) {
-
-                        /*
-                         * Since there was no minimum #of services demanded by
-                         * the caller, we return [null].
-                         */
-
-                        if(INFO)
-                            log.info("No non-excluded services, minCount is zero - will return null.");
-
-                        return null;
-                        
-                    } else {
-
-                        /*
-                         * We do not have ANY active and scored non-excluded
-                         * services and [minCount GT ZERO]. In this case we use
-                         * a he variant that does not use scores and that awaits
-                         * a service join.
-                         */
-
-                        if(INFO)
-                            log.info("Will await a service join.");
-
-                        return new ServiceLoadHelperWithoutScores()
-                                .getUnderUtilizedDataServices(minCount,
-                                        maxCount, exclude);
-
-                    }
-
-                }
-
-                /*
-                 * Use the scores to compute the under-utilized services.
-                 */
-
-                if (INFO)
-                    log
-                            .info("Will recommend services based on scores: #scored="
-                                    + scores.length
-                                    + ", nok="
-                                    + nok
-                                    + ", knownGood="
-                                    + knownGood
-                                    + ", exclude="
-                                    + exclude);
-
-                assert nok > 0;
-                assert knownGood != null;
-                assert scores != null;
-                assert scores.length != 0;
-
-                return new ServiceLoadHelperWithScores(knownGood, scores)
-                        .getUnderUtilizedDataServices(minCount, maxCount,
-                                exclude);
+                uuids = getUnderUtilizedDataServicesWithLock(minCount,
+                        maxCount, exclude);
 
             } finally {
 
@@ -2170,11 +2030,171 @@ abstract public class LoadBalancerService extends AbstractService
 
             }
 
+            if (INFO)
+                log.info("minCount=" + minCount + ", maxCount=" + maxCount
+                        + ", exclude=" + exclude + " : reporting "
+                        + uuids.length
+                        + " under-utilized and non-excluded services: "
+                        + Arrays.toString(uuids));
+            
+            return uuids;
+
         } finally {
 
             clearLoggingContext();
 
         }
+
+    }
+
+    /**
+     * Impl. runs with {@link #lock}.
+     * 
+     * @param minCount
+     * @param maxCount
+     * @param exclude
+     * @return
+     * @throws TimeoutException
+     * @throws InterruptedException
+     */
+    private UUID[] getUnderUtilizedDataServicesWithLock(final int minCount,
+            final int maxCount, final UUID exclude) throws TimeoutException,
+            InterruptedException {
+
+        if (DEBUG)
+            log.debug("minCount=" + minCount + ", maxCount=" + maxCount
+                    + ", exclude=" + exclude);
+        
+        if (nupdates < initialRoundRobinUpdateCount) {
+
+            /*
+             * Use a round-robin assignment for the first N updates while the
+             * LBS develops some history on the hosts and services.
+             */
+            return roundRobinServiceLoadHelper.getUnderUtilizedDataServices(
+                    minCount, maxCount, exclude);
+
+        }
+
+        /*
+         * Scores for the services in ascending order (least utilized to most
+         * utilized).
+         */
+        final ServiceScore[] scores = this.serviceScores.get();
+
+        if (scores == null || scores.length == 0) {
+
+            if (minCount == 0) {
+
+                if (DEBUG)
+                    log
+                            .debug("No scores, minCount is zero - will return null.");
+
+                return null;
+
+            }
+
+            /*
+             * Scores are not available immediately. This will await a
+             * non-excluded service join and then return the "under-utilized"
+             * services without reference to computed service scores. This path
+             * is used when the load balancer first starts up (unless the round
+             * robin is enabled) since it will not have scores for at least one
+             * pass of the UpdateTask.
+             */
+
+            return new ServiceLoadHelperWithoutScores()
+                    .getUnderUtilizedDataServices(minCount, maxCount, exclude);
+
+        }
+
+        /*
+         * Count the #of non-excluded active services - this is [nok].
+         * 
+         * Note: [knownGood] is set to a service that (a) is not excluded; and
+         * (b) is active. This is the fallback service that we will recommend if
+         * minCount is non-zero and we are using the scores and all of a sudden
+         * it looks like there are no active services to recommend. This
+         * basically codifies a decision point where we accept that this service
+         * is active. We choose this as the first active and non-excluded
+         * service so that it will be as under-utilized as possible.
+         */
+        int nok = 0;
+        UUID knownGood = null;
+        for (int i = 0; i < scores.length && nok < 1; i++) {
+
+            final UUID serviceUUID = scores[i].serviceUUID;
+
+            if (exclude != null && exclude.equals(serviceUUID))
+                continue;
+
+            if (!activeDataServices.containsKey(serviceUUID))
+                continue;
+
+            if (knownGood == null)
+                knownGood = serviceUUID;
+
+            nok++;
+
+        }
+
+        if (nok == 0) {
+
+            /*
+             * There are no non-excluded active services.
+             */
+
+            if (DEBUG)
+                log.debug("No non-excluded services.");
+
+            if (minCount == 0) {
+
+                /*
+                 * Since there was no minimum #of services demanded by the
+                 * caller, we return [null].
+                 */
+
+                if (DEBUG)
+                    log
+                            .debug("No non-excluded services, minCount is zero - will return null.");
+
+                return null;
+
+            } else {
+
+                /*
+                 * We do not have ANY active and scored non-excluded services
+                 * and [minCount GT ZERO]. In this case we use a he variant that
+                 * does not use scores and that awaits a service join.
+                 */
+
+                if (DEBUG)
+                    log.debug("Will await a service join.");
+
+                return new ServiceLoadHelperWithoutScores()
+                        .getUnderUtilizedDataServices(minCount, maxCount,
+                                exclude);
+
+            }
+
+        }
+
+        /*
+         * Use the scores to compute the under-utilized services.
+         */
+
+        if (DEBUG)
+            log.debug("Will recommend services based on scores: #scored="
+                    + scores.length + ", nok=" + nok + ", knownGood="
+                    + knownGood + ", exclude=" + exclude);
+
+        assert nok > 0;
+        assert knownGood != null;
+        assert scores != null;
+        assert scores.length != 0;
+
+        return new ServiceLoadHelperWithScores(knownGood, scores)
+                .getUnderUtilizedDataServices(minCount, maxCount, exclude);
 
     }
 

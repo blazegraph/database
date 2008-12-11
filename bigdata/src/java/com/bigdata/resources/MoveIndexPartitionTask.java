@@ -863,7 +863,8 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class CopyBufferedWritesProcedure implements IIndexProcedure {
+    public static class CopyBufferedWritesProcedure implements IIndexProcedure,
+            IDataServiceAwareProcedure {
 
         /**
          * 
@@ -894,7 +895,31 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
             
         }
         
+        private DataService dataService;
+        
+        public void setDataService(DataService dataService) {
+
+            this.dataService = dataService;
+            
+        }
+
+        protected DataService getDataService() {
+            
+            if (dataService == null)
+                throw new IllegalStateException();
+            
+            return dataService;
+            
+        }
+        
         public Object apply(final IIndex ndx) {
+
+            /*
+             * Note: used to increment the #of index partition moves received by
+             * the target data service.
+             */
+            final ResourceManager resourceManager = getDataService()
+                    .getResourceManager();
             
             assert rset != null;
          
@@ -1019,6 +1044,9 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
                 
                 // set the new index metadata on the live btree.
                 dst.setIndexMetadata(indexMetadata);
+         
+                // increment #of index partition moves received by this service (the target).
+                resourceManager.indexPartitionReceiveCounter.incrementAndGet();
                 
                 if (INFO)
                     log.info("Move finished: cleared sourcePartitionId: name="
@@ -1032,7 +1060,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
             return null;
             
         }
-        
+
     }
 
 }

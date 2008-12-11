@@ -180,9 +180,27 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     }
     private final LockManager<String> lockManager;
 
+    /**
+     * The time in milliseconds that a group commit will await currently running
+     * tasks to join the commit group.
+     */
+    protected final long groupCommitTimeout;
+    
+    /**
+     * 
+     * @param resourceManager
+     * @param corePoolSize
+     * @param maximumPoolSize
+     * @param queue
+     * @param threadFactory
+     * @param groupCommitTimeout
+     *            The time in milliseconds that a group commit will await
+     *            currently running tasks to join the commit group.
+     */
     public WriteExecutorService(IResourceManager resourceManager,
             int corePoolSize, int maximumPoolSize,
-            BlockingQueue<Runnable> queue, ThreadFactory threadFactory) {
+            BlockingQueue<Runnable> queue, ThreadFactory threadFactory,
+            long groupCommitTimeout) {
 
         super(  corePoolSize, //
                 maximumPoolSize,//
@@ -193,6 +211,11 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
         if (resourceManager == null)
             throw new IllegalArgumentException();
+        
+        if (groupCommitTimeout < 0L) 
+            throw new IllegalArgumentException();
+        
+        this.groupCommitTimeout = groupCommitTimeout;
         
         // Setup the lock manager used by the write service.
         {
@@ -544,7 +567,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * @param r
      *            The {@link AbstractTask}.
      */
-    protected void beforeTask(Thread t,AbstractTask r) {
+    protected void beforeTask(final Thread t, final AbstractTask r) {
 
         if (t == null)
             throw new NullPointerException();
@@ -610,7 +633,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      *            The exception thrown -or- <code>null</code> if the task
      *            completed successfully.
      */
-    protected void afterTask(AbstractTask r, Throwable t) {
+    protected void afterTask(final AbstractTask r, final Throwable t) {
         
         if (r == null)
             throw new NullPointerException();
@@ -1079,10 +1102,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                      * only task in the commit group!
                      * 
                      * Note: This will return normally unless interrupted.
-                     * 
-                     * @todo config group commit join timeout.
                      */
-                    waitForRunningTasks(200/* timeout */,
+                    waitForRunningTasks(groupCommitTimeout,
                             TimeUnit.MILLISECONDS);
                 }
                 {
@@ -1110,7 +1131,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             final int nwrites = this.nwrites.get();
 
             if (INFO)
-                log.info("Committing store: commit group size=" + nwrites
+                log.info("Committing store: commitGroupSize=" + nwrites
                         + ", #running=" + nrunning + ", active="
                         + active.entrySet());
 
@@ -1230,10 +1251,23 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * Wait a moment to let other tasks finish, but if the queue is empty then
      * return immediately in order to keep down latency for a single task that
      * is run all by itself without anything else in the queue.
+     * <p>
+     * Note: When the timeout is ZERO (0L), this methods DOES NOT yield the
+     * {@link #lock}. This means that the task running the group commit will
+     * not allow other tasks into the commit group and essentially disables
+     * group commit.
+     * 
+     * @param timeout
+     *            The timeout to await currently running tasks to join the
+     *            commit group.
+     * @param unit
+     *            The unit in which that timeout is expressed.
      * 
      * @todo do NOT wait if the current task might exceeds its max latency from
      *       submit (likewise, do not start task if it has already execeeded its
      *       maximum latency from submit).
+     * 
+     * @todo possibly do not wait if task is part of tx?
      */
     private void waitForRunningTasks(final long timeout, final TimeUnit unit)
             throws InterruptedException {
@@ -1243,27 +1277,22 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
         final long beginWait = System.nanoTime();
 
+        // nanoseconds remaining until timeout.
         long nanos = unit.toNanos(timeout);
-        
-        int nwaits = 0;
-        
-        while (nanos > 0 && !getQueue().isEmpty()) {
+
+        // until timeout, while tasks are running.
+        while (nanos > 0 && this.nrunning.get() > 0) {//!getQueue().isEmpty()) {
 
             /*
-             * Wait on condition.
-             * 
-             * Note: This yields the [lock] and permits other tasks to join the
-             * commit group. If we do not wait at least ONCE then the task
-             * running the commit will be the ONLY task in the commit group!
+             * Wait on condition (yields lock, allowing other tasks to enter the
+             * commit group).
              * 
              * Note: throws InterruptedException
              */
 
-            waiting.await(10, TimeUnit.MICROSECONDS);
+            waiting.await(nanos, TimeUnit.NANOSECONDS);
 
             nanos -= (System.nanoTime() - beginWait);
-            
-            nwaits++;
 
         }
 
@@ -1271,11 +1300,21 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
         if (INFO) {
 
+            /*
+             * #of tasks remaining in the queue (not yet running).
+             */
             final int queueSize = getQueue().size();
             
+            /*
+             * #of tasks that are running which did not join the commit group.
+             */
             final int nrunning = this.nrunning.get();
             
-            final int nwrites = this.nwrites.get();
+            /*
+             * Note: Since the caller holds the lock this will be the size of
+             * the commit group.
+             */
+            final int commitGroupSize = this.nwrites.get();
             
             final int corePoolSize = getCorePoolSize();
             
@@ -1286,12 +1325,17 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             final long elapsedWait = TimeUnit.NANOSECONDS.toMillis(
                     System.nanoTime() - beginWait);
 
-            log.info("Not waiting any longer: nwaits=" + nwaits
-                    + ", elapsed=" + elapsedWait + "ms, queueSize="
-                    + queueSize + ", nrunning=" + nrunning
-                    + ", nwrites=" + nwrites + ", corePoolSize="
-                    + corePoolSize + ", poolSize=" + poolSize
-                    + ", maxPoolSize=" + maxPoolSize);
+            log
+                    .info("Not waiting any longer"//
+                            + ": commitGroupSize=" + commitGroupSize//
+                            + ", elapsed(ms)=" + elapsedWait
+                            + ", queueSize=" + queueSize//
+                            + ", nrunning=" + nrunning//
+                            + ", corePoolSize=" + corePoolSize
+                            + ", poolSize="+ poolSize//
+                            + ", maxPoolSize=" + maxPoolSize//
+                            );
+            
         }
         
     }
