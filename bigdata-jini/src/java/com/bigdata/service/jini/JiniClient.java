@@ -58,6 +58,28 @@ import com.bigdata.util.NV;
 public class JiniClient extends AbstractScaleOutClient {
 
     /**
+     * Options understood by the {@link JiniClient}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static interface Options extends AbstractScaleOutClient.Options {
+        
+        /**
+         * The timeout in milliseconds that the client will await the discovery
+         * of a service if there is a cache miss (default
+         * {@value #DEFAULT_CACHE_MISS_TIMEOUT}).
+         * 
+         * @see DataServicesClient
+         */
+        String CACHE_MISS_TIMEOUT = JiniClient.class.getName()
+                + ".cacheMissTimeout";
+        
+        String DEFAULT_CACHE_MISS_TIMEOUT = "" + (2 * 1000);
+        
+    }
+    
+    /**
      * The federation and <code>null</code> iff not connected.
      */
     private JiniFederation fed = null;

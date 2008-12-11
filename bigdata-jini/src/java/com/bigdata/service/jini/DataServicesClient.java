@@ -82,12 +82,12 @@ public class DataServicesClient {
     /**
      * Timeout used when there is a cache miss (milliseconds).
      */
-    final long timeout = 1000L;
+    protected final long timeout;
 
     /**
      * Provides direct cached lookup {@link ServiceItem}s by {@link ServiceID}.
      */
-    final ServiceCache serviceMap;
+    protected final ServiceCache serviceMap;
 
     /**
      * When <code>true</code> {@link ServiceItem}s for {@link DataService}s
@@ -105,14 +105,18 @@ public class DataServicesClient {
      * Begins discovery for {@link DataService}s and {@link MetadataService}s.
      * 
      * @param discoveryManagement
-     * @para listener An optional listener that will see the
-     *       {@link ServiceDiscoveryEvent}s observed by the internal
-     *       {@link ServiceCache}.
+     * @param listener
+     *            An optional listener that will see the
+     *            {@link ServiceDiscoveryEvent}s observed by the internal
+     *            {@link ServiceCache}.
+     * @param timeout
+     *            The timeout in milliseconds that the client will await the
+     *            discovery of a service if there is a cache miss.
      */
     public DataServicesClient(DiscoveryManagement discoveryManagement,
-            ServiceDiscoveryListener listener) {
+            ServiceDiscoveryListener listener, long timeout) {
 
-        this(discoveryManagement, listener, true, true);
+        this(discoveryManagement, listener, timeout, true, true);
         
     }
     
@@ -137,6 +141,9 @@ public class DataServicesClient {
      *            An optional listener that will see the
      *            {@link ServiceDiscoveryEvent}s observed by the internal
      *            {@link ServiceCache}.
+     * @param timeout
+     *            The timeout in milliseconds that the client will await the
+     *            discovery of a service if there is a cache miss.
      * @param cacheDataServices
      *            When <code>true</code> {@link ServiceItem}s for
      *            {@link DataService}s will be cached.
@@ -153,14 +160,20 @@ public class DataServicesClient {
     public DataServicesClient(//
             final DiscoveryManagement discoveryManagement,//
             final ServiceDiscoveryListener listener,//
+            final long timeout,
             final boolean cacheDataServices, //
-            final boolean cacheMetadataServices//
+            final boolean cacheMetadataServices //
             ) {
 
         if (discoveryManagement == null)
             throw new IllegalArgumentException();
 
-        serviceMap = new ServiceCache(listener);
+        if (timeout < 0L)
+            throw new IllegalArgumentException();
+        
+        this.timeout = timeout;
+        
+        this.serviceMap = new ServiceCache(listener);
         
         this.cacheDataServices = cacheDataServices;
 
@@ -462,9 +475,10 @@ public class DataServicesClient {
    
     /**
      * Handles a cache miss by a remote query on the managed set of service
-     * registrars.
+     * registrars. The timeout for that query is determined by the ctor
+     * parameter.
      */
-    protected ServiceItem handleCacheMiss(ServiceItemFilter filter) {
+    protected ServiceItem handleCacheMiss(final ServiceItemFilter filter) {
 
         ServiceItem item = null;
 

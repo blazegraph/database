@@ -67,7 +67,7 @@ public class TimestampServiceClient {
     /**
      * Timeout for remote lookup on cache miss (milliseconds).
      */
-    private final long timeout = 1000;
+    protected final long timeout;
     
     /**
      * Provides direct cached lookup of services by their {@link ServiceID}.
@@ -80,10 +80,18 @@ public class TimestampServiceClient {
      * @param discoveryManagement
      * @param listener
      *            Optional listener will see {@link ServiceDiscoveryEvent}s.
+     * @param timeout
+     *            The timeout in milliseconds that the client will await the
+     *            discovery of a service if there is a cache miss.
      */
     public TimestampServiceClient(DiscoveryManagement discoveryManagement,
-            ServiceDiscoveryListener listener) {
+            ServiceDiscoveryListener listener, long timeout) {
 
+        if (timeout < 0)
+            throw new IllegalArgumentException();
+        
+        this.timeout = timeout;
+        
         serviceMap = new ServiceCache(listener);
         
         /*
@@ -176,7 +184,7 @@ public class TimestampServiceClient {
      * Handles a cache miss by a remote query on the managed set of service
      * registrars.
      */
-    protected ServiceItem handleCacheMiss(ServiceItemFilter filter) {
+    protected ServiceItem handleCacheMiss(final ServiceItemFilter filter) {
 
         ServiceItem item = null;
 

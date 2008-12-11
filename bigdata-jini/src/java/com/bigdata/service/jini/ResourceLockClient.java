@@ -67,7 +67,7 @@ public class ResourceLockClient {
     /**
      * Timeout for remote lookup on cache miss (milliseconds).
      */
-    private final long timeout = 1000;
+    private final long timeout;
     
     /**
      * Provides direct cached lookup of {@link IResourceLockService}s by their
@@ -81,10 +81,18 @@ public class ResourceLockClient {
      * @param discoveryManagement
      * @param listener
      *            Optional listener will see {@link ServiceDiscoveryEvent}s.
+     * @param timeout
+     *            The timeout in milliseconds that the client will await the
+     *            discovery of a service if there is a cache miss.
      */
     public ResourceLockClient(DiscoveryManagement discoveryManagement,
-            ServiceDiscoveryListener listener) {
+            ServiceDiscoveryListener listener, long timeout) {
 
+        if (timeout < 0)
+            throw new IllegalArgumentException();
+        
+        this.timeout = timeout;
+        
         serviceMap = new ServiceCache(listener);
         
         /*

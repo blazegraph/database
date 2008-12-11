@@ -36,7 +36,6 @@ import java.util.concurrent.Future;
 
 import net.jini.config.Configuration;
 import net.jini.core.discovery.LookupLocator;
-import net.jini.core.entry.Entry;
 import net.jini.core.lookup.ServiceItem;
 import net.jini.discovery.DiscoveryManagement;
 import net.jini.discovery.LookupDiscoveryManager;
@@ -47,11 +46,8 @@ import net.jini.jeri.InvocationLayerFactory;
 import net.jini.jeri.tcp.TcpServerEndpoint;
 import net.jini.lookup.ServiceDiscoveryEvent;
 import net.jini.lookup.ServiceDiscoveryListener;
-import net.jini.lookup.ServiceItemFilter;
-import net.jini.lookup.entry.Name;
 
 import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.io.IStreamSerializer;
 import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.ITimestampService;
@@ -59,7 +55,6 @@ import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.service.AbstractDistributedFederation;
-import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
@@ -108,7 +103,7 @@ public class JiniFederation extends AbstractDistributedFederation implements
      * @param client
      *            The client.
      */
-    public JiniFederation(JiniClient client, JiniConfig jiniConfig) {
+    public JiniFederation(final JiniClient client, final JiniConfig jiniConfig) {
 
         super(client);
     
@@ -134,18 +129,25 @@ public class JiniFederation extends AbstractDistributedFederation implements
                     lookupLocators, null /* DiscoveryListener */
             );
 
+            final long cacheMissTimeout = Long.parseLong(jiniConfig.properties
+                    .getProperty(JiniClient.Options.CACHE_MISS_TIMEOUT,
+                            JiniClient.Options.DEFAULT_CACHE_MISS_TIMEOUT));
+            
             // Start discovery for data and metadata services.
-            dataServicesClient = new DataServicesClient(discoveryManager, this);
+            dataServicesClient = new DataServicesClient(discoveryManager, this,
+                    cacheMissTimeout);
 
             // Start discovery for the timestamp service.
             timestampServiceClient = new TimestampServiceClient(
-                    discoveryManager, this);
+                    discoveryManager, this, cacheMissTimeout);
 
             // Start discovery for the load balancer service.
-            loadBalancerClient = new LoadBalancerClient(discoveryManager, this);
+            loadBalancerClient = new LoadBalancerClient(discoveryManager, this,
+                    cacheMissTimeout);
 
             // Start discovery for the resource lock manager.
-            resourceLockClient = new ResourceLockClient(discoveryManager, this);
+            resourceLockClient = new ResourceLockClient(discoveryManager, this,
+                    cacheMissTimeout);
 
         } catch (Exception ex) {
 
