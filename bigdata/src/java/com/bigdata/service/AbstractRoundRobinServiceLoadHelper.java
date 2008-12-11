@@ -84,9 +84,9 @@ abstract public class AbstractRoundRobinServiceLoadHelper implements
      * 
      * @see TestLoadBalancerRoundRobin
      */
-    public UUID[] getUnderUtilizedDataServices(int minCount,
-            int maxCount, UUID exclude) throws InterruptedException,
-            TimeoutException {
+    public UUID[] getUnderUtilizedDataServices(final int minCount,
+            final int maxCount, final UUID exclude)
+            throws InterruptedException, TimeoutException {
 
         /*
          * Note: In order to reduce the state that we track I've coded this to
@@ -107,15 +107,14 @@ abstract public class AbstractRoundRobinServiceLoadHelper implements
          * for each of the requested minCount UUIDs.
          */
         final long timeout = 10000;// ms @todo config
-        UUID[] a = awaitServices(1,
-                        //minCount == 0 ? 1 : minCount/* minCount */,
-                        timeout);
+        UUID[] a = awaitServices(1/* minCount */, timeout);
 
-        if (a.length == 1 && exclude != null && a[0] == exclude) {
+        if (a.length == 1 && exclude != null && exclude.equals(a[0])) {
 
             /*
-             * Make sure that we have at least one unexcluded service. @todo
-             * unit test for this bit.
+             * Make sure that we have at least one unexcluded service.'
+             * 
+             * @todo unit test for this bit.
              */
 
             a = awaitServices(2 /* minCount */, timeout);
@@ -148,10 +147,11 @@ abstract public class AbstractRoundRobinServiceLoadHelper implements
             // no less than the minCount.
             n = minCount;
         }
-        
-        if(INFO) {
-            
-            log.info("Have "+a.length+" data services and will make "+n+" assignments.");
+
+        if (INFO) {
+
+            log.info("Have " + a.length + " data services and will make " + n
+                    + " assignments.");
             
         }
         
@@ -164,9 +164,12 @@ abstract public class AbstractRoundRobinServiceLoadHelper implements
             
             assert uuid != null;
             
-            if (uuid == exclude) {
+            if (exclude != null && uuid.equals(exclude)) {
+                
                 nexcluded = 1;
+                
                 continue;
+                
             }
 
             b[i++] = uuid;
