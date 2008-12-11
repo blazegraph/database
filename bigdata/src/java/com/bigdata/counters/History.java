@@ -665,6 +665,12 @@ public class History<T> {
      *            The timestamp associated with the sample.
      * @param value
      *            The sampled value.
+     * 
+     * @throws IllegalArgumentException
+     *             if the timestamp is non-postitive.
+     * @throws TimestampOrderException
+     *             if the timestamp is way out of the current range for the
+     *             history buffer.
      */
     synchronized public void add(final long timestamp, final T value) {
 
@@ -704,10 +710,8 @@ public class History<T> {
             
             if ((lastLogicalSlot - logicalSlot) >= capacity) {
 
-                log.error("Ignoring sample WAY out of timestamp order: timestamp="
-                                + timestamp + ", value=" + value);
-
-                return;
+                throw new TimestampOrderException("timestamp=" + timestamp
+                        + ", value=" + value);
                 
             }
             
