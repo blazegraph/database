@@ -942,6 +942,20 @@ Short term tasks:
     ClientHashPartitionedIndex (vs the ClientIndexView, which could be
     renamed as KeyRangePartitionedIndex)
 
+    You specify that the index is hash partitioned when it is
+    registered via IndexMetadata.  The index is allocated on N logical
+    data services and those are recorded in the IndexMetadata for the
+    scale-out index on the MDS.  Since there are no key-ranges, no
+    data is stored on the MDS for that scale-out index other that its
+    IndexMetadata.  The choice of the logical data services may be
+    safely replicated since it is immutable.
+
+    The various index procedures need to be examined for compatibility.
+
+    Pipeline joins might not work.
+
+    Is it worth it?
+
   - Iterator refactor
 
      * Drive SLICE (offset as well as limit) through the IRangeQuery
@@ -1702,63 +1716,18 @@ JF-U100-host23-2DS:  ******** RUNNING NOW *********
     - Script to collect nohups, config files, and counters in a
       directory and tarball for post-mortem.
 
-- Service and host statistics:
-      
-   - **** There are no majorFaultsPerSec or percentFreeDiskSpace
-          numbers on a per-host basis so only defaults are being used
-          for those values when computing the host score.  I need to
-          write a new SAR collector to get those data.
-
-    ** The per-host physical disk counters for linux are not being
-       collected, including the major page faults per second for the
-       _host_.  This is one of the primary clues so we need that.
-
-       Write the Sar, iostat, or vmstat utility to collect these data.
-       This is a bit more complex under Linux since the data are
-       reported by device and the relationship of the devices to the
-       file system should be explicated.
-
-       Use [df] to report the % free space remaining?  There should be
-       one value for the logical disk (perhaps), and there should be a
-       report of the % free space remaining on the volume on which the
-       dataDir is located and the volume on which the tmpDir is
-       located.
-
-       Note: The StoreManager also reports the free space on the
-       volume for both the data dir and the temp dir.
-
-   *** IP Addr shows up for host2 but not host1 or host3.
-
-       192.168.20.27 is showing up as a host for DataServer3 but no
-       host statistics are being reported for that IP addr (they are
-       reported for the hostname instead) with the result that the IP
-       addr is getting the default values for the metrics used to
-       compute the host scores.
-
-       There is still the problem with how that IP addr is getting
-       reported and with whether or not any services are understood to
-       be running on that host (they are not).
-       
-       *** A host without services running on it effects the ranking
-           of the hosts and the host with the highest score. Does it
-           also effect any recommendations made by the LBS?
-
-   - Done. Modified host score to interpret high IO Wait as high
-     utilization.
-
-   - Done (mostly). The counter names need to be symbolic to avoid
-     edits causing counters to not be found during analysis.
-
-- Overflow processing
-
-
  - TemporaryRawStore abuse.  
       
    * BigdataClient temporary raw store to cache information locally.
      This should periodically be dropped as it can grow without bound.
 
-   * The StoreManager uses either a temporary raw store for the
-     indices it maintains for the resources that is is managing.
+   * The StoreManager uses a temporary raw store for the indices it
+     maintains for the resources that is is managing.
+
+   * Each IndexSegmentBuild can use up to THREE distinct temporary
+     stores.  We can probably reduce this by writing the leaves
+     directly onto the output file and then we just need to buffer the
+     nodes (which is always less data) and the blocks (if used).
 
  - Resource locators
 
@@ -1770,86 +1739,6 @@ JF-U100-host23-2DS:  ******** RUNNING NOW *********
    - Configure and tune the access path cache capacity for the
      SPORelation.  This has a strong effect on the locator cache for
      the triple store.
-
-============================================================
-
-Index allocation:
-
-    The initial index allocation appears to assign much more of the
-    effort to host3.  Either try random assignment or reconsider the
-    2-host assignment behavior.
-
-log files:
-
-    The log files do not interleave the logs by timestamp.  Clearly
-    there is no way to do this exactly in a distributed system.
-    However it might be done better if it all went through syslog.
-    Rather than an elapsed ms (or in addition) I need the UTC time in
-    a field that I can readily identify.  With that I could even merge
-    sort the logs together.
-
-DataServer3:
-
-The problem here is that there is no entry under the leftSeparatorKey
-for the partition in the MDS.  I am not clear why.  I have added a
-test for this condition and an exception which will provide more
-information.
-
-Caused by: java.lang.NullPointerException
-	at com.bigdata.mdi.PartitionLocator.equals(PartitionLocator.java:231)
-	at com.bigdata.service.MetadataService$MoveIndexPartitionTask.doTask(MetadataService.java:803)
-
-What led up to this was:
-
-testSPO#0	 = willBuild(name=testSPO#0)
-testterm2id#0	 = willSplit(name=testterm2id#0)
-
-and
-
-testSPO#0	 = willMove(name=testSPO#0,target=ba2214f9-b220-43f5-9f50-8f1095ce3ec6)
-testterm2id#1	 = willBuild(name=testterm2id#1)
-testterm2id#2	 = willBuild(name=testterm2id#2)
-
-and the exception was for the move.
-
---------------------
-
-DataServer4:
-
-Caused by: java.lang.RuntimeException: Expected
-
-oldLocator={ partitionId=1, dataServices=[ba2214f9-b220-43f5-9f50-8f1095ce3ec6], leftSeparator=[], rightSeparator=null}, but
-    actual={ partitionId=0, dataServices=[2eed9964-6c1c-40ee-8b3f-ceb5b30278d5], leftSeparator=[], rightSeparator=null}
-	at com.bigdata.service.MetadataService$SplitIndexPartitionTask.doTask(MetadataService.java:519)
-
-This is what was happening at the time.
-
-__global_namespace_index#0	 = wasCopied(name=__global_namespace_index#0)
-testOSP#1	 = willBuild(name=testOSP#1)
-testOSP#2	 = willBuild(name=testOSP#2)
-testPOS#1	 = willBuild(name=testPOS#1)
-testPOS#2	 = willBuild(name=testPOS#2)
-testSPO#1	 = willSplit(name=testSPO#1)
-testid2term#0	 = willBuild(name=testid2term#0)
-testjust#0	 = wasCopied(name=testjust#0)
-testsearch#0	 = willBuild(name=testsearch#0)
-
-So this looks like a cascade of the move problem.  So we need some
-compensating action for the failed move since it seems to have been at
-least partly effective even through there was an exception thrown.
-
---------------------
-
-This was in the client's stack trace.  i've added the index name to
-the stack trace, but again it looks linked to the problem with the SPO
-MOVE failure.
-
-Caused by: java.lang.NullPointerException
-	at com.bigdata.service.ClientIndexView.splitKeys(ClientIndexView.java:1751)
-	at com.bigdata.service.ClientIndexView.submit(ClientIndexView.java:877)
-	at com.bigdata.rdf.store.SPOIndexWriter.call(SPOIndexWriter.java:280)
-	at com.bigdata.rdf.store.SPOIndexWriter.call(SPOIndexWriter.java:73)
-	... 5 more
 
 ============================================================
 
@@ -2578,34 +2467,8 @@ Arjohn
 ============================================================
 OVERFLOW
 
-- Note: 350 bytes per statement w/o overflow but only 53 bytes per
-  statement with, so get overflow working (even w/o moves since we can
-  use a single data service to do 1B triples in 55G).  Moves can be
-  vetted as a second stage once we firmly believe that splits are
-  working correctly.
-
-- Estimate 1M triples at 53M, 1B is would be 53GB, (30B in 1.6TB), and
-  1 trillion would be 53TB.  However, we also need to plan for some
-  temporary drive space and some duplication during index builds, etc.
-  Maybe a 1.2 multiplier on top of that?
-
-- Generate U1500 and U8000 (running).
-
-  Load U1500 data set and collect query performance times.
-
-  Do it again with overflow enabled.
-
-  Load U8000 data set w/ overflow enabled and collect query
-  performance times.
-
-- Overflow appears to keep the lubm loader alive (e.g., JDS U50 on the
-  laptop) when those should be daemon threads.  Who is waiting for
-  what?
-
 - Write overflow tests for the sparse row store since our relation
   declarations are stored there.
-
-- Verify scale-out for bloom filter.
 
 ============================================================
 JOIN optimizations:
@@ -2822,6 +2685,9 @@ Executor services
   - IIndexProcedure should be generic (return type only at this
     point).
 
+  - Zookeeper may be an alternative way to approach a distributed
+    executor service.
+
 ============================================================
 CLOSURE CORRECTNESS
 
@@ -2873,6 +2739,8 @@ Conferences:
 
      Semantic Web:
 
+     W3C:
+
      OSCON:
 
      EmergingTech?
@@ -2889,8 +2757,6 @@ MULTICONF-09, http://www.promoteresearch.org/
 
   - International Conference on Recent Advances in Information
     Technology and Applications (RAITA-09)
-
-
 
 ------------------------------------------------------------
 
@@ -3045,8 +2911,6 @@ Commit notes:
     initiate a distributed operation such as a data load since
     otherwise we can't readily operate on larger clusters.
 
-  - Global resource locks and barriers using zookeeper.
-
   - Need ability to execute a command on all machines in a cluster.
 
   - Very large data sets will require either the ability to
@@ -3056,25 +2920,49 @@ Commit notes:
     decompress them dynamically during load but that will add extra
     cost to the load (closure and query costs would not be effected).
 
-  - It may be useful to restart the LBS from time to time or to
-    directly enter load scores for its hosts and services. That might
-    make it easier to verify its behavior.
-
   - Should be able to resume the load from a log indicating which
     files have already been loaded.  This may be important for a long
     running process if we hit very rare bugs that would otherwise
     require a full restart.
 
-- Performance testing on DP for U10, U100, U1000 with split / join /
-  move / build / merge.
+- Load balancer
 
-  DP run of U100 (1 machine) and U1000 (3 machines) with overflow and
-  splits enabled, but not moves.  Verify the LBS behavior.  The host
-  with TERM2ID should have the heaviest load.  The move targets will
-  be the more lightly loaded hosts.  Verify all collected host stats
-  and write collector for any stats that are missing.
+  - No history is saved when the counters are logged for the LBS
+    generated counters (the host and service scores).  Also, it would
+    be nice if the service scores indicated which services qualified
+    for high and low utilization by the set of rules in play, but
+    there is a potential dependency on the set of scores for the
+    services when rating a single service.
 
-  * The closure operation must be executed by a single host, not all
+  - Should seek to balance the most and least loaded hosts to within
+    10% or 20%.  Make sure that this works with 2DS.  Make sure that a
+    new DS will be tasked once another host overflows (LBS could force
+    overflow of a highly utilized service when the new service joins
+    to help the new service get loaded more quickly).
+
+  - Collect total swap space and factor % swap space used into the
+    hostScore. (When you run out of swap space you are basically
+    hosed, but this condition is generally indicating by a rising
+    count for major page faults, which we already track and use in the
+    hostScore).
+
+  - Fix history bug so that we can have more than 60 minutes of
+    detailed history.
+
+- Visualization
+
+  - Generate and visualize a concise summary of how the disk space in
+    the federation is allocated (a) on each data service on each host;
+    and (b) by index.
+
+  - Generate timelines of events correlated to interesting counters,
+    such as % IO Wait and % Processor Time.
+
+- Global resource locks and barriers using zookeeper.
+
+  - Creating a triple store.
+
+  - The closure operation must be executed by a single host, not all
     three. [well, it might work, but it would be very weird.]  I can
     either fix this (e.g., global lock service based on zookeeper) or
     I can work around it by doing a load first followed by a closure
@@ -3084,7 +2972,40 @@ Commit notes:
     this is to have a single client do the load, but that won't scale
     to 16 machines.
 
-  * (Partly resolved, but not I can't get it to release all releasable
+- Performance testing on DP for U100, U1500, U8000 with split / join /
+  move / build / merge.
+
+  - Note: 350 bytes per statement w/o overflow but only 53 bytes per
+    statement with, so get overflow working (even w/o moves since we
+    can use a single data service to do 1B triples in 55G).  Moves can
+    be vetted as a second stage once we firmly believe that splits are
+    working correctly.
+
+    Estimate 1M triples at 53M, 1B is would be 53GB, (30B in 1.6TB),
+    and 1 trillion would be 53TB.  However, we also need to plan for
+    some temporary drive space and some duplication during index
+    builds, etc.  Maybe a 1.2 multiplier on top of that?
+
+  * CDL may loose some data during load.  Compare CDL for U100 with
+    single threaded load of U100 (#clients=1).
+
+  * Review [U100countersfinal.xml] for interesting things.
+
+    Review U1500 run.  Throughput of ~10k tps as reported by CDL seems
+    low.  Compare with peformance counters.  Is CDL reporting
+    correctly?  Also, this is before the LBS bug fix for minCount==0
+    and excluded != null so re-run.
+
+  - Try running with DS4 on local disk vs NAS and see how that effects
+    IO wait for that machine.  I will need to monitor the disk space
+    remaining in order to move indices off of that service as it fills
+    up the local disk.
+
+  - *** Compacting merges tend to trigger
+    FileChannelUtility#transferAll().  This is a known Sun bug, but we
+    should implement a work around.
+
+  * (Partly resolved, but now I can't get it to release all releasable
     resources.)
 
     Look into a bug where an index can not be loaded because the
@@ -3179,8 +3100,8 @@ commitPointToPreserve=1228508365953
 
   - Do an LTS run for each of these cases.  This will give us a
     baseline for load and query performance and "ground truth" for
-    query correctness.  Only U100 and U1000 need to be run on the
-    cluster as we can get U10 easily on a laptop.
+    query correctness.  U100 and U1500 should be run on a host in the
+    cluster to provide a good basis for performance comparisons.
 
   * Verify overflow w/ MOVE enabled fixes the TERM2ID hotspot.
 
@@ -3227,19 +3148,9 @@ commitPointToPreserve=1228508365953
     - Run JDS query under the performance analyzer and look for
       interesting things.
 
-    - Why can't I blast the binary image of an index segment through a
-      socket for a MOVE?
-
     - Examine memory demands when overflow is enabled and choices for
       the storeCache, indexCache, and indexSegmentCache capacity and
       timeout values.
-
-    - Move the IndexSegmentStore.Options (other than the file name) to
-      the IndexMetadata.Options interface.  This will permit these
-      values to be set on a per-scale-out index basis when the index
-      is created. [Note: The BUFFER_NODES option now defaults to
-      false.  This might have been part of the high memory
-      consumption.]
 
     - Either lower or dynamically set the capacity of the read
       retention queue for indices.  This is very important for
@@ -3264,12 +3175,6 @@ commitPointToPreserve=1228508365953
       chunkCapacity.  How is that for query (not much of an effect)?
       For closure (larger joins).
 
-    - Try reducing the latency of the write service to 0 if nothing is
-      in the queue and to 10ms if there is something in the queue.
-      The chance for tasks to complete is really during each commit
-      since they are running asynchronously.  This will have the most
-      effect on the federation with its auto-commit semantics.
-
     - Try various values of chunk size and maxparallel for pipeline
       joins.
 
@@ -3277,18 +3182,31 @@ commitPointToPreserve=1228508365953
 
     - Try different branching factors for the index segments.
 
-  ----------------------------------------
+    - Try a Direct buffer for the journal.  We will have to force
+      overflow, terminating asynchronous overflow eagerly if necessary
+      including any chained tasks such as the atomic updtes, before we
+      reach the maximum capacity of the journal since it can not be
+      extended (we will be using a direct buffer of a fixed size for
+      the live journal that is passed in and passed from one to the
+      next, much like the write cache).  The trigger point will have
+      to be set early enough that we can get the builds done (at a
+      minimum) before the live journal fills up, however copying data
+      off of the live journal should be much faster since it is fully
+      buffered.
 
-- Close out old indices.  This has been deferred for the Journal,
-  Name2Addr, and the resource locator until I can get some more
-  feedback on how well the change is performing in the IndexManager.
-  This just seems safer for now, but there is a risk that indices will
-  not actually be closed if they are open in the historical index
-  cache or the live index cache.  Likewise, release of old relation
-  views is also important.
+    - Close out old indices.  This has been deferred for the Journal,
+      Name2Addr, and the resource locator until I can get some more
+      feedback on how well the change is performing in the
+      IndexManager.  This just seems safer for now, but there is a
+      risk that indices will not actually be closed if they are open
+      in the historical index cache or the live index cache.
+      Likewise, release of old relation views is also important.
 
-    defer. Name2Addr (live index cache)
+      defer. Name2Addr (live index cache)
 
-    defer. AbstractJournal (historical index cache)
+      defer. AbstractJournal (historical index cache)
 
-    defer. DefaultResourceLocator's cache.
+      defer. DefaultResourceLocator's cache.
+      
+      Add a thread to periodically touch flush stale entries from
+      these caches even when they are not being used?
