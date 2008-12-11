@@ -1880,7 +1880,7 @@ abstract public class LoadBalancerService extends AbstractService
 
             }
 
-            return isHighlyUtilizedDataService(score,scores);
+            return isHighlyUtilizedDataService(score, scores);
             
         } finally {
 
@@ -2006,13 +2006,17 @@ abstract public class LoadBalancerService extends AbstractService
 
         setupLoggingContext();
 
-        if (minCount < 0)
-            throw new IllegalArgumentException();
-
-        if (maxCount < 0)
-            throw new IllegalArgumentException();
-
         try {
+            
+            if (minCount < 0)
+                throw new IllegalArgumentException();
+
+            if (maxCount < 0)
+                throw new IllegalArgumentException();
+
+            if (INFO)
+                log.info("minCount=" + minCount + ", maxCount=" + maxCount
+                        + ", exclude=" + exclude);
             
             lock.lock();
 
@@ -2139,11 +2143,22 @@ abstract public class LoadBalancerService extends AbstractService
                  * Use the scores to compute the under-utilized services.
                  */
 
+                if (INFO)
+                    log
+                            .info("Will recommend services based on scores: #scored="
+                                    + scores.length
+                                    + ", nok="
+                                    + nok
+                                    + ", knownGood="
+                                    + knownGood
+                                    + ", exclude="
+                                    + exclude);
+
                 assert nok > 0;
                 assert knownGood != null;
                 assert scores != null;
                 assert scores.length != 0;
-                
+
                 return new ServiceLoadHelperWithScores(knownGood, scores)
                         .getUnderUtilizedDataServices(minCount, maxCount,
                                 exclude);
