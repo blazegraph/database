@@ -1218,7 +1218,7 @@ abstract public class LoadBalancerService extends AbstractService
                         + ") * 100d) / (1d + percentProcessorIdle("
                         + percentFormat.format(percentProcessorIdle)
                         + "), majorFaultsPerSec=" + majorFaultsPerSec
-                        + ", percentDiskSpaceFree"
+                        + ", percentDiskSpaceFree="
                         + percentFormat.format(percentDiskFreeSpace));
 
             }
@@ -2238,7 +2238,7 @@ abstract public class LoadBalancerService extends AbstractService
         protected boolean isUnderUtilizedDataService(ServiceScore score,
                 ServiceScore[] scores) {
 
-            return LoadBalancerService.this.isHighlyUtilizedDataService(score,
+            return LoadBalancerService.this.isUnderUtilizedDataService(score,
                     scores);
             
         }
@@ -2287,7 +2287,7 @@ abstract public class LoadBalancerService extends AbstractService
         protected boolean isUnderUtilizedDataService(ServiceScore score,
                 ServiceScore[] scores) {
 
-            return LoadBalancerService.this.isHighlyUtilizedDataService(score,
+            return LoadBalancerService.this.isUnderUtilizedDataService(score,
                     scores);
             
         }
