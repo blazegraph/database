@@ -1078,7 +1078,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
         }
 
-        if (underUtilizedDataServiceUUIDs.length == 0) {
+        if (underUtilizedDataServiceUUIDs == null
+                || underUtilizedDataServiceUUIDs.length == 0) {
 
             log.warn("Load balancer does not report any underutilized services.");
 
