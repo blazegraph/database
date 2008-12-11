@@ -2064,62 +2064,86 @@ abstract public class LoadBalancerService extends AbstractService
                 }
 
                 /*
-                 * Note: if[minCount] is non-zero, then [knownGood] is set to a
-                 * service that is (a) not excluded and (b) active. This is the
-                 * fallback service that we will recommend if minCount is
-                 * non-zero and we are using the scores and all of a sudden it
-                 * looks like there are no active services to recommend. This
-                 * basically codifies a decision point where we accept that this
-                 * service is active. We choose this as the first active and
-                 * non-excluded service so that it will be as under-utilized as
-                 * possible.
+                 * Count the #of non-excluded active services - this is [nok].
+                 * 
+                 * Note: [knownGood] is set to a service that (a) is not
+                 * excluded; and (b) is active. This is the fallback service
+                 * that we will recommend if minCount is non-zero and we are
+                 * using the scores and all of a sudden it looks like there are
+                 * no active services to recommend. This basically codifies a
+                 * decision point where we accept that this service is active.
+                 * We choose this as the first active and non-excluded service
+                 * so that it will be as under-utilized as possible.
                  */
-
+                int nok = 0;
                 UUID knownGood = null;
-                if (minCount > 0 && exclude != null) {
-                    
+                for (int i = 0; i < scores.length && nok < 1; i++) {
+
+                    final UUID serviceUUID = scores[i].serviceUUID;
+
+                    if (exclude != null && exclude.equals(serviceUUID))
+                        continue;
+
+                    if (!activeDataServices.containsKey(serviceUUID))
+                        continue;
+
+                    if (knownGood == null)
+                        knownGood = serviceUUID;
+
+                    nok++;
+
+                }
+
+                if (nok == 0) {
+
                     /*
-                     * Verify that we have a score for at least one active
-                     * service that is not excluded. If not, then we will use
-                     * the variant w/o scores that awaits a service join.
+                     * There are no non-excluded active services.
                      */
-                    int nok = 0;
-                    for (int i = 0; i < scores.length && nok < 1; i++) {
+
+                    if(INFO)
+                        log.info("No non-excluded services.");
                     
-                        final UUID serviceUUID = scores[i].serviceUUID;
-                        
-                        if(exclude.equals(serviceUUID)) continue;
-                        
-                        if (!activeDataServices.containsKey(serviceUUID))
-                            continue;
-                        
-                        if (knownGood == null)
-                            knownGood = serviceUUID;
-                        
-                        nok++;
-                        
-                    }
-                    
-                    if (nok < 1) {
-                        
+                    if (minCount == 0) {
+
                         /*
-                         * Since we do not have ANY active and scored
-                         * non-excluded services, use the variant that does not
-                         * use scores and that awaits a service join.
+                         * Since there was no minimum #of services demanded by
+                         * the caller, we return [null].
                          */
+
+                        if(INFO)
+                            log.info("No non-excluded services, minCount is zero - will return null.");
+
+                        return null;
+                        
+                    } else {
+
+                        /*
+                         * We do not have ANY active and scored non-excluded
+                         * services and [minCount GT ZERO]. In this case we use
+                         * a he variant that does not use scores and that awaits
+                         * a service join.
+                         */
+
+                        if(INFO)
+                            log.info("Will await a service join.");
 
                         return new ServiceLoadHelperWithoutScores()
                                 .getUnderUtilizedDataServices(minCount,
                                         maxCount, exclude);
-                        
+
                     }
-                    
+
                 }
 
                 /*
-                 * Use the scores to compute the under-utilized services. 
+                 * Use the scores to compute the under-utilized services.
                  */
 
+                assert nok > 0;
+                assert knownGood != null;
+                assert scores != null;
+                assert scores.length != 0;
+                
                 return new ServiceLoadHelperWithScores(knownGood, scores)
                         .getUnderUtilizedDataServices(minCount, maxCount,
                                 exclude);
