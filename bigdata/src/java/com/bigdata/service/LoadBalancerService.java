@@ -34,6 +34,8 @@ import com.bigdata.counters.IHostCounters;
 import com.bigdata.counters.IRequiredHostCounters;
 import com.bigdata.counters.ICounterSet.IInstrumentFactory;
 import com.bigdata.journal.ConcurrencyManager.IConcurrencyManagerCounters;
+import com.bigdata.rawstore.Bytes;
+import com.bigdata.resources.ResourceManager.IResourceManagerCounters;
 import com.bigdata.service.DataService.IDataServiceCounters;
 import com.bigdata.service.mapred.IMapService;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -1258,6 +1260,15 @@ abstract public class LoadBalancerService extends AbstractService
         }
         
         /**
+         * Format for bytes.
+         */
+        final NumberFormat bytesFormat;
+        {
+           bytesFormat = NumberFormat.getIntegerInstance();
+           bytesFormat.setGroupingUsed(true);
+        }
+        
+        /**
          * Compute the score for a service.
          * <p>
          * Note: utilization is defined in terms of transient system resources :
@@ -1290,6 +1301,15 @@ abstract public class LoadBalancerService extends AbstractService
             // verify that the host score has been normalized.
             assert hostScore.rank != -1 : hostScore.toString();
             
+            // resolve the service name : @todo refactor RMI out of this method.
+            String serviceName = "N/A";
+            try {
+                serviceName = getFederation().getDataService(serviceUUID)
+                        .getServiceName();
+            } catch (Throwable t) {
+                log.warn(t.getMessage(), t);
+            }
+            
             /*
              * The average queuing time for the unisolated write service is used
              * as the primary indicator of the write load of the service. The
@@ -1321,23 +1341,81 @@ abstract public class LoadBalancerService extends AbstractService
                             + ps + IQueueCounters.AverageQueuingTime,
                     100d/* default (ms) */, historyMinutes);
 
+            final double dataDirBytesAvailable = getAverageValueForMinutes(
+                    serviceCounterSet, IDataServiceCounters.concurrencyManager
+                            + ps + IConcurrencyManagerCounters.writeService
+                            + ps
+                            + IResourceManagerCounters.DataDirBytesAvailable,
+                    Bytes.gigabyte * 20/* default */, historyMinutes);
+
+            final double tmpDirBytesAvailable = getAverageValueForMinutes(
+                    serviceCounterSet, IDataServiceCounters.concurrencyManager
+                            + ps + IConcurrencyManagerCounters.writeService
+                            + ps
+                            + IResourceManagerCounters.TmpDirBytesAvailable,
+                    Bytes.gigabyte * 2/* default */, historyMinutes);
+
             final double rawScore = (averageQueueLength + 1) * (hostScore.score + 1);
 
-            // resolve the service name : @todo refactor RMI out of this method.
-            String serviceName = "N/A";
-            try {
-                serviceName = getFederation().getDataService(serviceUUID)
-                        .getServiceName();
-            } catch (Throwable t) {
-                log.warn(t.getMessage(), t);
-            }
+            double adjustedRawScore = rawScore;
             
+            /*
+             * dataDir
+             */
+            
+            if (dataDirBytesAvailable < Bytes.gigabyte * 1) {
+
+                // much higher utilization if the host is very short on disk.
+                adjustedRawScore *= 10d;
+
+                log.warn("service=" + serviceName
+                        + " : very short on disk: dataDirBytesAvail="
+                        + bytesFormat.format(dataDirBytesAvailable));
+
+            } else if (dataDirBytesAvailable < Bytes.gigabyte * 10) {
+
+                // higher utilization if the host is short on disk.
+                adjustedRawScore *= 2d;
+
+                log.warn("service=" + serviceName
+                        + " : is short on disk: dataDirBytesAvail="
+                        + bytesFormat.format(dataDirBytesAvailable));
+
+            }
+
+            /*
+             * tmpDir
+             */
+
+            if (tmpDirBytesAvailable < Bytes.gigabyte * 1) {
+
+                // much higher utilization if the host is very short on disk.
+                adjustedRawScore *= 10d;
+
+                log.warn("service=" + serviceName
+                        + " : very short on disk: tmpDirBytesAvail="
+                        + bytesFormat.format(tmpDirBytesAvailable));
+
+            } else if (tmpDirBytesAvailable < Bytes.gigabyte * 10) {
+
+                // higher utilization if the host is short on disk.
+                adjustedRawScore *= 2d;
+
+                log.warn("service=" + serviceName
+                        + " : is short on disk: tmpDirBytesAvail="
+                        + bytesFormat.format(tmpDirBytesAvailable));
+
+            }
+
             if (INFO) {
              
                 log.info("serviceName=" + serviceName//
                         + ", serviceUUID=" + serviceUUID //
                         + ", averageQueueLength=" + averageQueueLength//
-                        + ", averageQueueingTime=" + millisFormat.format(averageQueueingTime)
+                        + ", averageQueueingTime=" + millisFormat.format(averageQueueingTime)//
+                        + ", dataDirBytesAvail="+bytesFormat.format(dataDirBytesAvailable)//
+                        + ", tmpDirBytesAvail="+bytesFormat.format(tmpDirBytesAvailable)//
+                        + ", adjustedRawStore="+adjustedRawScore//
                         + ", rawScore(" + scoreFormat.format(rawScore) + ") "//
                         + "= (averageQueueingTime("+ averageQueueingTime+ ") + 1) "//
                         + "* (hostScore("+ scoreFormat.format(hostScore.score) + ") + 1)"//
@@ -1346,7 +1424,7 @@ abstract public class LoadBalancerService extends AbstractService
             }
 
             final ServiceScore score = new ServiceScore(hostScore.hostname,
-                    serviceUUID, serviceName, rawScore);
+                    serviceUUID, serviceName, adjustedRawScore);
             
             return score;
             

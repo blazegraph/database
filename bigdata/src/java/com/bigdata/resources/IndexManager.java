@@ -29,6 +29,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.resources;
 
 import java.io.File;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -49,8 +51,10 @@ import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.btree.ReadCommittedView;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.cache.ICacheEntry;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.concurrent.NamedLock;
+import com.bigdata.counters.Instrument;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
@@ -223,10 +227,35 @@ abstract public class IndexManager extends StoreManager {
         String INDEX_SEGMENT_CACHE_TIMEOUT = IndexManager.class.getName()
                 + ".indexCacheTimeout";
 
-        String DEFAULT_INDEX_SEGMENT_CACHE_TIMEOUT = ""+(60*1000); // One minute.
+        String DEFAULT_INDEX_SEGMENT_CACHE_TIMEOUT = "" + (60 * 1000); // One
+                                                                        // minute.
 
     }
-    
+
+    /**
+     * Performance counters for the {@link IndexManager}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static interface IIndexManagerCounters {
+
+        String StaleLocatorCacheCapacity = "Stale Locator Cache Capacity";
+
+        String StaleLocatorCacheSize = "Stale Locator Cache Size";
+
+        String StaleLocators = "Stale Locators";
+
+        String IndexCacheCapacity = "Index Cache Capacity";
+
+        String IndexCacheSize = "Index Cache Size";
+
+        String IndexSegmentCacheCapacity = "Index Segment Cache Capacity";
+
+        String IndexSegmentCacheSize = "Index Segment Cache Size";
+
+    }
+
     /**
      * Cache of added/retrieved btrees by name and timestamp.
      * <p>

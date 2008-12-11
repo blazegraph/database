@@ -76,7 +76,7 @@ import com.bigdata.resources.ResourceManager;
  *       journal. It may be that the right thing to do is to write the validated
  *       data onto the unisolated indices but not commit the journal and not
  *       permit other unisolated writes until the commit message arives, e.g.,
- *       block in the {@link AbstractJournal#writeService} waiting on the commit
+ *       block in the {@link WriteExecutorService} waiting on the commit
  *       message. A timeout would cause the buffered writes to be discarded (by
  *       an abort).
  * 

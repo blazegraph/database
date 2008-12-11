@@ -40,6 +40,7 @@ import java.util.concurrent.Callable;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileLockUtility;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.TemporaryRawStore;
@@ -80,6 +81,14 @@ import com.bigdata.rawstore.WormAddressManager;
  * abstracts this decision using a {@link TemporaryRawStore} for this purpose.
  * This space demand was not present in West's algorithm because it did not
  * attempt to place the leaves contiguously onto the store.
+ * 
+ * <p>
+ * 
+ * Note: The use of up to three {@link TemporaryRawStore}s per index segment
+ * build can raise the demand on the {@link DirectBufferPool}, for example if a
+ * number of concurrent index builds are occurring on a data service with a
+ * large #of index partitions. One choice is to limit the parallelism of the
+ * asynchronous overflow operation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -256,8 +265,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
     }
     
     /**
-     * The buffer used to hold leaves so that they can be evicted en mass onto
-     * a region of the {@link #outFile}.
+     * The buffer used to hold leaves so that they can be evicted en mass onto a
+     * region of the {@link #outFile}.
      */
     protected TemporaryRawStore leafBuffer;
     
@@ -269,7 +278,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
     
     /**
      * The optional buffer used to hold records referenced by index entries. In
-     * order to use this buffer the {@link IndexMetadata} MUST specify an  
+     * order to use this buffer the {@link IndexMetadata} MUST specify an
+     * {@link IOverflowHandler}.
      */
     protected TemporaryRawStore blobBuffer;
         

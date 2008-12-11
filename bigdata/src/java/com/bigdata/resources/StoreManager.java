@@ -75,7 +75,6 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.DiskOnlyStrategy;
-import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ILocalTransactionManager;
@@ -303,6 +302,124 @@ abstract public class StoreManager extends ResourceEvents implements
 
     }
 
+    /**
+     * Performance counters for the {@link StoreManager}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static interface IStoreManagerCounters {
+       
+        /**
+         * The configured data directory.
+         */
+        String DataDir = "DataDir";
+
+        /**
+         * The configured tmp directory.
+         */
+        String TmpDir = "TmpDir";
+
+        /**
+         * <code>true</code> iff {@link StoreManager#isOpen()}
+         */
+        String IsOpen = "isOpen";
+        
+        /**
+         * <code>true</code> iff {@link StoreManager#isStarting()}
+         */
+        String IsStarting = "isStarting";
+        
+        /**
+         * <code>true</code> iff {@link StoreManager#isRunning()}
+         */
+        String IsRunning = "isRunning";
+
+        String StoreCacheCapacity = "Store Cache Capacity";
+
+        String StoreCacheSize = "Store Cache Size";
+
+        /**
+         * #of journals currently under management.
+         */
+        String ManagedJournalCount = "Managed Journal Count";
+
+        /**
+         * #of index segments currently under management."
+         */
+        String ManagedSegmentStoreCount = "Managed Segment Store Count";
+
+        String JournalReopenCount = "Journal (Re-)open Count";
+
+        String SegmentStoreReopenCount = "Segment Store (Re-)open Count";
+
+        /**
+         * #of journals which have been deleted.
+         */
+        String JournalDeleteCount = "Journal Delete Count";
+
+        /**
+         * #of index segments which have been deleted.
+         */
+        String SegmentStoreDeleteCount = "Segment Store Delete Count";
+
+        /**
+         * The #of bytes currently under management by the {@link StoreManager}.
+         */
+        String BytesUnderManagement = "Bytes Under Management";
+
+        /**
+         * The #of bytes in resources that have been deleted by the
+         * {@link StoreManager} after they became release free.
+         */
+        String BytesDeleted = "Bytes Deleted";
+
+        /**
+         * The #of bytes available on the disk volume on which the data
+         * directory is located.
+         */
+        String DataDirBytesAvailable = "Data Volume Bytes Available";
+
+        /**
+         * The #of bytes available on the disk volume on which the temporary
+         * directory is located.
+         */
+        String TmpDirBytesAvailable = "Temp Volume Bytes Available";
+
+        /**
+         * The maximum extent of any journal managed by this service as of the
+         * time when it was closed out by synchronous overflow processing.
+         */
+        String MaximumJournalSizeAtOverflow = "Maximum Journal Size At Overflow";
+
+        /**
+         * The minimum age in milliseconds before a resource may be released.
+         * 
+         * @see StoreManager.Options#MIN_RELEASE_AGE
+         */
+        String MinimumReleaseAge = "Minimum Release Age";
+
+        /**
+         * The current release time for the {@link StoreManager}.
+         * 
+         * @see StoreManager#getReleaseTime()
+         */
+        String ReleaseTime = "Release Time";
+
+        /**
+         * The timestamp associated with the last synchronous overflow event.
+         */
+        String LastOverflowTime = "Last Overflow Time";
+
+        /**
+         * The more recent commit time preserved when resources were last purged
+         * from the {@link StoreManger}.
+         * 
+         * @see StoreManager#purgeResources
+         */
+        String LastCommitTimePreserved = "Last Commit Time Preserved";
+    }
+    
     /**
      * The directory in which the data files reside.
      * <p>
@@ -588,6 +705,12 @@ abstract public class StoreManager extends ResourceEvents implements
      */
     protected long lastOverflowTime = 0L;
 
+    /**
+     * The maximum size of a journal (its length in bytes) as measured at each
+     * synchronous overflow event.
+     */
+    protected long maximumJournalSizeAtOverflow = 0L;
+    
     /**
      * Resources MUST be at least this many milliseconds before they may be
      * deleted.
@@ -3650,7 +3773,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
                     assertRunning();
                     
-                    _truncateJournal();
+                    getLiveJournal().truncate();
                     
                 }
             
@@ -3670,31 +3793,6 @@ abstract public class StoreManager extends ResourceEvents implements
             return false;
 
         }
-
-    }
-
-    /**
-     * Truncate the backing buffer such that there is no remaining free space in
-     * the live journal.
-     * <p>
-     * Note: The caller MUST hold the exclusive lock on the
-     * {@link WriteExecutorService}.
-     */
-    private void _truncateJournal() {
-
-        final IBufferStrategy backingBuffer = getLiveJournal()
-                .getBufferStrategy();
-
-        final long oldExtent = backingBuffer.getExtent();
-
-        log.warn("Truncating the live journal: oldExtent=" + oldExtent);
-
-        final long newExtent = backingBuffer.getHeaderSize()
-                + backingBuffer.getNextOffset();
-
-        backingBuffer.truncate(newExtent);
-
-        log.warn("Truncated the live journal: newExtent=" + newExtent);
 
     }
 

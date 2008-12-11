@@ -346,10 +346,10 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility
      * immediately and will have a commit time of ZERO (0L).
      * <p>
      * Transactions with non-empty write sets are placed onto the
-     * {@link #writeService} and the caller will block until the transaction
-     * either commits or aborts. For this reason, this method MUST be invoked
-     * from within a worker thread for the transaction so that concurrent
-     * transactions may continue to execute.
+     * {@link WriteExecutorService} and the caller will block until the
+     * transaction either commits or aborts. For this reason, this method MUST
+     * be invoked from within a worker thread for the transaction so that
+     * concurrent transactions may continue to execute.
      * 
      * @param ts
      *            The transaction identifier (aka start time).
