@@ -979,7 +979,7 @@ public class DataLoader {
                 if (tm != null) {
                     
                     // delete the tempStore if truth maintenance is enabled.
-                    buffer.getStatementStore().closeAndDelete();
+                    buffer.getStatementStore().close();
                     
                 }
 

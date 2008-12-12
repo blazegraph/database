@@ -161,6 +161,7 @@ public class QueueStatisticsTask implements Runnable {
 
     private double averageCommitWaitingTime = 0d;
     private double averageCommitServiceTime = 0d;
+    private double averageCommitGroupSize = 0d;
     
     private long queueWaitingTime = 0L;
     private long lockWaitingTime = 0L;
@@ -174,7 +175,7 @@ public class QueueStatisticsTask implements Runnable {
      * Moving average in milliseconds of the time a task waits on a queue
      * pending execution.
      * 
-     * @see IQueueCounters#AverageTaskQueueWaitingTime
+     * @see IQueueCounters#AverageQueueWaitingTime
      */
     public final Instrument<Double> averageQueueWaitingTimeInst = new Instrument<Double>() {
         
@@ -277,6 +278,23 @@ public class QueueStatisticsTask implements Runnable {
         }
 
     };
+
+    /**
+     * Moving average of the size of commits (zero unless the service is
+     * unisolated).
+     * 
+     * @see IQueueCounters#AverageCommitGroupSize
+     */
+    public final Instrument<Double> averageCommitGroupSizeInst = new Instrument<Double>() {
+
+        @Override
+        protected void sample() {
+
+            setValue(averageCommitGroupSize);
+
+        }
+
+    };
     
     /**
      * Scaling factor converts nanoseconds to milliseconds.
@@ -354,11 +372,17 @@ public class QueueStatisticsTask implements Runnable {
     public QueueStatisticsTask(String name, ThreadPoolExecutor service,
             TaskCounters taskCounters, double w) {
     
-        assert name != null;
-        
-        assert service != null;
-        
-        assert w > 0d && w < 1d;
+        if (name == null)
+            throw new IllegalArgumentException();
+
+        if (service == null)
+            throw new IllegalArgumentException();
+
+        if (taskCounters == null)
+            throw new IllegalArgumentException();
+
+        if (w <= 0d || w >= 1d)
+            throw new IllegalArgumentException();
         
         this.name = name;
         
@@ -437,11 +461,11 @@ public class QueueStatisticsTask implements Runnable {
                  * so that they can obtain their lock(s) and "run".
                  */
                 
-                final int activeCount = ((WriteExecutorService) service)
-                        .getConcurrentTaskCount();
+                final int activeCountWithLocksHeld = ((WriteExecutorService) service)
+                        .getActiveTaskCountWithLocksHeld();
 
                 averageActiveCountWithLocksHeld = getMovingAverage(
-                        averageActiveCountWithLocksHeld, activeCount, w);
+                        averageActiveCountWithLocksHeld, activeCountWithLocksHeld, w);
 
             }
 
@@ -587,7 +611,11 @@ public class QueueStatisticsTask implements Runnable {
 
                     }
                     
-                }
+                    // moving average of the size of the commit groups. 
+                    averageCommitGroupSize = getMovingAverage(
+                            averageCommitGroupSize, tmp.getCommitGroupSize(), w);
+
+                } // end (if service instanceof WriteExecutorService )
 
             }
             
@@ -687,12 +715,14 @@ public class QueueStatisticsTask implements Runnable {
          * Computed variables based on the service itself.
          */
 
-        counterSet.addCounter(IQueueCounters.AverageQueueSize, averageQueueSizeInst);
+        counterSet.addCounter(IQueueCounters.AverageQueueSize,
+                averageQueueSizeInst);
 
         counterSet.addCounter(IQueueCounters.AverageActiveCount,
                 averageActiveCountInst);
 
-        counterSet.addCounter(IQueueCounters.AverageQueueLength, averageQueueLengthInst);
+        counterSet.addCounter(IQueueCounters.AverageQueueLength,
+                averageQueueLengthInst);
 
         /*
          * Computed variables based on the per-task counters.
@@ -735,7 +765,7 @@ public class QueueStatisticsTask implements Runnable {
              * Moving averages.
              */
             
-            counterSet.addCounter(IQueueCounters.AverageTaskQueueWaitingTime,
+            counterSet.addCounter(IQueueCounters.AverageQueueWaitingTime,
                     averageQueueWaitingTimeInst);
 
             counterSet.addCounter(IQueueCounters.AverageServiceTime,
@@ -792,6 +822,12 @@ public class QueueStatisticsTask implements Runnable {
                 }
             });
 
+            counterSet.addCounter(IQueueCounters.MaxCommitGroupSize, new Instrument<Long>() {
+                public void sample() {
+                    setValue((long)writeService.getMaxCommitGroupSize());
+                }
+            });
+
             counterSet.addCounter(IQueueCounters.MaxRunning, new Instrument<Long>() {
                 public void sample() {
                     setValue(writeService.getMaxRunning());
@@ -805,11 +841,14 @@ public class QueueStatisticsTask implements Runnable {
             counterSet.addCounter(IQueueCounters.AverageActiveCountWithLocksHeld,
                     averageActiveCountWithLocksHeldInst);
 
+            counterSet.addCounter(IQueueCounters.AverageCommitGroupSize,
+                    averageCommitGroupSizeInst);
+
             counterSet.addCounter(IQueueCounters.AverageLockWaitingTime,
                     averageLockWaitingTimeInst);
                 
             counterSet.addCounter(IQueueCounters.AverageCommitWaitingTime,
-                        averageCommitServiceTimeInst);
+                        averageCommitWaitingTimeInst);
                     
             counterSet.addCounter(IQueueCounters.AverageCommitServiceTime,
                         averageCommitServiceTimeInst);
@@ -889,7 +928,7 @@ public class QueueStatisticsTask implements Runnable {
          * Moving average in milliseconds of the time a task waits on a queue
          * pending execution.
          */
-        String AverageTaskQueueWaitingTime = "Average Queue Waiting Time";
+        String AverageQueueWaitingTime = "Average Queue Waiting Time";
 
         /**
          * Moving average in milliseconds of the time that a task is waiting for
@@ -961,6 +1000,18 @@ public class QueueStatisticsTask implements Runnable {
          */
         String MaxCommitServiceTime = "Max Commit Service Time";
 
+        /**
+         * Moving average of the #of tasks that participate in commit group.
+         * (The size of the most recent commit group is sampled and turned into
+         * a moving average.)
+         */
+        String AverageCommitGroupSize = "Average Commit Group Size"; 
+            
+        /**
+         * The maximum #of tasks in any commit group.
+         */
+        String MaxCommitGroupSize = "Max Commit Group Size";
+        
         /**
          * The maximum #of tasks that are concurrently executing without regard
          * to whether or not the tasks have acquired their locks.

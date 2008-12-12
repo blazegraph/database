@@ -27,15 +27,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.store;
 
+import java.nio.ByteBuffer;
 import java.util.Enumeration;
 import java.util.Properties;
 import java.util.UUID;
 
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
+import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.service.IBigdataFederation;
@@ -201,16 +205,24 @@ public class TempTripleStore extends AbstractLocalTripleStore {
      * Note: When <i>db</i> is non-<code>null</code>, the relations on the
      * {@link TempTripleStore} will be locatable by the specified <i>db</i>.
      * 
-     * @todo multiple KBs in a TempTripleStore could make sense for things like
-     *       closure. Closure has to create a lot of temp stores - those could
-     *       be in the same backing file.
-     * 
      * @param properties
      *            Overrides for the database's properties.
      * @param db
      *            The optional database (a) will establish the defaults for the
      *            {@link TempTripleStore}; and (b) will be able to locate
      *            relations declared on the backing {@link TemporaryStore}.
+     * 
+     * @deprecated Use
+     *             {@link #TempTripleStore(TemporaryStore, Properties, AbstractTripleStore)}
+     *             instead and provide the {@link TemporaryStore} reference
+     *             returned by {@link IIndexStore#getTempStore()}. This has the
+     *             advantage of reusing a single shared {@link TemporaryStore}
+     *             instance until it becomes "large" and then allocating a new
+     *             instance (note that each instance will consume a direct
+     *             {@link ByteBuffer} from the {@link DirectBufferPool}). This
+     *             is especially important for operations like
+     *             {@link TruthMaintenance} which have to create a lot of
+     *             temporary stores.
      */
     public TempTripleStore(Properties properties, AbstractTripleStore db) {
         
@@ -232,14 +244,16 @@ public class TempTripleStore extends AbstractLocalTripleStore {
      *            {@link TempTripleStore}; and (b) will be able to locate
      *            relations declared on the backing {@link TemporaryStore}.
      */
-    public TempTripleStore(TemporaryStore store, Properties properties, AbstractTripleStore db) {
-        
+    public TempTripleStore(final TemporaryStore store,
+            final Properties properties, final AbstractTripleStore db) {
+
         this(store, db == null ? properties : stackProperties(properties, db));
-        
-        if(log.isInfoEnabled()) {
-            
-            log.info("new temporary store: "+store.getFile()+", namespace="+getNamespace());
-            
+
+        if (INFO) {
+
+            log.info("new temporary store: " + store.getFile() + ", namespace="
+                    + getNamespace());
+
         }
 
         if (db != null) {

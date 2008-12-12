@@ -3055,9 +3055,12 @@ abstract public class AbstractTripleStore extends
         properties.setProperty(Options.ONE_ACCESS_PATH, "true");
 
         // no axioms.
-        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        properties.setProperty(
+                com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
+                NoAxioms.class.getName());
 
-        final TempTripleStore tmp = new TempTripleStore(properties,this);
+        final TempTripleStore tmp = new TempTripleStore(getIndexManager()
+                .getTempStore(), properties, this);
         
         /*
          * buffer everything in a temp triple store.
@@ -3082,7 +3085,7 @@ abstract public class AbstractTripleStore extends
                 
                 super.close();
                 
-                tmp.closeAndDelete();
+                tmp.close();
                 
             }
             
@@ -3092,7 +3095,7 @@ abstract public class AbstractTripleStore extends
                 
                 if(tmp.isOpen()) {
 
-                    tmp.closeAndDelete();
+                    tmp.close();
                     
                 }
                 

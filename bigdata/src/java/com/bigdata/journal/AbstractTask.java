@@ -45,7 +45,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
@@ -1856,37 +1855,27 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          */
         public Object call() throws Exception {
 
+            // The write service on which this task is running.
+            final WriteExecutorService writeService = delegate.concurrencyManager
+                    .getWriteService();
+
             // setup view of the declared resources.
             delegate.setupIndices();
             
             delegate.nanoTime_beginWork = System.nanoTime();
 
+            writeService.activeTaskCountWithLocksHeld.incrementAndGet();
+
             try {
-
-                if (INFO)
-                    log.info("Running with resource lock(s): " + this);
-
-                // The write service on which this task is running.
-                final WriteExecutorService writeService = delegate.concurrencyManager
-                        .getWriteService();
-
-                writeService.concurrentTaskCount.incrementAndGet();
 
                 // invoke doTask() on AbstractTask with locks.
                 final Object ret = delegate.doTask();
 
-                /*
-                 * checkpoint while holding locks.
-                 */
+                // checkpoint while holding locks.
                 delegate.checkpointTask();
 
-                writeService.concurrentTaskCount.decrementAndGet();
-
-                if (INFO)
-                    log.info("Did run with resource lock(s): " + this);
-
                 return ret;
-                
+
             } finally {
                 
                 /*
@@ -1898,7 +1887,9 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                  */
                 
                 delegate.nanoTime_finishedWork = System.nanoTime();
-
+                
+                writeService.activeTaskCountWithLocksHeld.decrementAndGet();
+                
             }
             
         }

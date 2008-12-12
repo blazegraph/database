@@ -2258,12 +2258,6 @@ Benchmarks
     * Fix TruthMaintenance#applyExistingStatements() - should use bulk
       filter not point tests!
 
-    * Closure for StatementIdentifers should reuse the same
-      TemporaryStore and close() vs closeAndDelete().
-
-    * TruthMaintenance should reuse the same TemporaryStore (at least
-      for a given closure) and close() vs closeAndDelete().
-
 ============================================================ 
 
     - A run with TERM2ID on NAS is taking a MAJOR IOWAIT penalty - up
@@ -2958,6 +2952,20 @@ Commit notes:
   - Generate timelines of events correlated to interesting counters,
     such as % IO Wait and % Processor Time.
 
+  - Tools
+
+    http://www.readwriteweb.com/archives/the_best_tools_for_visualization.php
+
+    http://www.ibm.com/developerworks/linux/library/l-datavistools/
+
+    treemaps: http://www.cs.umd.edu/hcil/treemap-history/,
+    http://treemap.sourceforge.net/ (MIT),
+    http://code.google.com/p/flex2treemap/ (MIT), 
+
+    flash: http://osflash.org/, http://osflash.org/open_source_flash_projects
+
+    hypertree: http://hypertree.sourceforge.net/
+
 - Global resource locks and barriers using zookeeper.
 
   - Creating a triple store.
@@ -2989,6 +2997,33 @@ Commit notes:
   * Is aynchronous overflow causing contention across services or
     causing the application to wait such that we wind up with only one
     data service progressing at a time?
+
+    - Consider a "tail split" for indices which are entirely (or
+      mostly) experiencing appends.  For example, the SPO and OSP (but
+      not the POS) indices have this behavior.  A "tail split" would
+      either just re-define the view to include a new index partition
+      accepting all keys beyond the last key in the source index
+      partition (this would have to issue new index partition
+      identifiers for both the source and the new index partition) or
+      split the data with a split that keeps most of the tuples in the
+      source index partition (which still gets assigned a new
+      partition identifier).  The purpose is (a) a faster split; and
+      (b) if we are in a tail append mode, then the source index
+      partition will receive few to no writes and the new rightSibling
+      will receive most to all writes, so it can be empty to start
+      with.
+
+    - Close out views that are known to be stale when the releaseAge
+      is advanced.  This could explicitly locate and close any open
+      indices for timestamps which are no longer accessible.
+
+      Alternatively we could just clear references on the hard
+      reference queues for the live index, historical index, index
+      view, index segment, and locator caches.      
+
+      Also use a scheduled task to clear stale references for those
+      caches so that we can close out things which are not being
+      accessed.
 
     * Try limited parallelism during asynchronous overflow.
 
@@ -3208,6 +3243,8 @@ commitPointToPreserve=1228508365953
 
     - Add a thread to periodically touch flush stale entries from
       these caches even when they are not being used?
+
+
 
 ------------------------------------------------------------
 Commit log
