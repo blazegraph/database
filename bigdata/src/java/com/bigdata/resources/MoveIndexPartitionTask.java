@@ -238,6 +238,8 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
         if (resourceManager.isOverflowAllowed())
             throw new IllegalStateException();
 
+        final long beginMove = System.currentTimeMillis();
+        
         // view of the source index partition.
         final ILocalBTreeView src = (ILocalBTreeView)getIndex(getOnlyResource());
         
@@ -379,8 +381,10 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
          * update task completes.
          */
 
+        final long beginAtomicUpdate = System.currentTimeMillis();
+        
         try {
-
+            
             concurrencyManager.submit(task).get();
             
         } catch (Throwable t) {
@@ -470,6 +474,19 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
             // the move failed - rethrow the exception.
             throw new RuntimeException( t );
             
+        } finally {
+            
+            final long now = System.currentTimeMillis();
+            
+            final long prepareMillis = now - beginMove;
+
+            final long atomicUpdateMillis = now - beginAtomicUpdate;
+         
+            // log time for move regardless of the outcome.
+            log.warn("Move: prepare=" + prepareMillis + "ms, atomicUpdate="
+                    + atomicUpdateMillis + "ms, source=" + sourceIndexName
+                    + ", target=" + targetIndexName);
+
         }
         
         if (INFO)
