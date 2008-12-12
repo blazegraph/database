@@ -278,7 +278,7 @@ public class DistributedJoinMasterTask extends JoinMasterTask implements
     /**
      * Map the given {@link IBindingSet} over the {@link JoinTask}(s) for
      * the index partition(s) the span the {@link IAccessPath} for that
-     * {@link IBindingSet}.
+     * {@link IBindingSet} in parallel.
      * 
      * @param bindingSet
      *            The binding set.
@@ -333,8 +333,8 @@ public class DistributedJoinMasterTask extends JoinMasterTask implements
 
             final int partitionId = locator.getPartitionId();
 
-            if (JoinMasterTask.DEBUG)
-                JoinMasterTask.log.debug("Will submit JoinTask: partitionId="
+            if (DEBUG)
+                log.debug("Will submit JoinTask: partitionId="
                         + partitionId);
 
             /*
@@ -354,8 +354,7 @@ public class DistributedJoinMasterTask extends JoinMasterTask implements
             /*
              * Submit the JoinTask. It will begin to execute when it is
              * scheduled by the ConcurrencyManager. When it executes it will
-             * consume the [initialBindingSet]. We wait on its future to
-             * complete below.
+             * consume the [initialBindingSet].
              */
             final Future f;
 

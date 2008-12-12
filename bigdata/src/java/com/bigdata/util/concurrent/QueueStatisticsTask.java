@@ -378,8 +378,9 @@ public class QueueStatisticsTask implements Runnable {
         if (service == null)
             throw new IllegalArgumentException();
 
-        if (taskCounters == null)
-            throw new IllegalArgumentException();
+        // Note: MAY be null (useful for generic executor services).
+//        if (taskCounters == null)
+//            throw new IllegalArgumentException();
 
         if (w <= 0d || w >= 1d)
             throw new IllegalArgumentException();
