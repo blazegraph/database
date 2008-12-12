@@ -1030,8 +1030,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
         if (!highlyUtilizedService || nactive <= minActiveIndexPartitions) {
 
-//            if(INFO)
-            log.warn("Preconditions for move not satisified: highlyUtilized="
+            if(INFO)
+            log.info("Preconditions for move not satisified: highlyUtilized="
                     + highlyUtilizedService + ", nactive=" + nactive
                     + ", minActive=" + minActiveIndexPartitions);
             
@@ -1087,7 +1087,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         if (underUtilizedDataServiceUUIDs == null
                 || underUtilizedDataServiceUUIDs.length == 0) {
 
-            log.warn("Load balancer does not report any underutilized services.");
+            if (INFO)
+                log.info("Load balancer does not report any underutilized services.");
 
             return EMPTY_LIST;
             
@@ -1131,14 +1132,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
          * not slowly, then at least not as rapidly as the hot index partitions.
          * Eventually a lot of splits will lead to some index partition not
          * being split during an overflow and then we can move it.
-         * 
-         * @todo could adjust the bounds here based on how important it is to
-         * begin moving index partitions off of this data service.
          */
 
-//        if(INFO)
-//            log.info
-            log.warn("Considering index partition moves: #targetServices="
+        if(INFO)
+            log.info("Considering index partition moves: #targetServices="
                 + underUtilizedDataServiceUUIDs.length + ", maxMovesPerTarget="
                 + maxMovesPerTarget + ", nactive=" + nactive + ", maxMoves="
                 + maxMoves + ", sourceService="+sourceServiceUUID+", targetServices="
@@ -1213,8 +1210,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                      * move.
                      */
                     
-                    log
-                            .warn("Skipping index: name=" + name
+                    if (INFO)
+                        log.info("Skipping index: name=" + name
                                     + ", reason=moveInProgress");
                  
                     continue;
@@ -1223,10 +1220,13 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 
             }
             
-//            if (INFO)
-//                log.info
-                log.warn("Considering move candidate: " + score);
+            if (INFO)
+                log.info("Considering move candidate: " + score);
             
+            /*
+             * @todo could adjust the bounds here based on how important it
+             * is to begin moving index partitions off of this data service.
+             */
             if (score.drank > .3 && score.drank < .8) {
 
                 /*

@@ -641,8 +641,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                     IntegerValidator.GT_ZERO);
 
             historicalIndexCacheTimeout = getProperty(
-                    Options.HISTORICAL_INDEX_CACHE_CAPACITY,
-                    Options.DEFAULT_HISTORICAL_INDEX_CACHE_CAPACITY,
+                    Options.HISTORICAL_INDEX_CACHE_TIMEOUT,
+                    Options.DEFAULT_HISTORICAL_INDEX_CACHE_TIMEOUT,
                     LongValidator.GTE_ZERO);
 
 //            historicalIndexCache = new WeakValueCache<Long, ICommitter>(

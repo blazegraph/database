@@ -261,11 +261,23 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter,
      */
     protected AtomicLong counter;
   
-    /**
-     * The last address from which the {@link IndexMetadata} record was read or
-     * on which it was written.
-     */
+//    /**
+//     * The last address from which the {@link IndexMetadata} record was read or
+//     * on which it was written.
+//     */
 //    private long lastMetadataAddr;
+
+    final protected int getReadRetentionQueueCapacity() {
+        
+        return metadata.getBTreeReadRetentionQueueCapacity();
+        
+    }
+    
+    final protected int getReadRetentionQueueScan() {
+        
+        return metadata.getBTreeReadRetentionQueueScan();
+        
+    }
     
     /**
      * Load a {@link BTree} from the store using a {@link Checkpoint} record.

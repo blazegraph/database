@@ -41,7 +41,6 @@ import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.compression.PrefixSerializer;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
-import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.config.Configuration;
 import com.bigdata.config.IValidator;
 import com.bigdata.config.IntegerRangeValidator;
@@ -330,35 +329,33 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                 + ".initialDataService";
 
         /**
-         * The capacity of the hard reference queue used to defer the eviction
-         * of dirty nodes (nodes or leaves).
+         * The capacity of the hard reference queue used to retain recently
+         * touched nodes (nodes or leaves) and to defer the eviction of dirty
+         * nodes (nodes or leaves).
          * <p>
-         * The purpose of this queue is to defer eviction of dirty nodes and
-         * leaves. Once a node falls off the write retention queue it is checked
-         * to see if it is dirty. If it is dirty, then it is serialized and
-         * persisted on the backing store. If the write retention queue capacity
-         * is set to a large value (say, GTE 1000), then that will will increase
-         * the commit latency and have a negative effect on the overall
-         * performance. Too small a value will mean that nodes that are
-         * undergoing mutation will be serialized and persisted prematurely
-         * leading to excessive writes on the backing store. For append-only
-         * stores, this directly contributes to what are effectively redundent
-         * and thereafter unreachable copies of the intermediate state of nodes
-         * as only nodes that can be reached by navigation from a
-         * {@link Checkpoint} will ever be read again. The value
-         * <code>500</code> appears to be a good default. While it is possible
-         * that some workloads could benefit from a larger value, this leads to
-         * higher commit latency and can therefore have a broad impact on
-         * performance.
-         * 
-         * @todo For historical reasons, the write rentention queue is used for
-         *       both {@link BTree} and {@link IndexSegment}. However, the code
-         *       should be modified such that the write retention queue is ONLY
-         *       use for mutable {@link BTree}s and the read-rentention queue
-         *       should be either provisioned dynamically or separately for
-         *       {@link IndexSegment}s and {@link BTree}s. (The
-         *       read-rentention queue would be used for both read-only and
-         *       mutable {@link BTree}s.)
+         * The purpose of this queue is to retain recently touched nodes and
+         * leaves and to defer eviction of dirty nodes and leaves in case they
+         * will be modified again soon. Once a node falls off the write
+         * retention queue it is checked to see if it is dirty. If it is dirty,
+         * then it is serialized and persisted on the backing store. If the
+         * write retention queue capacity is set to a large value (say, GTE
+         * 1000), then that will will increase the commit latency and have a
+         * negative effect on the overall performance. Too small a value will
+         * mean that nodes that are undergoing mutation will be serialized and
+         * persisted prematurely leading to excessive writes on the backing
+         * store. For append-only stores, this directly contributes to what are
+         * effectively redundent and thereafter unreachable copies of the
+         * intermediate state of nodes as only nodes that can be reached by
+         * navigation from a {@link Checkpoint} will ever be read again. The
+         * value <code>500</code> appears to be a good default. While it is
+         * possible that some workloads could benefit from a larger value, this
+         * leads to higher commit latency and can therefore have a broad impact
+         * on performance.
+         * <p>
+         * Note: The write rentention queue is used for both {@link BTree} and
+         * {@link IndexSegment}. Any touched node or leaf is placed onto this
+         * queue. As nodes and leaves are evicted from this queue, they are then
+         * placed onto the optional read-retention queue.
          */
         String WRITE_RETENTION_QUEUE_CAPACITY = com.bigdata.btree.AbstractBTree.class
                 .getPackage().getName()
@@ -377,73 +374,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                 .getPackage().getName()
                 + ".writeRetentionQueue.scan";
 
-        /**
-         * The capacity of the hard reference queue used to retain recently used
-         * nodes (or leaves). When zero (0), this queue is disabled.
-         * <p>
-         * The read retention queue complements the write retention queue. The
-         * latter has a strong buffering effect, but we can not increase the
-         * size of the write retention queue without bound as that will increase
-         * the commit latency. However, the read retention queue can be quite
-         * large and will "simply" buffer "recently" used nodes and leaves in
-         * memory. This can have a huge effect, especially when a complex
-         * high-level query would otherwise thrash the disk as nodes that are
-         * required for query processing fall off of the write retention queue
-         * and get garbage collected. The pragmatic upper bound for this
-         * probably depends on the index workload. At some point, you will stop
-         * seeing an increase in performance as a function of the read retention
-         * queue for a given workload. The larger the read retention queue, the
-         * more burden the index can impose on the heap. However, copy-on-write
-         * explicitly clears all references in a node so the JVM can collect the
-         * data for nodes that are no longer part of the index before they fall
-         * off of the queue even if it can not collect the node reference
-         * itself.
-         * 
-         * @todo The size of the read rentention queue should be set dynamically
-         *       as a function of the depth of the BTree (or the #of nodes and
-         *       leaves), the branching factor, and the RAM available to the
-         *       HOST (w/o swapping) and to the JVM. For a mutable {@link BTree}
-         *       the depth changes only slowly, but the other factors are always
-         *       changing. Regardless, changing the read-retention queue size is
-         *       never a problem as cleared references will never cause a
-         *       strongly reachable node to be released.
-         *       <p>
-         *       To avoid needless effort, there should be a minimum queue
-         *       capacity that is used up to depth=2/3. If the queue capacity is
-         *       set to n=~5-10% of the maximum possible #of nodes in a btree of
-         *       a given depth, then we can compute the capacity dynamically
-         *       based on that parameter. And of course it can be easily
-         *       provisioned when the BTree is {@link #reopen()}ed.
-         */
-        String READ_RETENTION_QUEUE_CAPACITY = com.bigdata.btree.AbstractBTree.class
-                .getPackage().getName()
-                + ".readRetentionQueue.capacity";
-
-        /**
-         * The #of entries on the hard reference queue that will be scanned for a
-         * match before a new reference is appended to the queue. This trades off
-         * the cost of scanning entries on the queue, which is handled by the queue
-         * itself, against the cost of queue churn.
-         */
-        String READ_RETENTION_QUEUE_SCAN = com.bigdata.btree.AbstractBTree.class
-                .getPackage().getName()
-                + ".readRetentionQueue.scan"; 
-
         String DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY = "500";
 
         String DEFAULT_WRITE_RETENTION_QUEUE_SCAN = "20";
-
-        /**
-         * @todo very different defaults make sense for scale-up vs scale-out
-         *       unless the actual capacity is determined dynamically.
-         *       <p>
-         *       It might make sense to give an "importance" factor to each
-         *       index so that performance critical indices can buffer more data
-         *       even when the host has less RAM available.
-         */
-        String DEFAULT_READ_RETENTION_QUEUE_CAPACITY = "10000";
-
-        String DEFAULT_READ_RETENTION_QUEUE_SCAN = "20";
 
         /*
          * Options that are valid for any AbstractBTree but which are not
@@ -492,6 +425,70 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          */
         String DEFAULT_BTREE_BRANCHING_FACTOR = "32"; //"256"
 
+        /**
+         * The capacity of the hard reference queue used to retain recently used
+         * nodes (or leaves) (default
+         * {@value #DEFAULT_BTREE_READ_RETENTION_QUEUE_CAPACITY}). When zero
+         * (0), this queue is disabled.
+         * <p>
+         * The read retention queue complements the write retention queue. The
+         * latter has a strong buffering effect, but we can not increase the
+         * size of the write retention queue without bound as that will increase
+         * the commit latency. However, the read retention queue can be quite
+         * large and will "simply" buffer "recently" used nodes and leaves in
+         * memory. This can have a huge effect, especially when a complex
+         * high-level query would otherwise thrash the disk as nodes that are
+         * required for query processing fall off of the write retention queue
+         * and get garbage collected. The pragmatic upper bound for this
+         * probably depends on the index workload. At some point, you will stop
+         * seeing an increase in performance as a function of the read retention
+         * queue for a given workload. The larger the read retention queue, the
+         * more burden the index can impose on the heap. However, copy-on-write
+         * explicitly clears all references in a node so the JVM can collect the
+         * data for nodes that are no longer part of the index before they fall
+         * off of the queue even if it can not collect the node reference
+         * itself.
+         * <p>
+         * A large values works well for scale-up but you <i>might</i> need to
+         * reduce the read retention queue capacity since if you expect to have
+         * a large #of smaller indices open, e.g., for scale-out scenarios. Zero
+         * will disable the read-retention queue. This queue ONLY applies to
+         * {@link BTree}s (vs {@link IndexSegment}s).
+         * 
+         * @todo The size of the read rentention queue should be set dynamically
+         *       as a function of the depth of the BTree (or the #of nodes and
+         *       leaves), the branching factor, and the RAM available to the
+         *       HOST (w/o swapping) and to the JVM. For a mutable {@link BTree}
+         *       the depth changes only slowly, but the other factors are always
+         *       changing. Regardless, changing the read-retention queue size is
+         *       never a problem as cleared references will never cause a
+         *       strongly reachable node to be released.
+         *       <p>
+         *       To avoid needless effort, there should be a minimum queue
+         *       capacity that is used up to depth=2/3. If the queue capacity is
+         *       set to n=~5-10% of the maximum possible #of nodes in a btree of
+         *       a given depth, then we can compute the capacity dynamically
+         *       based on that parameter. And of course it can be easily
+         *       provisioned when the BTree is {@link #reopen()}ed.
+         */
+        String BTREE_READ_RETENTION_QUEUE_CAPACITY = com.bigdata.btree.BTree.class
+                .getPackage().getName()
+                + ".readRetentionQueue.capacity";
+
+        String DEFAULT_BTREE_READ_RETENTION_QUEUE_CAPACITY = "10000";
+
+        /**
+         * The #of entries on the hard reference queue that will be scanned for
+         * a match before a new reference is appended to the queue. This trades
+         * off the cost of scanning entries on the queue, which is handled by
+         * the queue itself, against the cost of queue churn.
+         */
+        String BTREE_READ_RETENTION_QUEUE_SCAN = com.bigdata.btree.BTree.class
+                .getPackage().getName()
+                + ".readRetentionQueue.scan";
+
+        String DEFAULT_BTREE_READ_RETENTION_QUEUE_SCAN = "20";
+
         /*
          * Options that are specific to IndexSegment.
          * 
@@ -538,7 +535,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                 + ".bufferNodes";
         
         /**
-         * @see #BUFFER_NODES
+         * @see #INDEX_SEGMENT_BUFFER_NODES
          */
         String DEFAULT_INDEX_SEGMENT_BUFFER_NODES = "false";
      
@@ -555,21 +552,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * A larger value will tend to retain leaves longer at the expense of
          * consuming more RAM when many parts of the {@link IndexSegment} are
          * hot.
-         * 
-         * @todo The {@link #READ_RETENTION_QUEUE_CAPACITY} for index segments
-         *       should probably be much smaller than for a mutable btree for
-         *       several reasons. First, the {@link IndexSegment}'s iterators
-         *       DO NOT use navigation of the nodes from the root for prior/next
-         *       operations. Second, it is possible to fully buffer the nodes
-         *       region for an {@link IndexSegment}. Third, the branching
-         *       factor for an {@link IndexSegment} is normally larger and the
-         *       effect of the read-retention queue capacity and the leaf cache
-         *       size are related to the branching factor.
-         * 
-         * @todo Use a timeout and a {@link ConcurrentWeakValueCache} for this
-         *       cache?
-         * 
-         * @todo allow zero (0) to disable the cache?
          */
         String INDEX_SEGMENT_LEAF_CACHE_CAPACITY = IndexSegment.class.getName()
                 + ".leafCacheCapacity";
@@ -684,8 +666,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     private int branchingFactor;
     private int writeRetentionQueueCapacity;
     private int writeRetentionQueueScan;
-    private int readRetentionQueueCapacity;
-    private int readRetentionQueueScan;
+    private int btreeReadRetentionQueueCapacity;
+    private int btreeReadRetentionQueueScan;
     private LocalPartitionMetadata pmd;
     private String btreeClassName;
     private String checkpointClassName;
@@ -856,32 +838,32 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     }
 
     /**
-     * @see Options#READ_RETENTION_QUEUE_CAPACITY
+     * @see Options#BTREE_READ_RETENTION_QUEUE_CAPACITY
      */
-    public final int getReadRetentionQueueCapacity() {
+    public final int getBTreeReadRetentionQueueCapacity() {
         
-        return readRetentionQueueCapacity;
+        return btreeReadRetentionQueueCapacity;
         
     }
     
-    public final void setReadRetentionQueueCapacity(int v) {
+    public final void setBTreeReadRetentionQueueCapacity(int v) {
         
-        this.readRetentionQueueCapacity = v;
+        this.btreeReadRetentionQueueCapacity = v;
         
     }
 
     /**
-     * @see Options#READ_RETENTION_QUEUE_SCAN
+     * @see Options#BTREE_READ_RETENTION_QUEUE_SCAN
      */
-    public final int getReadRetentionQueueScan() {
+    public final int getBTreeReadRetentionQueueScan() {
         
-        return readRetentionQueueScan;
+        return btreeReadRetentionQueueScan;
         
     }
     
-    public final void setReadRetentionQueueScan(int v) {
+    public final void setBTreeReadRetentionQueueScan(int v) {
         
-        this.readRetentionQueueScan = v;
+        this.btreeReadRetentionQueueScan = v;
         
     }
 
@@ -1368,14 +1350,14 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                 Options.DEFAULT_WRITE_RETENTION_QUEUE_SCAN,
                 IntegerValidator.GTE_ZERO);
 
-        this.readRetentionQueueCapacity = getProperty(indexManager,
-                properties, namespace, Options.READ_RETENTION_QUEUE_CAPACITY,
-                Options.DEFAULT_READ_RETENTION_QUEUE_CAPACITY,
+        this.btreeReadRetentionQueueCapacity = getProperty(indexManager,
+                properties, namespace, Options.BTREE_READ_RETENTION_QUEUE_CAPACITY,
+                Options.DEFAULT_BTREE_READ_RETENTION_QUEUE_CAPACITY,
                 IntegerValidator.GTE_ZERO);
 
-        this.readRetentionQueueScan = getProperty(indexManager,
-                properties, namespace, Options.READ_RETENTION_QUEUE_SCAN,
-                Options.DEFAULT_READ_RETENTION_QUEUE_SCAN,
+        this.btreeReadRetentionQueueScan = getProperty(indexManager,
+                properties, namespace, Options.BTREE_READ_RETENTION_QUEUE_SCAN,
+                Options.DEFAULT_BTREE_READ_RETENTION_QUEUE_SCAN,
                 IntegerValidator.GTE_ZERO);
 
         this.indexSegmentBranchingFactor = getProperty(indexManager,
@@ -1614,9 +1596,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
         writeRetentionQueueScan = (int)LongPacker.unpackLong(in);
         
-        readRetentionQueueCapacity = (int)LongPacker.unpackLong(in);
+        btreeReadRetentionQueueCapacity = (int)LongPacker.unpackLong(in);
         
-        readRetentionQueueScan = (int)LongPacker.unpackLong(in);
+        btreeReadRetentionQueueScan = (int)LongPacker.unpackLong(in);
 
         pmd = (LocalPartitionMetadata)in.readObject();
         
@@ -1678,9 +1660,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         LongPacker.packLong(out, writeRetentionQueueScan);
         
-        LongPacker.packLong(out, readRetentionQueueCapacity);
+        LongPacker.packLong(out, btreeReadRetentionQueueCapacity);
        
-        LongPacker.packLong(out, readRetentionQueueScan);
+        LongPacker.packLong(out, btreeReadRetentionQueueScan);
 
         out.writeObject(pmd);
         

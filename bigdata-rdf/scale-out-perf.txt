@@ -2990,8 +2990,7 @@ Commit notes:
     causing the application to wait such that we wind up with only one
     data service progressing at a time?
 
-    - What effect does limited parallelism during asynchronous
-      overflow have?
+    * Try limited parallelism during asynchronous overflow.
 
       Make sure that atomic update tasks notice when the priamry task
       is cancelled (liveness).
@@ -3015,20 +3014,15 @@ Commit notes:
       a cap on the thread pool size - play around with that when there
       are a large #of splits on hand.
 
+    - Saw a java.rmi.NoSuchObjectInTable during closure on U1000.
+      I've modified the code to log the original stack trace so that I
+      can see where this is coming from.  It might be related to an
+      OOM since memory is tight.  Or it may be a failure to enable DGC
+      for something (but I would think that I would notice that
+      sooner).
+
   * CDL may loose some data during load.  Compare CDL for U100 with
     single threaded load of U100 (#clients=1).
-
-  * Review [U100countersfinal.xml] for interesting things.
-
-    Review U1500 run.  Throughput of ~10k tps as reported by CDL seems
-    low.  Compare with peformance counters.  Is CDL reporting
-    correctly?  Also, this is before the LBS bug fix for minCount==0
-    and excluded != null so re-run.
-
-  - Try running with DS4 on local disk vs NAS and see how that effects
-    IO wait for that machine.  I will need to monitor the disk space
-    remaining in order to move indices off of that service as it fills
-    up the local disk.
 
   - *** Compacting merges tend to trigger
     FileChannelUtility#transferAll().  This is a known Sun bug, but we
@@ -3142,15 +3136,6 @@ commitPointToPreserve=1228508365953
     query correctness.  U100 and U1500 should be run on a host in the
     cluster to provide a good basis for performance comparisons.
 
-  * Verify overflow w/ MOVE enabled fixes the TERM2ID hotspot.
-
-    Note: Splitting the TERM2ID index is not enough to get rid of the
-    hotspot on that index.  While greater concurrency would be allowed
-    for writers, and while the hotspot was for writers, the bottleneck
-    was in fact IOWAIT and splitting the TERM2ID index will not reduce
-    the IOWAIT bottleneck until we MOVE some of the term2id index
-    partitions onto a different machine.
-
   * It appears that new writes always for the RDF load always go into
     the most recently created index partition, which then gets split.
     I have seen this for at least the OSP and SPO index on U50.  The
@@ -3221,15 +3206,8 @@ commitPointToPreserve=1228508365953
 
     - Try different branching factors for the index segments.
 
-    - Close out old indices.  This has been deferred for the Journal,
-      Name2Addr, and the resource locator until I can get some more
-      feedback on how well the change is performing in the
-      IndexManager.  This just seems safer for now, but there is a
-      risk that indices will not actually be closed if they are open
-      in the historical index cache or the live index cache.
-      Likewise, release of old relation views is also important.
-
-      defer. DefaultResourceLocator's cache.
-      
-      Add a thread to periodically touch flush stale entries from
+    - Add a thread to periodically touch flush stale entries from
       these caches even when they are not being used?
+
+------------------------------------------------------------
+Commit log

@@ -91,7 +91,7 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
 
             metadata.setWriteRetentionQueueScan(10);
 
-            metadata.setReadRetentionQueueCapacity(0);
+            metadata.setBTreeReadRetentionQueueCapacity(0);
             
             metadata.write(store);
             

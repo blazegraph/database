@@ -108,7 +108,7 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
      *            length of a record. The value is passed through to
      *            {@link WormAddressManager#WormAddressManager(int)}.
      */
-    public TemporaryStore(int offsetBits) {
+    public TemporaryStore(final int offsetBits) {
 
         super(0L/* maximumExtent */, offsetBits, getTempFile());
 
