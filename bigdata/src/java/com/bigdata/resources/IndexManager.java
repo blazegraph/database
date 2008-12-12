@@ -29,8 +29,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.resources;
 
 import java.io.File;
-import java.util.Iterator;
-import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -51,10 +49,8 @@ import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.btree.ReadCommittedView;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.cache.ICacheEntry;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.concurrent.NamedLock;
-import com.bigdata.counters.Instrument;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
@@ -70,14 +66,11 @@ import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
-import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IClientIndex;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.MetadataService;
 import com.bigdata.util.NT;
 
 /**
@@ -85,32 +78,6 @@ import com.bigdata.util.NT;
  * their backing stores) are recently and currently referenced. This information
  * is used to coordinate the close out of index resources (and their backing
  * stores) on an LRU basis by the {@link ResourceManager}.
- * 
- * @todo Scale-out index import and index recovery
- *       <p>
- *       Note that key range partitioned indices are simply registered under a
- *       name that reflects both the scale-out index name and the index
- *       partition#. The metadata index provides the integrating structure for
- *       those individual index partitions. A {@link ClientIndexView} uses the
- *       {@link MetadataIndex} to provide transparent access to the scale-out
- *       index.
- *       <p>
- *       It should be possible to explicitly convert an index that supports
- *       delete markers into a scale-out index. The right model might be to
- *       "import" the index into an existing federation since there needs to be
- *       an explicit {@link MetadataService} on hand. There will only be a
- *       single partition of the index initially, but that can be broken down
- *       either because it is too large or because it becomes too large. The
- *       import can be realized by moving all of the data off of the journal
- *       onto one or more {@link IndexSegment}s, moving those index segment
- *       files into a selected data service, and then doing an "index recovery"
- *       operation that hooks up the index segment(s) into an index and
- *       registers the metadata index for that index. (Note that we can't make
- *       an index into a key-range partitioned index unless there is a metadata
- *       index lying around somewhere.)
- *       <p>
- *       Work through a federated index recovery where we re-generate the
- *       metadata index from the on hand data services.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

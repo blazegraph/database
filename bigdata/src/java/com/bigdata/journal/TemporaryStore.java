@@ -73,6 +73,18 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
      * @see Options#DEFAULT_LIVE_INDEX_CACHE_CAPACITY
      */
     private final int liveIndexCacheCapacity = 20;
+
+    /**
+     * The timeout for stale entries in the live index cache for the
+     * {@link Name2Addr} instance.
+     * 
+     * @todo this should be a configuration property once the temporary store
+     *       accepts a {@link Properties} object in its ctor.
+     * 
+     * @see Options#DEFAULT_LIVE_INDEX_CACHE_TIMEOUT
+     */
+    private final long liveIndexCacheTimeout = Long
+            .parseLong(Options.DEFAULT_LIVE_INDEX_CACHE_TIMEOUT);
     
     /**
      * A {@link TemporaryStore} that can scale-up. The backing file will be
@@ -131,7 +143,7 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
         
         name2Addr = Name2Addr.create(this);
 
-        name2Addr.setupCache(liveIndexCacheCapacity);
+        name2Addr.setupCache(liveIndexCacheCapacity, liveIndexCacheTimeout);
         
     }
     

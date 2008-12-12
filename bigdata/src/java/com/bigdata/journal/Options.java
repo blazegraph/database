@@ -32,6 +32,7 @@ import java.util.Properties;
 
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IndexSegment;
+import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.io.FileLockUtility;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
@@ -115,7 +116,24 @@ public interface Options {
      * 
      * @see AbstractJournal#getIndex(long)
      */
-    String HISTORICAL_INDEX_CACHE_CAPACITY = AbstractJournal.class.getName()+".historicalIndexCacheCapacity";
+    String HISTORICAL_INDEX_CACHE_CAPACITY = AbstractJournal.class.getName()
+            + ".historicalIndexCacheCapacity";
+
+    /**
+     * The timeout for stale entries in the historical index cache -or- ZERO (0)
+     * to disable the timeout (default
+     * {@value #DEFAULT_HISTORICAL_INDEX_CACHE_TIMEOUT}). When this timeout
+     * expires, the reference for the entry in the backing
+     * {@link HardReferenceQueue} will be cleared. Note that the entry will
+     * remain in the historical index cache regardless as long as it is strongly
+     * reachable.
+     * 
+     * @see AbstractJournal#getIndex(long)
+     */
+    String HISTORICAL_INDEX_CACHE_TIMEOUT = AbstractJournal.class.getName()
+            + ".historicalIndexCacheTimeout";
+
+    String DEFAULT_HISTORICAL_INDEX_CACHE_TIMEOUT = "" + (60 * 1000);
 
     /**
      * The capacity of the LRU cache for the "live" {@link Name2Addr} object
@@ -148,7 +166,23 @@ public interface Options {
      * 
      * @see Name2Addr
      */
-    String LIVE_INDEX_CACHE_CAPACITY = AbstractJournal.class.getName()+".liveIndexCacheCapacity";
+    String LIVE_INDEX_CACHE_CAPACITY = AbstractJournal.class.getName()
+            + ".liveIndexCacheCapacity";
+
+    /**
+     * The timeout for stale entries in the live index cache -or- ZERO (0) to
+     * disable the timeout (default {@value #DEFAULT_LIVE_INDEX_CACHE_TIMEOUT}).
+     * When this timeout expires, the reference for the entry in the backing
+     * {@link HardReferenceQueue} will be cleared. Note that the entry will
+     * remain in the live index cache regardless as long as it is strongly
+     * reachable.
+     * 
+     * @see Name2Addr
+     */
+    String LIVE_INDEX_CACHE_TIMEOUT = AbstractJournal.class.getName()
+            + ".liveIndexCacheTimeout";
+
+    String DEFAULT_LIVE_INDEX_CACHE_TIMEOUT = "" + (60 * 1000);
 
     /**
      * A boolean property whose value controls whether a direct (native) or

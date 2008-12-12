@@ -586,7 +586,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter,
      *             if the B+Tree is already read-only and you pass
      *             <code>false</code>.
      */
-    final public void setReadOnly(boolean readOnly) {
+    final public void setReadOnly(final boolean readOnly) {
 
         if (this.readOnly && !readOnly) {
 

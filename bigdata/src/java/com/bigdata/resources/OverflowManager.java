@@ -953,7 +953,7 @@ abstract public class OverflowManager extends IndexManager {
         final AtomicBoolean postProcess = new AtomicBoolean(false);
 
         // Do overflow processing.
-        lastCommitTime = doSynchronousOverflow(copied,postProcess);
+        lastCommitTime = doSynchronousOverflow(copied, postProcess);
                     
         // Note: commented out to protect access to the new journal until the write service is resumed.
         // report event.
