@@ -443,9 +443,9 @@ abstract public class OverflowManager extends IndexManager {
 
         /**
          * The default timeout in milliseconds for asynchronous overflow
-         * processing (equivalent to 20 minutes).
+         * processing (equivalent to 5 minutes).
          */
-        String DEFAULT_OVERFLOW_TIMEOUT = "" + 20 * 1000 * 60L; // 20 minutes.
+        String DEFAULT_OVERFLOW_TIMEOUT = "" + (5 * 1000 * 60L); // 5 minutes.
 
     }
 
