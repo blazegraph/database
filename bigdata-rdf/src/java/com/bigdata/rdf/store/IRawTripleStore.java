@@ -69,28 +69,6 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      */
     int N = 3;
 
-    /**
-     * Constant appended to the database namespace to obtain the
-     * {@link SPORelation}'s namespace.
-     */
-    String NAME_SPO_RELATION = ".spo.";
-    
-    /**
-     * Constant appended to the database namespace to obtain the
-     * {@link LexiconRelation}'s namespace.
-     */
-    String NAME_LEXICON_RELATION = ".lex.";
-    
-    /**
-     * The name of the optional index in which {@link Justification}s are
-     * stored.
-     */
-    static final public String name_just = "just";
-
-    /** @todo deprecate these methods in favor of {@link LexiconRelation}? */
-    abstract public IIndex getTerm2IdIndex();
-    abstract public IIndex getId2TermIndex();
-
     /** @todo deprecate these methods in favor of {@link SPORelation}? */
     abstract public IIndex getSPOIndex();
     abstract public IIndex getPOSIndex();

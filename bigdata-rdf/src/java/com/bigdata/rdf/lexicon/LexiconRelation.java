@@ -175,7 +175,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
             if(textIndex) {
                 
-                set.add(getNamespace() + FullTextIndex.NAME_SEARCH);
+                set.add(getNamespace() + "."+FullTextIndex.NAME_SEARCH);
                 
             }
             
@@ -1217,8 +1217,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      * Assign unique statement identifiers to triples.
      * <p>
      * Each distinct {@link StatementEnum#Explicit} {s,p,o} is assigned a unique
-     * statement identifier using the {@link IRawTripleStore#getTerm2IdIndex()}.
-     * The assignment of statement identifiers is <i>consistent</i> using an
+     * statement identifier using the {@link LexiconKeyOrder#TERM2ID} index. The
+     * assignment of statement identifiers is <i>consistent</i> using an
      * unisolated atomic write operation similar to
      * {@link #addTerms(BigdataValue[], int, boolean)}
      * <p>
@@ -1959,6 +1959,18 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      */
     private LRUCache<Long, BigdataValue> termCache = null;
 //    private LRUCache<Long, BigdataValue> termCache = new LRUCache<Long, BigdataValue>(10000);
+
+    /**
+     * Constant for the {@link LexiconRelation} namespace component.
+     * <p>
+     * Note: To obtain the fully qualified name of an index in the
+     * {@link LexiconRelation} you need to append a "." to the relation's
+     * namespace, then this constant, then a "." and then the local name of the
+     * index.
+     * 
+     * @see AbstractRelation#getFQN(IKeyOrder)
+     */
+    public static final transient String NAME_LEXICON_RELATION = "lex";
 
     /**
      * Handles {@link IRawTripleStore#NULL}, blank node identifiers, statement

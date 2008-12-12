@@ -755,8 +755,10 @@ public class RDFJoinNexus implements IJoinNexus {
             final IKeyOrder keyOrder = SPORelation.getKeyOrder(predicate);
 
             // The name of the desired index partition.
-            final String name = DataService.getIndexPartitionName(namespace
-                    + keyOrder.getIndexName(), predicate.getPartitionId());
+            final String name = DataService
+                    .getIndexPartitionName(namespace + "."
+                            + keyOrder.getIndexName(), predicate
+                            .getPartitionId());
             
             /*
              * @todo whether or not we need both keys and values depends on the

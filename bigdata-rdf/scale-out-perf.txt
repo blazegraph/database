@@ -2998,6 +2998,9 @@ Commit notes:
     causing the application to wait such that we wind up with only one
     data service progressing at a time?
 
+    - Pointless having a MOVE during the initial round robin period.
+      Should detect that and avoid moves until we have real scores.
+
     - Consider a "tail split" for indices which are entirely (or
       mostly) experiencing appends.  For example, the SPO and OSP (but
       not the POS) indices have this behavior.  A "tail split" would
@@ -3013,17 +3016,19 @@ Commit notes:
       will receive most to all writes, so it can be empty to start
       with.
 
-    - Close out views that are known to be stale when the releaseAge
-      is advanced.  This could explicitly locate and close any open
-      indices for timestamps which are no longer accessible.
+    - Close out views that are known to be stale when the releaseTime
+      is advanced (probably in purgeResources since that is when we
+      actually compute the effective release time, which can differ
+      from the specified release time because of the minReleaseAge).
+      This could explicitly locate and close any open indices for
+      timestamps which are no longer accessible.
 
       Alternatively we could just clear references on the hard
       reference queues for the live index, historical index, index
       view, index segment, and locator caches.      
 
-      Also use a scheduled task to clear stale references for those
-      caches so that we can close out things which are not being
-      accessed.
+    - Use a scheduled task to clear stale references for those caches
+      so that we can close out things which are not being accessed.
 
     * Try limited parallelism during asynchronous overflow.
 
@@ -3243,8 +3248,28 @@ commitPointToPreserve=1228508365953
 
     - Add a thread to periodically touch flush stale entries from
       these caches even when they are not being used?
+--------------------
 
+Why is the % Processor Time not being reported through to the LBS under WinNT?
 
+       WARN : 723365
+       com.bigdata.service.EmbeddedFederation$EmbeddedLoadBalancerServiceImpl.updateService1
+       com.bigdata.service.LoadBalancerService$UpdateTask.getAverageValueForMinutes(LoadBalancerService.java:1493):
+       Could not read double value: counterSet=/dpp2-wrkst13.dpp2.org,
+       counter=CPU/% Processor Time
+
+Why is the LBS reporting that an embedded data service is short on
+tmpDir space under WinNT? 
+
+       WARN : 723365
+       com.bigdata.service.EmbeddedFederation$EmbeddedLoadBalancerServiceImpl.updateService1
+       com.bigdata.service.LoadBalancerService$UpdateTask.computeScore(LoadBalancerService.java:1404):
+       service=dpp2-wrkst13.dpp2.org#interface
+       com.bigdata.service.IDataService : is short on disk:
+       tmpDirBytesAvail=2,147,483,648
+
+Why are all index partitions being moved off of one of the two embedded data services under WinNT U50?
 
 ------------------------------------------------------------
 Commit log
+

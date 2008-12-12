@@ -907,7 +907,7 @@ abstract public class AbstractTripleStore extends
             if (lexicon) {
 
                 lexiconRelation = new LexiconRelation(getIndexManager(),
-                        getNamespace() + NAME_LEXICON_RELATION, getTimestamp(),
+                        getNamespace() + "."+LexiconRelation.NAME_LEXICON_RELATION, getTimestamp(),
                         tmp);
 
                 lexiconRelation.create();
@@ -917,7 +917,7 @@ abstract public class AbstractTripleStore extends
             }
 
             spoRelation = new SPORelation(getIndexManager(), getNamespace()
-                    + NAME_SPO_RELATION, getTimestamp(), tmp);
+                    + "." + SPORelation.NAME_SPO_RELATION, getTimestamp(), tmp);
 
             spoRelation.create();
 
@@ -1177,8 +1177,8 @@ abstract public class AbstractTripleStore extends
         if (spoRelation == null) {
 
             spoRelation = (SPORelation) getIndexManager().getResourceLocator()
-                    .locate(getNamespace()
-                                    + NAME_SPO_RELATION, getTimestamp());
+                    .locate(getNamespace() + "." + SPORelation.NAME_SPO_RELATION,
+                            getTimestamp());
 
         }
 
@@ -1197,8 +1197,8 @@ abstract public class AbstractTripleStore extends
 
             lexiconRelation = (LexiconRelation) getIndexManager()
                     .getResourceLocator().locate(
-                            getNamespace()
-                                    + NAME_LEXICON_RELATION, getTimestamp());
+                            getNamespace()+"."
+                                    + LexiconRelation.NAME_LEXICON_RELATION, getTimestamp());
             
         }
 
@@ -1485,7 +1485,8 @@ abstract public class AbstractTripleStore extends
         final byte[] toKey = new byte[] { KeyBuilder
                 .encodeByte((byte) (ITermIndexCodes.TERM_CODE_BND + 1)) };
 
-        return getTerm2IdIndex().rangeCount(fromKey, toKey);
+        return getLexiconRelation().getTerm2IdIndex()
+                .rangeCount(fromKey, toKey);
 
     }
 
@@ -1497,7 +1498,8 @@ abstract public class AbstractTripleStore extends
         final byte[] toKey = new byte[] { KeyBuilder
                 .encodeByte((byte) (ITermIndexCodes.TERM_CODE_URI + 1)) };
 
-        return getTerm2IdIndex().rangeCount(fromKey, toKey);
+        return getLexiconRelation().getTerm2IdIndex()
+                .rangeCount(fromKey, toKey);
 
     }
 
@@ -1511,7 +1513,8 @@ abstract public class AbstractTripleStore extends
         final byte[] toKey = new byte[] { KeyBuilder
                 .encodeByte((byte) (ITermIndexCodes.TERM_CODE_DTL + 1)) };
 
-        return getTerm2IdIndex().rangeCount(fromKey, toKey);
+        return getLexiconRelation().getTerm2IdIndex()
+                .rangeCount(fromKey, toKey);
 
     }
 
@@ -1527,7 +1530,8 @@ abstract public class AbstractTripleStore extends
         final byte[] toKey = new byte[] { KeyBuilder
                 .encodeByte((byte) (ITermIndexCodes.TERM_CODE_BND + 1)) };
 
-        return getTerm2IdIndex().rangeCount(fromKey, toKey);
+        return getLexiconRelation().getTerm2IdIndex()
+                .rangeCount(fromKey, toKey);
 
     }
 

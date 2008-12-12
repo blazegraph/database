@@ -80,7 +80,6 @@ import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.Var;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.AbstractSolutionBuffer.InsertSolutionBuffer;
-import com.bigdata.resources.DefaultSplitHandler;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IClientIndex;
 import com.bigdata.striterator.ChunkedWrappedIterator;
@@ -179,7 +178,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
             
             if(justify) {
              
-                set.add(getNamespace()+NAME_JUST);
+                set.add(getNamespace() + "." + NAME_JUST);
                 
             }
 
@@ -212,7 +211,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
         if(justify) {
 
             // attempt to resolve the index and set the index reference.
-            just     = super.getIndex(getNamespace()+NAME_JUST);
+            just     = super.getIndex(getNamespace()+"."+NAME_JUST);
             
         } else {
             
@@ -332,13 +331,14 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
             if (justify) {
 
-                final IndexMetadata justMetadata = getJustIndexMetadata(getNamespace()
-                        + NAME_JUST);
+                final String fqn = getNamespace() + "." + NAME_JUST;
+
+                final IndexMetadata justMetadata = getJustIndexMetadata(fqn);
 
                 indexManager.registerIndex(justMetadata);
 
                 // resolve the index and set the index reference.
-                just = getIndex(getNamespace() + NAME_JUST);
+                just = getIndex(fqn);
 
             }
 
@@ -382,7 +382,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
             if (justify) {
 
-                indexManager.dropIndex(getNamespace() + NAME_JUST);
+                indexManager.dropIndex(getNamespace() + "."+ NAME_JUST);
                 just = null;
 
             }
@@ -403,6 +403,17 @@ public class SPORelation extends AbstractRelation<ISPO> {
     private IIndex osp;
     private IIndex just;
 
+    /**
+     * Constant for the {@link SPORelation} namespace component.
+     * <p>
+     * Note: To obtain the fully qualified name of an index in the
+     * {@link SPORelation} you need to append a "." to the relation's namespace,
+     * then this constant, then a "." and then the local name of the index.
+     * 
+     * @see AbstractRelation#getFQN(IKeyOrder)
+     */
+    public static final String NAME_SPO_RELATION = "spo";
+    
     private static final transient String NAME_JUST = "JUST";
     
     /**
@@ -770,7 +781,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
      */
     final private ConcurrentWeakValueCache<SPOPredicate, SPOAccessPath> cache = new ConcurrentWeakValueCache<SPOPredicate, SPOAccessPath>(
             100/* queueCapacity */, 0.75f/* loadFactor */, 50/* concurrencyLevel */);
-    
+
     /**
      * Isolates the logic for selecting the {@link SPOKeyOrder} from the
      * {@link SPOPredicate} and then delegates to

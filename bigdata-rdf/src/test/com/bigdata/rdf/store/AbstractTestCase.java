@@ -345,7 +345,7 @@ abstract public class AbstractTestCase
 
             System.err.println("terms index (forward mapping).");
 
-            final IIndex ndx = store.getTerm2IdIndex();
+            final IIndex ndx = store.getLexiconRelation().getTerm2IdIndex();
 
             final ITupleIterator itr = ndx.rangeIterator(null, null);
 
@@ -390,7 +390,7 @@ abstract public class AbstractTestCase
 
             System.err.println("ids index (reverse mapping).");
 
-            final IIndex ndx = store.getId2TermIndex();
+            final IIndex ndx = store.getLexiconRelation().getId2TermIndex();
 
             final ITupleIterator<BigdataValue> itr = ndx.rangeIterator(null, null);
 

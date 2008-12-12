@@ -171,8 +171,8 @@ public class LocalTripleStore extends AbstractLocalTripleStore {
          * can just materialize the existing relations and create them if they
          * are not found.
          */
-        if (!new SPORelation(getIndexManager(), getNamespace()
-                + NAME_SPO_RELATION, getTimestamp(), getProperties()).exists()) {
+        if (!new SPORelation(getIndexManager(), getNamespace() + "."
+                + SPORelation.NAME_SPO_RELATION, getTimestamp(), getProperties()).exists()) {
 
             /*
              * If we could not find the SPO relation then presume that this is a

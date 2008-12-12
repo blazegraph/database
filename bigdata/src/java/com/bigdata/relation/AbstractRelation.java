@@ -80,7 +80,7 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
      */
     public String getFQN(IKeyOrder<? extends E> keyOrder) {
         
-        return getNamespace() + keyOrder.getIndexName();
+        return getNamespace() + "." + keyOrder.getIndexName();
         
     }
     
