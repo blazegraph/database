@@ -1165,21 +1165,23 @@ public class ClientIndexView implements IClientIndex {
                     
                 } catch (ExecutionException e) {
                     
-                    AbstractDataServiceProcedureTask task = (AbstractDataServiceProcedureTask) tasks
+                    final AbstractDataServiceProcedureTask task = (AbstractDataServiceProcedureTask) tasks
                             .get(i);
-                    
-                    if(INFO) log.info("Execution failed: task=" + task, e);
-                    
+
+                    // log w/ stack trace so that we can see where this came
+                    // from.
+                    log.error("Execution failed: task=" + task, e);
+
                     if (task.causes != null) {
 
                         causes.addAll(task.causes);
 
                     } else {
-                        
+
                         causes.add(e);
-                        
+
                     }
-                    
+
                     nfailed++;
                     
                 }
