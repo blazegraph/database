@@ -505,13 +505,25 @@ abstract public class JoinTask implements Callable<Void> {
             halt(t);
 
             // reset the unsync buffers.
-            resetUnsyncBuffers();
+            try {
+                resetUnsyncBuffers();
+            } catch (Throwable t2) {
+                log.error(t2.getLocalizedMessage(), t2);
+            }
 
             // reset the sync buffer and cancel the sink JoinTasks.
-            cancelSinks();
+            try {
+                cancelSinks();
+            } catch (Throwable t2) {
+                log.error(t2.getLocalizedMessage(), t2);
+            }
 
             // report join stats _before_ we close our source(s).
-            reportOnce();
+            try {
+                reportOnce();
+            } catch (Throwable t2) {
+                log.error(t2.getLocalizedMessage(), t2);
+            }
 
             /*
              * Close source iterators, which will cause any source JoinTasks
@@ -519,7 +531,11 @@ abstract public class JoinTask implements Callable<Void> {
              * when the Future associated with the source iterator is
              * cancelled.
              */
-            closeSources();
+            try {
+                closeSources();
+            } catch (Throwable t2) {
+                log.error(t2.getLocalizedMessage(), t2);
+            }
 
             throw new RuntimeException(t);
 

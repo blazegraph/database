@@ -535,7 +535,7 @@ public class ProgramTask implements IProgramTask,
                     
                     final long releaseTime = lastCommitTime - 1;
 
-                    log.warn("readLock: releaseTime="+releaseTime);
+                    log.warn("readLock: releaseTime="+releaseTime+", step="+step.getName());
                     
                     ((IBigdataFederation) indexManager).getTimestampService()
                             .setReleaseTime(releaseTime);

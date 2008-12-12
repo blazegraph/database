@@ -191,20 +191,28 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * @param resourceManager
      * @param corePoolSize
      * @param maximumPoolSize
+     * @param keepAliveTime
+     * @param keepAliveUnit
      * @param queue
      * @param threadFactory
      * @param groupCommitTimeout
      *            The time in milliseconds that a group commit will await
      *            currently running tasks to join the commit group.
      */
-    public WriteExecutorService(IResourceManager resourceManager,
-            int corePoolSize, int maximumPoolSize,
-            BlockingQueue<Runnable> queue, ThreadFactory threadFactory,
-            long groupCommitTimeout) {
+    public WriteExecutorService(//
+            final IResourceManager resourceManager,
+            final int corePoolSize,
+            final int maximumPoolSize,
+            final long keepAliveTime,//
+            final TimeUnit keepAliveUnit,//
+            final BlockingQueue<Runnable> queue, 
+            final ThreadFactory threadFactory,
+            final long groupCommitTimeout) {
 
         super(  corePoolSize, //
                 maximumPoolSize,//
-                5 /* keepAliveTime */, TimeUnit.SECONDS,//
+                keepAliveTime,//
+                keepAliveUnit,//
                 queue,//
                 threadFactory//
                 );
@@ -292,7 +300,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
     /** #of write tasks completed since the last commit. */
     final private AtomicInteger nwrites = new AtomicInteger(0);
-
+    
     /** True iff we are executing a group commit. */
     final private AtomicBoolean groupCommit = new AtomicBoolean(false);
     
@@ -307,6 +315,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     private long maxRunning = 0;
     private long maxCommitWaitingTime = 0;
     private long maxCommitServiceTime = 0;
+    private int maxCommitGroupSize = 0;
+    private int commitGroupSize = 0;
     private AtomicLong ngroupCommits = new AtomicLong();
     private long naborts = 0;
     private long failedTaskCount = 0;
@@ -314,7 +324,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     private long committedTaskCount = 0;
     private long noverflow = 0;
 
-    protected AtomicInteger concurrentTaskCount = new AtomicInteger(0);
+    protected AtomicInteger activeTaskCountWithLocksHeld = new AtomicInteger(0);
 
     /**
      * The maximum #of threads in the pool.
@@ -360,6 +370,25 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         
     }
 
+    /**
+     * The #of tasks in the most recent commit group. In order to be useful
+     * information this must be sampled and turned into a moving average.
+     */
+    public int getCommitGroupSize() {
+        
+        return commitGroupSize;
+        
+    }
+    
+    /**
+     * The maximum #of tasks in any commit group.
+     */
+    public int getMaxCommitGroupSize() {
+        
+        return maxCommitGroupSize;
+        
+    }
+    
     /**
      * The #of group commits since the {@link WriteExecutorService} was started
      * (all commits by this service are group commits).
@@ -437,9 +466,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * their locks</strong> as well as those engaged in various pre- or
      * post-processing.
      */
-    public int getConcurrentTaskCount() {
+    public int getActiveTaskCountWithLocksHeld() {
 
-        return concurrentTaskCount.get();
+        return activeTaskCountWithLocksHeld.get();
         
     }
     
@@ -825,7 +854,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         
         sb.append(", nrunning="+nrunning);
 
-        sb.append(", concurrentTaskCount="+concurrentTaskCount);
+        sb.append(", concurrentTaskCount="+activeTaskCountWithLocksHeld);
 
         sb.append(", activeTaskSetSize="+active.size());
 
@@ -1162,8 +1191,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 }
                 
             } finally {
-                
-                taskCounters.commitServiceTime.addAndGet(System.nanoTime()-nanoTime_beginCommit);
+
+                taskCounters.commitServiceTime.addAndGet(System.nanoTime()
+                        - nanoTime_beginCommit);
                 
             }
 
@@ -1179,6 +1209,14 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
             }
 
+            this.commitGroupSize = nwrites;
+            
+            if (nwrites > maxCommitGroupSize) {
+
+                maxCommitGroupSize = nwrites;
+                
+            }
+            
             if (INFO)
                 log.info("Commit Ok : commitLatency=" + commitLatency
                         + ", maxCommitLatency=" + maxCommitServiceTime

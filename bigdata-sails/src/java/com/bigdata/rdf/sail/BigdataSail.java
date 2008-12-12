@@ -1354,7 +1354,7 @@ public class BigdataSail extends SailBase implements Sail {
                 if(truthMaintenance) {
                     
                     // discard the temp store that buffers assertions.
-                    assertBuffer.getStatementStore().closeAndDelete();
+                    assertBuffer.getStatementStore().close();
                     
                     // must be re-allocated on demand.
                     assertBuffer = null;
@@ -1371,7 +1371,7 @@ public class BigdataSail extends SailBase implements Sail {
                 if (truthMaintenance) {
 
                     // discard the temp store that buffers retractions.
-                    retractBuffer.getStatementStore().closeAndDelete();
+                    retractBuffer.getStatementStore().close();
 
                     // must be re-allocated on demand.
                     retractBuffer = null;

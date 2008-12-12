@@ -52,6 +52,7 @@ import java.util.Properties;
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
+import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rules.InferenceEngine;
@@ -128,16 +129,17 @@ public class TruthMaintenance {
     protected final InferenceEngine inferenceEngine;
 
     /**
-     * Return a new {@link TempTripleStore} that may be used to buffer
-     * {@link SPO}s to be either asserted or retracted from the database. It is
-     * recommended to use this factory method to provision the tempStore as it
-     * disables the lexicon (it will not be used) but leaves other features
-     * enabled (such as all access paths) which support truth maintenance.
+     * Return a new {@link TempTripleStore} backed by a shared
+     * {@link TemporaryStore} that may be used to buffer {@link SPO}s to be
+     * either asserted or retracted from the database. It is recommended to use
+     * this factory method to provision the tempStore as it disables the lexicon
+     * (it will not be used) but leaves other features enabled (such as all
+     * access paths) which support truth maintenance.
      * <p>
      * You can wrap this with an {@link IStatementBuffer} using:
      * 
      * <pre>
-     * new StatementBuffer(getTempStore(), database, bufferCapacity);
+     * new StatementBuffer(getTempTripleStore(), database, bufferCapacity);
      * </pre>
      * 
      * and then write on the {@link IStatementBuffer}, which will periodically
@@ -151,8 +153,9 @@ public class TruthMaintenance {
      * {@link #assertAll(TempTripleStore)} or
      * {@link #retractAll(TempTripleStore)} to update the closure of the
      * database.
-     * 
-     * @todo max in memory size for the temporary store?
+     * <p>
+     * Note: DO NOT use {@link TempTripleStore#closeAndDelete()} since the
+     * backing store is shared!
      */
     public TempTripleStore newTempTripleStore() {
 
@@ -166,8 +169,8 @@ public class TruthMaintenance {
                 com.bigdata.rdf.store.AbstractTripleStore.Options.LEXICON,
                 "false");
 
-        final TempTripleStore tempStore = new TempTripleStore(properties,
-                database);
+        final TempTripleStore tempStore = new TempTripleStore(database
+                .getIndexManager().getTempStore(), properties, database);
 
         return tempStore;
         
@@ -219,8 +222,10 @@ public class TruthMaintenance {
      * @todo this uses some techniques that are not scaleable if the focusStore
      *       is extremely large.
      */
-    static public int applyExistingStatements(AbstractTripleStore focusStore,
-            AbstractTripleStore database, IElementFilter<ISPO> filter) {
+    static public int applyExistingStatements(
+            final AbstractTripleStore focusStore,
+            final AbstractTripleStore database,
+            final IElementFilter<ISPO> filter) {
         
         if(INFO) 
             log.info("Filtering statements already known to the database");
@@ -278,7 +283,7 @@ public class TruthMaintenance {
                     final SPO spo = (SPO)chunk[i];
 
                     // Lookup the statement in the database.
-                    SPO tmp = database.getStatement(spo.s, spo.p, spo.o);
+                    final SPO tmp = database.getStatement(spo.s, spo.p, spo.o);
                     
                     if (tmp != null) {
 
@@ -328,7 +333,7 @@ public class TruthMaintenance {
 
         final long elapsed = System.currentTimeMillis() - begin;
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("Removed " + nremoved + " statements from the focusStore"
                     + " and upgraded " + nupgraded
                     + " statements in the database in " + elapsed + " ms.");
@@ -347,9 +352,9 @@ public class TruthMaintenance {
      * 
      * @param tempStore
      *            A temporary store containing statements to be asserted. The
-     *            tempStore will be closed and deleted as a post-condition.
+     *            tempStore will be closed as a post-condition.
      */
-    public ClosureStats assertAll(TempTripleStore tempStore) {
+    public ClosureStats assertAll(final TempTripleStore tempStore) {
 
         if (tempStore == null) {
 
@@ -372,7 +377,7 @@ public class TruthMaintenance {
         
         final long nbeforeClosure = tempStore.getStatementCount();
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("Computing closure of the temporary store with "
                     + nbeforeClosure + " statements");
 
@@ -401,7 +406,7 @@ public class TruthMaintenance {
 
         final long nafterClosure = tempStore.getStatementCount();
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("There are " + nafterClosure
                     + " statements in the temporary store after closure");
 
@@ -409,7 +414,8 @@ public class TruthMaintenance {
          * copy statements from the temporary store to the database.
          */
 
-        log.info("Copying statements from the temporary store to the database");
+        if (INFO)
+            log.info("Copying statements from the temporary store to the database");
 
 //        tempStore.dumpStore(database,true,true,false,true);
 
@@ -419,7 +425,7 @@ public class TruthMaintenance {
 //        database.dumpStore(database,true,true,false,true);
 
         // note: this is the number that are _new_ to the database.
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("Copied " + ncopied
                     + " statements that were new to the database.");
 
@@ -427,14 +433,14 @@ public class TruthMaintenance {
         
         stats.elapsed += elapsed;
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("Computed closure in " + elapsed + "ms");
         
-        if (log.isDebugEnabled())
+        if (DEBUG)
             log.debug("\n\ntempStore:\n"
                     + tempStore.dumpStore(database, true, true, false, true));
 
-        tempStore.closeAndDelete();
+        tempStore.close();
         
         return stats;
 
@@ -457,11 +463,11 @@ public class TruthMaintenance {
      * @param tempStore
      *            A temporary store containing explicit statements to be
      *            retracted from the database. The tempStore will be closed and
-     *            deleted as a post-condition.
+     *            as a post-condition.
      * 
      * @return statistics about the closure operation.
      */
-    public ClosureStats retractAll(TempTripleStore tempStore) {
+    public ClosureStats retractAll(final TempTripleStore tempStore) {
 
         final long begin = System.currentTimeMillis();
         
@@ -484,14 +490,14 @@ public class TruthMaintenance {
             
         }
         
-        if(log.isInfoEnabled()) log.info("Computing closure of the temporary store with "
+        if(INFO) log.info("Computing closure of the temporary store with "
                 + ngiven+ " statements");
 
         if(database.getStatementIdentifiers()) {
             
             AbstractTripleStore.fixPointStatementIdentifiers(database, tempStore);
 
-            if(log.isInfoEnabled()) log.info("Computing closure of the temporary store with " + ngiven
+            if(INFO) log.info("Computing closure of the temporary store with " + ngiven
                     + " statements (after fix point of statement identifiers)");
             
         }
@@ -505,7 +511,7 @@ public class TruthMaintenance {
        
         final long elapsed = System.currentTimeMillis() - begin;
         
-        if(log.isInfoEnabled()) log.info("Retracted " + ngiven
+        if(INFO) log.info("Retracted " + ngiven
                 + " given and updated closure on the database in " + elapsed
                 + " ms");
         
@@ -552,8 +558,8 @@ public class TruthMaintenance {
      * </li>
      * 
      * <li> Once all statements in the tempStore have been processed we flush
-     * the various buffers and {@link TempTripleStore#closeAndDelete()} the
-     * tempStore. </li>
+     * the various buffers and {@link TempTripleStore#close()} the tempStore.
+     * </li>
      * 
      * <li> We then compute the closure of the focusStore against the database
      * in order to discover additional statements that may no longer be
@@ -594,13 +600,9 @@ public class TruthMaintenance {
         /*
          * Temp store used to absorb statements for which no grounded
          * justification chain could be discovered.
-         * 
-         * FIXME There should be no lexicon for this tempStore, right? Should
-         * there be only one access path? How is the tempStore being used?
          */
-
-        final TempTripleStore focusStore = new TempTripleStore(database
-                .getProperties(), database);
+        final TempTripleStore focusStore = newTempTripleStore();
+//      final TempTripleStore focusStore = new TempTripleStore(database.getProperties(), database);
         
         // consider each statement in the tempStore.
         final IChunkedOrderedIterator<ISPO> itr = tempStore.getAccessPath(SPOKeyOrder.SPO).iterator();
@@ -835,8 +837,8 @@ public class TruthMaintenance {
 
         }
 
-        // drop the tempStore.
-        tempStore.closeAndDelete();
+        // close the tempStore.
+        tempStore.close();
 
         if (nretracted == 0) {
             

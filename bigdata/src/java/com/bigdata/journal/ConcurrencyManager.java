@@ -114,27 +114,23 @@ public class ConcurrencyManager implements IConcurrencyManager {
     /**
      * Options for the {@link ConcurrentManager}.
      * 
-     * @todo add option for retryCount, timeout (from submission until the group
-     *       commit).
-     * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
     public static interface Options extends IServiceShutdown.Options {
-    
+
         /**
          * The #of threads in the pool handling concurrent transactions.
          * 
          * @see #DEFAULT_TX_SERVICE_CORE_POOL_SIZE
          */
-        public static final String TX_SERVICE_CORE_POOL_SIZE = ConcurrencyManager.class
-                .getName()
+        String TX_SERVICE_CORE_POOL_SIZE = ConcurrencyManager.class.getName()
                 + ".txService.corePoolSize";
 
         /**
          * The default #of threads in the transaction service thread pool.
          */
-        public final static String DEFAULT_TX_SERVICE_CORE_POOL_SIZE = "0";
+        String DEFAULT_TX_SERVICE_CORE_POOL_SIZE = "0";
 
         /**
          * The #of threads in the pool handling concurrent unisolated read
@@ -143,8 +139,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
          * 
          * @see #DEFAULT_READ_SERVICE_CORE_POOL_SIZE
          */
-        public static final String READ_SERVICE_CORE_POOL_SIZE = ConcurrencyManager.class
-                .getName()
+        String READ_SERVICE_CORE_POOL_SIZE = ConcurrencyManager.class.getName()
                 + ".readService.corePoolSize";
 
         /**
@@ -152,7 +147,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
          * 
          * @see #READ_SERVICE_CORE_POOL_SIZE
          */
-        public final static String DEFAULT_READ_SERVICE_CORE_POOL_SIZE = "0";
+        String DEFAULT_READ_SERVICE_CORE_POOL_SIZE = "0";
 
         /**
          * The minimum #of threads in the pool handling concurrent unisolated
@@ -182,14 +177,14 @@ public class ConcurrencyManager implements IConcurrencyManager {
          * 
          * @see #DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE
          */
-        public final static String WRITE_SERVICE_CORE_POOL_SIZE = ConcurrencyManager.class
+        String WRITE_SERVICE_CORE_POOL_SIZE = ConcurrencyManager.class
                 .getName()
                 + ".writeService.corePoolSize";
 
         /**
          * The default minimum #of threads in the write service thread pool.
          */
-        public final static String DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE = "5";
+        String DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE = "5";
 
         /**
          * The maximum #of threads allowed in the pool handling concurrent
@@ -203,7 +198,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
          * 
          * @see #DEFAULT_WRITE_SERVICE_MAXIMUM_POOL_SIZE
          */
-        public final static String WRITE_SERVICE_MAXIMUM_POOL_SIZE = ConcurrencyManager.class
+        String WRITE_SERVICE_MAXIMUM_POOL_SIZE = ConcurrencyManager.class
                 .getName()
                 + ".writeService.maximumPoolSize";
 
@@ -211,7 +206,17 @@ public class ConcurrencyManager implements IConcurrencyManager {
          * The default for the maximum #of threads in the write service thread
          * pool.
          */
-        public final static String DEFAULT_WRITE_SERVICE_MAXIMUM_POOL_SIZE = "50";
+        String DEFAULT_WRITE_SERVICE_MAXIMUM_POOL_SIZE = "50";
+
+        /**
+         * The time in milliseconds that the {@link WriteExecutorService} will
+         * keep alive excess worker threads (those beyond the core pool size).
+         */
+        String WRITE_SERVICE_KEEP_ALIVE_TIME = ConcurrencyManager.class
+                .getName()
+                + ".writeService.keepAliveTime";
+
+        String DEFAULT_WRITE_SERVICE_KEEP_ALIVE_TIME = "5000";
 
         /**
          * When true, the write service will be prestart all of its worker
@@ -220,14 +225,14 @@ public class ConcurrencyManager implements IConcurrencyManager {
          * 
          * @see #DEFAULT_WRITE_SERVICE_PRESTART_ALL_CORE_THREADS
          */
-        public final static String WRITE_SERVICE_PRESTART_ALL_CORE_THREADS = ConcurrencyManager.class
+        String WRITE_SERVICE_PRESTART_ALL_CORE_THREADS = ConcurrencyManager.class
                 .getName()
                 + ".writeService.prestartAllCoreThreads";
 
         /**
          * The default for {@link #WRITE_SERVICE_PRESTART_ALL_CORE_THREADS}.
          */
-        public final static String DEFAULT_WRITE_SERVICE_PRESTART_ALL_CORE_THREADS = "false";
+        String DEFAULT_WRITE_SERVICE_PRESTART_ALL_CORE_THREADS = "false";
 
         /**
          * The maximum depth of the write service queue before newly submitted
@@ -237,15 +242,15 @@ public class ConcurrencyManager implements IConcurrencyManager {
          * @see #WRITE_SERVICE_CORE_POOL_SIZE
          * @see #DEFAULT_WRITE_SERVICE_QUEUE_CAPACITY
          */
-        public static final String WRITE_SERVICE_QUEUE_CAPACITY = ConcurrencyManager.class
+        String WRITE_SERVICE_QUEUE_CAPACITY = ConcurrencyManager.class
                 .getName()
                 + ".writeService.queueCapacity";
 
         /**
          * The default maximum depth of the write service queue (1000).
          */
-        public static final String DEFAULT_WRITE_SERVICE_QUEUE_CAPACITY = "1000";
-        
+        String DEFAULT_WRITE_SERVICE_QUEUE_CAPACITY = "1000";
+
         /**
          * The timeout in milliseconds that the the {@link WriteExecutorService}
          * will await other tasks to join the commit group (default
@@ -261,7 +266,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
                 + ".writeService.groupCommitTimeout";
 
         String DEFAULT_WRITE_SERVICE_GROUP_COMMIT_TIMEOUT = "100";
-        
+
     }
 
     /**
@@ -771,6 +776,17 @@ public class ConcurrencyManager implements IConcurrencyManager {
                 log
                         .info(ConcurrencyManager.Options.WRITE_SERVICE_GROUP_COMMIT_TIMEOUT
                                 + "=" + groupCommitTimeout);
+
+            final long keepAliveTime = Long
+                    .parseLong(properties
+                            .getProperty(
+                                    ConcurrencyManager.Options.WRITE_SERVICE_KEEP_ALIVE_TIME,
+                                    ConcurrencyManager.Options.DEFAULT_WRITE_SERVICE_KEEP_ALIVE_TIME));
+
+            if (INFO)
+                log
+                        .info(ConcurrencyManager.Options.WRITE_SERVICE_KEEP_ALIVE_TIME
+                                + "=" + keepAliveTime);
             
             final BlockingQueue<Runnable> queue =
                 ((writeServiceQueueCapacity == 0 || writeServiceQueueCapacity > 5000)
@@ -778,10 +794,15 @@ public class ConcurrencyManager implements IConcurrencyManager {
                         : new ArrayBlockingQueue<Runnable>(writeServiceQueueCapacity)
                         );
             
-            writeService = new WriteExecutorService(resourceManager,
-                    writeServiceCorePoolSize, writeServiceMaximumPoolSize,
-                    queue, new DaemonThreadFactory(getClass().getName()
-                            + ".writeService"), groupCommitTimeout);
+            writeService = new WriteExecutorService(//
+                    resourceManager,//
+                    writeServiceCorePoolSize,//
+                    writeServiceMaximumPoolSize,//
+                    keepAliveTime, TimeUnit.MILLISECONDS, // keepAliveTime
+                    queue, //
+                    new DaemonThreadFactory(getClass().getName()+".writeService"), //
+                    groupCommitTimeout//
+            );
 
             if (writeServicePrestart) {
 
