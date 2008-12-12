@@ -75,12 +75,12 @@ public class TestHardReferenceQueue extends TestCase2 {
      */
     public void test_ctor_correct_rejection() {
         
-        try {
-            new HardReferenceQueue<String>(null, 100);
-            fail("Expecting: " + IllegalArgumentException.class);
-        } catch (IllegalArgumentException ex) {
-            System.err.println("Ignoring expectedRefs exception: " + ex);
-        }
+//        try {
+//            new HardReferenceQueue<String>(null, 100);
+//            fail("Expecting: " + IllegalArgumentException.class);
+//        } catch (IllegalArgumentException ex) {
+//            System.err.println("Ignoring expectedRefs exception: " + ex);
+//        }
 
         try {
             new HardReferenceQueue<String>(new MyListener<String>(), 0);

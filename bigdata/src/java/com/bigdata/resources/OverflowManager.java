@@ -61,10 +61,7 @@ import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
-import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.service.DataService;
-import com.bigdata.service.EmbeddedFederation;
-import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
