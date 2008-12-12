@@ -920,7 +920,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
              */
             final ResourceManager resourceManager = getDataService()
                     .getResourceManager();
-            
+
             assert rset != null;
          
             /*
@@ -939,6 +939,11 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
              */
             final BTree dst = (BTree) ((ndx instanceof AbstractBTree) ? ndx
                     : ((FusedView) ndx).getSources()[0]);
+
+            /*
+             * The name of the index partition that we are receiving. 
+             */
+            final String name = dst.getIndexMetadata().getName();
             
             final int n = rset.getNumTuples();
             
@@ -1050,10 +1055,17 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
                 
                 if (INFO)
                     log.info("Move finished: cleared sourcePartitionId: name="
-                            + dst.getIndexMetadata().getName());
+                            + name);
+                
+                /*
+                 * Note in the log that we have received the index partition.
+                 * Clients will not be directed to this index partition until
+                 * the metadata index has been updated.
+                 */
+                log.warn("Received: name=" + name);
                 
                 // make sure that the BTree will be included in the commit.
-                assert dst.needsCheckpoint() : "name="+dst.getIndexMetadata().getName();
+                assert dst.needsCheckpoint() : "name=" + name;
                 
             }
             
