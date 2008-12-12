@@ -670,14 +670,6 @@ abstract public class StoreManager extends ResourceEvents implements
      * the name of the file as specified to the ctor for that class, so it may
      * be relative to some arbitrary directory or absolute within the file
      * system.
-     * 
-     * @todo We do not need to insist on the file names - we could just use the
-     *       file under whatever name we find it (Therefore we only insist that
-     *       the name of the file (as understood by the {@link ResourceManager})
-     *       agree with the {@link IResourceMetadata} and the
-     *       {@link ResourceManager} maintains its own map from the
-     *       {@link IResourceMetadata} to an <em>absolute</em> path for that
-     *       resource.)
      */
     private final Map<UUID, File> resourceFiles = new HashMap<UUID, File>();
 
@@ -1919,20 +1911,21 @@ abstract public class StoreManager extends ResourceEvents implements
         if (INFO)
             log.info("Found " + resource + " in " + file);
 
-        if (!file.getName().equals(new File(resource.getFile()).getName())) {
+//        if (!file.getName().equals(new File(resource.getFile()).getName())) {
+//
+//            /*
+//             * The base name and extension of the file does not agree with that
+//             * metadata reported by the store (unlikely since the store reports
+//             * its metadata based on the file that it opened).
+//             */
+//
+//            log.error("Wrong filename: actual=" + file + ", expected="
+//                    + file);
+//
+//        }
 
-            /*
-             * The base name and extension of the file does not agree with that
-             * metadata reported by the store (unlikely since the store reports
-             * its metadata based on the file that it opened).
-             */
-
-            log.error("Resource out of place: actual=" + file + ", expected="
-                    + file);
-
-        }
-
-        addResource(resource, file.getAbsoluteFile());
+//        addResource(resource, file.getAbsoluteFile());
+        addResource(resource, file);
 
     }
 
@@ -2052,7 +2045,7 @@ abstract public class StoreManager extends ResourceEvents implements
      */
     synchronized protected void addResource(
             final IResourceMetadata resourceMetadata,
-            final File file
+            File file
             ) {
 
         if (resourceMetadata == null)
@@ -2068,6 +2061,12 @@ abstract public class StoreManager extends ResourceEvents implements
         if (INFO)
             log.info("file=" + file + ", uuid=" + uuid);
 
+        if (file != null) {
+
+            file = file.getAbsoluteFile();
+
+        }
+        
 //        synchronized (storeCache) {
         
             if (storeCache.get(uuid) != null) {

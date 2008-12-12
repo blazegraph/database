@@ -5,7 +5,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bfs.BigdataFileSystem;
@@ -64,14 +63,12 @@ public class DefaultSplitHandler implements ISplitHandler {
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final protected static boolean DEBUG = log.isDebugEnabled();
 
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final protected static boolean INFO = log.isInfoEnabled();
 
     private int minimumEntryCount;
     
@@ -83,6 +80,28 @@ public class DefaultSplitHandler implements ISplitHandler {
 
     private double underCapacityMultiplier;
 
+    public String toString() {
+    
+        final StringBuilder sb = new StringBuilder();
+        
+        sb.append(getClass().getName());
+        
+        sb.append("{ minimumEntryCount=" + minimumEntryCount);
+
+        sb.append(", entryCountPerSplit=" + entryCountPerSplit);
+        
+        sb.append(", sampleRate=" + sampleRate);
+        
+        sb.append(", overCapacityMultiplier=" + overCapacityMultiplier);
+        
+        sb.append(", underCapacityMultiplier=" + underCapacityMultiplier);
+        
+        sb.append("}");
+        
+        return sb.toString();
+        
+    }
+    
     /**
      * De-serialization ctor.
      */
