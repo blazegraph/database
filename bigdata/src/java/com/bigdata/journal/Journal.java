@@ -44,9 +44,14 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.ReadCommittedView;
+import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.config.IntegerValidator;
+import com.bigdata.config.LongValidator;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.locator.DefaultResourceLocator;
+import com.bigdata.relation.locator.ILocatableResource;
+import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.StaleLocatorReason;
 import com.bigdata.service.AbstractEmbeddedResourceLockManager;
@@ -86,6 +91,40 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     public interface Options extends com.bigdata.journal.Options,
             com.bigdata.journal.ConcurrencyManager.Options {
 
+        /**
+         * The capacity of the {@link HardReferenceQueue} backing the
+         * {@link IResourceLocator} maintained by the {@link Journal}. The
+         * capacity of this cache indirectly controls how many
+         * {@link ILocatableResource}s the {@link Journal} will hold open.
+         * <p>
+         * The effect of this parameter is indirect owning to the semantics of
+         * weak references and the control of the JVM over when they are
+         * cleared. Once an {@link ILocatableResource} becomes weakly reachable,
+         * the JVM will eventually GC the object. Since objects which are
+         * strongly reachable are never cleared, this provides our guarentee
+         * that resources are never closed if they are in use.
+         * 
+         * @see #DEFAULT_LOCATOR_CACHE_CAPACITY
+         */
+        String LOCATOR_CACHE_CAPACITY = Journal.class.getName()
+                + ".locatorCacheCapacity";
+
+        String DEFAULT_LOCATOR_CACHE_CAPACITY = "20";
+        
+        /**
+         * The timeout in milliseconds for stale entries in the
+         * {@link IResourceLocator} cache -or- ZERO (0) to disable the timeout
+         * (default {@value #DEFAULT_LOCATOR_CACHE_TIMEOUT}). When this timeout
+         * expires, the reference for the entry in the backing
+         * {@link HardReferenceQueue} will be cleared. Note that the entry will
+         * remain in the {@link IResourceLocator} cache regardless as long as it
+         * is strongly reachable.
+         */
+        String LOCATOR_CACHE_TIMEOUT = Journal.class.getName()
+                + ".locatorCacheTimeout";
+
+        String DEFAULT_LOCATOR_CACHE_TIMEOUT = "" + (60 * 1000);
+
     }
     
     /**
@@ -101,7 +140,22 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         executorService = Executors.newCachedThreadPool(new DaemonThreadFactory
                 (getClass().getName()+".executorService"));
 
-        resourceLocator = new DefaultResourceLocator(this, null/*delegate*/);
+        {
+
+            final int cacheCapacity = getProperty(
+                    Options.LOCATOR_CACHE_CAPACITY,
+                    Options.DEFAULT_LOCATOR_CACHE_CAPACITY,
+                    IntegerValidator.GT_ZERO);
+
+            final long cacheTimeout = getProperty(
+                    Options.LOCATOR_CACHE_TIMEOUT,
+                    Options.DEFAULT_LOCATOR_CACHE_TIMEOUT,
+                    LongValidator.GTE_ZERO);
+
+            resourceLocator = new DefaultResourceLocator(this, null/*delegate*/,
+                    cacheCapacity, cacheTimeout);
+            
+        }
 
         resourceLockManager = new AbstractEmbeddedResourceLockManager(UUID
                 .randomUUID(), properties) {

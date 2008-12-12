@@ -120,8 +120,8 @@ public interface Options {
             + ".historicalIndexCacheCapacity";
 
     /**
-     * The timeout for stale entries in the historical index cache -or- ZERO (0)
-     * to disable the timeout (default
+     * The timeout in milliseconds for stale entries in the historical index
+     * cache -or- ZERO (0) to disable the timeout (default
      * {@value #DEFAULT_HISTORICAL_INDEX_CACHE_TIMEOUT}). When this timeout
      * expires, the reference for the entry in the backing
      * {@link HardReferenceQueue} will be cleared. Note that the entry will
@@ -170,12 +170,12 @@ public interface Options {
             + ".liveIndexCacheCapacity";
 
     /**
-     * The timeout for stale entries in the live index cache -or- ZERO (0) to
-     * disable the timeout (default {@value #DEFAULT_LIVE_INDEX_CACHE_TIMEOUT}).
-     * When this timeout expires, the reference for the entry in the backing
-     * {@link HardReferenceQueue} will be cleared. Note that the entry will
-     * remain in the live index cache regardless as long as it is strongly
-     * reachable.
+     * The timeout in milliseconds for stale entries in the live index cache
+     * -or- ZERO (0) to disable the timeout (default
+     * {@value #DEFAULT_LIVE_INDEX_CACHE_TIMEOUT}). When this timeout expires,
+     * the reference for the entry in the backing {@link HardReferenceQueue}
+     * will be cleared. Note that the entry will remain in the live index cache
+     * regardless as long as it is strongly reachable.
      * 
      * @see Name2Addr
      */

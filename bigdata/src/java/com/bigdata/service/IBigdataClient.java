@@ -36,9 +36,12 @@ import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.locator.ILocatableResource;
+import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.eval.NestedSubqueryWithJoinThreadsTask;
 import com.bigdata.relation.rule.eval.ProgramTask;
 import com.bigdata.resources.StaleLocatorException;
@@ -326,6 +329,41 @@ public interface IBigdataClient {
                 + ".batchOnly";
 
         String DEFAULT_CLIENT_BATCH_API_ONLY = "false";
+
+        /**
+         * The capacity of the {@link HardReferenceQueue} backing the
+         * {@link IResourceLocator} maintained by the {@link IBigdataClient}.
+         * The capacity of this cache indirectly controls how many
+         * {@link ILocatableResource}s the {@link IBigdataClient} will hold
+         * open.
+         * <p>
+         * The effect of this parameter is indirect owning to the semantics of
+         * weak references and the control of the JVM over when they are
+         * cleared. Once an {@link ILocatableResource} becomes weakly reachable,
+         * the JVM will eventually GC the object. Since objects which are
+         * strongly reachable are never cleared, this provides our guarentee
+         * that resources are never closed if they are in use.
+         * 
+         * @see #DEFAULT_LOCATOR_CACHE_CAPACITY
+         */
+        String CLIENT_LOCATOR_CACHE_CAPACITY = IBigdataClient.class.getName()
+                + ".locatorCacheCapacity";
+
+        String DEFAULT_CLIENT_LOCATOR_CACHE_CAPACITY = "20";
+        
+        /**
+         * The timeout in milliseconds for stale entries in the
+         * {@link IResourceLocator} cache -or- ZERO (0) to disable the timeout
+         * (default {@value #DEFAULT_LOCATOR_CACHE_TIMEOUT}). When this timeout
+         * expires, the reference for the entry in the backing
+         * {@link HardReferenceQueue} will be cleared. Note that the entry will
+         * remain in the {@link IResourceLocator} cache regardless as long as it
+         * is strongly reachable.
+         */
+        String CLIENT_LOCATOR_CACHE_TIMEOUT = IBigdataClient.class.getName()
+                + ".locatorCacheTimeout";
+
+        String DEFAULT_CLIENT_LOCATOR_CACHE_TIMEOUT = "" + (60 * 1000);
 
         /**
          * The capacity of the LRU cache of {@link IIndex} proxies held by the

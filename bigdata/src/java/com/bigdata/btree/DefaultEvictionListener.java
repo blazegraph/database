@@ -26,7 +26,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.btree;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.cache.HardReferenceQueue;
@@ -44,17 +43,18 @@ public class DefaultEvictionListener implements
     /**
      * Log for eviction of dirty leaves and nodes. 
      */
-    public static final Logger log = Logger.getLogger(DefaultEvictionListener.class);
+    protected static final Logger log = Logger
+            .getLogger(DefaultEvictionListener.class);
     
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO.toInt();
+    final static protected boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG.toInt();
+    final static protected boolean DEBUG = log.isDebugEnabled();
 
     public void evicted(final HardReferenceQueue<PO> cache, final PO ref) {
 
@@ -116,10 +116,10 @@ public class DefaultEvictionListener implements
                 assert !ref.dirty;
                 assert ref.identity != PO.NULL;
 
-                if(btree.readRetentionQueue!=null) {
-                    
+                if (btree.readRetentionQueue != null) {
+
                     btree.readRetentionQueue.append(ref);
-                    
+
                 }
                 
             }

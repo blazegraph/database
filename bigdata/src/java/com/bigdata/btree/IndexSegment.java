@@ -113,7 +113,31 @@ public class IndexSegment extends AbstractBTree {
         }
         
     }
+
+    /**
+     * Returns ZERO (0) in order to disable the read-retention queue.
+     * <p>
+     * Note: The read-retention queue is <em>disabled</em> for the
+     * {@link IndexSegment}. Instead the {@link IndexSegment} relies on the
+     * write-retention queue (all touched nodes and leaves are placed on that
+     * queue) and its {@link #leafCache}. The capacity of the write-retention
+     * queue is the right order of magnitude to fully buffer the visited nodes
+     * of an {@link IndexSegment} while the {@link #leafCache} capacity and
+     * whether or not the nodes region are fully buffered may be used to control
+     * the responsivness for leaves.
+     */
+    final protected int getReadRetentionQueueCapacity() {
+        
+        return 0;
+        
+    }
     
+    final protected int getReadRetentionQueueScan() {
+        
+        return 0;
+        
+    }
+
     /**
      * Open a read-only index segment.
      * 

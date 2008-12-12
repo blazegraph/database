@@ -71,6 +71,8 @@ abstract public class AbstractClient implements IBigdataClient {
     private final int maxStaleLocatorRetries; 
     private final int maxParallelTasksPerRequest;
     private final long taskTimeout;
+    private final int locatorCacheCapacity;
+    private final long locatorCacheTimeout;
     private final int indexCacheCapacity;
     private final long indexCacheTimeout;
     private final long tempStoreMaxExtent;
@@ -115,6 +117,18 @@ abstract public class AbstractClient implements IBigdataClient {
     public long getTaskTimeout() {
         
         return taskTimeout;
+        
+    }
+    
+    public int getLocatorCacheCapacity() {
+        
+        return locatorCacheCapacity;
+        
+    }
+    
+    public long getLocatorCacheTimeout() {
+        
+        return locatorCacheTimeout;
         
     }
     
@@ -262,6 +276,26 @@ abstract public class AbstractClient implements IBigdataClient {
             
         }
         
+        // locator cache
+        {
+            
+            locatorCacheCapacity = Integer.parseInt(properties
+                    .getProperty(Options.CLIENT_LOCATOR_CACHE_CAPACITY,
+                            Options.DEFAULT_CLIENT_LOCATOR_CACHE_CAPACITY));
+
+            if (INFO)
+                log.info(Options.CLIENT_LOCATOR_CACHE_CAPACITY + "="
+                        + locatorCacheCapacity);
+
+            locatorCacheTimeout = Long.parseLong(properties
+                    .getProperty(Options.CLIENT_LOCATOR_CACHE_TIMEOUT,
+                            Options.DEFAULT_CLIENT_LOCATOR_CACHE_TIMEOUT));
+
+            if (INFO)
+                log.info(Options.CLIENT_LOCATOR_CACHE_TIMEOUT + "="
+                        + locatorCacheTimeout);
+        }
+
         // indexCacheCapacity
         {
 

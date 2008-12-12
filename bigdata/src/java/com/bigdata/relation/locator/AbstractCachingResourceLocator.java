@@ -29,12 +29,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.relation.locator;
 
 import java.lang.ref.WeakReference;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.cache.ConcurrentWeakValueCache;
-import com.bigdata.cache.LRUCache;
-import com.bigdata.cache.WeakValueCache;
+import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.util.NT;
 
 /**
@@ -45,21 +45,17 @@ import com.bigdata.util.NT;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractCachingResourceLocator<T extends ILocatableResource> implements IResourceLocator<T> {
+abstract public class AbstractCachingResourceLocator<T extends ILocatableResource>
+        implements IResourceLocator<T> {
 
-    protected static final Logger log = Logger.getLogger(AbstractCachingResourceLocator.class);
-    
+    protected static final Logger log = Logger
+            .getLogger(AbstractCachingResourceLocator.class);
+
     protected static final boolean INFO = log.isInfoEnabled();
-    
+
     private transient ConcurrentWeakValueCache<NT, T> cache;
 
     private int capacity;
-    
-    /**
-     * The default #of recently located resources whose hard references will be
-     * retained by the {@link LRUCache}.
-     */
-    protected static transient final int DEFAULT_CACHE_CAPACITY = 10;
 
     /**
      * The cache capacity.
@@ -70,19 +66,31 @@ abstract public class AbstractCachingResourceLocator<T extends ILocatableResourc
         
     }
 
-    protected AbstractCachingResourceLocator() {
+    /**
+     * 
+     * @param capacity
+     *            The cache capacity.
+     * @param timeout
+     *            The timeout for stale entries.
+     */
+    protected AbstractCachingResourceLocator(final int capacity,
+            final long timeout) {
 
-        this(DEFAULT_CACHE_CAPACITY);
-
-    }
-
-    protected AbstractCachingResourceLocator(int capacity) {
-
+        if (capacity <= 0)
+            throw new IllegalArgumentException();
+        
+        if (timeout < 0)
+            throw new IllegalArgumentException();
+        
         this.capacity = capacity;
         
 //        this.cache = new WeakValueCache<NT, T>(new LRUCache<NT, T>(capacity));
 
-        this.cache = new ConcurrentWeakValueCache<NT, T>(capacity);
+        this.cache = new ConcurrentWeakValueCache<NT, T>(
+                new HardReferenceQueue<T>(null/* evictListener */, capacity,
+                        HardReferenceQueue.DEFAULT_NSCAN, TimeUnit.MILLISECONDS
+                                .toNanos(timeout)), .75f/* loadFactor */,
+                16/* concurrencyLevel */, true/* removeClearedEntries */);
 
     }
 

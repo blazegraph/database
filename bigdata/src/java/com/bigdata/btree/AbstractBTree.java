@@ -383,9 +383,10 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
      * <p>
      * Note: the {@link #readRetentionQueue} will typically contain multiple
      * references to a given node.
-     * 
-     * FIXME This is an experimental feature.  It is turned on or off in the
-     * ctor for now.
+     * <p>
+     * Note: the {@link IndexSegment} has an additional leaf cache since its
+     * iterators do not use the {@link Node}s to scan to the prior or next
+     * {@link Leaf}.
      */
     final protected HardReferenceQueue<PO> readRetentionQueue;
 
@@ -572,17 +573,32 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
      */
     protected HardReferenceQueue<PO> newReadRetentionQueue() {
 
-        return (metadata.getReadRetentionQueueCapacity() != 0
+        final int capacity = getReadRetentionQueueCapacity(); 
+        
+        return (capacity != 0
 
-        ? new HardReferenceQueue<PO>(NOPEvictionListener.INSTANCE, metadata
-                .getReadRetentionQueueCapacity(), metadata
-                .getReadRetentionQueueScan())
+        ? new HardReferenceQueue<PO>(//
+                NOPEvictionListener.INSTANCE,//
+                capacity, //
+                getReadRetentionQueueScan())
 
         : null
 
         );
           
     }
+
+    /**
+     * The capacity for the {@link #readRetentionQueue} (may differ for
+     * {@link BTree} and {@link IndexSegment}).
+     */
+    abstract protected int getReadRetentionQueueCapacity();
+
+    /**
+     * The capacity for the {@link #readRetentionQueue} (may differ for
+     * {@link BTree} and {@link IndexSegment}).
+     */
+    abstract protected int getReadRetentionQueueScan();
     
     /**
      * The contract for {@link #close()} is to reduce the resource burden of the

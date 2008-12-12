@@ -39,6 +39,7 @@ import java.util.concurrent.locks.Lock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndex;
+import com.bigdata.cache.LRUCache;
 import com.bigdata.concurrent.NamedLock;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IIndexManager;
@@ -127,7 +128,19 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
     private final transient NamedLock<String> namedLock = new NamedLock<String>();
 
     /**
-     * Designated constructor.
+     * The default #of recently located resources whose hard references will be
+     * retained by the {@link LRUCache}.
+     */
+    protected static transient final int DEFAULT_CACHE_CAPACITY = 10;
+
+    /**
+     * The default timeout for stale entries.
+     */
+    protected static transient final long DEFAULT_CACHE_TIMEOUT = (60 * 1000);
+
+    /**
+     * Ctor uses {@link #DEFAULT_CACHE_CAPACITY} and
+     * {@link #DEFAULT_CACHE_TIMEOUT}.
      * 
      * @param indexManager
      * @param delegate
@@ -136,7 +149,29 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
      */
     public DefaultResourceLocator(final IIndexManager indexManager,
             final IResourceLocator<T> delegate) {
+        
+        this(indexManager, delegate, DEFAULT_CACHE_CAPACITY,
+                DEFAULT_CACHE_TIMEOUT);
+    
+    }
 
+    /**
+     * 
+     * @param indexManager
+     * @param delegate
+     *            Optional {@link IResourceLocator} to which unanswered requests
+     *            are then delegated.
+     * @param cacheCapacity
+     *            The capacity of the internal weak value cache.
+     * @param cacheTimeout
+     *            The timeout for stale entries in that cache.
+     */
+    public DefaultResourceLocator(final IIndexManager indexManager,
+            final IResourceLocator<T> delegate, final int cacheCapacity,
+            final long cacheTimeout) {
+
+        super(cacheCapacity, cacheTimeout);
+        
         if (indexManager == null)
             throw new IllegalArgumentException();
 

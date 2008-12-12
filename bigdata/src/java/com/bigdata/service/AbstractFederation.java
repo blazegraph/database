@@ -446,7 +446,7 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
         
     }
 
-    protected AbstractFederation(IBigdataClient client) {
+    protected AbstractFederation(final IBigdataClient client) {
 
         if (client == null)
             throw new IllegalArgumentException();
@@ -491,7 +491,10 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
                 );
 
         // Setup locator.
-        resourceLocator = new DefaultResourceLocator(this, null /* delegate */);
+        resourceLocator = new DefaultResourceLocator(this,
+                null, // delegate
+                ((AbstractClient) client).getLocatorCacheCapacity(),
+                ((AbstractClient) client).getLocatorCacheTimeout());
         
     }
     
