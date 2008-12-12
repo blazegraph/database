@@ -1551,8 +1551,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                 + (overflowHandler == null ? "N/A" : overflowHandler.getClass()
                         .getName()));
         sb.append(", splitHandler="
-                + (splitHandler == null ? "N/A" : splitHandler.getClass()
-                        .getName()));
+                + (splitHandler == null ? "N/A" : splitHandler.toString()));
         sb.append(", indexSegmentBranchingFactor=" + indexSegmentBranchingFactor);
         sb.append(", indexSegmentBufferNodes=" + indexSegmentBufferNodes);
         sb.append(", indexSegmentLeafCacheCapacity=" + indexSegmentLeafCacheCapacity);

@@ -26,6 +26,7 @@ package com.bigdata.btree;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.lang.reflect.Constructor;
@@ -366,7 +367,8 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      * @throws RootBlockException
      *             if the root block is invalid.
      * @throws RuntimeException
-     *             if there is a problem.
+     *             if there is a problem, including a
+     *             {@link FileNotFoundException}.
      * 
      * @see #close()
      */
@@ -393,6 +395,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
             // open the file.
             if (this.raf == null) {
 
+                // Note: Throws FileNotFoundException
                 this.raf = new RandomAccessFile(file, mode);
 
             }
@@ -432,7 +435,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
             _close();
 
             // re-throw the exception.
-            throw new RuntimeException(t);
+            throw new RuntimeException("Could not (re-) open: file=" + file, t);
 
         }
 
