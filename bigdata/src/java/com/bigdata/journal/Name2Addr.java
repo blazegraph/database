@@ -30,11 +30,13 @@ import java.io.DataInputStream;
 import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
@@ -43,7 +45,8 @@ import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IDirtyListener;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.cache.ICacheEntry;
+import com.bigdata.cache.ConcurrentWeakValueCache;
+import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.counters.CounterSet;
@@ -132,7 +135,8 @@ public class Name2Addr extends BTree {
      * _clean_ indices can be held in the cache. Dirty indices remain strongly
      * reachable owing to their existence in the {@link #commitList}.
      */
-    private WeakValueCache<String, BTree> indexCache = null;
+//    private WeakValueCache<String, BTree> indexCache = null;
+    private ConcurrentWeakValueCache<String, BTree> indexCache = null;
 
     /**
      * Holds hard references for the dirty indices along with the index name.
@@ -349,13 +353,23 @@ public class Name2Addr extends BTree {
      *             unless this is the {@link ITx#UNISOLATED} {@link Name2Addr}
      *             instance.
      */
-    private void assertUnisolatedInstance() {
+    final protected void assertUnisolatedInstance() {
         
         if(indexCache == null) {
             
             throw new IllegalStateException();
             
         }
+        
+    }
+    
+    /**
+     * Return <code>true</code> iff this is the {@link ITx#UNISOLATED}
+     * {@link Name2Addr} instance.
+     */
+    final protected boolean isUnisolatedInstance() {
+
+        return indexCache != null;
         
     }
     
@@ -370,22 +384,48 @@ public class Name2Addr extends BTree {
      * @param cacheCapacity
      *            The capacity of the inner {@link LRUCache} for the
      *            {@link WeakValueCache}.
+     * @param cacheTimeout
+     *            The timeout for stale entries in the cache.
      * 
      * @see Options#LIVE_INDEX_CACHE_CAPACITY
+     * @see Options#LIVE_INDEX_CACHE_TIMEOUT
      */
-    protected void setupCache(final int cacheCapacity) {
-        
+    protected void setupCache(final int cacheCapacity, final long cacheTimeout) {
+
         if (indexCache != null) {
 
             // Cache was already configured.
             
             throw new IllegalStateException();
-            
+
         }
+
+        // indexCache = new WeakValueCache<String, BTree>(
+        // new LRUCache<String, BTree>(cacheCapacity));
+
+        indexCache = new ConcurrentWeakValueCache<String, BTree>(
+                new HardReferenceQueue<BTree>(null/* evictListener */,
+                        cacheCapacity, HardReferenceQueue.DEFAULT_NSCAN,
+                        TimeUnit.MILLISECONDS.toNanos(cacheTimeout)),
+                .75f/* loadFactor */, 16/* concurrencyLevel */, true/* removeClearedEntries */);
+
+    }
+    
+    /**
+     * An iterator that visits the entries in the internal {@link #indexCache}.
+     * You must test the weak reference for each entry in order to determine
+     * whether its value has been cleared as of the moment that you request that
+     * value.
+     * 
+     * @throws IllegalStateException
+     *             unless this is the {@link ITx#UNISOLATED} instance.
+     */
+    Iterator<java.util.Map.Entry<String, WeakReference<BTree>>> indexCacheEntryIterator() {
+
+        assertUnisolatedInstance();
         
-        indexCache = new WeakValueCache<String, BTree>(
-                new LRUCache<String, BTree>(cacheCapacity));
-        
+        return indexCache.entryIterator();
+    
     }
     
     /**
@@ -393,13 +433,12 @@ public class Name2Addr extends BTree {
      * <p>
      * Note: This is synchronized even through the commitList is thread-safe in
      * order to make the test atomic with respect to {@link #handleCommit(long)}.
-     * <p>
-     * Note: This will always return <code>false</code> unless you are using
-     * the {@link ITx#UNISOLATED} {@link Name2Addr} object since the
-     * {@link #commitList} will always be empty.
      * 
      * @param name
      *            The index name.
+     * 
+     * @throws IllegalStateException
+     *             unless this is the {@link ITx#UNISOLATED} instance.
      */
     synchronized public boolean willCommit(final String name) {
 
@@ -851,18 +890,28 @@ public class Name2Addr extends BTree {
 
         assertUnisolatedInstance();
         
-        /*
-         * Note: the WeakValueCache does not let you replace an existing entry
-         * so we first remove the old entry under the key if there is one.
-         */
+//        /*
+//         * Note: the WeakValueCache does not let you replace an existing entry
+//         * so we first remove the old entry under the key if there is one.
+//         */
+//        if (replace) {
+//
+//            indexCache.remove(name);
+//
+//        }
+//        
+//        // add name -> btree mapping to the transient cache.
+//        indexCache.put(name, btree, true/*dirty*/);
+
         if (replace) {
 
-            indexCache.remove(name);
-
+            indexCache.put(name, btree);
+            
+        } else {
+            
+            indexCache.putIfAbsent(name, btree);
+            
         }
-        
-        // add name -> btree mapping to the transient cache.
-        indexCache.put(name, btree, true/*dirty*/);
 
     }
     
@@ -969,17 +1018,28 @@ public class Name2Addr extends BTree {
 
         final CounterSet tmp = new CounterSet();
         
-        final Iterator<ICacheEntry<String, BTree>> itr = indexCache
-                .entryIterator();
+//        final Iterator<ICacheEntry<String, BTree>> itr = indexCache.
+//        .entryIterator();
+
+        final Iterator<java.util.Map.Entry<String, WeakReference<BTree>>> itr = indexCacheEntryIterator();
 
         while (itr.hasNext()) {
 
-            final ICacheEntry<String, BTree> entry = itr.next();
+//            final ICacheEntry<String, BTree> entry = itr.next();
+            final java.util.Map.Entry<String, WeakReference<BTree>> entry = itr.next();
 
             final String name = entry.getKey();
 
-            final BTree btree = entry.getObject();
+            final BTree btree = entry.getValue().get();
 
+            if (btree == null) {
+
+                // Note: Weak reference has been cleared.
+                
+                continue;
+                
+            }
+            
             final IndexMetadata md = btree.getIndexMetadata();
 
             LocalPartitionMetadata pmd = md.getPartitionMetadata();

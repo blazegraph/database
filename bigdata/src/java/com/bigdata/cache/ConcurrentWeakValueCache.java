@@ -23,10 +23,12 @@ import org.apache.log4j.Logger;
  * references to the objects in the cache. For these reasons, this class uses an
  * initialCapacity for the inner {@link ConcurrentHashMap} that is larger than
  * the <i>queueCapacity</i>. This helps to prevent resizing the
- * {@link ConcurrentHashMap} which is a relatively expensive operation. Also
- * note that you can set a <i>timeout</i> for the {@link HardReferenceQueue}.
- * This may be used to evict references from the tail of the queue whose last
- * access time exceeds the timeout.
+ * {@link ConcurrentHashMap} which is a relatively expensive operation.
+ * <p>
+ * Note: you can set a <i>timeout</i> for the {@link HardReferenceQueue}. This
+ * may be used to evict references from the tail of the queue whose last access
+ * time exceeds the timeout. The entries for those references WILL NOT be
+ * cleared from this map as long as those references remain strongly reachable.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -193,7 +195,8 @@ public class ConcurrentWeakValueCache<K, V> {
             final boolean removeClearedReferences
             ) {
 
-        if(queue==null) throw new IllegalArgumentException();
+        if (queue == null)
+            throw new IllegalArgumentException();
         
         this.queue = queue;
         

@@ -31,12 +31,16 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.File;
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
@@ -47,13 +51,14 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.btree.BTree.Counter;
-import com.bigdata.cache.LRUCache;
-import com.bigdata.cache.WeakValueCache;
+import com.bigdata.cache.ConcurrentWeakValueCache;
+import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.config.Configuration;
 import com.bigdata.config.IValidator;
 import com.bigdata.config.IntegerRangeValidator;
 import com.bigdata.config.IntegerValidator;
 import com.bigdata.config.LongRangeValidator;
+import com.bigdata.config.LongValidator;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.journal.Name2Addr.Entry;
@@ -272,13 +277,22 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
     private ICommitRecord _commitRecord;
 
     /**
-     * The configured capacity for the LRU backing the index cache maintained by
-     * the "live" {@link Name2Addr} object.
+     * The configured capacity for the {@link HardReferenceQueue} backing the
+     * index cache maintained by the "live" {@link Name2Addr} object.
      * 
      * @see Options#LIVE_INDEX_CACHE_CAPACITY
      */
     private final int liveIndexCacheCapacity;
 
+    /**
+     * The configured timeout for stale entries in the
+     * {@link HardReferenceQueue} backing the index cache maintained by the
+     * "live" {@link Name2Addr} object.
+     * 
+     * @see Options#LIVE_INDEX_CACHE_TIMEOUT
+     */
+    private final long liveIndexCacheTimeout;
+    
     /**
      * The configured capacity for the LRU backing the
      * {@link #historicalIndexCache}.
@@ -286,7 +300,15 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      * @see Options#HISTORICAL_INDEX_CACHE_CAPACITY
      */
     private final int historicalIndexCacheCapacity;
-    
+
+    /**
+     * The configured timeout for stale entries in the
+     * {@link HardReferenceQueue} backing the {@link #historicalIndexCache}.
+     * 
+     * @see Options#HISTORICAL_INDEX_CACHE_TIMEOUT
+     */
+    private final long historicalIndexCacheTimeout;
+
     /**
      * A cache that is used by the {@link AbstractJournal} to provide a
      * canonicalizing mapping from an address to the instance of a read-only
@@ -306,8 +328,10 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      * ensure that partial writes are discarded.
      * 
      * @see Options#HISTORICAL_INDEX_CACHE_CAPACITY
+     * @see Options#HISTORICAL_INDEX_CACHE_TIMEOUT
      */
-    final private WeakValueCache<Long, ICommitter> historicalIndexCache;
+//    final private WeakValueCache<Long, ICommitter> historicalIndexCache;
+    final private ConcurrentWeakValueCache<Long, BTree> historicalIndexCache;
 
     /**
      * The "live" BTree mapping index names to the last metadata record
@@ -339,7 +363,16 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      */
     public IIndex getName2Addr() {
 
-        final long checkpointAddr = name2Addr.getCheckpoint().getCheckpointAddr();
+        final long checkpointAddr;
+        if (name2Addr == null) {
+
+            checkpointAddr = getRootAddr(ROOT_NAME2ADDR);
+            
+        } else {
+
+            checkpointAddr = name2Addr.getCheckpoint().getCheckpointAddr();
+            
+        }
         
         /*
          * Note: This uses the canonicalizing mapping to get an instance that is
@@ -607,13 +640,31 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                     Options.DEFAULT_HISTORICAL_INDEX_CACHE_CAPACITY,
                     IntegerValidator.GT_ZERO);
 
-            historicalIndexCache = new WeakValueCache<Long, ICommitter>(
-                    new LRUCache<Long, ICommitter>(historicalIndexCacheCapacity));
+            historicalIndexCacheTimeout = getProperty(
+                    Options.HISTORICAL_INDEX_CACHE_CAPACITY,
+                    Options.DEFAULT_HISTORICAL_INDEX_CACHE_CAPACITY,
+                    LongValidator.GTE_ZERO);
+
+//            historicalIndexCache = new WeakValueCache<Long, ICommitter>(
+//                    new LRUCache<Long, ICommitter>(historicalIndexCacheCapacity));
+
+            historicalIndexCache = new ConcurrentWeakValueCache<Long, BTree>(
+                    new HardReferenceQueue<BTree>(null/* evictListener */,
+                            historicalIndexCacheCapacity,
+                            HardReferenceQueue.DEFAULT_NSCAN,
+                            TimeUnit.MILLISECONDS
+                                    .toNanos(historicalIndexCacheTimeout)),
+                    .75f/* loadFactor */, 16/* concurrencyLevel */, true/* removeClearedEntries */);
 
             liveIndexCacheCapacity = getProperty(
                     Options.LIVE_INDEX_CACHE_CAPACITY,
                     Options.DEFAULT_LIVE_INDEX_CACHE_CAPACITY,
                     IntegerValidator.GT_ZERO);
+
+            liveIndexCacheTimeout = getProperty(
+                    Options.LIVE_INDEX_CACHE_TIMEOUT,
+                    Options.DEFAULT_LIVE_INDEX_CACHE_TIMEOUT,
+                    LongValidator.GTE_ZERO);
 
         }
 
@@ -1186,11 +1237,14 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         if (INFO)
             log.info("Refreshing index counter set.");
 
-        synchronized (name2Addr) {
+        /*
+         * @todo probably does not need to be synchronized any more.
+         */
+//        synchronized (name2Addr) {
 
             return name2Addr.getIndexCounters();
 
-        }
+//        }
             
     }
     
@@ -1310,12 +1364,14 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      *       require us to close and reopen the journal since that will disturb
      *       concurrent readers.
      */
-    public void closeForWrites(long closeTime) {
+    public void closeForWrites(final long closeTime) {
+        
+        final long lastCommitTime = _rootBlock.getLastCommitTime();
         
         if (INFO)
             log.info("Closing journal for further writes: closeTime="
                     + closeTime + ", lastCommitTime="
-                    + _rootBlock.getLastCommitTime());
+                    + lastCommitTime);
 
         if (DEBUG)
             log.debug("before: " + _rootBlock);
@@ -1375,6 +1431,99 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
         // discard current commit record - can be re-read from the store.
         _commitRecord = null;
+        
+        /*
+         * Convert all of the unisolated BTree objects into read-historical
+         * BTrees as of the lastCommitTime on the journal. This is done in order
+         * to benefit from any data buffered by those BTrees since buffered data
+         * is data that we don't need to read from disk and we don't need to
+         * de-serialize. This is especially important for asynchronous overflow
+         * processing which performs full index scans of the BTree's shortly
+         * after synchronous overflow process (and which is the main reason why
+         * closeForWrites() exists).
+         * 
+         * Note: The caller already promises that they hold the exclusive write
+         * lock so we don't really need to synchronize on [name2Addr].
+         * 
+         * Note: If we find a dirty mutable BTree then we ignore it rather than
+         * repurposing it. This allows the possibility that there are
+         * uncommitted writes.
+         */
+        synchronized (name2Addr) {
+
+            final Iterator<Map.Entry<String, WeakReference<BTree>>> itr = name2Addr
+                    .indexCacheEntryIterator();
+
+            while (itr.hasNext()) {
+
+                final java.util.Map.Entry<String, WeakReference<BTree>> entry = itr
+                        .next();
+
+                final String name = entry.getKey();
+
+                final BTree btree = entry.getValue().get();
+
+                if (btree == null) {
+
+                    // Note: Weak reference was cleared.
+                    continue;
+                    
+                }
+                
+                if(btree.needsCheckpoint()) {
+                    
+                    // Note: Don't convert a dirty BTree.
+                    continue;
+                    
+                }
+                
+                // Recover the Entry which has the last checkpointAddr.
+                final Name2Addr.Entry _entry = name2Addr.getEntry(name);
+                
+                if (_entry == null) {
+
+                    /*
+                     * There must be an Entry for each index in Name2Addr's
+                     * cache.
+                     */
+                    
+                    throw new AssertionError("No entry: name=" + name);
+                    
+                }
+                
+                /*
+                 * Mark the index as read-only (the whole journal no longer
+                 * accepts writes) before placing it in the historical index
+                 * cache (we don't want concurrent requests to be able to obtain
+                 * a BTree that is not marked as read-only from the historical
+                 * index cache).
+                 */
+                
+                btree.setReadOnly(true);
+                
+                /*
+                 * Put the BTree into the historical index cache under that
+                 * checkpointAddr.
+                 * 
+                 * Note: putIfAbsent() avoids the potential problem of having
+                 * more than one object for the same checkpointAddr.
+                 */
+
+                historicalIndexCache.putIfAbsent(_entry.checkpointAddr, btree);
+            
+            } // next index.
+            
+//            /*
+//             * Note: We can't simply discard this. It is used by getName2Addr()
+//             * to obtain the read-committed view.
+//             * 
+//             * @todo it is worth modifying how that works so that we can discard
+//             * this?
+//             */
+            // discard since no writers are allowed.
+            name2Addr = null;
+            
+        }
        
 //        close();
         
@@ -2015,7 +2164,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
         }
 
-        name2Addr.setupCache(liveIndexCacheCapacity);
+        name2Addr.setupCache(liveIndexCacheCapacity, liveIndexCacheTimeout);
         
         // register for commit notices.
         setCommitter(ROOT_NAME2ADDR, name2Addr);
@@ -2281,25 +2430,50 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      * @see Options#HISTORICAL_INDEX_CACHE_CAPACITY
      */
     final public BTree getIndex(final long checkpointAddr) {
+
+        /*
+         * Note: There are potentially three IO operations here. Reading the
+         * Checkpoint record, reading the IndexMetadata record, then reading the
+         * root node/leaf of the BTree.
+         * 
+         * Note: We use putIfAbsent() here rather than the [synchronized]
+         * keyword for higher concurrency with atomic semantics.
+         */
+//        synchronized (historicalIndexCache) {
+
+//            BTree btree = (BTree) historicalIndexCache.get(checkpointAddr);
+  
+        BTree btree = historicalIndexCache.get(checkpointAddr);
         
-        synchronized (historicalIndexCache) {
+        if (btree == null) {
 
-            BTree obj = (BTree) historicalIndexCache.get(checkpointAddr);
-
-            if (obj == null) {
-
-                // Note: Does not set lastCommitTime.
-                obj = BTree.load(this, checkpointAddr, true/* readOnly */);
-             
-//                obj.setReadOnly(true);
+            /* 
+             * Load BTree from the store.
+             * 
+             * Note: Does not set lastCommitTime.
+             */
+            btree = BTree.load(this, checkpointAddr, true/* readOnly */);
                 
-            }
-            
-            historicalIndexCache.put(checkpointAddr, (ICommitter)obj, false/*dirty*/);
-    
-            return obj;
+        }
+
+        // Note: putIfAbsent is used to make concurrent requests atomic.
+        BTree oldval = historicalIndexCache.putIfAbsent(checkpointAddr, btree);
+
+        if (oldval != null) {
+
+            /*
+             * If someone beat us to it then use the BTree instance that they
+             * loaded.
+             */
+            btree = oldval;
 
         }
+
+// historicalIndexCache.put(checkpointAddr, (ICommitter)btree, false/*dirty*/);
+    
+        return btree;
+
+//        }
         
     }
 

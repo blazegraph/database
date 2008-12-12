@@ -599,14 +599,13 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
 
                     /*
                      * Something unexpected.
-                     * 
-                     * Note: We add the orderIndex to the stack trace so
-                     * that we can figure out which JoinTask failed.
                      */
 
+                    // add to list of errors.
                     errors.add(new ExecutionException(ex));
 
-                    log.error(ex);
+                    // log w/ stack trace so that we can see where this came from.
+                    log.error(ex.getMessage(), ex);
                     
                 }
 

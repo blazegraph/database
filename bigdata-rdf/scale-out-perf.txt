@@ -2986,6 +2986,35 @@ Commit notes:
     some temporary drive space and some duplication during index
     builds, etc.  Maybe a 1.2 multiplier on top of that?
 
+  * Is aynchronous overflow causing contention across services or
+    causing the application to wait such that we wind up with only one
+    data service progressing at a time?
+
+    - What effect does limited parallelism during asynchronous
+      overflow have?
+
+      Make sure that atomic update tasks notice when the priamry task
+      is cancelled (liveness).
+
+    - What about a Direct buffer for the journal?
+ 
+      Note: We will have to force overflow, terminating asynchronous
+      verflow eagerly if necessary including any chained tasks such as
+      the atomic updtes, before we reach the maximum capacity of the
+      journal since it can not be extended (we will be using a direct
+      buffer of a fixed size for the live journal that is passed in
+      and passed from one to the next, much like the write cache).
+      The trigger point will have to be set early enough that we can
+      get the builds done (at a minimum) before the live journal fills
+      up, however copying data off of the live journal should be much
+      faster since it is fully buffered.
+
+    - Occasional RejectedExecutionException during builds.  Perhaps
+      OOM?  This was on DS1.  Oh.  The write service defaults to a
+      fixed capacity queue, so that is what is happening. It also has
+      a cap on the thread pool size - play around with that when there
+      are a large #of splits on hand.
+
   * CDL may loose some data during load.  Compare CDL for U100 with
     single threaded load of U100 (#clients=1).
 
@@ -3004,6 +3033,16 @@ Commit notes:
   - *** Compacting merges tend to trigger
     FileChannelUtility#transferAll().  This is a known Sun bug, but we
     should implement a work around.
+
+Caused by: java.io.IOException: Map failed
+	at sun.nio.ch.FileChannelImpl.map(FileChannelImpl.java:761)
+	at sun.nio.ch.FileChannelImpl.transferFromFileChannel(FileChannelImpl.java:540)
+	at sun.nio.ch.FileChannelImpl.transferFrom(FileChannelImpl.java:603)
+	at com.bigdata.io.FileChannelUtility.transferAll(FileChannelUtility.java:317)
+	at com.bigdata.journal.AbstractBufferStrategy.transferFromDiskTo(AbstractBufferStrategy.java:424)
+	at com.bigdata.journal.DiskOnlyStrategy.transferTo(DiskOnlyStrategy.java:2191)
+	at com.bigdata.btree.IndexSegmentBuilder.writeIndexSegment(IndexSegmentBuilder.java:1852)
+	at com.bigdata.btree.IndexSegmentBuilder.call(IndexSegmentBuilder.java:1135)
 
   * (Partly resolved, but now I can't get it to release all releasable
     resources.)
@@ -3182,18 +3221,6 @@ commitPointToPreserve=1228508365953
 
     - Try different branching factors for the index segments.
 
-    - Try a Direct buffer for the journal.  We will have to force
-      overflow, terminating asynchronous overflow eagerly if necessary
-      including any chained tasks such as the atomic updtes, before we
-      reach the maximum capacity of the journal since it can not be
-      extended (we will be using a direct buffer of a fixed size for
-      the live journal that is passed in and passed from one to the
-      next, much like the write cache).  The trigger point will have
-      to be set early enough that we can get the builds done (at a
-      minimum) before the live journal fills up, however copying data
-      off of the live journal should be much faster since it is fully
-      buffered.
-
     - Close out old indices.  This has been deferred for the Journal,
       Name2Addr, and the resource locator until I can get some more
       feedback on how well the change is performing in the
@@ -3201,10 +3228,6 @@ commitPointToPreserve=1228508365953
       risk that indices will not actually be closed if they are open
       in the historical index cache or the live index cache.
       Likewise, release of old relation views is also important.
-
-      defer. Name2Addr (live index cache)
-
-      defer. AbstractJournal (historical index cache)
 
       defer. DefaultResourceLocator's cache.
       
