@@ -1,6 +1,5 @@
 package com.bigdata.service;
 
-import java.net.InetAddress;
 import java.util.UUID;
 
 import com.bigdata.counters.AbstractStatisticsCollector;

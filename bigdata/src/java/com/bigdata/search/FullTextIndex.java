@@ -81,10 +81,8 @@ import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
-import com.bigdata.resources.OverflowManager;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.IDataService;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.util.concurrent.ExecutionHelper;
 
@@ -334,23 +332,6 @@ public class FullTextIndex extends AbstractRelation {
         
         String DEFAULT_INDEXER_TIMEOUT = "1000";
         
-        /**
-         * Optional property gives the {@link UUID} of the {@link IDataService}
-         * on which the indices for the {@link FullTextIndex} will be
-         * registered. This property only used for {@link IBigdataFederation}s
-         * and only when {@link IBigdataFederation#isScaleOut()} is
-         * <code>true</code> (it is ignored for temporary stores created when
-         * the deployment is scale-out since the temporary stores use a
-         * different index manager).
-         * <p>
-         * Note: You can lock the {@link FullTextIndex} onto a specific
-         * {@link IDataService} using this option if you also disable
-         * {@link OverflowManager.Options#MAXIMUM_MOVES_PER_TARGET} or disable
-         * {@link OverflowManager.Options#OVERFLOW_ENABLED} for the specified
-         * {@link IDataService}.
-         */
-        String DATA_SERVICE_UUID = "indexer.dataServiceUUID";
-        
     }
     
     /**
@@ -440,7 +421,7 @@ public class FullTextIndex extends AbstractRelation {
         }
         
         // resolve index (might not exist, in which case this will be null).
-        ndx = getIndex(getNamespace()+NAME_SEARCH);
+        ndx = getIndex(getNamespace()+"."+NAME_SEARCH);
         
     }
 
@@ -454,7 +435,7 @@ public class FullTextIndex extends AbstractRelation {
 
         assertWritable();
         
-        final String name = getNamespace() + NAME_SEARCH;
+        final String name = getNamespace() + "."+NAME_SEARCH;
 
         final IIndexManager indexManager = getIndexManager();
 
@@ -476,37 +457,10 @@ public class FullTextIndex extends AbstractRelation {
             final IndexMetadata indexMetadata = new IndexMetadata(indexManager,
                     p, name, UUID.randomUUID());
 
-            if (indexManager instanceof IBigdataFederation
-                    && ((IBigdataFederation) indexManager).isScaleOut() &&
-                    p.getProperty(Options.DATA_SERVICE_UUID)!=null
-                    ) {
+            indexManager.registerIndex(indexMetadata);
 
-                // register the indices on the same data service.
-                
-                final IBigdataFederation fed = (IBigdataFederation)indexManager;
-                
-                final UUID dataServiceUUID = UUID.fromString(p
-                        .getProperty(Options.DATA_SERVICE_UUID));
-
-                if (INFO) {
-
-                    log.info("Allocating on dataService=" + dataServiceUUID);
-
-                }
-
-                fed.registerIndex(indexMetadata, dataServiceUUID);
-
-                if(INFO)
-                    log.info("Registered new text index: name=" + name);
-                
-            } else {
-
-                indexManager.registerIndex(indexMetadata);
-
-                if(INFO)
-                    log.info("Registered new text index: name=" + name);
-
-            }
+            if (INFO)
+                log.info("Registered new text index: name=" + name);
 
             ndx = getIndex(name);
 
@@ -531,7 +485,7 @@ public class FullTextIndex extends AbstractRelation {
 
         try {
 
-            indexManager.dropIndex(getNamespace() + NAME_SEARCH);
+            indexManager.dropIndex(getNamespace() +"."+ NAME_SEARCH);
 
         } finally {
 

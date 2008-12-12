@@ -175,8 +175,9 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
                 .getFederation(), namespace, ITx.UNISOLATED, client
                 .getProperties());
 
-        if(!new SPORelation(store.getIndexManager(), store.getNamespace()
-                + store.NAME_SPO_RELATION, store.getTimestamp(), store.getProperties()).exists()) {
+        if (!new SPORelation(store.getIndexManager(), store.getNamespace()
+                + "." + SPORelation.NAME_SPO_RELATION, store.getTimestamp(), store
+                .getProperties()).exists()) {
             
             // Presume that the KB does not exist.
             

@@ -57,7 +57,7 @@ abstract public class AbstractService implements IService {
      */
     protected AbstractService() {
         
-        serviceName = getHostname() + "#" + getServiceIface();
+        serviceName = getHostname() + "#" + getServiceIface().getName();
         
     }
 

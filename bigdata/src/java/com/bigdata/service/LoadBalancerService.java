@@ -1150,7 +1150,7 @@ abstract public class LoadBalancerService extends AbstractService
              * The percent of the time that the CPUs are idle.
              */
             final double percentProcessorIdle = 1d - getAverageValueForMinutes(
-                    hostCounterSet, IHostCounters.CPU_PercentProcessorTime,
+                    hostCounterSet, IRequiredHostCounters.CPU_PercentProcessorTime,
                     .5d, historyMinutes);
 
             /*
