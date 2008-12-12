@@ -807,8 +807,8 @@ abstract public class IndexManager extends StoreManager {
                      */
                     
                     throw new RuntimeException("Could not load index: name="
-                            + name + ", timestamp=" + timestamp
-                            + " from resource=" + resource.getFile(), ex);
+                            + name + ", timestamp=" + timestamp + ", resource="
+                            + resource.getFile() + " : " + ex, ex);
                     
                 }
 
