@@ -232,6 +232,26 @@ public class ConcurrentDataLoader {
      */
     final AtomicInteger nscanned = new AtomicInteger(0);
     
+    public int getScanCount() {
+        
+        return nscanned.get();
+        
+    }
+    
+    /**
+     * The #of scanned files accepted tasked to this client for processing. When
+     * there is more than one client, the total of {@link #taskedCount} across
+     * all clients should sum to the value of {@link #nscanned} for any of those
+     * clients ({@link #nscanned} should be the same for all clients).
+     */
+    final AtomicInteger taskedCount = new AtomicInteger(0);
+    
+    public int getTaskedCount() {
+        
+        return taskedCount.get();
+        
+    }
+    
 //    /**
 //     * The elapsed time during which one or more tasks was running on this
 //     * service.
@@ -297,9 +317,18 @@ public class ConcurrentDataLoader {
      *            pre-partitioned then you do not need to specify either
      *            <i>nclients</i> or <i>clientNum</i>.)
      */
-    public ConcurrentDataLoader(IBigdataClient client, int nthreads,
-            int nclients, int clientNum) {
+    public ConcurrentDataLoader(final IBigdataClient client,
+            final int nthreads, final int nclients, final int clientNum) {
 
+        if (nthreads < 1)
+            throw new IllegalArgumentException();
+
+        if (nclients < 1)
+            throw new IllegalArgumentException();
+        
+        if (clientNum < 0 || clientNum >= nclients)
+            throw new IllegalArgumentException();
+        
         this.fed = (AbstractFederation) client.getFederation();
         
         this.nthreads = nthreads;
@@ -393,18 +422,18 @@ public class ConcurrentDataLoader {
 
         if (ourCounterSet == null) {
 
-//            final String path = fed.getServiceCounterPathPrefix()
-//                    + "Concurrent Data Loader";
-
             // make path to the counter set for the data loader.
             ourCounterSet = fed.getServiceCounterSet().makePath(
                     "Concurrent Data Loader");
 
-            ourCounterSet.addCounter("#clients", new OneShotInstrument<Integer>(
-                            nclients));
+            ourCounterSet.addCounter("#threads",
+                    new OneShotInstrument<Integer>(nthreads));
 
-            ourCounterSet.addCounter("clientNum", new OneShotInstrument<Integer>(
-                    clientNum));
+            ourCounterSet.addCounter("#clients",
+                    new OneShotInstrument<Integer>(nclients));
+
+            ourCounterSet.addCounter("clientNum",
+                    new OneShotInstrument<Integer>(clientNum));
 
             {
 
@@ -416,6 +445,15 @@ public class ConcurrentDataLoader {
                     protected void sample() {
 
                         setValue((long) nscanned.get());
+
+                    }
+                });
+                tmp.addCounter("#tasked", new Instrument<Long>() {
+
+                    @Override
+                    protected void sample() {
+
+                        setValue((long) taskedCount.get());
 
                     }
                 });
@@ -680,7 +718,7 @@ public class ConcurrentDataLoader {
 
             if(INFO) log.info("Scanning file: " + file);
 
-            nscanned.incrementAndGet();
+            final int scanCount = nscanned.incrementAndGet();
 
             if (nclients > 1) {
 
@@ -706,10 +744,19 @@ public class ConcurrentDataLoader {
 //                 * loaded by this host.
                  */
                     
-                if ((nscanned.get() /* file.getPath().hashCode() */% nclients == clientNum)) {
+                if ((scanCount /* file.getPath().hashCode() */% nclients == clientNum)) {
 
-                    if(INFO) log.info("Client" + clientNum + " tasked: " + file);
+                    if (INFO)
+                        log.info("client#=" + clientNum + ", #scanned="
+                                + scanCount + ", ntasked=" + taskedCount
+                                + ", file=" + file);
+                    
+                    System.out.println("client#=" + clientNum + ", #scanned="
+                            + scanCount + ", ntasked=" + taskedCount
+                            + ", file=" + file);
 
+                    taskedCount.incrementAndGet();
+                    
                     submitTask(file.toString(), taskFactory );
 
                 }   
@@ -720,6 +767,8 @@ public class ConcurrentDataLoader {
                  * Only one client so it loads all of the files.
                  */
 
+                taskedCount.incrementAndGet();
+                
                 submitTask(file.toString(), taskFactory);
 
             }
@@ -1361,7 +1410,8 @@ public class ConcurrentDataLoader {
          * @param toldTriples
          */
         public ReaderTask(String resource, String baseURL, RDFFormat rdfFormat,
-                boolean verifyData, IStatementBufferFactory bufferFactory, AtomicLong toldTriples) {
+                boolean verifyData, IStatementBufferFactory bufferFactory,
+                AtomicLong toldTriples) {
 
             if (resource == null)
                 throw new IllegalArgumentException();
@@ -1452,14 +1502,14 @@ public class ConcurrentDataLoader {
                 // @todo reuse the same underlying parser instance?
                 loader.loadRdf(reader, baseURL, rdfFormat, verifyData);
 
-                long nstmts = loader.getStatementsAdded();
+                final long nstmts = loader.getStatementsAdded();
 
+                final long now = System.currentTimeMillis();
+                
                 stats.toldTriples = nstmts;
 
-                stats.loadTime = System.currentTimeMillis() - begin;
+                stats.totalTime = stats.loadTime = now - begin;
                 
-                stats.totalTime = System.currentTimeMillis() - begin;
-
                 /*
                  * This reports the load rate for the file, but this will only
                  * be representative of the real throughput if autoFlush is
@@ -1852,30 +1902,25 @@ public class ConcurrentDataLoader {
          * {@link #notifyStart()} and {@link #notifyEnd()}.
          */
         public long elapsed() {
-            
-            if(endTime==0L) {
-                
+
+            if (endTime == 0L) {
+
                 // Still running.
                 return System.currentTimeMillis() - beginTime;
-                
+
             } else {
-                
+
                 // Done.
-                
+
                 final long elapsed = endTime - beginTime;
-                
+
                 assert elapsed >= 0L;
-                
+
                 return elapsed;
-                
+
             }
             
         }
-
-//      /**
-//      * The baseURL and "" if none is needed.
-//      */
-//     final String baseURL;
      
         /**
          * An attempt will be made to determine the interchange syntax using
@@ -2070,16 +2115,10 @@ public class ConcurrentDataLoader {
          */
         public void setupCounters(CounterSet tmp) {
             
-            tmp.addCounter("toldTriples", new Instrument<Long>() {
-
-                @Override
-                protected void sample() {
-
-                    setValue(toldTriples.get());
-
-                }
-            });
-
+            /*
+             * Elapsed ms since the start of the load up to and until the end of
+             * the load.
+             */
             tmp.addCounter("elapsed", new Instrument<Long>() {
 
                 @Override
@@ -2093,8 +2132,28 @@ public class ConcurrentDataLoader {
             });
 
             /*
+             * Note: This is the #of told triples read by _this_ client.
+             * 
+             * When you are loading using multiple instances of the concurrent
+             * data loader, then the total #of told triples is the aggregation
+             * across all of those instances.
+             */
+            tmp.addCounter("toldTriples", new Instrument<Long>() {
+
+                @Override
+                protected void sample() {
+
+                    setValue(toldTriples.get());
+
+                }
+            });
+
+            /*
              * Note: This is the told triples per second rate for _this_ client
-             * only. When you are loading using multiple instances of the concurrent
+             * only since it is based on the triples read by the threads for
+             * this client.
+             * 
+             * When you are loading using multiple instances of the concurrent
              * data loader, then the total told triples per second rate is the
              * aggregation across all of those instances.
              */
@@ -2120,8 +2179,8 @@ public class ConcurrentDataLoader {
          * <p>
          * Note: these totals reflect the actual state of the database, not just
          * the #of triples written by this client. Therefore if there are
-         * concurent writes then the apparent TPS here will be higher than was
-         * reported by the counters for just this client -- all writes on the
+         * concurrent writers then the apparent TPS here will be higher than was
+         * reported by the counters for just this client -- all writers on the
          * database will have been attributed to just this client.
          */
         public String reportTotals() {
