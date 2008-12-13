@@ -751,9 +751,9 @@ public class ConcurrentDataLoader {
                                 + scanCount + ", ntasked=" + taskedCount
                                 + ", file=" + file);
                     
-                    System.out.println("client#=" + clientNum + ", #scanned="
-                            + scanCount + ", ntasked=" + taskedCount
-                            + ", file=" + file);
+//                    System.out.println("client#=" + clientNum + ", #scanned="
+//                            + scanCount + ", ntasked=" + taskedCount
+//                            + ", file=" + file);
 
                     taskedCount.incrementAndGet();
                     
