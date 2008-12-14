@@ -106,6 +106,17 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * managed resources and to release those resources by deleting them from the
  * file system.
  * 
+ * FIXME Read-committed tasks need to hold a read lock on the local resources in
+ * order to prevent their being released if there is a concurrent commit
+ * followed by a request to the StoreManager to purgeResources. This problem is
+ * very similar to the problem of the transaction manager which needs to manage
+ * the global release time. However, since read-committed views are not allowed
+ * into the index caches, we can use a weak value cache. When there is a request
+ * to purge resources, we scan the cache and take the minimum timestamp for any
+ * entry whose reference has not been cleared. That timestamp is the earliest
+ * commit time for resources that MUST NOT be released because to do so could
+ * cause a read-committed operation to fail.
+ * 
  * @todo Write a unit test for purge before, during and after the 1st overflow
  *       and after a restart. Before, there should be nothing to release.
  *       During, the views that are being constructed should remain safe. After,
@@ -2420,8 +2431,12 @@ abstract public class StoreManager extends ResourceEvents implements
      *             if the {@link StoreManager} is still starting up.
      * @throws IllegalArgumentException
      *             if <i>uuid</i> is <code>null</code>.
+     * @throws NoSuchStoreException
+     *             if the {@link UUID} is not recognized.
+     * @throws NoSuchStoreException
+     *             if the resource for that {@link UUID} could not be found.
      * @throws RuntimeException
-     *             if something goes wrong.
+     *             if something else goes wrong.
      * 
      * @todo it seems that we always have the {@link IResourceMetadata} on hand
      *       when we need to (re-)open a store so it might be nice to pass that
@@ -2441,7 +2456,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
         /*
          * Note: These operations can have modest latency, especially if we open
-         * an fully buffered index segment. Therefore we use a per-store
+         * a fully buffered index segment. Therefore we use a per-store
          * (actually, per-resource UUID, which is the same thing) lock to avoid
          * imposing latency on threads requiring access to different stores.
          */
@@ -2470,24 +2485,24 @@ abstract public class StoreManager extends ResourceEvents implements
                          * We can simply re-open an index segment's store file.
                          */
 
-                        // Note: relative to the data directory!
-                        final File file = resourceFiles.get(uuid);
+//                        // Note: relative to the data directory!
+//                        final File file = resourceFiles.get(uuid);
+//
+//                        if (file == null) {
+//
+//                            throw new NoSuchStoreException(uuid);
+//
+//                        }
+//
+//                        if (!file.exists()) {
+//
+//                            throw new RuntimeException(
+//                                    "Resource file missing? uuid=" + uuid
+//                                            + ", file=" + file);
+//
+//                        }
 
-                        if (file == null) {
-
-                            throw new NoSuchStoreException(uuid);
-
-                        }
-
-                        if (!file.exists()) {
-
-                            throw new RuntimeException(
-                                    "Resource file missing? uuid=" + uuid
-                                            + ", file=" + file);
-
-                        }
-
-                        // re-open the store file.
+                        // re-open the store file. it will complain if the file is gone.
                         ((IndexSegmentStore) store).reopen();
 
                         // re-opening the store.
@@ -2526,14 +2541,21 @@ abstract public class StoreManager extends ResourceEvents implements
                 final File file = resourceFiles.get(uuid);
 
                 if (file == null) {
-
+                    
+                    /*
+                     * Note: Non-transactional read-historical operations DO NOT
+                     * declare read locks and therefore are unable to prevent
+                     * resources from being released, which can lead to this
+                     * exception.
+                     */
+                    
                     throw new NoSuchStoreException(uuid);
 
                 }
 
                 if (!file.exists()) {
 
-                    throw new RuntimeException("Resource file missing? uuid="
+                    throw new NoSuchStoreException("Resource file missing? uuid="
                             + uuid + ", file=" + file);
 
                 }

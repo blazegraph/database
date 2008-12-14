@@ -184,7 +184,7 @@ public class DumpFederation {
 
             } else {
 
-                client.disconnect(true/* immediateShutdown */);
+                client.disconnect(false/* immediateShutdown */);
 
             }
 

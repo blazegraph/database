@@ -91,6 +91,10 @@ public class JiniClient extends AbstractScaleOutClient {
     }
     
     /**
+     * Note: Immediate shutdown can cause odd exceptions to be logged. Normal
+     * shutdown is recommended unless there is a reason to force immediate
+     * shutdown.
+     * 
      * @param immediateShutdown
      *            When <code>true</code> the shutdown is <em>abrubt</em>.
      *            You can expect to see messages about interrupted IO such as
@@ -107,7 +111,7 @@ public class JiniClient extends AbstractScaleOutClient {
      * These messages may be safely ignored if they occur during immediate
      * shutdown.
      */
-    synchronized public void disconnect(boolean immediateShutdown) {
+    synchronized public void disconnect(final boolean immediateShutdown) {
         
         if (fed != null) {
 
@@ -160,7 +164,7 @@ public class JiniClient extends AbstractScaleOutClient {
      * 
      * @param jiniConfig
      */
-    protected JiniClient(JiniConfig jiniConfig) {
+    protected JiniClient(final JiniConfig jiniConfig) {
 
         super(jiniConfig.properties);
 

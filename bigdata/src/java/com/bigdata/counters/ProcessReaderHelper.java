@@ -131,7 +131,19 @@ public abstract class ProcessReaderHelper extends
             
         } catch (Exception e) {
             
-            log.fatal(e.getMessage(), e);
+            /*
+             * Note: An IOException here generally means that the process from
+             * which we were reading has been killed. This can happen if you
+             * kill it externally. It can also happen with immediate shutdown.
+             * 
+             * FIXME If performance counter collection is killed but the client
+             * is not shutdown then counter collection SHOULD be restarted. This
+             * is especially true for the data services since the load balancer
+             * will otherwise not be able to measure their loads, recommend
+             * moves, etc.
+             */
+
+            log.error("Counter collection halted: " + e.getMessage(), e);
             
         }
         

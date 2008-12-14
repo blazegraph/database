@@ -36,7 +36,6 @@ import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -118,6 +117,10 @@ public interface IBigdataClient {
      * Immediate shutdown terminates any client requests to federation services,
      * and then terminate any background processing that is being performed on
      * the behalf of the client (service discovery, etc).
+     * <p>
+     * Note: Immediate shutdown can cause odd exceptions to be logged. Normal
+     * shutdown is recommended unless there is a reason to force immediate
+     * shutdown.
      * 
      * @param immediateShutdown
      *            When <code>true</code> an immediate shutdown will be
