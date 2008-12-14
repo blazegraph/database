@@ -43,6 +43,7 @@ import net.jini.lookup.entry.Name;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.journal.DumpJournal;
 import com.bigdata.journal.TimestampUtility;
@@ -66,6 +67,9 @@ import com.bigdata.util.InnerCause;
  * @todo dump by data service as well, showing the indices on the ds and the
  *       disk space allocated to the resource manager for the ds (depending on
  *       the release age there may be historical views preserved).
+ * 
+ * @todo should use a read-historical tx to assert a read-lock on the commitTime
+ *       for the dump.
  */
 public class DumpFederation {
 
@@ -146,6 +150,9 @@ public class DumpFederation {
 
         try {
 
+            /*
+             * Wait until we have the metadata service.
+             */
             fed.awaitServices(1/* minDataServices */, 10000L/* timeout(ms) */);
 
             final DumpFederation dumper = new DumpFederation(fed, fed
@@ -256,6 +263,8 @@ public class DumpFederation {
 
         final ITupleIterator<PartitionLocator> itr = ndx.rangeIterator();
 
+        PartitionLocator lastLocator = null;
+        
         while (itr.hasNext()) {
 
             final PartitionLocator locator = itr.next().getObject();
@@ -269,8 +278,68 @@ public class DumpFederation {
             
             System.out.println("\t\tDataService: label=" +smd.label+", uuid="+uuid);
 
+            if (lastLocator == null) {
+                
+                if (locator.getLeftSeparatorKey() != null) {
+                    
+                    System.err
+                            .println("Left separator is not null for 1st index partition: "
+                                    + locator);
+                    
+                }
+                
+            } else {
+                
+                /*
+                 * The leftSeparator of each index partition after the first
+                 * should be equal to the rightSeparator of the previous index
+                 * partition.
+                 */
+                final int cmp = BytesUtil.compareBytes(lastLocator
+                        .getRightSeparatorKey(), locator.getLeftSeparatorKey());
+                
+                if (cmp < 0) {
+
+                    /*
+                     * The rightSeparator of the prior index partition is LT the
+                     * leftSeparator of the current index partition. This means
+                     * that there is a gap between these index partitions (e.g.,
+                     * there is no index partition that covers keys which would
+                     * fall into that gap).
+                     */
+                    
+                    System.err
+                            .println("Gap between index partitions: lastLocator="
+                                    + lastLocator + ", thisLocator=" + locator);
+                    
+                } else if (cmp > 0) {
+
+                    /*
+                     * The rightSeparator of the prior index partition is GT the
+                     * leftSeparator of the current index partition. This means
+                     * that the two index partitions overlap for at least part
+                     * of their key range.
+                     */
+                    
+                    System.err.println("Index partitions overlap: lastLocator="
+                            + lastLocator + ", thisLocator=" + locator);
+            
+                }
+                
+            }
+            
+            lastLocator = locator;
+            
         }
 
+        if (lastLocator != null && lastLocator.getRightSeparatorKey() != null) {
+            
+            System.err
+                    .println("Right separator of last index partition is not null: "
+                            + lastLocator);
+            
+        }
+        
     }
 
     /**
