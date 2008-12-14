@@ -44,6 +44,7 @@ import net.jini.lookup.entry.Name;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.journal.DumpJournal;
 import com.bigdata.journal.TimestampUtility;
@@ -254,14 +255,17 @@ public class DumpFederation {
     /**
      * Dumps the locators for a scale-out index.
      * 
-     * @param ndx
+     * @param name
+     *            The name of the scale-out index.
+     * @param metadataIndex
      *            The scale-out index.
      */
-    protected void dumpIndexLocators(String name, IMetadataIndex ndx) {
+    protected void dumpIndexLocators(final String name,
+            final IMetadataIndex metadataIndex) {
 
         System.out.println("\n\nname=" + name);
 
-        final ITupleIterator<PartitionLocator> itr = ndx.rangeIterator();
+        final ITupleIterator<PartitionLocator> itr = metadataIndex.rangeIterator();
 
         PartitionLocator lastLocator = null;
         
@@ -276,66 +280,108 @@ public class DumpFederation {
 
             final ServiceMetadata smd = getServiceMetadata(uuid);
             
-            System.out.println("\t\tDataService: label=" +smd.label+", uuid="+uuid);
+            /*
+             * Verify some constraints on the index partition separator keys.
+             */
+            {
+             
+                if (lastLocator == null) {
 
-            if (lastLocator == null) {
-                
-                if (locator.getLeftSeparatorKey() != null) {
-                    
-                    System.err
-                            .println("Left separator is not null for 1st index partition: "
-                                    + locator);
-                    
+                    if (locator.getLeftSeparatorKey() == null
+                            || locator.getLeftSeparatorKey().length != 0) {
+
+                        log
+                                .error("name="
+                                        + name
+                                        + " : Left separator should be [] for 1st index partition: "
+                                        + locator);
+
+                    }
+
+                } else {
+
+                    /*
+                     * The leftSeparator of each index partition after the first
+                     * should be equal to the rightSeparator of the previous
+                     * index partition.
+                     */
+                    final int cmp = BytesUtil.compareBytes(lastLocator
+                            .getRightSeparatorKey(), locator
+                            .getLeftSeparatorKey());
+
+                    if (cmp < 0) {
+
+                        /*
+                         * The rightSeparator of the prior index partition is LT
+                         * the leftSeparator of the current index partition.
+                         * This means that there is a gap between these index
+                         * partitions (e.g., there is no index partition that
+                         * covers keys which would fall into that gap).
+                         */
+
+                        log
+                                .error("name="
+                                        + name
+                                        + " : Gap between index partitions: lastLocator="
+                                        + lastLocator + ", thisLocator="
+                                        + locator);
+
+                    } else if (cmp > 0) {
+
+                        /*
+                         * The rightSeparator of the prior index partition is GT
+                         * the leftSeparator of the current index partition.
+                         * This means that the two index partitions overlap for
+                         * at least part of their key range.
+                         */
+
+                        log.error("name=" + name
+                                + " : Index partitions overlap: lastLocator="
+                                + lastLocator + ", thisLocator=" + locator);
+
+                    }
+
                 }
-                
-            } else {
-                
-                /*
-                 * The leftSeparator of each index partition after the first
-                 * should be equal to the rightSeparator of the previous index
-                 * partition.
-                 */
-                final int cmp = BytesUtil.compareBytes(lastLocator
-                        .getRightSeparatorKey(), locator.getLeftSeparatorKey());
-                
-                if (cmp < 0) {
-
-                    /*
-                     * The rightSeparator of the prior index partition is LT the
-                     * leftSeparator of the current index partition. This means
-                     * that there is a gap between these index partitions (e.g.,
-                     * there is no index partition that covers keys which would
-                     * fall into that gap).
-                     */
-                    
-                    System.err
-                            .println("Gap between index partitions: lastLocator="
-                                    + lastLocator + ", thisLocator=" + locator);
-                    
-                } else if (cmp > 0) {
-
-                    /*
-                     * The rightSeparator of the prior index partition is GT the
-                     * leftSeparator of the current index partition. This means
-                     * that the two index partitions overlap for at least part
-                     * of their key range.
-                     */
-                    
-                    System.err.println("Index partitions overlap: lastLocator="
-                            + lastLocator + ", thisLocator=" + locator);
             
-                }
-                
             }
-            
+
+            /*
+             * Range count the index partition. This will verify that the
+             * view can be materialized.
+             */
+            String rangeCount;
+            try {
+
+                final IIndex ndx = fed.getIndex(name, TimestampUtility
+                        .asHistoricalRead(commitTime));
+
+                rangeCount = Long
+                        .toString(ndx.rangeCount(locator.getLeftSeparatorKey(),
+                                locator.getRightSeparatorKey()));
+
+            } catch (Throwable t) {
+
+                log.error("name=" + name
+                        + " : Could not range count index partition: "
+                        + locator, t);
+
+                rangeCount = t.getMessage();
+
+            }
+
+            System.out.println("\t\tDataService: label=" + smd.label
+                    + ", uuid=" + uuid + ", rangeCount=" + rangeCount);
+
             lastLocator = locator;
             
-        }
+        } // next index partition.
 
+        /*
+         * Verify a constraint on the last index partition.
+         */
         if (lastLocator != null && lastLocator.getRightSeparatorKey() != null) {
             
-            System.err
-                    .println("Right separator of last index partition is not null: "
+            log.error("name="+name+" : Right separator of last index partition is not null: "
                             + lastLocator);
             
         }
