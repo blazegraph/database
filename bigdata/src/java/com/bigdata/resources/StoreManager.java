@@ -3353,9 +3353,10 @@ abstract public class StoreManager extends ResourceEvents implements
 
             final File file = resourceFiles.remove(uuid);
 
-            if (INFO)
-                log.info("removeResource: file=" + file + ", uuid=" + uuid
-                        + ", isJournal=" + isJournal);
+//            if (INFO)
+//                log.info
+                log.warn("DELETE: file=" + file + ", uuid=" + uuid + ", isJournal="
+                    + isJournal);
             
             if (file == null) {
 

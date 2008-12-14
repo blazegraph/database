@@ -411,8 +411,15 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
      *             {@link DataService}s.
      * @throws TimeoutException
      *             If a timeout occurs.
+     * 
+     * @todo We should await critical services during connect() {MDS, TS, LS}.
+     *       The LBS is not critical, but we should either have it on hand to
+     *       notice our service join or we should notice its JOIN and then
+     *       notice it ourselves. That would leave this method with the
+     *       responsibility for awaiting the join of at least N data services
+     *       (and perhaps verifying that the other services are still joined).
      */
-    public UUID[] awaitServices(final int minDataServices, long timeout)
+    public UUID[] awaitServices(final int minDataServices, final long timeout)
             throws InterruptedException, TimeoutException {
 
         assertOpen();
