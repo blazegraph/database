@@ -39,6 +39,7 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
+import com.bigdata.resources.NoSuchStoreException;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.resources.StoreManager;
@@ -1679,15 +1680,21 @@ public class ConcurrencyManager implements IConcurrencyManager {
                 // attach the counter for the index / index partition.
                 t.attach(counters.getCounters());
 
-                final IIndex view;
+                IIndex view = null;
                 try {
 
                     /*
                      * Request the read-committed view of the index from the
                      * resource manager.
                      */
-                    
-                    view = resourceManager.getIndex(name, ITx.READ_COMMITTED);
+                    try {
+                        view = resourceManager.getIndex(name,
+                                ITx.READ_COMMITTED);
+                    } catch (Throwable ex) {
+                        log.error("Could not update counters: name=" + name
+                                + " : " + ex, ex);
+                        // fall through - [view] will be null.
+                    }
                     
                     if(view == null) {
                         
