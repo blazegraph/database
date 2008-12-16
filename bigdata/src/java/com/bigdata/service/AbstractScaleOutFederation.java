@@ -490,9 +490,8 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
      * Force overflow of each data service in the scale-out federation (only
      * scale-out federations support overflow processing). This method is
      * synchronous. It will not return until all {@link DataService}s have
-     * initiated and completed overflow processing. Any unused resources ( as
-     * determined by the {@link StoreManager#getMinReleaseAge()}) will have
-     * been purged.
+     * initiated and completed overflow processing. Any unused resources (as
+     * determined by the {@link StoreManager}) will have been purged.
      * 
      * @param truncateJournal
      *            When <code>true</code>, the live journal will be truncated
@@ -525,6 +524,20 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
 
         }
 
+        if(truncateJournal) {
+
+            /*
+             * @todo The metadata service does not yet support overflow (it does
+             * not support partitioned metadata indices) so it only has a live
+             * journal. Therefore all we can do is truncate the live journal for
+             * the metadata service.
+             */
+
+            tasks.add(new PurgeResourcesTask(getMetadataService(),
+                    truncateJournal));
+            
+        }
+        
         final List<Future<Void>> futures;
         try {
 
@@ -556,11 +569,59 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
             log.info("Did overflow: #ok=" + nok + ", #dataServices="
                 + ndataServices + ", now=" + new Date());
 
-        if (nok != ndataServices) {
+        if (nok != tasks.size()) {
 
             throw new RuntimeException(
                     "Errors during overflow processing: #ok=" + nok
-                            + ", #dataServices=" + ndataServices);
+                            + ", #tasks=" + tasks.size());
+
+        }
+
+    }
+
+    /**
+     * Task directs a {@link DataService} to purge any unused resources and to
+     * optionally truncate the extent of the live journal.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class PurgeResourcesTask implements Callable<Void> {
+
+        protected static final Logger log = Logger
+                .getLogger(PurgeResourcesTask.class);
+
+        protected static final boolean INFO = log.isInfoEnabled();
+
+        private final IDataService dataService;
+
+        private final boolean truncateJournal;
+
+        public PurgeResourcesTask(final IDataService dataService,
+                final boolean truncateJournal) {
+
+            if (dataService == null)
+                throw new IllegalArgumentException();
+
+            this.dataService = dataService;
+
+            this.truncateJournal = truncateJournal;
+
+        }
+
+        public Void call() throws Exception {
+
+            if (INFO)
+                log.info("dataService: " + dataService.getServiceName());
+
+            if (!dataService.purgeOldResources(5000/* ms */, truncateJournal)) {
+
+                log
+                        .warn("Could not pause write service - resources will not be purged.");
+
+            }
+
+            return null;
 
         }
 

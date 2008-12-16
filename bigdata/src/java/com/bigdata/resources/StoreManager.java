@@ -129,10 +129,9 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * transaction identifiers choosen from the half-open range
  * (requestedCommitTime, nextCommitTime].
  * 
- * FIXME refactor {@link CommitRecordIndex}, {@link JournalIndex},
- * {@link IndexSegmentIndex}, and even {@link Name2Addr} to use the
- * {@link ITupleSerializer} idiom (this might break binary compatibility for the
- * commit record index and name2addr, but then again it might not).
+ * FIXME refactor {@link CommitRecordIndex}(done), {@link JournalIndex},
+ * {@link IndexSegmentIndex}, and {@link Name2Addr} to use the
+ * {@link ITupleSerializer} idiom.
  * 
  * @todo Write a unit test for purge before, during and after the 1st overflow
  *       and after a restart. Before, there should be nothing to release.
@@ -140,8 +139,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       we should be able to achieve a compact footprint for the data service.
  * 
  * @todo After restart, the release time needs to be set before we allow a purge
- *       and the lastOverflowTime needs to be set from the lastCommitTime of the
- *       next-to-last journal.
+ *       (should be done during startup by the transaction manager).
  * 
  * @todo There is neither a "CREATE_TEMP_DIR" and "DELETE_ON_CLOSE" does not
  *       remove all directories created during setup. One of the consequences is
