@@ -18,6 +18,7 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -44,19 +45,18 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
-import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.util.InnerCause;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Examine the named indices defined on the journal identified by the
@@ -110,7 +110,7 @@ import com.bigdata.util.InnerCause;
  * indices.
  * 
  * @todo consider side-effects of post-processing tasks (build, split, join, or
- *       move ) on a distributed index rebuild operation. It is possible that
+ *       move) on a distributed index rebuild operation. It is possible that
  *       the new index partitions may have been defined (but not yet registered
  *       in the metadata index) and that new index resources (on journals or
  *       index segment files) may have been defined. However, none of these
@@ -164,14 +164,15 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      */
     private final Set<String> copied; 
     
-    /**
-     * @todo This was used for what is in my opinion an unreasonable attempt to
-     *       have the {@link PostProcessOldJournalTask} scale to very large #ofs
-     *       of indices on the live journal.  Simpler in-memory data structures
-     *       would work just fine.
-     */
-    private IRawStore tmpStore;
-
+//    /**
+//     * @deprecated This was used for what is in my opinion an unreasonable
+//     *             attempt to have the {@link PostProcessOldJournalTask} scale
+//     *             to very large #ofs of indices on the live journal. Simpler
+//     *             in-memory data structures would work just fine as would a
+//     *             transient {@link BTree}.
+//     */
+//    private IRawStore tmpStore;
+    
 //    /** Aggregated counters for the named indices. */ 
 //    private final Counters totalCounters;
 //    
@@ -620,7 +621,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                     if (tmp == null) {
 
-                        tmp = BTree.create(tmpStore, new IndexMetadata(UUID
+                        tmp = BTree.createTransient(new IndexMetadata(UUID
                                 .randomUUID()));
 
                         undercapacityIndexPartitions
@@ -1415,6 +1416,26 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * 
      * FIXME implement suggestions for handling cases when we are nearing DISK
      * exhaustion.
+     * 
+     * @todo Explictly prioritize the tasks to be run, otherwise we risk never
+     *       processing some indices.
+     * 
+     * @todo track time for read historical and atomic update phases of each
+     *       kind of index partition task.
+     * 
+     * FIXME read locks for read-committed operations.
+     * 
+     * FIXME Look at whether the indices we need are getting flushed from the
+     * LRU cache while we are examining the lastCommitTime and verify that the
+     * unisolated indices for the last commit on the old journal were turned
+     * into read-historical indices for that commit time and that we are
+     * benefitting from the buffering for those indices.
+     * 
+     * FIXME consider move as post-compact action using socket to blast the data
+     * to the target data service.
+     * 
+     * FIXME make the atomic update tasks truely atomic using distributed locks,
+     * paxos state, and correcting actions.
      */
     protected List<AbstractTask> chooseTasks() throws Exception {
 
@@ -1771,7 +1792,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             if (INFO)
                 log.info("begin");
 
-            tmpStore = new TemporaryRawStore();
+//            tmpStore = new TemporaryRawStore();
             
             if(INFO) {
                 
@@ -1846,24 +1867,24 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             
         } finally {
 
-            if (tmpStore != null) {
+//            if (tmpStore != null) {
+//
+//                try {
+//                    tmpStore.destroy();
+//                } catch (Throwable t) {
+//                    log.warn(t.getMessage(), t);
+//                }
+//
+//            }
 
-                try {
-                    tmpStore.destroy();
-                } catch (Throwable t) {
-                    log.warn(t.getMessage(), t);
-                }
+            // enable overflow again as a post-condition.
+            if (!resourceManager.overflowAllowed.compareAndSet(
+                    false/* expect */, true/* set */)) {
 
-                // enable overflow again as a post-condition.
-                if (!resourceManager.overflowAllowed.compareAndSet(
-                        false/* expect */, true/* set */)) {
+                throw new AssertionError();
 
-                    throw new AssertionError();
-
-                }
-                
             }
-
+            
         }
 
     }
@@ -1879,6 +1900,87 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
         if (INFO)
             log.info("begin : will run " + tasks.size() + " update tasks");
+
+//        runTasksConcurrent(tasks);
+        
+        runTasksInSingleThread(tasks);
+        
+        if (INFO)
+            log.info("end");
+        
+    }
+
+    /**
+     * Runs the overflow tasks one at a time, stopping when the journal needs to
+     * overflow again, when we run out of time, or when there are no more tasks
+     * to be executed.
+     */
+    protected void runTasksInSingleThread(final List<AbstractTask> tasks)
+        throws InterruptedException {
+        
+        final ExecutorService executorService = Executors
+                .newSingleThreadExecutor(DaemonThreadFactory
+                        .defaultThreadFactory());
+
+        try {
+
+            final long begin = System.nanoTime();
+            
+            // remaining nanoseconds in which to execute overflow tasks.
+            long nanos = TimeUnit.MILLISECONDS.toNanos(resourceManager.overflowTimeout);
+            
+            final Iterator<AbstractTask> titr = tasks.iterator();
+
+            int ndone = 0;
+            
+            while (titr.hasNext() && nanos > 0) {
+                
+                final boolean shouldOverflow = resourceManager
+                        .isOverflowEnabled()
+                        && resourceManager.shouldOverflow();
+                
+                if (shouldOverflow) {
+
+                    // end async overflow.
+                    break;
+                    
+                }
+
+                final AbstractTask task = titr.next();
+                
+                final Future<? extends Object> f = resourceManager
+                        .getConcurrencyManager().submit(task);
+
+                getFutureForTask(f, task, nanos, TimeUnit.NANOSECONDS);
+                
+                nanos -= (System.nanoTime() - begin);
+                
+                ndone++;
+                
+            }
+            
+            log.warn("Completed "+ndone+" out of "+tasks.size()+" tasks");
+            
+        } finally {
+            
+            executorService.shutdownNow();
+            
+//            executorService.awaitTermination(arg0, arg1)
+            
+        }
+        
+    }
+
+    /**
+     * Runs the overflow tasks in parallel, cancelling any tasks which have not
+     * completed if we run out of time.
+     * 
+     * @param tasks
+     * 
+     * @throws InterruptedException
+     */
+    protected void runTasksConcurrent(final List<AbstractTask> tasks)
+        throws InterruptedException {
 
         /*
          * Note: On return tasks that are not completed are cancelled.
@@ -1897,50 +1999,69 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             final AbstractTask task = titr.next();
 
             /*
-             * Note: An error here MAY be ignored. The index partition will
-             * remain coherent and valid but its view will continue to have a
-             * dependency on the old journal until a post-processing task for
-             * that index partition succeeds.
+             * Non-blocking: all tasks have already either completed or been
+             * cancelled.
              */
-            try {
 
-                /*
-                 * Non-blocking: all tasks have already either completed or been
-                 * cancelled.
-                 */
+            getFutureForTask(f, task, 0L, TimeUnit.NANOSECONDS);
+            
+        }
 
-                f.get();
+    }
+    
+    /**
+     * Note: An error here MAY be ignored. The index partition will remain
+     * coherent and valid but its view will continue to have a dependency on the
+     * old journal until a post-processing task for that index partition
+     * succeeds.
+     */
+    private void getFutureForTask(final Future<? extends Object> f,
+            final AbstractTask task, final long timeout, final TimeUnit unit) {
 
-            } catch (Throwable t) {
+        try {
 
-                if (t instanceof CancellationException) {
+            f.get(timeout, unit);
 
-                    log.warn("Task cancelled: task=" + task + " : " + t);
+            // elapsed execution time for the task.
+            final long elapsed = TimeUnit.NANOSECONDS
+                    .toMillis(task.nanoTime_finishedWork
+                            - task.nanoTime_beginWork);
 
-                    resourceManager.asyncOverflowTaskCancelledCounter
-                            .incrementAndGet();
+            log.warn("Task complete: elapsed=" + elapsed + ", task=" + task);
 
-                } else if (isNormalShutdown(t)) {
+        } catch (Throwable t) {
 
-                    log.warn("Normal shutdown? : task=" + task + " : " + t);
+            // elapsed execution time for the task.
+            final long elapsed = TimeUnit.NANOSECONDS
+                    .toMillis(task.nanoTime_finishedWork
+                            - task.nanoTime_beginWork);
 
-                } else {
+            if (t instanceof CancellationException) {
 
-                    resourceManager.asyncOverflowTaskFailedCounter
-                            .incrementAndGet();
+                log.warn("Task cancelled: elapsed=" + elapsed + ", task="
+                        + task + " : " + t);
 
-                    log.error("Task failed: task=" + task + " : " + t, t);
+                resourceManager.asyncOverflowTaskCancelledCounter
+                        .incrementAndGet();
 
-                }
+            } else if (isNormalShutdown(t)) {
 
-                continue;
+                log.warn("Normal shutdown? : elapsed=" + elapsed + ", task="
+                        + task + " : " + t);
+
+            } else {
+
+                resourceManager.asyncOverflowTaskFailedCounter
+                        .incrementAndGet();
+
+                log.error("Task failed: elapsed=" + elapsed + ", task=" + task
+                        + " : " + t, t);
 
             }
 
-        }
+            // fall through!
 
-        if (INFO)
-            log.info("end");
+        }
 
     }
     

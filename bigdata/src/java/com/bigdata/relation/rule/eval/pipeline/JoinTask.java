@@ -54,57 +54,55 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * Consumes {@link IBindingSet} chunks from the previous join dimension.
  * <p>
  * Note: Instances of this class MUST be created on the {@link IDataService}
- * that is host to the index partition on the task will read and they MUST
- * run inside of an {@link AbstractTask} on the {@link ConcurrencyManager}
- * in order to have access to the local index object for the index
- * partition.
+ * that is host to the index partition on the task will read and they MUST run
+ * inside of an {@link AbstractTask} on the {@link ConcurrencyManager} in order
+ * to have access to the local index object for the index partition.
  * <p>
  * This class is NOT serializable.
  * <p>
  * For a rule with 2 predicates, there will be two {@link JoinTask}s. The
- * {@link #orderIndex} is ZERO (0) for the first {@link JoinTask} and ONE
- * (1) for the second {@link JoinTask}. The first {@link JoinTask} will
- * have a single initialBinding from the {@link JoinMasterTask} and will
- * read on the {@link IAccessPath} for the first {@link IPredicate} in the
- * evaluation {@link #order}. The second {@link JoinTask} will read chunks
- * of {@link IBindingSet}s containing partial solutions from the first
- * {@link JoinTask} and will obtain and read on an {@link IAccessPath} for
- * the second predicate in the evaluation order for every partial solution.
- * Since there are only two {@link IPredicate}s in the {@link IRule}, the
- * second and last {@link JoinTask} will write on the {@link ISolution}
- * buffer obtained from {@link JoinMasterTask#getSolutionBuffer()}. Each
- * {@link JoinTask} will report its {@link JoinStats} to the master, which
- * aggregates those statistics.
+ * {@link #orderIndex} is ZERO (0) for the first {@link JoinTask} and ONE (1)
+ * for the second {@link JoinTask}. The first {@link JoinTask} will have a
+ * single initialBinding from the {@link JoinMasterTask} and will read on the
+ * {@link IAccessPath} for the first {@link IPredicate} in the evaluation
+ * {@link #order}. The second {@link JoinTask} will read chunks of
+ * {@link IBindingSet}s containing partial solutions from the first
+ * {@link JoinTask} and will obtain and read on an {@link IAccessPath} for the
+ * second predicate in the evaluation order for every partial solution. Since
+ * there are only two {@link IPredicate}s in the {@link IRule}, the second and
+ * last {@link JoinTask} will write on the {@link ISolution} buffer obtained
+ * from {@link JoinMasterTask#getSolutionBuffer()}. Each {@link JoinTask} will
+ * report its {@link JoinStats} to the master, which aggregates those
+ * statistics.
  * <p>
- * Note: {@link ITx#UNISOLATED} requests will deadlock if the same query
- * uses the same access path for two predicates! This is because the first
- * such join dimension in the evaluation order will obtain an exclusive lock
- * on an index partition making it impossible for another {@link JoinTask}
- * to obtain an exclusive lock on the same index partition. This is not a
- * problem if you are using read-consistent timestamps!
+ * Note: {@link ITx#UNISOLATED} requests will deadlock if the same query uses
+ * the same access path for two predicates! This is because the first such join
+ * dimension in the evaluation order will obtain an exclusive lock on an index
+ * partition making it impossible for another {@link JoinTask} to obtain an
+ * exclusive lock on the same index partition. This is not a problem if you are
+ * using read-consistent timestamps!
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo Allow the access paths to be consumed in parallel. this would let
- *       us use more threads for join dimensions that had to test more
- *       source binding sets.
+ * @todo Allow the access paths to be consumed in parallel. this would let us
+ *       use more threads for join dimensions that had to test more source
+ *       binding sets.
  *       <p>
  *       Parallel {@link AccessPathTask} processing is useful when each
  *       {@link AccessPathTask} consumes only a small chunk and there are a
  *       large #of source binding sets to be processed. In this case,
- *       parallelism reduces the overall latency by allowing threads to
- *       progress as soon as the data can be materialized from the index.
+ *       parallelism reduces the overall latency by allowing threads to progress
+ *       as soon as the data can be materialized from the index.
  *       {@link AccessPathTask} parallelism is realized by submitting each
- *       {@link AccessPathTask} to a service imposing a parallelism limit on
- *       the shared {@link IIndexStore#getExecutorService()}. Since the
+ *       {@link AccessPathTask} to a service imposing a parallelism limit on the
+ *       shared {@link IIndexStore#getExecutorService()}. Since the
  *       {@link AccessPathTask}s are concurrent, each one requires its own
- *       {@link UnsynchronizedOutputBuffer} on which it will place any
- *       accepted {@link IBindingSet}s. Once an {@link AccessPathTask}
- *       completes, its buffer may be reused by the next
- *       {@link AccessPathTask} assigned to a worker thread (this reduces
- *       heap churn and allows us to assemble full chunks when each
- *       {@link IAccessPath} realizes only a few accepted
+ *       {@link UnsynchronizedOutputBuffer} on which it will place any accepted
+ *       {@link IBindingSet}s. Once an {@link AccessPathTask} completes, its
+ *       buffer may be reused by the next {@link AccessPathTask} assigned to a
+ *       worker thread (this reduces heap churn and allows us to assemble full
+ *       chunks when each {@link IAccessPath} realizes only a few accepted
  *       {@link IBindingSet}s). For an {@link ExecutorService} with a
  *       parallelism limit of N, there are therefore N
  *       {@link UnsynchronizedOutputBuffer}s. Those buffers must be flushed
@@ -113,17 +111,16 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       Parallel {@link ChunkTask} processing may be useful when an
  *       {@link AccessPathTask} will consume a large #of chunks. Since the
  *       {@link IAccessPath#iterator()} is NOT thread-safe, reads on the
- *       {@link IAccessPath} must be sequential, but the chunks read from
- *       the {@link IAccessPath} can be placed onto a queue and parallel
- *       {@link ChunkTask}s can drain that queue, consuming the chunks.
- *       This can help by reducing the latency to materialize any given
- *       chunk.
+ *       {@link IAccessPath} must be sequential, but the chunks read from the
+ *       {@link IAccessPath} can be placed onto a queue and parallel
+ *       {@link ChunkTask}s can drain that queue, consuming the chunks. This
+ *       can help by reducing the latency to materialize any given chunk.
  *       <p>
- *       the required change is to make have a per-thread object
+ *       the required change is to have a per-thread
  *       {@link UnsynchronizedArrayBuffer} feeding a thread-safe
- *       {@link UnsyncDistributedOutputBuffer} (potentially via a queue)
- *       which maps each generated binding set across the index partition(s)
- *       for the sink {@link JoinTask}s.
+ *       {@link UnsyncDistributedOutputBuffer} (potentially via a queue) which
+ *       maps each generated binding set across the index partition(s) for the
+ *       sink {@link JoinTask}s.
  */
 abstract public class JoinTask implements Callable<Void> {
 
@@ -612,9 +609,13 @@ abstract public class JoinTask implements Callable<Void> {
          * 
          * Note: even when maxParallel is zero there will be one thread per
          * join dimension. For many queries that may be just fine.
+         * 
+         * FIXME parallel execution requires some thread-local unsynchronized
+         * buffers -- see my notes elsewhere in this class for what has to be
+         * done to support this.
          */
-        final int maxParallel;
-        maxParallel = joinNexus.getMaxParallelSubqueries();
+        final int maxParallel = 0;
+//        maxParallel = joinNexus.getMaxParallelSubqueries();
         //            maxParallel = 10;
 
         /*
