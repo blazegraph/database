@@ -579,14 +579,14 @@ public class Node extends AbstractNode<Node> implements INodeData {
      * Invoked by {@link #copyOnWrite()} to change the key for a child on a
      * cloned parent to a reference to a cloned child.
      * 
-     * @param oldChildKey
-     *            The key for the old child.
+     * @param oldChildId
+     *            The persistent identity for the old child.
      * @param newChild
      *            The reference to the new child.
      */
-    void replaceChildRef(long oldChildKey, AbstractNode newChild) {
+    void replaceChildRef(final long oldChildId, final AbstractNode newChild) {
 
-        assert oldChildKey != NULL;
+        assert oldChildId != NULL;
         assert newChild != null;
 
         // This node MUST have been cloned as a pre-condition, so it can not
@@ -600,7 +600,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
         // Scan for location in weak references.
         for (int i = 0; i <= nkeys; i++) {
 
-            if (childAddr[i] == oldChildKey) {
+            if (childAddr[i] == oldChildId) {
 
                 if (true) {
 
@@ -644,53 +644,57 @@ public class Node extends AbstractNode<Node> implements INodeData {
 //        System.err.println("this: "); dump(Level.DEBUG,System.err);
 //        System.err.println("newChild: "); newChild.dump(Level.DEBUG,System.err);
         throw new IllegalArgumentException("Not our child : oldChildKey="
-                + oldChildKey);
+                + oldChildId);
 
     }
 
-    public Tuple insert(byte[] key,byte[] value,boolean delete, long timestamp,Tuple tuple) {
+    public Tuple insert(final byte[] key, final byte[] value,
+            final boolean delete, final long timestamp, final Tuple tuple) {
 
         assert !deleted;
-        
-        if(btree.debug) assertInvariants();
 
-        btree.touch(this);
-
-        int childIndex = findChild(key);
-
-        AbstractNode child = (AbstractNode) getChild(childIndex);
-
-        return child.insert(key,value,delete,timestamp,tuple);
-
-    }
-
-    public Tuple lookup(byte[] key,Tuple tuple) {
-
-        assert !deleted;
-        
-        if(btree.debug) assertInvariants();
+        if (btree.debug)
+            assertInvariants();
 
         btree.touch(this);
 
         final int childIndex = findChild(key);
 
-        AbstractNode child = (AbstractNode)getChild(childIndex);
+        final AbstractNode child = (AbstractNode) getChild(childIndex);
 
-        return child.lookup(key,tuple);
-        
+        return child.insert(key, value, delete, timestamp, tuple);
+
     }
-    
-    public Tuple remove(byte[] key, Tuple tuple) {
+
+    public Tuple lookup(final byte[] key, final Tuple tuple) {
 
         assert !deleted;
-        
-        if(btree.debug) assertInvariants();
-        
+
+        if (btree.debug)
+            assertInvariants();
+
         btree.touch(this);
 
-        int childIndex = findChild(key);
+        final int childIndex = findChild(key);
 
-        AbstractNode child = (AbstractNode)getChild(childIndex);
+        final AbstractNode child = (AbstractNode) getChild(childIndex);
+
+        return child.lookup(key, tuple);
+
+    }
+
+    public Tuple remove(final byte[] key, final Tuple tuple) {
+
+        assert !deleted;
+
+        if (btree.debug)
+            assertInvariants();
+
+        btree.touch(this);
+
+        final int childIndex = findChild(key);
+
+        final AbstractNode child = (AbstractNode) getChild(childIndex);
 
         return child.remove(key, tuple);
         
@@ -699,7 +703,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
     /**
      * @todo convert to batch api and handle searchKeyOffset.
      */
-    public int indexOf(byte[] key) {
+    public int indexOf(final byte[] key) {
 
         assert !deleted;
 
@@ -1423,7 +1427,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
             System.arraycopy(s.childEntryCounts, 0, this.childEntryCounts, nkeys, s.nkeys+1);
             
             // update parent on children
-            final Reference<Node> weakRef = this.self;
+            final Reference<Node> weakRef = (Reference<Node>)this.self;
 //            final Reference<Node> weakRef = btree.newRef(this);
             for( int i=0; i<s.nkeys+1; i++ ) {
                 AbstractNode child = s.childRefs[i]==null?null:s.childRefs[i].get();
@@ -1492,7 +1496,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
             this.copyKey(s.nkeys, p.keys, index - 1);
             
             // update parent on children.
-            final Reference<Node> weakRef = this.self;
+            final Reference<Node> weakRef = (Reference<Node>)this.self;
 //            final Reference<Node> weakRef = btree.newRef(this);
             for( int i=0; i<s.nkeys+1; i++ ) {
                 AbstractNode child = s.childRefs[i]==null?null:s.childRefs[i].get();

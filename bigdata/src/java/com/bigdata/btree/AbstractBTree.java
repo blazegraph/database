@@ -136,6 +136,12 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
     final protected static String ERROR_READ_ONLY = "Read-only";
     
     /**
+     * The index is transient (not backed by persistent storage) but an
+     * operation that requires persistence was requested.
+     */
+    final protected static String ERROR_TRANSIENT = "Transient";
+    
+    /**
      * Log for btree opeations.
      */
     protected static final Logger log = Logger.getLogger(AbstractBTree.class);
@@ -517,33 +523,68 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
         // show the copyright banner during statup.
         Banner.banner();
 
-        assert store != null;
+        // Note: MAY be null (implies a transient BTree).
+//        assert store != null;
 
-        assert metadata != null;
+        if (metadata == null)
+            throw new IllegalArgumentException();
 
         // save a reference to the immutable metadata record.
         this.metadata = metadata;
         
         this.branchingFactor = metadata.getBranchingFactor();
 
-        assert branchingFactor >= Options.MIN_BRANCHING_FACTOR;
+        if(branchingFactor < Options.MIN_BRANCHING_FACTOR)
+            throw new IllegalArgumentException();
         
-        assert nodeFactory != null;
+        if (nodeFactory == null)
+            throw new IllegalArgumentException();
 
         this.store = store;
 
-        this.writeRetentionQueue = newWriteRetentionQueue();
+        if (store == null) {
+            
+            /*
+             * Transient BTree.
+             * 
+             * Note: The write retention queue does not have much of a role for
+             * a transient BTree and the read retention queue is positively
+             * useless.
+             * 
+             * Note: The [nodeSer] is used by a transient BTree - the nodes and
+             * leaves are NOT serialized since they are NOT persistent.
+             */
 
-        this.readRetentionQueue = newReadRetentionQueue();
+            this.writeRetentionQueue = new HardReferenceQueue<PO>(//
+                    NOPEvictionListener.INSTANCE,//
+                    metadata.getWriteRetentionQueueCapacity(),//
+                    metadata.getWriteRetentionQueueScan()//
+                    );
+            
+            this.readRetentionQueue = null;
 
-        this.nodeSer = new NodeSerializer(//
-                store, // addressManager
-                nodeFactory,//
-                branchingFactor,//
-                0, //initialBufferCapacity
-                metadata,//
-                readOnly
-                );
+            this.nodeSer = null;
+            
+        } else {
+        
+            /*
+             * Persistent BTree.
+             */
+            
+            this.writeRetentionQueue = newWriteRetentionQueue();
+
+            this.readRetentionQueue = newReadRetentionQueue();
+        
+            this.nodeSer = new NodeSerializer(//
+                    store, // addressManager
+                    nodeFactory,//
+                    branchingFactor,//
+                    0, //initialBufferCapacity
+                    metadata,//
+                    readOnly
+                    );
+            
+        }
 
     }
 
@@ -603,17 +644,22 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
     /**
      * The contract for {@link #close()} is to reduce the resource burden of the
      * index (by discarding buffers) while not rendering the index inoperative.
-     * An index that has been {@link #close() closed} MAY be
-     * {@link #reopen() reopened} at any time (conditional on the continued
-     * availability of the backing store). The index reference remains valid
-     * after a {@link #close()}. A closed index is transparently restored by
-     * either {@link #getRoot()} or {@link #reopen()}. A {@link #close()} on a
-     * dirty index MUST discard writes rather than flushing them to the store
-     * and MUST NOT update its {@link Checkpoint} record - ({@link #close()} is
-     * used to discard indices with partial writes when an {@link AbstractTask}
-     * fails). If you are seeking to {@link #close()} a mutable {@link BTree}
-     * that it state can be recovered by {@link #reopen()} then you MUST write a
-     * new {@link Checkpoint} record before closing the index.
+     * Unless the {@link AbstractBTree} {@link #isTransient()}, a B+Tree that
+     * has been {@link #close() closed} MAY be {@link #reopen() reopened} at any
+     * time (conditional on the continued availability of the backing store).
+     * Such an index reference remains valid after a {@link #close()}. A closed
+     * index is transparently restored by either {@link #getRoot()} or
+     * {@link #reopen()}.
+     * <p>
+     * Note: A {@link #close()} on a dirty index MUST discard writes rather than
+     * flushing them to the store and MUST NOT update its {@link Checkpoint}
+     * record - ({@link #close()} is used to discard indices with partial
+     * writes when an {@link AbstractTask} fails). If you are seeking to
+     * {@link #close()} a mutable {@link BTree} that it state can be recovered
+     * by {@link #reopen()} then you MUST write a new {@link Checkpoint} record
+     * before closing the index.
+     * <p>
+     * Note: CLOSING A TRANSIENT INDEX WILL DISCARD ALL DATA!
      * <p>
      * This implementation clears the hard reference queue (releasing all node
      * references), releases the hard reference to the root node, and releases
@@ -652,7 +698,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
         /*
          * Release buffers.
          */
-        nodeSer.close();
+        if (nodeSer != null) {
+         
+            nodeSer.close();
+            
+        }
 
         /*
          * Clear the hard reference queue.
@@ -751,6 +801,26 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
     }
 
     /**
+     * Return <code>true</code> iff this is a transient data structure (no
+     * backing store).
+     */
+    final public boolean isTransient() {
+        
+        return store == null;
+        
+    }
+    
+    final protected void assertNotTransient() {
+        
+        if(isTransient()) {
+            
+            throw new UnsupportedOperationException(ERROR_TRANSIENT);
+            
+        }
+        
+    }
+    
+    /**
      * Return <code>true</code> iff this B+Tree is read-only.
      */
     abstract public boolean isReadOnly();
@@ -788,11 +858,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
     /**
      * The backing store.
      */
-    public IRawStore getStore() {
-
-        return store;
-
-    }
+    abstract public IRawStore getStore();
 
     final public IResourceMetadata[] getResourceMetadata() {
         
@@ -876,14 +942,18 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
             
         }
         
-        sb.append(", m="+getBranchingFactor());
+        sb.append(", m=" + getBranchingFactor());
 
-        sb.append(", n="+getEntryCount());
-        
-        sb.append(", h="+getHeight());
+        sb.append(", height=" + getHeight());
 
-        sb.append(", lastCommitTime="+getLastCommitTime());
-        
+        sb.append(", entryCount=" + getEntryCount());
+
+        sb.append(", nodeCount=" + getNodeCount());
+
+        sb.append(", leafCount=" + getLeafCount());
+
+        sb.append(", lastCommitTime=" + getLastCommitTime());
+
         sb.append("}");
         
         return sb.toString();
@@ -1049,7 +1119,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
      * {@link #close() closed}. This method automatically {@link #reopen()}s
      * the index if it is closed, making it available for use.
      */
-    final public AbstractNode getRoot() {
+    final protected AbstractNode getRoot() {
 
         // make sure that the root is defined.
         if (root == null)
@@ -2866,46 +2936,6 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
 
     }
 
-//    /**
-//     * When <code>true</code> {@link Node}s will hold onto their parents and
-//     * children using {@link SoftReference}s. When <code>false</code> they
-//     * will use {@link WeakReference}s.
-//     */
-//    private final static boolean softReferences = false;
-
-//    /**
-//     * Dump a raw record from the store.
-//     * 
-//     * @param store
-//     *            The backing store.
-//     * @param addr
-//     *            The address from which the record was read.
-//     * @param buf
-//     *            The {@link ByteBuffer} containing the raw record.
-//     * 
-//     * @deprecated This will go away as soon as I am done debugging something.
-//     */
-//    private static String toString(IRawStore store, long addr, ByteBuffer b) {
-//
-//        final int byteCount = store.getByteCount(addr);
-//
-//        // independent view of the buffer.
-//        b = b.asReadOnlyBuffer();
-//
-//        // setup the view implied by the address and the store API.
-//        b.limit(byteCount);
-//
-//        b.position(0);
-//
-//        byte[] a = new byte[byteCount];
-//
-//        // transfer to a byte[].
-//        b.get(a);
-//
-//        return Arrays.toString(a);
-//        
-//    }
-    
     /**
      * Create the reference that will be used by a {@link Node} to refer to its
      * children (nodes or leaves).
@@ -2918,13 +2948,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
      * @see AbstractNode#self
      * @see SoftReference
      * @see WeakReference
-     * 
-     * @todo since each node (and leaf) now has a reference to itself and since
-     *       we reuse that reference for all references to the node (or leaf),
-     *       this method can be removed and replaced by a single {@link Reference}
-     *       allocation in {@link AbstractNode#AbstractNode(AbstractBTree, int, boolean)}
      */
-    final Reference<AbstractNode> newRef(AbstractNode child) {
+    final Reference<AbstractNode> newRef(final AbstractNode child) {
         
         /*
          * Note: If the parent refers to its children using soft references the
@@ -2940,39 +2965,72 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
          * the node choose among its children for those it will hold with a soft
          * reference so that the notion of frequent access is dynamic and can
          * change as the access patterns on the index change.
-         * 
-         * @todo examine heap usage further. it appears that we are reading the
-         * disk too much primarily because we are not holding onto "interesting"
-         * nodes and leaves long enough. the readRetentionQueue should help
-         * here. Maybe all references should be weak and the read retention
-         * queue should have a capacity of 10000 or more node references? 
          */
 
+        if (store == null) {
+
+            /*
+             * Note: Used for transient BTrees.
+             */
+            
+            return new HardReference<AbstractNode>(child);
+            
+        } else {
+        
             return new WeakReference<AbstractNode>( child );
 //        return new SoftReference<AbstractNode>( child ); // causes significant GC "hesitations".
-
+        }
+        
+        
     }
     
-//    /**
-//     * Create the reference that will be used by a node to refer to its parent.
-//     * 
-//     * @param parent A node.
-//     * 
-//     * @return A reference to that node.
-//     */
-//    final Reference<Node> newRef(Node parent) {
-//        
-//        /*
-//         * Note: A weak reference by a child to its parent means that the
-//         * existence of the child object does not incline the garbage collector
-//         * to keep the parent.
-//         */
-//
-//        return new WeakReference<Node>( parent );
-////      return new SoftReference<Node>( parent ); // retains too much.
-//
-//    }
+    /**
+     * A class that provides hard reference semantics for use with transient
+     * {@link BTree}s. While the class extends {@link WeakReference}, it
+     * internally holds a hard reference and thereby prevents the reference from
+     * being cleared. This approach is necessitated on the one hand by the use
+     * of {@link Reference} objects for {@link AbstractNode#self},
+     * {@link AbstractNode#parent}, {@link Node#childRefs}, etc. and on the
+     * other hand by the impossibility of defining your own direct subclass of
+     * {@link Reference} (a runtime security manager exception will result).
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @param <T>
+     */
+    static class HardReference<T> extends WeakReference<T> {
+        
+        final private T ref;
+        
+        HardReference(T ref) {
 
+            super(null);
+            
+            this.ref = ref;
+            
+        }
+        
+        /**
+         * Returns the hard reference.
+         */
+        public T get() {
+            
+            return ref;
+            
+        }
+        
+        /**
+         * Overridden as a NOP.
+         */
+        public void clear() {
+
+            // NOP
+            
+        }
+        
+    }
+    
     /*
      * API used to report how long it has been since the BTree was last used.
      * This is used to clear BTrees that are not in active use from a variety of

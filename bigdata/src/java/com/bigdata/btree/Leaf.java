@@ -545,7 +545,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         
     }
 
-    public int indexOf(byte[] key) {
+    public int indexOf(final byte[] key) {
 
         btree.touch(this);
         

@@ -37,6 +37,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -58,10 +59,11 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IIndex;
+import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentStore;
@@ -73,6 +75,7 @@ import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.CommitRecordIndex;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.ICommitRecord;
@@ -82,13 +85,14 @@ import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.TemporaryRawStore;
+import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.mdi.IPartitionMetadata;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -116,6 +120,19 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * entry whose reference has not been cleared. That timestamp is the earliest
  * commit time for resources that MUST NOT be released because to do so could
  * cause a read-committed operation to fail.
+ * <p>
+ * An efficient way to track the read-committed read lock time is an ordered
+ * list of the active read times. Since there can be more than one reader we
+ * would actually need a reference counter as well (or use the clearing of a
+ * weak reference as noticed by polling a reference queue as our clue). (The
+ * transaction manager handles a similar problem, but it assigns distinct
+ * transaction identifiers choosen from the half-open range
+ * (requestedCommitTime, nextCommitTime].
+ * 
+ * FIXME refactor {@link CommitRecordIndex}, {@link JournalIndex},
+ * {@link IndexSegmentIndex}, and even {@link Name2Addr} to use the
+ * {@link ITupleSerializer} idiom (this might break binary compatibility for the
+ * commit record index and name2addr, but then again it might not).
  * 
  * @todo Write a unit test for purge before, during and after the 1st overflow
  *       and after a restart. Before, there should be nothing to release.
@@ -456,20 +473,6 @@ abstract public class StoreManager extends ResourceEvents implements
     protected final File tmpDir;
 
     /**
-     * A temporary store used for the {@link #journalIndex} and the
-     * {@link #segmentIndex}. The store is not used much so it is
-     * configured to keep its in-memory footprint small.
-     * 
-     * @todo since this is a WORM store it will never shrink in size. Eventually
-     *       it could grow modestly large if the data service were to run long
-     *       enough. Therefore it makes sense to periodically "overflow" this by
-     *       copying the current state of the {@link #journalIndex} and the
-     *       {@link #segmentIndex} onto a new tmpStore (or just rebuilding
-     *       them from the {@link #dataDir}).
-     */
-    private final IRawStore tmpStore = new TemporaryRawStore();
-
-    /**
      * A map over the journal histories. The map is transient and is
      * re-populated from a scan of the file system during startup.
      * <P>
@@ -593,7 +596,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
     /**
      * Succeeds if the {@link StoreManager} {@link #isOpen()} and is NOT
-     * {@link #isStarting()}.
+     * {@link #isStarting()} (the test itself is NOT atomic).
      * 
      * @throws IllegalStateException
      *             unless open and not starting.
@@ -964,8 +967,8 @@ abstract public class StoreManager extends ResourceEvents implements
          * Create the _transient_ index in which we will store the mapping from
          * the commit times of the journals to their resource descriptions.
          */
-        journalIndex = JournalIndex.create(tmpStore);
-        segmentIndex = IndexSegmentIndex.create(tmpStore);
+        journalIndex = JournalIndex.createTransient();//tmpStore);
+        segmentIndex = IndexSegmentIndex.createTransient();//(tmpStore);
 
         if (INFO)
             log.info("Current working directory: "
@@ -1164,6 +1167,12 @@ abstract public class StoreManager extends ResourceEvents implements
 
                     start();
 
+                    // successful startup
+                    starting.set(false);
+                    
+                    // Purge any resources that we no longer require.
+                    purgeOldResources();
+                    
                 } catch (Throwable ex) {
 
                     // avoid possibility that isRunning() could become true.
@@ -1181,8 +1190,8 @@ abstract public class StoreManager extends ResourceEvents implements
             } finally {
 
                 /*
-                 * Whether or not startup was successful, we now turn this flag
-                 * off.
+                 * Whether or not startup was successful, we make sure that this
+                 * flag is turned off.
                  */
 
                 starting.set(false);
@@ -1315,11 +1324,6 @@ abstract public class StoreManager extends ResourceEvents implements
              * shutdown.
              */
             purgeIncompleteMoves();
-            
-            /*
-             * Purge any resources that we no longer require.
-             */
-            purgeOldResources();
             
             /*
              * Notify the timestamp service of the last commit time for the live
@@ -1649,11 +1653,11 @@ abstract public class StoreManager extends ResourceEvents implements
             log.warn(ex.getMessage(), ex);
         }
 
-        try {
-            tmpStore.destroy();
-        } catch (Exception ex) {
-            log.warn(ex.getMessage(), ex);
-        }
+//        try {
+//            tmpStore.destroy();
+//        } catch (Exception ex) {
+//            log.warn(ex.getMessage(), ex);
+//        }
 
         // release the write cache.
         writeCache = null;
@@ -1687,11 +1691,11 @@ abstract public class StoreManager extends ResourceEvents implements
             log.warn(ex.getMessage(), ex);
         }
 
-        try {
-            tmpStore.destroy();
-        } catch (Exception ex) {
-            log.warn(ex.getMessage(), ex);
-        }
+//        try {
+//            tmpStore.destroy();
+//        } catch (Exception ex) {
+//            log.warn(ex.getMessage(), ex);
+//        }
 
         // release the write cache.
         writeCache = null;
@@ -2219,6 +2223,15 @@ abstract public class StoreManager extends ResourceEvents implements
 
         }
 
+        /**
+         * Exposed for {@link StoreManger#getResourcesForTimestamp(long)}.
+         */
+        public CommitRecordIndex getCommitRecordIndex() {
+            
+            return super.getCommitRecordIndex();
+            
+        }
+        
         public void notifyCommit(final long commitTime) {
             
             getLocalTransactionManager().notifyCommitRobust(commitTime);
@@ -2226,11 +2239,13 @@ abstract public class StoreManager extends ResourceEvents implements
         }
         
         /**
-         * Delegates to the federation. Local federation implementations have
-         * direct access to the root block on the live journal for their data
-         * service(s). Distributed federations rely on the timestamp service to
-         * process {@link #notifyCommit(long)} events in order to report the
-         * most recent global commit time.
+         * <strong>WARNING: Delegates to the federation</strong>.
+         * 
+         * Local federation implementations have direct access to the root block
+         * on the live journal for their data service(s). Distributed
+         * federations rely on the timestamp service to process
+         * {@link #notifyCommit(long)} events in order to report the most recent
+         * global commit time.
          */
         public long lastCommitTime() {
             
@@ -2329,11 +2344,11 @@ abstract public class StoreManager extends ResourceEvents implements
      * @throws IllegalStateException
      *             if the {@link StoreManager} is still starting up.
      */
-    public AbstractJournal getLiveJournal() {
+    public ManagedJournal getLiveJournal() {
         
         assertRunning();
 
-        AbstractJournal tmp = liveJournalRef.get();
+        final ManagedJournal tmp = liveJournalRef.get();
         
         assert tmp != null : "open=" + isOpen() + ", starting="
                 + isStarting() + ", dataDir=" + dataDir;
@@ -2399,7 +2414,12 @@ abstract public class StoreManager extends ResourceEvents implements
 
         synchronized (journalIndex) {
 
-            // @todo add a weak reference cache in front of this by timestamp?
+            /*
+             * @todo add a weak reference cache in front of this by timestamp?
+             * (The MDI had a hotspot for a similar pattern of use, but I have
+             * not verified yet whether there is such a hotspot here).
+             */
+
             resource = journalIndex.find(Math.abs(timestamp));
 
         }
@@ -2820,18 +2840,21 @@ abstract public class StoreManager extends ResourceEvents implements
          * a lock on the write service) so we really need to use the
          * [lastOverflowTime] here to have the same semantics.
          */
-        final long lastOverflowTime = this.lastOverflowTime;
-//        final long lastCommitTime = getLiveJournal().getRootBlockView().getLastCommitTime(); 
+//        final long lastOverflowTime = this.lastOverflowTime;
+        final long lastCommitTime = getLiveJournal().getRootBlockView().getLastCommitTime(); 
 
-        if (lastOverflowTime == 0L) {
+        if (lastCommitTime == 0L) {
             
-            /*
-             * Resources can only be purged after an overflow event. When we are
-             * still on the 1st journal there has been no overflow and so we can
-             * not purge anything.
-             */
-            
-            log.info("Can not purge resources until the first overflow.");
+//            /*
+//             * Resources can only be purged after an overflow event. When we are
+//             * still on the 1st journal there has been no overflow and so we can
+//             * not purge anything.
+//             */
+//            
+//            log.info("Can not purge resources until the first overflow.");
+
+            if (INFO)
+                log.info("Nothing committed yet.");
             
             return;
             
@@ -2945,7 +2968,7 @@ abstract public class StoreManager extends ResourceEvents implements
             
             return;
 
-        } else if (releaseTime > lastOverflowTime ) {
+        } else if (releaseTime > lastCommitTime ) {
 
             /*
              * If the computed [releaseTime] is after the last commit record
@@ -2957,10 +2980,10 @@ abstract public class StoreManager extends ResourceEvents implements
 
             if (INFO)
                 log
-                        .info("Choosing commitTimeToPreserve as the lastOverflowTime: "
-                                + lastOverflowTime);
+                        .info("Choosing commitTimeToPreserve as the lastCommitTime: "
+                                + lastCommitTime);
             
-            commitTimeToPreserve = lastOverflowTime;
+            commitTimeToPreserve = lastCommitTime;
 
         } else {
 
@@ -3592,83 +3615,291 @@ abstract public class StoreManager extends ResourceEvents implements
     
     /**
      * Finds all resources used by any registered index as of the given
-     * commitTime.
+     * <i>commitTime</i> up to and including the lastCommitTime for the live
+     * journal.
+     * <p>
+     * Note: We include all dependencies for all commit points subsequent to the
+     * probe in order to ensure that we do not accidently release dependencies
+     * required for more current views of the index.
+     * <p>
+     * Note: This method solely considers the index views as defined at each
+     * commit point starting with the given commit point. It DOES NOT pay
+     * attention to the release time or to any other aspect of the state of the
+     * system.
      * 
      * @param commitTime
      *            A commit time.
      * 
-     * @return The set of resource {@link UUID}s required by at least one
-     *         registered index as of that commit time.
-     * 
-     * @throws IllegalArgumentException
-     *             if there is no commit point that is strictly greater than the
-     *             releaseTime is not spanned by any journal (this implies that
-     *             the release time is either in the future or, if the
-     *             releaseTime is equal to the last commitTime, that you are
-     *             trying to release everything in the database).
+     * @return The set of resource {@link UUID}s required by at least one index
+     *         for the commit point GTE the specified commit time.
      */
+//    * 
+//    * @throws IllegalArgumentException
+//    *             if there is no commit point that is strictly greater than the
+//    *             releaseTime is not spanned by any journal (this implies that
+//    *             the release time is either in the future or, if the
+//    *             releaseTime is equal to the last commitTime, that you are
+//    *             trying to release everything in the database).
     protected Set<UUID> getResourcesForTimestamp(final long commitTime) {
 
-        final ManagedJournal journal = (ManagedJournal) getJournal(commitTime);
+        log.warn("commitTime=" + commitTime + ", lastCommitTime="
+                + getLiveJournal().getRootBlockView().getLastCommitTime());
+        
+        // must be a commitTime.
+        if (commitTime < 0)
+            throw new IllegalArgumentException();
+        
+        final long begin = System.currentTimeMillis();
+        
+        final Set<UUID> uuids = new LinkedHashSet<UUID>(512);
 
-        if (journal == null) {
+        /*
+         * The live journal is always a dependency, even if there are no indices
+         * declared.
+         */
+        uuids.add(getLiveJournal().getRootBlockView().getUUID());
+        
+        /*
+         * Scan all journals having data for commit points GTE the given
+         * [commitTime].
+         * 
+         * Note: We have to scan ALL journals since they are organized by their
+         * createTime in the [journalIndex] not their [lastCommitTime].
+         */
+        synchronized(journalIndex) {
 
-            throw new IllegalArgumentException("No data for commitTime="
-                    + commitTime);
+            final ITupleIterator itr = journalIndex.rangeIterator();
+            
+            while(itr.hasNext()) {
+                
+                final ITuple tuple = itr.next();
 
-        }
+                // @todo convert to TupleSerializer pattern
+                final JournalMetadata journalMetadata = (JournalMetadata) SerializerUtil
+                        .deserialize(tuple.getValue());
+                
+                final UUID uuid = journalMetadata.getUUID();
+                
+                final ManagedJournal journal = (ManagedJournal)openStore(uuid);
+                
+                // the last commit point on that journal.
+                final long lastCommitTime = journal.getRootBlockView()
+                        .getLastCommitTime();
 
-        // the Name2Addr instance for that timestamp.
-        final IIndex name2Addr = journal.getName2Addr(commitTime);
+                if (lastCommitTime < commitTime) {
+                    
+                    /*
+                     * Ignore this journal since last commit point is strictly
+                     * LT our starting [commitTime].
+                     */
+                    
+                    continue;
+                    
+                }
+                
+                /*
+                 * Scan commit points on that journal.
+                 */
+                {
+                    
+                    if (INFO)
+                        log.info("Examining journal: file="
+                            + journal.getFile() + ", lastCommitTime="
+                            + lastCommitTime + ", uuid="
+                            + journal.getRootBlockView().getUUID());
+                    
+                    /*
+                     * The index of commit points for the journal, loaded from
+                     * the last commit point on the journal. This is Ok since we
+                     * always want to read up to the lastCommitPoint on each
+                     * journal, including on the live journal.
+                     */
+                    final CommitRecordIndex commitRecordIndex = journal
+                            .getCommitRecordIndex();
 
-        assert name2Addr != null;
+                    /*
+                     * A per-journal hash set of the [checkpointAddr] for the
+                     * BTree's that we have examined so that we can skip over
+                     * any BTree whose state has not been changed since the last
+                     * commit point (if it has the same checkpointAddr in two
+                     * different commit point then its state has not changed
+                     * between those commit points).
+                     */
+                    final Set<Long/* checkpointAddr */> addrs = new HashSet<Long>(
+                            512);
+                    
+                    /*
+                     * In order to scan timestamps from [commitTime] through to
+                     * the end. For each tuple, fetch the corresponding
+                     * [commitRecord]. For each commitRecord, fetch the
+                     * Name2Addr index and visit its Entries.
+                     */
+                    final ITupleIterator<ICommitRecord> itr2 = commitRecordIndex
+                            .rangeIterator(// @todo make getKey(commitTime) protected again.
+                                    commitRecordIndex.getKey(commitTime), null/*toKey*/);
+                    
+                    while(itr2.hasNext()) {
+                        
+                        final ITuple tuple2 = itr2.next();
+                        
+                        final CommitRecordIndex.Entry entry2 = (CommitRecordIndex.Entry) tuple2
+                                .getObject();
 
-        if (INFO)
-            log.info("commitTime=" + commitTime + "\njournal="
-                    + journal.getResourceMetadata());
+                        /*
+                         * For each distinct checkpoint, load the BTree and
+                         * fetch its local partition metadata which specifies
+                         * its resource dependencies. For each resource, add it
+                         * to the set of resources that we are collecting. All
+                         * of those resources MUST be retained.
+                         */
+                        final ICommitRecord commitRecord = commitRecordIndex
+                                .fetchCommitRecord(entry2);
+                        
+                        final Name2Addr name2addr = (Name2Addr) Name2Addr
+                                .load(
+                                        journal,
+                                        commitRecord
+                                                .getRootAddr(AbstractJournal.ROOT_NAME2ADDR));
+                        
+                        final ITupleIterator<Name2Addr.Entry> itr3 = name2addr.rangeIterator();
+                        
+                        while(itr3.hasNext()) {
+                            
+                            final ITuple<Name2Addr.Entry> tuple3 = itr3.next();
+                            
+                            // FIXME modify Name2Addr to support the tuple serializer pattern.
+                            final Name2Addr.Entry entry3 = Name2Addr.EntrySerializer.INSTANCE.deserialize(tuple3.getValueStream());
+                            
+                            final long checkpointAddr = entry3.checkpointAddr;
+                            
+                            if(addrs.add(checkpointAddr)) {
+                               
+                                /*
+                                 * New checkpoint address.
+                                 */
 
-        final Set<UUID> uuids = new HashSet<UUID>();
+                                if (INFO)
+                                    log.info("index: name=" + entry3.name);
+                                
+                                // load checkpoint record from the store.
+                                final Checkpoint checkpoint = Checkpoint.load(journal, entry3.checkpointAddr);
+                                
+                                // read the index metadata object for that checkpoint.
+                                final IndexMetadata indexMetadata = IndexMetadata.read(journal, checkpoint.getMetadataAddr());
+                                
+                                // this is where the definition of the view is stored.
+                                final LocalPartitionMetadata pmd = indexMetadata.getPartitionMetadata();
+                                
+                                if (pmd == null) {
 
-        final ITupleIterator itr = name2Addr.rangeIterator(null, null);
+                                    /*
+                                     * For scale-out, all indices should be
+                                     * index partitions and should define the
+                                     * resources required by their view.
+                                     * However, the metadata service is not
+                                     * currently partitioned so you will see
+                                     * unpartitioned indices there.
+                                     */
+                                    
+//                                    log
+//                                            .error("Not expecting an unpartitioned index: name="
+//                                                    + entry3.name
+//                                                    + ", commitTime="
+//                                                    + entry2.commitTime
+//                                                    + ", file="
+//                                                    + journal.getFile());
+                                    
+                                    continue;
+                                    
+                                }
+                                
+                                for(IResourceMetadata t : pmd.getResources()) {
+                                    
+                                    if (uuids.add(t.getUUID())) {
 
-        while (itr.hasNext()) {
-
-            final ITuple tuple = itr.next();
-
-            final Entry entry = EntrySerializer.INSTANCE
-                    .deserialize(new DataInputBuffer(tuple.getValue()));
-
-            /*
-             * Open the historical BTree used to absorb writes on the historical
-             * journal.
-             */
-            final BTree btree = (BTree) journal.getIndex(entry.checkpointAddr);
-
-            assert btree != null : entry.toString();
-
-            // index metadata for that index partition.
-            final IndexMetadata indexMetadata = btree.getIndexMetadata();
-
-            // index partition metadata
-            final LocalPartitionMetadata pmd = indexMetadata
-                    .getPartitionMetadata();
-
-            for (IResourceMetadata tmp : pmd.getResources()) {
-
-                // add to set of in-use resources.
-                uuids.add(tmp.getUUID());
-
-                if(INFO)
-                    log.info(indexMetadata.getName() + " uses " + tmp.getFile()
-                        + ", createTime=" + tmp.getCreateTime());
+                                        if (INFO)
+                                            log.info("Dependency: file="
+                                                + t.getFile() + ", uuid="
+                                                + t.getUUID());
+                                        
+                                    }
+                                    
+                                } // next resource in view
+                                
+                            } // end if 
+                            
+                        } // next Name2Addr.Entry
+                        
+                    } // next CommitRecordIndex.Entry
+                    
+                }
                 
             }
-
+            
         }
+        
+//        final ManagedJournal journal = (ManagedJournal) getJournal(commitTime);
+//
+//        if (journal == null) {
+//
+//            throw new IllegalArgumentException("No data for commitTime="
+//                    + commitTime);
+//
+//        }
+//
+//        // the Name2Addr instance for that timestamp.
+//        final IIndex name2Addr = journal.getName2Addr(commitTime);
+//
+//        assert name2Addr != null;
+//
+//        if (INFO)
+//            log.info("commitTime=" + commitTime + "\njournal="
+//                    + journal.getResourceMetadata());
+//
+//        final Set<UUID> uuids = new HashSet<UUID>();
+//
+//        final ITupleIterator itr = name2Addr.rangeIterator(null, null);
+//
+//        while (itr.hasNext()) {
+//
+//            final ITuple tuple = itr.next();
+//
+//            final Entry entry = EntrySerializer.INSTANCE
+//                    .deserialize(new DataInputBuffer(tuple.getValue()));
+//
+//            /*
+//             * Open the historical BTree used to absorb writes on the historical
+//             * journal.
+//             */
+//            final BTree btree = (BTree) journal.getIndex(entry.checkpointAddr);
+//
+//            assert btree != null : entry.toString();
+//
+//            // index metadata for that index partition.
+//            final IndexMetadata indexMetadata = btree.getIndexMetadata();
+//
+//            // index partition metadata
+//            final LocalPartitionMetadata pmd = indexMetadata
+//                    .getPartitionMetadata();
+//
+//            for (IResourceMetadata tmp : pmd.getResources()) {
+//
+//                // add to set of in-use resources.
+//                uuids.add(tmp.getUUID());
+//
+//                if(INFO)
+//                    log.info(indexMetadata.getName() + " uses " + tmp.getFile()
+//                        + ", createTime=" + tmp.getCreateTime());
+//                
+//            }
+//
+//        }
 
-        if (INFO)
-            log.info("There are " + uuids.size()
-                    + " resources in use: commitTime=" + commitTime);
+        final long elapsed = System.currentTimeMillis() - begin;
+        
+//        if (INFO)
+//            log.info
+            log.warn("commitTime="+commitTime+", #used="+uuids.size()+", elapsed="+elapsed);
 
         return uuids;
 

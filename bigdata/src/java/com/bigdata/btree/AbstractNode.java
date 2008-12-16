@@ -169,7 +169,7 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      * {@link Reference} object for any given {@link Node}.
      * </p>
      */
-    protected final Reference<T> self;
+    protected final Reference<? extends AbstractNode> self;
     
     /**
      * The #of times that this node is present on the {@link HardReferenceQueue} .
@@ -313,7 +313,7 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
         this.branchingFactor = branchingFactor;
 
         // reference to self: reused to link parents and children.
-        this.self = (Reference<T>)btree.newRef(this);
+        this.self = btree.newRef(this);
         
         /*
          * Compute the minimum #of children/values. this is the same whether

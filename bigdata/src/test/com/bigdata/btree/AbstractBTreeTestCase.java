@@ -499,11 +499,12 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
     }
     
-    public BTree getBTree(int branchingFactor,ITupleSerializer tupleSer) {
+    public BTree getBTree(final int branchingFactor,
+            final ITupleSerializer tupleSer) {
         
-        IRawStore store = new SimpleMemoryRawStore();
+        final IRawStore store = new SimpleMemoryRawStore();
 
-        IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
         
         metadata.setBranchingFactor(branchingFactor);
 

@@ -287,8 +287,11 @@ public class Checkpoint implements Externalizable {
             final long addrBloomFilter, final int height, final int nnodes,
             final int nleaves, final int nentries, final long counter) {
 
-        assert addrMetadata != 0L;
-
+        /*
+         * Note: The constraint on [addrMetadata] is relaxed in order to permit
+         * a transient BTree (no backing store).
+         */
+//        assert addrMetadata != 0L;
         // MUST be valid addr.
         this.addrMetadata = addrMetadata;
 
@@ -361,8 +364,11 @@ public class Checkpoint implements Externalizable {
      *            record. This address is set on the {@link Checkpoint}
      *            record as a side-effect.
      */
-    public static Checkpoint load(IRawStore store, long addrCheckpoint) {
+    public static Checkpoint load(final IRawStore store, final long addrCheckpoint) {
 
+        if (store == null)
+            throw new IllegalArgumentException();
+        
         final ByteBuffer buf = store.read(addrCheckpoint);
 
         final Checkpoint checkpoint = (Checkpoint) SerializerUtil.deserialize(buf);

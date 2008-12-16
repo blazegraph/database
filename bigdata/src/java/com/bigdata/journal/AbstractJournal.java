@@ -1655,7 +1655,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      * @param committer
      *            The commiter.
      */
-    final public void setCommitter(int rootSlot, ICommitter committer) {
+    final public void setCommitter(final int rootSlot, final ICommitter committer) {
 
         assertOpen();
 

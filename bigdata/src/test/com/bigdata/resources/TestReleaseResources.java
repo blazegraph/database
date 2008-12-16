@@ -30,6 +30,7 @@ package com.bigdata.resources;
 
 import java.io.IOException;
 import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
@@ -59,7 +60,84 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
     public TestReleaseResources(String arg0) {
         super(arg0);
     }
-
+    
+    /*
+     * Note: This interfers with the ability to run the individual test classes
+     * by themselves.
+     */
+//    public static Test suite()
+//    {
+//
+//        TestSuite suite = new TestSuite("releaseFree");
+//
+//        suite.addTestSuite(TestAddDeleteResource.class);
+//        suite.addTestSuite(TestReleaseResources.TestReleaseFree.class);
+//        suite.addTestSuite(TestReleaseResources.TestWithCopyNoRelease.class);
+//        suite.addTestSuite(TestReleaseResources.TestWithCopyImmediateRelease.class);
+//        
+//        return suite;
+//        
+//    }
+    
+//    /**
+//     * A unit test for the logic which determines which resources are "release
+//     * free" as of a given commit time to be preserved (aka, resource which are
+//     * not required for views based on any commit point from the timestamp to be
+//     * preserved up to and including the unisolated views).
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    static public class TestReleaseFree extends TestReleaseResources {
+//        
+//
+//        /**
+//         * 
+//         */
+//        public TestReleaseFree() {
+//        }
+//
+//        /**
+//         * @param arg0
+//         */
+//        public TestReleaseFree(String arg0) {
+//            super(arg0);
+//        }
+//        
+//        public Properties getProperties() {
+//            
+//            Properties properties = new Properties( super.getProperties() );
+//
+////            // Immediate release of old resources.
+////            properties.setProperty(Options.MIN_RELEASE_AGE,
+////                    Options.MIN_RELEASE_AGE_NO_HISTORY);
+//            
+////            // Overflow should not occur during this test.
+////            properties.setProperty(OverflowManager.Options.OVERFLOW_ENABLED,
+////                    "false");
+//            
+//            return properties;
+//            
+//        }
+//        
+//        /**
+//         * Test creates a sequence of view declarations for an index and
+//         * verifies that the correct set of resources are identified as being
+//         * in-use for a variety of timestamps.
+//         * 
+//         * @throws IOException
+//         * @throws ExecutionException
+//         * @throws InterruptedException
+//         */
+//        public void test() throws IOException,
+//                InterruptedException, ExecutionException {
+//
+//            fail("Write test");
+//            
+//        }
+//        
+//    }
+    
     /**
      * Test where the index view is copied in its entirety onto the new journal
      * but the {@link ResourceManager} is not permitted to release old resources
@@ -171,21 +249,39 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
                             .getCommitTimeStrictlyGreaterThan(createTime1));
 
             /*
-             * Verify that the resources required for [A] when we first
-             * registered it are exactly [j0].
+             * Verify that the resources required for [A] are {j0, j1} when the
+             * probe commitTime is the timestamp when we registered [A] on [j0].
+             * (j1 is also represented since we include all dependencies for all
+             * commit points subsequent to the probe in order to ensure that we
+             * do not accidently release dependencies required for more current
+             * views of the index).
              */
-            assertSameResources(new IRawStore[] { j0 }, //
-                    resourceManager.getResourcesForTimestamp(j0.getRootBlockView()
-                            .getFirstCommitTime()));
-
+            {
+                
+                final long commitTime = j0.getRootBlockView()
+                        .getFirstCommitTime();
+                
+                final Set<UUID> actual = resourceManager.getResourcesForTimestamp(commitTime);
+                
+                assertSameResources(new IRawStore[] { j0, j1 }, actual);
+            
+            }
 
             /*
              * Verify that the resources required for [A] after overflow are
              * exactly [j1].
              */
-            assertSameResources(new IRawStore[] { j1 }, //
-                    resourceManager.getResourcesForTimestamp(j1.getRootBlockView()
-                            .getFirstCommitTime()));
+            {
+                
+                final long commitTime = j1.getRootBlockView()
+                        .getFirstCommitTime();
+                
+                final Set<UUID> actual = resourceManager
+                        .getResourcesForTimestamp(commitTime);
+                
+                assertSameResources(new IRawStore[] { j1 }, actual);
+                
+            }
             
         }
         
@@ -264,15 +360,32 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             // did overflow.
             assertEquals(1,resourceManager.getOverflowCount());
 
-            // should have been closed for writes during sync. overflow processing.
-            assertTrue(j0.isOpen());
-            assertTrue(j0.isReadOnly());
+            /*
+             * Note: the old journal should have been closed for writes during
+             * syncronous overflow processing.
+             */
+            assertTrue(j0.isOpen()); // still open
+            assertTrue(j0.isReadOnly()); // but no longer accepts writes.
             
             /*
              * Purge old resources. If the index was copied to the new journal
              * then there should be no dependency on the old journal and it
              * should be deleted.
              */
+            {
+              
+                final AbstractJournal liveJournal = resourceManager
+                        .getLiveJournal();
+
+                final long lastCommitTime = liveJournal.getLastCommitTime();
+                
+                final Set<UUID> actual = resourceManager
+                        .getResourcesForTimestamp(lastCommitTime);
+                
+                assertSameResources(new IRawStore[] {liveJournal}, actual);
+
+            }
+            
             resourceManager
                     .purgeOldResources(1000/* ms */, false/*truncateJournal*/);
             
@@ -311,9 +424,14 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
              * Verify that the resources required for [A] after overflow are
              * exactly [j1].
              */
+            final Set<UUID> actualResourceUUIDs = resourceManager
+                    .getResourcesForTimestamp(j1.getRootBlockView()
+                            .getFirstCommitTime());
+            
+            System.err.println("resources="+actualResourceUUIDs);
+            
             assertSameResources(new IRawStore[] { j1 }, //
-                    resourceManager.getResourcesForTimestamp(j1.getRootBlockView()
-                            .getFirstCommitTime()));
+                    actualResourceUUIDs);
             
         }
         
@@ -457,6 +575,9 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             // did overflow.
             assertEquals(2,resourceManager.getOverflowCount());
 
+            // note: purge is not invoke on overflow anymore, so do it ourselves.
+            resourceManager.purgeOldResources(100/*ms*/, false/*truncateJournal*/);
+            
             // should have been closed no later than when it was deleted.
             assertFalse(j0.isOpen());
             

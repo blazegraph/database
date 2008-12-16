@@ -39,7 +39,6 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
-import com.bigdata.resources.NoSuchStoreException;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.resources.StoreManager;
@@ -185,7 +184,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
         /**
          * The default minimum #of threads in the write service thread pool.
          */
-        String DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE = "5";
+        String DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE = "10";
 
         /**
          * The maximum #of threads allowed in the pool handling concurrent
@@ -217,7 +216,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
                 .getName()
                 + ".writeService.keepAliveTime";
 
-        String DEFAULT_WRITE_SERVICE_KEEP_ALIVE_TIME = "5000";
+        String DEFAULT_WRITE_SERVICE_KEEP_ALIVE_TIME = "60000";
 
         /**
          * When true, the write service will be prestart all of its worker

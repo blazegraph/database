@@ -27,6 +27,7 @@ import java.util.UUID;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
+import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.btree.keys.IKeyBuilder;
@@ -47,6 +48,9 @@ import com.bigdata.rawstore.IRawStore;
  * <p>
  * Note: This is used as a transient data structure that is populated from the
  * file system by the {@link ResourceManager}.
+ * 
+ * @todo this should be updated to use an {@link ITupleSerializer} that
+ *       automatically (de-)serializes the keys and values.
  */
 public class IndexSegmentIndex extends BTree {
 
@@ -57,20 +61,17 @@ public class IndexSegmentIndex extends BTree {
             + Bytes.SIZEOF_UUID);
 
     /**
-     * Create a new instance.
-     * 
-     * @param store
-     *            The backing store.
+     * Create a transient instance.
      * 
      * @return The new instance.
      */
-    static public IndexSegmentIndex create(IRawStore store) {
-    
-        IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+    static public IndexSegmentIndex createTransient() {
         
+        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+
         metadata.setBTreeClassName(IndexSegmentIndex.class.getName());
-        
-        return (IndexSegmentIndex) BTree.create(store, metadata);
+
+        return (IndexSegmentIndex) BTree.createTransient(metadata);
         
     }
 

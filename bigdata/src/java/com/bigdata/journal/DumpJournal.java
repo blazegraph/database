@@ -252,13 +252,13 @@ public class DumpJournal {
                 
                 CommitRecordIndex commitRecordIndex = journal._commitRecordIndex;
                 
-                ITupleIterator itr = commitRecordIndex.rangeIterator();
+                ITupleIterator<CommitRecordIndex.Entry> itr = commitRecordIndex.rangeIterator();
                 
                 while(itr.hasNext()) {
                     
                     System.err.println("----");
 
-                    final CommitRecordIndex.Entry entry = commitRecordIndex.deserializeEntry(itr.next().getValueStream());
+                    final CommitRecordIndex.Entry entry = itr.next().getObject();
                     
                     System.err.print("Commit Record: " + entry.commitTime
                             + ", addr=" + journal.toString(entry.addr)+", ");

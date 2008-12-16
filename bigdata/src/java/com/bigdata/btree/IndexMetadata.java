@@ -1183,7 +1183,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     }
     
     /**
-     * De-serialization constructor.
+     * <strong>De-serialization constructor only</strong> - DO NOT use this
+     * ctor for creating a new instance!
      */
     public IndexMetadata() {
         

@@ -185,6 +185,15 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter,
     }
 
     /**
+     * The backing store.
+     */
+    final public IRawStore getStore() {
+
+        return store;
+
+    }
+    
+    /**
      * Returns a mutable counter. All {@link ICounter}s returned by this method
      * report and increment the same underlying counter.
      * <p>
@@ -280,7 +289,9 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter,
     }
     
     /**
-     * Load a {@link BTree} from the store using a {@link Checkpoint} record.
+     * Required constructor form for {@link BTree} and any derived subclasses.
+     * This ctor is used both to create a new {@link BTree}, and to load a
+     * {@link BTree} from the store using a {@link Checkpoint} record.
      * 
      * @param store
      *            The store.
@@ -292,9 +303,10 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter,
      * @see BTree#create(IRawStore, IndexMetadata)
      * @see BTree#load(IRawStore, long, boolean)
      */
-    public BTree(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata) {
+    public BTree(final IRawStore store, final Checkpoint checkpoint,
+            final IndexMetadata metadata) {
 
-        super(store, 
+        super(  store, 
                 NodeFactory.INSTANCE, //
                 /*
                  * Note: A BTree is not known to be read-only during its ctor.
@@ -311,11 +323,15 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter,
             
         }
 
-        if(checkpoint.getMetadataAddr() != metadata.getMetadataAddr()) {
-            
-            // must agree.
-            throw new IllegalArgumentException();
-            
+        if (store != null) {
+
+            if (checkpoint.getMetadataAddr() != metadata.getMetadataAddr()) {
+
+                // must agree.
+                throw new IllegalArgumentException();
+
+            }
+
         }
 
         if (metadata.getConflictResolver() != null && !metadata.isIsolatable()) {
@@ -344,6 +360,34 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter,
         
     }
     
+//    /**
+//     * Ctor used for transient {@link BTree}s.
+//     * 
+//     * @param checkpoint
+//     *            The initial checkpoint record (initial state, not persistent).
+//     * @param metadata
+//     *            The index metadata (not persistent).
+//     * 
+//     * @see #createTransient(IndexMetadata)
+//     */
+//    protected BTree(final Checkpoint checkpoint, final IndexMetadata metadata) {
+//
+//        super(  null, //store 
+//                NodeFactory.INSTANCE, //
+//                /*
+//                 * Note: A BTree is not known to be read-only during its ctor.
+//                 * It might be marked as read-only afterwards, but we can't be
+//                 * sure at this point.
+//                 */
+//                false, // read-only
+//                metadata
+//                );
+//        
+//        // initializes entryCount, etc.
+//        setCheckpoint(checkpoint);
+//
+//    }
+    
     /**
      * Sets the {@link #checkpoint} and initializes the mutable fields from the
      * checkpoint record. In order for this operation to be atomic, the caller
@@ -351,7 +395,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter,
      * exclusive access, e.g., during the ctor or when the {@link BTree} is
      * mutable and access is therefore required to be single-threaded.
      */
-    private void setCheckpoint(Checkpoint checkpoint) {
+    private void setCheckpoint(final Checkpoint checkpoint) {
 
         this.checkpoint = checkpoint; // save reference.
         
@@ -750,6 +794,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter,
      */
     final public boolean flush() {
 
+        assertNotTransient();
         assertNotReadOnly();
         
         if (root != null && root.dirty) {
@@ -789,6 +834,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter,
      */
     final public long writeCheckpoint() {
         
+        assertNotTransient();
         assertNotReadOnly();
         
         if (INFO)
@@ -1064,6 +1110,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter,
      */
     public long handleCommit(final long commitTime) {
 
+        assertNotTransient();
         assertNotReadOnly();
 
         if (/*autoCommit &&*/ needsCheckpoint()) {
@@ -1187,7 +1234,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter,
      *                copy of the metadata object with the metadata address set
      *                to <code>0L</code>.
      */
-    public static BTree create(IRawStore store, IndexMetadata metadata) {
+    public static BTree create(final IRawStore store, final IndexMetadata metadata) {
         
         if (metadata.getMetadataAddr() != 0L) {
 
@@ -1220,6 +1267,76 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter,
         
     }
 
+    /**
+     * Create a new {@link BTree} or derived class that is fully transient (NO
+     * backing {@link IRawStore}).
+     * <p>
+     * Fully transient {@link BTree}s provide the functionality of a B+Tree
+     * without a backing persistence store. Internally, reachable nodes and
+     * leaves of the transient {@link BTree} use hard references to ensure that
+     * remain strongly reachable. Deleted nodes and leaves simply clear their
+     * references and will be swept by the garbage collector shortly thereafter.
+     * <p>
+     * Operations which attempt to write on the backing store will fail.
+     * <p>
+     * While nodes and leaves are never persisted, the keys and values of the
+     * transient {@link BTree} are unsigned byte[]s. This means that application
+     * keys and values are always converted into unsigned byte[]s before being
+     * stored in the {@link BTree}. Hence if an object that is inserted into
+     * the {@link BTree} and then looked up using the {@link BTree} API, you
+     * WILL NOT get back the same object reference.
+     * <p>
+     * Note: CLOSING A TRANSIENT INDEX WILL DISCARD ALL DATA!
+     * 
+     * @param metadata
+     *            The metadata record.
+     * 
+     * @return The transient {@link BTree}.
+     */
+    public static BTree createTransient(final IndexMetadata metadata) {
+        
+        /*
+         * Create checkpoint for the new B+Tree.
+         */
+        final Checkpoint firstCheckpoint = metadata.firstCheckpoint();
+
+        /*
+         * Create B+Tree object instance.
+         */
+        try {
+
+            final Class cl = Class.forName(metadata.getBTreeClassName());
+
+            /*
+             * Note: A NoSuchMethodException thrown here means that you did not
+             * declare the required public constructor for a class derived from
+             * BTree.
+             */
+            final Constructor ctor = cl.getConstructor(new Class[] {
+                    IRawStore.class,//
+                    Checkpoint.class,//
+                    IndexMetadata.class //
+                    });
+
+            final BTree btree = (BTree) ctor.newInstance(new Object[] { //
+                    null , // store
+                    firstCheckpoint, //
+                    metadata //
+                    });
+
+            // create the root node.
+            btree.reopen();
+
+            return btree;
+
+        } catch (Exception ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+        
+    }
+    
     /**
      * Load an instance of a {@link BTree} or derived class from the store. The
      * {@link BTree} or derived class MUST declare a constructor with the
@@ -1299,9 +1416,9 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter,
          * Create B+Tree object instance.
          */
         try {
-            
+
             final Class cl = Class.forName(metadata.getBTreeClassName());
-            
+
             /*
              * Note: A NoSuchMethodException thrown here means that you did not
              * declare the required public constructor for a class derived from
@@ -1315,27 +1432,27 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter,
 
             final BTree btree = (BTree) ctor.newInstance(new Object[] { //
                     store,//
-                    checkpoint, //
-                    metadata //
+                            checkpoint, //
+                            metadata //
                     });
 
-            if(readOnly) {
-                
+            if (readOnly) {
+
                 btree.setReadOnly(true);
-                
+
             }
-            
+
             // read the root node.
             btree.reopen();
-            
+
             return btree;
-            
-        } catch(Exception ex) {
-            
+
+        } catch (Exception ex) {
+
             throw new RuntimeException(ex);
-            
+
         }
-        
+
     }
     
     /**
