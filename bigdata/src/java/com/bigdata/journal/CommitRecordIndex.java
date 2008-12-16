@@ -27,9 +27,13 @@ import java.io.IOException;
 import java.util.UUID;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.Checkpoint;
+import com.bigdata.btree.DefaultTupleSerializer;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
@@ -40,9 +44,10 @@ import com.bigdata.rawstore.IRawStore;
 
 /**
  * BTree mapping commit times to {@link ICommitRecord}s. The keys are the long
- * integers. The values are {@link Entry} objects recording the commit time of
- * the index and the address of the {@link ICommitRecord} for that commit time.
- * A canonicalizing cache is maintained such that the caller will never observe
+ * integers corresponding to the timestamps assigned to commit points in the
+ * store. The values are {@link Entry} objects recording the commit time of the
+ * index and the address of the {@link ICommitRecord} for that commit time. A
+ * canonicalizing cache is maintained such that the caller will never observe
  * distinct concurrent instances of the same {@link ICommitRecord}. This in
  * turn facilitates canonicalizing caches for objects loaded from that
  * {@link ICommitRecord}.
@@ -80,9 +85,12 @@ public class CommitRecordIndex extends BTree {
      */
     static public CommitRecordIndex create(IRawStore store) {
     
-        IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
         
         metadata.setBTreeClassName(CommitRecordIndex.class.getName());
+        
+        metadata.setTupleSerializer(new CommitRecordIndexTupleSerializer(
+                new ASCIIKeyBuilderFactory(Bytes.SIZEOF_LONG)));
         
         return (CommitRecordIndex) BTree.create(store, metadata);
         
@@ -102,7 +110,14 @@ public class CommitRecordIndex extends BTree {
 
         super(store, checkpoint, metadata);
 
+        this.ser = new Entry.EntrySerializer();
+        
     }
+    
+    /**
+     * Used to (de-)serialize {@link Entry}s (NOT thread-safe).
+     */
+    private final Entry.EntrySerializer ser;
     
     /**
      * Encodes the commit time into a key.
@@ -112,7 +127,7 @@ public class CommitRecordIndex extends BTree {
      * 
      * @return The corresponding key.
      */
-    protected byte[] getKey(long commitTime) {
+    public byte[] getKey(long commitTime) {
 
         /*
          * Note: The {@link UnicodeKeyBuilder} is NOT thread-safe
@@ -167,7 +182,7 @@ public class CommitRecordIndex extends BTree {
         }
         
         // deserialize the entry.
-        final Entry entry = deserializeEntry(new DataInputBuffer(val));
+        final Entry entry = ser.deserializeEntry(new DataInputBuffer(val));
 
         /*
          * re-load the commit record from the store.
@@ -240,7 +255,7 @@ public class CommitRecordIndex extends BTree {
      * @return The commit record -or- <code>null</code> if there is no commit
      *         record whose timestamp is strictly greater than <i>timestamp</i>.
      */
-    synchronized public ICommitRecord findNext(long timestamp) {
+    synchronized public ICommitRecord findNext(final long timestamp) {
 
         if (timestamp == ITx.UNISOLATED) {
 
@@ -278,13 +293,30 @@ public class CommitRecordIndex extends BTree {
      * 
      * @see #findIndexOf(long)
      */
-    private ICommitRecord valueAtIndex(int index) {
+    private ICommitRecord valueAtIndex(final int index) {
         
         /*
          * Retrieve the entry for the commit record from the index.  This
          * also stores the actual commit time for the commit record.
          */
-        final Entry entry = deserializeEntry( new DataInputBuffer( super.valueAt( index ) ));
+        final Entry entry = ser.deserializeEntry( new DataInputBuffer( super.valueAt( index ) ));
+
+        return fetchCommitRecord(entry);
+        
+    }
+    
+    /**
+     * Materialize a commit record, from cache if possible.
+     * <p>
+     * Note: This DOES NOT perform lookup of the commit time!
+     * 
+     * @param entry An {@link Entry}.
+     * 
+     * @return The {@link ICommitRecord}.
+     * 
+     * @see #get(long)
+     */
+    public ICommitRecord fetchCommitRecord(final Entry entry) {
 
         /*
          * Test the cache for this commit record using its actual commit time.
@@ -395,7 +427,7 @@ public class CommitRecordIndex extends BTree {
      * @exception IllegalArgumentException
      *                if <i>addr</i> is invalid.
      */
-    synchronized public void add(long commitRecordAddr, ICommitRecord commitRecord) {
+    synchronized public void add(final long commitRecordAddr, final ICommitRecord commitRecord) {
         
         if (commitRecord == null)
             throw new IllegalArgumentException();
@@ -416,7 +448,7 @@ public class CommitRecordIndex extends BTree {
         
         // add a serialized entry to the persistent index.
         super.insert(key,
-                serializeEntry(new Entry(commitTime, commitRecordAddr)));
+                ser.serializeEntry(new Entry(commitTime, commitRecordAddr)));
         
         // should not be an existing entry for that commit time.
         assert cache.get(commitTime) == null;
@@ -453,58 +485,166 @@ public class CommitRecordIndex extends BTree {
             
         }
         
-    }
-    
-    /**
-     * Private buffer used within sychronized contexts to serialize
-     * {@link Entry}s.
-     */
-    private DataOutputBuffer out = new DataOutputBuffer(Bytes.SIZEOF_LONG*2);
-    
-    /**
-     * Serialize an {@link Entry}.
-     * 
-     * @param entry
-     *            The entry.
-     * 
-     * @return The serialized entry.
-     */
-    protected byte[] serializeEntry(Entry entry) {
-        
-        out.reset();
+        /**
+         * Used to (de-)serialize {@link Entry}s (NOT thread-safe).
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+         * @version $Id$
+         */
+        public static class EntrySerializer {
 
-        out.putLong(entry.commitTime);
-        
-        out.putLong(entry.addr);
-        
-        return out.toByteArray();
-        
-    }
+            /**
+             * Private buffer used within sychronized contexts to serialize
+             * {@link Entry}s.
+             */
+            private final DataOutputBuffer out = new DataOutputBuffer(
+                    Bytes.SIZEOF_LONG * 2);
 
-    /**
-     * De-serialize an {@link Entry}.
-     * 
-     * @param is
-     *            The serialized data.
-     *            
-     * @return The {@link Entry}.
-     */
-    protected Entry deserializeEntry(DataInputBuffer is) {
+            /**
+             * Serialize an {@link Entry}.
+             * 
+             * @param entry
+             *            The entry.
+             * 
+             * @return The serialized entry.
+             */
+            public byte[] serializeEntry(Entry entry) {
 
-        try {
+                out.reset();
 
-            long commitTime = is.readLong();
-            
-            long addr = is.readLong();
-            
-            return new Entry(commitTime, addr);
-            
-        } catch (IOException ex) {
-            
-            throw new RuntimeException(ex);
-            
+                out.putLong(entry.commitTime);
+
+                out.putLong(entry.addr);
+
+                return out.toByteArray();
+
+            }
+
+            /**
+             * De-serialize an {@link Entry}.
+             * 
+             * @param is
+             *            The serialized data.
+             * 
+             * @return The {@link Entry}.
+             */
+            public Entry deserializeEntry(DataInputBuffer is) {
+
+                try {
+
+                    long commitTime = is.readLong();
+
+                    long addr = is.readLong();
+
+                    return new Entry(commitTime, addr);
+
+                } catch (IOException ex) {
+
+                    throw new RuntimeException(ex);
+
+                }
+
+            }
+
         }
         
     }
     
+    /**
+     * Encapsulates key and value formation for the {@link CommitRecordIndex}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static public class CommitRecordIndexTupleSerializer extends
+            DefaultTupleSerializer<Long, Entry> {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -4410874047750277697L;
+
+        /**
+         * Used to (de-)serialize {@link Entry}s (NOT thread-safe).
+         */
+        private final Entry.EntrySerializer ser;
+        
+        /**
+         * De-serialization ctor.
+         */
+        public CommitRecordIndexTupleSerializer() {
+
+            super();
+
+            this.ser = new Entry.EntrySerializer();
+            
+        }
+
+        /**
+         * Ctor when creating a new instance.
+         * 
+         * @param keyBuilderFactory
+         */
+        public CommitRecordIndexTupleSerializer(
+                final IKeyBuilderFactory keyBuilderFactory) {
+            
+            super(keyBuilderFactory);
+            
+            this.ser = new Entry.EntrySerializer();
+
+        }
+        
+        /**
+         * Decodes the term identifier key to a term identifier.
+         * 
+         * @param key
+         *            The key for an entry in the id:term index.
+         * 
+         * @return The term identifier.
+         */
+        @Override
+        public Long deserializeKey(ITuple tuple) {
+
+            final byte[] key = tuple.getKeyBuffer().array();
+
+            final long id = KeyBuilder.decodeLong(key, 0);
+
+            return id;
+
+        }
+
+        /**
+         * Return the unsigned byte[] key for a commit time.
+         * 
+         * @param obj
+         *            A commit time.
+         */
+        @Override
+        public byte[] serializeKey(Object obj) {
+
+            return getKeyBuilder().reset().append((Long) obj).getKey();
+
+        }
+
+        /**
+         * Return the byte[] value an {@link Entry}.
+         * 
+         * @param obj
+         *            An Entry.
+         */
+        public byte[] serializeVal(Entry entry) {
+            
+            return ser.serializeEntry(entry);
+
+        }
+
+        @Override
+        public Entry deserialize(ITuple tuple) {
+
+            return ser.deserializeEntry(tuple.getValueStream());
+
+        }
+
+    }
+
 }

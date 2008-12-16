@@ -91,8 +91,11 @@ public class TestAll extends TestCase {
 
         // test release of old resources.
         suite.addTestSuite(TestAddDeleteResource.class);
+//        suite.addTest(TestReleaseResources.suite());
+//        suite.addTestSuite(TestReleaseResources.TestReleaseFree.class);
         suite.addTestSuite(TestReleaseResources.TestWithCopyNoRelease.class);
         suite.addTestSuite(TestReleaseResources.TestWithCopyImmediateRelease.class);
+        suite.addTestSuite(TestReleaseResources.TestWithCopy_NonZeroMinReleaseAge.class);
 
         return suite;
 

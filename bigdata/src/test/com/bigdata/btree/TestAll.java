@@ -148,6 +148,11 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestDirtyListener.class);
         // test the close/reopen protocol for releasing index buffers.
         suite.addTestSuite(TestReopen.class);
+        
+        /*
+         * test of transient BTree's (no backing store).
+         */
+        suite.addTestSuite(TestTransientBTree.class);
 
         /*
          * Test bloom filters for a BTree (vs an IndexSegment, which is handled

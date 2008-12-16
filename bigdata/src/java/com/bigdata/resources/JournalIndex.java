@@ -27,6 +27,7 @@ import java.util.UUID;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
+import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -38,14 +39,18 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 
 /**
- * {@link BTree} mapping {@link IJournal} commit times to
- * {@link IResourceMetadata} records. The keys are the long integers. The values
- * are {@link IResourceMetadata} objects.
+ * {@link BTree} mapping {@link IJournal} <em>createTimes</em> to
+ * {@link IResourceMetadata} records. The keys are the long integers,
+ * representing the createTime of the {@link IJournal}. The values are
+ * {@link IResourceMetadata} objects describing the {@link IJournal}.
  * <p>
  * Note: Access to this object MUST be synchronized.
  * <p>
  * Note: This is used as a transient data structure that is populated from the
  * file system by the {@link ResourceManager}.
+ * 
+ * @todo this should be updated to use an {@link ITupleSerializer} that
+ *       automatically (de-)serializes the keys and values.
  */
 public class JournalIndex extends BTree {
 
@@ -55,20 +60,17 @@ public class JournalIndex extends BTree {
     final private IKeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG);
 
     /**
-     * Create a new instance.
-     * 
-     * @param store
-     *            The backing store.
+     * Create a transient instance.
      * 
      * @return The new instance.
      */
-    static public JournalIndex create(IRawStore store) {
+    static public JournalIndex createTransient() {
     
-        IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
         
         metadata.setBTreeClassName(JournalIndex.class.getName());
         
-        return (JournalIndex) BTree.create(store, metadata);
+        return (JournalIndex) BTree.createTransient(/*store, */metadata);
         
     }
 
@@ -154,7 +156,8 @@ public class JournalIndex extends BTree {
     }
     
     /**
-     * Find the first journal strictly greater than the timestamp.
+     * Find the first journal whose <em>createTime</em> is strictly greater
+     * than the timestamp.
      * 
      * @param timestamp
      *            The timestamp. A value of ZERO (0) may be used to find the
@@ -165,6 +168,10 @@ public class JournalIndex extends BTree {
      */
     synchronized public IResourceMetadata findNext(final long timestamp) {
 
+        /*
+         * Note: can also be written using rangeIterator().next().
+         */
+        
         if (timestamp < 0L)
             throw new IllegalArgumentException();
         

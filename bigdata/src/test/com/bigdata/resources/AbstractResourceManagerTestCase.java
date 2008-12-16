@@ -609,6 +609,13 @@ public class AbstractResourceManagerTestCase extends
      */
     protected void assertSameResources(IRawStore[] expected, Set<UUID> actual) {
         
+        if(log.isInfoEnabled()) {
+            
+            log.info("\nexpected=" + Arrays.toString(expected) + "\nactual="
+                    + actual);
+            
+        }
+        
         // copy to avoid side-effects.
         final Set<UUID> tmp = new HashSet<UUID>(actual);
         

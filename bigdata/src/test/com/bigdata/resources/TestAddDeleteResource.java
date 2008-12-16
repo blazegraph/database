@@ -35,7 +35,6 @@ import java.util.UUID;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
