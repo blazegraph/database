@@ -46,7 +46,11 @@ import com.bigdata.io.SerializerUtil;
 
 /**
  * Default implementation uses the {@link KeyBuilder} to format the object as a
- * key and uses Java default serialization for the value.
+ * key and uses Java default serialization for the value. You only need to
+ * subclass this if you want to use custom (de-)serialization of the value,
+ * custom conversion of the application key to an unsigned byte[], or if you
+ * have a special type of application key such that you are able to decode the
+ * unsigned byte[] and materialize the corresponding application key.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

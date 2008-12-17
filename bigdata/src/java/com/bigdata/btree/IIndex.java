@@ -40,7 +40,7 @@ import com.bigdata.service.Split;
  * Interface for mutable B+-Tree mapping arbitrary non-null keys to arbitrary
  * values.
  * </p>
- * 
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

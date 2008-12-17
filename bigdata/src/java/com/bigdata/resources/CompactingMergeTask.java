@@ -28,7 +28,7 @@ import com.bigdata.mdi.SegmentMetadata;
  * journal.
  * <p>
  * Note: As its last action, this task submits a
- * {@link AtomicReplaceHistoryTask} which replaces the view with one
+ * {@link AtomicUpdateCompactingMergeTask} which replaces the view with one
  * defined by the current {@link BTree} on the journal and the newly built
  * {@link IndexSegment}.
  * <p>
@@ -115,7 +115,7 @@ public class CompactingMergeTask extends
         try {
             
             // task will update the index partition view definition.
-            final AbstractTask<Void> task = new AtomicReplaceHistoryTask(
+            final AbstractTask<Void> task = new AtomicUpdateCompactingMergeTask(
                     resourceManager, concurrencyManager, name, indexUUID,
                     result);
 
@@ -276,7 +276,7 @@ public class CompactingMergeTask extends
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static public class AtomicReplaceHistoryTask extends
+    static protected class AtomicUpdateCompactingMergeTask extends
             AbstractAtomicUpdateTask<Void> {
 
         final protected BuildResult buildResult;
@@ -287,7 +287,7 @@ public class CompactingMergeTask extends
          * @param resource
          * @param buildResult
          */
-        public AtomicReplaceHistoryTask(ResourceManager resourceManager,
+        public AtomicUpdateCompactingMergeTask(ResourceManager resourceManager,
                 IConcurrencyManager concurrencyManager, String resource,
                 UUID indexUUID, BuildResult buildResult) {
 

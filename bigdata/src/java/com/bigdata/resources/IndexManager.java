@@ -896,7 +896,7 @@ abstract public class IndexManager extends StoreManager {
      * 
      * @see Journal#getIndex(String, long)
      */
-    public IIndex getIndex(String name, long timestamp) {
+    public IIndex getIndex(final String name, final long timestamp) {
         
         if (name == null) {
 

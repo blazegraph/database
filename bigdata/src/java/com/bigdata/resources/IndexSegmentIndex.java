@@ -27,30 +27,27 @@ import java.util.UUID;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
-import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 
 /**
- * {@link BTree} mapping {@link IndexSegmentStore} commit times (aka their
- * create times) to {@link IResourceMetadata} records. The keys are the long
- * integers (commitTimes) followed by the index segment UUID to break ties (this
- * is not the scale-out index UUID, but the UUID of the specific index segment).
- * The values are {@link IResourceMetadata} objects.
+ * {@link BTree} mapping {@link IndexSegmentStore} <em>createTime</em>s to
+ * {@link IResourceMetadata} records. The keys are the long integers
+ * (commitTimes) followed by the index segment UUID to break ties (this is not
+ * the scale-out index UUID, but the UUID of the specific index segment). The
+ * values are {@link IResourceMetadata} objects.
  * <p>
  * Note: Access to this object MUST be synchronized.
  * <p>
  * Note: This is used as a transient data structure that is populated from the
  * file system by the {@link ResourceManager}.
- * 
- * @todo this should be updated to use an {@link ITupleSerializer} that
- *       automatically (de-)serializes the keys and values.
  */
 public class IndexSegmentIndex extends BTree {
 
@@ -122,7 +119,7 @@ public class IndexSegmentIndex extends BTree {
      *                if there is already an entry registered under for the
      *                given timestamp.
      */
-    synchronized public void add(IResourceMetadata resourceMetadata) {
+    synchronized public void add(SegmentMetadata resourceMetadata) {
 
         if (resourceMetadata == null)
             throw new IllegalArgumentException();

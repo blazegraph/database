@@ -707,7 +707,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static public class AtomicUpdateMoveIndexPartitionTask extends
+    static protected class AtomicUpdateMoveIndexPartitionTask extends
             AbstractResourceManagerTask<Long> {
 
         final private MoveResult moveResult;

@@ -27,30 +27,28 @@ import java.util.UUID;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
-import com.bigdata.btree.ITupleSerializer;
+import com.bigdata.btree.DefaultTupleSerializer;
+import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.IJournal;
-import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 
 /**
- * {@link BTree} mapping {@link IJournal} <em>createTimes</em> to
- * {@link IResourceMetadata} records. The keys are the long integers,
- * representing the createTime of the {@link IJournal}. The values are
- * {@link IResourceMetadata} objects describing the {@link IJournal}.
+ * {@link BTree} mapping {@link IJournal} <em>createTimes</em> (long integers)
+ * to {@link JournalMetadata} records describing the {@link IJournal}.
  * <p>
  * Note: Access to this object MUST be synchronized.
  * <p>
  * Note: This is used as a transient data structure that is populated from the
  * file system by the {@link ResourceManager}.
- * 
- * @todo this should be updated to use an {@link ITupleSerializer} that
- *       automatically (de-)serializes the keys and values.
  */
 public class JournalIndex extends BTree {
 
@@ -69,7 +67,10 @@ public class JournalIndex extends BTree {
         final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
         
         metadata.setBTreeClassName(JournalIndex.class.getName());
-        
+
+        metadata.setTupleSerializer(new TupleSerializer(
+                new ASCIIKeyBuilderFactory(Bytes.SIZEOF_LONG)));
+
         return (JournalIndex) BTree.createTransient(/*store, */metadata);
         
     }
@@ -101,12 +102,14 @@ public class JournalIndex extends BTree {
      */
     protected byte[] getKey(final long commitTime) {
 
+//        return metadata.getTupleSerializer().serializeKey(commitTime);
+
         return keyBuilder.reset().append(commitTime).getKey();
 
     }
 
     /**
-     * Return the {@link IResourceMetadata} identifying the journal having the
+     * Return the {@link JournalMetadata} identifying the journal having the
      * largest createTime that is less than or equal to the given timestamp.
      * This is used primarily to locate the commit record that will serve as the
      * ground state for a transaction having <i>timestamp</i> as its start
@@ -123,7 +126,7 @@ public class JournalIndex extends BTree {
      * @throws IllegalArgumentException
      *             if <i>timestamp</i> is less than or equals to ZERO (0L).
      */
-    synchronized public IResourceMetadata find(final long timestamp) {
+    synchronized public JournalMetadata find(final long timestamp) {
 
         if (timestamp <= 0L)
             throw new IllegalArgumentException();
@@ -146,9 +149,9 @@ public class JournalIndex extends BTree {
     /**
      * Retrieve the entry from the index.
      */
-    private IResourceMetadata valueAtIndex(final int index) {
+    private JournalMetadata valueAtIndex(final int index) {
 
-        final IResourceMetadata entry = (IResourceMetadata) SerializerUtil
+        final JournalMetadata entry = (JournalMetadata) SerializerUtil
                 .deserialize(super.valueAt(index));
 
         return entry;
@@ -166,7 +169,7 @@ public class JournalIndex extends BTree {
      * @return The commit record -or- <code>null</code> if there is no commit
      *         record whose timestamp is strictly greater than <i>timestamp</i>.
      */
-    synchronized public IResourceMetadata findNext(final long timestamp) {
+    synchronized public JournalMetadata findNext(final long timestamp) {
 
         /*
          * Note: can also be written using rangeIterator().next().
@@ -240,10 +243,10 @@ public class JournalIndex extends BTree {
     
     /**
      * Add an entry under the commitTime associated with the
-     * {@link IResourceMetadata} record.
+     * {@link JournalMetadata} record.
      * 
      * @param resourceMetadata
-     *            The {@link IResourceMetadata} record.
+     *            The {@link JournalMetadata} record.
      * 
      * @exception IllegalArgumentException
      *                if <i>commitTime</i> is <code>0L</code>.
@@ -253,7 +256,7 @@ public class JournalIndex extends BTree {
      *                if there is already an entry registered under for the
      *                given timestamp.
      */
-    synchronized public void add(final IResourceMetadata resourceMetadata) {
+    synchronized public void add(final JournalMetadata resourceMetadata) {
 
         if (resourceMetadata == null)
             throw new IllegalArgumentException();
@@ -279,4 +282,54 @@ public class JournalIndex extends BTree {
         
     }
     
+    /**
+     * Encapsulates key and value formation.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static protected class TupleSerializer extends
+            DefaultTupleSerializer<Long, JournalMetadata> {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -2851852959439807542L;
+
+        /**
+         * De-serialization ctor.
+         */
+        public TupleSerializer() {
+
+            super();
+            
+        }
+
+        /**
+         * Ctor when creating a new instance.
+         * 
+         * @param keyBuilderFactory
+         */
+        public TupleSerializer(final IKeyBuilderFactory keyBuilderFactory) {
+
+            super(keyBuilderFactory);
+
+        }
+        
+        /**
+         * Decodes the key as a commit time.
+         */
+        @Override
+        public Long deserializeKey(ITuple tuple) {
+
+            final byte[] key = tuple.getKeyBuffer().array();
+
+            final long id = KeyBuilder.decodeLong(key, 0);
+
+            return id;
+
+        }
+
+    }
+
 }

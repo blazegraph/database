@@ -312,7 +312,7 @@ public class JoinIndexPartitionTask extends
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static public class AtomicUpdateJoinIndexPartition extends
+    static protected class AtomicUpdateJoinIndexPartition extends
             AbstractResourceManagerTask<Void> {
 
         private final JoinResult result;

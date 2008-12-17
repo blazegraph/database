@@ -83,7 +83,7 @@ public class CommitRecordIndex extends BTree {
      * 
      * @return The new instance.
      */
-    static public CommitRecordIndex create(IRawStore store) {
+    static public CommitRecordIndex create(final IRawStore store) {
     
         final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
         
@@ -127,7 +127,7 @@ public class CommitRecordIndex extends BTree {
      * 
      * @return The corresponding key.
      */
-    public byte[] getKey(long commitTime) {
+    private byte[] getKey(long commitTime) {
 
         /*
          * Note: The {@link UnicodeKeyBuilder} is NOT thread-safe
@@ -595,12 +595,7 @@ public class CommitRecordIndex extends BTree {
         }
         
         /**
-         * Decodes the term identifier key to a term identifier.
-         * 
-         * @param key
-         *            The key for an entry in the id:term index.
-         * 
-         * @return The term identifier.
+         * Decodes the key as a commit time.
          */
         @Override
         public Long deserializeKey(ITuple tuple) {
