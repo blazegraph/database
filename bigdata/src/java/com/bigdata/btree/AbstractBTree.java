@@ -1793,6 +1793,26 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
         return rangeCount(null, null);
         
     }
+
+    /**
+     * Variant implicitly converts the optional application keys into unsigned
+     * byte[]s.
+     * 
+     * @param fromKey
+     * @param toKey
+     * @return
+     */
+    final public long rangeCount(Object fromKey, Object toKey) {
+
+        fromKey = fromKey == null ? null : metadata.getTupleSerializer()
+                .serializeKey(fromKey);
+
+        toKey = toKey == null ? null : metadata.getTupleSerializer()
+                .serializeKey(toKey);
+
+        return rangeCount((byte[]) fromKey, (byte[]) toKey);
+        
+    }
     
     /**
      * This method computes the #of entries in the half-open range using
@@ -1911,6 +1931,26 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
 
     }
 
+    /**
+     * Variant implicitly converts the optional application keys into unsigned
+     * byte[]s.
+     * 
+     * @param fromKey
+     * @param toKey
+     * @return
+     */
+    final public ITupleIterator rangeIterator(Object fromKey, Object toKey) {
+
+        fromKey = fromKey == null ? null : metadata.getTupleSerializer()
+                .serializeKey(fromKey);
+
+        toKey = toKey == null ? null : metadata.getTupleSerializer()
+                .serializeKey(toKey);
+
+        return rangeIterator((byte[]) fromKey, (byte[]) toKey);
+        
+    }
+    
     final public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey) {
 
         return rangeIterator(fromKey, toKey, 0/* capacity */,
@@ -1954,6 +1994,31 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
 //        
 //    }
 
+    /**
+     * Variant implicitly converts the optional application keys into unsigned
+     * byte[]s.
+     * 
+     * @param fromKey
+     * @param toKey
+     * @return
+     */
+    final public ITupleIterator rangeIterator(Object fromKey, Object toKey,
+            final int capacity,//
+            final int flags,//
+            final IFilterConstructor filter//
+    ) {
+
+        fromKey = fromKey == null ? null : metadata.getTupleSerializer()
+                .serializeKey(fromKey);
+
+        toKey = toKey == null ? null : metadata.getTupleSerializer()
+                .serializeKey(toKey);
+
+        return rangeIterator((byte[]) fromKey, (byte[]) toKey, capacity, flags,
+                filter);
+
+    }
+    
     /**
      * Core implementation.
      * <p>

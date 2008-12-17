@@ -63,7 +63,6 @@ import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentStore;
@@ -84,6 +83,7 @@ import com.bigdata.journal.ILocalTransactionManager;
 import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.IRootBlockView;
+import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.TemporaryStore;
@@ -94,6 +94,7 @@ import com.bigdata.mdi.IPartitionMetadata;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
+import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.locator.DefaultResourceLocator;
@@ -112,14 +113,20 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * FIXME Read-committed tasks need to hold a read lock on the local resources in
  * order to prevent their being released if there is a concurrent commit
- * followed by a request to the StoreManager to purgeResources. This problem is
- * very similar to the problem of the transaction manager which needs to manage
- * the global release time. However, since read-committed views are not allowed
- * into the index caches, we can use a weak value cache. When there is a request
- * to purge resources, we scan the cache and take the minimum timestamp for any
- * entry whose reference has not been cleared. That timestamp is the earliest
- * commit time for resources that MUST NOT be released because to do so could
- * cause a read-committed operation to fail.
+ * followed by a request to the StoreManager to purgeResources. The window of
+ * opportunity for the problem is not very large since the read committed task
+ * must still be running when the resource(s) on which it was based are
+ * released. This is most likely to happen when overflow is triggered following
+ * a large data load and you have concurrent tasks doing read-committed range
+ * counts and encountering large IO WAIT.
+ * <p>
+ * This problem is very similar to the problem of the transaction manager which
+ * needs to manage the global release time. However, since read-committed views
+ * are not allowed into the index caches, we can use a weak value cache. When
+ * there is a request to purge resources, we scan the cache and take the minimum
+ * timestamp for any entry whose reference has not been cleared. That timestamp
+ * is the earliest commit time for resources that MUST NOT be released because
+ * to do so could cause a read-committed operation to fail.
  * <p>
  * An efficient way to track the read-committed read lock time is an ordered
  * list of the active read times. Since there can be more than one reader we
@@ -128,15 +135,10 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * transaction manager handles a similar problem, but it assigns distinct
  * transaction identifiers choosen from the half-open range
  * (requestedCommitTime, nextCommitTime].
- * 
- * FIXME refactor {@link CommitRecordIndex}(done), {@link JournalIndex},
- * {@link IndexSegmentIndex}, and {@link Name2Addr} to use the
- * {@link ITupleSerializer} idiom.
- * 
- * @todo Write a unit test for purge before, during and after the 1st overflow
- *       and after a restart. Before, there should be nothing to release.
- *       During, the views that are being constructed should remain safe. After,
- *       we should be able to achieve a compact footprint for the data service.
+ * <p>
+ * In fact, a similar measure should be taken for read-historical indices as
+ * well since their views can otherwise be disrupted by purging old resources.
+ * {@link ITx}, {@link ITransactionManager}
  * 
  * @todo After restart, the release time needs to be set before we allow a purge
  *       (should be done during startup by the transaction manager).
@@ -2127,11 +2129,11 @@ abstract public class StoreManager extends ResourceEvents implements
 
         if (resourceMetadata.isJournal()) {
 
-            journalIndex.add(resourceMetadata);
+            journalIndex.add((JournalMetadata)resourceMetadata);
 
         } else {
 
-            segmentIndex.add(resourceMetadata);
+            segmentIndex.add((SegmentMetadata)resourceMetadata);
 
         }
         
@@ -3422,7 +3424,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
                 synchronized (journalIndex) {
 
-                    final ITupleIterator<IResourceMetadata> itr = journalIndex
+                    final ITupleIterator<JournalMetadata> itr = journalIndex
                             .rangeIterator(null/* fromKey */,
                                     null/* toKey */, 0/* capacity */,
                                     IRangeQuery.DEFAULT | IRangeQuery.CURSOR,
@@ -3450,7 +3452,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
                 synchronized (segmentIndex) {
 
-                    final ITupleIterator<IResourceMetadata> itr = segmentIndex
+                    final ITupleIterator<SegmentMetadata> itr = segmentIndex
                             .rangeIterator(null/* fromKey */,
                                     null/* toKey */, 0/* capacity */,
                                     IRangeQuery.DEFAULT | IRangeQuery.CURSOR,
@@ -3631,13 +3633,6 @@ abstract public class StoreManager extends ResourceEvents implements
      * @return The set of resource {@link UUID}s required by at least one index
      *         for the commit point GTE the specified commit time.
      */
-//    * 
-//    * @throws IllegalArgumentException
-//    *             if there is no commit point that is strictly greater than the
-//    *             releaseTime is not spanned by any journal (this implies that
-//    *             the release time is either in the future or, if the
-//    *             releaseTime is equal to the last commitTime, that you are
-//    *             trying to release everything in the database).
     protected Set<UUID> getResourcesForTimestamp(final long commitTime) {
 
         log.warn("commitTime=" + commitTime + ", lastCommitTime="
@@ -3666,15 +3661,13 @@ abstract public class StoreManager extends ResourceEvents implements
          */
         synchronized(journalIndex) {
 
-            final ITupleIterator itr = journalIndex.rangeIterator();
+            final ITupleIterator<JournalMetadata> itr = journalIndex.rangeIterator();
             
             while(itr.hasNext()) {
                 
-                final ITuple tuple = itr.next();
+                final ITuple<JournalMetadata> tuple = itr.next();
 
-                // @todo convert to TupleSerializer pattern
-                final JournalMetadata journalMetadata = (JournalMetadata) SerializerUtil
-                        .deserialize(tuple.getValue());
+                final JournalMetadata journalMetadata = tuple.getObject();
                 
                 final UUID uuid = journalMetadata.getUUID();
                 
@@ -3733,8 +3726,7 @@ abstract public class StoreManager extends ResourceEvents implements
                      * Name2Addr index and visit its Entries.
                      */
                     final ITupleIterator<ICommitRecord> itr2 = commitRecordIndex
-                            .rangeIterator(// @todo make getKey(commitTime) protected again.
-                                    commitRecordIndex.getKey(commitTime), null/*toKey*/);
+                            .rangeIterator(commitTime/* fromKey */, null/* toKey */);
                     
                     while(itr2.hasNext()) {
                         
@@ -3765,8 +3757,8 @@ abstract public class StoreManager extends ResourceEvents implements
                             
                             final ITuple<Name2Addr.Entry> tuple3 = itr3.next();
                             
-                            // FIXME modify Name2Addr to support the tuple serializer pattern.
-                            final Name2Addr.Entry entry3 = Name2Addr.EntrySerializer.INSTANCE.deserialize(tuple3.getValueStream());
+                            final Name2Addr.Entry entry3 = tuple3.getObject(); 
+//                                Name2Addr.EntrySerializer.INSTANCE.deserialize(tuple3.getValueStream());
                             
                             final long checkpointAddr = entry3.checkpointAddr;
                             
@@ -3794,19 +3786,12 @@ abstract public class StoreManager extends ResourceEvents implements
                                      * For scale-out, all indices should be
                                      * index partitions and should define the
                                      * resources required by their view.
-                                     * However, the metadata service is not
-                                     * currently partitioned so you will see
+                                     * 
+                                     * Note: However, the metadata service is
+                                     * not currently partitioned so you will see
                                      * unpartitioned indices there.
                                      */
-                                    
-//                                    log
-//                                            .error("Not expecting an unpartitioned index: name="
-//                                                    + entry3.name
-//                                                    + ", commitTime="
-//                                                    + entry2.commitTime
-//                                                    + ", file="
-//                                                    + journal.getFile());
-                                    
+
                                     continue;
                                     
                                 }
@@ -3835,63 +3820,6 @@ abstract public class StoreManager extends ResourceEvents implements
             }
             
         }
-        
-//        final ManagedJournal journal = (ManagedJournal) getJournal(commitTime);
-//
-//        if (journal == null) {
-//
-//            throw new IllegalArgumentException("No data for commitTime="
-//                    + commitTime);
-//
-//        }
-//
-//        // the Name2Addr instance for that timestamp.
-//        final IIndex name2Addr = journal.getName2Addr(commitTime);
-//
-//        assert name2Addr != null;
-//
-//        if (INFO)
-//            log.info("commitTime=" + commitTime + "\njournal="
-//                    + journal.getResourceMetadata());
-//
-//        final Set<UUID> uuids = new HashSet<UUID>();
-//
-//        final ITupleIterator itr = name2Addr.rangeIterator(null, null);
-//
-//        while (itr.hasNext()) {
-//
-//            final ITuple tuple = itr.next();
-//
-//            final Entry entry = EntrySerializer.INSTANCE
-//                    .deserialize(new DataInputBuffer(tuple.getValue()));
-//
-//            /*
-//             * Open the historical BTree used to absorb writes on the historical
-//             * journal.
-//             */
-//            final BTree btree = (BTree) journal.getIndex(entry.checkpointAddr);
-//
-//            assert btree != null : entry.toString();
-//
-//            // index metadata for that index partition.
-//            final IndexMetadata indexMetadata = btree.getIndexMetadata();
-//
-//            // index partition metadata
-//            final LocalPartitionMetadata pmd = indexMetadata
-//                    .getPartitionMetadata();
-//
-//            for (IResourceMetadata tmp : pmd.getResources()) {
-//
-//                // add to set of in-use resources.
-//                uuids.add(tmp.getUUID());
-//
-//                if(INFO)
-//                    log.info(indexMetadata.getName() + " uses " + tmp.getFile()
-//                        + ", createTime=" + tmp.getCreateTime());
-//                
-//            }
-//
-//        }
 
         final long elapsed = System.currentTimeMillis() - begin;
         

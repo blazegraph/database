@@ -43,6 +43,11 @@ import com.bigdata.resources.StoreManager.Options;
  * 
  * @todo write test where the [releaseAge] is set.
  * 
+ * @todo Write a unit test for purge before, during and after the 1st overflow
+ *       and after a restart. Before, there should be nothing to release.
+ *       During, the views that are being constructed should remain safe. After,
+ *       we should be able to achieve a compact footprint for the data service.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

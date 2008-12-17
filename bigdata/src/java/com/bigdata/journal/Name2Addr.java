@@ -34,6 +34,7 @@ import java.lang.ref.WeakReference;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Locale;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -42,9 +43,12 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
+import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IDirtyListener;
+import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
+import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.cache.LRUCache;
@@ -323,7 +327,11 @@ public class Name2Addr extends BTree {
         final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
         
         metadata.setBTreeClassName(Name2Addr.class.getName());
-        
+
+        // @todo configure unicode sort key behavior explicitly?
+        metadata.setTupleSerializer(new Name2AddrTupleSerializer(
+                new DefaultKeyBuilderFactory(new Properties())));
+
         return (Name2Addr) BTree.create(store, metadata);
         
     }
@@ -626,9 +634,11 @@ public class Name2Addr extends BTree {
      *            
      * @return The corresponding key.
      */
-    protected byte[] getKey(final String name) {
+    private byte[] getKey(final String name) {
 
-        return KeyBuilder.asSortKey(name);
+        return metadata.getTupleSerializer().serializeKey(name);
+        
+//        return KeyBuilder.asSortKey(name);
 
     }
 
@@ -1042,7 +1052,7 @@ public class Name2Addr extends BTree {
             
             final IndexMetadata md = btree.getIndexMetadata();
 
-            LocalPartitionMetadata pmd = md.getPartitionMetadata();
+            final LocalPartitionMetadata pmd = md.getPartitionMetadata();
 
             final String path;
             if (pmd != null) {
@@ -1167,6 +1177,84 @@ public class Name2Addr extends BTree {
                 throw new RuntimeException(e);
 
             }
+
+        }
+
+    }
+
+    /**
+     * Encapsulates key and value formation for {@link Name2Addr}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static public class Name2AddrTupleSerializer extends
+            DefaultTupleSerializer<String, Entry> {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 5699568938604974463L;
+        
+        /**
+         * Used to (de-)serialize {@link Entry}s (NOT thread-safe).
+         */
+        private final EntrySerializer ser;
+        
+        /**
+         * De-serialization ctor.
+         */
+        public Name2AddrTupleSerializer() {
+
+            super();
+
+            this.ser = EntrySerializer.INSTANCE;
+            
+        }
+
+        /**
+         * Ctor when creating a new instance.
+         * 
+         * @param keyBuilderFactory
+         */
+        public Name2AddrTupleSerializer(
+                final IKeyBuilderFactory keyBuilderFactory) {
+            
+            super(keyBuilderFactory);
+            
+            this.ser = EntrySerializer.INSTANCE;
+
+        }
+        
+        /**
+         * Return the unsigned byte[] key for an index name.
+         * 
+         * @param obj
+         *            The name of an index.
+         */
+        @Override
+        public byte[] serializeKey(Object obj) {
+
+            return getKeyBuilder().reset().append((String) obj).getKey();
+
+        }
+
+        /**
+         * Return the byte[] value an {@link Entry}.
+         * 
+         * @param obj
+         *            An Entry.
+         */
+        public byte[] serializeVal(Entry entry) {
+            
+            return ser.serialize(entry);
+
+        }
+
+        @Override
+        public Entry deserialize(ITuple tuple) {
+
+            return ser.deserialize(tuple.getValueStream());
 
         }
 

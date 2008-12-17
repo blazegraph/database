@@ -34,6 +34,12 @@ package com.bigdata.btree;
  * <code>byte[]</code>s using the {@link ITupleSerializer} configured on the
  * {@link IndexMetadata} object for the {@link IIndex}.
  * 
+ * @todo Add generic parameters for the application key type and the application
+ *       value type.
+ * 
+ * @todo Add {@link IRangeQuery} variants with automatic conversion of
+ *       application keys to unsigned byte[] keys.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

@@ -24,7 +24,7 @@ import com.bigdata.mdi.SegmentMetadata;
  * the view (aka an incremental build).
  * <p>
  * Note: As its last action, this task submits a
- * {@link AtomicUpdateViewTask} which replaces the view with one
+ * {@link AtomicUpdateIncrementalBuildTask} which replaces the view with one
  * defined by the current {@link BTree} on the journal and the newly built
  * {@link IndexSegment}.
  * <p>
@@ -108,7 +108,7 @@ public class IncrementalBuildTask extends
         try {
             
             // task will update the index partition view definition.
-            final AbstractTask<Void> task = new AtomicUpdateViewTask(
+            final AbstractTask<Void> task = new AtomicUpdateIncrementalBuildTask(
                     resourceManager, concurrencyManager, name, indexUUID,
                     result);
 
@@ -165,7 +165,7 @@ public class IncrementalBuildTask extends
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static public class AtomicUpdateViewTask extends
+    static protected class AtomicUpdateIncrementalBuildTask extends
             AbstractAtomicUpdateTask<Void> {
 
         final protected BuildResult buildResult;
@@ -176,7 +176,7 @@ public class IncrementalBuildTask extends
          * @param resource
          * @param buildResult
          */
-        public AtomicUpdateViewTask(ResourceManager resourceManager,
+        public AtomicUpdateIncrementalBuildTask(ResourceManager resourceManager,
                 IConcurrencyManager concurrencyManager, String resource,
                 UUID indexUUID, BuildResult buildResult) {
 

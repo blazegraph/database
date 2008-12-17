@@ -22,7 +22,7 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
-import com.bigdata.resources.CompactingMergeTask.AtomicReplaceHistoryTask;
+import com.bigdata.resources.CompactingMergeTask.AtomicUpdateCompactingMergeTask;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Split;
 import com.bigdata.sparse.SparseRowStore;
@@ -330,9 +330,9 @@ public class SplitIndexPartitionTask extends
              * these tasks do not hold any locks until the atomic update task
              * runs.
              * 
-             * @todo We might be better off here doing a non-compacting merge
-             * for just the mutable BTree since there is an expectation that we
-             * are close to a split.
+             * Note: We are probably better off here doing a non-compacting
+             * merge for just the mutable BTree since there is an expectation
+             * that we are close to a split.
              */
             
             if (INFO)
@@ -341,42 +341,46 @@ public class SplitIndexPartitionTask extends
             // the file to be generated.
             final File outFile = resourceManager.getIndexSegmentFile(indexMetadata);
            
-            // build the index segment in this thread.
-            final BuildResult result = resourceManager.buildIndexSegment(name,
-                    src, outFile, true/* compactingMerge */, lastCommitTime,
-                    null/* fromKey */, null/* toKey */);
+            return concurrencyManager.submit(
+                    new IncrementalBuildTask(resourceManager, lastCommitTime,
+                            name, outFile)).get();
             
-            /*
-             * @todo error handling should be inside of the atomic update task since
-             * it has more visibility into the state changes and when we can no
-             * longer delete the new index segment.
-             */
-            try {
-                
-                // create task that will update the index partition view definition.
-                final AbstractTask<Void> task = new AtomicReplaceHistoryTask(
-                        resourceManager, concurrencyManager, name, indexUUID,
-                        result);
-
-                if (INFO)
-                    log.info("src=" + name + ", will run atomic update task");
-
-                // submit task and wait for it to complete @todo config timeout?
-                concurrencyManager.submit(task).get();
-
-            } catch (Throwable t) {
-
-                // delete the generated index segment.
-                resourceManager.deleteResource(result.segmentMetadata.getUUID(),
-                        false/* isJournal */);
-
-                // re-throw the exception
-                throw new Exception(t);
-
-            }
-
-            return result;
-            
+//            // build the index segment in this thread.
+//            final BuildResult result = resourceManager.buildIndexSegment(name,
+//                    src, outFile, true/* compactingMerge */, lastCommitTime,
+//                    null/* fromKey */, null/* toKey */);
+//            
+//            /*
+//             * @todo error handling should be inside of the atomic update task since
+//             * it has more visibility into the state changes and when we can no
+//             * longer delete the new index segment.
+//             */
+//            try {
+//                
+//                // create task that will update the index partition view definition.
+//                final AbstractTask<Void> task = new AtomicUpdateCompactingMergeTask(
+//                        resourceManager, concurrencyManager, name, indexUUID,
+//                        result);
+//
+//                if (INFO)
+//                    log.info("src=" + name + ", will run atomic update task");
+//
+//                // submit task and wait for it to complete @todo config timeout?
+//                concurrencyManager.submit(task).get();
+//
+//            } catch (Throwable t) {
+//
+//                // delete the generated index segment.
+//                resourceManager.deleteResource(result.segmentMetadata.getUUID(),
+//                        false/* isJournal */);
+//
+//                // re-throw the exception
+//                throw new Exception(t);
+//
+//            }
+//
+//            return result;
+//            
         }
         
         // The #of splits.
@@ -405,7 +409,8 @@ public class SplitIndexPartitionTask extends
         
 //        final int MAX_PARALLELISM = 4; // Integer.MAX_VALUE for no limit.
         
-        final List<BuildIndexSegmentSplitTask> tasks = new ArrayList<BuildIndexSegmentSplitTask>(nsplits);
+        final List<BuildIndexSegmentSplitTask> tasks = new ArrayList<BuildIndexSegmentSplitTask>(
+                nsplits);
 
         for (int i = 0; i < splits.length; i++) {
             
@@ -563,17 +568,18 @@ public class SplitIndexPartitionTask extends
         }
 
     }
-    
+
     /**
      * Task used to build an {@link IndexSegment} from a restricted key-range of
-     * an index during a {@link SplitIndexPartitionTask}.  This is a compacting
+     * an index during a {@link SplitIndexPartitionTask}. This is a compacting
      * merge since we want as much of the data for the index as possible in a
      * single {@link IndexSegment}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static class BuildIndexSegmentSplitTask extends AbstractResourceManagerTask<BuildResult> {
+    static protected class BuildIndexSegmentSplitTask extends
+            AbstractResourceManagerTask<BuildResult> {
 
         /**
          * The file on which the index segment is being written.
@@ -593,7 +599,8 @@ public class SplitIndexPartitionTask extends
                 long lastCommitTime, String resource, File outFile,
                 Split split) {
 
-            super(resourceManager, -lastCommitTime, resource);
+            super(resourceManager, TimestampUtility
+                    .asHistoricalRead(lastCommitTime), resource);
 
             this.lastCommitTime = lastCommitTime;
 
@@ -678,7 +685,7 @@ public class SplitIndexPartitionTask extends
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static public class AtomicUpdateSplitIndexPartitionTask extends
+    static protected class AtomicUpdateSplitIndexPartitionTask extends
             AbstractAtomicUpdateTask<Void> {
 
         protected final SplitResult splitResult;
