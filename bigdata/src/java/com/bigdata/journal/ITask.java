@@ -101,9 +101,8 @@ public interface ITask<T> extends Callable<T> {
      * Return an appropriate view of the named index for the operation.
      * <p>
      * When the task is isolated by a transaction, then the index will be
-     * isolated by the transaction using the appropriate
-     * {@link IsolationEnum isolation level}. If the transaction is read-only,
-     * then the index will not be writable.
+     * isolated by the transaction using the appropriate isolation level. If the
+     * transaction is read-only, then the index will not be writable.
      * </p>
      * <p>
      * When the task is a read-only unisolated operation, the index will be

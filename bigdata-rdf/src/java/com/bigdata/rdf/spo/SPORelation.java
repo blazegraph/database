@@ -904,7 +904,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
         
         final int flags = IRangeQuery.KEYS
                 | IRangeQuery.VALS
-                | (TimestampUtility.isHistoricalRead(getTimestamp()) ? IRangeQuery.READONLY
+                | (TimestampUtility.isReadOnly(getTimestamp()) ? IRangeQuery.READONLY
                         : 0);
         
         final AbstractTripleStore container = getContainer();

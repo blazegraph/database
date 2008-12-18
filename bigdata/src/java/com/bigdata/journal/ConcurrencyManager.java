@@ -1017,21 +1017,22 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * the store by only syncing the data to disk periodically rather than after
      * every write. Group commits are scheduled by the {@link #commitService}.
      * The trigger conditions for group commits may be configured using
-     * {@link ConcurrencyManager.Options}. If you are using the store in a single threaded context
-     * then you may set {@link Options#WRITE_SERVICE_CORE_POOL_SIZE} to ONE (1)
-     * which has the effect of triggering commit immediately after each
-     * unisolated write. However, note that you can not sync a disk more than ~
-     * 30-40 times per second so your throughput in write operations per second
-     * will never exceed that for a single-threaded application writing on a
-     * hard disk. (Your mileage can vary if you are writing on a transient store
-     * or using a durable medium other than disk).
+     * {@link ConcurrencyManager.Options}. If you are using the store in a
+     * single threaded context then you may set
+     * {@link Options#WRITE_SERVICE_CORE_POOL_SIZE} to ONE (1) which has the
+     * effect of triggering commit immediately after each unisolated write.
+     * However, note that you can not sync a disk more than ~ 30-40 times per
+     * second so your throughput in write operations per second will never
+     * exceed that for a single-threaded application writing on a hard disk.
+     * (Your mileage can vary if you are writing on a transient store or using a
+     * durable medium other than disk).
      * <p>
-     * Note: The isolated indices used by a {@link IsolationEnum#ReadWrite}
-     * transaction are NOT thread-safe. Therefore a partial order is imposed
-     * over concurrent tasks for the <strong>same</strong> transaction that
-     * seek to read or write on the same index(s). Full concurrency is allowed
-     * when different transactions access the same index(s), but write-write
-     * conflicts MAY be detected during commit processing.
+     * Note: The isolated indices used by a read-write transaction are NOT
+     * thread-safe. Therefore a partial order is imposed over concurrent tasks
+     * for the <strong>same</strong> transaction that seek to read or write on
+     * the same index(s). Full concurrency is allowed when different
+     * transactions access the same index(s), but write-write conflicts MAY be
+     * detected during commit processing.
      * <p>
      * Note: The following exceptions MAY be wrapped by {@link Future#get()} for
      * tasks submitted via this method:
@@ -1092,7 +1093,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
         } else {
 
-            if (task.isTransaction) {
+            if (task.isReadWriteTx) {
 
                 /*
                  * A task that reads from historical data and writes on isolated

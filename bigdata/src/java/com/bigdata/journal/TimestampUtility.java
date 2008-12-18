@@ -51,10 +51,10 @@ public class TimestampUtility {
         if (timestamp == ITx.READ_COMMITTED)
             return "read-committed";
 
-        if (timestamp < 0)
-            return "historical-read(" + timestamp + ")";
+        if (isReadWriteTx(timestamp))
+            return "readWriteTX(" + timestamp + ")";
 
-        return "tx(" + timestamp + ")";
+        return "readOnly(" + timestamp + ")";
 
     }
     
@@ -71,15 +71,18 @@ public class TimestampUtility {
         
     }
 
-    static public boolean isHistoricalRead(long timestamp) {
+    static public boolean isReadOnly(long timestamp) {
         
-        return timestamp < ITx.READ_COMMITTED;
+//        return timestamp < ITx.READ_COMMITTED;
+        return timestamp > 0 || timestamp == ITx.READ_COMMITTED;
         
     }
 
-    static public boolean isTx(long timestamp) {
+    static public boolean isReadWriteTx(long timestamp) {
         
-        return timestamp > 0;
+//        return timestamp > 0;
+        
+        return timestamp < ITx.READ_COMMITTED;
         
     }
     
@@ -102,27 +105,17 @@ public class TimestampUtility {
     }
 
     /**
-     * Temporary method accepts a commitTime and returns a timestamp that will
-     * be interpreted as a historical read.
-     * 
-     * FIXME At the moment, the transform is <code>-timestamp</code>.
-     * However, historical read timestamps are being modified such that NO
-     * transform will be required. A precondition for that change is to
-     * encapsulate all locations in the code base that use historical reads such
-     * that they use this method instead. Once the code base is safely
-     * encapsulated, then the interpretation of negative timestamps as
-     * historical reads can be changed.
-     * <p>
-     * As a follow on, an algorithm will be specified for full transaction
-     * identifiers that assigns them using the available interval following the
-     * desired transaction effective time. See {@link ITransactionManager}
+     * Accepts a commitTime and returns a timestamp that will be interpreted as
+     * a historical read (this is a NOP).
      * 
      * @param commitTime
      *            The commit time from {@link IIndexStore#getLastCommitTime()},
      *            etc.
+     *            
      * @return The corresponding timestamp that will be interpreted as a
      *         historical read against the state of the database having that
      *         commit time.
+     *         
      * @throws IllegalArgumentException
      *             if <i>commitTime</i> is negative (zero is permitted for some
      *             edge cases).
@@ -132,7 +125,8 @@ public class TimestampUtility {
         if (commitTime < 0)
             throw new IllegalArgumentException("commitTime: " + commitTime);
         
-        return -commitTime;
+//        return -commitTime;
+        return commitTime;
         
     }
     

@@ -24,13 +24,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
  * Created on Feb 27, 2006
  */
-package com.bigdata.journal;
+package com.bigdata.service.jini;
 
 /**
  * Isolation levels for a transaction.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated This has been replaced by the convention that transaction
+ *             identifiers for read-write transactions are
+ *             <code>-startTime</code> while transaction identifiers for
+ *             read-only transactions AND lightweight reads without read-locks
+ *             are positive timestamps.
  */
 public enum IsolationEnum {
 

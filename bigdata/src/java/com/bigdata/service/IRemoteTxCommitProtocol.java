@@ -29,23 +29,16 @@ package com.bigdata.service;
 
 import java.io.IOException;
 import java.rmi.Remote;
-import java.rmi.RemoteException;
 
-import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ValidationError;
 
 /**
- * Remote interface.
+ * Remote interface by which the centralized {@link ITransactionManager} manages
+ * the state of transactions on the distributed {@link IDataService}s.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo reconcile API with {@link ITransactionManager} which is declared by
- *       {@link AbstractJournal}. I do not want to have IOException on all of
- *       the bigdata interfaces, but you need either that or
- *       {@link RemoteException} for an interface that will be exposed by a jini
- *       service (unless you use a smart proxy?).
  */
 public interface IRemoteTxCommitProtocol extends Remote {
 
@@ -53,16 +46,60 @@ public interface IRemoteTxCommitProtocol extends Remote {
      * Notify a data service that it may release data required to support views
      * for the specified release time (basically, this releases any read locks
      * on views for timestamps up to and including the specified release time).
+     * 
+     * @param releaseTime
+     *            The new release time (strictly advanced by the transaction
+     *            manager).
+     * 
+     * @todo when the release time is advanced any active transactions (or
+     *       lightweight reads) GTE the new release time should be interrupted.
      */
     public void setReleaseTime(long releaseTime) throws IOException;
-    
-    /**
-     * Request commit of the transaction write set.
-     */
-    public long commit(long tx) throws ValidationError, IOException;
 
     /**
-     * Request abort of the transaction write set.
+     * Request preparation of a read-write transaction for a 2-phase commit.
+     * 
+     * @param tx
+     *            The transaction identifier.
+     *            
+     * @throws IllegalArgumentException
+     *             if the transaction has not been started on this data service.
+     * @throws ValidationError
+     *             if validation fails.
+     * @throws IOException
+     */
+    public void prepare(long tx) throws ValidationError, IOException;
+
+    /**
+     * Request commit of the transaction by the data service.
+     * 
+     * @param tx
+     *            The transaction identifier.
+     * @param commitTime
+     *            The commit time assigned to that transaction.
+     * 
+     * @throws IllegalArgumentException
+     *             if the transaction has not been started on this data service.
+     * @throws IllegalArgumentException
+     *             if the <i>commitTime</i> is LTE the last commit time
+     *             performed on this data service.
+     * @throws IllegalStateException
+     *             if the transaction is a read-write transaction and it has not
+     *             been {@link #prepare(long) prepared}
+     * @throws IllegalStateException
+     *             if the transaction is a read-write transaction and a timeout
+     *             has invalidated {@link #prepare(long) prepared} commit.
+     */
+    public void commit(long tx, long commitTime) throws IOException;
+
+    /**
+     * Request abort of the transaction by the data service.
+     * 
+     * @param tx
+     *            The transaction identifier.
+     *            
+     * @throws IllegalArgumentException
+     *             if the transaction has not been started on this data service.
      */
     public void abort(long tx) throws IOException;
 

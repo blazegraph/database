@@ -104,7 +104,8 @@ abstract public class AbstractTestTxRunState extends ProxyTestCase {
 
         public long newTx(Journal journal) {
             
-            return journal.newTx(IsolationEnum.ReadOnly);
+            // @todo also test w/ tx created from a caller specified commit point.
+            return journal.newTx(ITx.READ_COMMITTED);
             
         }
         
@@ -121,7 +122,7 @@ abstract public class AbstractTestTxRunState extends ProxyTestCase {
 
         public long newTx(Journal journal) {
             
-            return journal.newTx(IsolationEnum.ReadWrite);
+            return journal.newTx(ITx.UNISOLATED);
             
         }
         

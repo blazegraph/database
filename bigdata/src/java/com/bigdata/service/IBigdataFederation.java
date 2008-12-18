@@ -272,12 +272,11 @@ public interface IBigdataFederation extends IIndexManager {
      * @param name
      *            The index name.
      * @param timestamp
-     *            Either the startTime of an active transaction,
-     *            {@link ITx#UNISOLATED} for the current unisolated index view,
-     *            {@link ITx#READ_COMMITTED} for a read-committed view, or
-     *            <code>-timestamp</code> for a historical view no later than
+     *            A transaction identifier, {@link ITx#UNISOLATED} for the
+     *            unisolated index view, {@link ITx#READ_COMMITTED}, or
+     *            <code>timestamp</code> for a historical view no later than
      *            the specified timestamp.
-     * 
+     *            
      * @return The index or <code>null</code> if the index does not exist.
      */
     public IClientIndex getIndex(String name, long timestamp);

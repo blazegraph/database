@@ -29,8 +29,6 @@ package com.bigdata.service.jini;
 
 import junit.framework.TestCase;
 
-import com.bigdata.journal.IsolationEnum;
-import com.bigdata.service.OldTransactionServer;
 
 /**
  * Test suite for semantics of the {@link OldTransactionServer}.

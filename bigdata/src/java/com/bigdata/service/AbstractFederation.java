@@ -340,7 +340,7 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
      * 
      * @return The {@link ScheduledFuture} for that task.
      */
-    public ScheduledFuture addScheduledStatisticsTask(Runnable task,
+    public ScheduledFuture addScheduledTask(Runnable task,
             long initialDelay, long delay, TimeUnit unit) {
 
         if (task == null)
@@ -483,7 +483,7 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
         tempStoreFactory = new TemporaryStoreFactory(this.client
                 .getTempStoreMaxExtent());
         
-        addScheduledStatisticsTask(//
+        addScheduledTask(//
                 new StartDeferredTasksTask(),// task to run.
                 150, // initialDelay (ms)
                 150, // delay
@@ -905,7 +905,7 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
             final QueueStatisticsTask queueStatisticsTask = new QueueStatisticsTask(
                     relpath, threadPool, taskCounters);
 
-            addScheduledStatisticsTask(queueStatisticsTask, initialDelay,
+            addScheduledTask(queueStatisticsTask, initialDelay,
                     delay, unit);
 
             queueStatisticsTask.addCounters(getServiceCounterSet().makePath(relpath));
@@ -966,7 +966,7 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
 
             final long initialDelay = delay;
 
-            addScheduledStatisticsTask(new ReportTask(AbstractFederation.this),
+            addScheduledTask(new ReportTask(AbstractFederation.this),
                     initialDelay, delay, unit);
 
             if (INFO)

@@ -351,10 +351,9 @@ public class ClientIndexView implements IClientIndex {
      * @param name
      *            The index name.
      * @param timestamp
-     *            Either the startTime of an active transaction,
-     *            {@link ITx#UNISOLATED} for the current unisolated index view,
-     *            {@link ITx#READ_COMMITTED} for a read-committed view, or
-     *            <code>-timestamp</code> for a historical view no later than
+     *            A transaction identifier, {@link ITx#UNISOLATED} for the
+     *            unisolated index view, {@link ITx#READ_COMMITTED}, or
+     *            <code>timestamp</code> for a historical view no later than
      *            the specified timestamp.
      * @param metadataIndex
      *            The {@link IMetadataIndex} for the named scale-out index as of
@@ -391,7 +390,7 @@ public class ClientIndexView implements IClientIndex {
 
         this.taskTimeout = fed.getClient().getTaskTimeout();
         
-        this.historicalRead = TimestampUtility.isHistoricalRead(timestamp);
+        this.historicalRead = TimestampUtility.isReadOnly(timestamp);
 
     }
 

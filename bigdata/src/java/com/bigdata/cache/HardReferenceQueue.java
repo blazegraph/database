@@ -345,6 +345,21 @@ public class HardReferenceQueue<T> {
 
     /**
      * Examine references backwards from the tail, evicting any that have become
+     * stale (too long since they were last touched) based on the timeout
+     * specified to the ctor (this is a NOP if the timeout is ZERO(0)).
+     */
+    final public void evictStaleRefs() {
+        
+        if (timeout != 0L) {
+
+            evictStaleRefs(timeout);
+            
+        }
+        
+    }
+    
+    /**
+     * Examine references backwards from the tail, evicting any that have become
      * stale (too long since they were last touched).
      * 
      * @param timeout

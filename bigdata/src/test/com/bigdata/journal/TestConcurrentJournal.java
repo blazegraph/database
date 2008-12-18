@@ -239,8 +239,14 @@ public class TestConcurrentJournal extends ProxyTestCase {
     }
 
     /**
-     * Submits an {@link IsolationEnum#ReadOnly} task to the transaction service
-     * and verifies that it executes.
+     * Submits an read-only task to the transaction service and verifies that it
+     * executes.
+     * 
+     * @todo this test is somewhat odd since there are no commits on the journal
+     *       when we request a read-only transaction. Potentially that should be
+     *       illegal since there is nothing available to read. Certainly the
+     *       returned transaction identifier MUST NOT be ZERO (0) since that
+     *       would indicate an unisolated operation!
      * 
      * @throws InterruptedException
      * @throws ExecutionException
@@ -260,7 +266,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
             final AtomicBoolean ran = new AtomicBoolean(false);
 
-            final long tx = journal.newTx(IsolationEnum.ReadOnly);
+            final long tx = journal.newTx(ITx.READ_COMMITTED);
 
             assertNotSame(ITx.UNISOLATED, tx);
 
@@ -311,8 +317,8 @@ public class TestConcurrentJournal extends ProxyTestCase {
     
 
     /**
-     * Submits a {@link IsolationEnum#ReadCommitted} task to the transaction
-     * service and verifies that it executes.
+     * Submits a read-committed task to the transaction service and verifies
+     * that it executes.
      * 
      * @throws InterruptedException
      * @throws ExecutionException
@@ -391,8 +397,8 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
 
     /**
-     * Submits a {@link IsolationEnum#ReadWrite} task with an empty write set to
-     * the transaction service and verifies that it executes.
+     * Submits a read-write task with an empty write set to the transaction
+     * service and verifies that it executes.
      * 
      * @throws InterruptedException
      * @throws ExecutionException
@@ -412,7 +418,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
             final AtomicBoolean ran = new AtomicBoolean(false);
 
-            final long tx = journal.newTx(IsolationEnum.ReadWrite);
+            final long tx = journal.newTx(ITx.UNISOLATED);
 
             assertNotSame(ITx.UNISOLATED, tx);
 

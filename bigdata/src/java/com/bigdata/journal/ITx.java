@@ -161,10 +161,10 @@ public interface ITx {
      */
     public void abort();
 
-    /**
-     * The type-safe isolation level for this transaction.
-     */
-    public IsolationEnum getIsolationLevel();
+//    /**
+//     * The type-safe isolation level for this transaction.
+//     */
+//    public IsolationEnum getIsolationLevel();
     
     /**
      * When true, the transaction will reject writes.

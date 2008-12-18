@@ -40,9 +40,9 @@ import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IJournal;
-import com.bigdata.journal.IsolationEnum;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryRawStore;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -280,10 +280,10 @@ public class ResourceEvents {
      * @param level
      *            The isolation level of the transaction.
      */
-    static public void openTx(long startTime, IsolationEnum level) {
+    static public void openTx(long startTime) {
 
         if (INFO)
-            log.info("tx=" + startTime + ", level=" + level);
+            log.info(TimestampUtility.toString(startTime));
 
     }
 

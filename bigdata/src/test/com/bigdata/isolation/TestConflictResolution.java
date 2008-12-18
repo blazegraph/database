@@ -33,12 +33,11 @@ import java.util.UUID;
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.IsolationEnum;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
 import com.bigdata.journal.ValidationError;
@@ -157,9 +156,9 @@ public class TestConflictResolution extends TestCase2 {
          * Create two transactions.
          */
         
-        final long tx1 = journal.newTx(IsolationEnum.ReadWrite);
+        final long tx1 = journal.newTx(ITx.UNISOLATED);
         
-        final long tx2 = journal.newTx(IsolationEnum.ReadWrite);
+        final long tx2 = journal.newTx(ITx.UNISOLATED);
         
         /*
          * Write a value under the same key on the same index in both
@@ -238,9 +237,9 @@ public class TestConflictResolution extends TestCase2 {
          * Create two transactions.
          */
         
-        final long tx1 = journal.newTx(IsolationEnum.ReadWrite);
+        final long tx1 = journal.newTx(ITx.UNISOLATED);
         
-        final long tx2 = journal.newTx(IsolationEnum.ReadWrite);
+        final long tx2 = journal.newTx(ITx.UNISOLATED);
         
         /*
          * Write a value under the same key on the same index in both

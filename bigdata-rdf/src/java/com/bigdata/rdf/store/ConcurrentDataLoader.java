@@ -366,7 +366,7 @@ public class ConcurrentDataLoader {
                 "Load Service", loadService, counters);
 
         // setup sampling for the [loadService]
-        loadServiceStatisticsFuture = fed.addScheduledStatisticsTask(
+        loadServiceStatisticsFuture = fed.addScheduledTask(
                 loadServiceStatisticsTask, 0/* initialDelay */,
                 1000/* delay */, TimeUnit.MILLISECONDS);
 

@@ -40,8 +40,8 @@ import junit.framework.TestCase2;
 import junit.framework.TestSuite;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
@@ -359,7 +359,7 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
         journal.commit();
 
         // fully isolated transaction.
-        long tx = journal.newTx(IsolationEnum.ReadWrite);
+        long tx = journal.newTx(ITx.UNISOLATED);
 
         // run test.
         doIndexWriteRateTest(name, tx, 128);

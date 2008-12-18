@@ -291,7 +291,7 @@ public class BigdataFileSystem extends
      * Note: This is a {@link SparseRowStore} governed by the
      * {@link FileMetadataSchema}.
      */
-    public static final String FILE_METADATA_INDEX_BASENAME = "#fileMetadata";
+    public static final String FILE_METADATA_INDEX_BASENAME = "fileMetadata";
     
     /**
      * The basename of the index in which the file data blocks are stored. The
@@ -308,7 +308,7 @@ public class BigdataFileSystem extends
      * computed using the successor of the file identifier will naturally visit
      * all blocks in a file in sequence.
      */
-    public static final String FILE_DATA_INDEX_BASENAME = "#fileData";
+    public static final String FILE_DATA_INDEX_BASENAME = "fileData";
     
     public static final FileMetadataSchema metadataSchema = new FileMetadataSchema();
     
@@ -444,7 +444,7 @@ public class BigdataFileSystem extends
                  * guarentee depends on this.
                  */
 
-                final String name = getNamespace()+FILE_METADATA_INDEX_BASENAME;
+                final String name = getNamespace()+"."+FILE_METADATA_INDEX_BASENAME;
                 
                 final IndexMetadata md = new IndexMetadata(indexManager, tmp,
                         name, UUID.randomUUID());
@@ -465,7 +465,7 @@ public class BigdataFileSystem extends
                  * file together (soft requirement).
                  */
 
-                final String name = getNamespace()+FILE_DATA_INDEX_BASENAME;
+                final String name = getNamespace()+"."+FILE_DATA_INDEX_BASENAME;
                 
                 final IndexMetadata md = new IndexMetadata(indexManager, tmp,
                         name, UUID.randomUUID());
@@ -499,9 +499,9 @@ public class BigdataFileSystem extends
         
         try {
 
-            getIndexManager().dropIndex(getNamespace()+FILE_METADATA_INDEX_BASENAME);
+            getIndexManager().dropIndex(getNamespace()+"."+FILE_METADATA_INDEX_BASENAME);
 
-            getIndexManager().dropIndex(getNamespace()+FILE_DATA_INDEX_BASENAME);
+            getIndexManager().dropIndex(getNamespace()+"."+FILE_DATA_INDEX_BASENAME);
             
             super.destroy();
             
@@ -1847,7 +1847,7 @@ public class BigdataFileSystem extends
              * by the specified transaction.
              */
 
-            dataIndex = getIndexManager().getIndex(getNamespace()+FILE_DATA_INDEX_BASENAME,tx);
+            dataIndex = getIndexManager().getIndex(getNamespace()+"."+FILE_DATA_INDEX_BASENAME,tx);
             
         }
 

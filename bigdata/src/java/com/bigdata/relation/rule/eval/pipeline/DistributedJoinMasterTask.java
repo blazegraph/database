@@ -151,7 +151,7 @@ public class DistributedJoinMasterTask extends JoinMasterTask implements
              */
 
             if (!TimestampUtility
-                    .isHistoricalRead(joinNexus.getReadTimestamp())) {
+                    .isReadOnly(joinNexus.getReadTimestamp())) {
 
                 /*
                  * Must use a read-consistent view and advance the

@@ -235,7 +235,8 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
              */
             final AtomicReference<IIndexManager> foundOn = new AtomicReference<IIndexManager>();
 
-            final Properties properties = locateResource(namespace, timestamp, foundOn);
+            final Properties properties = locateResource(namespace, timestamp,
+                    foundOn);
             
             if (properties == null) {
 
@@ -356,10 +357,11 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
                 Properties properties = null;
 
                 try {
-                
-                    properties = locateResourceOn(indexManager, namespace, timestamp);
-                    
-                } catch(IllegalStateException t) {
+
+                    properties = locateResourceOn(indexManager, namespace,
+                            timestamp);
+
+                } catch (IllegalStateException t) {
                     
                     if(indexManager instanceof TemporaryStore) {
 
@@ -418,8 +420,9 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
          * read properties from the global row store for the default index
          * manager.
          */
-        
-        final Properties properties = locateResourceOn(indexManager, namespace, timestamp);
+
+        final Properties properties = locateResourceOn(indexManager, namespace,
+                timestamp);
 
         if (properties != null) {
 

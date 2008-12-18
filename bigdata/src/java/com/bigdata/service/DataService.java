@@ -69,6 +69,7 @@ import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IndexProcedureTask;
 import com.bigdata.journal.RegisterIndexTask;
+import com.bigdata.journal.ValidationError;
 import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.IBlock;
@@ -355,6 +356,30 @@ abstract public class DataService extends AbstractService
     }
     
     /**
+     * Invoked periodically to clear stale entries from a variety of LRU caches.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected class ClearStaleCacheEntries implements Runnable {
+
+        public void run() {
+
+            if (!resourceManager.isRunning()) {
+
+                log.warn("Halting task : resource manager is not running.");
+                
+                throw new RuntimeException();
+                
+            }
+            
+            resourceManager.clearStaleCacheEntries();
+            
+        }
+        
+    }
+    
+    /**
      * Starts the {@link DataService}.
      * 
      * @todo it would be nice if {@link #start()} could restart after
@@ -371,6 +396,38 @@ abstract public class DataService extends AbstractService
         
         resourceManager = (ResourceManager) newResourceManager(properties);
 
+        /*
+         * Schedule tasks that will clear stale references from the index cache,
+         * the index segment cache, and the store cache. This ensures that the
+         * LRU references in these caches will become weakly reachable after a
+         * timeout even in the event that there are no touched on the cache.
+         * 
+         * @todo config params for initialDelay and delay.
+         * 
+         * @todo do we need to do this for the Journal as well? Probably else
+         * these indices will still be strongly references. Also the resource
+         * locator cache, etc. All instances of ConcurrentWeakReferenceCache.
+         * 
+         * @todo one consequence of this is that you can shutdown heavily
+         * buffered indices, which you might not want to do.  In that case
+         * the delay should be ZERO and the task should not be run.
+         */
+        {
+
+            final long initialDelay = 5000;
+            
+            final long delay = 5000;
+            
+            /*
+             * Note: The task will self-cancel by throwing an exception once the
+             * resource manager is no longer running.
+             */
+
+            getFederation().addScheduledTask(new ClearStaleCacheEntries(),
+                    initialDelay, delay, TimeUnit.MILLISECONDS);
+            
+        }
+        
         localTransactionManager = new AbstractLocalTransactionManager(resourceManager) {
 
             public long nextTimestamp() throws IOException {
@@ -388,7 +445,7 @@ abstract public class DataService extends AbstractService
                 
             }
             
-            public void notifyCommit(long commitTime) throws IOException {
+            public void notifyCommit(final long commitTime) throws IOException {
                 
                 // resolve the timestamp service.
                 final ITimestampService timestampService = DataService.this
@@ -418,12 +475,12 @@ abstract public class DataService extends AbstractService
                 
             }
 
-            public void setReleaseTime(long releaseTime) {
+            public void setReleaseTime(final long releaseTime) {
 
                 DataService.this.setReleaseTime(releaseTime);
                 
             }
-
+            
         };
 
         concurrencyManager = new ConcurrencyManager(properties,
@@ -785,14 +842,37 @@ abstract public class DataService extends AbstractService
         
     }
     
-    public long commit(long tx) throws IOException {
+    public void prepare(long tx) throws ValidationError, IOException {
         
         setupLoggingContext();
         
         try {
+
+            // this is a prepare for a 2-phase commit.
+            throw new UnsupportedOperationException();
+
+//            // will place task on writeService and block iff necessary.
+//            localTransactionManager.prepare(tx);
         
-            // will place task on writeService and block iff necessary.
-            return localTransactionManager.commit(tx);
+        } finally {
+            
+            clearLoggingContext();
+            
+        }
+        
+    }
+        
+    public void commit(long tx, long commitTime) throws IOException {
+        
+        setupLoggingContext();
+        
+        try {
+
+            // this is the commit for 2-phase commit.
+            throw new UnsupportedOperationException();
+            
+//            // will place task on writeService and block iff necessary.
+//            return localTransactionManager.commit(tx);
         
         } finally {
             

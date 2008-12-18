@@ -146,11 +146,10 @@ public class Tx extends AbstractTx implements ITx {
             final ILocalTransactionManager transactionManager,//
             final IResourceManager resourceManager, //
             final long startTime,//
-            final boolean readOnly//
+            final boolean readOnly//@todo remove this flag.
             ) {
 
-        super(transactionManager, resourceManager, startTime,
-                readOnly ? IsolationEnum.ReadOnly : IsolationEnum.ReadWrite);
+        super(transactionManager, resourceManager, startTime);
 
 //        /*
 //         * The commit record serving as the ground state for the indices

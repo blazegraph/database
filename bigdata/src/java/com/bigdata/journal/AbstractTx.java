@@ -99,19 +99,18 @@ abstract public class AbstractTx implements ITx {
      */
     final protected boolean readOnly;
     
-    /**
-     * The type-safe enumeration representing the isolation level of this
-     * transaction.
-     */
-    final protected IsolationEnum level;
+//    /**
+//     * The type-safe enumeration representing the isolation level of this
+//     * transaction.
+//     */
+//    final protected IsolationEnum level;
     
     private RunState runState;
 
     protected AbstractTx(//
             final ILocalTransactionManager transactionManager,
             final IResourceManager resourceManager,//
-            final long startTime,//
-            final IsolationEnum level//
+            final long startTime//
             ) {
         
         if (transactionManager == null)
@@ -132,9 +131,9 @@ abstract public class AbstractTx implements ITx {
         
         this.startTime = startTime;
 
-        this.readOnly = level != IsolationEnum.ReadWrite;;
+        this.readOnly = TimestampUtility.isReadOnly(startTime);
 
-        this.level = level;
+//        this.level = level;
         
         // pre-compute the hash code for the transaction.
         this.hashCode = Long.valueOf(startTime).hashCode();
@@ -144,7 +143,7 @@ abstract public class AbstractTx implements ITx {
         this.runState = RunState.Active;
 
         // report event.
-        ResourceManager.openTx(startTime, level);
+        ResourceManager.openTx(startTime);
 
     }
     
@@ -209,11 +208,11 @@ abstract public class AbstractTx implements ITx {
         
     }
 
-    final public IsolationEnum getIsolationLevel() {
-        
-        return level;
-        
-    }
+//    final public IsolationEnum getIsolationLevel() {
+//        
+//        return level;
+//        
+//    }
     
     final public boolean isReadOnly() {
         
@@ -346,7 +345,7 @@ abstract public class AbstractTx implements ITx {
 
             }
 
-            transactionManager.prepared(this);
+            transactionManager.preparedTx(this);
 
             runState = RunState.Prepared;
 

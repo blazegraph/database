@@ -1196,9 +1196,15 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter,
              * Note: By clearing the references to null we also facilitate
              * garbage collection of the nodes and leaves in the cache.
              */
+
             writeRetentionQueue.clear(true/* clearRefs */);
+
+            ndistinctOnWriteRetentionQueue = 0;
+
             if (readRetentionQueue != null) {
+
                 readRetentionQueue.clear(true/* clearRefs */);
+
             }
 
             /*
