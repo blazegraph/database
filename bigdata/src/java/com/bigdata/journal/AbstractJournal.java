@@ -2266,7 +2266,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      *       also write on this index. I have tried some different approaches to
      *       handling this.
      */
-    public ICommitRecord getCommitRecord(long commitTime) {
+    public ICommitRecord getCommitRecord(final long commitTime) {
 
         assertOpen();
 
@@ -2284,7 +2284,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      * @return The commit record -or- <code>null</code> if there is no commit
      *         record whose timestamp is strictly greater than <i>commitTime</i>.
      */
-    public ICommitRecord getCommitRecordStrictlyGreaterThan(long commitTime) {
+    public ICommitRecord getCommitRecordStrictlyGreaterThan(final long commitTime) {
 
         assertOpen();
 
@@ -2302,14 +2302,15 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      * @throws UnsupportedOperationException
      *             If you pass in {@link ITx#UNISOLATED},
      *             {@link ITx#READ_COMMITTED}, or a timestamp that corresponds
-     *             to a transaction since those are not "commit times".
+     *             to a read-write transaction since those are not "commit
+     *             times".
      */
     public IIndex getIndex(final String name, final long commitTime) {
 
         assertOpen();
 
         if (commitTime == ITx.UNISOLATED || commitTime == ITx.READ_COMMITTED
-                || TimestampUtility.isTx(commitTime)) {
+                || TimestampUtility.isReadWriteTx(commitTime)) {
             
             throw new UnsupportedOperationException();
             

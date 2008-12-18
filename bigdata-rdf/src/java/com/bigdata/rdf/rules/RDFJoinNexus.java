@@ -589,11 +589,9 @@ public class RDFJoinNexus implements IJoinNexus {
 ////				 * Note: This advances the read-behind timestamp for a local
 ////				 * Journal configuration without the ConcurrencyManager (the
 ////				 * only scenario where we do an explicit commit).
-////				 * 
-////				 * @issue negative timestamp for historical read.
 ////				 */
 ////
-////				return -lastCommitTime;
+////				return TimestampUtility.asHistoricalRead(lastCommitTime);
 ////
 ////			}
 ////

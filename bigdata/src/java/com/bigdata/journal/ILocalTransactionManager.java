@@ -69,7 +69,7 @@ public interface ILocalTransactionManager extends ITransactionManager, IServiceS
      * 
      * @throws IllegalStateException
      */
-    public void prepared(ITx tx) throws IllegalStateException;
+    public void preparedTx(ITx tx) throws IllegalStateException;
 
     /**
      * Notify the journal that a transaction is completed (either aborted or

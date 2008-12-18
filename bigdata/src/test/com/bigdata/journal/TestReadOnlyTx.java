@@ -31,9 +31,22 @@ import java.util.UUID;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.service.IBigdataFederation;
 
 /**
- * Test suite for fully isolated read-only transactions.
+ * Test suite for fully isolated read-only transactions reading from a caller
+ * specified start time.
+ * 
+ * @todo this test suite needs to be updated as the semantics have changed. it
+ *       needs to explore in more depth the ability to create a read-only
+ *       transaction reading from the commit point corresponding to the caller
+ *       specified timestamp, the ability to create more than one such
+ *       concurrent read-only transaction for the same commit point (the
+ *       assigned transaction identifiers must differ).
+ * 
+ * @todo this test suite should be extended for {@link IBigdataFederation}s to
+ *       also test the interaction with the releaseTime (distributed read
+ *       locks).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -66,6 +79,7 @@ public class TestReadOnlyTx extends ProxyTestCase {
 
         final byte[] v1 = new byte[]{1};
 
+        final long ts1;
         {
             
             /*
@@ -81,7 +95,7 @@ public class TestReadOnlyTx extends ProxyTestCase {
 
             ndx.insert(k1, v1);
 
-            journal.commit();
+            ts1 = journal.commit();
             
         }
         
@@ -93,7 +107,7 @@ public class TestReadOnlyTx extends ProxyTestCase {
              * index.
              */
             
-            final long tx1 = journal.newTx(IsolationEnum.ReadOnly);
+            final long tx1 = journal.newTx(ts1);
             
             IIndex ndx = journal.getIndex(name,tx1);
 
@@ -119,7 +133,7 @@ public class TestReadOnlyTx extends ProxyTestCase {
              * transaction.
              */
             
-            final long tx1 = journal.newTx(IsolationEnum.ReadOnly);
+            final long tx1 = journal.newTx(ts1);
             
             IIndex ndx = journal.getIndex(name,tx1);
 

@@ -184,17 +184,17 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
     private IJournal journal;
     
     /**
-     * The transaction identifier -or- {@link ITx#UNISOLATED} IFF the operation
-     * is NOT isolated by a transaction -or- <code> - timestamp </code> to read
-     * from the most recent commit point not later than the absolute value of
-     * <i>timestamp</i>.
+     * The transaction identifier -or- {@link ITx#UNISOLATED} if the operation
+     * is NOT isolated by a transaction, -or- {@link ITx#READ_COMMITTED}, -or-
+     * <code>timestamp</code> to read from the most recent commit point not
+     * later than <i>timestamp</i>.
      */
     protected final long timestamp;
 
     /**
      * True iff the operation is isolated by a transaction.
      */
-    protected final boolean isTransaction;
+    protected final boolean isReadWriteTx;
 
     /**
      * True iff the operation is not permitted to write.
@@ -1063,11 +1063,11 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * @param concurrencyControl
      *            The object used to control access to the local resources.
      * @param timestamp
-     *            The transaction identifier -or- {@link ITx#UNISOLATED} IFF the
-     *            operation is NOT isolated by a transaction -or-
-     *            <code> - tx </code> to read from the most recent commit point
-     *            not later than the absolute value of <i>tx</i> (a fully
-     *            isolated read-only transaction using a historical start time).
+     *            The transaction identifier, {@link ITx#UNISOLATED} for an
+     *            unisolated view, {@link ITx#READ_COMMITTED} for a view as of
+     *            the most recent commit point, or <code>timestamp</code> to
+     *            read from the most recent commit point not later than that
+     *            timestamp.
      * @param resource
      *            The resource(s) on which the task will operate. E.g., the
      *            names of the index(s). When the task is an unisolated write
@@ -1111,13 +1111,13 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         
         this.timestamp = timestamp;
 
-        this.isTransaction = timestamp > ITx.UNISOLATED;
+        this.isReadWriteTx = TimestampUtility.isReadWriteTx(timestamp);
         
         this.resource = resource;
 
         this.indexCache = new HashMap<String,IIndex>(resource.length);
         
-        if (isTransaction) {
+        if (isReadWriteTx) {
 
             /*
              * A transaction.
@@ -1137,6 +1137,10 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
              * 
              * If the transaction is read-write then it will write on a fully
              * isolated write set.
+             * 
+             * FIXME only read-write tx can be identified in this manner, and
+             * only read-write tx need to be registered with the
+             * [transactionManager].
              */
 
             tx = transactionManager.getTx(timestamp);
@@ -1157,7 +1161,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             
             taskCounters = this.concurrencyManager.countersTX;
             
-        } else if (timestamp < ITx.UNISOLATED) {
+        } else if (TimestampUtility.isReadOnly(timestamp)) {
 
             /*
              * A lightweight historical read.
@@ -1517,7 +1521,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                 
             }
             
-            if (isTransaction) {
+            if (isReadWriteTx) {
 
                 if (INFO)
                     log.info("Running isolated operation: timestamp="
@@ -1581,7 +1585,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                  * the lock manager for the unisolated indices.
                  */
 
-                assert timestamp == ITx.UNISOLATED;
+                assert timestamp == ITx.UNISOLATED : "timestamp="+timestamp;
                 
                 return doUnisolatedReadWriteTask();
                 
@@ -1775,7 +1779,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
     
     /**
      * Inner class used to wrap up the call to {@link AbstractTask#doTask()} for
-     * {@link IsolationEnum#ReadWrite} transactions.
+     * read-write transactions.
      */
     static protected class InnerReadWriteTxServiceCallable extends DelegateTask {
 
@@ -2092,8 +2096,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             
             // did the task declare the resource name?
             final String namespace = GlobalFileSystemHelper.GLOBAL_FILE_SYSTEM_NAMESPACE;
-            if (isResource(namespace + BigdataFileSystem.FILE_METADATA_INDEX_BASENAME)
-                    && isResource(namespace + BigdataFileSystem.FILE_DATA_INDEX_BASENAME)) {
+            if (isResource(namespace + "."+BigdataFileSystem.FILE_METADATA_INDEX_BASENAME)
+                    && isResource(namespace + "."+BigdataFileSystem.FILE_DATA_INDEX_BASENAME)) {
 
                 // unisolated view - will create if it does not exist.
                 return new GlobalFileSystemHelper(this).getGlobalFileSystem();

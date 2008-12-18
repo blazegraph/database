@@ -86,9 +86,10 @@ public interface IResourceManager extends IServiceShutdown {
      * the given timestamp. If necessary, the journal will be opened.
      * 
      * @param timestamp
-     *            The startTime of an active transaction, <code>0L</code> for
-     *            the current unisolated index view, or <code>-timestamp</code>
-     *            for a historical view no later than the specified timestamp.
+     *            A transaction identifier, {@link ITx#UNISOLATED} for the
+     *            unisolated index view, {@link ITx#READ_COMMITTED}, or
+     *            <code>timestamp</code> for a historical view no later than
+     *            the specified timestamp.
      * 
      * @return The corresponding journal for that timestamp -or-
      *         <code>null</code> if no journal has data for that timestamp,
@@ -122,12 +123,11 @@ public interface IResourceManager extends IServiceShutdown {
      * @param name
      *            The name of the index.
      * @param timestamp
-     *            Either the startTime of an active transaction,
-     *            {@link ITx#UNISOLATED} for the current unisolated index view,
-     *            {@link ITx#READ_COMMITTED} for a read-committed view, or
-     *            <code>-timestamp</code> for a historical view no later than
+     *            A transaction identifier, {@link ITx#UNISOLATED} for the
+     *            unisolated index view, {@link ITx#READ_COMMITTED}, or
+     *            <code>timestamp</code> for a historical view no later than
      *            the specified timestamp.
-     * 
+     *            
      * @return The sources for the index view or <code>null</code> if the
      *         index was not defined as of the timestamp.
      * 
@@ -160,12 +160,11 @@ public interface IResourceManager extends IServiceShutdown {
      * @param name
      *            The index name.
      * @param timestamp
-     *            Either the startTime of an active transaction,
-     *            {@link ITx#UNISOLATED} for the current unisolated index view,
-     *            {@link ITx#READ_COMMITTED} for a read-committed view, or
-     *            <code>-timestamp</code> for a historical view no later than
+     *            A transaction identifier, {@link ITx#UNISOLATED} for the
+     *            unisolated index view, {@link ITx#READ_COMMITTED}, or
+     *            <code>timestamp</code> for a historical view no later than
      *            the specified timestamp.
-     * 
+     *            
      * @return The index or <code>null</code> iff there is no index registered
      *         with that name for that <i>timestamp</i>, including if the
      *         timestamp is a transaction identifier and the transaction is

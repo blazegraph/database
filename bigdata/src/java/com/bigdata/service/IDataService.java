@@ -38,7 +38,6 @@ import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.IsolationEnum;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.Options;
 import com.bigdata.mdi.IResourceMetadata;
@@ -72,9 +71,11 @@ import com.bigdata.sparse.SparseRowStore;
  * scale-out indices.
  * </p>
  * <p>
- * The data service exposes both isolated (transactional) and unisolated batch
- * operations on named indices. The isolation level is identified the start
- * time, also known as the transaction identifier or <i>tx</i>. The following
+ * The data service exposes both fully isolated read-write transactions,
+ * read-only transactions, lightweight read-historical operations, and
+ * unisolated operations on named indices. These choices are captured by the
+ * timestamp associated with the operation. When it is a transaction, this is
+ * also known as the transaction identifier or <i>tx</i>. The following
  * distinctions are available:
  * <dl>
  * 
@@ -121,27 +122,31 @@ import com.bigdata.sparse.SparseRowStore;
  * </p>
  * </dd>
  * 
- * <dt>Historical read</dt>
+ * <dt>Light weight historical reads</dt>
  * 
- * <dd>Historical reads are indicated using <code>-tx</code>, where <i>tx</i>
- * is the commit point. A historical read is fully isolated but has very low
- * overhead and does NOT require the caller to open the transaction. The read
- * will have a consistent view of the data as of the most recent commit point
- * not greater than <i>tx</i>. Historical reads correspond to
- * {@link IsolationEnum#ReadOnly}. Unlike a distributed read-only transaction,
- * a historical read does NOT cause the resources required for a consistent view
- * as of that timestamp to be retained for the duration of the read.</dd>
+ * <dd>Historical reads are indicated using <code>tx</code>, where <i>tx</i>
+ * is a timestamp and is associated with the closest commit point LTE to the
+ * timestamp. A historical read is fully isolated but has very low overhead and
+ * does NOT require the caller to open the transaction. The read will have a
+ * consistent view of the data as of the most recent commit point not greater
+ * than <i>tx</i>. Unlike a distributed read-only transaction, a historical
+ * read does NOT impose a distributed read lock. While the operation will have
+ * access to the necessary resources on the local data service, it is possible
+ * that resources for the same timestamp will be concurrently released on other
+ * data services. If you need to map a read operation across the distributed
+ * database, the you must use a read only transaction which will assert the
+ * necessary read-lock.</dd>
  * 
  * <dt>Distributed transactions</dt>
  * 
  * <dd>Distributed transactions are coordinated using an
  * {@link ITransactionManagerService} service and incur more overhead than both
- * unisolated and historical read operations. Transactions are assigned a
- * timestamp (the transaction identifier) and an {@link IsolationEnum} when they
- * begin and must be explicitly closed by either an abort or a commit. Both the
- * {@link IsolationEnum#ReadOnly} and the {@link IsolationEnum#ReadWrite} modes
- * force the retention of resources required for a consistent view as of the
- * transaction start time until the transaction is closed.</dd>
+ * unisolated and historical read operations. Transactions are assigned a start
+ * time (the transaction identifier) when they begin and must be explicitly
+ * closed by either an abort or a commit. Both read-only and read-write
+ * transactions assert read locks which force the retention of resources
+ * required for a consistent view as of the transaction start time until the
+ * transaction is closed.</dd>
  * </dl>
  * </p>
  * <p>
@@ -302,12 +307,11 @@ public interface IDataService extends IRemoteTxCommitProtocol, IService {
      * @param name
      *            The index name.
      * @param timestamp
-     *            Either the startTime of an active transaction,
-     *            {@link ITx#UNISOLATED} for the current unisolated index view,
-     *            {@link ITx#READ_COMMITTED} for a read-committed view, or
-     *            <code>-timestamp</code> for a historical view no later than
+     *            A transaction identifier, {@link ITx#UNISOLATED} for the
+     *            unisolated index view, {@link ITx#READ_COMMITTED}, or
+     *            <code>timestamp</code> for a historical view no later than
      *            the specified timestamp.
-     * 
+     *            
      * @return The metadata for the named index.
      * 
      * @throws IOException

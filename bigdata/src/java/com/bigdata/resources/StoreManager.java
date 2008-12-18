@@ -53,6 +53,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.commons.io.FileSystemUtils;
 import org.apache.log4j.Logger;
@@ -83,7 +84,6 @@ import com.bigdata.journal.ILocalTransactionManager;
 import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.IRootBlockView;
-import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.TemporaryStore;
@@ -110,35 +110,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * segments), including the logic to compute the effective release time for the
  * managed resources and to release those resources by deleting them from the
  * file system.
- * 
- * FIXME Read-committed tasks need to hold a read lock on the local resources in
- * order to prevent their being released if there is a concurrent commit
- * followed by a request to the StoreManager to purgeResources. The window of
- * opportunity for the problem is not very large since the read committed task
- * must still be running when the resource(s) on which it was based are
- * released. This is most likely to happen when overflow is triggered following
- * a large data load and you have concurrent tasks doing read-committed range
- * counts and encountering large IO WAIT.
- * <p>
- * This problem is very similar to the problem of the transaction manager which
- * needs to manage the global release time. However, since read-committed views
- * are not allowed into the index caches, we can use a weak value cache. When
- * there is a request to purge resources, we scan the cache and take the minimum
- * timestamp for any entry whose reference has not been cleared. That timestamp
- * is the earliest commit time for resources that MUST NOT be released because
- * to do so could cause a read-committed operation to fail.
- * <p>
- * An efficient way to track the read-committed read lock time is an ordered
- * list of the active read times. Since there can be more than one reader we
- * would actually need a reference counter as well (or use the clearing of a
- * weak reference as noticed by polling a reference queue as our clue). (The
- * transaction manager handles a similar problem, but it assigns distinct
- * transaction identifiers choosen from the half-open range
- * (requestedCommitTime, nextCommitTime].
- * <p>
- * In fact, a similar measure should be taken for read-historical indices as
- * well since their views can otherwise be disrupted by purging old resources.
- * {@link ITx}, {@link ITransactionManager}
  * 
  * @todo After restart, the release time needs to be set before we allow a purge
  *       (should be done during startup by the transaction manager).
@@ -1624,7 +1595,16 @@ abstract public class StoreManager extends ResourceEvents implements
         return open.get();
 
     }
+    
+    /**
+     * Clears any stale entries in the LRU backing the {@link #storeCache}
+     */
+    public void clearStaleCacheEntries() {
 
+        storeCache.clearStaleRefs();
+        
+    }
+    
     synchronized public void shutdown() {
 
         if (INFO)
@@ -2796,6 +2776,23 @@ abstract public class StoreManager extends ResourceEvents implements
     }
 
     /**
+     * @see IndexManager#getIndexRetentionTime()
+     */
+    abstract protected long getIndexRetentionTime();
+    
+    /**
+     * In order to have atomic semantics and prevent a read-historical operation
+     * from starting concurrently that would have access to a view that is being
+     * purged, {@link IndexManager#getIndex(String, long)} and
+     * {@link StoreManager#purgeOldResources()} MUST contend for a shared lock.
+     * This is a {@link ReentrantReadWriteLock} since concurrent getIndex()
+     * requests can proceed as long as {@link StoreManager#purgeOldResources()}
+     * is not running. Also note that contention is not required for
+     * {@link ITx#UNISOLATED} index views.
+     */
+    protected final ReentrantReadWriteLock indexCacheLock = new ReentrantReadWriteLock();
+
+    /**
      * Delete resources having no data for the
      * {@link #getEffectiveReleaseTime()}.
      * <p>
@@ -2813,7 +2810,7 @@ abstract public class StoreManager extends ResourceEvents implements
      * The caller MUST hold the exclusive lock on the
      * {@link WriteExecutorService}.
      */
-    private void purgeOldResources() {
+    protected void purgeOldResources() {
 
         if (minReleaseAge == Long.MAX_VALUE) {
 
@@ -2869,11 +2866,10 @@ abstract public class StoreManager extends ResourceEvents implements
         if (maxReleaseTime < 0L) {
 
             /*
-             * Note: Someone specified a very large value for
-             * [minReleaseAge] and the clock has not yet reached that value.
-             * (The test above for Long.MAX_VALUE just avoids the RMI to the
-             * timestamp service when we KNOW that the database is
-             * immortal).
+             * Note: Someone specified a very large value for [minReleaseAge]
+             * and the clock has not yet reached that value. (The test above for
+             * Long.MAX_VALUE just avoids the RMI to the timestamp service when
+             * we KNOW that the database is immortal).
              */
 
             if (INFO)
@@ -2883,20 +2879,25 @@ abstract public class StoreManager extends ResourceEvents implements
 
         }
 
-        final long releaseTime;
+        indexCacheLock.writeLock().lock();
+        
+        try {
+
+            final long releaseTime;
+            final long indexRetentionTime = getIndexRetentionTime();
+            
         if (this.releaseTime == 0L) {
 
             /*
-             * Note: The [releaseTime] is normally advanced by the
-             * transaction manager when it decides that a historical time
-             * will no longer be reachable by new transactions and no
-             * running transactions is reading from that historical time.
-             * Absent a transaction manager, the [releaseTime] is assumed to
-             * be [minReleaseAge] milliseconds in the past.
+             * Note: The [releaseTime] is normally advanced by the transaction
+             * manager when it decides that a historical time will no longer be
+             * reachable by new transactions and no running transactions is
+             * reading from that historical time. Absent a transaction manager,
+             * the [releaseTime] is assumed to be [minReleaseAge] milliseconds
+             * in the past.
              * 
-             * Note: If there are active tasks reading from that historical
-             * time then they will fail once the resources have been
-             * released.
+             * Note: If there are active tasks reading from that historical time
+             * then they will fail once the resources have been released.
              */
 
             releaseTime = maxReleaseTime;
@@ -2911,7 +2912,8 @@ abstract public class StoreManager extends ResourceEvents implements
              * Choose whichever timestamp would preserve more history.
              */
 
-            releaseTime = Math.min(maxReleaseTime, this.releaseTime);
+            releaseTime = Math.min(indexRetentionTime, Math.min(
+                        maxReleaseTime, this.releaseTime));
 
             if (INFO)
                 log.info("Choosen releaseTime=" + releaseTime
@@ -3034,6 +3036,12 @@ abstract public class StoreManager extends ResourceEvents implements
         log.warn("Purged old resources: #bytes=" + getBytesUnderManagement()
                 + ", #journals=" + getManagedJournalCount() + ", #segments="
                 + getManagedIndexSegmentCount());
+    
+        } finally {
+        
+            indexCacheLock.writeLock().unlock();
+            
+        }
 
     }
     

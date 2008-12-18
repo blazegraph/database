@@ -10,7 +10,9 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
+import com.bigdata.service.TransactionService;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -185,7 +187,7 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility
      * 
      * @throws IllegalStateException
      */
-    public void prepared(final ITx tx) throws IllegalStateException {
+    public void preparedTx(final ITx tx) throws IllegalStateException {
 
         final Long startTime = tx.getStartTimestamp();
 
@@ -276,35 +278,40 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility
      * transaction and that is strictly LT the current time (probed without
      * assignment). If necessary, this will cause the caller to block until a
      * suitable timestamp is available.
+     * 
+     * This should be done by delegation to the core impl that is also used for
+     * the {@link IBigdataFederation} - the {@link TransactionService}.
      */
-    public long newTx(final IsolationEnum level) {
+    public long newTx(final long timestamp) {
 
-        final ILocalTransactionManager transactionManager = this;
-
-        final long startTime = nextTimestampRobust();
+        throw new UnsupportedOperationException();
         
-        switch (level) {
-        
-        case ReadOnly: {
-
-            new Tx(transactionManager, resourceManager, startTime, true);
-
-            return startTime;
-        }
-
-        case ReadWrite: {
-            
-            new Tx(transactionManager, resourceManager, startTime, false);
-            
-            return startTime;
-
-        }
-
-        default:
-
-            throw new AssertionError("Unknown isolation level: " + level);
-        
-        }
+//        final ILocalTransactionManager transactionManager = this;
+//
+//        final long startTime = nextTimestampRobust();
+//        
+//        switch (level) {
+//        
+//        case ReadOnly: {
+//
+//            new Tx(transactionManager, resourceManager, startTime, true);
+//
+//            return startTime;
+//        }
+//
+//        case ReadWrite: {
+//            
+//            new Tx(transactionManager, resourceManager, startTime, false);
+//            
+//            return startTime;
+//
+//        }
+//
+//        default:
+//
+//            throw new AssertionError("Unknown isolation level: " + level);
+//        
+//        }
 
     }
     
@@ -441,13 +448,13 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility
 
     }
 
-    public void wroteOn(long startTime, String[] resource) {
-        
-        /*
-         * Ignored since the information is also in the local ITx.
-         */
-        
-    }
+//    public void wroteOn(long startTime, UUID dataServiceUUID) {
+//        
+//        /*
+//         * NOP for a standalone journal.
+//         */
+//        
+//    }
     
     /**
      * This task is an UNISOLATED operation that validates and commits a

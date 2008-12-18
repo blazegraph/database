@@ -188,7 +188,7 @@ public class DataServiceIndex implements IClientIndex {
 
         this.batchOnly = fed.getClient().getBatchApiOnly();
         
-        this.historicalRead = TimestampUtility.isHistoricalRead(timestamp);
+        this.historicalRead = TimestampUtility.isReadOnly(timestamp);
         
         if(historicalRead) {
             

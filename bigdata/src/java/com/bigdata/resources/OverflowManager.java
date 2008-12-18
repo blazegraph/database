@@ -56,6 +56,7 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
@@ -1223,7 +1224,7 @@ abstract public class OverflowManager extends IndexManager {
                     + oldJournal.getFile()
                     + "\npre-condition views: overflowCounter="
                     + getOverflowCount() + "\n"
-                    + listIndexPartitions(-lastCommitTime));
+                    + listIndexPartitions(TimestampUtility.asHistoricalRead(lastCommitTime)));
 
             // using read-committed view of Name2Addr
             numIndices = (int) oldJournal.getName2Addr().rangeCount(null,null);

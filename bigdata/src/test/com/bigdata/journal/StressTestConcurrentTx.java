@@ -394,7 +394,7 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
          */
         public Long call() throws Exception {
             
-            final long tx = journal.newTx(IsolationEnum.ReadWrite);
+            final long tx = journal.newTx(ITx.UNISOLATED);
             
             /*
              * Now that the transaction is running, submit tasks that are

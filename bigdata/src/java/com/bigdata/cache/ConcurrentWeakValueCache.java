@@ -29,6 +29,8 @@ import org.apache.log4j.Logger;
  * may be used to evict references from the tail of the queue whose last access
  * time exceeds the timeout. The entries for those references WILL NOT be
  * cleared from this map as long as those references remain strongly reachable.
+ * You may periodically invoke {@link #clearStaleRefs()} in order to clear
+ * references even when the map is not being touched.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -456,7 +458,7 @@ public class ConcurrentWeakValueCache<K, V> {
      * here.
      * </p>
      */
-    final private void removeClearedEntries()
+    protected void removeClearedEntries()
     {
         
         if (referenceQueue == null)
@@ -516,6 +518,29 @@ public class ConcurrentWeakValueCache<K, V> {
     public Iterator<Map.Entry<K,WeakReference<V>>> entryIterator() {
 
         return map.entrySet().iterator();
+        
+    }
+
+    /**
+     * Clears stale references from the backing {@link HardReferenceQueue}.
+     * <p>
+     * Note: Evictions from the backing hard reference queue are driven by
+     * touches (get, put, remove). This means that the LRU entries in the map
+     * will not be cleared from the backing {@link HardReferenceQueue}
+     * regardless of their age. Applications may invoke this method occasionally
+     * (in general, with a delay of not less than the configured time) in order
+     * to ensure that stale references are cleared in the absence of touched and
+     * thus may become weakly reachable in a timely fashion.
+     * 
+     * @see HardReferenceQueue#evictStaleRefs()
+     */
+    public void clearStaleRefs() {
+        
+        synchronized(queue) {
+            
+            queue.evictStaleRefs();
+            
+        }
         
     }
     

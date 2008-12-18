@@ -29,9 +29,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.resources;
 
 import java.io.File;
+import java.lang.ref.ReferenceQueue;
+import java.lang.ref.WeakReference;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 
 import org.apache.log4j.Logger;
@@ -61,6 +66,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.NoSuchIndexException;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.journal.Tx;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
@@ -224,7 +230,7 @@ abstract public class IndexManager extends StoreManager {
     }
 
     /**
-     * Cache of added/retrieved btrees by name and timestamp.
+     * Cache of added/retrieved {@link IIndex}s by name and timestamp.
      * <p>
      * Map from the name and timestamp of an index to a weak reference for the
      * corresponding {@link IIndex}. Entries will be cleared from this map
@@ -238,6 +244,12 @@ abstract public class IndexManager extends StoreManager {
      * many _clean_ indices can be held in the cache. Dirty indices remain
      * strongly reachable owing to their existence in the
      * {@link Name2Addr#commitList}.
+     * <p>
+     * Note: Read-historical and read-committed tasks need to hold a read lock
+     * on the local resources in order to prevent their being released if there
+     * is a concurrent commit followed by a request to the StoreManager to
+     * purgeResources. This problem is very similar to the problem of the
+     * transaction manager which needs to manage the global release time.
      * <p>
      * Note: {@link ITx#READ_COMMITTED} indices MUST NOT be allowed into this
      * cache. Each time there is a commit for a given {@link BTree}, the
@@ -256,7 +268,183 @@ abstract public class IndexManager extends StoreManager {
      *       definition (index segments in use) might have changed as well.
      */
 //    final private WeakValueCache<NT, IIndex> indexCache;
-    final private ConcurrentWeakValueCache<NT, IIndex> indexCache;
+    final private IndexCache indexCache;
+
+    /**
+     * The earliest timestamp that must be retained for the read-historical
+     * indices in the cache and {@link Long#MAX_VALUE} if there a NO
+     * read-historical indices in the cache.
+     * 
+     * @see StoreManager#indexCacheLock
+     */
+    protected long getIndexRetentionTime() {
+
+        final long t = indexCache.getRetentionTime();
+
+        assert t > 0 : "t=" + t;
+
+        return t;
+        
+    }
+    
+    /**
+     * Extends the {@link ConcurrentWeakValueCache} to track the earliest
+     * timestamp from which any local {@link IIndex} view is reading. This
+     * timestamp is reported by {@link #getRetentionTime()}. The
+     * {@link StoreManager} uses this in
+     * {@link StoreManager#purgeOldResources()} to provide a "read lock" such
+     * that resources for in use views are not released.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected class IndexCache extends ConcurrentWeakValueCache<NT, IIndex> {
+
+        /**
+         * The earliest timestamp that must be retained for the read-historical
+         * indices in the cache, {@link Long#MAX_VALUE} if there a NO
+         * read-historical indices in the cache, and (-1L) if the value is not
+         * known and must be computed by scanning the index cache.
+         * 
+         * @todo an alternative is to maintain a sorted set of the timestamps
+         *       (breaking ties with the index name) and then always return the
+         *       first entry (lowest value) from the set.
+         */
+        private AtomicLong retentionTime = new AtomicLong(-1L);
+
+        /**
+         * The earliest timestamp that must be retained for the read-historical
+         * indices in the cache and {@link Long#MAX_VALUE} if there a NO
+         * read-historical indices in the cache.
+         * <p>
+         * Note: Due to the concurrent operations of the garbage collector, this
+         * method MAY return a time that is earlier than necessary. This
+         * possibility arises because {@link WeakReference} values may be
+         * cleared at any time. There is no negative consequence to this
+         * behavior - it simply means that fewer resources will be released than
+         * might otherwise be possible. This "hole" can not be closed by polling
+         * the {@link ReferenceQueue} since it is not when the entries are
+         * removed from the map which matters, but when their
+         * {@link WeakReference} values are cleared. However, periodically
+         * clearing stale references using {@link #clearStaleRefs()} will keep
+         * down the size of that "hole".
+         */
+        public long getRetentionTime() {
+
+            synchronized (retentionTime) {
+
+                if (retentionTime.get() == -1L) {
+
+                    long tmp = Long.MAX_VALUE; // note: default if nothing is
+                    // found.
+
+                    final Iterator<Map.Entry<NT, WeakReference<IIndex>>> itr = entryIterator();
+
+                    while (itr.hasNext()) {
+
+                        final Map.Entry<NT, WeakReference<IIndex>> entry = itr
+                                .next();
+
+                        if (entry.getValue().get() == null) {
+
+                            // skip cleared references.
+                            continue;
+
+                        }
+
+                        final long timestamp = entry.getKey().getTimestamp();
+
+                        if (timestamp == ITx.UNISOLATED) {
+
+                            // ignore unisolated indices.
+                            continue;
+
+                        }
+
+                        if (timestamp < tmp) {
+
+                            // choose the earliest timestamp for any index.
+                            tmp = timestamp;
+
+                        }
+
+                    } // next entry
+
+                    retentionTime.set(tmp);
+
+                } // end search.
+
+                return retentionTime.get();
+                
+            } // synchronized(retentionTime)
+
+        }
+
+        public IIndex put(NT k, IIndex v) {
+
+            synchronized (retentionTime) {
+
+                if (retentionTime.get() > k.getTimestamp()) {
+
+                    // found an earlier timestamp, so use that.
+                    retentionTime.set(k.getTimestamp());
+
+                }
+
+            }
+
+            return super.put(k, v);
+
+        }
+
+        public IIndex putIfAbsent(NT k, IIndex v) {
+            
+            synchronized(retentionTime) {
+                
+                if (retentionTime.get() > k.getTimestamp()) {
+
+                    // found an earlier timestamp, so use that.
+                    retentionTime.set(k.getTimestamp());
+                    
+                }
+                
+            }
+
+            return super.putIfAbsent(k, v);
+            
+        }
+        
+        public IIndex remove(NT k) {
+            
+            synchronized(retentionTime) {
+                
+                if (retentionTime.get() == k.getTimestamp()) {
+
+                    /*
+                     * Removed the earliest timestamp so we will need to
+                     * explicitly search for the new minimum timestamp.
+                     */
+                    
+                    retentionTime.set(-1L);
+                    
+                }
+                
+            }
+
+            return super.remove(k);
+            
+        }
+        
+        public IndexCache(final int cacheCapacity, final long cacheTimeout) {
+
+            super(new HardReferenceQueue<IIndex>(null/* evictListener */,
+                    cacheCapacity, HardReferenceQueue.DEFAULT_NSCAN,
+                    TimeUnit.MILLISECONDS.toNanos(cacheTimeout)),
+                    .75f/* loadFactor */, 16/* concurrencyLevel */, true/* removeClearedEntries */);
+
+        }
+        
+    }
     
     /**
      * A canonicalizing cache for {@link IndexSegment}s.
@@ -284,6 +472,21 @@ abstract public class IndexManager extends StoreManager {
      */
     private final transient NamedLock<UUID> segmentLock = new NamedLock<UUID>();
     
+    /**
+     * Clears any stale entries in the LRU backing the {@link #indexCache} or
+     * the {@link #indexSegmentCache}.
+     */
+    public void clearStaleCacheEntries() {
+
+        // the store manager.
+        super.clearStaleCacheEntries();
+        
+        indexCache.clearStaleRefs();
+
+        indexSegmentCache.clearStaleRefs();
+        
+    }
+
     /**
      * The #of entries in the hard reference cache for {@link IIndex}s. There
      * MAY be more {@link IIndex}s open than are reported by this method if
@@ -427,12 +630,7 @@ abstract public class IndexManager extends StoreManager {
 //            indexCache = new WeakValueCache<NT, IIndex>(
 //                    new LRUCache<NT, IIndex>(indexCacheCapacity));
 
-            indexCache = new ConcurrentWeakValueCache<NT, IIndex>(
-                    new HardReferenceQueue<IIndex>(null/* evictListener */,
-                            indexCacheCapacity,
-                            HardReferenceQueue.DEFAULT_NSCAN,
-                            TimeUnit.MILLISECONDS.toNanos(indexCacheTimeout)),
-                    .75f/* loadFactor */, 16/* concurrencyLevel */, true/* removeClearedEntries */);
+            indexCache = new IndexCache(indexCacheCapacity, indexCacheTimeout);
 
         }
         
@@ -496,9 +694,10 @@ abstract public class IndexManager extends StoreManager {
      * @param name
      *            The index name.
      * @param timestamp
-     *            The startTime of an active transaction, <code>0L</code> for
-     *            the current unisolated index view, or <code>-timestamp</code>
-     *            for a historical view no later than the specified timestamp.
+     *            A transaction identifier, {@link ITx#UNISOLATED} for the
+     *            unisolated index view, {@link ITx#READ_COMMITTED}, or
+     *            <code>timestamp</code> for a historical view no later than
+     *            the specified timestamp.
      * @param store
      *            The store from which the index will be loaded.
      * 
@@ -896,14 +1095,39 @@ abstract public class IndexManager extends StoreManager {
      * 
      * @see Journal#getIndex(String, long)
      */
-    public IIndex getIndex(final String name, final long timestamp) {
+    public IIndex getIndex(final String name, /*final*/ long timestamp) {
         
         if (name == null) {
 
             throw new IllegalArgumentException();
 
         }
+        
+        /*
+         * Note: Contention is with purgeResources().
+         */
+        indexCacheLock.readLock().lock();
+        
+        try {
 
+        if (timestamp == ITx.READ_COMMITTED) {
+
+            /*
+             * @todo experimental alternative gives a view based on the most
+             * recent commit time. The only drawback about this approach is that
+             * each request by the same operation will return the then most
+             * recently committed view, well and the IIndex will report the
+             * actual timestamp used. The upside is that the view is cached
+             * since it has a normal timestamp and we need do nothing more to
+             * provide a read lock for read-committed requests. In fact, if we
+             * simply did this when the task began to execute then it would use
+             * a consistent timestamp for all of its index views.
+             */
+            
+            timestamp = getLiveJournal().getRootBlockView().getLastCommitTime();
+            
+        }
+        
         final NT nt = new NT(name, timestamp);
         
         final Lock lock = namedLock.acquireLock(nt);
@@ -930,17 +1154,17 @@ abstract public class IndexManager extends StoreManager {
                 
             }
 
-            // is this a transactional view?
-            final boolean isTransaction = timestamp > ITx.UNISOLATED;
+            // is this a read-write transactional view?
+            final boolean isReadWriteTx = TimestampUtility.isReadWriteTx(timestamp);
 
             // lookup transaction iff transactional view.
-            final ITx tx = (isTransaction ? getConcurrencyManager()
+            final ITx tx = (isReadWriteTx ? getConcurrencyManager()
                     .getTransactionManager().getTx(timestamp) : null);
 
-            if (isTransaction) {
+            if (isReadWriteTx) {
 
                 /*
-                 * Handle transactional views.
+                 * Handle fully isolated (read-write) transactional views.
                  */
                 
                 if (tx == null) {
@@ -967,7 +1191,7 @@ abstract public class IndexManager extends StoreManager {
 
             }
 
-            if (isTransaction && tx == null) {
+            if (isReadWriteTx && tx == null) {
 
                 /*
                  * Note: This will happen both if you attempt to use a
@@ -982,12 +1206,12 @@ abstract public class IndexManager extends StoreManager {
 
             }
 
-            final boolean readOnly = (timestamp < ITx.UNISOLATED)
-                    || (isTransaction && tx.isReadOnly());
+            final boolean readOnly = TimestampUtility.isReadOnly(timestamp);
+//                        || (isReadWriteTx && tx.isReadOnly());
 
             final IIndex tmp;
 
-            if (isTransaction) {
+            if (isReadWriteTx) {
 
                 /*
                  * Isolated operation.
@@ -1063,7 +1287,8 @@ abstract public class IndexManager extends StoreManager {
                      * most one task has access to this index at a time.
                      */
 
-                    assert timestamp == ITx.UNISOLATED;
+                    assert timestamp == ITx.UNISOLATED : "timestamp="
+                                + timestamp;
 
                     /*
                      * Check to see if an index partition was split, joined or
@@ -1128,6 +1353,12 @@ abstract public class IndexManager extends StoreManager {
 
             lock.unlock();
 
+        }
+        
+        } finally {
+            
+            indexCacheLock.readLock().unlock();
+            
         }
 
     }

@@ -346,7 +346,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 //        this.fullyBufferedReadThreshold = 100000;
         this.fullyBufferedReadThreshold = fullyBufferedReadThreshold;
         
-        this.historicalRead = TimestampUtility.isHistoricalRead(timestamp);
+        this.historicalRead = TimestampUtility.isReadOnly(timestamp);
         
         final IElementFilter<R> constraint = predicate.getConstraint();
 

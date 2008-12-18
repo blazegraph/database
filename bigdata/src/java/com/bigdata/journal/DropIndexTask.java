@@ -28,10 +28,9 @@ package com.bigdata.journal;
  * Drop a named index (unisolated write operation).
  * <p>
  * Note: the dropped index will continue to be visible to unisolated readers or
- * {@link IsolationEnum#ReadCommitted} isolated operations (since they read from
- * the most recent committed state) until the next commit. However, unisolated
- * writers that execute after the index has been dropped will NOT be able to see
- * the index.
+ * read-commmitted isolated operations (since they read from the most recent
+ * committed state) until the next commit. However, unisolated writers that
+ * execute after the index has been dropped will NOT be able to see the index.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

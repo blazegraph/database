@@ -217,7 +217,7 @@ public class CommitRecordIndex extends BTree {
      * 
      * @see #get(long)
      */
-    synchronized public ICommitRecord find(long timestamp) {
+    synchronized public ICommitRecord find(final long timestamp) {
 
         if (timestamp == ITx.UNISOLATED) {
 

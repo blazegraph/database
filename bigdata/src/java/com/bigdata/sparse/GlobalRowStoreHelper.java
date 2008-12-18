@@ -72,7 +72,8 @@ public class GlobalRowStoreHelper {
 
         if (globalRowStore == null) {
 
-            IIndex ndx = indexManager.getIndex(GLOBAL_ROW_STORE_INDEX, ITx.UNISOLATED);
+            IIndex ndx = indexManager.getIndex(GLOBAL_ROW_STORE_INDEX,
+                    ITx.UNISOLATED);
 
             if (ndx == null) {
 

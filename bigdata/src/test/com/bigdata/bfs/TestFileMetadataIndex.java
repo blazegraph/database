@@ -38,6 +38,7 @@ import com.bigdata.bfs.Document;
 import com.bigdata.bfs.DocumentImpl;
 import com.bigdata.bfs.FileMetadataSchema;
 import com.bigdata.bfs.RepositoryDocumentImpl;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.ITPV;
 
@@ -417,7 +418,7 @@ public class TestFileMetadataIndex extends AbstractRepositoryTestCase {
             
             // verify read back.
             assertEquals("version0", expected0, read(repo.inputStream(id,
-                    version0, -timestamp)));
+                    version0, TimestampUtility.asHistoricalRead(timestamp))));
             
         }
         

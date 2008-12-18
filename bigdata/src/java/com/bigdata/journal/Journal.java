@@ -450,11 +450,15 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     }
 
     public void activateTx(ITx tx) throws IllegalStateException {
+        
         localTransactionManager.activateTx(tx);
+        
     }
 
     public void completedTx(ITx tx) throws IllegalStateException {
+        
         localTransactionManager.completedTx(tx);
+        
     }
 
     /**
@@ -473,12 +477,12 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         }
 
-        final boolean isTransaction = timestamp > ITx.UNISOLATED;
+        final boolean isReadWriteTx = TimestampUtility.isReadWriteTx(timestamp);
         
-        final ITx tx = (isTransaction ? getConcurrencyManager()
+        final ITx tx = (isReadWriteTx ? getConcurrencyManager()
                 .getTransactionManager().getTx(timestamp) : null); 
         
-        if(isTransaction) {
+        if(isReadWriteTx) {
 
             if(tx == null) {
                 
@@ -502,7 +506,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                                 
         }
         
-        if( isTransaction && tx == null ) {
+        if( isReadWriteTx && tx == null ) {
         
             /*
              * Note: This will happen both if you attempt to use a transaction
@@ -517,12 +521,13 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             
         }
         
-        final boolean readOnly = (timestamp < ITx.UNISOLATED)
-                || (isTransaction && tx.isReadOnly());
+        final boolean readOnly = TimestampUtility.isReadOnly(timestamp);
+//        final boolean readOnly = (timestamp < ITx.UNISOLATED)
+//                || (isReadWriteTx && tx.isReadOnly());
 
         final IIndex tmp;
 
-        if (isTransaction) {
+        if (isReadWriteTx) {
 
             /*
              * Isolated operation.
@@ -546,16 +551,20 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         } else {
             
             /*
-             * historical read -or- unisolated read operation.
+             * Non-transactional view.
              */
 
             if (readOnly) {
 
                 if (timestamp == ITx.READ_COMMITTED) {
 
+                    // read-committed
+                    
                     tmp = new ReadCommittedView(this, name);
 
                 } else {
+                    
+                    // historical read
 
                     final AbstractBTree[] sources = getIndexSources(name,
                             timestamp);
@@ -649,13 +658,13 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
     }
     
-    public void prepared(ITx tx) throws IllegalStateException {
-        localTransactionManager.prepared(tx);
+    public void preparedTx(ITx tx) throws IllegalStateException {
+        localTransactionManager.preparedTx(tx);
     }
 
-    public long newTx(IsolationEnum level) {
+    public long newTx(final long commitTime) {
         
-        return localTransactionManager.newTx(level);
+        return localTransactionManager.newTx(commitTime);
         
     }
     
@@ -671,11 +680,11 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     }
 
-    public void wroteOn(long startTime, String[] resource) {
-
-        localTransactionManager.wroteOn(startTime, resource);
-        
-    }
+//    public void wroteOn(long startTime, UUID dataServiceUUID) {
+//
+//        localTransactionManager.wroteOn(startTime, dataServiceUUID);
+//        
+//    }
 
     /*
      * IConcurrencyManager

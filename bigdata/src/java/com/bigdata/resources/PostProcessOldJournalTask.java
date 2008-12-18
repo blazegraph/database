@@ -784,7 +784,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     resultBuffer = (ResultBuffer) resourceManager
                             .getFederation().getMetadataService()
                             .submit(
-                                    -lastCommitTime,
+                                    TimestampUtility.asHistoricalRead(lastCommitTime),
                                     MetadataService
                                             .getMetadataIndexName(scaleOutIndexName),
                                     op);

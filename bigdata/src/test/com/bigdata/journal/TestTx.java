@@ -86,7 +86,7 @@ public class TestTx extends ProxyTestCase<Journal> {
 
         journal.commit();
         
-        final long tx = journal.newTx(IsolationEnum.ReadWrite);
+        final long tx = journal.newTx(ITx.UNISOLATED);
         
         /*
          * nothing written on this transaction.
@@ -122,7 +122,7 @@ public class TestTx extends ProxyTestCase<Journal> {
         }
                 
         // start tx1.
-        final long tx1 = journal.newTx(IsolationEnum.ReadWrite);
+        final long tx1 = journal.newTx(ITx.UNISOLATED);
 
         // the index is not visible in tx1.
         assertNull(journal.getIndex(name,tx1));
@@ -131,7 +131,7 @@ public class TestTx extends ProxyTestCase<Journal> {
         assertNotSame(0L,journal.commit());
         
         // start tx2.
-        final long tx2 = journal.newTx(IsolationEnum.ReadWrite);
+        final long tx2 = journal.newTx(ITx.UNISOLATED);
 
         // the index still is not visible in tx1.
         assertNull(journal.getIndex(name,tx1));
@@ -171,13 +171,13 @@ public class TestTx extends ProxyTestCase<Journal> {
             
         }
 
-        final long tx1 = journal.newTx(IsolationEnum.ReadWrite);
+        final long tx1 = journal.newTx(ITx.UNISOLATED);
 
         final IIndex ndx1 = journal.getIndex(name,tx1);
         
         assertNotNull(ndx1);
         
-        final long tx2 = journal.newTx(IsolationEnum.ReadWrite);
+        final long tx2 = journal.newTx(ITx.UNISOLATED);
 
         final IIndex ndx2 = journal.getIndex(name,tx2);
 
@@ -234,7 +234,7 @@ public class TestTx extends ProxyTestCase<Journal> {
             
         }
         
-        final long tx1 = journal.newTx(IsolationEnum.ReadWrite);
+        final long tx1 = journal.newTx(ITx.UNISOLATED);
     
         {
 
@@ -280,7 +280,7 @@ public class TestTx extends ProxyTestCase<Journal> {
 
         }
         
-        final long tx2 = journal.newTx(IsolationEnum.ReadWrite);
+        final long tx2 = journal.newTx(ITx.UNISOLATED);
         
         {
 
@@ -343,10 +343,16 @@ public class TestTx extends ProxyTestCase<Journal> {
          * create two transactions.
          */
         
-        final long tx1 = journal.newTx(IsolationEnum.ReadWrite);
+        final long tx1 = journal.newTx(ITx.UNISOLATED);
         
-        final long tx2 = journal.newTx(IsolationEnum.ReadWrite);
+        final long tx2 = journal.newTx(ITx.UNISOLATED);
 
+        assertNotSame(tx1, tx2);
+
+        assertTrue(tx1 >= journal.getRootBlockView().getLastCommitTime());
+        
+        assertTrue(tx2 > tx1);
+        
         {
             
             /*
@@ -488,10 +494,16 @@ public class TestTx extends ProxyTestCase<Journal> {
          * create transactions.
          */
 
-        final long tx0 = journal.newTx(IsolationEnum.ReadWrite);
+        final long tx0 = journal.newTx(ITx.UNISOLATED);
 
-        final long tx1 = journal.newTx(IsolationEnum.ReadWrite);
+        final long tx1 = journal.newTx(ITx.UNISOLATED);
 
+        assertNotSame(tx0, tx1);
+
+        assertTrue(tx0 >= journal.getRootBlockView().getLastCommitTime());
+        
+        assertTrue(tx1 > tx0);
+        
         /*
          * Write v0 on tx0.
          */
@@ -583,10 +595,16 @@ public class TestTx extends ProxyTestCase<Journal> {
          * create transactions.
          */
 
-        final long tx0 = journal.newTx(IsolationEnum.ReadWrite);
+        final long tx0 = journal.newTx(ITx.UNISOLATED);
 
-        final long tx1 = journal.newTx(IsolationEnum.ReadWrite);
+        final long tx1 = journal.newTx(ITx.UNISOLATED);
 
+        assertNotSame(tx0, tx1);
+
+        assertTrue(tx0 >= journal.getRootBlockView().getLastCommitTime());
+        
+        assertTrue(tx1 > tx0);
+        
         /*
          * Write v0 on tx0.
          */
@@ -694,10 +712,16 @@ public class TestTx extends ProxyTestCase<Journal> {
          * create transactions.
          */
 
-        final long tx0 = journal.newTx(IsolationEnum.ReadWrite);
+        final long tx0 = journal.newTx(ITx.UNISOLATED);
 
-        final long tx1 = journal.newTx(IsolationEnum.ReadWrite);
+        final long tx1 = journal.newTx(ITx.UNISOLATED);
 
+        assertNotSame(tx0, tx1);
+
+        assertTrue(tx0 >= journal.getRootBlockView().getLastCommitTime());
+        
+        assertTrue(tx1 > tx0);
+        
         /*
          * Write v0 on tx0.
          */
@@ -788,20 +812,22 @@ public class TestTx extends ProxyTestCase<Journal> {
          * Transaction that starts before the transaction on which we write. The
          * change will not be visible in this scope.
          */
-        final long tx0 = journal.newTx(IsolationEnum.ReadWrite);
+        final long tx0 = journal.newTx(ITx.UNISOLATED);
 
         // transaction on which we write and later commit.
-        final long tx1 = journal.newTx(IsolationEnum.ReadWrite);
+        final long tx1 = journal.newTx(ITx.UNISOLATED);
 
         // new transaction - commit will not be visible in this scope.
-        final long tx2 = journal.newTx(IsolationEnum.ReadWrite);
+        final long tx2 = journal.newTx(ITx.UNISOLATED);
 
-        assertTrue(commitTime0<tx0);
-        assertTrue(tx0<tx1);
-        assertTrue(tx1<tx2);
+        System.err.println("commitTime0   ="+commitTime0);
         System.err.println("tx0: startTime="+tx0);
         System.err.println("tx1: startTime="+tx1);
         System.err.println("tx2: startTime="+tx2);
+
+        assertTrue(commitTime0<=tx0);
+        assertTrue(tx0<tx1);
+        assertTrue(tx1<tx2);
         
         final byte[] id1 = new byte[]{1};
 
@@ -833,9 +859,9 @@ public class TestTx extends ProxyTestCase<Journal> {
         assertEquals(v0, (byte[])journal.getIndex(name).lookup(id1));
 
         // new transaction - commit is visible in this scope.
-        final long tx3 = journal.newTx(IsolationEnum.ReadWrite);
+        final long tx3 = journal.newTx(ITx.UNISOLATED);
         assertTrue(tx2<tx3);
-        assertTrue(tx3>tx1CommitTime);
+        assertTrue(tx3>=tx1CommitTime);
         System.err.println("tx3: startTime="+tx3);
 //        System.err.println("tx3: ground state: "+((Tx)journal.getTx(tx3)).commitRecord);
         
@@ -915,7 +941,7 @@ public class TestTx extends ProxyTestCase<Journal> {
         journal.commit();
 
         // start transaction.
-        final long tx0 = journal.newTx(IsolationEnum.ReadWrite);
+        final long tx0 = journal.newTx(ITx.UNISOLATED);
 
         // data version visible in the transaction.
         assertEquals(v0, journal.getIndex(name, tx0).lookup(id0));

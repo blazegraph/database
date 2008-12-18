@@ -400,6 +400,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
      * Return some "statistics" about the btree.
      * 
      * @todo fold in {@link #getUtilization()} here.
+     * 
+     * @todo factor counter names into interface.
      */
     synchronized public ICounterSet getCounters() {
 
@@ -409,13 +411,32 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
 
             counterSet.attach(counters.getCounters());
     
+            counterSet.addCounter("Write Retention Queue Capacity",
+                    new Instrument<Long>() {
+                        public void sample() {
+                            setValue((long)writeRetentionQueue.capacity());
+                        }
+                    });
+
+            counterSet.addCounter("Write Retention Queue Distinct Count",
+                    new Instrument<Long>() {
+                        public void sample() {
+                            setValue((long)ndistinctOnWriteRetentionQueue);
+                        }
+                    });
+
+            counterSet.addCounter("Read Retention Queue Capacity",
+                    new Instrument<Long>() {
+                        public void sample() {
+                            setValue((long) (readRetentionQueue == null ? 0
+                                    : readRetentionQueue.capacity()));
+                        }
+                    });
+
             /*
-             * @todo report on soft vs weak refs.
+             * @todo report time open?
              * 
-             * @todo report on readRetentionQueue iff used. track #distinct.
-             * 
-             * @todo track life time of nodes and leaves and #of touches during life
-             * time.
+             * @todo report #of times open?
              * 
              * @todo estimate heap requirements for nodes and leaves based on their
              * state (keys, values, and other arrays). report estimated heap
@@ -712,6 +733,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
          * in the hard reference queue.
          */
         writeRetentionQueue.clear(true/* clearRefs */);
+        ndistinctOnWriteRetentionQueue = 0;
         
         if (readRetentionQueue != null) {
             

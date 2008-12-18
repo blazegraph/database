@@ -31,7 +31,6 @@ import java.io.IOException;
 import java.rmi.Remote;
 
 import com.bigdata.isolation.IConflictResolver;
-import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 
 /**
@@ -43,19 +42,28 @@ import com.bigdata.service.IDataService;
  * The underlying concurrency control mechanism is Multi-Version Concurrency
  * Control (MVCC). There are no "write locks" per say. Instead, a transaction
  * reads from a historical commit point identified by its assigned start time
- * (-startTime is a timestamp which identifies the commit point) and writes on
- * an isolated write set visible only to that transaction. When a read-write
- * transaction commits, its write set is validated against the then current
- * committed state of the database. If validation succeeds, the isolated write
- * set is merged down onto the database. Otherwise the transaction is aborted
- * and its write set is discarded.
+ * (abs(transactionIdentifier) is a timestamp which identifies the commit point)
+ * and writes on an isolated write set visible only to that transaction. When a
+ * read-write transaction commits, its write set is validated against the then
+ * current committed state of the database. If validation succeeds, the isolated
+ * write set is merged down onto the database. Otherwise the transaction is
+ * aborted and its write set is discarded. (It is possible to register an index
+ * with an {@link IConflictResolver} in order to present the application with an
+ * opportunity to validate write-write conflicts using state-based techniques,
+ * i.e., by looking at the records and timestamps and making an informed
+ * decision).
  * </p>
  * <p>
  * A transaction imposes "read locks" on the resources required for the
- * historical state of the database from which that transaction is reading.
- * Those resources will not be released until the transaction is complete or
- * aborted (the transaction manager MAY choose to abort a read in order to
- * release locked resources).
+ * historical state of the database from which that transaction is reading (both
+ * read-only and read-write transactions impose read locks). Those resources
+ * will not be released until the transaction is complete or aborted. The
+ * transaction manager coordinates the release of resources by advancing the
+ * global release time - the earliest commit time from which a transaction may
+ * read. Under dire circumstances (disk shortage) the transaction manager MAY
+ * choose to abort transactions and advance the release time in order to permit
+ * the release of locked resources and the reclaimation of their space on local
+ * disk.
  * </p>
  * <h2>Centralized transaction manager service</h2>
  * <p>
@@ -63,65 +71,57 @@ import com.bigdata.service.IDataService;
  * implementing this interface and clients will discover and talk with that
  * service. The centralized service in turn will coordinate the distributed
  * transactions with the various {@link IDataService}s using their local
- * implementations of this same interface. The centralized transactin service
+ * implementations of this same interface. The centralized transaction service
  * SHOULD invoke the corresponding methods on a {@link IDataService} IFF it
  * knows that the {@link IDataService} is buffering writes for the transaction.
  * </p>
  * <h2>Timestamps</h2>
  * <p>
- * Timestamps are used to indicate whether an operation is a historical
- * read-only transaction (-startTime), a fully isolated read-write (startTime),
- * a read-committed operation ({@link ITx#READ_COMMITTED}), or an unisolated
- * read-write operation ({@link ITx#UNISOLATED}}. Timestamps for fully
- * isolated read-write transactions MUST be obtained from an
- * {@link ITransactionManager}. Likewise, a read-only transaction obtained from
- * an {@link ITransactionManager} will cause the resources necessary to support
- * that read to be retained until the transaction has completed. The value
- * <code>-startTime</code> MAY be used to perform a lightweight read-only
- * operations without coordination with the {@link ITransactionManager} but
- * resources MAY be released since no read "locks" have been declared.
+ * Both read-only and read-write transactions assert global read locks on the
+ * resources required for that historical state of the database corresponding to
+ * their start time. Those read locks are released when the transaction
+ * completes. Periodically the transaction manager will advance the release
+ * time, rendering views of earlier states of the database unavailable.
  * </p>
- * A transaction identifier serves to uniquely distinguish transactions. The
- * practice is to assign transaction identifies based on the timestamp of their
- * view and to reverse the sign for read-write transaction identifiers are
- * negative values (essentially negative timestamps) while commit times are
- * positive values (timestamps). Successive read-write transactions must be
- * assigned transaction identifiers whose absolute value is strictly increasing -
- * this requirement is introduced by the MVCC protocol. There are special values
- * for {@link ITx#UNISOLATED} and {@link ITx#READ_COMMITTED} operations, which
- * are not transactions at all.
  * <p>
+ * The transaction identifier is the transaction <em>start time</em>. The
+ * transaction start time is choosen from among those distinct timestamps
+ * available between the specified commit time and the next commit time on the
+ * database. Successive read-write transactions must be assigned transaction
+ * identifiers whose absolute value is strictly increasing - this requirement is
+ * introduced by the MVCC protocol.
+ * </p>
+ * <p>
+ * The sign of the transaction identifier indicates whether the transaction is
+ * read-only (positive) or read-write (negative). Read-only transaction
+ * identifiers may be directly used as commit times when reading on a local
+ * store. Read-write transaction identifiers must have their sign bit cleared in
+ * order to read from their ground state (the commit point corresponding to
+ * their transaction start time) and unmodified transaction identifier is used
+ * to access their mutable view (the view comprised of the write set of the
+ * transaction super imposed on the ground state such that writes, overwrites,
+ * and deletes are visible to the view).
+ * </p>
+ * <p>
+ * The symbolic value {@link ITx#READ_COMMITTED} and any <code>startTime</code>
+ * MAY be used to perform a lightweight read-only operations either on a local
+ * data service or on the distributed database without coordination with the
+ * {@link ITransactionManager}, but resources MAY be released at any time since
+ * no read "locks" have been declared. While a read-write transaction may be
+ * readily identified by the sign associated with the transaction identifier,
+ * you CAN NOT differentiate between a read-only transaction (with read-locks)
+ * and a lightweight read on a given commit time. In practice, it is only the
+ * transaction manager which needs to recognize read-only transactions and then
+ * only to constrain its assignment of distinct transaction identifiers and to
+ * coordinate the advance of the release time as transactions end. There is no
+ * other practical difference between read-only transactions and lightweight
+ * reads from the perspective of either the client or the individual data
+ * services as read-locks are managed solely through the advancement of the
+ * release time by the transaction manager.
+ * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * FIXME My recommendation based on the above is to go with a centralized time
- * service and to use a heartbeat to drive distributed commits of both isolated
- * and unisolated transactions. the group commit protocol can wait for a
- * suitable heartbeat to make the data restart safe.
- * 
- * @todo The transaction server should make sure that time does not go backwards
- *       when it starts up (with respect to the last time that it issued).
- *       
- * @todo Since the overall concurrency control algorithm is MVCC, the
- *       {@link ITransactionManager} becomes aware of the required locks during
- *       the active {@link ITx#isActive()} phase of the transaction. By the time
- *       the transaction is done executing and a COMMIT is requested by the
- *       client the {@link ITransactionManagerService} knows the set of
- *       resources (named indices) on which the transaction has written. As its
- *       first step in the commit protocol the
- *       {@link ITransactionManagerService} acquires the necessary exclusive
- *       locks on those resources. The locks are eventually released when the
- *       transaction either commits or aborts.
- * 
- * FIXME in order to support 2-/3-phase commit, the [commitTime] from the
- * transaction manager service must be passed through to the journal rather than
- * being returned from {@link #commit(long)}. There also needs to be a distinct
- * "prepare" message that validates the write set of the transaction and makes
- * it restart safe. finally, i have to coordinate the serialization of the wait
- * for the "commit" message. (The write set of the transaction also needs to be
- * restart safe when it indicates that it has "prepared" so that a commit will
- * eventually succeed.)
  * 
  * FIXME extends {@link Remote} and declare {@link IOException} for all methods
  * on this interface.
@@ -130,58 +130,35 @@ public interface ITransactionManager extends ITimestampService {
 
     /**
      * Create a new transaction.
-     * <p>
-     * The concurrency control algorithm is MVCC, so readers never block and
-     * only write-write conflicts can arise. It is possible to register an index
-     * with an {@link IConflictResolver} in order to present the application
-     * with an opportunity to validate write-write conflicts using state-based
-     * techniques (i.e., by looking at the records and timestamps and making an
-     * informed decision).
      * 
-     * @param level
-     *            The isolation level. The following isolation levels are
-     *            supported:
-     *            <dl>
-     *            <dt>{@link IsolationEnum#ReadOnly}</dt>
-     *            <dd>A fully isolated read-only transaction with "read locks"
-     *            on the resources required for that historical state of the
-     *            database.</dd>
-     *            <dt>{@link IsolationEnum#ReadWrite}</dt>
-     *            <dd>A fully isolated read-write transaction.</dd>
-     *            </dl>
+     * @param timestamp
+     *            The timestamp may be:
+     *            <ul>
+     *            <li>A timestamp (GT ZERO), which will result in a
+     *            read-historical (read-only) transaction that reads from the
+     *            most recent committed state whose commit timestamp is less
+     *            than or equal to <i>timestamp</i>.</li>
+     *            <li>The symbolic constant {@link ITx#READ_COMMITTED} to
+     *            obtain a read-historical transaction reading from the most
+     *            recently committed state of the database. The transaction will
+     *            be assigned a start time corresponding to the most recent
+     *            commit point of the database and will be a fully isolated
+     *            read-only view of the state of the database as of that start
+     *            time. (This is an atomic shorthand for
+     *            newTx(getLastCommitTime())).</li>
+     *            <li>{@link ITx#UNISOLATED} for a read-write transaction.</li>
+     *            </ul>
      * 
-     * @return The transaction start time, which serves as the unique identifier
-     *         for the transaction.
+     * @return The unique transaction identifier.
      * 
-     * FIXME Modify this to accept an optional timestamp so that the caller can
-     * request a historical read with "read locks" on the resources required for
-     * that historical committed state. When the optional timestamp is 0L the
-     * transaction manager will assign a timestamp. For a read-only transaction
-     * the timestamp will identify the most recent committed state of the
-     * database (it will in fact be a distinct timestamp not less than the last
-     * assigned commit time). For a read-write transaction it will be a distinct
-     * timestamp not less than the last assigned commit time. When a historical
-     * read is specified for a caller supplied timestamp an exception (or other
-     * indication) should be given to the caller to indicate that they are not
-     * the only client reading from that timestamp - what is at issue here is
-     * that the "read locks" will be released as soon as the historical read is
-     * completed - and any client can cause it to be completed, so it two
-     * clients are using the same timestamp then one could inadvertently cause
-     * the read locks to be released too early. Another way to handle this is to
-     * return a timestamp distinct from any active historical read tx, but we
-     * could run out of timestamps under some very high concurrency scenarios in
-     * which case the caller might be delayed the start of their historical
-     * read.
+     * @throws IllegalStateException
+     *             if the requested timestamp is for a commit point that is no
+     *             longer preserved by the database (the resources for that
+     *             commit point have been released).
      * 
-     * @todo a heartbeat could be sent to all clients (and data services) from
-     *       the {@link ITransactionManager} giving the most recent commit time
-     *       on the database. this is useful for clients that want a
-     *       light-weight historical read (no read locks, not read-committed).
-     *       <P>
-     *       this could be extended for the RDF inference case to give the last
-     *       read-behind closure time as well.
+     * @todo specialize this exception?
      */
-    public long newTx(IsolationEnum level);
+    public long newTx(long timestamp);
     
     /**
      * Request commit of the transaction write set (synchronous).
@@ -204,53 +181,5 @@ public interface ITransactionManager extends ITimestampService {
      *             if the tx is not a known active transaction.
      */
     public void abort(long tx);
-
-//    /**
-//     * Obtain a lock on a named index (synchronous).
-//     * <p>
-//     * Note: Clients DO NOT use this method. Locks are NOT required during the
-//     * active phrase of a transaction. Locks are only required during the commit
-//     * phase of a transaction where they are used to coordinate execution with
-//     * concurrent unisolated operations. The transaction manager automatically
-//     * acquires the necessary locks during the commit and will cause those locks
-//     * to be released before the transaction is complete.
-//     * 
-//     * @param tx
-//     *            The transaction identifier.
-//     * @param name
-//     *            The resource name(s).
-//     */
-//    public void lock(long tx,String resource[]);
-//
-//    /**
-//     * Release all locks held by the transaction.
-//     * 
-//     * @param tx
-//     *            The transaction identifier.
-//     */
-//    public void releaseLocks(long tx);
-
-    /**
-     * Invoked by tasks executing a transaction to notify the transaction
-     * manager that they have written on the named resource(s). This information
-     * is used when submitting the task(s) that will handle the validation and
-     * commit (or abort) of the transaction.
-     * 
-     * @param startTime
-     *            The transaction identifier.
-     * @param resource
-     *            The named resources.
-     * 
-     * @todo pass the {@link DataService} identifier also (or instead) to make
-     *       it easier for a distributed transaction manager to locate the
-     *       {@link DataService}s holding the write sets for the transaction?
-     *       <p>
-     *       Note: In a failover situation we need to know the specific
-     *       resources on which the transaction wrote on each
-     *       {@link DataService} unless the media replication strategy for the
-     *       data services also sends along this piece of otherwise transient
-     *       state.
-     */
-    public void wroteOn(long startTime, String[] resource);
     
 }

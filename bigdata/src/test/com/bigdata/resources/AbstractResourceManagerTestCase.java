@@ -299,7 +299,11 @@ public class AbstractResourceManagerTestCase extends
             throw new UnsupportedOperationException();
         }
 
-        public long commit(long tx) throws ValidationError, IOException {
+        public void prepare(long tx) throws ValidationError, IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        public void commit(long tx,long commitTime) throws IOException {
             throw new UnsupportedOperationException();
         }
 

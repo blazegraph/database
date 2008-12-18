@@ -192,6 +192,12 @@ Consider a RW store variant.
 
     - BTree
 
+     - Modify to allow a purely transient BTree using ONLY hard
+       references.  This variant does not require a backing store.
+       The parent and child references should be HARD
+       references. Deleted nodes and leaves will be GC'd once they are
+       evicted from the write retention queue.
+
      - Per-child locks : try using the childRef for this.  Add
        synchronized(node) to ensure that the childRef[i] is non-null
        and then synchronized(childRef[i]) for the lock itself.
@@ -900,6 +906,13 @@ Short term tasks:
 
    - Transaction support.
 
+     - Done. Read-historical and read-committed tasks need to hold a
+       read lock on the local resources in order to prevent their
+       being released if there is a concurrent commit followed by a
+       request to the StoreManager to purgeResources.  This problem
+       shows up when there is significant IO Wait for an operation,
+       e.g., a complete row scan on a scale-out index.
+
      - Overhaul transaction processing and support full, 2-/3- phase
        transactions
 
@@ -913,21 +926,26 @@ Short term tasks:
        transaction identifier for the interval implied by some desired
        historical start time.
 
-     - ** Change tx timestamps to negative and use positive timestamps
-       for historical reads.  Changes to AbstractTask, ITx,
+     - Done. Change tx timestamps to negative and use positive
+       timestamps for historical reads.  Changes to AbstractTask, ITx,
        ITransactionManager, StoreFileManager, IsolationEnum, and the
        post-processing tasks.  This will greatly simplify thinking
        about historical read operations since they will simply use the
        actual commit time while transactions will use a free
        (-timestamp) value selected by the transaction manager.
 
-     - AbstractJournal#getIndex(String,long ) has different semantics
-       from IIndexStore#getIndex(String,long) (it only accepts a
-       positive commitTime vs the more generalized timestamp, which
-       can represent a transaction, an unisolated request, a
-       read-committed request, or a commitTime).  The root of the
-       issue is commitTime vs historical read, so fix this when I
-       address that issue.
+     - ? Modify AbstractTask to interpret a read-committed request by
+       replacing the timestamp with the lastCommitTime as of the
+       moment when the task runs?  (This might break semantics for
+       some uses, including closure).
+
+     - Done. AbstractJournal#getIndex(String,long ) has different
+       semantics from IIndexStore#getIndex(String,long) (it only
+       accepts a positive commitTime vs the more generalized
+       timestamp, which can represent a transaction, an unisolated
+       request, a read-committed request, or a commitTime).  The root
+       of the issue is commitTime vs historical read, so fix this when
+       I address that issue.
 
      - AbstractResourceManagerTask - documents a potential problem
        with MDI updates without 2-phase commits.  Look into this
@@ -1372,10 +1390,6 @@ java.lang.IllegalStateException
      will run, e.g., /var/bigdata/DataServer0
 
    - Done. verify jini using nio.
-
-   - timestamp service should notify the load balancer.  this will be
-     extended to be the transaction service and that will have things
-     to report.
 
    - Startup should be event driven.
 
@@ -2941,7 +2955,7 @@ Commit notes:
     hostScore).
 
   - Fix history bug so that we can have more than 60 minutes of
-    detailed history.
+    detailed history.  Parameterize the actual #of minutes on the LBS.
 
 - Visualization
 
@@ -2958,9 +2972,15 @@ Commit notes:
 
     http://www.ibm.com/developerworks/linux/library/l-datavistools/
 
+    http://code.google.com/p/flot/, http://solutoire.com/flotr/
+
+    http://flare.prefuse.org/ (also has a treemap)
+
     treemaps: http://www.cs.umd.edu/hcil/treemap-history/,
     http://treemap.sourceforge.net/ (MIT),
     http://code.google.com/p/flex2treemap/ (MIT), 
+
+    http://code.google.com/apis/visualization/
 
     flash: http://osflash.org/, http://osflash.org/open_source_flash_projects
 
@@ -2994,9 +3014,99 @@ Commit notes:
     some temporary drive space and some duplication during index
     builds, etc.  Maybe a 1.2 multiplier on top of that?
 
-  * Is aynchronous overflow causing contention across services or
-    causing the application to wait such that we wind up with only one
-    data service progressing at a time?
+  - Main issues:
+
+    - Read-historical tx for closure.  The code will have to be
+      modified to explicitly start and commit a read-only tx for the
+      desired timestamp for each mutation operation in ProgramTask.
+      The releaseTime will be automatically maintained by the tx
+      manager.
+
+    - zookeeper for locks/barriers;
+     
+    - service starter & cluster setup tools;
+
+    - purge of only release free resources and compact end state for
+      the federation;
+
+    - distributed dynamic generation of the LUBM data sets.
+
+    - Aynchronous overflow is causing contention across services.
+
+      A big culprit is MOVE, but there may be a variety of ways in
+      which throughput can be improved for the application during
+      asynchronous overflow.
+
+    - Bullet proof asynchronous overflow operations;
+
+      Observed failures range from leaving behind empty index segments,
+      to losing an index partition.
+
+      Timeouts on asynchronous overflow raise the likelyhood of
+      failure since operations may be cancelled via interrupt rather
+      than distributed services failures, OOM, etc.
+
+    - Fix the history problem so that I can get 24hours of minutes!
+
+    - Obtain new performance baselines:
+
+      - JDS U1000 w/o overflow and w/ scale-up indices.
+	
+	statementCount=133,614,330; termCount=32,905,352;
+        uriCount=21,735,249; literalCount=11,170,103; tps=29579;
+        #scanned=20020; loadTime=4,517,118ms.  No errors.  Query 
+	results in JDS_U1000_3DS_no_moves2/queryRun.txt.
+
+	Based on this, it appears that allowing overflow has resulted
+        in lost triples as well as lost terms, which should not be any
+        suprise.
+
+	* When starting rdfs2 during closure there is a HUGE period of
+          high IOWAIT where the JOIN appears to be single threaded.
+          This was WITHOUT OVERFLOW, so it was doing a huge amount of
+          random IO against the journal.
+
+	  1) Provide a means to fully buffer the view for a JOIN
+             dimension with a high expected cardinality.  E.g., signal
+             that the index segments nodes should be fully buffered
+             and set a flag for the cursor to read ahead to the end
+             key as long as it does not overrun the leafCache.
+
+	     Test this by re-computing the closure of U1000 using a
+	     cold data set (federation re-start).
+
+	     Note: When overflow is not enabled then we do not have
+	     index segments and the BTree is as well suited to
+	     optimized readers as the index segment.
+
+	  2) Make sure that we permit concurrent threads to consume
+             the binding sets so that we can use more cores in high IO
+             Wait situations.  Test the impact of this on U1000
+             closure using a cold data set (federation re-start).
+
+	     Note: This requires per-thread unsync buffers in the
+	     JoinTask and that has not been implemented yet.
+
+	  x) This can also be tested using cold-start query.  That is
+	     even easier for comparison since there is no side-effect
+	     on the data.
+
+      - JDS U1000 w/ 3 DS, no moves.
+
+        103,037,483 told triples at 9,680 tps w/o closure
+        (statementCount=99,553,587, no term count available).
+        Counters available in JDS_U1000_3DS_nomoves.  Closure ____.
+
+      - LTS U1000: 
+
+      - LDS U1000: (concurrent data loader, pipeline joins?)
+
+      - JDS U1000 w/ 5 DS (rather than 3). How that effects
+        performance?
+
+    - Move is definately the weakness of the system.  Look at making
+      this much faster.  E.g., take a compacting merge and then blast
+      it across to another data service on a raw socket.
 
     - Pointless having a MOVE during the initial round robin period.
       Should detect that and avoid moves until we have real scores.
@@ -3016,26 +3126,33 @@ Commit notes:
       will receive most to all writes, so it can be empty to start
       with.
 
-    - Close out views that are known to be stale when the releaseTime
-      is advanced (probably in purgeResources since that is when we
-      actually compute the effective release time, which can differ
-      from the specified release time because of the minReleaseAge).
-      This could explicitly locate and close any open indices for
-      timestamps which are no longer accessible.
+    - Partly done. Clear stale references on the hard reference queues
+      for the live index, historical index, index view, index segment,
+      and locator caches. (I still need to do this for locators, for
+      the open journals, etc.)
 
-      Alternatively we could just clear references on the hard
-      reference queues for the live index, historical index, index
-      view, index segment, and locator caches.      
+    - Done. Use a scheduled task to clear stale references for those
+      caches so that we can close out things which are not being
+      accessed.
 
-    - Use a scheduled task to clear stale references for those caches
-      so that we can close out things which are not being accessed.
+    - Clearing the references for the lastCommitTime of the old
+      journal could cause performance problems during asynchronous
+      overflow.  It might be best to decide on those indices that have
+      priority during synchronous overflow and pass hard references to
+      those indices to the asynchronous overflow task.
 
-    * Try limited parallelism during asynchronous overflow.
-
-      Make sure that atomic update tasks notice when the priamry task
+    - Make sure that atomic update tasks notice when the primary task
       is cancelled (liveness).
 
-    - What about a Direct buffer for the journal?
+    - Limited parallelism might be faster (single threaded is fastest
+      on my 2-core laptop for the compact utility) but could lead to
+      timeouts for the index views for the lastCommitTime on the old
+      journal and if those indices are dropped then performance will
+      suffer.
+
+    - Does IO Wait spike during overflow?
+
+      If so, what about a Direct buffer for the journal?
  
       Note: We will have to force overflow, terminating asynchronous
       verflow eagerly if necessary including any chained tasks such as
@@ -3048,11 +3165,11 @@ Commit notes:
       up, however copying data off of the live journal should be much
       faster since it is fully buffered.
 
-    - Occasional RejectedExecutionException during builds.  Perhaps
-      OOM?  This was on DS1.  Oh.  The write service defaults to a
-      fixed capacity queue, so that is what is happening. It also has
-      a cap on the thread pool size - play around with that when there
-      are a large #of splits on hand.
+    - Occasional RejectedExecutionException during index segment
+      builds.  The write service defaults to a fixed capacity queue,
+      so that is what is happening. It also has a cap on the thread
+      pool size - play around with that when there are a large #of
+      splits on hand.
 
     - Saw a java.rmi.NoSuchObjectInTable during closure on U1000.
       I've modified the code to log the original stack trace so that I
@@ -3060,9 +3177,6 @@ Commit notes:
       OOM since memory is tight.  Or it may be a failure to enable DGC
       for something (but I would think that I would notice that
       sooner).
-
-  * CDL may loose some data during load.  Compare CDL for U100 with
-    single threaded load of U100 (#clients=1).
 
   - *** Compacting merges tend to trigger
     FileChannelUtility#transferAll().  This is a known Sun bug, but we
@@ -3078,94 +3192,6 @@ Caused by: java.io.IOException: Map failed
 	at com.bigdata.btree.IndexSegmentBuilder.writeIndexSegment(IndexSegmentBuilder.java:1852)
 	at com.bigdata.btree.IndexSegmentBuilder.call(IndexSegmentBuilder.java:1135)
 
-  * (Partly resolved, but now I can't get it to release all releasable
-    resources.)
-
-    Look into a bug where an index can not be loaded because the
-    backing journal has been released.  This appears to be related to
-    the changes to the storeCache, indexCache, and indexSegmentCache.
-    The problem is not consistent, but it does seem to show up
-    consistently for longer runs, e.g., loading U50 for JDS.
-
-    I am seeing this on U10 w/ 50M journal extents and overflow
-    enabled.  It may be that the view was redefined before the index
-    segment was on hand since it appeared to be looking for an index
-    segment with a filename implying a later creation date.  Or
-    perhaps the wrong index segment was deleted during a purge?
-
-	    SPO 35472
-
-	    I was doing a compact on that index.
-
-	    The index segment file was built and added to the store
-	    manager.
-
-	    purge ran.
-
-	    The index segment file was deleted during purge.
-
-	    The task requested the unisolated view, which had cleared
-	    been updated to use the index segment, but the index
-	    segment had been deleted.
-
-	    The problem is that the releaseTime was set to
-	    [lastCommitTime-1] and the purge was run against the state
-	    before the commit, which is an error.  The logic choose
-	    the wrong commit point and therefore computed the wrong
-	    set of dependencies which left the newest view out in the
-	    cold.
-
-WARN : 305687 overflowService1 overflowService
-com.bigdata.resources.PostProcessOldJournalTask.call(PostProcessOldJournalTask.java:1653):
-done: overflowCounter=8, lastCommitTime=1228508366843, elapsed=24265ms
-
-WARN : 305687 overflowService1 overflowService
-com.bigdata.resources.StoreManager.getCommitTimeStrictlyGreaterThan(StoreManager.java:3250):
-commitPoint=1228508365953 for releaseTime=1228508365952
-
-lastCommitTime       =1228508366843
-commitPointToPreserve=1228508365953
-          releaseTime=1228508365952
-
-	  The problem is that I need to retain all resources whose
-	  createTime is GTE the releaseTime as well as those actually
-	  in use as of that releaseTime!
-
-	  Ah. The code tries to do exactly that.  There was a fence
-	  post (GT vs GTE), but that is not the problem.
-
-	  The index segment was in fact created from a timestamp
-	  *after* the release time - it was created from the
-	  lastCommitTime as of the synchronous overflow event.
-
-	  Maybe the problem is that we can't release any resources
-	  created from the lastCommitTime on the old journal?  Is this
-	  somehow more likely to happen during closure than during
-	  load?
-
-    > The problem is that the commitTimeToPreserve is GT than
-      lastCommitTime for the old journal (on overflow).  This means
-      that resources built from the old journal during asynchronous
-      overflow processing are not being protected from release.
-
-      However, if I use the lastOverflowTime instead, then purge is
-      not able to release resources that are no longer necessary.
-      E.g., after a load+closure operation when the read lock has been
-      released.
-
-      It seems like I need to do more work on identifying resources
-      that were generated from the lastCommitTime on the old journal
-      and allow them to be released when not required by either a read
-      lock (releaseTime) or by minReleaseAge.
-
-    - Following a load and several aborted passes at closure on U50 I
-      have a number of index segments for the statement indices that
-      are not being purged.  This may reflect a failure during restart
-      to examine the index segments and verify whether they belong to
-      any view that we wish to preserve.  Note that index segments are
-      created before they are incorporated into a view, so this could
-      be the result of several builds.
-
   - Choose the index partitions to compact based on the #of sources
     (and possibly the rangeCount) NOT just the order in which they are
     visited by the itr since that is an alpha order and has a
@@ -3176,10 +3202,10 @@ commitPointToPreserve=1228508365953
     query correctness.  U100 and U1500 should be run on a host in the
     cluster to provide a good basis for performance comparisons.
 
-  * It appears that new writes always for the RDF load always go into
-    the most recently created index partition, which then gets split.
-    I have seen this for at least the OSP and SPO index on U50.  The
-    POS index does not have this behavior.
+  * It appears that new writes for the RDF load always go into the
+    most recently created index partition, which then gets split.  I
+    have seen this for at least the OSP and SPO index on U50.  The POS
+    index does not have this behavior.
 
     It's pretty clear that this is an artifact of how term identifiers
     are assigned.  During data load we get new subjects and new
@@ -3229,11 +3255,6 @@ commitPointToPreserve=1228508365953
       does not set the maximum JVM memory too high, then we can use it
       as a proxy for both.  When we approach the maximum available RAM
       we need to back down on the read retention queues.
-
-    - The write retention queue is currently imposing a minimum #of
-      buffered nodes.  It should be disabled for a read-only index so
-      that we can better control the buffering for indices that are
-      not absorbing writes.
 
     - Try lowering the fullyBufferedReadThreshold to the
       chunkCapacity.  How is that for query (not much of an effect)?
