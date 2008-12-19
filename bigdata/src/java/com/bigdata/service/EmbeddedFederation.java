@@ -41,7 +41,7 @@ import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IResourceLockService;
-import com.bigdata.journal.ITimestampService;
+import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ResourceLockService;
 import com.bigdata.service.EmbeddedClient.Options;
 
@@ -77,9 +77,9 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
     private final File dataDir;
     
     /**
-     * The (in process) {@link TimestampService}.
+     * The (in process) {@link AbstractTransactionService}.
      */
-    private TimestampService timestampService;
+    private AbstractTransactionService abstractTransactionService;
     
     /** The (in process) {@link LockManager} */
     private ResourceLockService resourceLockManager;
@@ -121,13 +121,13 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
     }
 
     /**
-     * The (in process) {@link ITimestampService}.
+     * The (in process) {@link ITransactionService}.
      */
-    final public ITimestampService getTimestampService() {
+    final public ITransactionService getTransactionService() {
 
         // Note: return null if service not available/discovered.
         
-        return timestampService;
+        return abstractTransactionService;
         
     }
     
@@ -259,7 +259,7 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
         /*
          * Start the timestamp service.
          */
-        timestampService = new EmbeddedTimestampServiceImpl(UUID.randomUUID(),
+        abstractTransactionService = new EmbeddedTransactionServiceImpl(UUID.randomUUID(),
                 properties).start();
 
         /*
@@ -508,8 +508,8 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
              * Other service joins.
              */
 
-            loadBalancerService.join(timestampService.getServiceUUID(),
-                    timestampService.getServiceIface(), hostname);
+            loadBalancerService.join(abstractTransactionService.getServiceUUID(),
+                    abstractTransactionService.getServiceIface(), hostname);
 
             loadBalancerService.join(loadBalancerService.getServiceUUID(),
                     loadBalancerService.getServiceIface(), hostname);
@@ -704,13 +704,13 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
         
     }
 
-    protected class EmbeddedTimestampServiceImpl extends AbstractEmbeddedTimestampService {
+    protected class EmbeddedTransactionServiceImpl extends AbstractEmbeddedTransactionService {
 
         /**
          * @param serviceUUID
          * @param properties
          */
-        public EmbeddedTimestampServiceImpl(UUID serviceUUID, Properties properties) {
+        public EmbeddedTransactionServiceImpl(UUID serviceUUID, Properties properties) {
            
             super(serviceUUID, properties);
             
@@ -799,11 +799,11 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
             
         }
         
-        if (timestampService != null) {
+        if (abstractTransactionService != null) {
 
-            timestampService.shutdown();
+            abstractTransactionService.shutdown();
 
-            timestampService = null;
+            abstractTransactionService = null;
 
         }
 
@@ -848,11 +848,11 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
             
         }
         
-        if (timestampService != null) {
+        if (abstractTransactionService != null) {
 
-            timestampService.shutdownNow();
+            abstractTransactionService.shutdownNow();
 
-            timestampService = null;
+            abstractTransactionService = null;
 
         }
 
@@ -912,9 +912,9 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
         
         loadBalancerService = null;
         
-        timestampService.shutdownNow();
+        abstractTransactionService.shutdownNow();
         
-        timestampService = null;
+        abstractTransactionService = null;
         
     }
     

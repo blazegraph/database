@@ -28,9 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.io.IOException;
-import java.rmi.Remote;
+import java.util.UUID;
 
 import com.bigdata.isolation.IConflictResolver;
+import com.bigdata.resources.ResourceManager;
+import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 
 /**
@@ -106,7 +108,7 @@ import com.bigdata.service.IDataService;
  * The symbolic value {@link ITx#READ_COMMITTED} and any <code>startTime</code>
  * MAY be used to perform a lightweight read-only operations either on a local
  * data service or on the distributed database without coordination with the
- * {@link ITransactionManager}, but resources MAY be released at any time since
+ * {@link ITransactionService}, but resources MAY be released at any time since
  * no read "locks" have been declared. While a read-write transaction may be
  * readily identified by the sign associated with the transaction identifier,
  * you CAN NOT differentiate between a read-only transaction (with read-locks)
@@ -122,11 +124,8 @@ import com.bigdata.service.IDataService;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * FIXME extends {@link Remote} and declare {@link IOException} for all methods
- * on this interface.
  */
-public interface ITransactionManager extends ITimestampService {
+public interface ITransactionService extends ITimestampService {
 
     /**
      * Create a new transaction.
@@ -155,10 +154,12 @@ public interface ITransactionManager extends ITimestampService {
      *             if the requested timestamp is for a commit point that is no
      *             longer preserved by the database (the resources for that
      *             commit point have been released).
-     * 
-     * @todo specialize this exception?
+     * @throws IOException
+     *             RMI errors.
+     *             
+     * @todo specialize exception for a timestamp that is no longer preserved?
      */
-    public long newTx(long timestamp);
+    public long newTx(long timestamp) throws IOException;
     
     /**
      * Request commit of the transaction write set (synchronous).
@@ -166,20 +167,96 @@ public interface ITransactionManager extends ITimestampService {
      * @param tx
      *            The transaction identifier.
      * 
+     * @return The commit time assigned to the transaction iff the transaction
+     *         was successfully committed.
+     * 
+     * @throws ValidationError
+     *             if the transaction could not be validated.
      * @throws IllegalStateException
      *             if the tx is not a known active transaction.
+     * @throws IOException
+     *             RMI errors.
      */
-    public long commit(long tx) throws ValidationError;
+    public long commit(long tx) throws ValidationError, IOException;
 
     /**
      * Request abort of the transaction write set.
      * 
      * @param tx
      *            The transaction identifier.
-     *            
+     * 
      * @throws IllegalStateException
      *             if the tx is not a known active transaction.
+     * @throws IOException
+     *             RMI errors.
      */
-    public void abort(long tx);
+    public void abort(long tx) throws IOException;
     
+    /**
+     * Notify the {@link ITransactionService} that a commit has been performed
+     * with the given timestamp (which it assigned) and that it should update
+     * its lastCommitTime iff the given commitTime is GT its current
+     * lastCommitTime.
+     * <p>
+     * Note: This method is used by {@link IDataService}s when they perform a
+     * commit of non-transactional operations. The {@link ITransactionService}
+     * will automatically update the lastCommitTime as full transactions commit.
+     * 
+     * @param commitTime
+     *            The commit time.
+     * 
+     * @throws IOException
+     */
+    public void notifyCommit(long commitTime) throws IOException;
+
+    /**
+     * Return the last commit time reported to the {@link ITimestampService}.
+     * 
+     * @return The last known commit time.
+     * 
+     * @throws IOException
+     */
+    public long lastCommitTime() throws IOException;
+
+    /**
+     * Advance the release time, thereby releasing any read locks on views older
+     * than the specified timestamp. The caller is responsible for ensuring that
+     * the release time is advanced once there are no longer any readers for
+     * timestamps earlier than the new release time.
+     * <p>
+     * Normally this is invoked by the transaction manager. Whenever a read
+     * historical transaction completes it consults its internal state and
+     * decides if there are existing readers still reading from an earlier
+     * timestamp. If not, then it can choose to advance the release time. Data
+     * services MAY release data for views whose timestamp is less than or equal
+     * to the specified release time IFF that action would be in keeping with
+     * their local history retention policy (minReleaseAge) AND if the data is
+     * not required for the most current committed state (data for the most
+     * current committed state is not releasable regardless of the release time
+     * or the minReleaseAge).
+     * 
+     * @param releaseTime
+     *            The timestamp.
+     * 
+     * @throws IOException
+     * 
+     * @see ResourceManager#getMinReleaseAge()
+     */
+    public void setReleaseTime(long releaseTime) throws IOException;
+    
+    /**
+     * Invoked on the behalf of tasks executing a read-write transaction to
+     * notify the global transaction manager of their intention to write on a
+     * {@link DataService}. When it comes time to validate and prepare the
+     * transaction, only those {@link DataService}s on which it has written
+     * will partitipate in the 2-phase commit.
+     * 
+     * @param tx
+     *            The transaction identifier.
+     * @param dataServiceUUID
+     *            The {@link UUID} of a logical {@link DataService} on which the
+     *            transaction will write.
+     */
+    public void wroteOn(long tx, UUID dataService);
+
 }

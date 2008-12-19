@@ -54,8 +54,7 @@ import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.IResourceManager;
-import com.bigdata.journal.ITimestampService;
-import com.bigdata.journal.ITransactionManager;
+import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.RegisterIndexTask;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.ValidationError;
@@ -169,8 +168,7 @@ public class AbstractResourceManagerTestCase extends
 
         };
 
-        localTransactionManager = new MockLocalTransactionManager(
-                resourceManager);
+        localTransactionManager = new MockLocalTransactionManager();
         
         concurrencyManager = new ConcurrencyManager(properties,
                 localTransactionManager, resourceManager);
@@ -201,7 +199,7 @@ public class AbstractResourceManagerTestCase extends
      * existing requests have been processed.
      * <p>
      * Note: The {@link IConcurrencyManager} is shutdown first, then the
-     * {@link ITransactionManager} and finally the {@link IResourceManager}.
+     * {@link ITransactionService} and finally the {@link IResourceManager}.
      */
     public void shutdown() {
 
@@ -220,7 +218,7 @@ public class AbstractResourceManagerTestCase extends
      * possible.
      * <p>
      * Note: The {@link IConcurrencyManager} is shutdown first, then the
-     * {@link ITransactionManager} and finally the {@link IResourceManager}.
+     * {@link ITransactionService} and finally the {@link IResourceManager}.
      */
     public void shutdownNow() {
 
@@ -493,7 +491,7 @@ public class AbstractResourceManagerTestCase extends
             
         }
 
-        public ITimestampService getTimestampService() {
+        public ITransactionService getTransactionService() {
 
             return null;
         }

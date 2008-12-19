@@ -281,7 +281,7 @@ abstract public class AbstractTx implements ITx {
 
     }
 
-    final public void prepare(long commitTime) {
+    final public void prepare(final long commitTime) {
 
         lock.lock();
 
@@ -307,7 +307,7 @@ abstract public class AbstractTx implements ITx {
                  * not write any data.
                  */
 
-                assert commitTime == 0L;
+                assert commitTime == 0L : "commitTime="+commitTime+", tx="+this;
 
             } else {
 

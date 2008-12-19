@@ -56,11 +56,12 @@ import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.StaleLocatorReason;
 import com.bigdata.service.AbstractEmbeddedResourceLockManager;
 import com.bigdata.service.AbstractFederation;
+import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.JournalTransactionService;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
-import com.bigdata.util.MillisecondTimestampFactory;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ShutdownHelper;
 
@@ -75,7 +76,7 @@ import com.bigdata.util.concurrent.ShutdownHelper;
  * @see ResourceManager, which supports views.
  */
 public class Journal extends AbstractJournal implements IConcurrencyManager,
-        ILocalTransactionManager, IResourceManager {
+        /*ILocalTransactionManager,*/ IResourceManager {
 
     /**
      * Object used to manage local transactions. 
@@ -168,40 +169,32 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         }.start();
 
-        localTransactionManager = new AbstractLocalTransactionManager(this/* resourceManager */) {
+        final AbstractTransactionService abstractTransactionService = new JournalTransactionService(
+                properties, this) {
 
-            public long nextTimestamp() {
+            @Override
+            public AbstractFederation getFederation() {
 
-                return MillisecondTimestampFactory.nextMillis();
-
-            }
-            
-            /**
-             * Ignored - we always have the lastCommitTime on the root block so
-             * we don't need to look at this event.
-             */
-            public void notifyCommit(long commitTime) {
-                
-            }
-            
-            /**
-             * Reports the last commit time on the root block.
-             */
-            public long lastCommitTime() {
-                
-                return Journal.this.getLastCommitTime();
+                throw new UnsupportedOperationException();
                 
             }
 
-            public void setReleaseTime(final long releaseTime) {
+        };
+        
+        localTransactionManager = new AbstractLocalTransactionManager() {
+
+            public AbstractTransactionService getTransactionService() {
                 
-                Journal.this.setReleaseTime(releaseTime);
+                return abstractTransactionService;
                 
             }
             
         };
+
+        // notify the transaction manager of the last commit point on restart.
+        localTransactionManager.notifyCommit(getRootBlockView().getLastCommitTime());
         
-        concurrencyManager = new ConcurrencyManager(properties, this, this);
+        concurrencyManager = new ConcurrencyManager(properties, localTransactionManager, this);
 
         localTransactionManager.setConcurrencyManager(concurrencyManager);
 
@@ -246,7 +239,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      */
     public File getDataDir() {
         
-        File file = getFile();
+        final File file = getFile();
         
         if (file == null) {
 
@@ -262,7 +255,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * Note: This will only succeed if the <i>uuid</i> identifies <i>this</i>
      * journal.
      */
-    public IRawStore openStore(UUID uuid) {
+    public IRawStore openStore(final UUID uuid) {
     
         if(uuid == getRootBlockView().getUUID()) {
             
@@ -449,18 +442,6 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
     }
 
-    public void activateTx(ITx tx) throws IllegalStateException {
-        
-        localTransactionManager.activateTx(tx);
-        
-    }
-
-    public void completedTx(ITx tx) throws IllegalStateException {
-        
-        localTransactionManager.completedTx(tx);
-        
-    }
-
     /**
      * Note: {@link ITx#READ_COMMITTED} views are given read-committed semantics
      * using a {@link ReadCommittedView}.  This means that they can be cached
@@ -629,62 +610,124 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
     }
 
-    public ITx getTx(long startTime) {
-        return localTransactionManager.getTx(startTime);
-    }
+    /**
+     * @see ITransactionService#newTx(long)
+     */
+    public long newTx(final long timestamp) {
+        
+        try {
 
-    public long nextTimestamp() throws IOException {
-        return localTransactionManager.nextTimestamp();
-    }
+            final long tx = localTransactionManager.getTransactionService()
+                    .newTx(timestamp);
 
-    public long nextTimestampRobust() {
-        return localTransactionManager.nextTimestampRobust();
-    }
+            /*
+             * Note: create local state for this transaction (starting tx on the
+             * journal).
+             */
 
-    public void notifyCommit(long commitTime) throws IOException {
-        localTransactionManager.notifyCommit(commitTime);
-    }
+            new Tx(localTransactionManager, this, tx);
 
-    public void notifyCommitRobust(long commitTime) {
-        localTransactionManager.notifyCommitRobust(commitTime);
+            return tx;
+            
+        } catch (IOException e) {
+
+            throw new RuntimeException(e);
+
+        }
+
     }
 
     /**
-     * Returns the last commit time on the root block.
+     * @see ITransactionService#abort(long)
      */
-    public long lastCommitTime() {
+    public void abort(final long tx) {
 
-        return getLastCommitTime();
-        
-    }
-    
-    public void preparedTx(ITx tx) throws IllegalStateException {
-        localTransactionManager.preparedTx(tx);
-    }
+        try {
 
-    public long newTx(final long commitTime) {
-        
-        return localTransactionManager.newTx(commitTime);
-        
-    }
-    
-    public void abort(long startTime) {
-        
-        localTransactionManager.abort(startTime);
-        
-    }
+            /*
+             * Note: TransactionService will make call back to the
+             * localTransactionManager to handle the client side of the
+             * protocol.
+             */
+            
+            localTransactionManager.getTransactionService().abort(tx);
 
-    public long commit(long startTime) throws ValidationError {
+        } catch (IOException e) {
+            
+            throw new RuntimeException(e);
+            
+        }
 
-        return localTransactionManager.commit(startTime);
-
-    }
-
-//    public void wroteOn(long startTime, UUID dataServiceUUID) {
+//        final ITx t = localTransactionManager.getTx(tx);
 //
-//        localTransactionManager.wroteOn(startTime, dataServiceUUID);
+//        if (t == null) {
+//
+//            throw new IllegalStateException();
+//            
+//        }
+//
+//        t.abort();
+
+    }
+
+    /**
+     * @see ITransactionService#commit(long)
+     */
+    public long commit(final long tx) throws ValidationError {
+
+        try {
+
+            /*
+             * Note: TransactionService will make call back to the
+             * localTransactionManager to handle the client side of the
+             * protocol.
+             */
+
+            return localTransactionManager.getTransactionService().commit(tx);
+
+        } catch (IOException e) {
+            
+            throw new RuntimeException(e);
+            
+        }
+
+//        final ITx t = localTransactionManager.getTx(tx);
+//
+//        if (t == null) {
+//
+//            throw new IllegalStateException();
+//
+//        }
+//
+//        // Note: throws ValidationError
+//        t.prepare(localTransactionManager.nextTimestamp());
 //        
-//    }
+//        return t.commit();
+        
+    }
+
+    /**
+     * @deprecated This method in particular should be hidden from the
+     *             {@link Journal} as it exposes the {@link ITx} which really
+     *             deals with the client-side state of a transaction and which
+     *             should not be visible to applications - they should just use
+     *             the [long] transaction identifier.
+     */
+    public ITx getTx(long startTime) {
+    
+        return localTransactionManager.getTx(startTime);
+        
+    }
+
+    /**
+     * @deprecated This is here for historical reasons and is only used by the
+     *             test suite.
+     */
+    public long nextTimestamp() {
+    
+        return localTransactionManager.nextTimestamp();
+    
+    }
 
     /*
      * IConcurrencyManager
@@ -700,7 +743,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     
     /**
      * Note: The {@link #executorService} is shutdown first, then the
-     * {@link IConcurrencyManager}, the {@link ITransactionManager} and finally
+     * {@link IConcurrencyManager}, the {@link ITransactionService} and finally
      * the {@link IResourceManager}.
      */
     synchronized public void shutdown() {
@@ -756,7 +799,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     /**
      * Note: The {@link IConcurrencyManager} is shutdown first, then the
-     * {@link ITransactionManager} and finally the {@link IResourceManager}.
+     * {@link ITransactionService} and finally the {@link IResourceManager}.
      */
     synchronized public void shutdownNow() {
 
@@ -847,22 +890,22 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
     }
 
-    /**
-     * This request is always ignored for a {@link Journal} since it does not
-     * have any resources to manage.
-     */
-    public void setReleaseTime(final long releaseTime) {
-
-        if (releaseTime < 0L) {
-
-            // Not a timestamp.
-            throw new IllegalArgumentException();
-            
-        }
-
-        // ignored.
-        
-    }
+//    /**
+//     * This request is always ignored for a {@link Journal} since it does not
+//     * have any resources to manage.
+//     */
+//    public void setReleaseTime(final long releaseTime) {
+//
+//        if (releaseTime < 0L) {
+//
+//            // Not a timestamp.
+//            throw new IllegalArgumentException();
+//            
+//        }
+//
+//        // ignored.
+//        
+//    }
 
     /**
      * @throws UnsupportedOperationException

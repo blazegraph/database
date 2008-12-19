@@ -49,7 +49,7 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ResultSet;
 import com.bigdata.journal.IIndexStore;
-import com.bigdata.journal.ITransactionManager;
+import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
@@ -177,8 +177,7 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
      *       What we would need to know is the historical commit time
      *       corresponding to an assigned transaction startTime. This is not
      *       one-to-one since the start times for transactions must be unique
-     *       (among those in play). See
-     *       {@link ITransactionManager#newTx(com.bigdata.journal.IsolationEnum)}
+     *       (among those in play). See {@link ITransactionService#newTx(long)}
      *       for more on this.
      * 
      * @todo cache leased information about index partitions of interest to the

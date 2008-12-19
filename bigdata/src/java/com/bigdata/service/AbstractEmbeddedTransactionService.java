@@ -37,17 +37,19 @@ import java.util.UUID;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractEmbeddedTimestampService extends TimestampService {
- 
+abstract public class AbstractEmbeddedTransactionService extends
+        DistributedTransactionService {
+
     /**
      * @param properties
      */
-    public AbstractEmbeddedTimestampService(UUID serviceUUID, Properties properties) {
+    public AbstractEmbeddedTransactionService(UUID serviceUUID,
+            Properties properties) {
 
         super(properties);
-        
+
         setServiceUUID(serviceUUID);
-        
+
     }
 
 }

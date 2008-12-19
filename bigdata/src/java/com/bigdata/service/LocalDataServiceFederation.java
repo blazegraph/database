@@ -35,7 +35,7 @@ import java.util.UUID;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.journal.IResourceLockService;
-import com.bigdata.journal.ITimestampService;
+import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.ResourceLockService;
 import com.bigdata.mdi.IMetadataIndex;
@@ -45,7 +45,7 @@ import com.bigdata.util.InnerCause;
 /**
  * Integration provides a view of a local {@link DataService} as if it were a
  * federation. The {@link LocalDataServiceFederation} runs its own embedded
- * {@link TimestampService} and {@link LoadBalancerService} to support its
+ * {@link AbstractTransactionService} and {@link LoadBalancerService} to support its
  * embedded {@link DataService}. Since there is no {@link MetadataService},
  * overflow processing is disabled.
  * 
@@ -56,7 +56,7 @@ import com.bigdata.util.InnerCause;
  */
 public class LocalDataServiceFederation extends AbstractFederation {
 
-    private TimestampService timestampService;
+    private AbstractTransactionService abstractTransactionService;
     private ResourceLockService resourceLockManager;
     private LoadBalancerService loadBalancerService;
     private LocalDataServiceImpl dataService;
@@ -74,7 +74,7 @@ public class LocalDataServiceFederation extends AbstractFederation {
         indexCache = new DataServiceIndexCache(this, client
                 .getIndexCacheCapacity(), client.getIndexCacheTimeout());
         
-        timestampService = new AbstractEmbeddedTimestampService(UUID.randomUUID(),
+        abstractTransactionService = new AbstractEmbeddedTransactionService(UUID.randomUUID(),
                 properties) {
             
             public LocalDataServiceFederation getFederation() {
@@ -347,11 +347,11 @@ public class LocalDataServiceFederation extends AbstractFederation {
         
     }
     
-    public ITimestampService getTimestampService() {
+    public ITransactionService getTransactionService() {
 
         assertOpen();
 
-        return timestampService;
+        return abstractTransactionService;
         
     }
 
@@ -436,11 +436,11 @@ public class LocalDataServiceFederation extends AbstractFederation {
 
         }
 
-        if (timestampService != null) {
+        if (abstractTransactionService != null) {
 
-            timestampService.shutdown();
+            abstractTransactionService.shutdown();
 
-            timestampService = null;
+            abstractTransactionService = null;
 
         }
 
@@ -479,11 +479,11 @@ public class LocalDataServiceFederation extends AbstractFederation {
 
         }
 
-        if (timestampService != null) {
+        if (abstractTransactionService != null) {
 
-            timestampService.shutdownNow();
+            abstractTransactionService.shutdownNow();
 
-            timestampService = null;
+            abstractTransactionService = null;
 
         }
 
@@ -526,11 +526,11 @@ public class LocalDataServiceFederation extends AbstractFederation {
 
         }
 
-        if(timestampService!=null) {
+        if(abstractTransactionService!=null) {
 
-            timestampService.shutdownNow();
+            abstractTransactionService.shutdownNow();
         
-            timestampService = null;
+            abstractTransactionService = null;
             
         }
      

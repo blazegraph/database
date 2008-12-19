@@ -46,6 +46,12 @@ public interface IIndexManager extends IIndexStore {
      * @param indexMetadata
      *            The metadata describing the index.
      * 
+     * @throws IllegalArgumentException
+     *             if the argument is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if the name argument was not specified when the
+     *             {@link IndexMetadata} was created.
+     * 
      * @exception IndexExistsException
      *                if there is an index already registered under the name
      *                returned by {@link IndexMetadata#getName()}. Use

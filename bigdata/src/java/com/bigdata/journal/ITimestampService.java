@@ -30,8 +30,6 @@ package com.bigdata.journal;
 import java.io.IOException;
 import java.rmi.Remote;
 
-import com.bigdata.resources.ResourceManager;
-
 /**
  * A service for unique timestamps.
  * 
@@ -52,62 +50,8 @@ public interface ITimestampService extends Remote {
      * @throws IOException
      *             if there is an RMI problem.
      * 
-     * @throws NullPointerException
-     *             if the {@link ITimestampService} has not been discovered yet.
-     * 
      * @see TimestampServiceUtil#nextTimestamp(ITimestampService)
-     * 
-     * @todo the NPE here should be removed from the javadoc. it wound up here
-     *       because of the screwy delegation patterns.
      */
     public long nextTimestamp() throws IOException;
 
-    /**
-     * Notify the global transaction manager that a commit has been performed
-     * with the given timestamp (which it assigned) and that it should update
-     * its lastCommitTime iff the given commitTime is GT its current
-     * lastCommitTime.
-     * 
-     * @param commitTime
-     *            The commit time.
-     * 
-     * @throws IOException
-     */
-    public void notifyCommit(long commitTime) throws IOException;
-
-    /**
-     * Return the last commit time reported to the {@link ITimestampService}.
-     * 
-     * @return The last known commit time.
-     * 
-     * @throws IOException
-     */
-    public long lastCommitTime() throws IOException;
-
-    /**
-     * Advance the release time, thereby releasing any read locks on views older
-     * than the specified timestamp. The caller is responsible for ensuring that
-     * the release time is advanced once there are no longer any readers for
-     * timestamps earlier than the new release time.
-     * <p>
-     * Normally this is invoked by the transaction manager. Whenever a read
-     * historical transaction completes it consults its internal state and
-     * decides if there are existing readers still reading from an earlier
-     * timestamp. If not, then it can choose to advance the release time. Data
-     * services MAY release data for views whose timestamp is less than or equal
-     * to the specified release time IFF that action would be in keeping with
-     * their local history retention policy (minReleaseAge) AND if the data is
-     * not required for the most current committed state (data for the most
-     * current committed state is not releasable regardless of the release time
-     * or the minReleaseAge).
-     * 
-     * @param releaseTime
-     *            The timestamp.
-     * 
-     * @throws IOException
-     * 
-     * @see ResourceManager#getMinReleaseAge()
-     */
-    public void setReleaseTime(long releaseTime) throws IOException;
-    
 }

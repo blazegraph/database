@@ -41,7 +41,7 @@ import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.LoadBalancerServer;
 import com.bigdata.service.jini.MetadataServer;
 import com.bigdata.service.jini.ResourceLockServer;
-import com.bigdata.service.jini.TimestampServer;
+import com.bigdata.service.jini.TransactionServer;
 
 /**
  * Proxy test suite for {@link ScaleOutTripleStore} running against an
@@ -164,7 +164,7 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
     /**
      * Starts in {@link #setUpFederation()}.
      */
-    protected TimestampServer timestampServer0;
+    protected TransactionServer timestampServer0;
     /**
      * Starts in {@link #setUpFederation()}.
      */
@@ -238,7 +238,7 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
         /*
          * Start up a timestamp server.
          */
-        timestampServer0 = new TimestampServer(new String[] {
+        timestampServer0 = new TransactionServer(new String[] {
                 "src/resources/config/standalone/TimestampServer0.config"
 //                , AbstractServer.ADVERT_LABEL+groups 
                 });

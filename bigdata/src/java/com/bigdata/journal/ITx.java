@@ -30,10 +30,8 @@ import com.bigdata.isolation.IsolatedFusedView;
 
 /**
  * <p>
- * Interface for transactional reading and writing of persistent data.
+ * Interface for transaction state on the client.
  * </p>
- * 
- * @see ITransactionManager
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -81,12 +79,6 @@ public interface ITx {
      * for read-committed (and unisolated) operations. For this reason, it is
      * often better to specify "read-consistent" semantics by giving the
      * lastCommitTime for the {@link IIndexStore}.
-     * 
-     * @todo define another constant for "read consistent" semantics. it would
-     *       read from the last globally committed state consistently for each
-     *       operation. so, for example, an iterator scanning across multiple
-     *       index partitions will be read-consistent but another operation on
-     *       the same index could read from a different commit point.
      */
     public static final long READ_COMMITTED = -1L;
     
@@ -99,6 +91,8 @@ public interface ITx {
      * typically will only start on some journals rather than all.
      * 
      * @return The transaction start time.
+     * 
+     * @todo rename since the sign indicates read-only vs read-write?
      */
     public long getStartTimestamp();
 
@@ -140,16 +134,12 @@ public interface ITx {
      * Commit a transaction that has already been {@link #prepare(long)}d.
      * 
      * @return The commit time assigned to the transactions -or- 0L if the
-     *         transaction was read-only.
+     *         transaction was read-only or if it has an empty write set.
      * 
      * @exception IllegalStateException
      *                If the transaction has not {@link #prepare(long) prepared}.
      *                If the transaction is not already complete, then it is
      *                aborted.
-     * 
-     * @return The commit timestamp assigned by a centralized transaction
-     *         manager service or <code>0L</code> if the transaction was
-     *         read-only.
      */
     public long commit();
 
@@ -161,11 +151,6 @@ public interface ITx {
      */
     public void abort();
 
-//    /**
-//     * The type-safe isolation level for this transaction.
-//     */
-//    public IsolationEnum getIsolationLevel();
-    
     /**
      * When true, the transaction will reject writes.
      */

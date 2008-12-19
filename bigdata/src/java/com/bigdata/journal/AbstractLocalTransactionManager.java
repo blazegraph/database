@@ -12,26 +12,12 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.TransactionService;
 import com.bigdata.util.InnerCause;
 
 /**
- * Abstract base class for local transaction either when running a standalone
- * database.
- * 
- * @todo Most of the logic in this class can be reused to manage the local state
- *       for transactions executing on a specific {@link IDataService} when
- *       running a distributed database. However, you MUST override
- *       {@link #newTx(IsolationEnum)} so that it accept the given timestamp
- *       (presumably from a centralized transaction manager) rather than
- *       generating its own timestamps.
- *       <p>
- *       The distributed transaction manager itself requires somewhat more
- *       sophisticated logic.
- * 
- * @todo assert and coordinate read locks for transactions with the resource
- *       manager and release read locks once the transaction is no longer
- *       active.
+ * Manages the client side of a transaction either for a standalone
+ * {@link Journal} or for an {@link IDataService} in an
+ * {@link IBigdataFederation}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -53,11 +39,6 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility
      * True iff the {@link #log} level is DEBUG or less.
      */
     final static protected boolean DEBUG = log.isDebugEnabled();
-
-    /**
-     * Object used to manage local resources.
-     */
-    private final IResourceManager resourceManager;
 
     private IConcurrencyManager concurrencyManager;
     
@@ -93,22 +74,15 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility
         this.concurrencyManager = concurrencyManager;
         
     }
-    
+
     /**
      * Note: You MUST use {@link #setConcurrencyManager(IConcurrencyManager)}
      * after calling this constructor (the parameter can not be passed in since
      * there is a circular dependency between the {@link IConcurrencyManager}
      * and {@link #commit(long)} on this class, which requires access to the
      * {@link IConcurrencyManager} to submit a task).
-     * 
-     * @param resourceManager
      */
-    public AbstractLocalTransactionManager(IResourceManager resourceManager) {
-
-        if (resourceManager == null)
-            throw new IllegalArgumentException();
-
-        this.resourceManager = resourceManager;
+    public AbstractLocalTransactionManager() {
 
     }
 
@@ -266,54 +240,50 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility
     /*
      * ITxCommitProtocol.
      */
-    
-    /*
-     * ITxCommitProtocol
-     */
 
-    /**
-     * FIXME modify to accept the desired start time for read-only transactions
-     * and to assign an actual start time for read-only transactions that is GTE
-     * to the most recent commit time that is NOT already in use by any active
-     * transaction and that is strictly LT the current time (probed without
-     * assignment). If necessary, this will cause the caller to block until a
-     * suitable timestamp is available.
-     * 
-     * This should be done by delegation to the core impl that is also used for
-     * the {@link IBigdataFederation} - the {@link TransactionService}.
-     */
-    public long newTx(final long timestamp) {
-
-        throw new UnsupportedOperationException();
-        
-//        final ILocalTransactionManager transactionManager = this;
+//    /**
+//     * FIXME modify to accept the desired start time for read-only transactions
+//     * and to assign an actual start time for read-only transactions that is GTE
+//     * to the most recent commit time that is NOT already in use by any active
+//     * transaction and that is strictly LT the current time (probed without
+//     * assignment). If necessary, this will cause the caller to block until a
+//     * suitable timestamp is available.
+//     * 
+//     * This should be done by delegation to the core impl that is also used for
+//     * the {@link IBigdataFederation} - the {@link TransactionService}.
+//     */
+//    public long newTx(final long timestamp) {
 //
-//        final long startTime = nextTimestampRobust();
+//        throw new UnsupportedOperationException();
 //        
-//        switch (level) {
-//        
-//        case ReadOnly: {
+////        final ILocalTransactionManager transactionManager = this;
+////
+////        final long startTime = nextTimestampRobust();
+////        
+////        switch (level) {
+////        
+////        case ReadOnly: {
+////
+////            new Tx(transactionManager, resourceManager, startTime, true);
+////
+////            return startTime;
+////        }
+////
+////        case ReadWrite: {
+////            
+////            new Tx(transactionManager, resourceManager, startTime, false);
+////            
+////            return startTime;
+////
+////        }
+////
+////        default:
+////
+////            throw new AssertionError("Unknown isolation level: " + level);
+////        
+////        }
 //
-//            new Tx(transactionManager, resourceManager, startTime, true);
-//
-//            return startTime;
-//        }
-//
-//        case ReadWrite: {
-//            
-//            new Tx(transactionManager, resourceManager, startTime, false);
-//            
-//            return startTime;
-//
-//        }
-//
-//        default:
-//
-//            throw new AssertionError("Unknown isolation level: " + level);
-//        
-//        }
-
-    }
+//    }
     
     /**
      * Abort a transaction (synchronous, low latency for read-only transactions
@@ -491,7 +461,7 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility
              * The commit time is assigned when we prepare the transaction.
              */
 
-            final long commitTime = nextTimestampRobust();
+            final long commitTime = nextTimestamp();
 
             /*
              * @todo should I acquire AbstractTx.lock around the prepare/commit?
@@ -549,7 +519,12 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility
      */
     final int maxtries = 100; 
     
-    public long nextTimestampRobust() {
+    /**
+     * Note: The reason for all this retry logic is to work around race
+     * conditions during service startup (and possibly during service failover)
+     * when the {@link ITimestampService} has not been discovered yet.
+     */
+    public long nextTimestamp() {
 
         final long begin = System.currentTimeMillis();
         
@@ -561,23 +536,29 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility
 
             try {
 
-                return nextTimestamp();
-                
-            } catch (NullPointerException e) {
-                
-                log.warn("Timestamp service not discovered? : " + e /*, e*/);
+                final ITransactionService transactionService = getTransactionService();
 
-                try {
+                if (transactionService == null) {
 
-                    Thread.sleep(delay/* ms */);
+                    log.warn("Service not discovered yet?");
 
-                } catch (InterruptedException e2) {
+                    try {
 
-                    throw new RuntimeException(
-                            "Interrupted awaiting timestamp service discovery: "
-                                    + e2);
+                        Thread.sleep(delay/* ms */);
+
+                        continue;
+                        
+                    } catch (InterruptedException e2) {
+
+                        throw new RuntimeException(
+                                "Interrupted awaiting timestamp service discovery: "
+                                        + e2);
+
+                    }
 
                 }
+
+                return transactionService.nextTimestamp();
                 
             } catch (IOException e) {
 
@@ -601,7 +582,7 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility
         
     }
 
-    public void notifyCommitRobust(final long commitTime) {
+    public void notifyCommit(final long commitTime) {
         
         final long begin = System.currentTimeMillis();
         
@@ -613,26 +594,32 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility
 
             try {
 
-                notifyCommit(commitTime);
-                
-                return;
-                
-            } catch (NullPointerException e) {
-                
-                log.warn("Timestamp service not discovered? : " + e /*, e*/);
+                final ITransactionService transactionService = getTransactionService();
 
-                try {
+                if (transactionService == null) {
 
-                    Thread.sleep(delay/* ms */);
+                    log.warn("Service not discovered?");
 
-                } catch (InterruptedException e2) {
+                    try {
 
-                    throw new RuntimeException(
-                            "Interrupted awaiting timestamp service discovery: "
-                                    + e2);
+                        Thread.sleep(delay/* ms */);
+
+                    } catch (InterruptedException e2) {
+
+                        throw new RuntimeException(
+                                "Interrupted awaiting timestamp service discovery: "
+                                        + e2);
+
+                    }
+
+                    continue;
 
                 }
-                
+
+                transactionService.notifyCommit(commitTime);
+
+                return;
+
             } catch (IOException e) {
 
                 log.warn("Problem with timestamp service? : ntries=" + ntries

@@ -145,8 +145,7 @@ public class Tx extends AbstractTx implements ITx {
     public Tx(//
             final ILocalTransactionManager transactionManager,//
             final IResourceManager resourceManager, //
-            final long startTime,//
-            final boolean readOnly//@todo remove this flag.
+            final long startTime//
             ) {
 
         super(transactionManager, resourceManager, startTime);
@@ -199,10 +198,22 @@ public class Tx extends AbstractTx implements ITx {
      *       concurrency expected for transactions. Also, note that the write
      *       set of the tx is not restart safe, we never force writes to disk,
      *       etc. Those are good fits for the {@link BufferMode#Temporary}
-     *       {@link BufferMode}.  However, it might be nice to do without having
+     *       {@link BufferMode}. However, it might be nice to do without having
      *       a {@link WriteExecutorService} per transaction, e.g., by placing
-     *       the named indices for a transaction within a namespace for that
-     *       tx. 
+     *       the named indices for a transaction within a namespace for that tx.
+     * 
+     * @todo Rather than creating a distinct {@link TemporaryStore} for each tx
+     *       and then closing and deleting the store when the tx completes, just
+     *       use the temporary store factory. Once there are no more tx's using
+     *       a given temporary store it will automatically be finalized and
+     *       deleted. However, it is important that we namespace the indices so
+     *       that different transactions do not see one another's data.
+     *       <p>
+     *       We can do this just as easily with {@link BufferMode#Temporary},
+     *       but {@link IIndexStore#getTempStore()} would have to be modified.
+     *       However, that would give us more concurrency control in the tmp
+     *       stores and we might need that for concurrent access to named
+     *       indices (see above).
      */
     private IRawStore getTemporaryStore() {
 
@@ -521,7 +532,7 @@ public class Tx extends AbstractTx implements ITx {
                 System.arraycopy(sources, 0, b, 1, sources.length);
 
                 // create view with isolated write set.
-                index = new IsolatedFusedView(startTime, b);
+                index = new IsolatedFusedView(-startTime, b);
 
                 // report event.
                 ResourceManager.isolateIndex(startTime, name);
