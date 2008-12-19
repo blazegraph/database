@@ -59,7 +59,6 @@ import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.JournalTransactionService;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -196,7 +195,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
         concurrencyManager = new ConcurrencyManager(properties, localTransactionManager, this);
 
-        localTransactionManager.setConcurrencyManager(concurrencyManager);
+//        localTransactionManager.setConcurrencyManager(concurrencyManager);
 
     }
 
@@ -603,41 +602,65 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * Always returns the {@link BTree} as the sole element of the array since
      * partitioned indices are not supported.
      */
-    public AbstractBTree[] getIndexSources(String name, long timestamp,
-            BTree btree) {
+    public AbstractBTree[] getIndexSources(final String name,
+            final long timestamp, final BTree btree) {
         
         return new AbstractBTree[] { btree };
         
     }
 
     /**
+     * Create a new transaction on the {@link Journal}.
+     * 
+     * @param timestamp
+     *            A positive timestamp for a historical read-only transaction as
+     *            of the first commit point LTE the given timestamp,
+     *            {@link ITx#READ_COMMITTED} for a historical read-only
+     *            transaction as of the most current commit point on the
+     *            {@link Journal} as of the moment that the transaction is
+     *            created, or {@link ITx#UNISOLATED} for a read-write
+     *            transaction.
+     * 
+     * @return The transaction identifier.
+     * 
      * @see ITransactionService#newTx(long)
      */
     public long newTx(final long timestamp) {
         
+        final long tx;
         try {
 
-            final long tx = localTransactionManager.getTransactionService()
+            tx = localTransactionManager.getTransactionService()
                     .newTx(timestamp);
 
-            /*
-             * Note: create local state for this transaction (starting tx on the
-             * journal).
-             */
-
-            new Tx(localTransactionManager, this, tx);
-
-            return tx;
-            
         } catch (IOException e) {
+
+            /*
+             * Note: IOException is declared for RMI but will not be thrown
+             * since the transaction service is in fact local.
+             */
 
             throw new RuntimeException(e);
 
         }
 
+        /*
+         * Note: This creates the local state for this transaction (starts the
+         * tx on the journal).
+         */
+
+        new Tx(localTransactionManager, this, tx);
+
+        return tx;
+        
     }
 
     /**
+     * Abort a transaction.
+     * 
+     * @param tx
+     *            The transaction identifier.
+     *            
      * @see ITransactionService#abort(long)
      */
     public void abort(final long tx) {
@@ -654,23 +677,25 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         } catch (IOException e) {
             
+            /*
+             * Note: IOException is declared for RMI but will not be thrown
+             * since the transaction service is in fact local.
+             */
+            
             throw new RuntimeException(e);
             
         }
 
-//        final ITx t = localTransactionManager.getTx(tx);
-//
-//        if (t == null) {
-//
-//            throw new IllegalStateException();
-//            
-//        }
-//
-//        t.abort();
-
     }
 
     /**
+     * Commit a transaction.
+     * 
+     * @param tx
+     *            The transaction identifier.
+     * 
+     * @return The commit time assigned to that transaction.
+     * 
      * @see ITransactionService#commit(long)
      */
     public long commit(final long tx) throws ValidationError {
@@ -686,24 +711,16 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             return localTransactionManager.getTransactionService().commit(tx);
 
         } catch (IOException e) {
-            
+
+            /*
+             * Note: IOException is declared for RMI but will not be thrown
+             * since the transaction service is in fact local.
+             */
+
             throw new RuntimeException(e);
-            
+
         }
 
-//        final ITx t = localTransactionManager.getTx(tx);
-//
-//        if (t == null) {
-//
-//            throw new IllegalStateException();
-//
-//        }
-//
-//        // Note: throws ValidationError
-//        t.prepare(localTransactionManager.nextTimestamp());
-//        
-//        return t.commit();
-        
     }
 
     /**
@@ -745,6 +762,13 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * Note: The {@link #executorService} is shutdown first, then the
      * {@link IConcurrencyManager}, the {@link ITransactionService} and finally
      * the {@link IResourceManager}.
+     * 
+     * FIXME The {@link Journal} MUST maintain a counter of the #of open
+     * read-only transactions. On {@link #shutdown()} it must not allow new
+     * transactions to be opened (shutting down the
+     * {@link ILocalTransactionManager} will do this) and then await the
+     * read-only transaction counter to reach ZERO. At that point it can
+     * shutdown the {@link JournalTransactionService} as well.
      */
     synchronized public void shutdown() {
         

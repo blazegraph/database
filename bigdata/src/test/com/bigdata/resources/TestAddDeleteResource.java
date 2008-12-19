@@ -138,7 +138,7 @@ public class TestAddDeleteResource extends AbstractResourceManagerTestCase {
             
             outFile = resourceManager.getIndexSegmentFile(btree.getIndexMetadata());
             
-            final long createTime = resourceManager.nextTimestampRobust();
+            final long createTime = resourceManager.nextTimestamp();
 
             // build an index segment from that btree.
             buildResult = resourceManager.buildIndexSegment(INDEX_NAME, btree,

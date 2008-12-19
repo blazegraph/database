@@ -29,7 +29,10 @@ package com.bigdata.service;
 
 import java.io.IOException;
 import java.rmi.Remote;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
+import com.bigdata.btree.ITuple;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ValidationError;
 
@@ -40,7 +43,7 @@ import com.bigdata.journal.ValidationError;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IRemoteTxCommitProtocol extends Remote {
+public interface ITxCommitProtocol extends Remote {
 
     /**
      * Notify a data service that it MAY release data required to support views
@@ -59,22 +62,9 @@ public interface IRemoteTxCommitProtocol extends Remote {
      *             if the read lock is set to a time earlier than its current
      *             value.
      * @throws IOException
+     *             if there is an RMI problem.
      */
     public void setReleaseTime(long releaseTime) throws IOException;
-
-    /**
-     * Request preparation of a read-write transaction for a 2-phase commit.
-     * 
-     * @param tx
-     *            The transaction identifier.
-     *            
-     * @throws IllegalArgumentException
-     *             if the transaction has not been started on this data service.
-     * @throws ValidationError
-     *             if validation fails.
-     * @throws IOException
-     */
-    public void prepare(long tx) throws ValidationError, IOException;
 
     /**
      * Request commit of the transaction by the data service. In the case where
@@ -85,26 +75,66 @@ public interface IRemoteTxCommitProtocol extends Remote {
      * 
      * @param tx
      *            The transaction identifier.
-     * @param commitTime
-     *            The commit time assigned to that transaction.
+     * 
+     * @return The commit time assigned to that transaction.
      * 
      * @throws IllegalArgumentException
-     *             if the transaction has not been started on this data service.
+     *             if the transaction is read-only.
+     * @throws IllegalStateException
+     *             if the transaction is not known to the data service.
+     * @throws InterruptedException
+     *             if interrupted.
+     * @throws ExecutionException
+     *             This will wrap a {@link ValidationError} if validation fails.
+     * @throws IOException
+     *             if there is an RMI problem.
+     */
+    public long singlePhaseCommit(long tx) throws InterruptedException,
+            ExecutionException, IOException;
+
+    /**
+     * Request that {@link IDataService} prepare for a 2-phase commit.
+     * 
+     * @param tx
+     *            The transaction identifier.
+     * @param revisionTime
+     *            The timestamp that will be written into the {@link ITuple}s
+     *            when the write set of the validated transaction is merged down
+     *            onto the unisolated indices.
+     * 
+     * @return The {@link Future} of the task running the commit protocol on the
+     *         {@link IDataService} (this may be used to cancel validation while
+     *         it is already in progress).
+     * 
      * @throws IllegalArgumentException
-     *             if the <i>commitTime</i> is LTE the last commit time
-     *             performed on this data service.
+     *             if the transaction is read-only.
      * @throws IllegalStateException
-     *             if the transaction is a read-write transaction and it has not
-     *             been {@link #prepare(long) prepared}
-     * @throws IllegalStateException
-     *             if the transaction is a read-write transaction and a timeout
-     *             has invalidated {@link #prepare(long) prepared} commit.
-     * @throws ValidationError
-     *             if validation fails (single-phase commit only).
+     *             if the transaction is not known to the data service.
+     * @throws InterruptedException
+     *             if interrupted.
+     * @throws ExecutionException
+     *             This will wrap a {@link ValidationError} if validation fails.
+     * @throws IOException
+     *             if there is an RMI problem.
+     */
+    public Future<Void> twoPhasePrepare(long tx, long revisionTime)
+            throws InterruptedException, ExecutionException, IOException;
+
+    /**
+     * Request that the {@link IDataService} finalize a 2-phase commit.
+     * 
+     * @param tx
+     *            The transaction identifier.
+     * @param commitTime
+     *            The commit time that must be used for the commit point on the
+     *            backing store.
+     * 
+     * @throws InterruptedException
+     * @throws ExecutionException
      * @throws IOException
      */
-    public void commit(long tx, long commitTime) throws ValidationError,
-            IOException;
+    public void twoPhaseCommit(long tx, long commitTime)
+            throws InterruptedException, ExecutionException, IOException;
 
     /**
      * Request abort of the transaction by the data service.
@@ -115,6 +145,7 @@ public interface IRemoteTxCommitProtocol extends Remote {
      * @throws IllegalArgumentException
      *             if the transaction has not been started on this data service.
      * @throws IOException
+     *             if there is an RMI problem.
      */
     public void abort(long tx) throws IOException;
 

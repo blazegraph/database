@@ -44,7 +44,8 @@ import com.bigdata.rawstore.IRawStore;
 public interface IBufferStrategy extends IRawStore, IMRMW {
     
     /**
-     * The next offset at which a data item would be written on the store.
+     * The next offset at which a data item would be written on the store as an
+     * offset into the <em>user extent</em>.
      */
     public long getNextOffset();
     

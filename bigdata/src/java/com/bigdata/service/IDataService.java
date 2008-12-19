@@ -53,7 +53,7 @@ import com.bigdata.sparse.SparseRowStore;
  * <p>
  * The data service interface provides remote access to named indices, provides
  * for both unisolated and isolated operations on those indices, and exposes the
- * {@link IRemoteTxCommitProtocol} interface to the
+ * {@link ITxCommitProtocol} interface to the
  * {@link ITransactionManagerService} service for the coordination of
  * distributed transactions. Clients normally write to the {@link IIndex}
  * interface. The {@link ClientIndexView} provides an implementation of that
@@ -262,7 +262,7 @@ import com.bigdata.sparse.SparseRowStore;
  *       can have more flexibility since they are under less of a latency
  *       constraint.
  */
-public interface IDataService extends IRemoteTxCommitProtocol, IService {
+public interface IDataService extends ITxCommitProtocol, IService {
 
     /**
      * Register a named mutable index on the {@link DataService}.

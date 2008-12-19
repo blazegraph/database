@@ -162,13 +162,32 @@ public interface ITransactionService extends ITimestampService {
     public long newTx(long timestamp) throws IOException;
     
     /**
-     * Request commit of the transaction write set (synchronous).
+     * Request commit of the transaction write set. Committing a read-only
+     * transaction is necessary in order to release read locks (this is very
+     * fast). If a transaction has a write set, then this method does not return
+     * until that write set has been made restart safe or the transaction has
+     * failed.
+     * <p>
+     * The commit of a transaction with a write set on a single
+     * {@link IDataService} does not require either {@link ITx#UNISOLATED} tasks
+     * or other transactions to wait. The latency for such commits is directly
+     * related to the size of the transaction write set.
+     * <p>
+     * However, the commit of a transaction with writes on more than one
+     * {@link IDataService} requires a distributed commit protocol. The
+     * distributed commit protocol forces ALL tasks writing on those
+     * {@link IDataService}s to wait until the transaction is complete. This is
+     * necessary in order to obtain a global commit point that corresponds to
+     * the atomic commit state of the transaction (without this we would not
+     * have the Atomic property for distributed transaction commits).
      * 
      * @param tx
      *            The transaction identifier.
      * 
-     * @return The commit time assigned to the transaction iff the transaction
-     *         was successfully committed.
+     * @return The commit time for the transaction -or- ZERO (0L) if the
+     *         transaction was read-only or had an empty write set. This commit
+     *         time identifies a global commit point on the database from which
+     *         you may read the coherent post-commit state of the transaction.
      * 
      * @throws ValidationError
      *             if the transaction could not be validated.
@@ -197,10 +216,6 @@ public interface ITransactionService extends ITimestampService {
      * with the given timestamp (which it assigned) and that it should update
      * its lastCommitTime iff the given commitTime is GT its current
      * lastCommitTime.
-     * <p>
-     * Note: This method is used by {@link IDataService}s when they perform a
-     * commit of non-transactional operations. The {@link ITransactionService}
-     * will automatically update the lastCommitTime as full transactions commit.
      * 
      * @param commitTime
      *            The commit time.

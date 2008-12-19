@@ -39,40 +39,60 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.Tuple;
+import com.bigdata.journal.AbstractTask;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.service.IBigdataFederation;
 
 /**
  * <p>
  * An index (or index partition) that has been isolated by a transaction.
  * Isolation is achieved by the following mechanisms:
  * <ol>
- * <li>The writeSet of the transaction on the index is isolated on a B+Tree
- * visible only to that transaction.</li>
- * <li>Version timestamps are maintained for index entries in both the source
- * indices (groundState) and the isolated write set.</li>
+ * <li>The writeSet of the transaction on the index is isolated on a
+ * {@link BTree} visible only to that transaction.</li>
+ * <li>Version timestamps are maintained for index entries in both the isolated
+ * write set and groundState from which the transaction is reading.</li>
  * <li>The groundState is defined as the view of the index (partition) as of
- * the startTime of the transaction.</li>
+ * the abs(startTime) of the transaction.</li>
  * <li>Reads are performed against an ordered view defined by the writeSet
- * followed by the ordered set of indices defining the groundState of the index
- * as of the start time of the transactions.</li>
+ * followed by the ordered set of indices defining the groundState of the index.</li>
  * <li>Writes first read through the ordered view to locate the most recent
  * version for an index entry. If the index entry is located in the isolated
  * writeSet then it is overwritten and its timestamp is unchanged. If the index
- * entry is located in the ground state view then the timestamp is copied from
- * that index entry and written on the new version in the isolated write set.</li>
- * <li>During validation, version timestamps in the isolated write set are
- * compared against the then current state view of the unisolated index. If the
- * timestamp in the unisolated view differs from that in the write set then
- * there is a write-write conflict. Write-write conflicts MAY be validated if
- * the index has a registered {@link IConflictResolver}. No operations are
- * permitted on the unisolated index between validation and the merge down step
- * which applies the write set to the unisolated index view.</li>
- * <li>If the write set is validated then it is merged down (copied onto) the
- * then current unisolated index view. During the merge down phase the commit
+ * entry is located in the groundState then the timestamp is copied from that
+ * index entry and written on the new version in the isolated writeSet.</li>
+ * <li>During validation, version timestamps in the isolated writeSet are
+ * compared against the then current view of the corresponding unisolated index.
+ * If the timestamp in the unisolated view differs from that in the writeSet
+ * then there is a write-write conflict. Write-write conflicts MAY be validated
+ * if the index has a registered {@link IConflictResolver}.</li>
+ * <li>If the writeSet is validated then it is mergedDown (copied onto) the
+ * then current unisolated index view. During the mergeDown phase the commit
  * timestamp of the transaction is applied to all index entries copied from the
  * write set. Transactions that later try to commit will recognize write-write
  * conflicts based on those updated timestamps.</li>
  * </ol>
+ * </p>
+ * <p>
+ * Note: The commit time of the transaction is a bit of an illusion. What it
+ * does is provide a strictly increasing timestamp on the tuples updated by that
+ * transaction in the indices on which it has written. Write-write conflicts are
+ * detected on the basis of that timestamp. Thus it is really a "revision
+ * timestamp" for the transaction commit point. The timestamp from which the
+ * post-commit state of the transaction may be read IS NOT defined for an
+ * {@link IBigdataFederation}. It is not possible to define this timestamp
+ * without requiring concurrent commit processing to be paused on all data
+ * services on which the transaction has written, which is viewed as too high
+ * a cost.
+ * </p>
+ * Note: The process of validating, merging down changes, and committing those
+ * changes MUST be atomic. Therefore no other operations may be permitted access
+ * to the unisolated indices corresponding to the isolated indices on which the
+ * transaction during this process. This constraint is generally achieved by
+ * holding a write lock on the unisolated indices corresponding to the indices
+ * isolated by the transaction, e.g., by declaring those indices to an
+ * {@link ITx#UNISOLATED} {@link AbstractTask} which handles this process.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -113,16 +133,15 @@ public class IsolatedFusedView extends FusedView {
      * satisified by the first resource containing an index entry for the search
      * key.
      * <p>
-     * Writes will first read through looking for a
+     * Writes will first read through looking for a @todo javadoc
      * 
      * @param timestamp
      *            The timestamp associated with the <i>groundState</i>.
-     * @param writeSet
-     *            The btree that will absorb writes.
-     * @param groundState
-     *            The historical ground state.
+     * @param sources
+     *            An ordered array of sources comprised of the {@link BTree}
+     *            that will absorb writes and the historical ground state.
      */
-    public IsolatedFusedView(final long timestamp, AbstractBTree[] sources ) {
+    public IsolatedFusedView(final long timestamp, final AbstractBTree[] sources ) {
         
         super(sources);
 
@@ -196,7 +215,7 @@ public class IsolatedFusedView extends FusedView {
     /**
      * Write an entry for the key on the write set.
      */
-    public byte[] insert(byte[] key, byte[] val) {
+    public byte[] insert(final byte[] key, final byte[] val) {
 
         final Tuple tuple = lookup(key, lookupTuple.get());
 
@@ -219,7 +238,7 @@ public class IsolatedFusedView extends FusedView {
              * There is an (potentially deleted) entry under that key and we are
              * going to overwrite it. We will use the timestamp from that entry.
              * If the entry is NOT in the write set then the timestamp will be
-             * the commit time of the last write on that key before this
+             * the [revisionTime] of the last write on that key before this
              * transaction's start time and the timestamp will be copied into
              * the write set. If the entry is in the write set then the
              * timestamp will either have been copied already into the write set
@@ -265,7 +284,7 @@ public class IsolatedFusedView extends FusedView {
              * There is an (potentially deleted) entry under that key and we are
              * going to overwrite it. We will use the timestamp from that entry.
              * If the entry is NOT in the write set then the timestamp will be
-             * the commit time of the last write on that key before this
+             * the [revisionTime] of the last write on that key before this
              * transaction's start time and the timestamp will be copied into
              * the write set. If the entry is in the write set then the
              * timestamp will either have been copied into the write set
@@ -338,7 +357,7 @@ public class IsolatedFusedView extends FusedView {
      * 
      * @return True iff validation succeeds.
      */
-    public boolean validate(AbstractBTree[] groundStateSources) {
+    public boolean validate(final AbstractBTree[] groundStateSources) {
 
         if (isEmptyWriteSet()) {
 
@@ -393,7 +412,8 @@ public class IsolatedFusedView extends FusedView {
          * 
          * Note: It is NOT safe to update the value on the IsolatedBTree during
          * traversal since it might trigger copy-on-write which would cause
-         * structural modifications that would break the iterator.
+         * structural modifications that would break the iterator. [@todo
+         * actually, that is fine now if we specify the CURSOR flag].
          * 
          * @todo Once we create this temporary tree we need to read from a fused
          * view of it and the primary IsolatedFusedView if we are going to
@@ -599,11 +619,12 @@ public class IsolatedFusedView extends FusedView {
      * <p>
      * Note: This method is also responsible for updating the version timestamps
      * that are used to detect write-write conflicts during validation - they
-     * are set to the <i>commitTime</i>.
+     * are set to the <i>revisionTime</i>.
      * </p>
      * 
-     * @param commitTime
-     *            The commit time assigned to the transaction.
+     * @param revisionTime
+     *            The revision timestamp assigned to the commit point of the
+     *            transaction.
      * 
      * @param groundStateSources
      *            The ordered view of the unisolated index. This MUST be the
@@ -612,8 +633,8 @@ public class IsolatedFusedView extends FusedView {
      *            same as the groundState specified to the constructor if
      *            intervening transactions have committed on the index.
      */
-    public void mergeDown(final long commitTime,
-            AbstractBTree[] groundStateSources) {
+    public void mergeDown(final long revisionTime,
+            final AbstractBTree[] groundStateSources) {
 
         /*
          * A read-only view onto the consistent state of the current global
@@ -662,7 +683,7 @@ public class IsolatedFusedView extends FusedView {
 
 //                    globalScope.remove(key);
                     groundStateWriteSet.insert(key, null/* val */, true/* delete */,
-                            commitTime, null/*tuple*/);
+                            revisionTime, null/*tuple*/);
 
                 } else {
 
@@ -678,12 +699,12 @@ public class IsolatedFusedView extends FusedView {
                 /*
                  * Copy the entry down onto the global scope.
                  * 
-                 * Note: This writes the commit time of the transaction on the
-                 * unisolated index entry.
+                 * Note: This writes the [revisionTime] of the transaction on
+                 * the unisolated index entry.
                  */
 
                 groundStateWriteSet.insert(key, entry.getValue(),
-                        false/* delete */, commitTime, null/* tuple */);
+                        false/* delete */, revisionTime, null/* tuple */);
 
             }
 

@@ -192,6 +192,24 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
     protected final long timestamp;
 
     /**
+     * The timestamp of the group commit for an {@link ITx#UNISOLATED} task
+     * which executes successfully and then iff the group commit succeeds.
+     * Otherwise ZERO (0L).
+     */
+    long commitTime = 0L;
+    
+    /**
+     * The timestamp of the group commit for an {@link ITx#UNISOLATED} task
+     * which executes successfully and then iff the group commit succeeds.
+     * Otherwise ZERO (0L).
+     */
+    public long getCommitTime() {
+
+        return commitTime;
+        
+    }
+    
+    /**
      * True iff the operation is isolated by a transaction.
      */
     protected final boolean isReadWriteTx;

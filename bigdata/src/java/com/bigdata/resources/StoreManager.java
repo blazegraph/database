@@ -84,6 +84,7 @@ import com.bigdata.journal.ILocalTransactionManager;
 import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.IRootBlockView;
+import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.TemporaryStore;
@@ -100,7 +101,6 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.IMetadataService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -1376,7 +1376,7 @@ abstract public class StoreManager extends ResourceEvents implements
                  * Set the createTime on the new journal resource.
                  */
                 p.setProperty(Options.CREATE_TIME, Long
-                        .toString(nextTimestampRobust()));
+                        .toString(nextTimestamp()));
 
                 newJournal = true;
 
@@ -2197,12 +2197,22 @@ abstract public class StoreManager extends ResourceEvents implements
             
         }
         
-        public long nextTimestamp() {
+//        public long nextTimestamp() {
+//
+//            return StoreManager.this.nextTimestampRobust();
+//
+//        }
 
-            return StoreManager.this.nextTimestampRobust();
-
+        /**
+         * Note: Exposed for the {@link DataService} which needs this for its
+         * 2-phase commit protocol.
+         */
+        public long commitNow(final long commitTime) {
+            
+            return super.commitNow(commitTime);
+            
         }
-
+        
         /**
          * Exposed for {@link StoreManger#getResourcesForTimestamp(long)}.
          */
@@ -2212,38 +2222,32 @@ abstract public class StoreManager extends ResourceEvents implements
             
         }
         
-        public void notifyCommit(final long commitTime) {
-            
-            getLocalTransactionManager().notifyCommit(commitTime);
-            
-        }
-        
-        /**
-         * <strong>WARNING: Delegates to the federation</strong>.
-         * 
-         * Local federation implementations have direct access to the root block
-         * on the live journal for their data service(s). Distributed
-         * federations rely on the timestamp service to process
-         * {@link #notifyCommit(long)} events in order to report the most recent
-         * global commit time.
-         */
-        public long lastCommitTime() {
-            
-            return getFederation().getLastCommitTime();
-            
-        }
+//        /**
+//         * <strong>WARNING: Delegates to the federation</strong>.
+//         * 
+//         * The local and embedded federations impls have direct access to the
+//         * root block on the live journal for their data service(s). Distributed
+//         * federations rely on the {@link ITransactionService} to process
+//         * {@link ITransactionService#notifyCommit(long)} events in order to
+//         * report the most recent global commit time.
+//         */
+//        public long lastCommitTime() {
+//            
+//            return getFederation().getLastCommitTime();
+//            
+//        }
 
-        /**
-         * Ignored.
-         */
-        public void setReleaseTime(long releaseTime) throws IOException {
-            
-            if (releaseTime < 0)
-                throw new IllegalArgumentException();
-            
-            // ignored.
-            
-        }
+//        /**
+//         * Ignored.
+//         */
+//        public void setReleaseTime(long releaseTime) throws IOException {
+//            
+//            if (releaseTime < 0)
+//                throw new IllegalArgumentException();
+//            
+//            // ignored.
+//            
+//        }
 
         public ILocalTransactionManager getLocalTransactionManager() {
 
@@ -2251,11 +2255,11 @@ abstract public class StoreManager extends ResourceEvents implements
 
         }
 
-        public IMetadataService getMetadataService() {
-            
-            return getFederation().getMetadataService();
-            
-        }
+//        public IMetadataService getMetadataService() {
+//            
+//            return getFederation().getMetadataService();
+//            
+//        }
 
         public SparseRowStore getGlobalRowStore() {
             
@@ -2655,16 +2659,9 @@ abstract public class StoreManager extends ResourceEvents implements
     }
 
     /**
-     * Report the next timestamp assigned by the
-     * {@link ILocalTransactionManager}.
-     * <p>
-     * Note: the {@link ILocalTransactionManager} handles the "robust" semantics
-     * for discoverying the timestamp service and obtaining the next timestamp
-     * from that service. This delegates to that class. It is present here
-     * because many pieces of the {@link ResourceManager} and its layers use
-     * {@link #nextTimestampRobust()} and its presence here is a convenient.
+     * Report the next timestamp assigned by the {@link ITransactionService}.
      */
-    protected long nextTimestampRobust() {
+    protected long nextTimestamp() {
 
         final ILocalTransactionManager transactionManager = getConcurrencyManager()
                 .getTransactionManager();
@@ -2858,7 +2855,7 @@ abstract public class StoreManager extends ResourceEvents implements
         }
 
         // the current time (RMI).
-        final long currentTime = nextTimestampRobust();
+        final long currentTime = nextTimestamp();
 
         // the upper bound on the release time.
         final long maxReleaseTime = currentTime - minReleaseAge;

@@ -22,7 +22,6 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
-import com.bigdata.resources.CompactingMergeTask.AtomicUpdateCompactingMergeTask;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Split;
 import com.bigdata.sparse.SparseRowStore;
@@ -65,7 +64,6 @@ public class SplitIndexPartitionTask extends
     
     /**
      * @param resourceManager 
-     * @param concurrencyManager
      * @param lastCommitTime
      * @param resource
      */

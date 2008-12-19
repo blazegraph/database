@@ -166,31 +166,6 @@ import com.bigdata.util.ChecksumUtility;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME Priority items are:
- * <ol>
- * <li> AIO for the Direct and Disk modes (low priority since not IO bound).</li>
- * <li> GOM integration features, including: support for primary key (clustered)
- * indices; supporting both embedded and remote scenarios; and using state-based
- * conflict resolution to obtain high concurrency for generic objects, link set
- * metadata, indices, and distributed split cache and hot cache support.</li>
- * <li> Scale-out database, including:
- * <ul>
- * <li> Media replication for data service failover </li>
- * <li> Transaction service (low-latency with failover instances that keep track
- * of the current transaction metadata).</li>
- * </ul>
- * </ol>
- * 
- * @todo Define distributed transaction protocol. Pay attention to 2-phase or
- *       3-phase commits when necessary, but take advantage of locality when
- *       possible (all writes on a single journal). There is a dependency in a
- *       distributed database architecture on transaction begin time. A very
- *       long running transaction could force the journal to hold onto
- *       historical states. If a decision is made to discard those states and
- *       the transaction begins to read from the journal then the transaction
- *       must be rolled back. This should be worked out with the resource
- *       deallocation for old journals and segments.
- * 
  * @todo Checksums and/or record compression are currently handled on a per-{@link BTree}
  *       or other persistence capable data structure basis. It is nice to be
  *       able to choose for which indices and when ( {@link Journal} vs
@@ -1513,13 +1488,6 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             
             } // next index.
             
-//            /*
-//             * Note: We can't simply discard this. It is used by getName2Addr()
-//             * to obtain the read-committed view.
-//             * 
-//             * @todo it is worth modifying how that works so that we can discard
-//             * this?
-//             */
             // discard since no writers are allowed.
             name2Addr = null;
             
@@ -1839,7 +1807,17 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         assertOpen();
 
         if (INFO)
-            log.info("commitTime="+commitTime);
+            log.info("commitTime=" + commitTime);
+
+        if (commitTime <= _rootBlock.getLastCommitTime()) {
+
+            /*
+             * The commit times must strictly advance.
+             */
+
+            throw new IllegalArgumentException();
+
+        }
         
         /*
          * First, run each of the committers accumulating the updated root
@@ -2293,11 +2271,9 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     }
 
     /**
-     * @issue negative commit time. This does not have the full semantics of
-     *        {@link IIndexStore#getIndex(String, long)}. Instead it always
-     *        treats the <i>commitTime</i> as exactly that. This will be fixed
-     *        when we resolve the issue dealing timestamps being negative commit
-     *        times.
+     * 
+     * @param commitTime
+     *            A positive timestamp (a possible commit time on the store).
      * 
      * @throws UnsupportedOperationException
      *             If you pass in {@link ITx#UNISOLATED},
