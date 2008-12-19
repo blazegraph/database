@@ -145,8 +145,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
 
         ResourceManager resourceManager = new MyResourceManager(properties);
 
-        AbstractLocalTransactionManager localTransactionManager = new MockLocalTransactionManager(
-                resourceManager);
+        AbstractLocalTransactionManager localTransactionManager = new MockLocalTransactionManager();
 
         ConcurrencyManager concurrencyManager = new ConcurrencyManager(
                 properties, localTransactionManager, resourceManager);
@@ -271,8 +270,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
 
         ResourceManager resourceManager = new MyResourceManager(properties);
 
-        AbstractLocalTransactionManager localTransactionManager = new MockLocalTransactionManager(
-                resourceManager);
+        AbstractLocalTransactionManager localTransactionManager = new MockLocalTransactionManager();
 
         ConcurrencyManager concurrencyManager = new ConcurrencyManager(
                 properties, localTransactionManager, resourceManager);
@@ -409,8 +407,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
 
         ResourceManager resourceManager = new MyResourceManager(properties);
 
-        AbstractLocalTransactionManager localTransactionManager = new MockLocalTransactionManager(
-                resourceManager);
+        AbstractLocalTransactionManager localTransactionManager = new MockLocalTransactionManager();
 
         ConcurrencyManager concurrencyManager = new ConcurrencyManager(
                 properties, localTransactionManager, resourceManager);
@@ -621,8 +618,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
 
         ResourceManager resourceManager = new MyResourceManager(properties);
         
-        AbstractLocalTransactionManager localTransactionManager = new MockLocalTransactionManager(
-                resourceManager);
+        AbstractLocalTransactionManager localTransactionManager = new MockLocalTransactionManager();
         
         ConcurrencyManager concurrencyManager = new ConcurrencyManager(
                 properties, localTransactionManager, resourceManager);

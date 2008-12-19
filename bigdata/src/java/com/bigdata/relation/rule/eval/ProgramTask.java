@@ -303,7 +303,7 @@ public class ProgramTask implements IProgramTask,
                      * more on this.
                      */
 
-                    ((IBigdataFederation) indexManager).getTimestampService()
+                    ((IBigdataFederation) indexManager).getTransactionService()
                             .setReleaseTime(0L/* releaseTime */);
                     
                 }
@@ -537,7 +537,7 @@ public class ProgramTask implements IProgramTask,
 
                     log.warn("readLock: releaseTime="+releaseTime+", step="+step.getName());
                     
-                    ((IBigdataFederation) indexManager).getTimestampService()
+                    ((IBigdataFederation) indexManager).getTransactionService()
                             .setReleaseTime(releaseTime);
 
                 }

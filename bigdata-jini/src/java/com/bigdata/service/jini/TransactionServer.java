@@ -40,32 +40,35 @@ import net.jini.lookup.entry.Name;
 
 import org.apache.log4j.MDC;
 
-import com.bigdata.journal.ITimestampService;
+import com.bigdata.journal.ITransactionService;
+import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.DataService;
 import com.bigdata.service.DefaultServiceFederationDelegate;
-import com.bigdata.service.TimestampService;
+import com.bigdata.service.DistributedTransactionService;
 
 /**
- * Server exposing a discoverable {@link ITimestampService}.
+ * Server exposing a discoverable {@link ITransactionService}.
  * 
  * @todo verify that time is strictly ascending on restart or failover.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * FIXME rename various configuration files as well.
  */
-public class TimestampServer extends AbstractServer {
+public class TransactionServer extends AbstractServer {
 
     /**
      * @param args
      */
-    public TimestampServer(String[] args) {
+    public TransactionServer(String[] args) {
 
         super(args);
         
     }
 
     /**
-     * Starts a new {@link TimestampServer}.  This can be done programmatically
+     * Starts a new {@link TransactionServer}.  This can be done programmatically
      * by executing
      * <pre>
      *    new TimestampServer(args).run();
@@ -77,7 +80,7 @@ public class TimestampServer extends AbstractServer {
      */
     public static void main(String[] args) {
         
-        new TimestampServer(args) {
+        new TransactionServer(args) {
             
             /**
              * Overriden to use {@link System#exit()} since this is the command
@@ -106,16 +109,17 @@ public class TimestampServer extends AbstractServer {
     }
    
     @Override
-    protected TimestampService newService(Properties properties) {
+    protected AbstractTransactionService newService(Properties properties) {
         
-        final TimestampService service = new AdministrableTimestampService(
+        final AbstractTransactionService service = new AdministrableTimestampService(
                 this, properties);
 
         /*
          * Setup a delegate that let's us customize some of the federation
          * behaviors on the behalf of the data service.
          */
-        getClient().setDelegate(new DefaultServiceFederationDelegate<TimestampService>(service));
+        getClient().setDelegate(
+                new DefaultServiceFederationDelegate<AbstractTransactionService>(service));
 
         return service;
         
@@ -127,12 +131,12 @@ public class TimestampServer extends AbstractServer {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class AdministrableTimestampService extends TimestampService
+    public static class AdministrableTimestampService extends DistributedTransactionService
             implements RemoteAdministrable, RemoteDestroyAdmin {
 
-        protected TimestampServer server;
+        protected TransactionServer server;
 
-        public AdministrableTimestampService(TimestampServer server,
+        public AdministrableTimestampService(TransactionServer server,
                 Properties properties) {
             
             super(properties);

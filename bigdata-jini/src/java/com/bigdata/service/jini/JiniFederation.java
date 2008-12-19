@@ -51,6 +51,7 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.io.IStreamSerializer;
 import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.ITimestampService;
+import com.bigdata.journal.ITransactionService;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBuffer;
@@ -86,7 +87,7 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
     protected ResourceLockClient resourceLockClient;
 
-    protected TimestampServiceClient timestampServiceClient;
+    protected TransactionServiceClient transactionServiceClient;
     
     protected DiscoveryManagement discoveryManager;
 
@@ -138,7 +139,7 @@ public class JiniFederation extends AbstractDistributedFederation implements
                     cacheMissTimeout);
 
             // Start discovery for the timestamp service.
-            timestampServiceClient = new TimestampServiceClient(
+            transactionServiceClient = new TransactionServiceClient(
                     discoveryManager, this, cacheMissTimeout);
 
             // Start discovery for the load balancer service.
@@ -185,12 +186,12 @@ public class JiniFederation extends AbstractDistributedFederation implements
         
     }
     
-    public ITimestampService getTimestampService() {
+    public ITransactionService getTransactionService() {
         
         // Note: return null if service not available/discovered.
-        if(timestampServiceClient == null) return null;
+        if(transactionServiceClient == null) return null;
         
-        return timestampServiceClient.getTimestampService();
+        return transactionServiceClient.getTransactionService();
         
     }
     
@@ -247,56 +248,6 @@ public class JiniFederation extends AbstractDistributedFederation implements
         
     }
 
-//    /**
-//     * Helper places {@link IService}s into order by their {@link UUID}s.
-//     * 
-//     * @todo this will do RMI for {@link IService#getServiceUUID()}s during the
-//     *       sort, which is not very nice and should be cached.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    private static class ServiceUUIDComparator implements Comparator<IService> {
-//
-//        public static final ServiceUUIDComparator INSTANCE = new ServiceUUIDComparator();
-//        
-//        private ServiceUUIDComparator() {
-//            
-//        }
-//        
-//        public int compare(IService o1, IService o2) {
-//            
-//            final UUID u1, u2;
-//
-//            try {
-//                // Note: This is RMI and should be cached.
-//                u1 = o1.getServiceUUID();
-//                u2 = o2.getServiceUUID();
-//            } catch (IOException ex) {
-//                throw new RuntimeException(ex);
-//            }
-//            
-//            final long msb1 = u1.getMostSignificantBits();
-//
-//            final long msb2 = u2.getMostSignificantBits();
-//
-//            int ret = msb1 < msb2 ? -1 : msb1 > msb2 ? 1 : 0;
-//
-//            if (ret == 0) {
-//
-//                final long lsb1 = u1.getLeastSignificantBits();
-//                final long lsb2 = u2.getLeastSignificantBits();
-//
-//                ret = lsb1 < lsb2 ? -1 : lsb1 > lsb2 ? 1 : 0;
-//
-//            }
-//            
-//            return ret;
-//            
-//        }
-//        
-//    }
-    
     private boolean open;
     
     synchronized public void shutdown() {
@@ -356,11 +307,11 @@ public class JiniFederation extends AbstractDistributedFederation implements
             
         }
         
-        if (timestampServiceClient != null) {
+        if (transactionServiceClient != null) {
 
-            timestampServiceClient.terminate();
+            transactionServiceClient.terminate();
 
-            timestampServiceClient = null;
+            transactionServiceClient = null;
             
         }
         
@@ -488,9 +439,9 @@ public class JiniFederation extends AbstractDistributedFederation implements
         }
         
         // destroy timestamp service(s)
-        if(timestampServiceClient!=null) {
+        if(transactionServiceClient!=null) {
             
-            final ITimestampService timestampService = timestampServiceClient.getTimestampService(); 
+            final ITimestampService timestampService = transactionServiceClient.getTransactionService(); 
 
             if (timestampService != null) {
 
@@ -519,38 +470,15 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
     }
 
-    /**
-     * @todo The {@link ITimestampService} must have explicit knowledge of
-     *       commits (as part of its eventual role as a transaction manager
-     *       service) and this method should query the {@link ITimestampService}
-     *       for the timestamp of the last _completed_ commit (rather than the
-     *       last timestamp assigned by the service). The notification of the
-     *       commit protocol to the timestamp service can be asynchronous unless
-     *       the commit is part of a transaction, in which case it needs to be
-     *       synchronous. (There could be another method for the last
-     *       transaction commit time. This method reflects commits by unisolated
-     *       operations).
-     *       <p>
-     *       Dealing with this properly might need to wait for a 2-/3-phase
-     *       commit protocol since the commit should fail if the timestamp
-     *       service does not acknowledge the receipt of the commit time
-     *       otherwise a client depending on the lastCommitTime to access the
-     *       recently committed data would read from a prior commit point. On
-     *       the other hand, this is not so bad as even a post-commit error will
-     *       be noticed by the committer and there will normally be continued
-     *       commits which would cause the lastCommitTime to advance anyway,
-     *       thereby causing the commit point would commitTime was not noticed
-     *       to be recorded.
-     */
     public long getLastCommitTime() {
 
-        final ITimestampService timestampService = getTimestampService();
+        final ITransactionService transactionService = getTransactionService();
 
-        if (timestampService != null) {
+        if (transactionService != null) {
 
             try {
                 
-                lastKnownCommitTime = timestampService.lastCommitTime();
+                lastKnownCommitTime = transactionService.lastCommitTime();
                 
             } catch (IOException e) {
                 
@@ -565,117 +493,8 @@ public class JiniFederation extends AbstractDistributedFederation implements
         return lastKnownCommitTime;
 
     }
-
     private long lastKnownCommitTime;
 
-//    /**
-//     * Extended to allow the client to be configured with the <em>name</em> of
-//     * the {@link DataService} on which a named scale-out index will be
-//     * registered using the pattern
-//     * <code>register.<i>name</i> = serviceName</code>, where <i>name</i>
-//     * is the fully qualified name of the scale-out index and <i>serviceName</i>
-//     * is the name of a {@link DataService} as reported by
-//     * {@link IService#getServiceName()} and specified in the configuration file
-//     * for that service.
-//     */
-//    public void registerIndex(final IndexMetadata metadata) {
-//        
-//        // the name of the scale-out index.
-//        final String indexName = metadata.getName();
-//
-//        final String serviceName = getClient().getProperties().getProperty(
-//                "register." + indexName);
-//
-//        if (serviceName == null) {
-//        
-//            // default behavior.
-//            super.registerIndex(metadata);
-//        
-//            return;
-//        
-//        }
-//
-//        // lookup the named service.
-//        final ServiceItem[] serviceItems = dataServicesClient.serviceMap
-//                .getServiceItems(1,
-//
-//                new ServiceItemFilter() {
-//
-//                    public boolean check(ServiceItem serviceItem) {
-//
-//                        final Entry[] a = serviceItem.attributeSets;
-//
-//                        for (Entry entry : a) {
-//
-//                            if (!(entry instanceof Name))
-//                                continue;
-//
-//                            if (serviceName.equals(((Name) entry).name)) {
-//
-//                                // found the named service.
-//                                return true;
-//
-//                            }
-//
-//                        }
-//
-//                        return false;
-//
-//                    }
-//
-//                });
-//
-//        if (serviceItems.length == 0) {
-//
-//            log.warn("Could not locate service: " + serviceName
-//                    + " for index: " + indexName);
-//
-//            // default behavior.
-//            super.registerIndex(metadata);
-//
-//            return;
-//
-//        }
-//
-//        // there will be only one value in the array (maxCount==1)
-//        final ServiceItem serviceItem = serviceItems[0];
-//
-//        final IDataService service;
-//        try {
-//            
-//            service = (IDataService)serviceItem.service;
-//            
-//        } catch(ClassCastException ex) {
-//            
-//            log.error("Not a data service: "+serviceName);
-//            
-//            // default behavior.
-//            super.registerIndex(metadata);
-//            
-//            return;
-//            
-//        }
-//
-//        final UUID uuid;
-//        try {
-//            
-//            uuid = service.getServiceUUID();
-//            
-//        } catch (IOException ex) {
-//            
-//            throw new RuntimeException(ex);
-//            
-//        }
-//
-//        if (INFO)
-//            log.info("Registering index=" + indexName + " on service="
-//                    + serviceName);
-//        
-//        // register on the service having that service name.
-//        registerIndex(metadata, uuid);
-//        
-//    }
-    
     /**
      * Note: The invocation layer factory is reused for each exported proxy (but
      * the exporter itself is paired 1:1 with the exported proxy).

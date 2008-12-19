@@ -43,18 +43,18 @@ import net.jini.lookup.ServiceItemFilter;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.journal.ITimestampService;
+import com.bigdata.journal.ITransactionService;
 
 /**
- * Client manages discovery of an {@link ITimestampService}.
+ * Client manages discovery of an {@link ITransactionService}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TimestampServiceClient {
+public class TransactionServiceClient {
 
     protected static final transient Logger log = Logger
-            .getLogger(TimestampServiceClient.class);
+            .getLogger(TransactionServiceClient.class);
 
     protected static final boolean INFO = log.isInfoEnabled();
     
@@ -75,7 +75,7 @@ public class TimestampServiceClient {
     private final ServiceCache serviceMap;
 
     /**
-     * Begins discovery for the {@link ITimestampService}.
+     * Begins discovery for the {@link ITransactionService}.
      * 
      * @param discoveryManagement
      * @param listener
@@ -84,7 +84,7 @@ public class TimestampServiceClient {
      *            The timeout in milliseconds that the client will await the
      *            discovery of a service if there is a cache miss.
      */
-    public TimestampServiceClient(DiscoveryManagement discoveryManagement,
+    public TransactionServiceClient(DiscoveryManagement discoveryManagement,
             ServiceDiscoveryListener listener, long timeout) {
 
         if (timeout < 0)
@@ -118,7 +118,7 @@ public class TimestampServiceClient {
         try {
             
             template = new ServiceTemplate(null,
-                    new Class[] { ITimestampService.class }, null);
+                    new Class[] { ITransactionService.class }, null);
 
             serviceLookupCache = serviceDiscoveryManager.createLookupCache(
                     template, null /*new TimestampFilter()*/ /* filter */,
@@ -147,7 +147,7 @@ public class TimestampServiceClient {
     }
 
     /**
-     * Return the {@link ITimestampService} service from the cache -or-
+     * Return the {@link ITransactionService} service from the cache -or-
      * <code>null</code> if there is no such service in the cache and a remote
      * lookup times out.
      * 
@@ -155,7 +155,7 @@ public class TimestampServiceClient {
      *       a primary. secondaries MUST listen to the primary so that time
      *       continues to move forward.
      */
-    public ITimestampService getTimestampService() {
+    public ITransactionService getTransactionService() {
 
         ServiceItem item = serviceLookupCache.lookup(null);
 
@@ -176,7 +176,7 @@ public class TimestampServiceClient {
             
         }
         
-        return (ITimestampService) item.service;
+        return (ITransactionService) item.service;
 
     }
 

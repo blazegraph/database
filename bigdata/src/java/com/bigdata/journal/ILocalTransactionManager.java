@@ -33,13 +33,22 @@ import java.io.IOException;
 import com.bigdata.service.IServiceShutdown;
 
 /**
- * Interface for managing local transactions.
+ * Interface for managing local transaction state (the client side of the
+ * {@link ITransactionService}).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo we don't really need an interface for this as there is only one impl.
  */
-public interface ILocalTransactionManager extends ITransactionManager, IServiceShutdown {
+public interface ILocalTransactionManager extends /*ITransactionManager,*/ IServiceShutdown {
 
+    /**
+     * The server side of the transaction manager (possibly remote, in which
+     * case this may require the service to be discovered).
+     */
+    public ITransactionService getTransactionService();
+    
 //    /** #of active transactions. */
 //    public int getActiveTxCount();
 //    
@@ -110,8 +119,8 @@ public interface ILocalTransactionManager extends ITransactionManager, IServiceS
      * 
      * @see ITimestampService#nextTimestamp()
      */
-    public long nextTimestampRobust();
-    
+    public long nextTimestamp();
+
     /**
      * Notify the global transaction manager that a commit has been performed
      * with the given timestamp (which it assigned) and that it should update
@@ -121,6 +130,6 @@ public interface ILocalTransactionManager extends ITransactionManager, IServiceS
      * @param commitTime
      *            The commit time.
      */
-    public void notifyCommitRobust(long commitTime);
+    public void notifyCommit(long commitTime);
 
 }

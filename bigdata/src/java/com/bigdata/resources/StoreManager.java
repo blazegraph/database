@@ -1304,7 +1304,7 @@ abstract public class StoreManager extends ResourceEvents implements
              * pose queries after restart of a federation.
              */
 
-            getConcurrencyManager().getTransactionManager().notifyCommitRobust(
+            getConcurrencyManager().getTransactionManager().notifyCommit(
                     liveJournalRef.get().getLastCommitTime());
             
         }
@@ -2214,7 +2214,7 @@ abstract public class StoreManager extends ResourceEvents implements
         
         public void notifyCommit(final long commitTime) {
             
-            getLocalTransactionManager().notifyCommitRobust(commitTime);
+            getLocalTransactionManager().notifyCommit(commitTime);
             
         }
         
@@ -2669,7 +2669,7 @@ abstract public class StoreManager extends ResourceEvents implements
         final ILocalTransactionManager transactionManager = getConcurrencyManager()
                 .getTransactionManager();
 
-        return transactionManager.nextTimestampRobust();
+        return transactionManager.nextTimestamp();
 
     }
     

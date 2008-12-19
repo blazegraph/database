@@ -33,7 +33,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.ITimestampService;
+import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.sparse.GlobalRowStoreSchema;
@@ -68,11 +68,12 @@ public interface IBigdataFederation extends IIndexManager {
     public String getHttpdURL();
     
     /**
-     * Return the {@link ITimestampService} (or a proxy for that service).
+     * Return the {@link ITransactionService} (or a proxy for that service).
      * 
-     * @return The service -or- <code>null</code> if the service has not been discovered.
+     * @return The service -or- <code>null</code> if the service has not been
+     *         discovered.
      */
-    public ITimestampService getTimestampService();
+    public ITransactionService getTransactionService();
     
     /**
      * Return the load balancer service (or a proxy for that service).

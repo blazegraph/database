@@ -28,8 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.sparse;
 
-import java.io.IOException;
-
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
@@ -115,21 +113,20 @@ public class TimestampChooser implements IRowStoreConstants {
              * unique timestamp.
              */
 
-            try {
+//            try {
 
-                return journal.nextTimestamp();
+                return journal.getLocalTransactionManager().nextTimestamp();
                 
-            } catch(IOException ex) {
-                
-                /*
-                 * Note: Declared for RMI interoperability.
-                 */
-                
-                throw new RuntimeException(ex);
-                
-            }
+//            } catch(IOException ex) {
+//                
+//                /*
+//                 * Note: Declared for RMI interoperability.
+//                 */
+//                
+//                throw new RuntimeException(ex);
+//                
+//            }
             
-
         } else {
     
             // return the caller's value.

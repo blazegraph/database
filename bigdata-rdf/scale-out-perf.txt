@@ -3016,20 +3016,45 @@ Commit notes:
 
   - Main issues:
 
+    - zookeeper for locks/barriers and service startup.
+
+      Run zoo on one master.  Defer failover setup.  Populate with
+      configuration data which specifies the #of each kind of service
+      {lbs=1, tx=1, mds=1, ds=N} and optionally binds specific
+      services (lbs, tx, mds) to specific hosts.
+
+      Run codebase http service on one master with appropriately
+      (un)jared resources.  No idea how to setup failover for that.
+      Perhaps DNS magic?  Actually, the codebase is a list of URIs
+      that is easy enough to do but the codebase is set at startup so
+      this is not going to be dynamic.
+
+      Run jini on one master.  The IP of this host needs to be in the
+      configuration file for each jini service.  Unless those service
+      descriptions are generated dynamically this needs to be a known
+      constant.  Alternatively, we can use multicast service discovery
+      and then jini is whereever you find it.
+
+      For each host, either
+
+	  A) Start the service activation daemon that will be used to
+	  start services on this host.  In this case the master runs a
+	  service that decides where to place the other services by
+	  consulting zookeeper (for the #of services to run) and by
+	  consulting the LBS (when deciding where to place new heavy
+	  services, e.g., DS instances).
+
+	  B) Start a bigdata service using jini to discover the joined
+	  services and contending for locks on configuration nodes for
+	  various services.
+
+    - Distributed dynamic generation of the LUBM data sets.
+
     - Read-historical tx for closure.  The code will have to be
       modified to explicitly start and commit a read-only tx for the
       desired timestamp for each mutation operation in ProgramTask.
       The releaseTime will be automatically maintained by the tx
       manager.
-
-    - zookeeper for locks/barriers;
-     
-    - service starter & cluster setup tools;
-
-    - purge of only release free resources and compact end state for
-      the federation;
-
-    - distributed dynamic generation of the LUBM data sets.
 
     - Aynchronous overflow is causing contention across services.
 

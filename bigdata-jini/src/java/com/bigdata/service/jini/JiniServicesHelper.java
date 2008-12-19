@@ -37,7 +37,7 @@ public class JiniServicesHelper {
 
     public LoadBalancerServer loadBalancerServer0;
 
-    public TimestampServer timestampServer0;
+    public TransactionServer timestampServer0;
 
     public ResourceLockServer resourceLockServer0;
 
@@ -97,7 +97,7 @@ public class JiniServicesHelper {
         /*
          * Start up a timestamp server.
          */
-        threadPool.execute(timestampServer0 = new TimestampServer(
+        threadPool.execute(timestampServer0 = new TransactionServer(
                 new String[] { path + "TimestampServer0.config" }));
 
         

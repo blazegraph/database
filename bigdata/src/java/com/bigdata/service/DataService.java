@@ -65,7 +65,7 @@ import com.bigdata.journal.ILocalTransactionManager;
 import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITimestampService;
-import com.bigdata.journal.ITransactionManager;
+import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IndexProcedureTask;
 import com.bigdata.journal.RegisterIndexTask;
@@ -428,58 +428,64 @@ abstract public class DataService extends AbstractService
             
         }
         
-        localTransactionManager = new AbstractLocalTransactionManager(resourceManager) {
+        localTransactionManager = new AbstractLocalTransactionManager() {//resourceManager) {
 
-            public long nextTimestamp() throws IOException {
-
-                // resolve the timestamp service.
-                final ITimestampService timestampService = DataService.this
-                        .getFederation().getTimestampService();
-
-                if (timestampService == null)
-                    throw new NullPointerException(
-                            "TimestampService not discovered");
-
-                // request the next distinct timestamp (robust).
-                return timestampService.nextTimestamp();
+            public ITransactionService getTransactionService() {
+                
+                return DataService.this.getFederation().getTransactionService();
                 
             }
             
-            public void notifyCommit(final long commitTime) throws IOException {
-                
-                // resolve the timestamp service.
-                final ITimestampService timestampService = DataService.this
-                        .getFederation().getTimestampService();
-
-                if (timestampService == null)
-                    throw new NullPointerException(
-                            "TimestampService not discovered");
-
-                // notify the timestamp service.
-                timestampService.notifyCommit(commitTime);
-                                
-            }
-            
-            public long lastCommitTime() throws IOException {
-                
-                // resolve the timestamp service.
-                final ITimestampService timestampService = DataService.this
-                        .getFederation().getTimestampService();
-
-                if (timestampService == null)
-                    throw new NullPointerException(
-                            "TimestampService not discovered");
-
-                // obtain from the timestamp service.
-                return timestampService.lastCommitTime();
-                
-            }
-
-            public void setReleaseTime(final long releaseTime) {
-
-                DataService.this.setReleaseTime(releaseTime);
-                
-            }
+//            public long nextTimestamp() throws IOException {
+//
+//                // resolve the timestamp service.
+//                final ITimestampService timestampService = DataService.this
+//                        .getFederation().getTimestampService();
+//
+//                if (timestampService == null)
+//                    throw new NullPointerException(
+//                            "TimestampService not discovered");
+//
+//                // request the next distinct timestamp (robust).
+//                return timestampService.nextTimestamp();
+//                
+//            }
+//            
+//            public void notifyCommit(final long commitTime) throws IOException {
+//                
+//                // resolve the timestamp service.
+//                final ITimestampService timestampService = DataService.this
+//                        .getFederation().getTimestampService();
+//
+//                if (timestampService == null)
+//                    throw new NullPointerException(
+//                            "TimestampService not discovered");
+//
+//                // notify the timestamp service.
+//                timestampService.notifyCommit(commitTime);
+//                                
+//            }
+//            
+//            public long lastCommitTime() throws IOException {
+//                
+//                // resolve the timestamp service.
+//                final ITimestampService timestampService = DataService.this
+//                        .getFederation().getTimestampService();
+//
+//                if (timestampService == null)
+//                    throw new NullPointerException(
+//                            "TimestampService not discovered");
+//
+//                // obtain from the timestamp service.
+//                return timestampService.lastCommitTime();
+//                
+//            }
+//
+//            public void setReleaseTime(final long releaseTime) {
+//
+//                DataService.this.setReleaseTime(releaseTime);
+//                
+//            }
             
         };
 
@@ -505,7 +511,7 @@ abstract public class DataService extends AbstractService
     
     /**
      * Delegate handles custom counters for the {@link ResourceManager}, local
-     * {@link TransactionService} and the {@link ConcurrencyManager}, dynamic
+     * {@link AbstractTransactionService} and the {@link ConcurrencyManager}, dynamic
      * re-attachment of counters, etc. This delegate must be set on the
      * {@link AbstractClient} for those additional features to work.
      * 
@@ -649,7 +655,7 @@ abstract public class DataService extends AbstractService
             serviceRoot.makePath(IDataServiceCounters.concurrencyManager)
                     .attach(service.concurrencyManager.getCounters());
 
-            serviceRoot.makePath(IDataServiceCounters.transactionManager)
+            serviceRoot.makePath(IDataServiceCounters.transactionService)
                     .attach(service.localTransactionManager.getCounters());
 
             // block API.
@@ -811,9 +817,9 @@ abstract public class DataService extends AbstractService
         String concurrencyManager = "Concurrency Manager";
 
         /**
-         * The namespace for the counters pertaining to the {@link ITransactionManager}.
+         * The namespace for the counters pertaining to the {@link ITransactionService}.
          */
-        String transactionManager = "Transaction Manager";
+        String transactionService = "Transaction Manager";
         
         /**
          * The namespace for the counters pertaining to the {@link ResourceManager}.

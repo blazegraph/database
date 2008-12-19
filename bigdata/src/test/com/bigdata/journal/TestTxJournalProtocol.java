@@ -55,19 +55,22 @@ public class TestTxJournalProtocol extends ProxyTestCase {
     /**
      * Test verifies that duplicate transaction identifiers are detected in the
      * case where the first transaction is active.
+     * 
+     * @todo also test with read-historical tx?
      */
     public void test_duplicateTransactionIdentifiers01() throws IOException {
 
         Journal journal = new Journal(getProperties());
 
-        final long startTime = journal.nextTimestamp();
+        final long startTime = -journal.nextTimestamp();
 
-        Tx tx0 = new Tx(journal, journal, startTime, false);
+        Tx tx0 = new Tx(journal.getLocalTransactionManager(), journal,
+                startTime);
 
         try {
 
             // Try to create another transaction with the same identifier.
-            new Tx(journal, journal, startTime, false);
+            new Tx(journal.getLocalTransactionManager(), journal, startTime);
 
             fail("Expecting: " + IllegalStateException.class);
 
@@ -103,16 +106,17 @@ public class TestTxJournalProtocol extends ProxyTestCase {
 
         Journal journal = new Journal(getProperties());
 
-        final long startTime = journal.nextTimestamp();
+        final long startTime = -journal.nextTimestamp();
 
-        ITx tx0 = new Tx(journal, journal, startTime, false/*readOnly*/);
-        
-        tx0.prepare(0L/*journal.nextTimestamp()*/);
+        ITx tx0 = new Tx(journal.getLocalTransactionManager(), journal,
+                startTime);
+
+        tx0.prepare(0L/* journal.nextTimestamp() */);
 
         try {
 
             // Try to create another transaction with the same start time.
-            new Tx(journal, journal, startTime, false);
+            new Tx(journal.getLocalTransactionManager(), journal, startTime);
 
             fail("Expecting: " + IllegalStateException.class);
 

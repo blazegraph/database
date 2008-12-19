@@ -30,11 +30,11 @@ package com.bigdata.service;
 import java.io.IOException;
 import java.rmi.Remote;
 
-import com.bigdata.journal.ITransactionManager;
+import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ValidationError;
 
 /**
- * Remote interface by which the centralized {@link ITransactionManager} manages
+ * Remote interface by which the centralized {@link ITransactionService} manages
  * the state of transactions on the distributed {@link IDataService}s.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -43,16 +43,22 @@ import com.bigdata.journal.ValidationError;
 public interface IRemoteTxCommitProtocol extends Remote {
 
     /**
-     * Notify a data service that it may release data required to support views
-     * for the specified release time (basically, this releases any read locks
-     * on views for timestamps up to and including the specified release time).
+     * Notify a data service that it MAY release data required to support views
+     * for up to the specified <i>releaseTime </i>. This is the mechanism by
+     * which read locks are released. In effect, a read lock is a requirement
+     * that the releaseTime not be advanced as far as the start time of the
+     * transaction holding that read lock. Periodically and as transactions
+     * complete, the transaction manager will advance the releaseTime, thereby
+     * releasing read locks.
      * 
      * @param releaseTime
      *            The new release time (strictly advanced by the transaction
      *            manager).
      * 
-     * @todo when the release time is advanced any active transactions (or
-     *       lightweight reads) GTE the new release time should be interrupted.
+     * @throws IllegalStateException
+     *             if the read lock is set to a time earlier than its current
+     *             value.
+     * @throws IOException
      */
     public void setReleaseTime(long releaseTime) throws IOException;
 
@@ -71,7 +77,11 @@ public interface IRemoteTxCommitProtocol extends Remote {
     public void prepare(long tx) throws ValidationError, IOException;
 
     /**
-     * Request commit of the transaction by the data service.
+     * Request commit of the transaction by the data service. In the case where
+     * the transaction is entirely contained on the data service this method may
+     * be used to both prepare (validate) and commit the transaction (a single
+     * phase commit). Otherwise a 2-/3- phase commit is required and a separate
+     * {@link #prepare(long)} message MUST be used.
      * 
      * @param tx
      *            The transaction identifier.
@@ -89,17 +99,22 @@ public interface IRemoteTxCommitProtocol extends Remote {
      * @throws IllegalStateException
      *             if the transaction is a read-write transaction and a timeout
      *             has invalidated {@link #prepare(long) prepared} commit.
+     * @throws ValidationError
+     *             if validation fails (single-phase commit only).
+     * @throws IOException
      */
-    public void commit(long tx, long commitTime) throws IOException;
+    public void commit(long tx, long commitTime) throws ValidationError,
+            IOException;
 
     /**
      * Request abort of the transaction by the data service.
      * 
      * @param tx
      *            The transaction identifier.
-     *            
+     * 
      * @throws IllegalArgumentException
      *             if the transaction has not been started on this data service.
+     * @throws IOException
      */
     public void abort(long tx) throws IOException;
 

@@ -33,7 +33,7 @@ import com.bigdata.service.jini.DataServer;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.LoadBalancerServer;
 import com.bigdata.service.jini.MetadataServer;
-import com.bigdata.service.jini.TimestampServer;
+import com.bigdata.service.jini.TransactionServer;
 import com.bigdata.service.mapReduce.TestEmbeddedMaster;
 import com.bigdata.service.mapred.AbstractMaster;
 import com.bigdata.service.mapred.MapReduceJob;
@@ -118,7 +118,7 @@ public class TestMaster extends AbstractServerTestCase {
     /**
      * Starts in {@link #setUp()}.
      */
-    TimestampServer timestampServer0;
+    TransactionServer timestampServer0;
     /**
      * Starts in {@link #setUp()}.
      */
@@ -159,7 +159,7 @@ public class TestMaster extends AbstractServerTestCase {
         /*
          * Start the timestamp server.
          */
-        timestampServer0 = new TimestampServer(
+        timestampServer0 = new TransactionServer(
                 new String[] { "src/resources/config/standalone/TimestampServer0.config"
                         });
         

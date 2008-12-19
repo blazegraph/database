@@ -86,7 +86,7 @@ import com.bigdata.util.ChecksumUtility;
  * </p><p>
  * This class is an abstract implementation of the {@link IJournal} interface
  * that does not implement the {@link IConcurrencyManager},
- * {@link IResourceManager}, or {@link ITransactionManager} interfaces. There
+ * {@link IResourceManager}, or {@link ITransactionService} interfaces. There
  * are several classes which DO support all of these features, relying on the
  * {@link AbstractJournal} for their underlying persistence store. These
  * include:
@@ -208,7 +208,7 @@ import com.bigdata.util.ChecksumUtility;
  *       we could throw a single exception that indicated that the journal had
  *       been asynchronously closed.
  */
-public abstract class AbstractJournal implements IJournal, ITimestampService {
+public abstract class AbstractJournal implements IJournal/*, ITimestampService*/ {
 
     /**
      * Logger.
@@ -1783,7 +1783,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
          * Get timestamp that will be assigned to this commit (RMI if the
          * journal is part of a distributed federation).
          */
-        final long commitTime = transactionManager.nextTimestampRobust();
+        final long commitTime = transactionManager.nextTimestamp();
         
         // do the commit.
         final long commitTime2 = commitNow(commitTime);
@@ -1808,7 +1808,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
          * something like a 2/3-phase commit for this to be robust.
          */
         
-        transactionManager.notifyCommitRobust(commitTime);
+        transactionManager.notifyCommit(commitTime);
             
         return commitTime;
         
@@ -2521,7 +2521,15 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      */
     public void registerIndex(final IndexMetadata metadata) {
 
-        registerIndex(metadata.getName(), metadata);
+        if (metadata == null)
+            throw new IllegalArgumentException();
+
+        final String name = metadata.getName();
+
+        if (name == null)
+            throw new IllegalArgumentException();
+        
+        registerIndex(name, metadata);
         
     }
     

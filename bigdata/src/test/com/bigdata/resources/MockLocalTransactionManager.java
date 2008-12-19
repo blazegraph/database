@@ -1,9 +1,7 @@
 package com.bigdata.resources;
 
-import java.io.IOException;
-
 import com.bigdata.journal.AbstractLocalTransactionManager;
-import com.bigdata.util.MillisecondTimestampFactory;
+import com.bigdata.journal.ITransactionService;
 
 /**
  * Mock implementation used by some of the unit tests.
@@ -13,41 +11,15 @@ import com.bigdata.util.MillisecondTimestampFactory;
  */
 class MockLocalTransactionManager extends AbstractLocalTransactionManager {
 
-    public MockLocalTransactionManager(ResourceManager resourceManager) {
+    public MockLocalTransactionManager() {
 
-        super(resourceManager);
+        super();
 
     }
 
-    public long nextTimestamp() {
-
-        return MillisecondTimestampFactory.nextMillis();
-        
+    public ITransactionService getTransactionService() {
+        // TODO Auto-generated method stub
+        return null;
     }
 
-    public long lastCommitTime() throws IOException {
-        
-        return lastCommitTime;
-        
-    }
-
-    synchronized public void notifyCommit(final long commitTime)
-            throws IOException {
-
-        if (commitTime > lastCommitTime) {
-
-            lastCommitTime = commitTime;
-
-        }
-        
-    }
-    
-    private volatile long lastCommitTime = 0L;
-
-    public void setReleaseTime(final long releaseTime) {
-        
-        // NOP.
-        
-    }
-    
 }

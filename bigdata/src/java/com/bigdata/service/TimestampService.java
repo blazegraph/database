@@ -28,22 +28,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
-import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
 import org.apache.log4j.MDC;
 
 import com.bigdata.journal.ITimestampService;
-import com.bigdata.journal.ITransactionManager;
 import com.bigdata.util.MillisecondTimestampFactory;
 
 /**
  * Basic {@link ITimestampService} implementation provides distinct and strictly
  * increasing timestamps with no more than millisecond resolution.
- * 
- * @todo this will probably get upgraded to an {@link ITransactionManager}. See
- *       {@link TransactionService}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -75,70 +70,6 @@ abstract public class TimestampService extends AbstractService implements
     final public long nextTimestamp() {
         
         return MillisecondTimestampFactory.nextMillis();
-        
-    }
-    
-    final public long lastCommitTime() {
-        
-        return lastCommitTime;
-        
-    }
-    
-    final public void notifyCommit(final long commitTime) {
-            
-        synchronized(lastCommitTimeLock) {
-            
-            /*
-             * Note: commit time notifications can be overlap such that they
-             * appear out of sequence with respect to their values. This is Ok.
-             * We just ignore any older commit times. However we do need to be
-             * synchronized here such that the commit time notices themsevles
-             * are serialized in order for us not to miss any.
-             */
-            
-            if (lastCommitTime < commitTime) {
-
-                lastCommitTime = commitTime;
-                
-            }
-            
-        }
-        
-    }
-    
-    /**
-     * The last (known) commit time.
-     * 
-     * @todo must be restart safe.  can be obtained by querying data services
-     * or written in a local file.
-     */
-    private long lastCommitTime = 0L;
-    private final Object lastCommitTimeLock = new Object();
-
-    /**
-     * Notifies all data services of the new release time.
-     */
-    public void setReleaseTime(final long releaseTime) {
-        
-        final IBigdataFederation fed = getFederation();
-        
-        final UUID[] a = fed.getDataServiceUUIDs(0/*maxCount*/);
-        
-        // @todo notify services in parallel?
-        // @todo robustness if IOException?
-        for(UUID serviceUUID : a) {
-            
-            try {
-                
-                fed.getDataService(serviceUUID).setReleaseTime(releaseTime);
-                
-            } catch(IOException ex) {
- 
-                throw new RuntimeException(ex);
-                
-            }
-            
-        }
         
     }
     
@@ -191,19 +122,11 @@ abstract public class TimestampService extends AbstractService implements
         
     }
 
-    /** NOP */
-    @Override
-    public TimestampService start() {
-        
-        return this;
-        
-    }
-    
-    public Class getServiceIface() {
-
-        return ITimestampService.class;
-        
-    }
+//    public Class getServiceIface() {
+//
+//        return ITimestampService.class;
+//        
+//    }
 
     public boolean isOpen() {
         

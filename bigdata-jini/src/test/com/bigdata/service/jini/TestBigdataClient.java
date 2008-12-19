@@ -72,7 +72,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
     /**
      * Starts in {@link #setUp()}.
      */
-    TimestampServer timestampServer0;
+    TransactionServer timestampServer0;
     ITimestampService timestampService0;
     
     /**
@@ -118,7 +118,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
         /*
          * Start up a timestamp server.
          */
-        timestampServer0 = new TimestampServer(new String[] {
+        timestampServer0 = new TransactionServer(new String[] {
                 "src/resources/config/standalone/TimestampServer0.config"
 //                , AbstractServer.ADVERT_LABEL+groups 
                 });
@@ -222,7 +222,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
         final JiniFederation fed = client.connect();
 
         // resolve proxy.
-        timestampService0 = fed.getTimestampService();
+        timestampService0 = fed.getTransactionService();
         assertNotNull("timestampService",timestampService0);
         
         // resolve proxy.
