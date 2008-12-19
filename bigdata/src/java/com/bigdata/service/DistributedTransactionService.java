@@ -29,14 +29,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
-import com.bigdata.journal.ValidationError;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.resources.StoreManager;
+import com.bigdata.util.concurrent.ExecutionExceptions;
 
 /**
  * Implementation for an {@link IBigdataFederation}.
@@ -73,79 +78,93 @@ public abstract class DistributedTransactionService extends
     }
 
     @Override
-    protected void abortImpl(final long tx) {
+    protected void abortImpl(final long tx) throws Exception {
 
-        try {
+        /*
+         * Note: Don't abort a read-only tx since there is no local state on the
+         * data service.
+         */
+        assert !TimestampUtility.isReadOnly(tx);
+        
+        final TxState state = activeTx.get(tx);
 
-            final TxState t = activeTx.get(tx);
+        if (state == null)
+            throw new IllegalStateException();
 
-            if (t == null)
-                throw new IllegalStateException();
-            
-            assert t.lock.isHeldByCurrentThread();
-            
-            assert t.isActive();
+        assert state.lock.isHeldByCurrentThread();
 
-            /*
-             * @todo won't work for read-only since wroteOn is not notified. if
-             * necessary change to startedOn(tx,dataServiceUUID) so that we can
-             * release the local state on the ds's txmgr.
-             */
-            final UUID[] uuids = t.getDataServiceUUIDs();
+        assert state.isActive();
 
-            for (UUID uuid : uuids) {
+        final UUID[] uuids = state.getDataServiceUUIDs();
 
-                try {
+        List<Throwable> causes = null;
+        
+        for (UUID uuid : uuids) {
 
-                    final IDataService dataService = getFederation()
-                            .getDataService(uuid);
+            try {
 
-                    dataService.abort(t.tx);
+                final IDataService dataService = getFederation()
+                        .getDataService(uuid);
 
-                } catch (Throwable t2) {
+                dataService.abort(state.tx);
 
-                    /*
-                     * @todo collect all causes and always throw an error if any
-                     * ds abort fails.
-                     */
-                    log.error(t2, t2);
+            } catch (Throwable t2) {
 
+                /*
+                 * Collect all causes and always throw an error if any data
+                 * service abort fails.
+                 */
+                
+                log.error(t2, t2);
+
+                if (causes == null) {
+                    
+                    causes = new LinkedList<Throwable>();
+                    
                 }
+                
+                causes.add(t2);
                 
             }
 
-        } catch (Throwable t) {
-
-            throw new RuntimeException(t);
-
         }
+        
+        if (causes != null)
+            throw new ExecutionExceptions(causes);
 
     }
 
     @Override
-    protected void commitImpl(final long tx, final long commitTime)
-            throws ValidationError {
-
-        final TxState t = activeTx.get(tx);
+    protected long commitImpl(final long tx) throws Exception {
         
-        if (t == null)
+        final TxState state = activeTx.get(tx);
+        
+        if (state == null)
             throw new IllegalStateException();
         
-        // @todo unless we always need to commit/abort on each touched ds.
-        if (!t.isReadOnly() && t.isEmptyWriteSet()) {
+        if (state.isReadOnly() || state.isEmptyWriteSet()) {
             
-            // NOP
-            return;
+            /*
+             * Note: We do not maintain any transaction state on the client for
+             * read-only transactionss.
+             * 
+             * Note: If the write set is empty then the transaction was never
+             * started on any data service so we do not need to notify any data
+             * service. In effect, the tx was writable but no writes were
+             * requested.
+             */
+            
+            return 0L;
             
         }
         
-        if (t.isDistributed()) {
+        if (state.isDistributed()) {
 
-            twoPhaseCommit(t, commitTime);
+            return twoPhaseCommit(state);
 
         } else {
 
-            singlePhaseCommit(t, commitTime);
+            return singlePhaseCommit(state);
 
         }
 
@@ -155,8 +174,7 @@ public abstract class DistributedTransactionService extends
      * Prepare and commit a read-write transactions that has written on a single
      * data service.
      */
-    protected void singlePhaseCommit(final TxState tx, final long commitTime) 
-        throws ValidationError {
+    protected long singlePhaseCommit(final TxState tx) throws Exception {
 
         assert tx.lock.isHeldByCurrentThread();
 
@@ -170,16 +188,7 @@ public abstract class DistributedTransactionService extends
         final IDataService dataService = getFederation().getDataService(
                 serviceUUID);
 
-        try {
-
-            // note: prepare + commit.
-            dataService.commit(tx.tx, commitTime);
-
-        } catch (IOException ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
+        return dataService.singlePhaseCommit(tx.tx);
 
     }
     
@@ -188,95 +197,122 @@ public abstract class DistributedTransactionService extends
      * one data service.
      * <p>
      * Note: read-write transactions that have written on multiple journals must
-     * use a 2-/3-phase commit protocol. Latency is critical in multi-phase
-     * commits since the journals will be unable to perform unisolated writes
-     * until the transaction either commits or aborts.
+     * use a 2-/3-phase commit protocol. As part of the commit protocol, we
+     * obtain an exclusive write lock on each journal on which the transaction
+     * has written. This is necessary in order for the transaction as a whole to
+     * be assigned a single commit time. Latency is critical in this commit
+     * protocol since the journals participating in the commit will be unable to
+     * perform any unisolated operations until the transaction either commits or
+     * aborts.
+     * 
+     * @throws Exception
+     *             if anything goes wrong.
+     * 
+     * @return The commit time for the transaction.
      */
-    protected void twoPhaseCommit(final TxState tx, final long commitTime) {
+    protected long twoPhaseCommit(final TxState tx) throws Exception {
 
         assert tx.lock.isHeldByCurrentThread();
 
         final UUID[] uuids = tx.getDataServiceUUIDs();
 
-        /*
-         * @todo issue prepare messages concurrently to reduce latency,
-         * collecting all exceptions and reporting them all back to the
-         * client. If the exceptions are just validation errors then we can
-         * summarize since the client does not need to know about the
-         * details, just that the tx could be be validated and hence was
-         * aborted.
-         * 
-         * @todo resolve data services once (not one for prepare and once
-         * for commit).
-         * 
-         * @todo if any prepare messages fail, then ALL data services must
-         * abort (since all services have write sets that need to be
-         * discarded).
-         * 
-         * @todo prepare might well flush any writes not related to the tx
-         * by gaining an exclusive write service lock, forcing a commit of
-         * any running tasks, and then preparing and continuing to hold the
-         * lock until a commit message is received or a timeout occurs.
-         */
-        try {
+        // resolve UUIDs to services (arrays are correlated).
+        final IDataService[] services = new IDataService[uuids.length];
+        {
+
+            int i = 0;
 
             for (UUID uuid : uuids) {
 
-                final IDataService dataService = getFederation()
-                        .getDataService(uuid);
-
-                /*
-                 * @todo ITx#prepare() appears to already want the
-                 * commitTime. reconcile this.
-                 */
-                dataService.prepare(tx.tx);
+                services[i++] = getFederation().getDataService(uuid);
 
             }
-
-        } catch (Throwable t) {
-
-            /*
-             * Caller will abort.
-             */
-
-            if (t instanceof ValidationError)
-                throw (ValidationError) t;
-
-            throw new RuntimeException(t);
-
+            
         }
 
         /*
+         * FIXME 2-phase commit impl.
+         * 
+         * Note: We can not issue the [revisionTime] for the tx commit until we
+         * have the write lock for the indices isolated by the transaction on
+         * all of the journals since there may be ongoing work for the
+         * transaction in queues on some journals (not good practice, but could
+         * be true).
+         * 
+         * This requires a callback to the txservice once the write lock is held
+         * on the necessary indices before validation may proceed. All callers
+         * will have to wait at a barrier until the write lock is held for all
+         * data services. At that point we can issue the next timestamp as the
+         * commit time and the journals can go forth and prepare.
+         * 
+         * Prepare should validate and merge down onto the unisolated indices.
+         * 
+         * Each preparer again waits at a barrier. Once they are all ready, we
+         * inspect the prepare outcomes. If any preparer failed, then we issue
+         * an abort to all participating services. Otherwise we issue a commit.
+         * Both the abort() and the commit() message will cause the exclusive
+         * write lock (which has to be held all this time) to be released.
+         * 
+         * @todo resolve data services once (not one for prepare and once for
+         * commit).
+         * 
+         * @todo this might flush any writes not related to the tx when it gains
+         * an exclusive write service lock by forcing a commit of any running
+         * tasks, and then doing {prepare+mergeDown} and continuing to hold the
+         * lock until a commit message is received or a timeout occurs.
+         * 
+         * @todo allow interrupt of the data service if any task fails during
+         * prepare+mergeDown.
+         * 
+         * @todo if any data service fails, then ALL data services must abort
+         * (since all services have write sets that need to be discarded).
+         * 
          * @todo issue commit messages concurrently to reduce latency
          * 
-         * @todo if any commit messages fail, then we have a problem since
-         * the data may be restart safe on some of the journals. A three
-         * phase commit would prevent further commits by the journal until
-         * all journals had successfully committed and would rollback the
-         * journals to the prior commit points (touching the root block to
-         * do this) if any journal failed to commit.
+         * @todo if any commit messages fail, then we have a problem since the
+         * data may be restart safe on some of the journals. A three phase
+         * commit would prevent further commits by the journal until all
+         * journals had successfully committed and would rollback the journals
+         * to the prior commit points (touching the root block to do this) if
+         * any journal failed to commit.
          */
+        
+        // futures for the tasks running the 2-phase commit on each data service.
+        final List<Future<Void>> futures = new ArrayList<Future<Void>>(uuids.length);
+        {
 
-        try {
+            List<Throwable> causes = null;
 
-            for (UUID uuid : uuids) {
+            final long revisionTime = nextTimestamp();
 
-                final IDataService dataService = getFederation()
-                        .getDataService(uuid);
+            for (IDataService dataService : services) {
 
-                dataService.commit(tx.tx, commitTime);
+                try {
+
+                    futures.add(dataService
+                            .twoPhasePrepare(tx.tx, revisionTime));
+
+                } catch (Throwable t) {
+
+                    causes.add(t);
+
+                }
 
             }
 
-        } catch (Throwable t) {
-
-            /*
-             * caller will abort.
-             */
-
-            throw new RuntimeException(t);
-
         }
+        
+        /*
+         * FIXME monitor the futures until all are done or the first on errors.
+         * On error, cancel all other futures.
+         * 
+         * FIXME Bother! The futures will not be done until the commit is done.
+         * We are lacking the means to create a barrier before obtaining the
+         * commitTime and triggering the commit phase!!! One more time to
+         * refactor...
+         */
+        
+        throw new UnsupportedOperationException();
 
     }
 

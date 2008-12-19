@@ -26,6 +26,7 @@ package com.bigdata.journal;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.BlockingQueue;
@@ -298,6 +299,12 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      */
     final private ConcurrentHashMap<Thread,AbstractTask> active = new ConcurrentHashMap<Thread,AbstractTask>();
 
+    /**
+     * The set of tasks that make it into the commit group (so that we can set
+     * the commit time on each of them iff the goup commit succeeds).
+     */
+    final private Map<Thread,AbstractTask> commitGroup = new LinkedHashMap<Thread, AbstractTask>();
+    
     /** #of write tasks completed since the last commit. */
     final private AtomicInteger nwrites = new AtomicInteger(0);
     
@@ -701,6 +708,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 
                 assert nwrites > 0;
 
+                // add to the commit group.
+                commitGroup.put(Thread.currentThread(), r);
+                
                 // another task executed successfully.
                 successTaskCount++;
 
@@ -1837,7 +1847,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
             resetState();
             
-            return false;            
+            return false;
             
         }
         
@@ -1894,6 +1904,23 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 
             }
 
+            /*
+             * Set the commitTime on each of the tasks in the commitGroup.
+             * 
+             * Note: [commitGroup] is cleared by resetState() in finally{}.
+             */
+            {
+                
+                assert nwrites.get() == commitGroup.size();
+                
+                for (AbstractTask task : commitGroup.values()) {
+                
+                    task.commitTime = timestamp;
+                    
+                }
+                
+            }
+            
             // #of commits that succeeded.
             ngroupCommits.incrementAndGet();
             
@@ -2149,6 +2176,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             // no write tasks are awaiting commit.
             nwrites.set(0);
 
+            commitGroup.clear();
+            
 //            // clear the set of active tasks.
 //            active.clear();
 

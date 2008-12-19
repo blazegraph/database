@@ -28,8 +28,6 @@
 
 package com.bigdata.journal;
 
-import java.io.IOException;
-
 import com.bigdata.service.IServiceShutdown;
 
 /**
@@ -48,12 +46,6 @@ public interface ILocalTransactionManager extends /*ITransactionManager,*/ IServ
      * case this may require the service to be discovered).
      */
     public ITransactionService getTransactionService();
-    
-//    /** #of active transactions. */
-//    public int getActiveTxCount();
-//    
-//    /** #of pending transactions. */
-//    public int getPreparedTxCount();
     
     /**
      * Notify the journal that a new transaction is being activated (starting on
@@ -94,24 +86,22 @@ public interface ILocalTransactionManager extends /*ITransactionManager,*/ IServ
     /**
      * Lookup an active or prepared transaction (exact match).
      * 
-     * @param startTime
-     *            The start timestamp for the transaction.
+     * @param tx
+     *            The transaction identifier.
      * 
-     * @return The transaction with that start time or <code>null</code> if
-     *         the start time is not mapped to either an active or prepared
+     * @return The transaction -or- <code>null</code> if there is no such
      *         transaction.
      */
-    public ITx getTx(long startTime);
+    public ITx getTx(long tx);
     
     /**
-     * Return the next timestamp from the {@link ITimestampService}. This
-     * method is "robust" and will "retry"
-     * {@link ITimestampService#nextTimestamp()} several times before giving up,
-     * quietly handling both {@link NullPointerException}s (indicating that the
-     * service has not been discovered yet) and {@link IOException}s
-     * (indicating a problem with RMI).
+     * Return the next timestamp from the {@link ITransactionService}.
+     * <p>
+     * Note: This method is "robust" and will "retry"
+     * {@link ITransactionService#nextTimestamp()} several times before giving
+     * up.
      * 
-     * @return The next timestamp assigned by the {@link ITimestampService}.
+     * @return The next timestamp assigned by the {@link ITransactionService}.
      * 
      * @throws RuntimeException
      *             if the service can not be resolved or the timestamp can not

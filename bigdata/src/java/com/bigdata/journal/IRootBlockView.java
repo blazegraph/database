@@ -158,10 +158,10 @@ public interface IRootBlockView {
     /**
      * Return the address at which the {@link ICommitRecord} for this root block
      * is stored. The {@link ICommitRecord}s are stored separately from the
-     * root block so that they may be indexed by the
-     * {@link #getCommitTimestamp()}. This is necessary in order to be able to
-     * quickly recover the root addresses for a given commit timestamp, which is
-     * a featured used to support transactional isolation.
+     * root block so that they may be indexed by the commit timestamps. This is
+     * necessary in order to be able to quickly recover the root addresses for a
+     * given commit timestamp, which is a featured used to support transactional
+     * isolation.
      * <p>
      * Note: When a logical journal may overflow onto more than one physical
      * journal then the address of the {@link ICommitRecord} MAY refer to a

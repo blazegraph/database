@@ -66,7 +66,6 @@ public class JoinIndexPartitionTask extends
 
     /**
      * @param resourceManager
-     * @param concurrencyManager
      * @param lastCommitTime
      * @param resource
      *            The names of the index partitions to be joined. These names
@@ -318,7 +317,7 @@ public class JoinIndexPartitionTask extends
         private final JoinResult result;
 
         /**
-         * @param concurrencyManager
+         * @param resourceManager
          * @param startTime
          * @param resource
          *            All resources (both the new index partition arising from

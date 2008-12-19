@@ -43,7 +43,7 @@ public class IncrementalBuildTask extends
 
     /**
      * 
-     * @param concurrencyManager
+     * @param resourceManager
      * @param lastCommitTime
      *            The lastCommitTime of the journal whose view of the index
      *            you wish to capture in the generated {@link IndexSegment}.

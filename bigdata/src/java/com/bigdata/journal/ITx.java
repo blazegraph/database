@@ -27,6 +27,7 @@ import java.util.Date;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.isolation.IsolatedFusedView;
+import com.bigdata.service.IDataService;
 
 /**
  * <p>
@@ -96,58 +97,94 @@ public interface ITx {
      */
     public long getStartTimestamp();
 
-    /**
-     * Return the commit timestamp assigned to this transaction by a centralized
-     * transaction manager service.
-     * 
-     * @return The commit timestamp assigned to this transaction.
-     * 
-     * @exception UnsupportedOperationException
-     *                unless the transaction is writable.
-     * 
-     * @exception IllegalStateException
-     *                if the transaction is writable but has not yet prepared (
-     *                the commit time is assigned when the transaction is
-     *                prepared).
-     */
-    public long getCommitTimestamp();
+//    /**
+//     * Return the timestamp assigned to this transaction by a centralized
+//     * transaction manager service during its prepare+commit protocol. This
+//     * timestamp is written into the tuples modified by the transaction when
+//     * they are merged down onto the unisolated indices. Write-write conflicts
+//     * for transactions are detected (during validation) based on those revision
+//     * timestamps.
+//     * 
+//     * @return The revision timestamp assigned to this transaction.
+//     * 
+//     * @exception UnsupportedOperationException
+//     *                unless the transaction is writable.
+//     * 
+//     * @exception IllegalStateException
+//     *                if the transaction is writable but has not yet prepared (
+//     *                the commit time is assigned when the transaction is
+//     *                prepared).
+//     */
+//    public long getRevisionTimestamp();
     
     /**
-     * Prepare the transaction for a {@link #commit()} by validating the write
-     * set for each index isolated by the transaction.
+     * Validate the write set of the named indices isolated transaction and
+     * merge down that write set onto the corresponding unisolated indices but
+     * DOES NOT commit the data. As a post-condition, the {@link RunState} of
+     * the transaction will be {@link RunState#Prepared} iff successful and
+     * {@link RunState#Aborted} otherwise.
+     * <p>
+     * For a single-phase commit the caller MUST hold an exclusive lock on the
+     * unisolated indices on which this operation will write.
+     * <p>
+     * For a distributed transaction, the caller MUST hold a lock on the
+     * {@link WriteExecutorService} for each {@link IDataService} on which the
+     * transaction has written.
      * 
-     * @param commitTime
-     *            The commit time assigned by a centralized transaction manager
-     *            service -or- ZERO (0L) IFF the transaction is read-only.
+     * @param revisionTime
+     *            The revision time assigned by a centralized transaction
+     *            manager service -or- ZERO (0L) IFF the transaction is
+     *            read-only.
      * 
-     * @exception IllegalStateException
-     *                if the transaction is not active. If the transaction is
-     *                not complete, then it will be aborted.
-     * 
-     * @exception ValidationError
-     *                If the transaction can not be validated. If this exception
-     *                is thrown, then the transaction was aborted.
+     * @throws IllegalStateException
+     *             if the transaction is not active. If the transaction is not
+     *             complete, then it will be aborted.
+     * @throws ValidationError
+     *             If the transaction can not be validated. If this exception is
+     *             thrown, then the transaction was aborted.
      */
-    public void prepare(long commitTime);
+    public void prepare(long revisionTime);
 
-    /**
-     * Commit a transaction that has already been {@link #prepare(long)}d.
-     * 
-     * @return The commit time assigned to the transactions -or- 0L if the
-     *         transaction was read-only or if it has an empty write set.
-     * 
-     * @exception IllegalStateException
-     *                If the transaction has not {@link #prepare(long) prepared}.
-     *                If the transaction is not already complete, then it is
-     *                aborted.
-     */
-    public long commit();
+//    /**
+//     * Merge down the write set of a transaction that has already been
+//     * {@link #prepare(long)}d onto the unisolated indices. The caller MUST
+//     * hold an exclusive lock on at least the unisolated indices on which this
+//     * operation will write. For a distributed transaction, the caller MUST hold
+//     * a lock on the {@link WriteExecutorService} for each {@link IDataService}
+//     * on which the transaction has written before invoking either
+//     * {@link #prepare(long)} or this method.
+//     * 
+//     * @param revisionTime
+//     *            The revision time assigned by a centralized transaction
+//     *            manager service -or- ZERO (0L) IFF the transaction is
+//     *            read-only.
+//     * 
+//     * @throws IllegalStateException
+//     *             If the transaction has not {@link #prepare(long) prepared}.
+//     *             If the transaction is not already complete, then it is
+//     *             aborted.
+//     * 
+//     * FIXME Since this no longer commits the backing store it must not change
+//     * the state from {@link RunState#Prepared} to {@link RunState#Committed}.
+//     * Instead, {@link #prepare(long)} and {@link #mergeDown()} should be
+//     * combined into a single {@link #prepare(long)} method and the caller must
+//     * be responsible for handshaking with the {@link ILocalTransactionManager}
+//     * and this interface to make sure that the state of the {@link ITx} is
+//     * update to reflect success or failure (or that the {@link ITx} is just
+//     * removed from the {@link ILocalTransactionManager}'s tables so that its
+//     * state is no longer visible).
+//     * 
+//     * @todo also note that merely letting the {@link ITx} become weakly
+//     *       reachable is enough for it to release its resources, including any
+//     *       temporary store.
+//     */
+//    public void mergeDown(final long revisionTime);
 
     /**
      * Abort the transaction.
      * 
-     * @exception IllegalStateException
-     *                if the transaction is already complete.
+     * @throws IllegalStateException
+     *             if the transaction is already complete.
      */
     public void abort();
 
@@ -216,7 +253,7 @@ public interface ITx {
      * {@link IsolatedFusedView} will be validated against the then current commited
      * state of the named index.
      * <p>
-     * During {@link #commit()}, the validated write sets will be merged down
+     * During {@link #mergeDown()}, the validated write sets will be merged down
      * onto the then current committed state of the named index.
      * 
      * @param name

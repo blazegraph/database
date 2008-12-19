@@ -290,20 +290,21 @@ public class ResourceEvents {
     /**
      * Report completion of a transaction.
      * 
-     * @param startTime
+     * @param tx
      *            The transaction identifier.
-     * @param commitTime
-     *            The commit timestamp (non-zero iff this was a writable
+     * @param revisionTime
+     *            The timestamp assigned to the revisions written by the
+     *            transactions when it commits (non-zero iff this was a writable
      *            transaction that committed successfully and zero otherwise).
      * @param aborted
      *            True iff the transaction aborted vs completing successfully.
      */
-    static public void closeTx(long startTime, long commitTime, boolean aborted) {
+    static public void closeTx(long tx, long revisionTime, boolean aborted) {
 
         if (INFO)
-            log.info("tx=" + startTime + ", commitTime=" + commitTime
+            log.info("tx=" + tx + ", revisionTime=" + revisionTime
                     + ", aborted=" + aborted + ", elapsed="
-                    + (commitTime - startTime));
+                    + (revisionTime - tx));
 
     }
 

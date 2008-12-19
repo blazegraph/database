@@ -173,7 +173,7 @@ public class AbstractResourceManagerTestCase extends
         concurrencyManager = new ConcurrencyManager(properties,
                 localTransactionManager, resourceManager);
 
-        localTransactionManager.setConcurrencyManager(concurrencyManager);
+//        localTransactionManager.setConcurrencyManager(concurrencyManager);
 
         resourceManager.setConcurrencyManager(concurrencyManager);
         
@@ -297,18 +297,6 @@ public class AbstractResourceManagerTestCase extends
             throw new UnsupportedOperationException();
         }
 
-        public void prepare(long tx) throws ValidationError, IOException {
-            throw new UnsupportedOperationException();
-        }
-
-        public void commit(long tx,long commitTime) throws IOException {
-            throw new UnsupportedOperationException();
-        }
-
-        public void abort(long tx) throws IOException {
-            throw new UnsupportedOperationException();
-        }
-
         public void splitIndexPartition(String name,
                 PartitionLocator oldLocator, PartitionLocator[] newLocators)
                 throws IOException, InterruptedException, ExecutionException {
@@ -399,6 +387,33 @@ public class AbstractResourceManagerTestCase extends
         public void setReleaseTime(long releaseTime) {
             // TODO Auto-generated method stub
             
+        }
+
+        public void abort(long tx) throws IOException {
+
+            throw new UnsupportedOperationException();
+            
+        }
+
+        public long singlePhaseCommit(long tx) throws InterruptedException,
+                ExecutionException, IOException {
+
+            throw new UnsupportedOperationException();
+
+        }
+
+        public Future<Void> twoPhasePrepare(long tx, long revisionTime)
+                throws InterruptedException, ExecutionException, IOException {
+
+            throw new UnsupportedOperationException();
+
+        }
+
+        public void twoPhaseCommit(long tx, long commitTime)
+                throws InterruptedException, ExecutionException, IOException {
+
+            throw new UnsupportedOperationException();
+
         }
 
     }

@@ -269,7 +269,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
      * Note: This is synchronized since it MAY be invoked directly while
      * concurrent writers are running and not just from {@link #overflow(long)}.
      */
-    synchronized public void truncate(long newExtent) {
+    synchronized public void truncate(final long newExtent) {
 
         final long newUserExtent = newExtent - headerSize;
         

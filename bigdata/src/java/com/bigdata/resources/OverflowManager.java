@@ -1079,7 +1079,7 @@ abstract public class OverflowManager extends IndexManager {
          * Note: We assign the same timestamp to the createTime of the new
          * journal and the closeTime of the old journal.
          */
-        final long createTime = nextTimestampRobust();
+        final long createTime = nextTimestamp();
         final long closeTime = createTime;
 
         /*

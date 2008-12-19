@@ -188,7 +188,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
      * the readability of the trace of the choosen tasks for the
      * {@link PostProcessOldJournalTask}.
      * 
-     * @param concurrencyManager
+     * @param resourceManager
      * @param lastCommitTime
      *            The lastCommitTime of the old journal.
      * @param resource
@@ -713,7 +713,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
         final private MoveResult moveResult;
 
         /**
-         * @param concurrencyManager
+         * @param resourceManager
          * @param resource
          *            The source index partition.
          * @param moveResult

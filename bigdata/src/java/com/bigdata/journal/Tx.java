@@ -39,6 +39,8 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.isolation.IsolatedFusedView;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.ResourceManager;
+import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IDataService;
 
 /**
  * <p>
@@ -49,7 +51,7 @@ import com.bigdata.resources.ResourceManager;
  * {@link IsolatedFusedView}. The write set is validated when the transaction
  * {@link #prepare()}s. The write set is merged down onto the global state when
  * the transaction commits. When the transaction is read-only, writes will be
- * rejected and {@link #prepare()} and {@link #commit()} are NOPs.
+ * rejected and {@link #prepare()} and {@link #mergeDown()} are NOPs.
  * </p>
  * <p>
  * The write set of a transaction is written onto a {@link TemporaryRawStore}.
@@ -80,12 +82,14 @@ import com.bigdata.resources.ResourceManager;
  *       message. A timeout would cause the buffered writes to be discarded (by
  *       an abort).
  * 
- * @todo track whether or not the transaction has written any isolated data (I
- *       currently rangeCount the isolated indices in {@link #isEmptyWriteSet()}).
- *       do this at the same time that I modify the isolated indices use a
- *       delegation strategy so that I can trap attempts to access an isolated
- *       index once the transaction is no longer active. define "active" as up
- *       to the point where a "commit" or "abort" is _requested_ for the tx.
+ * @todo Modify the isolated indices use a delegation strategy so that I can
+ *       trap attempts to access an isolated index once the transaction is no
+ *       longer active? Define "active" as up to the point where a "commit" or
+ *       "abort" is _requested_ for the tx. (Alternative, extend the close()
+ *       model for an index to not permit the re-open of an isolated index after
+ *       the tx commits and then just close the btree absorbing writes for the
+ *       isolated index when we are releasing our various resources. The
+ *       isolated index will thereafter be unusable, which is what we want.)
  * 
  * @todo The various public methods on this API that have {@link RunState}
  *       constraints all eagerly force an abort when invoked from an illegal
@@ -101,13 +105,6 @@ import com.bigdata.resources.ResourceManager;
  */
 public class Tx extends AbstractTx implements ITx {
 
-//    /**
-//     * The historical {@link ICommitRecord} choosen as the ground state for this
-//     * transaction. All indices isolated by this transaction are isolated as of
-//     * the discoverable root address based on this commit record.
-//     */
-//    final protected ICommitRecord commitRecord;
-
     /**
      * A temporary store used to hold write sets for read-write transactions. It
      * is null if the transaction is read-only and will remain null in any case
@@ -119,28 +116,28 @@ public class Tx extends AbstractTx implements ITx {
      * Indices isolated by this transactions.
      * 
      * @todo this must be thread-safe to support concurrent operations on the
-     *       same tx.
+     *       same tx. the temporary store for the transaction's isolated state
+     *       must also be thread safe.
      */
     private Map<String, IIndex> indices = new HashMap<String, IIndex>();
 
     /**
      * Create a transaction reading from the most recent committed state not
      * later than the specified startTime.
+     * <p>
+     * Note: For an {@link IBigdataFederation}, a transaction does not start
+     * execution on all {@link IDataService}s at the same moment. Instead, the
+     * transaction startTime is assigned by the {@link ITransactionService} and
+     * then provided each time an {@link ITx} must be created for isolatation of
+     * resources accessible on a {@link IDataService}.
      * 
-     * @param journal
-     *            The journal.
-     * 
+     * @param transactionManager
+     *            The local (client-side) transaction manager.
+     * @param resourceManager
+     *            Provides access to named indices that are isolated by the
+     *            transaction.
      * @param startTime
-     *            The start time assigned to the transaction. Note that a
-     *            transaction does not start execution on all {@link Journal}s
-     *            at the same moment. Instead, the transaction start startTime
-     *            is assigned by a centralized time service and then provided
-     *            each time a transaction object must be created for isolatation
-     *            of resources accessible on some {@link Journal}.
-     * 
-     * @param readOnly
-     *            When true the transaction will reject writes and
-     *            {@link #prepare()} and {@link #commit()} will be NOPs.
+     *            The transaction identifier
      */
     public Tx(//
             final ILocalTransactionManager transactionManager,//
@@ -150,19 +147,11 @@ public class Tx extends AbstractTx implements ITx {
 
         super(transactionManager, resourceManager, startTime);
 
-//        /*
-//         * The commit record serving as the ground state for the indices
-//         * isolated by this transaction (MAY be null, in which case the
-//         * transaction will be unable to isolate any indices).
-//         */
-//        this.commitRecord = journal.getCommitRecord(startTime);
-
     }
 
     /**
-     * This method must be invoked any time a transaction completes ({@link #abort()}s
-     * or {@link #commit()}s) in order to release resources held by that
-     * transaction.
+     * This method must be invoked any time a transaction completes in order to
+     * release resources held by that transaction.
      */
     protected void releaseResources() {
 
@@ -179,6 +168,10 @@ public class Tx extends AbstractTx implements ITx {
 
         /*
          * Close and delete the TemporaryRawStore.
+         * 
+         * @todo when changing to use a shared temporary store modify this to
+         * drop the BTree for the isolated indices on the temporary store. That
+         * will reduce clutter in its Name2Addr object.
          */
         if (tmpStore != null && tmpStore.isOpen()) {
 
@@ -236,24 +229,6 @@ public class Tx extends AbstractTx implements ITx {
 
         assert !readOnly;
 
-        // Note: This is not true now that unisolated writers may be concurrent.
-        //        
-        // /*
-        // * This compares the current commit counter on the journal with the
-        // * commit counter as of the start time for the transaction. If they
-        // are
-        // * the same, then no intervening commits have occurred on the journal
-        // * and there is nothing to validate.
-        // */
-        //        
-        // if (commitRecord == null
-        // || (journal.getRootBlockView().getCommitCounter() == commitRecord
-        // .getCommitCounter())) {
-        //            
-        // return true;
-        //            
-        // }
-
         /*
          * for all isolated btrees, if(!validate()) return false;
          */
@@ -302,52 +277,12 @@ public class Tx extends AbstractTx implements ITx {
         return true;
 
     }
-
-//    /**
-//     * Return a read-only view of the current (unisolated) named index.
-//     * 
-//     * @param name
-//     *            The index name.
-//     *            
-//     * @return The view -or- <code>null</code> iff the index is not registered
-//     *         at this time.A
-//     */
-//    private IIndex getCurrentGroundState(String name) {
-//
-//        final AbstractBTree[] sources = resourceManager.getIndexSources(name,
-//                UNISOLATED);
-//
-//        if (sources == null) {
-//
-//            // Index does not exist.
-//            
-//            return null;
-//            
-//        }
-//        
-//        assert sources.length > 0;
-//
-//        if (sources.length == 1) {
-//
-//            assert sources[0] != null;
-//
-//            return new ReadOnlyIndex(sources[0]);
-//
-//        } else {
-//
-//            return new ReadOnlyFusedView(sources);
-//
-//        }
-//
-//        // IIndex groundState = journal.getIndex(name);
-//
-//    }
     
-    protected void mergeOntoGlobalState(final long commitTime) {
+    protected void mergeOntoGlobalState(final long revisionTime) {
 
         assert !readOnly;
 
-        super.mergeOntoGlobalState(commitTime);
+        super.mergeOntoGlobalState(revisionTime);
 
         final Iterator<Map.Entry<String, IIndex>> itr = indices.entrySet()
                 .iterator();
@@ -386,8 +321,16 @@ public class Tx extends AbstractTx implements ITx {
              * markers, and values as necessary in the unisolated index.
              */
 
-            isolated.mergeDown(commitTime, sources );
+            isolated.mergeDown(revisionTime, sources );
 
+            /*
+             * Write a checkpoint so that everything is on the disk. This
+             * reduces both the latency for the commit and the possibilities for
+             * error.
+             */
+            
+            isolated.getWriteSet().writeCheckpoint();
+            
         }
 
     }
@@ -438,17 +381,6 @@ public class Tx extends AbstractTx implements ITx {
 
             }
 
-            // if (commitRecord == null) {
-            //
-            // /*
-            // * This occurs when there are either no commit records or no
-            // * commit records before the start time for the transaction.
-            // */
-            //
-            // return null;
-            //
-            // }
-
             final IIndex index;
 
             /*
@@ -485,8 +417,6 @@ public class Tx extends AbstractTx implements ITx {
 
             }
 
-            // IIndex src = journal.getIndex(name, commitRecord);
-
             /*
              * Isolate the named btree.
              */
@@ -504,16 +434,6 @@ public class Tx extends AbstractTx implements ITx {
                     index = new FusedView(sources);
 
                 }
-
-//                if (sources.length == 1) {
-//
-//                    index = new ReadOnlyIndex(sources[0]);
-//
-//                } else {
-//
-//                    index = new ReadOnlyFusedView(sources);
-//
-//                }
 
             } else {
 

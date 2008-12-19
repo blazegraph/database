@@ -150,7 +150,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
         ConcurrencyManager concurrencyManager = new ConcurrencyManager(
                 properties, localTransactionManager, resourceManager);
 
-        localTransactionManager.setConcurrencyManager(concurrencyManager);
+//        localTransactionManager.setConcurrencyManager(concurrencyManager);
 
         resourceManager.setConcurrencyManager(concurrencyManager);
         
@@ -275,7 +275,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
         ConcurrencyManager concurrencyManager = new ConcurrencyManager(
                 properties, localTransactionManager, resourceManager);
 
-        localTransactionManager.setConcurrencyManager(concurrencyManager);
+//        localTransactionManager.setConcurrencyManager(concurrencyManager);
 
         resourceManager.setConcurrencyManager(concurrencyManager);
         
@@ -412,7 +412,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
         ConcurrencyManager concurrencyManager = new ConcurrencyManager(
                 properties, localTransactionManager, resourceManager);
 
-        localTransactionManager.setConcurrencyManager(concurrencyManager);
+//        localTransactionManager.setConcurrencyManager(concurrencyManager);
 
         resourceManager.setConcurrencyManager(concurrencyManager);
         
@@ -623,7 +623,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
         ConcurrencyManager concurrencyManager = new ConcurrencyManager(
                 properties, localTransactionManager, resourceManager);
 
-        localTransactionManager.setConcurrencyManager(concurrencyManager);
+//        localTransactionManager.setConcurrencyManager(concurrencyManager);
 
         resourceManager.setConcurrencyManager(concurrencyManager);
         
