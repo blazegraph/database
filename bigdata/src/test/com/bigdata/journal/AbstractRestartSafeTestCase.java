@@ -83,7 +83,7 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
      *                if the existing store is not closed, e.g., from failure to
      *                obtain a file lock, etc.
      */
-    protected IRawStore reopenStore(IRawStore store) {
+    protected IRawStore reopenStore(final IRawStore store) {
 
         // close the store.
         store.close();
@@ -95,7 +95,7 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
         properties.setProperty(Options.CREATE_TEMP_FILE,"false");
         
         // The backing file that we need to re-open.
-        File file = store.getFile();
+        final File file = store.getFile();
         
         assertNotNull(file);
         
@@ -114,6 +114,7 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
         
         IAtomicStore store = (IAtomicStore)getStore();
         
+        try {
         assertTrue(store.isStable());
         
         Random r = new Random();
@@ -169,7 +170,11 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
 //        // verify that the data are all zeros since we did not commit the store.
 //        assertEquals(new byte[len],actual);
 
+        } finally {
+            
         store.destroy();
+
+        }
         
     }
     
@@ -180,6 +185,8 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
     public void test_restartSafe_oneWrite() {
         
         IAtomicStore store = (IAtomicStore)getStore();
+        
+        try {
         
         assertTrue(store.isStable());
         
@@ -226,7 +233,11 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
         
         assertEquals(expected,actual);
 
-        store.destroy();
+        } finally {
+
+            store.destroy();
+            
+        }
         
     }
     
@@ -238,6 +249,8 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
     public void test_restartSafe_multipleWrites() {
 
         IAtomicStore store = (IAtomicStore)getStore();
+        
+        try {
         
         assertTrue(store.isStable());
 
@@ -317,8 +330,12 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
             
         }
 
-        store.destroy();
+        } finally {
+
+            store.destroy();
+            
+        }
         
     }
-    
+
 }

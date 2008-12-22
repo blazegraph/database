@@ -47,7 +47,60 @@ public enum RunState {
     public String toString() {
     
         return name;
+
+    }
+
+    /**
+     * Return <code>true</code> iff a transition is allowable from the current
+     * {@link RunState} to the proposed {@link RunState}.
+     * <p>
+     * Note: Only certain state transitions are allowed. These are:
+     * {Active->Prepared, Active->Aborted, Active->Committed;
+     * Prepared->Committed, Prepared->Aborted}. Both Committed and Aborted are
+     * absorbing states.
+     * <p>
+     * Note: A transition to the same state is always allowed.
+     * 
+     * @param newval
+     *            The proposed {@link RunState}.
+     * 
+     * @return <code>true</code> iff that state transition is allowed.
+     */
+    public boolean isTransitionAllowed(final RunState newval) {
+
+        if (newval == null)
+            throw new IllegalArgumentException();
+
+        if (this.equals(newval))
+            return true;
+        
+        if (this.equals(Active)) {
+
+            if (newval.equals(Prepared))
+                return true;
+
+            if (newval.equals(RunState.Aborted))
+                return true;
+
+            if (newval.equals(Committed))
+                return true;
+
+            return false;
+
+        } else if (this.equals(RunState.Prepared)) {
+
+            if (newval.equals(Aborted))
+                return true;
+
+            if (newval.equals(Committed))
+                return true;
+
+            return false;
+
+        }
+
+        return false;
         
     }
-    
+
 }

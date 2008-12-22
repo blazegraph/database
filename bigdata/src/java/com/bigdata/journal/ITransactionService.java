@@ -29,11 +29,13 @@ package com.bigdata.journal;
 
 import java.io.IOException;
 import java.util.UUID;
+import java.util.concurrent.BrokenBarrierException;
 
 import com.bigdata.isolation.IConflictResolver;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
+import com.bigdata.service.ITxCommitProtocol;
 
 /**
  * <p>
@@ -260,18 +262,73 @@ public interface ITransactionService extends ITimestampService {
     public void setReleaseTime(long releaseTime) throws IOException;
     
     /**
-     * Invoked on the behalf of tasks executing a read-write transaction to
-     * notify the global transaction manager of their intention to write on a
-     * {@link DataService}. When it comes time to validate and prepare the
-     * transaction, only those {@link DataService}s on which it has written
-     * will partitipate in the 2-phase commit.
+     * An {@link IDataService} MUST invoke this method before permitting an
+     * unknown read-write transaction to start on that {@link IDataService}.
+     * Only those {@link DataService}s on which a read-write transaction has
+     * started will participate in the commit. If there is only a single such
+     * {@link IDataService}, then a single-phase commit will be used. Otherwise
+     * a distributed transaction commit protocol will be used.
      * 
      * @param tx
      *            The transaction identifier.
-     * @param dataServiceUUID
-     *            The {@link UUID} of a logical {@link DataService} on which the
+     * @param dataService
+     *            The {@link UUID} an {@link IDataService} on which the
      *            transaction will write.
+     * 
+     * @return {@link IllegalStateException} if the transaction is not an active
+     *         read-write transaction.
      */
-    public void wroteOn(long tx, UUID dataService);
+    public void startOn(long tx, UUID dataService) throws IOException;
+
+    /**
+     * Callback by an {@link IDataService} participating in a two phase commit
+     * for a distributed transaction. The {@link ITransactionService} will wait
+     * until all {@link IDataService}s have prepared. It will then choose a
+     * <i>commitTime</i> for the transaction and return that value to each
+     * {@link IDataService}.
+     * <p>
+     * Note: If this method throws ANY exception then the task MUST cancel the
+     * commit, discard the local write set of the transaction, and note that the
+     * transaction is aborted in its local state.
+     * 
+     * @param tx
+     *            The transaction identifier.
+     * @param dataService
+     *            The {@link UUID} of the {@link IDataService} which sent the
+     *            message.
+     * 
+     * @return The assigned commit time.
+     * 
+     * @throws InterruptedException
+     * @throws BrokenBarrierException
+     * @throws IOException
+     *             if there is an RMI problem.
+     */
+    public long prepared(long tx, UUID dataService) throws IOException,
+            InterruptedException, BrokenBarrierException;
+
+    /**
+     * Sent by a task participating in a distributed commit of a transaction
+     * when the task has successfully committed the write set of the transaction
+     * on the live journal of the local {@link IDataService}. If this method
+     * returns <code>false</code> then the distributed commit has failed and
+     * the task MUST rollback the live journal to the previous commit point. If
+     * the return is <code>true</code> then the distributed commit was
+     * successful and the task should halt permitting the {@link IDataService}
+     * to return from the {@link ITxCommitProtocol#prepare(long, long)} method.
+     * 
+     * @param tx
+     *            The transaction identifier.
+     * @param dataService
+     *            The {@link UUID} of the {@link IDataService} which sent the
+     *            message.
+     * 
+     * @return <code>true</code> if the distributed commit was successfull and
+     *         <code>false</code> if there was a problem.
+     * 
+     * @throws IOException
+     */
+    public boolean committed(long tx, UUID dataService) throws IOException,
+            InterruptedException, BrokenBarrierException;
 
 }

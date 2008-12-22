@@ -33,21 +33,20 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.IndexSegment;
-import com.bigdata.isolation.IsolatedFusedView;
+import com.bigdata.btree.BTree;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.AbstractTestTxRunState;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.RunState;
-import com.bigdata.journal.Tx;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.journal.ValidationError;
-import com.bigdata.journal.WriteExecutorService;
-import com.bigdata.resources.StoreManager;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -60,58 +59,7 @@ import com.bigdata.util.InnerCause;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @see OldTransactionServer, which has lots of code and notes that bear on this
- *      implementation.
- * 
- * @todo Note: The metadata state of a transaction is (a) abs(startTime); and
- *       (b) whether it is read-only or read-write (which is indicated by the
- *       sign of the transaction identifier).
- *       <p>
- *       The global transaction manager maintains additional state for
- *       transactions, including (a) their runState; and (b) the set of
- *       resources (names of index partitions) on which a read-write transaction
- *       has written;
- *       <p>
- *       The transaction state should also include a counter for the #of clients
- *       that have started work on a transaction in order to support distributed
- *       start/commit protocols. Alternatively, the same result could be
- *       achieved using a distributed barrier (ala zookeeper).
- * 
- * @todo Note: The correspondence between a transaction identifier and its start
- *       time and readOnly flag and the need to issue distinct (and for
- *       read-write transactions, strictly increasing) timestamps creates a
- *       contention for the distinct timestamps available to the transaction
- *       manager which can satisify the request for a new transaction
- *       identifier.
- *       <p>
- *       Under some circumstances the assignment of a read-only transaction
- *       identifier must be delayed until a distinct timestamp becomes available
- *       between the designed start time and the next commit point.
- *       <p>
- *       Likewise, there is an upper bound of one read-write transaction that
- *       may be created per millisecond (the resolution of the global timestamp
- *       service) and requests for new read-write transactions contend with
- *       request for global timestamps.
- * 
- * @todo Track which {@link IndexSegment}s and {@link Journal}s are required
- *       to support the {@link IsolatedFusedView}s in use by a {@link Tx}. The
- *       easiest way to do this is to name these by appending the transaction
- *       identifier to the name of the index partition, e.g., name#partId#tx. At
- *       that point the {@link StoreManager} will automatically track the
- *       resources. This also simplifies access control (write locks) for the
- *       isolated indices as the same {@link WriteExecutorService} will serve.
- *       However, with this approach {split, move, join} operations will have to
- *       be either deferred or issued against the isolated index partitions as
- *       well as the unisolated index partitions.
- *       <p>
- *       Make writes on the tx thread-safe (Temporary mode Journal rather than
- *       TemporaryStore).
- * 
- * @todo test for transactions that have already been completed? that would
- *       represent a protocol error. we could maintain an LRU cache of completed
- *       transactions for this purpose.
- * 
- * @todo The transaction server should make sure that time does not go backwards
+ * @todo The transactionserver should make sure that time does not go backwards
  *       when it starts up (with respect to the last time that it issued). Note
  *       that {@link AbstractJournal#commit(long)} already protects against this
  *       problem.
@@ -172,8 +120,17 @@ abstract public class AbstractTransactionService extends TimestampService implem
      * @todo config param for the initial capacity of the map.
      * @todo config for the concurrency rating of the map.
      */
-    final protected ConcurrentHashMap<Long, TxState> activeTx = new ConcurrentHashMap<Long, TxState>();
+    final private ConcurrentHashMap<Long, TxState> activeTx = new ConcurrentHashMap<Long, TxState>();
 
+    /**
+     * The #of open transactions in any {@link RunState}.
+     */
+    final public int getActiveCount() {
+        
+        return activeTx.size();
+        
+    }
+    
     public AbstractTransactionService(final Properties properties) {
         
         super(properties);
@@ -196,7 +153,7 @@ abstract public class AbstractTransactionService extends TimestampService implem
      * Polite shutdown. New transactions will not start. This method will block
      * until existing transactions are complete (either aborted or committed).
      * 
-     * FIXME implement
+     * FIXME implement shutdown.
      * 
      * @todo Support a federation shutdown protocol. The transaction manager is
      *       notified that the federation will shutdown. At that point the
@@ -223,7 +180,7 @@ abstract public class AbstractTransactionService extends TimestampService implem
      * and may result in either commits or aborts (if the commit fails, e.g.,
      * due to validation errors).
      * 
-     * FIXME implement.
+     * FIXME implement shutdownNow
      */
     synchronized public void shutdownNow() {
 
@@ -234,17 +191,120 @@ abstract public class AbstractTransactionService extends TimestampService implem
     }
     
     /**
+     * Note: There is an upper bound of one read-write transaction that may be
+     * created per millisecond (the resolution of {@link #nextTimestamp()}) and
+     * requests for new read-write transactions contend with other requests for
+     * {@link #nextTimestamp()}.
+     * 
      * @todo write unit tests for fence posts for the assigned transaction
      *       identifers and the resolution of the correct commit time for both
      *       read-only and read-write transactions.
+     * 
+     * @todo write unit tests for read-only transaction identifiers (the
+     *       existing tests only cover read-committed and read-write at the
+     *       moment). See {@link AbstractTestTxRunState}.
+     * 
+     * @todo Ideally create a proxy test suite that will let me run the tx test
+     *       suite against any journal without running the entire journal test
+     *       suite and also against any {@link IBigdataFederation} instance so
+     *       that I can reuse this test suite as part of the distributed
+     *       transaction test suite, but the latter also needs to include tests
+     *       of single phase vs distributed transactions.
      * 
      * @todo write unit tests for distinct read-only transaction identifiers
      *       under heavy load (forces contention for the distinct identifiers
      *       and could lead to deadlocks if you try to hold more than one
      *       read-only tx at a time).
      */
-    public long newTx(long timestamp) {
+    public long newTx(final long timestamp) {
 
+        /*
+         * Note: It may be possible to increase the concurrency of this
+         * operation. Many cases do not allow contention since they will just
+         * use the value returned by nextTimestamp(), which is always distinct.
+         * Those cases which do allow contention involve search for a start time
+         * that can read from a specific commit point. Even then we may be able
+         * to reduce contention using atomic operations on [activeTx], e.g.,
+         * putIfAbsent().
+         */
+
+        synchronized (newTxLock) {
+
+            return assignTransactionIdentifier(timestamp);
+            
+        }
+
+    }
+    private final Object newTxLock = new Object();
+
+    /**
+     * Adds the transaction from to the local tables.
+     * 
+     * @param state
+     *            The transaction.
+     */
+    protected void activateTx(final TxState state) {
+
+        if (state == null)
+            throw new IllegalArgumentException();
+
+        state.lock.lock();
+
+        try {
+        
+            if (!state.isActive())
+                throw new IllegalArgumentException();
+            
+            activeTx.put(state.tx, state);
+            
+        } finally {
+            
+            state.lock.unlock();
+            
+        }
+        
+    }
+    
+    /**
+     * Removes the transaction from the local tables.
+     * 
+     * @param state
+     *            The transaction.
+     */
+    protected void deactivateTx(final TxState state) {
+        
+        if (state == null)
+            throw new IllegalArgumentException();
+
+        state.lock.lock();
+
+        try {
+        
+            if (!state.isComplete())
+                throw new IllegalArgumentException();
+            
+            activeTx.remove(state);
+            
+        } finally {
+            
+            state.lock.unlock();
+            
+        }
+                
+        updateReleaseTime(state.tx);
+        
+    }
+    
+    /**
+     * Assign a transaction identifier for a new transaction.
+     * 
+     * @param timestamp
+     *            The timestamp.
+     *            
+     * @return The assigned transaction identifier.
+     */
+    protected long assignTransactionIdentifier(final long timestamp) {
+        
         if (timestamp == ITx.UNISOLATED) {
 
             /*
@@ -259,31 +319,22 @@ abstract public class AbstractTransactionService extends TimestampService implem
              * assigned this transaction identifier.
              */
 
-            final long startTime = -nextTimestamp();
-
-            activeTx.put(startTime, new TxState(startTime));
-
-            return startTime;
+            return -nextTimestamp();
 
         }
 
-        final long lastCommitTime;
-        try {
+        final long lastCommitTime = lastCommitTime();
 
-            lastCommitTime = lastCommitTime();
-
-        } catch (IOException ex) {
-
+        if (timestamp == lastCommitTime) {
+            
             /*
-             * Note: This exception will never be thrown since we are the
-             * service and we are just requesting a method on a concrete
-             * subclass.
+             * Special case.  We just return the next timestamp.
              */
             
-            throw new RuntimeException(ex);
-
+            return nextTimestamp();
+            
         }
-
+        
         if (timestamp > lastCommitTime) {
 
             /*
@@ -300,77 +351,204 @@ abstract public class AbstractTransactionService extends TimestampService implem
             /*
              * This is a symbolic shorthand for a read-only transaction that
              * will read from the most recent commit point on the database.
+             * 
+             * Note: Once again we can just issue a timestamp since it will be
+             * GT lastCommitTime.
              */
 
-                timestamp = lastCommitTime;
-
-            if (timestamp == 0L) {
-
-                /*
-                 * There are no commit points from which we can read.
-                 */
-                
-                throw new RuntimeException("Nothing committed.");
-                
-            }
-
-        }
-
-        synchronized (startTimeLock) {
-
-            /*
-             * FIXME identify a distinct start time NOT in use by any
-             * transaction that is LTE the specified timestamp and GT the first
-             * commit point LT the specified timestamp (that is, any of the
-             * timestamps which would read from the same commit point on the
-             * database).
-             * 
-             * @todo we do not need to serialize all such requests, only those
-             * requests that contend for timestamps reading from the same commit
-             * point.
-             * 
-             * @todo in order to write this we need to maintain a log of the
-             * historical commit times. That log can be in a transient BTree.
-             * The head of the log can be truncated whenever we advance the
-             * releaseTime (that is, we always remove an entry when a tx
-             * completes and if the entry is the head of the log then it is the
-             * earliest tx and we also advance the release time).
-             */
-
-            if (timestamp == lastCommitTime) {
-              
-                /*
-                 * Special case.  We just return the next timestamp.
-                 */
-                
-                return nextTimestamp();
-                
-            }
+            return nextTimestamp();
             
-            throw new UnsupportedOperationException();
-
         }
+        
+        return getStartTime(timestamp);
 
     }
 
     /**
-     * Lock serializes requests for a read-only transaction identifier.
+     * Assign a distinct timestamp to a historical read that will read from the
+     * commit point identified by the specified timestamp.
+     * <p>
+     * Note: Under some circumstances the assignment of a read-only transaction
+     * identifier must be delayed until a distinct timestamp becomes available
+     * between the designed start time and the next commit point.
+     * 
+     * @param timestamp
+     *            The timestamp (identifies the desired commit point).
+     * 
+     * @return A distinct timestamp not in use by any transaction that will read
+     *         from the same commit point.
      */
-    private final Object startTimeLock = new Object();
+    protected long getStartTime(final long timestamp) {
+
+        synchronized(commitTimeIndex) {
+        
+            /*
+             * Fine the commit time from which the tx will read (largest
+             * commitTime LTE timestamp).
+             */
+            final long commitTime = commitTimeIndex.find(timestamp);
+            
+            if (commitTime == -1L) {
+
+                /*
+                 * @todo I believe that this can only arise when there are no
+                 * commit points in the log.
+                 */
+                throw new RuntimeException(
+                        "No data for that commit time: timestamp=" + timestamp);
+                
+            }
+
+            /*
+             * The commit time for the successor of that commit point (GT).
+             */
+            final long nextCommitTime = commitTimeIndex.findNext(commitTime);
+
+            if (nextCommitTime == -1L) {
+
+                /*
+                 * Note: If there is no successor of the desired commit point
+                 * then we can just return the next timestamp. It is guarenteed
+                 * to be GT the desired commit time and LT the next commit
+                 * point. [Note: this case is in fact handled above so you
+                 * should not get here.]
+                 */
+
+                return nextTimestamp();
+
+            }
+
+            // Find a valid, unused timestamp.
+            return findUnusedTimestamp(commitTime, nextCommitTime);
+
+        }
+
+    }
+    
+    /**
+     * Find a valid, unused timestamp.
+     * <p>
+     * Note: Any timestamp in the half-open range [commitTime:nextCommitTime)
+     * MAY be assigned as all such timestamps will read from the commit point
+     * associated with [commitTime].
+     * 
+     * @param commitTime
+     *            The commit time for the commit point on which the tx will read
+     *            (this must be the exact timestamp associated with the desired
+     *            commit point).
+     * @param nextCommitTime
+     *            The commit time for the successor of that commit point.
+     */
+    protected long findUnusedTimestamp(final long commitTime,
+            final long nextCommitTime) {
+
+        for (long t = commitTime; t < nextCommitTime; t++) {
+
+            if (activeTx.containsKey(t)) {
+
+                /*
+                 * @todo We could grap the timestamp using an atomic putIfAbsent
+                 * and a special value and the replace the value with the
+                 * desired one (or just construct the TxState object each time
+                 * and discard it if the map contains that key).  This might
+                 * let us increase concurrency for newTx().
+                 */
+                
+                continue;
+                
+            }
+            
+            return t;
+            
+        }
+        
+        /*
+         * @todo Wait for a tx to end in the desired half-open range and then
+         * assign it immediately to the first request for that half-open range.
+         */
+
+        throw new RuntimeException("No timestamp available: commitTime="
+                + commitTime + ", nextCommitTime=" + nextCommitTime);
+        
+    }
+    
+    /**
+     * A {@link BTree} containing a log of the historical commit points. <
+     * 
+     * @todo If this is not restart safe then on restart the commit points in
+     *       the federation will have to be reported to the transaction service
+     *       so that it knows the timestamp intervals within which it can make
+     *       its choices for read-historical transactions. It would be trivial
+     *       to make this restart safe using a {@link Journal}.
+     */
+    private final CommitTimeIndex commitTimeIndex = CommitTimeIndex.createTransient();
+
+    /**
+     * Note: Declared abstract so that we can hide the {@link IOException}.
+     */
+    abstract public long lastCommitTime();
 
     /**
      * Implementation must abort the tx on the journal (standalone) or on each
      * data service (federation) on which it has written.
+     * <p>
+     * Pre-conditions:
+     * <ol>
+     * <li>The transaction is {@link RunState#Active}; and</li>
+     * <li>The caller holds the {@link TxState#lock}.</li>
+     * </ol>
+     * <p>
+     * Post-conditions:
+     * <ol>
+     * <li>The transaction is {@link RunState#Aborted}; and</li>
+     * <li>The transaction write set has been discarded by each {@link Journal}
+     * or {@link IDataService} or which it has written (applicable for
+     * read-write transactions only).</li>
+     * </ol>
+     * <p>
+     * This method SHOULD NOT throw any exceptions.
      * 
-     * @param tx
-     *            The transaction identifier.
+     * @param state
+     *            The transaction state as maintained by the transaction server.
      */
-    abstract protected void abortImpl(final long tx) throws Exception;
+    abstract protected void abortImpl(final TxState state);
 
     /**
      * Implementation must either single-phase commit (standalone journal or a
      * transaction that only writes on a single data service) or 2-/3-phase
      * commit (distributed transaction running on a federation).
+     * <p>
+     * Pre-conditions:
+     * <ol>
+     * <li>The transaction is {@link RunState#Active}; and</li>
+     * <li>The caller holds the {@link TxState#lock}.</li>
+     * </ol>
+     * <p>
+     * Post-conditions (success for read-only transaction or a read-write
+     * transaction with an empty write set):
+     * <ol>
+     * <li>The transaction is {@link RunState#Committed}; and</li>
+     * <li>The returned <i>commitTime</i> is ZERO (0L).</li>
+     * </ol>
+     * <p>
+     * Post-conditions (success for read-write transaction with a non-empty
+     * write set):
+     * <ol>
+     * <li>The transaction is {@link RunState#Committed};</li>
+     * <li>The transaction write set has been made restart-safe by each
+     * {@link Journal} or {@link IDataService} or which it has written
+     * (applicable for read-write transactions only); and</li>
+     * <li>The application can read exactly the data written by the transaction
+     * from the commit point identified by the returned <i>commitTime</i>.</li>
+     * </ol>
+     * <p>
+     * Post-conditions (failure):
+     * <ol>
+     * <li>The transaction is {@link RunState#Aborted}; and</li>
+     * <li>The transaction write set has been discarded by each {@link Journal}
+     * or {@link IDataService} or which it has written (applicable for
+     * read-write transactions only).</li>
+     * </ol>
      * 
      * @param tx
      *            The transaction identifier.
@@ -382,14 +560,22 @@ abstract public class AbstractTransactionService extends TimestampService implem
      *             if something else goes wrong. This will be (or will wrap) a
      *             {@link ValidationError} if validation fails.
      */
-    abstract protected long commitImpl(final long tx) throws Exception;
+    abstract protected long commitImpl(final TxState state) throws Exception;
 
     /**
      * FIXME Remove the transaction entry in the ordered set of running
      * transactions. If the transaction was the lowest entry in that ordered
      * set, then update the releaseTime to the now lowest member of that set.
      * Note that the ordered set only contains the absolute value of the
-     * transaction identifers!
+     * transaction identifers! [this suggests that we need a BTree for the
+     * activeTx, which should be leveraged by
+     * {@link #findUnusedTimestamp(long, long)} so that it can constraint its
+     * search within the half-open interval.]
+     * 
+     * FIXME The head of the log must be truncated whenever we advance the
+     * releaseTime (that is, we always remove an entry when a tx completes and
+     * if the entry is the head of the log then it is the earliest tx and we
+     * also advance the release time).
      * 
      * @todo edge case when the set is empty sets the releaseTime to zero, but
      *       minReleaseAge will prevent us from really releasing all state in
@@ -397,6 +583,10 @@ abstract public class AbstractTransactionService extends TimestampService implem
      * 
      * @param tx
      *            The transaction identifier.
+     * 
+     * @todo periodically we should compare {@link #activeTx} with the data
+     *       structure used to track the earliest running tx. or perhaps they
+     *       can be basically one and the same.
      */
     protected void updateReleaseTime(final long tx) {
         
@@ -422,23 +612,11 @@ abstract public class AbstractTransactionService extends TimestampService implem
 
             }
 
-            if(!state.isReadOnly()) {
-                
-                try {
+            abortImpl(state);
 
-                    abortImpl(tx);
-                    
-                } catch (Throwable t) {
-                    
-                    throw new RuntimeException(t);
-                    
-                }
-                
-            }
-
-            state.runState = RunState.Aborted;
-
-            updateReleaseTime(tx);
+            assert state.isAborted();
+            
+            deactivateTx(state);
             
         } finally {
             
@@ -470,26 +648,16 @@ abstract public class AbstractTransactionService extends TimestampService implem
 
             try {
 
-                final long commitTime = commitImpl(tx);
+                final long commitTime = commitImpl(state);
 
-                state.runState = RunState.Committed;
+                assert state.isCommitted();
 
-                updateReleaseTime(tx);
-                
                 return commitTime;
-                
+
             } catch (Throwable t2) {
 
-                try {
+                assert state.isAborted();
 
-                    abortImpl(tx);
-                    
-                } catch (Throwable t3) {
-                    
-                    log.error(t3);
-                    
-                }
-                
                 if (InnerCause.isInnerCause(t2, ValidationError.class)) {
 
                     throw new ValidationError();
@@ -499,45 +667,18 @@ abstract public class AbstractTransactionService extends TimestampService implem
                 throw new RuntimeException(t2);
 
             }
-             
+
         } finally {
 
-            try {
+            deactivateTx(state);
 
-                assert !state.isActive();
-
-                assert state.isCommitted() || state.isAborted();
-            
-            } finally {
-
-                state.lock.unlock();
-
-            }
+            state.lock.unlock();
             
         }
 
     }
 
-    /**
-     * Notify the {@link ITransactionService} that a new transaction is being
-     * activated on a {@link DataService} instance (the transaction is writing
-     * on that {@link DataService}).
-     * <p>
-     * Note: The {@link DataService} is responsible for ensuring that notice of
-     * writes is generated <strong>before</strong> the successful completion of
-     * a task isolated by a read-write transaction which writes on an isolated
-     * index. Notice MUST be received before the task commits so that we do not
-     * risk lost writes by committing a tx before noticing its writes on a
-     * {@link DataService}!
-     * 
-     * @param tx
-     *            The transaction identifier (aka start time).
-     * 
-     * @param dataServiceUUID
-     *            The UUID for the logical {@link DataService} instance on which
-     *            the transaction is writing.
-     */
-    public void wroteOn(final long tx, final UUID dataServiceUUID)
+    public void startOn(final long tx, final UUID dataServiceUUID)
             throws IllegalStateException {
 
         final TxState state = activeTx.get(tx);
@@ -564,8 +705,8 @@ abstract public class AbstractTransactionService extends TimestampService implem
 
             }
 
-            state.addDataService(dataServiceUUID);
-
+            state.startOn(dataServiceUUID);
+            
         } finally {
 
             state.lock.unlock();
@@ -575,12 +716,12 @@ abstract public class AbstractTransactionService extends TimestampService implem
     }
 
     /**
-     * Metadata for the transaction state.
+     * Transaction state.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static protected class TxState {
+    protected class TxState {
 
         /**
          * The transaction identifier.
@@ -596,24 +737,153 @@ abstract public class AbstractTransactionService extends TimestampService implem
          * The run state of the transaction (only accessible while you are
          * holding the {@link #lock}.
          * 
-         * @todo we don't need {@link RunState#Prepared} - that is captured by
-         *       the act of prepare+commit.
+         * @todo make private and use {@link #setRunState(RunState)}
          */
-        private RunState runState = RunState.Active;
-        
-//        /**
-//         * The commit time assigned to a read-write transaction iff it
-//         * successfully commits and otherwise ZERO (0L).
-//         */
-//        private long commitTime = 0L;
+        protected RunState runState = RunState.Active;
         
         /**
-         * The set of {@link DataService}s on which the transaction has written
-         * and <code>null</code> if this is not a read-write transaction (we
-         * only track data services on which the transaction writes).
+         * Change the {@link RunState}.
+         * 
+         * @param newval
+         *            The new {@link RunState}.
+         * 
+         * @throws IllegalArgumentException
+         *             if the argument is <code>null</code>.
+         * @throws IllegalStateException
+         *             if the state transition is not allowed.
+         * 
+         * @see RunState#isTransitionAllowed(RunState)
          */
-        private final Set<UUID/* logicalDataServiceUUID */> writtenOn;
+        public void setRunState(final RunState newval) {
 
+            if (!lock.isHeldByCurrentThread())
+                throw new IllegalMonitorStateException();
+
+            if (newval == null)
+                throw new IllegalArgumentException();
+            
+            if (!runState.isTransitionAllowed(newval)) {
+
+                throw new IllegalStateException("runState=" + runState
+                        + ", newValue=" + newval);
+
+            }
+
+            this.runState = newval;
+            
+        }
+        
+        /**
+         * The commit time assigned to a distributed read-write transaction
+         * during the commit protocol and otherwise ZERO (0L).
+         */
+        private long commitTime = 0L;
+        
+        /**
+         * The commit time assigned to a distributed read-write transaction
+         * during the commit protocol.
+         * 
+         * @return The assigned commit time.
+         * 
+         * @throws IllegalStateException
+         *             if the commit time has not been assigned.
+         */
+        public long getCommitTime() {
+            
+            if (!lock.isHeldByCurrentThread()) {
+
+                throw new IllegalMonitorStateException();
+                
+            }
+            
+            if (commitTime == 0L) {
+
+                throw new IllegalStateException();
+                
+            }
+            
+            return commitTime;
+            
+        }
+
+        /**
+         * Sets the assigned commit time.
+         * 
+         * @param commitTime
+         *            The assigned commit time.
+         */
+        protected void setCommitTime(final long commitTime) {
+
+            if (!lock.isHeldByCurrentThread()) {
+
+                throw new IllegalMonitorStateException();
+                
+            }
+            
+            if (commitTime == 0L) {
+                
+                throw new IllegalArgumentException();
+                
+            }
+
+            if (this.commitTime != 0L) {
+                
+                throw new IllegalStateException();
+                
+            }
+            
+            this.commitTime = commitTime;
+
+        }
+        
+        /**
+         * Barrier used to await the
+         * {@link ITransactionService#prepared(long, UUID)} messages during a
+         * distributed read-write transaction commit.
+         */
+        protected CyclicBarrier preparedBarrier = null;
+
+        /**
+         * Barrier used to await the
+         * {@link ITransactionService#committed(long, UUID)} messages during a
+         * distributed read-write transaction commit.
+         */
+        protected CyclicBarrier committedBarrier = null;
+
+        /**
+         * The set of {@link DataService}s on which a read-write transaction
+         * has been started and <code>null</code> if this is not a read-write
+         * transaction (we only track data services on which the transaction
+         * starts).
+         */
+        private final Set<UUID/* logicalDataServiceUUID */> startedOn;
+
+        /**
+         * Return <code>true</code> iff the dataService identified by the
+         * {@link UUID} is one on which this transaction has been started.
+         * 
+         * @param dataServiceUUID
+         *            The {@link UUID} identifying an {@link IDataService}.
+         * 
+         * @return <code>true</code> if this transaction has been started on
+         *         that {@link IDataService}. <code>false</code> for
+         *         read-only transactions.
+         */
+        public boolean isWrittenOn(final UUID dataServiceUUID) {
+            
+            if(!lock.isHeldByCurrentThread())
+                throw new IllegalMonitorStateException();
+
+            if (dataServiceUUID == null)
+                throw new IllegalArgumentException();
+            
+            if (startedOn == null)
+                return false;
+
+            return startedOn.contains(dataServiceUUID);
+            
+        }
+        
         /**
          * The set of {@link DataService}s on which the transaction has
          * written.
@@ -623,10 +893,13 @@ abstract public class AbstractTransactionService extends TimestampService implem
          */
         protected UUID[] getDataServiceUUIDs() {
 
-            if (writtenOn == null)
+            if(!lock.isHeldByCurrentThread())
+                throw new IllegalMonitorStateException();
+            
+            if (startedOn == null)
                 throw new IllegalStateException();
             
-            return writtenOn.toArray(new UUID[] {});
+            return startedOn.toArray(new UUID[] {});
             
         }
         
@@ -637,19 +910,22 @@ abstract public class AbstractTransactionService extends TimestampService implem
          */
         final protected ReentrantLock lock = new ReentrantLock();
         
-        public TxState(final long startTime) {
+        protected TxState(final long tx) {
             
-            if (startTime == ITx.UNISOLATED)
+            if (tx == ITx.UNISOLATED)
+                throw new IllegalArgumentException();
+
+            if (tx == ITx.READ_COMMITTED)
                 throw new IllegalArgumentException();
             
-            this.tx = startTime;
+            this.tx = tx;
             
-            this.readOnly = startTime > 0;
+            this.readOnly = TimestampUtility.isReadOnly(tx);
                        
             // pre-compute the hash code for the transaction.
-            this.hashCode = Long.valueOf(startTime).hashCode();
+            this.hashCode = Long.valueOf(tx).hashCode();
 
-            this.writtenOn = readOnly ? null : new LinkedHashSet<UUID>();
+            this.startedOn = readOnly ? null : new LinkedHashSet<UUID>();
             
         }
 
@@ -681,40 +957,66 @@ abstract public class AbstractTransactionService extends TimestampService implem
          * 
          * @param locator
          *            The locator for the data service instance.
+         * 
+         * @throws IllegalStateException
+         *             if the transaction is read-only.
+         * @throws IllegalStateException
+         *             if the transaction is not active.
          */
-        final public void addDataService(final UUID dataServiceUUID) {
+        final public void startOn(final UUID dataServiceUUID) {
 
-            assert lock.isHeldByCurrentThread();
+            if(!lock.isHeldByCurrentThread())
+                throw new IllegalMonitorStateException();
 
-            writtenOn.add(dataServiceUUID);
+            if (readOnly)
+                throw new IllegalStateException(ERR_READ_ONLY);
 
-        }
+            if (!isActive())
+                throw new IllegalStateException(ERR_NOT_ACTIVE);
 
-        /*
-         * Note: This will report true if there was an attempt to write on a
-         * data service. If the write operation on the data service failed after
-         * the transaction manager was notified, the write set would still be
-         * empty. This is Ok as long as the prepare+commit protocol on the data
-         * service does not reject empty write sets.
-         */
-        final boolean isEmptyWriteSet() {
-
-            assert lock.isHeldByCurrentThread();
-
-            return writtenOn.isEmpty();
-
-        }
-
-        final boolean isDistributed() {
-
-            assert lock.isHeldByCurrentThread();
-
-            return writtenOn.size() > 1;
+            startedOn.add(dataServiceUUID);
+            
+            if (INFO)
+                log.info("Started on: " + dataServiceUUID);
 
         }
 
         /**
-         * Returns a string representation of the transaction start time.
+         * Return <code>true</code> if the transaction is read-only or if a
+         * read-write transaction has not been started on any
+         * {@link IDataService}s.
+         * <p>
+         * <strong>WARNING: This method should only be used for distributed
+         * databases. It will always report [false] for a standalone database
+         * since {@link ITransactionService#startOn(long, UUID)} is not invoked
+         * for a standalone database!</strong>
+         */
+        final public boolean isEmptyWriteSet() {
+
+            if(!lock.isHeldByCurrentThread())
+                throw new IllegalMonitorStateException();
+
+            return readOnly || startedOn.isEmpty();
+
+        }
+
+        /**
+         * Return <code>true</code> iff a read-write transaction has started on
+         * more than one {@link IDataService}.
+         */
+        final boolean isDistributedTx() {
+
+            if(!lock.isHeldByCurrentThread())
+                throw new IllegalMonitorStateException();
+
+            return !readOnly && startedOn.size() > 1;
+
+        }
+
+        /**
+         * Returns a string representation of the transaction state.
+         * 
+         * @todo more details here, but it must all be safe w/o a lock.
          */
         final public String toString() {
 
@@ -730,23 +1032,26 @@ abstract public class AbstractTransactionService extends TimestampService implem
 
         final public boolean isActive() {
 
-            assert lock.isHeldByCurrentThread();
+            if(!lock.isHeldByCurrentThread())
+                throw new IllegalMonitorStateException();
 
             return runState == RunState.Active;
 
         }
 
-//        final public boolean isPrepared() {
-//
-//            assert lock.isHeldByCurrentThread();
-//
-//            return runState == RunState.Prepared;
-//
-//        }
+        final public boolean isPrepared() {
+
+            if(!lock.isHeldByCurrentThread())
+                throw new IllegalMonitorStateException();
+
+            return runState == RunState.Prepared;
+
+        }
 
         final public boolean isComplete() {
 
-            assert lock.isHeldByCurrentThread();
+            if(!lock.isHeldByCurrentThread())
+                throw new IllegalMonitorStateException();
 
             return runState == RunState.Committed
                     || runState == RunState.Aborted;
@@ -755,7 +1060,8 @@ abstract public class AbstractTransactionService extends TimestampService implem
 
         final public boolean isCommitted() {
 
-            assert lock.isHeldByCurrentThread();
+            if(!lock.isHeldByCurrentThread())
+                throw new IllegalMonitorStateException();
 
             return runState == RunState.Committed;
 
@@ -763,7 +1069,8 @@ abstract public class AbstractTransactionService extends TimestampService implem
 
         final public boolean isAborted() {
 
-            assert lock.isHeldByCurrentThread();
+            if(!lock.isHeldByCurrentThread())
+                throw new IllegalMonitorStateException();
 
             return runState == RunState.Aborted;
 

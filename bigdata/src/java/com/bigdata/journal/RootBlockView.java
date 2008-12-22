@@ -424,7 +424,8 @@ public class RootBlockView implements IRootBlockView {
      *                if the root block is not valid (bad magic, timestamps do
      *                not agree, etc).
      */
-    RootBlockView(boolean rootBlock0, ByteBuffer buf, ChecksumUtility checker) throws RootBlockException {
+    RootBlockView(final boolean rootBlock0, final ByteBuffer buf,
+            final ChecksumUtility checker) throws RootBlockException {
         
         if( buf == null ) throw new IllegalArgumentException();
         
@@ -525,9 +526,9 @@ public class RootBlockView implements IRootBlockView {
      */
     public long getChallisField() throws RootBlockException {
         
-        long timestamp0 = buf.getLong(OFFSET_CHALLIS0);
+        final long timestamp0 = buf.getLong(OFFSET_CHALLIS0);
         
-        long timestamp1 = buf.getLong(OFFSET_CHALLIS1);
+        final long timestamp1 = buf.getLong(OFFSET_CHALLIS1);
         
         if( timestamp0 != timestamp1 ) {
             

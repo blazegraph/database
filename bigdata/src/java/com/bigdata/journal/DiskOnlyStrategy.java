@@ -1388,9 +1388,16 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
          * FIXME Also of interest, the JRockit VM corresponding to 1.5.0_06
          * performs significantly worse on the same test. Check out some other
          * VM and OS versions and see what is going on here!
+         * 
+         * @todo If you are NOT synchronized here then NIO READ operations can
+         * be concurrent with WRITEs on the channel and there are methods on
+         * this class that DO NOT retry writes if the channel is concurrently
+         * closed! Those methods would need to be modified to retry in order for
+         * this class to remain thread-safe. ( @todo DirectBuffer probably has
+         * the same problem.)
          */
 
-        synchronized (this)  //FIXME RESTORE SYNCHRONIZATION HERE! 
+        synchronized (this) 
         {
 
             if (nbytes > counters.maxReadSize) {
@@ -2025,6 +2032,11 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
             /*
              * Write bytes in [data] from position to limit onto the channel.
+             * 
+             * Note: Since the caller is synchronized on [this] it SHOULD NOT be
+             * possible for a reader is to be interrupted during a concurrent
+             * NIO operation and thus the channel SHOULD NOT be asynchronously
+             * closed while we are writing on it.
              */
 
             counters.ndiskWrite += FileChannelUtility.writeAll(getChannel(),
@@ -2047,24 +2059,61 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         counters.elapsedDiskWriteNanos += (System.nanoTime() - begin);
 
     }
+
+    public ByteBuffer readRootBlock(final boolean rootBlock0) {
+        
+        if(!isOpen()) throw new IllegalStateException();
+
+        final ByteBuffer tmp = ByteBuffer
+                .allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
+
+        try {
+
+            /*
+             * Note: Synchronized on [this] to pervent concurrent NIO requests
+             * which might lead to the channel being closed asynchronously.
+             */
+            synchronized (this) {
+
+                FileChannelUtility.readAll(getChannel(), tmp,
+                        rootBlock0 ? FileMetadata.OFFSET_ROOT_BLOCK0
+                                : FileMetadata.OFFSET_ROOT_BLOCK1);
+                
+            }
+            
+            tmp.position(0); // resets the position.
+
+        } catch (IOException ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+
+        return tmp;
+
+    }
     
     public void writeRootBlock(final IRootBlockView rootBlock,
             final ForceEnum forceOnCommit) {
 
-        if(temporaryStore) {
-            
-            /*
-             * Note: There are NO ROOT BLOCKS for a temporary store. Root blocks
-             * are only useful for stores that can be re-opened, and you can not
-             * re-open a temporary store - the backing file is always deleted
-             * when the store is closed. The AbstractJournal still formats the
-             * root blocks and retains a reference to the current root block,
-             * but it is NOT written onto the file.
-             */
-            
-            return;
-            
-        }
+        /*
+         * Note: Root blocks are written for a temporary store in support of
+         * rollback().
+         */
+//        if(temporaryStore) {
+//            
+//            /*
+//             * Note: There are NO ROOT BLOCKS for a temporary store. Root blocks
+//             * are only useful for stores that can be re-opened, and you can not
+//             * re-open a temporary store - the backing file is always deleted
+//             * when the store is closed. The AbstractJournal still formats the
+//             * root blocks and retains a reference to the current root block,
+//             * but it is NOT written onto the file.
+//             */
+//            
+//            return;
+//            
+//        }
         
         if (rootBlock == null)
             throw new IllegalArgumentException();
@@ -2075,8 +2124,16 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             
             final long pos = rootBlock.isRootBlock0() ? FileMetadata.OFFSET_ROOT_BLOCK0
                     : FileMetadata.OFFSET_ROOT_BLOCK1;
-            
-            FileChannelUtility.writeAll(getChannel(), data, pos);
+
+            /*
+             * Note: Synchronized on [this] to pervent concurrent NIO requests
+             * which might lead to the channel being closed asynchronously.
+             */
+            synchronized(this) {
+
+                FileChannelUtility.writeAll(getChannel(), data, pos);
+                
+            }
 
             if (forceOnCommit != ForceEnum.No) {
 
@@ -2084,9 +2141,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
             }
 
-        }
-
-        catch (IOException ex) {
+        } catch (IOException ex) {
 
             throw new RuntimeException(ex);
 
@@ -2159,7 +2214,9 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
              * I've see an IOException "The handle is invalid" tossed here (just
              * once). A bit of searching around suggests that perhaps the
              * RandomAccessFile was concurrently closed? Something to look out
-             * for if it happens again.
+             * for if it happens again. [@todo probably a concurrent reader was
+             * interrupted, in which case this method should just try the
+             * setLength() operation again.]
              */
             throw new RuntimeException(ex);
             

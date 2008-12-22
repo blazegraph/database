@@ -95,11 +95,17 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
      */
     public void test_behaviorBeforeAnythingIsCommitted() throws IOException {
 
-        Journal journal = new Journal(getProperties());
+        final Journal journal = new Journal(getProperties());
 
+        try {
+        
         assertNull(journal.getCommitRecord(journal.nextTimestamp()));
         
-        journal.destroy();
+        } finally {
+
+            journal.destroy();
+            
+        }
         
     }
     
@@ -108,38 +114,44 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
      * {@link CommitRecordIndex}.
      */
     public void test_recoverCommitRecord() {
-        
-        Journal journal = new Journal(getProperties());
 
-        /*
-         * The first commit flushes the root leaves of some indices so we get
-         * back a non-zero commit timestamp.
-         */
-        assertTrue(0L!=journal.commit());
+        final Journal journal = new Journal(getProperties());
 
-        /*
-         * A follow up commit in which nothing has been written should return a
-         * 0L timestamp.
-         */
-        assertEquals(0L,journal.commit());
-        
-        journal.write(ByteBuffer.wrap(new byte[]{1,2,3}));
-        
-        final long commitTime1 = journal.commit();
-        
-        assertTrue(commitTime1!=0L);
-        
-        ICommitRecord commitRecord = journal.getCommitRecord(commitTime1);
+        try {
 
-        assertNotNull(commitRecord);
-        
-        assertNotNull(journal.getCommitRecord());
-        
-        assertEquals(commitTime1, journal.getCommitRecord().getTimestamp());
-        
-        assertEquals(journal.getCommitRecord(),commitRecord);
-        
-        journal.destroy();
+            /*
+             * The first commit flushes the root leaves of some indices so we
+             * get back a non-zero commit timestamp.
+             */
+            assertTrue(0L != journal.commit());
+
+            /*
+             * A follow up commit in which nothing has been written should
+             * return a 0L timestamp.
+             */
+            assertEquals(0L, journal.commit());
+
+            journal.write(ByteBuffer.wrap(new byte[] { 1, 2, 3 }));
+
+            final long commitTime1 = journal.commit();
+
+            assertTrue(commitTime1 != 0L);
+
+            ICommitRecord commitRecord = journal.getCommitRecord(commitTime1);
+
+            assertNotNull(commitRecord);
+
+            assertNotNull(journal.getCommitRecord());
+
+            assertEquals(commitTime1, journal.getCommitRecord().getTimestamp());
+
+            assertEquals(journal.getCommitRecord(), commitRecord);
+
+        } finally {
+
+            journal.destroy();
+
+        }
         
     }
     
@@ -149,58 +161,63 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
     public void test_commitRecordIndex_restartSafe() {
         
         Journal journal = new Journal(getProperties());
-        
-        if(!journal.isStable()) {
-            
-            // test only applies to restart-safe journals.
-            
+
+        try {
+
+            if (!journal.isStable()) {
+
+                // test only applies to restart-safe journals.
+                return;
+
+            }
+
+            /*
+             * Write a record directly on the store in order to force a commit
+             * to write a commit record (if you write directly on the store it
+             * will not cause a state change in the root addresses, but it will
+             * cause a new commit record to be written with a new timestamp).
+             */
+
+            // write some data.
+            journal.write(ByteBuffer.wrap(new byte[] { 1, 2, 3 }));
+
+            // commit the store.
+            final long commitTime1 = journal.commit();
+
+            assertTrue(commitTime1 != 0L);
+
+            ICommitRecord commitRecord1 = journal.getCommitRecord(commitTime1);
+
+            assertEquals(commitTime1, commitRecord1.getTimestamp());
+
+            assertEquals(commitTime1, journal.getRootBlockView()
+                    .getLastCommitTime());
+
+            /*
+             * Close and then re-open the store and verify that the correct
+             * commit record is returned.
+             */
+            journal = reopenStore(journal);
+
+            ICommitRecord commitRecord2 = journal.getCommitRecord();
+
+            assertEquals(commitRecord1, commitRecord2);
+
+            /*
+             * Now recover the commit record by searching the commit record
+             * index.
+             */
+            ICommitRecord commitRecord3 = journal.getCommitRecord(commitTime1);
+
+            assertEquals(commitRecord1, commitRecord3);
+            assertEquals(commitRecord2, commitRecord3);
+
+        } finally {
+
             journal.destroy();
-            
-            return;
-            
+
         }
-
-        /*
-         * Write a record directly on the store in order to force a commit to
-         * write a commit record (if you write directly on the store it will not
-         * cause a state change in the root addresses, but it will cause a new
-         * commit record to be written with a new timestamp).
-         */
         
-        // write some data.
-        journal.write(ByteBuffer.wrap(new byte[]{1,2,3}));
-        
-        // commit the store.
-        final long commitTime1 = journal.commit();
-        
-        assertTrue(commitTime1!=0L);
-        
-        ICommitRecord commitRecord1 = journal.getCommitRecord(commitTime1);
-
-        assertEquals(commitTime1, commitRecord1.getTimestamp());
-        
-        assertEquals(commitTime1, journal.getRootBlockView().getLastCommitTime());
-        
-        /*
-         * Close and then re-open the store and verify that the correct commit
-         * record is returned.
-         */
-        journal = reopenStore(journal);
-        
-        ICommitRecord commitRecord2 = journal.getCommitRecord();
-
-        assertEquals(commitRecord1, commitRecord2);
-
-        /*
-         * Now recover the commit record by searching the commit record index.
-         */
-        ICommitRecord commitRecord3 = journal.getCommitRecord(commitTime1);
-
-        assertEquals(commitRecord1, commitRecord3);
-        assertEquals(commitRecord2, commitRecord3);
-        
-        journal.destroy();
-
     }
     
     /**
@@ -214,6 +231,8 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
         
         Journal journal = new Journal(getProperties());
 
+        try {
+        
         final int limit = 10;
         
         final long[] commitTime = new long[limit];
@@ -323,7 +342,11 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
             
         }
         
-        journal.destroy();
+        } finally {
+
+            journal.destroy();
+            
+        }
         
     }
 
@@ -334,7 +357,9 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
      */
     public void test_canonicalizingCache() {
         
-        Journal journal = new Journal(getProperties());
+        final Journal journal = new Journal(getProperties());
+        
+        try {
 
         /*
          * The first commit flushes the root leaves of some indices so we get
@@ -381,7 +406,11 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
 
         assertTrue(commitRecord1 == journal.getCommitRecord(commitTime1 + 1));
 
-        journal.destroy();
+        } finally {
+
+            journal.destroy();
+            
+        }
 
     }
     

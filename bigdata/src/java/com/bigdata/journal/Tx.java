@@ -36,9 +36,11 @@ import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexSegment;
 import com.bigdata.isolation.IsolatedFusedView;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.ResourceManager;
+import com.bigdata.resources.StoreManager;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 
@@ -72,15 +74,19 @@ import com.bigdata.service.IDataService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo In order to support a distributed transaction commit protocol the write
- *       set of a validated transaction needs to be made restart safe without
- *       making it restart safe on the corresponding unisolated index on the
- *       journal. It may be that the right thing to do is to write the validated
- *       data onto the unisolated indices but not commit the journal and not
- *       permit other unisolated writes until the commit message arives, e.g.,
- *       block in the {@link WriteExecutorService} waiting on the commit
- *       message. A timeout would cause the buffered writes to be discarded (by
- *       an abort).
+ * @todo Track which {@link IndexSegment}s and {@link Journal}s are required
+ *       to support the {@link IsolatedFusedView}s in use by a {@link Tx}. The
+ *       easiest way to do this is to name these by appending the transaction
+ *       identifier to the name of the index partition, e.g., name#partId#tx. At
+ *       that point the {@link StoreManager} will automatically track the
+ *       resources. This also simplifies access control (write locks) for the
+ *       isolated indices as the same {@link WriteExecutorService} will serve.
+ *       However, with this approach {split, move, join} operations will have to
+ *       be either deferred or issued against the isolated index partitions as
+ *       well as the unisolated index partitions.
+ *       <p>
+ *       Make writes on the tx thread-safe (Temporary mode Journal rather than
+ *       TemporaryStore).
  * 
  * @todo Modify the isolated indices use a delegation strategy so that I can
  *       trap attempts to access an isolated index once the transaction is no
@@ -90,18 +96,6 @@ import com.bigdata.service.IDataService;
  *       the tx commits and then just close the btree absorbing writes for the
  *       isolated index when we are releasing our various resources. The
  *       isolated index will thereafter be unusable, which is what we want.)
- * 
- * @todo The various public methods on this API that have {@link RunState}
- *       constraints all eagerly force an abort when invoked from an illegal
- *       state. This is, perhaps, excessive. Futher, since this is used in a
- *       single-threaded server context (the {@link AbstractTask} needs to
- *       manage resource locks for the isolated indices when there are
- *       concurrent tasks executing for the same transaction), we are better off
- *       testing for illegal conditions and notifying clients without out
- *       generating expensive stack traces. This could be done by return flags
- *       or by the server checking pre-conditions itself and exceptions being
- *       thrown from here if the server failed to test the pre-conditions and
- *       they were not met
  */
 public class Tx extends AbstractTx implements ITx {
 
@@ -140,7 +134,7 @@ public class Tx extends AbstractTx implements ITx {
      *            The transaction identifier
      */
     public Tx(//
-            final ILocalTransactionManager transactionManager,//
+            final AbstractLocalTransactionManager transactionManager,//
             final IResourceManager resourceManager, //
             final long startTime//
             ) {
@@ -321,7 +315,7 @@ public class Tx extends AbstractTx implements ITx {
              * markers, and values as necessary in the unisolated index.
              */
 
-            isolated.mergeDown(revisionTime, sources );
+            isolated.mergeDown(revisionTime, sources);
 
             /*
              * Write a checkpoint so that everything is on the disk. This

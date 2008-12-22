@@ -69,17 +69,20 @@ public class TestJournalBasics extends TestCase {
         TestSuite suite = new TestSuite("journal basics");
 
         // tests of creation, lookup, use, commit of named indices.
-        suite.addTestSuite( TestNamedIndices.class );
+        suite.addTestSuite(TestNamedIndices.class);
 
         // verify that an index is restart-safe iff the journal commits.
-        suite.addTestSuite( TestRestartSafe.class );
+        suite.addTestSuite(TestRestartSafe.class);
 
         // tests of the commit list for named indices.
-        suite.addTestSuite( TestCommitList.class );
+        suite.addTestSuite(TestCommitList.class);
 
         // tests the ability to recover and find historical commit records.
-        suite.addTestSuite( TestCommitHistory.class );
-        
+        suite.addTestSuite(TestCommitHistory.class);
+
+        // test ability to rollback a commit.
+        suite.addTestSuite(TestRollbackCommit.class);
+
         // test compacting merge of a Journal.
         suite.addTestSuite(TestCompactJournal.class);
         

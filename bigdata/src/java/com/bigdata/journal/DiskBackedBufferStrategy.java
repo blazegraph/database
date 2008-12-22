@@ -171,6 +171,32 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
         
     }
    
+    public ByteBuffer readRootBlock(final boolean rootBlock0) {
+        
+        if(isOpen()) throw new IllegalStateException();
+
+        final ByteBuffer tmp = ByteBuffer
+                .allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
+
+        try {
+
+            // @todo retry if asynchronously closed by NIO 
+            FileChannelUtility.readAll(getChannel(), tmp,
+                    rootBlock0 ? FileMetadata.OFFSET_ROOT_BLOCK0
+                            : FileMetadata.OFFSET_ROOT_BLOCK1);
+
+        } catch (IOException ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+
+        tmp.position(0); // resets the position.
+
+        return tmp;
+
+    }
+    
     public void writeRootBlock(IRootBlockView rootBlock,ForceEnum forceOnCommit) {
 
         if (rootBlock == null)
@@ -183,19 +209,8 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
             final long pos = rootBlock.isRootBlock0() ? FileMetadata.OFFSET_ROOT_BLOCK0
                     : FileMetadata.OFFSET_ROOT_BLOCK1;
             
+            // @todo retry if asynchronously closed by NIO 
             FileChannelUtility.writeAll(getChannel(), data, pos);
-
-//            final int count = getChannel().write(rootBlock.asReadOnlyBuffer(),
-//                    rootBlock.isRootBlock0() ? FileMetadata.OFFSET_ROOT_BLOCK0
-//                            : FileMetadata.OFFSET_ROOT_BLOCK1);
-//
-//            if(count != RootBlockView.SIZEOF_ROOT_BLOCK) {
-//                
-//                throw new IOException("Expecting to write "
-//                        + RootBlockView.SIZEOF_ROOT_BLOCK + " bytes, but wrote"
-//                        + count + " bytes.");
-//                
-//            }
 
             if( forceOnCommit != ForceEnum.No ) {
 

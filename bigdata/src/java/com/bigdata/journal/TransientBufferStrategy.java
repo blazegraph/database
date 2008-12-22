@@ -109,14 +109,16 @@ public class TransientBufferStrategy extends BasicBufferStrategy {
         
     }
     
-    public void writeRootBlock(IRootBlockView rootBlock, ForceEnum forceOnCommit) {
-        
-        if(rootBlock == null) throw new IllegalArgumentException();
-        
+    public void writeRootBlock(final IRootBlockView rootBlock,
+            final ForceEnum forceOnCommit) {
+
+        if (rootBlock == null)
+            throw new IllegalArgumentException();
+
         currentRootBlock = rootBlock.isRootBlock0() ? 0 : 1;
 
         rootBlocks[currentRootBlock] = rootBlock;
-        
+
     }
 
     /**
@@ -127,6 +129,12 @@ public class TransientBufferStrategy extends BasicBufferStrategy {
     final public int getHeaderSize() {
         
         return 0;
+        
+    }
+
+    public ByteBuffer readRootBlock(boolean rootBlock0) {
+
+        return rootBlocks[rootBlock0 ? 0 : 1].asReadOnlyBuffer();
         
     }
     
