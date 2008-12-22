@@ -402,14 +402,7 @@ public class AbstractResourceManagerTestCase extends
 
         }
 
-        public Future<Void> twoPhasePrepare(long tx, long revisionTime)
-                throws InterruptedException, ExecutionException, IOException {
-
-            throw new UnsupportedOperationException();
-
-        }
-
-        public void twoPhaseCommit(long tx, long commitTime)
+        public void prepare(long tx, long revisionTime)
                 throws InterruptedException, ExecutionException, IOException {
 
             throw new UnsupportedOperationException();

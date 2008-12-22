@@ -74,6 +74,7 @@ import com.bigdata.concurrent.NamedLock;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.CommitRecordIndex;
 import com.bigdata.journal.ConcurrencyManager;
@@ -2197,12 +2198,6 @@ abstract public class StoreManager extends ResourceEvents implements
             
         }
         
-//        public long nextTimestamp() {
-//
-//            return StoreManager.this.nextTimestampRobust();
-//
-//        }
-
         /**
          * Note: Exposed for the {@link DataService} which needs this for its
          * 2-phase commit protocol.
@@ -2221,45 +2216,13 @@ abstract public class StoreManager extends ResourceEvents implements
             return super.getCommitRecordIndex();
             
         }
-        
-//        /**
-//         * <strong>WARNING: Delegates to the federation</strong>.
-//         * 
-//         * The local and embedded federations impls have direct access to the
-//         * root block on the live journal for their data service(s). Distributed
-//         * federations rely on the {@link ITransactionService} to process
-//         * {@link ITransactionService#notifyCommit(long)} events in order to
-//         * report the most recent global commit time.
-//         */
-//        public long lastCommitTime() {
-//            
-//            return getFederation().getLastCommitTime();
-//            
-//        }
 
-//        /**
-//         * Ignored.
-//         */
-//        public void setReleaseTime(long releaseTime) throws IOException {
-//            
-//            if (releaseTime < 0)
-//                throw new IllegalArgumentException();
-//            
-//            // ignored.
-//            
-//        }
+        public AbstractLocalTransactionManager getLocalTransactionManager() {
 
-        public ILocalTransactionManager getLocalTransactionManager() {
-
-            return getConcurrencyManager().getTransactionManager();
+            return (AbstractLocalTransactionManager) getConcurrencyManager()
+                    .getTransactionManager();
 
         }
-
-//        public IMetadataService getMetadataService() {
-//            
-//            return getFederation().getMetadataService();
-//            
-//        }
 
         public SparseRowStore getGlobalRowStore() {
             

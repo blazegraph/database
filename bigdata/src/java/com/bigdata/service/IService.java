@@ -41,7 +41,7 @@ import java.util.UUID;
 public interface IService extends Remote {
 
     /**
-     * The unique identifier for this data service.
+     * The unique identifier for this service.
      * <p>
      * Note: Some service discovery frameworks (Jini) will assign the service a
      * {@link UUID} asynchronously after a new service starts, in which case

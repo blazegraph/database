@@ -38,7 +38,6 @@ import java.util.UUID;
 
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.counters.AbstractStatisticsCollector;
-import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.ITransactionService;
@@ -732,7 +731,7 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
             }
             
         }
-        
+
     }
     
 //    public IMetadataIndex getMetadataIndex(String name, long timestamp) {
@@ -934,15 +933,7 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
     }
     
     /**
-     * @todo This scans the {@link DataService}s and reports the most recent
-     *       value.
-     *       <p>
-     *       The data service initialization should be changed so that the
-     *       embedded data services are using a shared
-     *       {@link AbstractLocalTransactionManager} and that class should note
-     *       the most recent commit time (it will have to query the data
-     *       services during start, much like we are doing here). This approach
-     *       generalizes towards the distributed systems approach.
+     * This scans the {@link DataService}s and reports the most recent value.
      */
     public long getLastCommitTime() {
 

@@ -319,7 +319,7 @@ public abstract class AbstractIndexManagerTestCase<S extends IIndexManager> exte
         
         final int nbytes = r.nextInt(1024) + 1;
         
-        byte[] bytes = new byte[nbytes];
+        final byte[] bytes = new byte[nbytes];
         
         r.nextBytes(bytes);
         

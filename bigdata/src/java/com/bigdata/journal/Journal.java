@@ -199,7 +199,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     }
 
-    public ILocalTransactionManager getLocalTransactionManager() {
+    public AbstractLocalTransactionManager getLocalTransactionManager() {
 
         return localTransactionManager;
 
@@ -627,11 +627,10 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      */
     public long newTx(final long timestamp) {
         
-        final long tx;
         try {
 
-            tx = localTransactionManager.getTransactionService()
-                    .newTx(timestamp);
+            return localTransactionManager.getTransactionService().newTx(
+                    timestamp);
 
         } catch (IOException e) {
 
@@ -643,15 +642,6 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             throw new RuntimeException(e);
 
         }
-
-        /*
-         * Note: This creates the local state for this transaction (starts the
-         * tx on the journal).
-         */
-
-        new Tx(localTransactionManager, this, tx);
-
-        return tx;
         
     }
 
@@ -737,6 +727,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     }
 
     /**
+     * Returns the next timestamp from the {@link ILocalTransactionManager}.
+     * 
      * @deprecated This is here for historical reasons and is only used by the
      *             test suite.
      */

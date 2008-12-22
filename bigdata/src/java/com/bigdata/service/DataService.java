@@ -27,25 +27,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.Writer;
 import java.nio.ByteBuffer;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
@@ -53,7 +44,6 @@ import org.apache.log4j.MDC;
 import com.bigdata.Banner;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
@@ -62,13 +52,11 @@ import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.io.ByteBufferInputStream;
-import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.AbstractTx;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.DropIndexTask;
-import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ILocalTransactionManager;
 import com.bigdata.journal.IResourceLockService;
@@ -76,19 +64,18 @@ import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IndexProcedureTask;
+import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.RegisterIndexTask;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.journal.JournalTransactionService.SinglePhaseCommit;
 import com.bigdata.mdi.IResourceMetadata;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StoreManager;
 import com.bigdata.resources.StoreManager.ManagedJournal;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * An implementation of a network-capable {@link IDataService}. The service is
@@ -563,7 +550,7 @@ abstract public class DataService extends AbstractService
 
             setupCounters();
 
-            logHttpdURL();
+            logHttpdURL(service.getResourceManager().getDataDir());
 
         }
 
@@ -609,7 +596,7 @@ abstract public class DataService extends AbstractService
             serviceRoot.makePath(IDataServiceCounters.concurrencyManager)
                     .attach(service.concurrencyManager.getCounters());
 
-            serviceRoot.makePath(IDataServiceCounters.transactionService)
+            serviceRoot.makePath(IDataServiceCounters.transactionManager)
                     .attach(service.localTransactionManager.getCounters());
 
             // block API.
@@ -651,50 +638,6 @@ abstract public class DataService extends AbstractService
 
         }
 
-        /**
-         * Writes the URL of the local httpd service for the {@link DataService}
-         * onto a file named <code>httpd.url</code> in the data directory that
-         * was configured for the {@link DataService}.
-         */
-        protected void logHttpdURL() {
-            
-            final File dir = service.getResourceManager().getDataDir();
-            
-            final File httpdURLFile = new File(dir, "httpd.url");
-            
-            // delete in case old version exists.
-            httpdURLFile.delete();
-            
-            final String httpdURL = service.getFederation().getHttpdURL();
-
-            if (httpdURL != null) {
-
-                try {
-
-                    final Writer w = new BufferedWriter(new FileWriter(
-                            httpdURLFile));
-
-                    try {
-
-                        w.write(httpdURL);
-
-                    } finally {
-
-                        w.close();
-
-                    }
-
-                } catch (IOException ex) {
-
-                    log.warn("Problem writing httpdURL on file: "
-                            + httpdURLFile);
-                    
-                }
-
-            }
-
-        }
-        
     }
     
     /**
@@ -771,9 +714,9 @@ abstract public class DataService extends AbstractService
         String concurrencyManager = "Concurrency Manager";
 
         /**
-         * The namespace for the counters pertaining to the {@link ITransactionService}.
+         * The namespace for the counters pertaining to the {@link ILocalTransactionService}.
          */
-        String transactionService = "Transaction Manager";
+        String transactionManager = "Transaction Manager";
         
         /**
          * The namespace for the counters pertaining to the {@link ResourceManager}.
@@ -784,16 +727,6 @@ abstract public class DataService extends AbstractService
         
     /*
      * ITxCommitProtocol.
-     * 
-     * FIXME The data service MUST notify the transaction service when a task
-     * writes on an index partition isolated by a transactions on the data
-     * service. The local state of the transaction should include the fact that
-     * notice was generated for the data service so we do not reissue notices
-     * for each write operation. The notice itself can be sent by the ITx object
-     * when it isolates an index for the tx for the first time (or better yet,
-     * when it observes that there has been a write on an isolated index by a
-     * task - so maybe in AbstractTask), but it will need to be able to access
-     * the data service's UUID in order to send that notice.
      */
     
     public void setReleaseTime(final long releaseTime) {
@@ -830,11 +763,14 @@ abstract public class DataService extends AbstractService
                  * A read-only transaction.
                  * 
                  * Note: We do not maintain state on the client for read-only
-                 * transactions. The state for a read-only transaction is captured
-                 * by its transaction identifier and by state on the transaction
-                 * service, which maintains a read lock.
+                 * transactions. The state for a read-only transaction is
+                 * captured by its transaction identifier and by state on the
+                 * transaction service, which maintains a read lock.
+                 * 
+                 * Note: Thrown exception since this method will not be invoked
+                 * by the txService for a read-only tx.
                  */
-                
+
                 throw new IllegalArgumentException();
                 
             }
@@ -872,7 +808,7 @@ abstract public class DataService extends AbstractService
         
     }
 
-    public Future<Void> twoPhasePrepare(final long tx, final long revisionTime)
+    public void prepare(final long tx, final long revisionTime)
             throws ExecutionException, InterruptedException, IOException {
         
         setupLoggingContext();
@@ -888,6 +824,9 @@ abstract public class DataService extends AbstractService
                  * transactions. The state for a read-only transaction is captured
                  * by its transaction identifier and by state on the transaction
                  * service, which maintains a read lock.
+                 * 
+                 * Note: Thrown exception since this method will not be invoked
+                 * by the txService for a read-only tx.
                  */
                 
                 throw new IllegalArgumentException();
@@ -908,14 +847,16 @@ abstract public class DataService extends AbstractService
             }
             
             /*
-             * Submit commit task and _return_ its Future.
-             * 
-             * Note: The caller can use the Future to cancel the 2-phase commit.
+             * Submit the task and await its future
              */
 
-            return commitService
-                    .submit(new TwoPhaseCommit(state, revisionTime));
+            concurrencyManager.submit(
+                    new DistributedCommitTask(concurrencyManager,
+                            resourceManager, getServiceUUID(), state,
+                            revisionTime)).get();
 
+            // Done.
+            
         } finally {
 
             clearLoggingContext();
@@ -924,375 +865,220 @@ abstract public class DataService extends AbstractService
 
     }
 
-    /*
-     * FIXME shutdown with the dataservice!
-     */
-    private ExecutorService commitService = Executors
-            .newSingleThreadExecutor(new DaemonThreadFactory(getServiceName()
-                    + "-commitService"));
-    
-    public void twoPhaseCommit(final long tx, final long commitTime)
-            throws ExecutionException, InterruptedException, IOException {
-
-        setupLoggingContext();
-
-        try {
-            
-            if (commitTime <= getResourceManager().getLiveJournal()
-                    .getLastCommitTime()) {
-
-                /*
-                 * The commit times must strictly advance.
-                 */
-                
-                throw new IllegalArgumentException();
-                
-            }
-
-            if(TimestampUtility.isReadOnly(tx)) {
-                
-                /*
-                 * A read-only transaction.
-                 * 
-                 * Note: We do not maintain state on the client for read-only
-                 * transactions. The state for a read-only transaction is captured
-                 * by its transaction identifier and by state on the transaction
-                 * service, which maintains a read lock.
-                 */
-                
-                throw new IllegalArgumentException();
-                
-            }
-            
-            final AbstractTx state = (AbstractTx) getLocalTransactionManager()
-                    .getTx(tx);
-
-            if (state == null) {
-
-                /*
-                 * This is not an active transaction.
-                 */
-
-                throw new IllegalStateException();
-
-            }
-
-            final TwoPhaseCommit task = commitTasks.get(state);
-            
-            if (task == null) {
-
-                /*
-                 * There is no commit task for that transaction.
-                 */
-
-                throw new IllegalStateException();
-                
-            }
-            
-            if (!state.isPrepared()) {
-                
-                /*
-                 * @todo We might want to be holding [tx.lock] here, in which
-                 * case the [task] and the [tx] should probably use the same
-                 * lock object -- [tx.lock].
-                 */
-                
-                throw new IllegalStateException();
-                
-            }
-            
-            task.lock.lock();
-
-            try {
-
-                // set the commitTime to be used for the tx.
-                task.commitTime = commitTime;
-
-                /*
-                 * Signal the [ready] condition on the task so that it will
-                 * commit the journal and release the write lock.
-                 */
-
-                task.ready.signal();
-
-                /*
-                 * Wait until [done] is signaled.
-                 */
-                
-                task.done.await();
-                
-            } finally {
-                
-                task.lock.unlock();
-
-            }
-            
-        } finally {
-            
-            clearLoggingContext();
-            
-        }
-        
-    }
-
     /**
-     * Map containing {@link TwoPhaseCommit} tasks for transactions that have
-     * been issued a {@link #twoPhasePrepare(long, long)} message but not yet
-     * either cancelled (via their {@link Future}) or successfully committed.
-     */
-    private final ConcurrentHashMap<ITx, TwoPhaseCommit> commitTasks = new ConcurrentHashMap<ITx, TwoPhaseCommit>();
-
-    /**
-     * A 2-phase commit protocol used when the transaction write set is
-     * distributed across more than one {@link DataService}.
+     * Task handling the distributed commit protocol for the
+     * {@link IDataService}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private class TwoPhaseCommit implements Callable<Void> {
+    private static class DistributedCommitTask extends AbstractTask<Void> {
 
-        /**
-         * The local state for the transaction.
-         */
-        protected final AbstractTx state;
-
-        /**
-         * The revision time that will be used for {@link ITuple}s when the
-         * write set of the transaction is merged down onto the unisolated
-         * indices.
-         */
-        protected final long revisionTime;
-
-        /**
-         * Lock used to coordinate access to the {@link #ready} and
-         * {@link #done} signals.
-         */
-        protected final ReentrantLock lock;
-
-        /**
-         * Volatile flag is set if this task is aborted. You MUST hold the
-         * {@link #lock} to inspect the state of this flag so that decisions
-         * made on its state will be atomic.
-         */
-//        protected volatile boolean aborted = false;
+        // ctor arg.
+        private final ResourceManager resourceManager;
+        private UUID dataServiceUUID;
+        private final AbstractTx state;
+        private final long revisionTime;
+        
+        // derived.
+        private final long tx;
         
         /**
-         * Condition is signalled when all participants in the distributed
-         * commit protocol are ready.
-         * <p>
-         * Note that the {@link #commitTime} MUST be set before you signal this
-         * {@link Condition}.
-         */
-        protected final Condition ready;
-
-        /**
-         * Once this task receives the {@link #ready} signal it will begin the
-         * atomic commit phase and it will send a {@link #done} signal when the
-         * commit is done.
-         * <p>
-         * Note: This {@link Condition} is used to await the completion of the
-         * 2-phase commit protocol on this {@link DataService} before returning
-         * to the caller. However, {@link #done} WILL NOT be signalled unless
-         * this task has noticed the {@link #ready} signal.
-         */
-        protected final Condition done;
-
-        /**
-         * The commit time assigned by the {@link ITransactionService}.
-         */
-        protected long commitTime = 0L;
-
-        /**
+         * @param concurrencyManager
+         * @param resourceManager
+         * @param dataServiceUUID
          * @param state
          * @param revisionTime
          */
-        protected TwoPhaseCommit(final AbstractTx state, final long revisionTime) {
+        public DistributedCommitTask(
+                final ConcurrencyManager concurrencyManager,//
+                final ResourceManager resourceManager,//
+                final UUID dataServiceUUID,//
+                final AbstractTx state,//
+                final long revisionTime//
+                ) {
+
+            super(concurrencyManager, ITx.UNISOLATED, state.getDirtyResource());
+
+            if (resourceManager == null)
+                throw new IllegalArgumentException();
 
             if (state == null)
                 throw new IllegalArgumentException();
+            
+            if (revisionTime == 0L)
+                throw new IllegalArgumentException();
+            
+            if (revisionTime <= state.getStartTimestamp())
+                throw new IllegalArgumentException();
+
+            this.resourceManager = resourceManager;
+
+            this.dataServiceUUID = dataServiceUUID;
 
             this.state = state;
 
             this.revisionTime = revisionTime;
 
-            this.lock = new ReentrantLock(); // @todo ? vs state.lock;
+            this.tx = state.getStartTimestamp();
 
-            this.ready = lock.newCondition();
-            
-            this.done = lock.newCondition();
-            
         }
 
-        public Void call() throws Exception {
+        /**
+         * FIXME Finish, write tests and debug.
+         */
+        @Override
+        protected Void doTask() throws Exception {
 
-            if (!state.lock.tryLock()
-                    && !state.lock.tryLock(10L, TimeUnit.MILLISECONDS)) {
+            final ITransactionService txService = resourceManager
+                    .getLiveJournal().getLocalTransactionManager()
+                    .getTransactionService();
 
-                /*
-                 * This idiom tries barging in and then waits for a short moment
-                 * before deciding that the transaction has ongoing work on this
-                 * data service. It then aborts the commit protocol so that we
-                 * don't wind up deadlocked while holding the exclusive lock on
-                 * the write service.
-                 */
+            prepare();
 
-                throw new RuntimeException("Transaction is still being used?");
+            final long commitTime = txService.prepared(tx, dataServiceUUID);
 
-            }
-            
+            // obtain the exclusive write lock on journal.
+            lockJournal();
             try {
-                
-                lock.lock();
 
+                // Commit using the specified commit time.
+                commit(commitTime);
+
+                boolean success = false;
                 try {
 
-                    // add to the set of running commits.
-                    commitTasks.put(state, this);
-
-                    final WriteExecutorService writeService = getConcurrencyManager()
-                            .getWriteService();
-
                     /*
-                     * Wait for the exclusive lock on the write service.
-                     * 
-                     * Note: There WILL NOT be any UNISOLATED tasks running on
-                     * this data service while we prepare, mergeDown or wait for
-                     * the signal to commit the transaction!
-                     * 
-                     * Note: Read tasks are not blocked by this protocol.
+                     * Wait until the entire distributed transaction is
+                     * committed.
                      */
-
-                    writeService.tryLock(Long.MAX_VALUE, TimeUnit.SECONDS);
-
-                    try {
-
-                        /*
-                         * Prepare the transaction (validate and merge down onto
-                         * the unisolated indices and then checkpoints those
-                         * indices).
-                         */
-                        state.prepare(revisionTime);
-
-                        /*
-                         * Note: Since we are holding the exclusive write lock
-                         * it is not possible for the live journal to overflow
-                         * and therefore this reference will remain valid until
-                         * we release that lock.
-                         */
-                        final ManagedJournal liveJournal = resourceManager
-                                .getLiveJournal();
-
-                        ensureMinFree(liveJournal);
-
-                        /*
-                         * Wait until signaled -or- interrupted.
-                         * 
-                         * Note: throws InterruptedException.
-                         */
-                        ready.await();
-
-                        /*
-                         * Once we receive the [ready] signal we do the atomic
-                         * commit and we MUST signal [done] regardless of the
-                         * outcome of that commit.
-                         * 
-                         * Note: Any failure at this point will result in a bad
-                         * commit for the transaction as some data services may
-                         * succeed while at least this one will fail.
-                         */
-                        try {
-
-                            if (commitTime == 0) {
-
-                                /*
-                                 * The commitTime must be set before you signal
-                                 * [ready].
-                                 */
-
-                                throw new AssertionError();
-
-                            }
-
-                            // commit using the caller's commit time.
-                            liveJournal.commitNow(commitTime);
-
-                            return null;
-
-                        } finally {
-
-                            done.signal();
-
-                        }
-
-                    } catch (Throwable t) {
-
-//                        aborted = true;
-                        
-                        state.abort();
-
-                        throw new RuntimeException(t);
-
-                    } finally {
-
-                        // release the exclusive lock on the write service.
-                        writeService.unlock();
-
-                    }
+                    success = txService.committed(tx, dataServiceUUID);
 
                 } finally {
 
-                    // remove from the set of running commits.
-                    commitTasks.remove(state);
+                    if (!success) {
 
-                    lock.unlock();
+                        // Rollback the journal.
+                        rollback();
+
+                    }
 
                 }
-
+                
             } finally {
 
-                state.lock.unlock();
+                // release the exclusive write lock on journal.
+                unlockJournal();
 
             }
+
+            return null;
+
+        }
+
+        /**
+         * Prepare the transaction (validate and merge down onto the unisolated
+         * indices and then checkpoints those indices).
+         * <p>
+         * Note: This presumes that we are already holding exclusive write locks
+         * on the named indices such that the pre-conditions for validation and
+         * its post-conditions can not change until we either commit or discard
+         * the transaction.
+         * <p>
+         * Note: The indices need to be isolated as by {@link AbstractTask} or
+         * they will be enrolled onto {@link Name2Addr}'s commitList when they
+         * become dirty and then checkpointed and included with the NEXT commit.
+         * <p>
+         * For this reason, the {@link DistributedCommitTask} is an UNISOLATED
+         * task so that we can reuse the existing mechanisms as much as
+         * possible.
+         * 
+         * FIXME This will work if we can grab the write service lock from
+         * within the task (which will mean changing that code to allow the lock
+         * with the caller only still running or simply waiting until we are
+         * signaled by the txService that all participants are either go
+         * (continue execution and will commit at the next group commit, but
+         * then we need a protocol to impose the correct commit time, e.g., by
+         * passing it on the task and ensuring that there is no other tx ready
+         * in the commit group) or abort (just throw an exception).
+         */
+        protected void prepare() {
+            
+            state.prepare(revisionTime);
+            
+        }
+
+        /**
+         * Obtain the exclusive lock on the write service. This will prevent any
+         * other tasks using the concurrency API from writing on the journal.
+         */
+        protected void lockJournal() {
+
+            throw new UnsupportedOperationException();
+            
+        }
+        
+        protected void unlockJournal() {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+        
+        /**
+         * Commit the transaction using the specified <i>commitTime</i>.
+         * <p>
+         * Note: There are no persistent side-effects unless this method returns
+         * successfully.
+         * 
+         * @param commitTime
+         *            The commit time that must be used.
+         */
+        protected void commit(final long commitTime) {
+
+            /*
+             * @todo enroll the named indices onto Name2Addr's commitList (this
+             * basically requires breaking the isolation imposed by the
+             * AbstractTask).
+             */
+
+            if (true)
+                throw new UnsupportedOperationException();
+
+            final ManagedJournal journal = resourceManager.getLiveJournal();
+            
+            // atomic commit.
+            journal.commitNow(commitTime);
 
         }
         
         /**
-         * Make sure that the live journal is not completely full so that we can
-         * avoid the possibility of a "disk full" error.
-         * <p>
-         * Note: You need an exclusive write lock on the journal to extend it,
-         * but we have one.
+         * Discard the last commit, restoring the journal to the previous commit
+         * point.
          */
-        protected void ensureMinFree(AbstractJournal liveJournal) {
-        
-            final IBufferStrategy buf = liveJournal.getBufferStrategy();
-
-            final long remaining = buf.getUserExtent() - buf.getNextOffset();
-
-            final long MIN_FREE = Bytes.kilobyte * 10;
-
-            if (remaining < MIN_FREE) {
-
-                buf.truncate(buf.getExtent() + MIN_FREE);
-
-            }
-
+        protected void rollback() {
+            
+            final ManagedJournal journal = resourceManager.getLiveJournal();
+            
+            journal.rollback();
+            
         }
         
     }
 
-    public void abort(long tx) throws IOException {
+    public void abort(final long tx) throws IOException {
 
         setupLoggingContext();
 
         try {
 
-            final ITx state = getLocalTransactionManager().getTx(tx);
+            final AbstractTx localState = (AbstractTx) getLocalTransactionManager()
+                    .getTx(tx);
 
-            if (state == null)
+            if (localState == null)
                 throw new IllegalArgumentException();
             
-            state.abort();
+            // FIXME review and reconcile w/ standalone version.
+            localState.abort();
             
         } finally {
             

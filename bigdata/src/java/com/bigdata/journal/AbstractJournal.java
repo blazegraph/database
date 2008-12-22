@@ -1311,6 +1311,38 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     }
 
     /**
+     * Make sure that the journal has at least the specified number of bytes of
+     * unused capacity remaining in the user extent.
+     * <p>
+     * Note: You need an exclusive write lock on the journal to extend it.
+     * 
+     * @param minFree
+     *            The minimum #of bytes free for the user extent.
+     * 
+     * @return The #of bytes of free space remaining in the user extent.
+     */
+    public long ensureMinFree(final long minFree) {
+
+        assertOpen();
+        
+        if (minFree < 0L)
+            throw new IllegalArgumentException();
+        
+        final IBufferStrategy buf = _bufferStrategy;
+
+        final long remaining = buf.getUserExtent() - buf.getNextOffset();
+
+        if (remaining < minFree) {
+
+            buf.truncate(buf.getExtent() + minFree);
+
+        }
+
+        return buf.getUserExtent() - buf.getNextOffset();
+
+    }
+ 
+    /**
      * Restart safe conversion of the store into a read-only store with the
      * specified <i>closeTime</i>.
      * <p>
@@ -1736,12 +1768,61 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             log.info("done");
         
     }
-
+    
     /**
-     * Return the object providing the {@link ILocalTransactionManager} for this
-     * journal.
+     * Rollback a journal to its previous commit point.
+     * <p>
+     * Note: You MUST have an exclusive write lock on the journal.
+     * <p>
+     * Note: To restore the last root block we copy the alternative root block
+     * over the current root block. That gives us two identical root blocks and
+     * restores us to the root block that was in effect before the last commit.
      */
-    abstract public ILocalTransactionManager getLocalTransactionManager();
+    public void rollback() {
+
+        assertOpen();
+
+        if(isReadOnly())
+            throw new IllegalStateException();
+
+        log.warn("");
+        
+        /*
+         * Read the alternate root block (NOT the current one!).
+         */
+        final ByteBuffer buf = _bufferStrategy.readRootBlock(!_rootBlock
+                .isRootBlock0());
+
+        /*
+         * Create a view from the alternate root block, but using the SAME
+         * [rootBlock0] flag state as the current root block so that this will
+         * overwrite the current root block.
+         */
+        final IRootBlockView newRootBlock = new RootBlockView(_rootBlock
+                .isRootBlock0(), buf, checker);
+        
+        /*
+         * Overwrite the current root block on the backing store with the
+         * state of the alternate root block.
+         */
+        _bufferStrategy.writeRootBlock(newRootBlock, forceOnCommit);
+
+        // Use the new root block. 
+        _rootBlock = newRootBlock;
+        
+        /*
+         * Discard all in-memory state - it will need be re-loaded from the
+         * restored root block.
+         */
+        abort();
+        
+    }
+        
+    /**
+     * Return the object providing the {@link AbstractLocalTransactionManager}
+     * for this journal.
+     */
+    abstract public AbstractLocalTransactionManager getLocalTransactionManager();
     
     public long commit() {
         
@@ -1768,18 +1849,17 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         assert commitTime2 == commitTime;
         
         /*
-         * Committed data so we need to notify the federation that it must
-         * advance its global lastCommitTime.
+         * Now that we have committed the data we notify the federation that it
+         * should advance its global lastCommitTime.
          * 
-         * FIXME This protocol is not robust since if we fail to notify the
-         * federation there is no way to rollback the commit. In fact we need
-         * something like a 2/3-phase commit for this to be robust.
+         * @todo we could use IBufferStrategy#rollback() if the notice failed,
+         * e.g., due to a service outage.
          */
         
         transactionManager.notifyCommit(commitTime);
-            
+
         return commitTime;
-        
+
     }
 
     /**
@@ -1841,7 +1921,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
              * any useful purpose.
              */
             
-            log.info("Nothing to commit");
+            if(INFO)
+                log.info("Nothing to commit");
 
             return 0L;
 

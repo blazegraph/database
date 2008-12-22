@@ -30,6 +30,7 @@ package com.bigdata.journal;
 
 import java.io.IOException;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
 import com.bigdata.service.AbstractTransactionService;
@@ -58,9 +59,21 @@ abstract public class JournalTransactionService extends
 
     }
 
-    protected void abortImpl(final long tx) {
+    /**
+     * Extended to register the new tx in the
+     * {@link AbstractLocalTransactionManager}.
+     */
+    protected void activateTx(final TxState state) {
 
-        if(TimestampUtility.isReadOnly(tx)) {
+        super.activateTx(state);
+        
+        new Tx(journal.getLocalTransactionManager(), journal, state.tx);
+        
+    }
+    
+    protected void abortImpl(final TxState state) {
+
+        if(state.isReadOnly()) {
             
             /*
              * A read-only transaction.
@@ -70,35 +83,44 @@ abstract public class JournalTransactionService extends
              * by its transaction identifier and by state on the transaction
              * service, which maintains a read lock.
              */
+
+            state.setRunState(RunState.Aborted);
             
             return;
             
         }
-        
-        final AbstractTx state = (AbstractTx) journal
-                .getLocalTransactionManager().getTx(tx);
 
-        if (state == null) {
+        try {
 
             /*
-             * This is an unknown transaction.
+             * The local (client-side) state for this tx.
              */
+            final AbstractTx localState = (AbstractTx) journal
+                    .getLocalTransactionManager().getTx(state.tx);
+
+            if (localState == null) {
+
+                throw new AssertionError();
+
+            }
+
+            /*
+             * Update the local state of the tx to indicate that it is aborted.
+             * 
+             * Note: We do not need to issue an abort to the journal since
+             * nothing is written by the transaction on the unisolated indices
+             * until it has validated - and the validate/merge task is an
+             * unisolated write operation, so the task's write set will be
+             * automatically discarded if it fails.
+             */
+
+            localState.abort();
+
+        } finally {
             
-            throw new IllegalStateException();
+            state.setRunState(RunState.Aborted);
             
         }
-
-        /*
-         * Update the local state of the tx to indicate that it is aborted.
-         * 
-         * Note: We do not need to issue an abort to the journal since nothing
-         * is written by the transaction on the unisolated indices until it has
-         * validated - and the validate/merge task is an unisolated write
-         * operation, so the task's write set will be automatically discarded if
-         * it fails.
-         */
-
-        state.abort();
 
     }
 
@@ -117,17 +139,18 @@ abstract public class JournalTransactionService extends
      * <ol>
      * <li> Validate the write sets of the transaction;</li>
      * <li> Merge down the validated write sets onto the live (unisolated
-     * indices);</li>
+     * indices).</li>
      * </ol>
      * If the task succeeds, then return the commit time for the task.
-     * Otherwise, the task will have been aborted (its write sets will have been
-     * discarded) and we mark the tx locally as aborted and re-throw the
-     * exception to the caller.
+     * Otherwise, the write set of the transaction will have been discarded and
+     * the transaction will be marked as aborted.
+     * 
+     * FIXME make sure the tx is removed from the local tables.
      */
-    protected long commitImpl(final long tx) throws ExecutionException,
+    protected long commitImpl(final TxState state) throws ExecutionException,
             InterruptedException {
 
-        if(TimestampUtility.isReadOnly(tx)) {
+        if(state.isReadOnly()) {
             
             /*
              * A read-only transaction.
@@ -138,20 +161,18 @@ abstract public class JournalTransactionService extends
              * service, which maintains a read lock.
              */
             
-            throw new IllegalArgumentException();
+            state.setRunState(RunState.Committed);
+
+            return 0L;
             
         }
         
-        final AbstractTx state = (AbstractTx) journal
-                .getLocalTransactionManager().getTx(tx);
+        final AbstractTx localState = (AbstractTx) journal
+                .getLocalTransactionManager().getTx(state.tx);
 
-        if (state == null) {
+        if (localState == null) {
 
-            /*
-             * This is not an active transaction.
-             */
-
-            throw new IllegalStateException();
+            throw new AssertionError();
 
         }
 
@@ -162,47 +183,61 @@ abstract public class JournalTransactionService extends
              * since validation and commit are basically NOPs (this is the same
              * as the read-only case.)
              * 
-             * Note: Lock out other operations on this tx so that this decision
-             * will be atomic.
+             * Note: We lock out other operations on this tx so that this
+             * decision will be atomic.
              */
 
-            state.lock.lock();
+            localState.lock.lock();
 
             try {
 
-                if (state.isEmptyWriteSet()) {
+                if (localState.isEmptyWriteSet()) {
 
-                    state.prepare(0L/* revisionTime */);
+                    localState.setRunState(RunState.Committed);
 
+                    localState.releaseResources();
+                    
+                    state.setRunState(RunState.Committed);
+                    
+                    journal.getLocalTransactionManager().completedTx(localState);
+                    
                     return 0L;
 
                 }
 
             } finally {
 
-                state.lock.unlock();
+                localState.lock.unlock();
 
             }
 
         }
 
-        final IConcurrencyManager concurrencyManager = journal
-                .getConcurrencyManager();
+        final IConcurrencyManager concurrencyManager = journal.getConcurrencyManager();
 
         final AbstractTask<Void> task = new SinglePhaseCommit(
-                concurrencyManager, journal.getLocalTransactionManager(), state);
+                concurrencyManager, journal.getLocalTransactionManager(),
+                localState);
 
-        // submit and wait for the result.
-        concurrencyManager.getWriteService().submit(task).get();
-        
+        try {
+            
+            // submit and wait for the result.
+            concurrencyManager.getWriteService().submit(task).get();
+            
+            state.setRunState(RunState.Committed);
+            
+        } catch(Throwable t) {
+            
+            state.setRunState(RunState.Aborted);
+            
+        }
+
         /*
          * Note: This is returning the commitTime set on the task when it was
          * committed as part of a group commit.
          */
 
         return task.getCommitTime();
-
-
 
     }
 
@@ -308,4 +343,24 @@ abstract public class JournalTransactionService extends
         
     }
     
+    /**
+     * Throws exception since distributed transactions are not used for a single
+     * {@link Journal}.
+     */
+    public long prepared(long tx, UUID dataService) throws IOException {
+
+        throw new UnsupportedOperationException();
+
+    }
+
+    /**
+     * Throws exception since distributed transactions are not used for a single
+     * {@link Journal}.
+     */
+    public boolean committed(long tx, UUID dataService) throws IOException {
+
+        throw new UnsupportedOperationException();
+        
+    }
+
 }

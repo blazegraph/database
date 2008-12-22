@@ -40,6 +40,7 @@ import net.jini.lookup.entry.Name;
 
 import org.apache.log4j.MDC;
 
+import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.DataService;
@@ -49,12 +50,12 @@ import com.bigdata.service.DistributedTransactionService;
 /**
  * Server exposing a discoverable {@link ITransactionService}.
  * 
- * @todo verify that time is strictly ascending on restart or failover.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME rename various configuration files as well.
+ * @todo verify that time is strictly ascending on restart or failover.
+ * 
+ * @todo rename various configuration files as well.
  */
 public class TransactionServer extends AbstractServer {
 
@@ -97,7 +98,7 @@ public class TransactionServer extends AbstractServer {
                 } catch (Throwable t2) {
                     
                     log.error(t2.getMessage(), t2);
-                    
+
                 }
 
                 System.exit(1);
@@ -107,19 +108,92 @@ public class TransactionServer extends AbstractServer {
         }.run();
 
     }
-   
+
+    /**
+     * Extended to attach the various performance counters reported by the
+     * {@link DistributedTransactionService}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static public class TransactionServiceFederationDelegate extends
+            DefaultServiceFederationDelegate<DistributedTransactionService> {
+
+        public TransactionServiceFederationDelegate(
+                DistributedTransactionService service) {
+
+            super(service);
+
+        }
+
+        /**
+         * Extended to setup {@link AbstractTransactionService} specific
+         * counters
+         * 
+         * @todo write the client URL onto a file in the service's data
+         *       directory.
+         */
+        public void didStart() {
+
+            super.didStart();
+
+            setupCounters();
+
+            // logHttpdURL(dir);
+
+        }
+
+        /**
+         * Sets up {@link AbstractTransactionService} specific counters.
+         */
+        protected void setupCounters() {
+
+            if (getServiceUUID() == null) {
+
+                throw new IllegalStateException(
+                        "The ServiceUUID is not available yet");
+
+            }
+
+            if (!service.isOpen()) {
+
+                /*
+                 * The service has already been closed.
+                 */
+
+                log.warn("Service is not open.");
+
+                return;
+
+            }
+
+            /*
+             * Service specific counters.
+             */
+
+            final CounterSet serviceRoot = service.getFederation()
+                    .getServiceCounterSet();
+
+            serviceRoot.attach(service.getCounters());
+
+        }
+
+    }
+
     @Override
     protected AbstractTransactionService newService(Properties properties) {
-        
-        final AbstractTransactionService service = new AdministrableTimestampService(
+
+        final AbstractTransactionService service = new AdministrableTransactionService(
                 this, properties);
 
         /*
          * Setup a delegate that let's us customize some of the federation
          * behaviors on the behalf of the data service.
          */
-        getClient().setDelegate(
-                new DefaultServiceFederationDelegate<AbstractTransactionService>(service));
+        getClient()
+                .setDelegate(
+                        new DefaultServiceFederationDelegate<AbstractTransactionService>(
+                                service));
 
         return service;
         
@@ -131,12 +205,12 @@ public class TransactionServer extends AbstractServer {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class AdministrableTimestampService extends DistributedTransactionService
+    public static class AdministrableTransactionService extends DistributedTransactionService
             implements RemoteAdministrable, RemoteDestroyAdmin {
 
         protected TransactionServer server;
 
-        public AdministrableTimestampService(TransactionServer server,
+        public AdministrableTransactionService(TransactionServer server,
                 Properties properties) {
             
             super(properties);

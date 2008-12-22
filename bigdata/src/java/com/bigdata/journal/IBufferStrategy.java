@@ -25,6 +25,7 @@ package com.bigdata.journal;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.rawstore.IMRMW;
@@ -137,6 +138,28 @@ public interface IBufferStrategy extends IRawStore, IMRMW {
      */
     public void writeRootBlock(IRootBlockView rootBlock,
             ForceEnum forceOnCommitEnum);
+    
+//    /**
+//     * Rolls back the store to the prior commit point by restoring the last
+//     * written root block.
+//     * 
+//     * @throws IllegalStateException
+//     *             if the store is not open
+//     * @throws IllegalStateException
+//     *             if no prior root block is on hand to be restored.
+//     * 
+//     * @todo Right now the rollback is a single step to the previous root block.
+//     *       However, we could in fact maintain an arbitrary history for
+//     *       rollback by writing the rootblocks onto the store (in the user
+//     *       extent) and saving a reference to the prior root block on the
+//     *       {@link ICommitRecord} before we write the new root block.
+//     */
+//    public void rollback();
+
+    /**
+     * Read the specified root block from the backing file.
+     */
+    public ByteBuffer readRootBlock(boolean rootBlock0);
     
     /**
      * A block operation that transfers the serialized records (aka the written

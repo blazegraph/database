@@ -37,51 +37,6 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility
      */
     final static protected boolean DEBUG = log.isDebugEnabled();
 
-//    private IConcurrencyManager concurrencyManager;
-//    
-//    /**
-//     * The object used to control access to the index resources.
-//     * 
-//     * @throws IllegalStateException
-//     *             if the object has not been set yet using
-//     *             {@link #setConcurrencyManager(IConcurrencyManager)}.
-//     */
-//    public IConcurrencyManager getConcurrencyManager() {
-//
-//        if (concurrencyManager == null) {
-//
-//            // Not assigned!
-//
-//            throw new IllegalStateException();
-//
-//        }
-//
-//        return concurrencyManager;
-//
-//    }
-//
-//    public void setConcurrencyManager(IConcurrencyManager concurrencyManager) {
-//
-//        if (concurrencyManager == null)
-//            throw new IllegalArgumentException();
-//
-//        if (this.concurrencyManager != null)
-//            throw new IllegalStateException();
-//
-//        this.concurrencyManager = concurrencyManager;
-//        
-//    }
-//
-//    /**
-//     * @todo That dependency probably no longer exists.
-//     *       <p>
-//     *       Note: You MUST use
-//     *       {@link #setConcurrencyManager(IConcurrencyManager)} after calling
-//     *       this constructor (the parameter can not be passed in since there is
-//     *       a circular dependency between the {@link IConcurrencyManager} and
-//     *       {@link #commit(long)} on this class, which requires access to the
-//     *       {@link IConcurrencyManager} to submit a task).
-//     */
     public AbstractLocalTransactionManager() {
 
     }
@@ -94,19 +49,23 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility
      * A hash map containing all active transactions. A transaction that is
      * preparing will remain in this collection until it has either successfully
      * prepared or aborted.
+     * 
+     * @todo config initial capacity and concurrency.
      */
-    final Map<Long, ITx> activeTx = new ConcurrentHashMap<Long, ITx>();
+    final protected Map<Long, ITx> activeTx = new ConcurrentHashMap<Long, ITx>();
 
     /**
      * A hash map containing all transactions that have prepared but not yet
      * either committed or aborted.
+     * 
+     * @todo use only a single map for all running tx?
      * 
      * @todo A transaction will be in this map only while it is actively
      *       committing, so this is always a "map" of one and could be replaced
      *       by a scalar reference (except that we may allow concurrent prepare
      *       and commit of read-only transactions).
      */
-    final Map<Long, ITx> preparedTx = new ConcurrentHashMap<Long, ITx>();
+    final protected Map<Long, ITx> preparedTx = new ConcurrentHashMap<Long, ITx>();
 
     /**
      * Notify the journal that a new transaction is being activated (starting on
@@ -181,8 +140,13 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility
      */
     public void completedTx(final ITx tx) throws IllegalStateException {
 
-        assert tx != null;
-        assert tx.isComplete();
+        if (tx == null)
+            throw new IllegalArgumentException();
+        
+        // @todo verify caller holds lock else IllegalMonitorStateException.
+        
+        if (!tx.isComplete())
+            throw new IllegalStateException();
 
         final Long startTime = tx.getStartTimestamp();
 
@@ -200,16 +164,16 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility
     }
 
     /**
-     * Lookup an active or prepared transaction (exact match).
+     * Return the local state for a transaction.
      * 
-     * @param startTime
-     *            The start timestamp for the transaction.
+     * @param tx
+     *            The transaction identifier.
      * 
-     * @return The transaction with that start time or <code>null</code> if
-     *         the start time is not mapped to either an active or prepared
-     *         transaction.
+     * @return The local state for the identified transaction -or-
+     *         <code>null</code> if the start time is not mapped to either an
+     *         active or prepared transaction.
      */
-    public ITx getTx(final long startTime) {
+    public ITx getTx(final long tx) {
 
         /*
          * @todo lock for [activeTx] and [preparedTx] to prevent concurrent decl
@@ -217,15 +181,15 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility
          * lookup and state changes are atomic.
          */
         
-        ITx tx = activeTx.get(startTime);
+        ITx localState = activeTx.get(tx);
 
-        if (tx == null) {
+        if (localState == null) {
 
-            tx = preparedTx.get(startTime);
+            localState = preparedTx.get(tx);
 
         }
 
-        return tx;
+        return localState;
 
     }
 

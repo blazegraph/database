@@ -360,34 +360,6 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter,
         
     }
     
-//    /**
-//     * Ctor used for transient {@link BTree}s.
-//     * 
-//     * @param checkpoint
-//     *            The initial checkpoint record (initial state, not persistent).
-//     * @param metadata
-//     *            The index metadata (not persistent).
-//     * 
-//     * @see #createTransient(IndexMetadata)
-//     */
-//    protected BTree(final Checkpoint checkpoint, final IndexMetadata metadata) {
-//
-//        super(  null, //store 
-//                NodeFactory.INSTANCE, //
-//                /*
-//                 * Note: A BTree is not known to be read-only during its ctor.
-//                 * It might be marked as read-only afterwards, but we can't be
-//                 * sure at this point.
-//                 */
-//                false, // read-only
-//                metadata
-//                );
-//        
-//        // initializes entryCount, etc.
-//        setCheckpoint(checkpoint);
-//
-//    }
-    
     /**
      * Sets the {@link #checkpoint} and initializes the mutable fields from the
      * checkpoint record. In order for this operation to be atomic, the caller
@@ -465,49 +437,6 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter,
         
     }
 
-//    /**
-//     * A field that is set by the ctor if the B+Tree is using a bloom filter and
-//     * cleared iff the bloom filter becomes disabled. This is used to determine
-//     * whether or not we must maintain and test the bloom filter.
-//     * <p>
-//     * Note: You can not simply test <code>bloomFilter!=null</code> since the
-//     * {@link #bloomFilter} reference is discarded by {@link #close()} and is
-//     * not created until the root leaf is created (or reopened). Hence this
-//     * field, which helps to avoid those pitfalls.
-//     */
-//    private boolean isBloomFilter;
-//
-//    @Override
-//    final public boolean isBloomFilter() {
-//
-//        reopen();
-//
-//        return isBloomFilter;
-//
-//    }
-
-//    /**
-//     * Uses {@link #handleCommit()} to flush any dirty nodes to the store and
-//     * update the metadata so we can clear the hard reference queue and release
-//     * the hard reference to the root node. {@link #reopen()} is responsible for
-//     * reloading the root node.
-//     */
-//    public void close() {
-//
-//        /*
-//         * flush any dirty records, noting the address of the metadata record
-//         * so that we can reload the store.
-//         */
-//        handleCommit();
-//        
-//        /*
-//         * this will clear the hard reference cache, release the node serializer
-//         * buffers, and release the hard reference to the root node.
-//         */
-//        super.close();
-//        
-//    }
-    
     @Override
     protected void _reopen() {
         
@@ -655,31 +584,6 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter,
     }
     transient private boolean readOnly = false;
     
-//    /**
-//     * Return <code>true</code> if the {@link BTree} will participate in
-//     * commits requested via {@link #handleCommit()}.
-//     */
-//    final public boolean getAutoCommit() {
-//        
-//        return autoCommit;
-//        
-//    }
-//
-//    /**
-//     * Sets the auto-commit flag (default <code>true</code>). When
-//     * <code>false</code> the {@link BTree} will NOT write a checkpoint record
-//     * in response to a {@link #handleCommit()} request.
-//     * 
-//     * @param autoCommit
-//     *            The new value for the auto-commit flag.
-//     */
-//    final public void setAutoCommit(boolean autoCommit) {
-//        
-//        this.autoCommit = autoCommit;
-//        
-//    }
-//    transient private boolean autoCommit = true;
-    
     final public long getLastCommitTime() {
         
         return lastCommitTime;
@@ -813,14 +717,15 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter,
     }
     
     /**
-     * Checkpoint operation writes dirty nodes using a post-order traversal that
-     * first writes any dirty leaves and then (recursively) their parent nodes.
-     * The parent nodes are guarenteed to be dirty if there is a dirty child so
-     * the commit never triggers copy-on-write.
+     * Checkpoint operation {@link #flush()}es dirty nodes, the optional
+     * {@link IBloomFilter} (if dirty), the {@link IndexMetadata} (if dirty),
+     * and then writes a new {@link Checkpoint} record on the backing store,
+     * saves a reference to the current {@link Checkpoint} and returns the
+     * address of that {@link Checkpoint} record.
      * <p>
      * Note: A checkpoint by itself is NOT an atomic commit. The commit protocol
-     * is at the store level and uses checkpoints to ensure that the state of
-     * the btree is current on the store.
+     * is at the store level and uses {@link Checkpoint}s to ensure that the
+     * state of the {@link BTree} is current on the backing store.
      * 
      * @return The address at which the {@link Checkpoint} record for the
      *         {@link BTree} was written onto the store. The {@link BTree} can
@@ -914,10 +819,10 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter,
     }
     
     /**
-     * Returns the most recent {@link Checkpoint} record for this btree.
+     * Returns the most recent {@link Checkpoint} record for this {@link BTree}.
      * 
-     * @return The most recent {@link Checkpoint} record for this btree and
-     *         never <code>null</code>.
+     * @return The most recent {@link Checkpoint} record for this {@link BTree}
+     *         and never <code>null</code>.
      */
     final public Checkpoint getCheckpoint() {
 

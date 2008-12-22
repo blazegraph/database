@@ -34,12 +34,18 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import com.bigdata.concurrent.LockManager;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
-import com.bigdata.journal.TimestampUtility;
+import com.bigdata.journal.ITransactionService;
+import com.bigdata.journal.RunState;
 import com.bigdata.resources.StoreManager;
 import com.bigdata.util.concurrent.ExecutionExceptions;
 
@@ -63,6 +69,13 @@ public abstract class DistributedTransactionService extends
     }
 
     /**
+     * A map of the distributed transactions that are currently committing.
+     * 
+     * @todo config for initial capacity and concurrency?
+     */
+    private final ConcurrentHashMap<Long/* tx */, TxState/* state */> commitList = new ConcurrentHashMap<Long, TxState>();
+    
+    /**
      * @param properties
      */
     public DistributedTransactionService(final Properties properties) {
@@ -78,69 +91,52 @@ public abstract class DistributedTransactionService extends
     }
 
     @Override
-    protected void abortImpl(final long tx) throws Exception {
-
-        /*
-         * Note: Don't abort a read-only tx since there is no local state on the
-         * data service.
-         */
-        assert !TimestampUtility.isReadOnly(tx);
-        
-        final TxState state = activeTx.get(tx);
-
-        if (state == null)
-            throw new IllegalStateException();
+    protected void abortImpl(final TxState state) {
 
         assert state.lock.isHeldByCurrentThread();
 
         assert state.isActive();
 
+        if(state.isReadOnly()) {
+    
+            state.setRunState(RunState.Aborted);
+            
+            return;
+            
+        }
+
         final UUID[] uuids = state.getDataServiceUUIDs();
 
-        List<Throwable> causes = null;
+        final IDataService[] services = getDataServices(uuids);
         
-        for (UUID uuid : uuids) {
+        // @todo could be executed in parallel.
+        for (IDataService dataService : services) {
 
             try {
 
-                final IDataService dataService = getFederation()
-                        .getDataService(uuid);
-
                 dataService.abort(state.tx);
 
-            } catch (Throwable t2) {
+            } catch (Throwable t) {
 
                 /*
-                 * Collect all causes and always throw an error if any data
+                 * Collect all causes and always log an error if any data
                  * service abort fails.
+                 * 
+                 * Note: If an exception is thrown here the transaction will be
+                 * aborted regardless. Howwever, the data service which threw
+                 * the exception may still have local state on hand for the tx.
                  */
                 
-                log.error(t2, t2);
+                log.error(t, t);
 
-                if (causes == null) {
-                    
-                    causes = new LinkedList<Throwable>();
-                    
-                }
-                
-                causes.add(t2);
-                
             }
 
         }
         
-        if (causes != null)
-            throw new ExecutionExceptions(causes);
-
     }
 
     @Override
-    protected long commitImpl(final long tx) throws Exception {
-        
-        final TxState state = activeTx.get(tx);
-        
-        if (state == null)
-            throw new IllegalStateException();
+    protected long commitImpl(final TxState state) throws Exception {
         
         if (state.isReadOnly() || state.isEmptyWriteSet()) {
             
@@ -153,14 +149,16 @@ public abstract class DistributedTransactionService extends
              * service. In effect, the tx was writable but no writes were
              * requested.
              */
+
+            state.setRunState(RunState.Committed);
             
             return 0L;
             
         }
         
-        if (state.isDistributed()) {
+        if (state.isDistributedTx()) {
 
-            return twoPhaseCommit(state);
+            return distributedCommit(state);
 
         } else {
 
@@ -174,11 +172,11 @@ public abstract class DistributedTransactionService extends
      * Prepare and commit a read-write transactions that has written on a single
      * data service.
      */
-    protected long singlePhaseCommit(final TxState tx) throws Exception {
+    protected long singlePhaseCommit(final TxState state) throws Exception {
 
-        assert tx.lock.isHeldByCurrentThread();
+        assert state.lock.isHeldByCurrentThread();
 
-        final UUID[] uuids = tx.getDataServiceUUIDs();
+        final UUID[] uuids = state.getDataServiceUUIDs();
 
         if (uuids.length != 1)
             throw new AssertionError();
@@ -188,132 +186,589 @@ public abstract class DistributedTransactionService extends
         final IDataService dataService = getFederation().getDataService(
                 serviceUUID);
 
-        return dataService.singlePhaseCommit(tx.tx);
+        try {
+
+            final long commitTime = dataService.singlePhaseCommit(state.tx);
+
+            state.setRunState(RunState.Committed);
+
+            return commitTime;
+
+        } catch (Throwable t) {
+
+            state.setRunState(RunState.Aborted);
+
+            throw new RuntimeException(t);
+
+        }
 
     }
     
+    /**
+     * Resolve UUIDs to services (arrays are correlated).
+     * 
+     * @param uuids
+     *            The (meta)data service UUIDs.
+     * 
+     * @return The (meta)data service proxies.
+     */
+    protected IDataService[] getDataServices(final UUID[] uuids) {
+        
+        final IDataService[] services = new IDataService[uuids.length];
+
+        final IBigdataFederation fed = getFederation();
+        
+        int i = 0;
+        
+        // UUID of the metadata service (if forced to discover it).
+        UUID mdsUUID = null;
+
+        for (UUID uuid : uuids) {
+
+            IDataService service = fed.getDataService(uuid);
+
+            if (service == null) {
+
+                if (mdsUUID == null) {
+                
+                    try {
+                    
+                        mdsUUID = fed.getMetadataService().getServiceUUID();
+                        
+                    } catch (IOException ex) {
+                        
+                        throw new RuntimeException(ex);
+                    
+                    }
+                    
+                }
+                
+                if (uuid == mdsUUID) {
+
+                    /*
+                     * @todo getDataServices(int maxCount) DOES NOT return MDS
+                     * UUIDs because we don't want people storing application
+                     * data there, but getDataService(UUID) should probably work
+                     * for the MDS UUID also since once you have the UUID you
+                     * want the service.
+                     */
+
+                    service = fed.getMetadataService();
+                }
+                
+            }
+
+            if (service == null) {
+
+                throw new RuntimeException("Could not discover service: uuid="
+                        + uuid);
+
+            }
+
+            services[i++] = service;
+
+        }
+        
+        return services;
+
+    }
+
     /**
      * Prepare and commit a read-write transaction that has written on more than
      * one data service.
      * <p>
      * Note: read-write transactions that have written on multiple journals must
-     * use a 2-/3-phase commit protocol. As part of the commit protocol, we
-     * obtain an exclusive write lock on each journal on which the transaction
-     * has written. This is necessary in order for the transaction as a whole to
-     * be assigned a single commit time. Latency is critical in this commit
-     * protocol since the journals participating in the commit will be unable to
-     * perform any unisolated operations until the transaction either commits or
-     * aborts.
+     * use a distributed (2-/3-phase) commit protocol. As part of the commit
+     * protocol, we obtain an exclusive write lock on each journal on which the
+     * transaction has written. This is necessary in order for the transaction
+     * as a whole to be assigned a single commit time. Latency is critical in
+     * this commit protocol since the journals participating in the commit will
+     * be unable to perform any unisolated operations until the transaction
+     * either commits or aborts.
+     * <p>
+     * Note: There is an assumption that the revisionTime does not need to be
+     * the commitTime. This allows us to get all the heavy work done before we
+     * reach the "prepared" barrier, which means that the commit phase should be
+     * very fast. The assumption is that validation of different transactions
+     * writing on the same unisolated indices is in fact serialized. The
+     * transaction services MUST enforce that assumption by serializing
+     * distributed commits (at least those which touch the same index partitions
+     * (necessary constraint), the same indices (sufficient constraint) or the
+     * same {@link IDataService}s (sufficient constraint)). If it did not
+     * serialize distributed commits then <strong>deadlocks</strong> could
+     * arise where two distributed commits were each seeking the exclusive write
+     * lock on resources, one of which was already held by the other commit.
+     * 
+     * @todo The <code>synchronized</code> keyword imposes a sufficient
+     *       constraint to avoid deadlock, but it restricts the possible
+     *       throughput. The maximum concurrency would be achieved if we knew
+     *       the specific named index (partitions) on which the transaction had
+     *       written, which would require both communicating more state from the
+     *       {@link IDataService}. A partial ordering could also be established
+     *       based on the {@link IDataService}s or the scale-out index names.
+     *       <p>
+     *       A partial ordering can then be imposed on a queue of requested
+     *       commits using a {@link LockManager}. Any commit must obtain a lock
+     *       on all of the necessary resources before proceeding. If there is an
+     *       existing commit using some of those resources, then other commits
+     *       will block.
+     *       <p>
+     *       Note: Single phase commits may contend for the resource locks, but
+     *       they could also run without acquiring those locks since they will
+     *       be serialized locally by the {@link IDataService} on which they are
+     *       executing.
      * 
      * @throws Exception
      *             if anything goes wrong.
      * 
      * @return The commit time for the transaction.
      */
-    protected long twoPhaseCommit(final TxState tx) throws Exception {
+    synchronized 
+    protected long distributedCommit(final TxState state) throws Exception {
 
-        assert tx.lock.isHeldByCurrentThread();
+        if(!state.lock.isHeldByCurrentThread())
+            throw new IllegalMonitorStateException();
 
-        final UUID[] uuids = tx.getDataServiceUUIDs();
+        // The UUIDs of the participating (meta)dataServices.
+        final UUID[] uuids = state.getDataServiceUUIDs();
 
-        // resolve UUIDs to services (arrays are correlated).
-        final IDataService[] services = new IDataService[uuids.length];
-        {
+        // The corresponding data services.
+        final IDataService[] services = getDataServices(uuids);
+        
+        // choose the revision timestamp.
+        final long revisionTime = nextTimestamp();
 
-            int i = 0;
+        commitList.put(state.tx, state);
 
-            for (UUID uuid : uuids) {
+        try {
+        
+            /*
+             * Submit a task that will run issue the prepare(tx,rev) messages to
+             * each participating data service and await its future.
+             */
+            
+            final long commitTime = getFederation()
+                    .getExecutorService()
+                    .submit(
+                            new RunCommittersTask(services, state, revisionTime))
+                    .get();
 
-                services[i++] = getFederation().getDataService(uuid);
+            return commitTime;
+            
+        } finally {
 
-            }
+            commitList.remove(state.tx);
             
         }
-
-        /*
-         * FIXME 2-phase commit impl.
-         * 
-         * Note: We can not issue the [revisionTime] for the tx commit until we
-         * have the write lock for the indices isolated by the transaction on
-         * all of the journals since there may be ongoing work for the
-         * transaction in queues on some journals (not good practice, but could
-         * be true).
-         * 
-         * This requires a callback to the txservice once the write lock is held
-         * on the necessary indices before validation may proceed. All callers
-         * will have to wait at a barrier until the write lock is held for all
-         * data services. At that point we can issue the next timestamp as the
-         * commit time and the journals can go forth and prepare.
-         * 
-         * Prepare should validate and merge down onto the unisolated indices.
-         * 
-         * Each preparer again waits at a barrier. Once they are all ready, we
-         * inspect the prepare outcomes. If any preparer failed, then we issue
-         * an abort to all participating services. Otherwise we issue a commit.
-         * Both the abort() and the commit() message will cause the exclusive
-         * write lock (which has to be held all this time) to be released.
-         * 
-         * @todo resolve data services once (not one for prepare and once for
-         * commit).
-         * 
-         * @todo this might flush any writes not related to the tx when it gains
-         * an exclusive write service lock by forcing a commit of any running
-         * tasks, and then doing {prepare+mergeDown} and continuing to hold the
-         * lock until a commit message is received or a timeout occurs.
-         * 
-         * @todo allow interrupt of the data service if any task fails during
-         * prepare+mergeDown.
-         * 
-         * @todo if any data service fails, then ALL data services must abort
-         * (since all services have write sets that need to be discarded).
-         * 
-         * @todo issue commit messages concurrently to reduce latency
-         * 
-         * @todo if any commit messages fail, then we have a problem since the
-         * data may be restart safe on some of the journals. A three phase
-         * commit would prevent further commits by the journal until all
-         * journals had successfully committed and would rollback the journals
-         * to the prior commit points (touching the root block to do this) if
-         * any journal failed to commit.
-         */
         
-        // futures for the tasks running the 2-phase commit on each data service.
-        final List<Future<Void>> futures = new ArrayList<Future<Void>>(uuids.length);
-        {
+    }
+
+    /**
+     * Task handles the distributed read-write transaction commit protocol. 
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private class RunCommittersTask implements Callable<Long> {
+        
+        final IDataService[] services;
+
+        final TxState state;
+
+        final long revisionTime;
+
+        /**
+         * The #of participating {@link IDataService}s.
+         */
+        final int nservices;
+
+        public RunCommittersTask(final IDataService[] services,
+                final TxState state, final long revisionTime) {
+
+            this.services = services;
+
+            this.state = state;
+
+            this.revisionTime = revisionTime;
+
+            this.nservices = services.length;
+            
+        }
+        
+        /**
+         * Setups up the {@link TxState#preparedBarrier} and the
+         * {@link TxState#committedBarrier} and then runs the
+         * {@link DistributedCommitterTask} tasks.
+         * <p>
+         * Post-conditions: {@link TxState#isComplete()} will be true. The
+         * transaction will either have been aborted or committed on all
+         * {@link IDataService}s.
+         * 
+         * @return The assigned commit time.
+         * 
+         * @todo Allow interrupt of the data service committers if any task
+         *       fails during prepare() rather than having to wait for all of
+         *       those tasks to join at the {@link TxState#preparedBarrier}.
+         *       This is only an optimization.
+         */
+        public Long call() throws Exception {
+
+            setupPreparedBarrier();
+            
+            setupCommittedBarrier();
+            
+            /*
+             * The futures for the tasks used to invoke prepare(tx,rev) on each
+             * dataService.
+             */
+            final List<Future<Void>> futures;
+            {
+
+                final List<Callable<Void>> tasks = new ArrayList<Callable<Void>>(
+                        nservices);
+
+                for (IDataService dataService : services) {
+
+                    tasks.add(new DistributedCommitterTask(dataService));
+
+                }
+
+                state.lock.lock();
+                try {
+                
+                    /*
+                     * Await all futures, returning once they are all done.
+                     */
+                    
+                    futures = getFederation().getExecutorService().invokeAll(
+                            tasks);
+
+                    // tx must be complete (either committed or aborted). 
+                    assert state.isComplete() : "tx=" + state;
+                    
+                } catch(Throwable t) {
+                    
+                    /*
+                     * If we can not invoke all tasks then abort
+                     */
+
+                    log.error(t.getLocalizedMessage(), t);
+                    
+                    state.setRunState(RunState.Aborted);
+                    
+                    /*
+                     * reset the barriers in case anyone is waiting.
+                     */
+                    
+                    state.preparedBarrier.reset();
+                    
+                    state.committedBarrier.reset();
+
+                    throw new RuntimeException(t);
+                    
+                } finally {
+                    
+                    state.lock.unlock();
+                    
+                }
+
+            }
 
             List<Throwable> causes = null;
-
-            final long revisionTime = nextTimestamp();
-
-            for (IDataService dataService : services) {
+            for (Future f : futures) {
 
                 try {
 
-                    futures.add(dataService
-                            .twoPhasePrepare(tx.tx, revisionTime));
+                    f.get();
 
                 } catch (Throwable t) {
 
+                    if (causes == null) {
+
+                        causes = new LinkedList<Throwable>();
+
+                    }
+
                     causes.add(t);
+
+                    log.error(t.getLocalizedMessage(), t);
 
                 }
 
             }
 
+            if (causes != null) {
+
+                final int nfailed = causes.size();
+
+                state.lock.lock();
+                try {
+
+                    state.setRunState(RunState.Aborted);
+                    
+                    /*
+                     * reset the barriers in case anyone is waiting (should
+                     * not be possible).
+                     */
+                    
+                    state.preparedBarrier.reset();
+                    
+                    state.committedBarrier.reset();
+
+                } finally {
+
+                    state.lock.unlock();
+
+                }
+
+                throw new ExecutionExceptions("Committer(s) failed: n=" + nservices
+                        + ", nfailed=" + nfailed, causes);
+
+            }
+
+            // Success - commit is finished.
+            state.lock.lock();
+            try {
+
+                state.setRunState(RunState.Committed);
+                
+                return state.getCommitTime();
+                
+            } finally {
+                
+                state.lock.unlock();
+                
+            }
+            
+        }
+
+        /**
+         * Sets up the {@link TxState#preparedBarrier}. When the barrier action
+         * runs it will change {@link RunState} to {@link RunState#Prepared} and
+         * assign a <em>commitTime</em> to the transaction. When the barrier
+         * breaks, the assigned <i>commitTime</i> will be reported back to the
+         * {@link IDataService}s waiting in
+         * {@link ITransactionService#prepared(long, UUID)} as the return value
+         * for that method.
+         */
+        private void setupPreparedBarrier() {
+
+            state.preparedBarrier = new CyclicBarrier(nservices,
+
+            new Runnable() {
+
+                public void run() {
+
+                    state.lock.lock();
+
+                    try {
+
+                        state.setRunState( RunState.Prepared );
+
+                        state.setCommitTime(nextTimestamp());
+
+                    } finally {
+
+                        state.lock.unlock();
+
+                    }
+
+                }
+
+            });
+
+        }
+
+        /**
+         * Sets up the {@link TxState#committedBarrier}. When the barrier
+         * action runs it will change the {@link RunState} to
+         * {@link RunState#Committed}.
+         */
+        protected void setupCommittedBarrier() {
+
+            state.committedBarrier = new CyclicBarrier(nservices,
+
+            new Runnable() {
+
+                public void run() {
+
+                    state.lock.lock();
+
+                    try {
+
+                        state.setRunState(RunState.Committed);
+
+                    } finally {
+
+                        state.lock.unlock();
+
+                    }
+
+                }
+
+            });
+
         }
         
-        /*
-         * FIXME monitor the futures until all are done or the first on errors.
-         * On error, cancel all other futures.
+        /**
+         * Task issues {@link ITxCommitProtocol#prepare(long, long)} to an
+         * {@link IDataService} participating in a distributed commit.
          * 
-         * FIXME Bother! The futures will not be done until the commit is done.
-         * We are lacking the means to create a barrier before obtaining the
-         * commitTime and triggering the commit phase!!! One more time to
-         * refactor...
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+         *         Thompson</a>
+         * @version $Id$
          */
-        
-        throw new UnsupportedOperationException();
+        protected class DistributedCommitterTask implements Callable<Void> {
 
+            final IDataService service;
+            
+            public DistributedCommitterTask(final IDataService service) {
+
+                this.service = service;
+                
+            }
+
+            public Void call() throws Exception {
+
+                try {
+
+                    service.prepare(state.tx, revisionTime);
+
+                } catch (Throwable e) {
+
+                    /*
+                     * If an exception is thrown, then make sure that the tx
+                     * is in the [Abort] state.
+                     */
+                    
+                    try {
+                        log.error(e.getLocalizedMessage(), e);
+                    } catch (Throwable t) {
+                        // ignored
+                    }
+                    
+                    state.lock.lock();
+
+                    try {
+
+                        state.setRunState(RunState.Aborted);
+
+                    } finally {
+
+                        state.lock.unlock();
+
+                    }
+                    
+                    throw new RuntimeException(e);
+
+                }
+
+                return null;
+
+            }
+
+        }
+
+    }
+
+    /**
+     * Waits at "prepared" barrier. When the barrier breaks, examing the
+     * {@link TxState}. If the transaction is aborted, then throw an
+     * {@link InterruptedException}. Otherwise return the commitTime assigned
+     * to the transaction.
+     * 
+     * @throws InterruptedException
+     *             if the barrier is reset while the caller is waiting.
+     */
+    public long prepared(final long tx, final UUID dataService)
+            throws IOException, InterruptedException, BrokenBarrierException {
+
+        final TxState state = commitList.get(tx);
+        
+        if (state == null) {
+
+            /*
+             * Transaction is not committing.
+             */
+            
+            throw new IllegalStateException();
+            
+        }
+        
+        state.lock.lock();
+        
+        try {
+        
+            if(!state.isWrittenOn(dataService)) {
+                
+                throw new IllegalArgumentException();
+                
+            }
+            
+            // wait at the 'prepared' barrier.
+            state.preparedBarrier.await();
+
+            if (state.isAborted())
+                throw new InterruptedException();
+
+            return state.getCommitTime();
+            
+        } finally {
+            
+            state.lock.unlock();
+            
+        }
+        
+    }
+    
+    /**
+     * Wait at "committed" barrier. When the barrier breaks, examing the
+     * {@link TxState}. If the transaction is aborted, then return
+     * <code>false</code>. Otherwise return true.
+     * <p>
+     * Note: The {@link TxState} will be aborted if any of the committers throws
+     * an exception of their {@link ITxCommitProtocol#prepare(long, long)}
+     * method.
+     */
+    public boolean committed(final long tx, final UUID dataService)
+            throws IOException, InterruptedException, BrokenBarrierException {
+
+        final TxState state = commitList.get(tx);
+        
+        if (state == null) {
+
+            /*
+             * Transaction is not committing.
+             */
+            
+            throw new IllegalStateException();
+            
+        }
+        
+        state.lock.lock();
+        
+        try {
+        
+            if(!state.isWrittenOn(dataService)) {
+                
+                throw new IllegalArgumentException();
+                
+            }
+            
+            // wait at the 'committed' barrier.
+            state.committedBarrier.await();
+
+            if (state.isAborted())
+                return false;
+
+            return true;
+            
+        } finally {
+            
+            state.lock.unlock();
+            
+        }
+                
     }
 
     final public void notifyCommit(final long commitTime) {
@@ -484,9 +939,6 @@ public abstract class DistributedTransactionService extends
      * @todo add counter for #of tx started, completed, committed, and aborted,
      *       the #of read-only and the #of read-write tx started and active, and
      *       the min(abs(tx)) (earliest) active tx).
-     * 
-     * FIXME make sure that these counters are reported to the LBS through the
-     * client by a delegation pattern for the service.
      */
     synchronized public CounterSet getCounters() {
         
@@ -496,7 +948,7 @@ public abstract class DistributedTransactionService extends
 
             countersRoot.addCounter("#active", new Instrument<Integer>() {
                 protected void sample() {
-                    setValue(activeTx.size());
+                    setValue(getActiveCount());
                 }
             });
 

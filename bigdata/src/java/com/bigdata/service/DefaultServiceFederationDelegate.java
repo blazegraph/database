@@ -28,7 +28,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.Writer;
 import java.util.UUID;
+
+import org.apache.log4j.Logger;
 
 /**
  * Basic delegate for services that need to override the service UUID and
@@ -40,6 +47,9 @@ import java.util.UUID;
 public class DefaultServiceFederationDelegate<T extends AbstractService>
         implements IFederationDelegate {
 
+    protected final static Logger log = Logger
+            .getLogger(DefaultServiceFederationDelegate.class);
+    
     final protected T service;
     
     public DefaultServiceFederationDelegate(T service) {
@@ -97,6 +107,47 @@ public class DefaultServiceFederationDelegate<T extends AbstractService>
 
     /** NOP */
     public void serviceLeave(UUID serviceUUID) {
+
+    }
+
+    /**
+     * Writes the URL of the local httpd service for the {@link DataService}
+     * onto a file named <code>httpd.url</code> in the specified
+     * directory.
+     */
+    protected void logHttpdURL(final File dir) {
+
+        final File httpdURLFile = new File(dir, "httpd.url");
+
+        // delete in case old version exists.
+        httpdURLFile.delete();
+
+        final String httpdURL = service.getFederation().getHttpdURL();
+
+        if (httpdURL != null) {
+
+            try {
+
+                final Writer w = new BufferedWriter(
+                        new FileWriter(httpdURLFile));
+
+                try {
+
+                    w.write(httpdURL);
+
+                } finally {
+
+                    w.close();
+
+                }
+
+            } catch (IOException ex) {
+
+                log.warn("Problem writing httpdURL on file: " + httpdURLFile);
+
+            }
+
+        }
 
     }
 

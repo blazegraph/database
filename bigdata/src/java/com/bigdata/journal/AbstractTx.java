@@ -69,7 +69,7 @@ abstract public class AbstractTx implements ITx {
     /**
      * Used for some handshaking in the commit protocol.
      */
-    final protected ILocalTransactionManager localTransactionManager;
+    final protected AbstractLocalTransactionManager localTransactionManager;
     
     /**
      * Used to locate the named indices that the transaction isolates.
@@ -106,8 +106,40 @@ abstract public class AbstractTx implements ITx {
     
     private RunState runState;
 
+    /**
+     * Change the {@link RunState}.
+     * 
+     * @param newval
+     *            The new {@link RunState}.
+     * 
+     * @throws IllegalArgumentException
+     *             if the argument is <code>null</code>.
+     * @throws IllegalStateException
+     *             if the state transition is not allowed.
+     * 
+     * @see RunState#isTransitionAllowed(RunState)
+     */
+    public void setRunState(final RunState newval) {
+
+        if (!lock.isHeldByCurrentThread())
+            throw new IllegalMonitorStateException();
+
+        if (newval == null)
+            throw new IllegalArgumentException();
+        
+        if (!runState.isTransitionAllowed(newval)) {
+
+            throw new IllegalStateException("runState=" + runState
+                    + ", newValue=" + newval);
+
+        }
+
+        this.runState = newval;
+        
+    }
+    
     protected AbstractTx(//
-            final ILocalTransactionManager localTransactionManager,
+            final AbstractLocalTransactionManager localTransactionManager,
             final IResourceManager resourceManager,//
             final long startTime//
             ) {

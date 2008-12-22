@@ -438,7 +438,8 @@ public class FileMetadata {
     
                 /*
                  * Note: The code to read the MAGIC, VERSION, and root blocks is
-                 * shared by DumpJournal (code is copy by value).
+                 * shared by DumpJournal (code is copy by value) and in part by
+                 * the rollback() method on AbstractJournal.
                  */
                 
                 /*
@@ -502,7 +503,13 @@ public class FileMetadata {
                 }
                 if(alternateRootBlock)
                     log.warn("Using alternate root block");
-                // Choose the root block based on the commit counter.
+                /*
+                 * Choose the root block based on the commit counter.
+                 * 
+                 * Note: The commit counters MAY be equal. This will happen if
+                 * we rollback the journal and override the current root block
+                 * with the alternate root block.
+                 */
                 this.rootBlock =
                     ( rootBlock0.getCommitCounter() > rootBlock1.getCommitCounter()
                         ? (alternateRootBlock ?rootBlock1 :rootBlock0)

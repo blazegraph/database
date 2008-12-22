@@ -48,51 +48,16 @@ public interface ILocalTransactionManager extends /*ITransactionManager,*/ IServ
     public ITransactionService getTransactionService();
     
     /**
-     * Notify the journal that a new transaction is being activated (starting on
-     * the journal).
-     * 
-     * @param tx
-     *            The transaction.
-     * 
-     * @throws IllegalStateException
-     * 
-     * @todo test for transactions that have already been completed? that would
-     *       represent a protocol error in the transaction manager service.
-     */
-    public void activateTx(ITx tx) throws IllegalStateException;
-    
-    /**
-     * Notify the journal that a transaction has prepared (and hence is no
-     * longer active).
-     * 
-     * @param tx
-     *            The transaction
-     * 
-     * @throws IllegalStateException
-     */
-    public void preparedTx(ITx tx) throws IllegalStateException;
-
-    /**
-     * Notify the journal that a transaction is completed (either aborted or
-     * committed).
-     * 
-     * @param tx
-     *            The transaction.
-     * 
-     * @throws IllegalStateException
-     */
-    public void completedTx(ITx tx) throws IllegalStateException;
-
-    /**
-     * Lookup an active or prepared transaction (exact match).
+     * Return the local state for a transaction.
      * 
      * @param tx
      *            The transaction identifier.
      * 
-     * @return The transaction -or- <code>null</code> if there is no such
-     *         transaction.
+     * @return The local state for the identified transaction -or-
+     *         <code>null</code> if the start time is not mapped to either an
+     *         active or prepared transaction.
      */
-    public ITx getTx(long tx);
+    public ITx getTx(final long tx);
     
     /**
      * Return the next timestamp from the {@link ITransactionService}.
