@@ -397,11 +397,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      * {@link ICommitRecord}. The keys are timestamps (long integers). The
      * values are the address of the {@link ICommitRecord} with that commit
      * timestamp.
-     * 
-     * @todo this should be private, but {@link DumpJournal} is using it to
-     *       report on the historical states of named btrees.
      */
-    /*private*/ CommitRecordIndex _commitRecordIndex;
+    private volatile CommitRecordIndex _commitRecordIndex;
 
     /**
      * True iff the journal was opened in a read-only mode
@@ -1756,6 +1753,10 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
          * again.
          */
         
+        // clear reference.
+        _commitRecordIndex = null;
+        
+        // load from the store.
         _commitRecordIndex = getCommitRecordIndex();
 
         // discard any hard references that might be cached.
@@ -2233,39 +2234,46 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     }
 
     /**
-     * Re-load the last committed state of the index that resolves timestamps to
+     * Return the current state of the index that resolves timestamps to
      * {@link ICommitRecord}s and create it if the index does not exist.
      * 
      * @return The {@link CommitRecordIndex}.
-     * 
-     * @see #_commitRecordIndex
      */
     protected CommitRecordIndex getCommitRecordIndex() {
 
-        final long addr = _rootBlock.getCommitRecordIndexAddr();
+        assertOpen();
+        
+        if (_commitRecordIndex == null) {
 
-        try {
-            
-            return getCommitRecordIndex(addr);
-    
-        } catch (RuntimeException ex) {
-            
-            /*
-             * Log the root block for post-mortem.
-             */
-            log.fatal("Could not read the commit record index:\n" + _rootBlock,
-                    ex);
+            synchronized (this) {
 
-//            // Log the commit record also, if possible.
-//            try {
-//                log.fatal("commitRecord:" + getCommitRecord());
-//            } catch (Exception ex2) {
-//                /* Ignore. */
-//            }
-            
-            throw ex;
-            
+                if (_commitRecordIndex == null) {
+
+                    final long addr = _rootBlock.getCommitRecordIndexAddr();
+
+                    try {
+
+                        _commitRecordIndex = getCommitRecordIndex(addr);
+
+                    } catch (RuntimeException ex) {
+
+                        /*
+                         * Log the root block for post-mortem.
+                         */
+                        log.fatal("Could not read the commit record index:\n"
+                                + _rootBlock, ex);
+
+                        throw ex;
+
+                    }
+
+                }
+
+            }
+
         }
+
+        return _commitRecordIndex;
         
     }
     
@@ -2282,7 +2290,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      * 
      * @see #_commitRecordIndex
      */
-    protected CommitRecordIndex getCommitRecordIndex(long addr) {
+    protected CommitRecordIndex getCommitRecordIndex(final long addr) {
 
         if (INFO)
             log.info("addr=" + toString(addr));
@@ -2300,9 +2308,15 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
              * index on an in-memory store in order to avoid triggering a write
              * exception on the journal.
              */
+            if(isReadOnly()) {
 
-            // create btree mapping names to addresses.
-            ndx = CommitRecordIndex.create((isReadOnly()?new SimpleMemoryRawStore() :this));
+                ndx = CommitRecordIndex.createTransient();
+
+            } else {
+                
+                ndx = CommitRecordIndex.create(this);
+                
+            }
 
         } else {
 

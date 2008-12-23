@@ -457,6 +457,7 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
 
         IKeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_INT);
         
+        // @todo rewrite as a Task submitted to the journal using that timestamp.
         IIndex ndx = (tx == 0 ? journal.getIndex(name)
                 : journal.getTx(tx).getIndex(name));
 

@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
-import java.util.Date;
 import java.util.UUID;
 
 import com.bigdata.btree.BTree;
@@ -43,8 +42,6 @@ import com.bigdata.isolation.IsolatedFusedView;
  * 
  * @todo verify with writes on multiple indices.
  * 
- * @todo Verify correct abort after 'prepare'.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -59,19 +56,19 @@ public class TestTx extends ProxyTestCase<Journal> {
         
     }
 
-    /**
-     * Writes some interesting constants on {@link System#err}.
-     */
-    public void test_constants() {
-        
-        System.err.println("min : "+new Date(Long.MIN_VALUE));
-        System.err.println("min1: "+new Date(Long.MIN_VALUE+1));
-        System.err.println("-1L : "+new Date(-1));
-        System.err.println(" 0L : "+new Date(0L));
-        System.err.println("max1: "+new Date(Long.MAX_VALUE-1));
-        System.err.println("max : "+new Date(Long.MAX_VALUE));
-        
-    }
+//    /**
+//     * Writes some interesting constants on {@link System#err}.
+//     */
+//    public void test_constants() {
+//        
+//        System.err.println("min : "+new Date(Long.MIN_VALUE));
+//        System.err.println("min1: "+new Date(Long.MIN_VALUE+1));
+//        System.err.println("-1L : "+new Date(-1));
+//        System.err.println(" 0L : "+new Date(0L));
+//        System.err.println("max1: "+new Date(Long.MAX_VALUE-1));
+//        System.err.println("max : "+new Date(Long.MAX_VALUE));
+//        
+//    }
     
     /**
      * Test verifies that a transaction may start when there are (a) no commits
@@ -82,20 +79,26 @@ public class TestTx extends ProxyTestCase<Journal> {
      */
     public void test_noIndicesRegistered() {
 
-        Journal journal = new Journal(getProperties());
+        final Journal journal = getStore();
 
-        journal.commit();
-        
-        final long tx = journal.newTx(ITx.UNISOLATED);
-        
-        /*
-         * nothing written on this transaction.
-         */
-        
-        // commit.
-        assertEquals(0L,journal.commit(tx));
+        try {
 
-        journal.destroy();
+            journal.commit();
+
+            final long tx = journal.newTx(ITx.UNISOLATED);
+
+            /*
+             * nothing written on this transaction.
+             */
+
+            // commit.
+            assertEquals(0L, journal.commit(tx));
+
+        } finally {
+
+            journal.destroy();
+            
+        }
         
     }
 
@@ -106,92 +109,104 @@ public class TestTx extends ProxyTestCase<Journal> {
      */
     public void test_indexNotVisibleUnlessCommitted() {
        
-        Journal journal = new Journal(getProperties());
+        final Journal journal = getStore();
 
-        String name = "abc";
+        try {
         
-        // register index in unisolated scope, but do not commit yet.
-        {
-         
-            IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
-            
-            md.setIsolatable(true);
-            
-            journal.registerIndex(md);
-            
+            final String name = "abc";
+
+            // register index in unisolated scope, but do not commit yet.
+            {
+
+                IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
+
+                md.setIsolatable(true);
+
+                journal.registerIndex(md);
+
+            }
+
+            // start tx1.
+            final long tx1 = journal.newTx(ITx.UNISOLATED);
+
+            // the index is not visible in tx1.
+            assertNull(journal.getIndex(name, tx1));
+
+            // do unisolated commit.
+            assertNotSame(0L, journal.commit());
+
+            // start tx2.
+            final long tx2 = journal.newTx(ITx.UNISOLATED);
+
+            // the index still is not visible in tx1.
+            assertNull(journal.getIndex(name, tx1));
+
+            // the index is visible in tx2.
+            assertNotNull(journal.getIndex(name, tx2));
+
+            journal.abort(tx1);
+
+            journal.abort(tx2);
+
+        } finally {
+
+            journal.destroy();
+
         }
-                
-        // start tx1.
-        final long tx1 = journal.newTx(ITx.UNISOLATED);
-
-        // the index is not visible in tx1.
-        assertNull(journal.getIndex(name,tx1));
-        
-        // do unisolated commit.
-        assertNotSame(0L,journal.commit());
-        
-        // start tx2.
-        final long tx2 = journal.newTx(ITx.UNISOLATED);
-
-        // the index still is not visible in tx1.
-        assertNull(journal.getIndex(name,tx1));
-
-        // the index is visible in tx2.
-        assertNotNull(journal.getIndex(name,tx2));
-        
-        journal.abort(tx1);
-        
-        journal.abort(tx2);
-        
-        journal.destroy();
         
     }
 
     /**
      * Test verifies that you always get the same object back when you ask for
-     * an isolated named index.  This is important both to conserve resources
-     * and since the write set is in the isolated index -- you lose it and it
-     * is gone.
+     * an isolated named index. This is important both to conserve resources and
+     * since the write set is in the isolated index -- you lose it and it is
+     * gone.
      */
     public void test_sameIndexObject() {
 
-        Journal journal = new Journal(getProperties());
+        final Journal journal = getStore();
         
-        final String name = "abc";
+        try {
 
-        {
-            
-            IndexMetadata md = new IndexMetadata(name,UUID.randomUUID());
-            
-            md.setIsolatable(true);
-            
-            journal.registerIndex(md);
-            
-            journal.commit();
-            
+            final String name = "abc";
+
+            {
+
+                IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
+
+                md.setIsolatable(true);
+
+                journal.registerIndex(md);
+
+                journal.commit();
+
+            }
+
+            final long tx1 = journal.newTx(ITx.UNISOLATED);
+
+            final IIndex ndx1 = journal.getIndex(name, tx1);
+
+            assertNotNull(ndx1);
+
+            final long tx2 = journal.newTx(ITx.UNISOLATED);
+
+            final IIndex ndx2 = journal.getIndex(name, tx2);
+
+            assertTrue(tx1 != tx2);
+
+            assertTrue(ndx1 != ndx2);
+
+            assertNotNull(ndx2);
+
+            assertTrue(ndx1 == journal.getIndex(name, tx1));
+
+            assertTrue(ndx2 == journal.getIndex(name, tx2));
+
+        } finally {
+
+            journal.destroy();
+
         }
-
-        final long tx1 = journal.newTx(ITx.UNISOLATED);
-
-        final IIndex ndx1 = journal.getIndex(name,tx1);
-        
-        assertNotNull(ndx1);
-        
-        final long tx2 = journal.newTx(ITx.UNISOLATED);
-
-        final IIndex ndx2 = journal.getIndex(name,tx2);
-
-        assertTrue(tx1 != tx2);
-
-        assertTrue(ndx1 != ndx2);
-        
-        assertNotNull(ndx2);
-        
-        assertTrue( ndx1 == journal.getIndex(name,tx1));
-
-        assertTrue( ndx2 == journal.getIndex(name,tx2));
-        
-        journal.destroy();
         
     }
     
@@ -203,104 +218,110 @@ public class TestTx extends ProxyTestCase<Journal> {
      */
     public void test_readIsolation() {
         
-        Journal journal = new Journal(getProperties());
-        
-        final String name = "abc";
-        
-        final byte[] k1 = new byte[]{1};
-        final byte[] k2 = new byte[]{2};
+        final Journal journal = getStore();
 
-        final byte[] v1 = new byte[]{1};
-        final byte[] v2 = new byte[]{2};
-        
-        {
+        try {
 
-            /*
-             * register the index, write an entry on the unisolated index,
-             * and commit the journal. 
-             */
+            final String name = "abc";
 
-            IndexMetadata md = new IndexMetadata(name,UUID.randomUUID());
-            
-            md.setIsolatable(true);
-            
-            journal.registerIndex(md);
+            final byte[] k1 = new byte[] { 1 };
+            final byte[] k2 = new byte[] { 2 };
 
-            IIndex index = journal.getIndex(name);
-        
-            assertNull(index.insert(k1, v1));
-            
-            assertNotSame(0L,journal.commit());
-            
+            final byte[] v1 = new byte[] { 1 };
+            final byte[] v2 = new byte[] { 2 };
+
+            {
+
+                /*
+                 * register the index, write an entry on the unisolated index,
+                 * and commit the journal.
+                 */
+
+                IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
+
+                md.setIsolatable(true);
+
+                journal.registerIndex(md);
+
+                IIndex index = journal.getIndex(name);
+
+                assertNull(index.insert(k1, v1));
+
+                assertNotSame(0L, journal.commit());
+
+            }
+
+            final long tx1 = journal.newTx(ITx.UNISOLATED);
+
+            {
+
+                /*
+                 * verify that the write is visible in a transaction that starts
+                 * after the commit.
+                 */
+
+                IIndex index = journal.getIndex(name, tx1);
+
+                assertTrue(index.contains(k1));
+
+                assertEquals(v1, (byte[]) index.lookup(k1));
+
+            }
+
+            {
+
+                /*
+                 * obtain the unisolated index and write another entry and
+                 * commit the journal.
+                 */
+
+                IIndex index = journal.getIndex(name);
+
+                assertNull(index.insert(k2, v2));
+
+                assertNotSame(0L, journal.commit());
+
+            }
+
+            {
+
+                /*
+                 * verify that the entry written on the unisolated index is not
+                 * visible to the transaction that started before that write.
+                 */
+
+                IIndex index = journal.getIndex(name, tx1);
+
+                assertTrue(index.contains(k1));
+                assertFalse(index.contains(k2));
+
+            }
+
+            final long tx2 = journal.newTx(ITx.UNISOLATED);
+
+            {
+
+                /*
+                 * start another transaction and verify that the 2nd committed
+                 * write is now visible to that transaction.
+                 */
+
+                IIndex index = journal.getIndex(name, tx2);
+
+                assertTrue(index.contains(k1));
+                assertTrue(index.contains(k2));
+
+            }
+
+            journal.abort(tx1);
+
+            journal.abort(tx2);
+
+        } finally {
+
+            journal.destroy();
+
         }
-        
-        final long tx1 = journal.newTx(ITx.UNISOLATED);
-    
-        {
-
-            /*
-             * verify that the write is visible in a transaction that starts
-             * after the commit.
-             */
-            
-            IIndex index  = journal.getIndex(name,tx1);
-            
-            assertTrue(index.contains(k1));
-            
-            assertEquals(v1,(byte[])index.lookup(k1));
-            
-        }
-
-        {
-    
-            /*
-             * obtain the unisolated index and write another entry and commit
-             * the journal. 
-             */
-            
-            IIndex index  = journal.getIndex(name);
-            
-            assertNull(index.insert(k2, v2));
-            
-            assertNotSame(0L,journal.commit());
-            
-        }
-        
-        {
-            
-            /*
-             * verify that the entry written on the unisolated index is not
-             * visible to the transaction that started before that write.
-             */
-
-            IIndex index = journal.getIndex(name,tx1);
-            
-            assertTrue(index.contains(k1));
-            assertFalse(index.contains(k2));
-
-        }
-        
-        final long tx2 = journal.newTx(ITx.UNISOLATED);
-        
-        {
-
-            /*
-             * start another transaction and verify that the 2nd committed
-             * write is now visible to that transaction.
-             */
-            
-            IIndex index = journal.getIndex(name,tx2);
-            
-            assertTrue(index.contains(k1));
-            assertTrue(index.contains(k2));
-
-        }
-        
-        journal.abort(tx1);
-        
-        journal.abort(tx2);
-
-        journal.destroy();
         
     }
 
@@ -308,153 +329,163 @@ public class TestTx extends ProxyTestCase<Journal> {
      * Test verifies that an isolated write is visible inside of a transaction
      * (tx1) but not in a concurrent transaction (tx2) and not in the unisolated
      * index until the tx1 commits. Once the tx1 commits, the write is visible
-     * in the unisolated index. The write never becomes visible in tx2.  If tx2
+     * in the unisolated index. The write never becomes visible in tx2. If tx2
      * attempts to write a value under the same key then a write-write conflict
      * is reported and validation fails.
      */
     public void test_writeIsolation() {
-        
-        Journal journal = new Journal(getProperties());
-        
-        final String name = "abc";
-        
-        final byte[] k1 = new byte[]{1};
 
-        final byte[] v1 = new byte[]{1};
-        final byte[] v1a = new byte[]{1,1};
-        
-        {
+        final Journal journal = getStore();
 
-            /*
-             * register an index and commit the journal. 
-             */
-            
-            IndexMetadata md = new IndexMetadata(name,UUID.randomUUID());
-            
-            md.setIsolatable(true);
-            
-            journal.registerIndex(md);
-                        
-            assertNotSame(0L,journal.commit());
-            
-        }
+        try {
 
-        /*
-         * create two transactions.
-         */
-        
-        final long tx1 = journal.newTx(ITx.UNISOLATED);
-        
-        final long tx2 = journal.newTx(ITx.UNISOLATED);
+            final String name = "abc";
 
-        assertNotSame(tx1, tx2);
+            final byte[] k1 = new byte[] { 1 };
 
-        assertTrue(tx1 >= journal.getRootBlockView().getLastCommitTime());
-        
-        assertTrue(tx2 > tx1);
-        
-        {
-            
-            /*
-             * write an entry in tx1.  verify that the entry is not visible
-             * in the unisolated index or in the index as isolated by tx2.
-             */
-            
-            IsolatedFusedView ndx1 = (IsolatedFusedView)journal.getIndex(name,tx1);
-            
-            assertFalse(ndx1.contains(k1));
-            
-            assertNull(ndx1.insert(k1,v1));
-            
-            // existence check in tx1.
-            assertTrue(ndx1.contains(k1));
-            
-            // not visible in the other tx.
-            assertFalse(journal.getIndex(name,tx2).contains(k1));
+            final byte[] v1 = new byte[] { 1 };
+            final byte[] v1a = new byte[] { 1, 1 };
 
-            // not visible in the unisolated index.
-            assertFalse(journal.getIndex(name).contains(k1));
-
-            /*
-             * commit tx1. verify that the write is still not visible in tx2 but
-             * that it is now visible in the unisolated index.
-             */
-            
-            // commit tx1.
-            final long commitTime1 = journal.commit(tx1);
-            assertNotSame(0L, commitTime1);
-            
-            // still not visible in the other tx.
-            assertFalse(journal.getIndex(name,tx2).contains(k1));
-
-            // but now visible in the unisolated index.
-            assertTrue(journal.getIndex(name).contains(k1));
-
-            // check the version timestamp in the unisolated index.
             {
 
-                BTree btree = ((BTree) journal.getIndex(name));
-                
-                ITuple tuple = btree.lookup(k1, new Tuple(btree,
-                        IRangeQuery.ALL));
-                
-                assertNotNull(tuple);
-                
-                assertFalse(tuple.isDeletedVersion());
-                
-                assertEquals("versionTimestamp", commitTime1, tuple
-                        .getVersionTimestamp());
-                
+                /*
+                 * register an index and commit the journal.
+                 */
+
+                IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
+
+                md.setIsolatable(true);
+
+                journal.registerIndex(md);
+
+                assertNotSame(0L, journal.commit());
+
             }
 
             /*
-             * write a conflicting entry in tx2 and verify that validation of
-             * tx2 fails.
+             * create two transactions.
              */
 
-            assertNull(journal.getIndex(name, tx2).insert(k1, v1a));
+            final long tx1 = journal.newTx(ITx.UNISOLATED);
 
-            // check the version counter in tx2.
+            final long tx2 = journal.newTx(ITx.UNISOLATED);
+
+            assertNotSame(tx1, tx2);
+
+            assertTrue(Math.abs(tx1) >= journal.getRootBlockView()
+                    .getLastCommitTime());
+
+            assertTrue(Math.abs(tx2) > Math.abs(tx1));
+
             {
 
-                IsolatedFusedView isolatedView = (IsolatedFusedView) journal
-                        .getIndex(name, tx2);
+                /*
+                 * write an entry in tx1. verify that the entry is not visible
+                 * in the unisolated index or in the index as isolated by tx2.
+                 */
 
-                BTree btree = ((BTree) journal.getIndex(name));
-                
-                Tuple tuple = btree.lookup(k1,
-                        new Tuple(btree,IRangeQuery.ALL));
+                IsolatedFusedView ndx1 = (IsolatedFusedView) journal.getIndex(
+                        name, tx1);
 
-                tuple = isolatedView.getWriteSet().lookup(k1, tuple);
+                assertFalse(ndx1.contains(k1));
 
-                assertNotNull(tuple);
+                assertNull(ndx1.insert(k1, v1));
 
-                assertFalse(tuple.isDeletedVersion());
+                // existence check in tx1.
+                assertTrue(ndx1.contains(k1));
 
-                assertEquals("versionTimestamp", tx2, tuple
-                        .getVersionTimestamp());
-                
+                // not visible in the other tx.
+                assertFalse(journal.getIndex(name, tx2).contains(k1));
+
+                // not visible in the unisolated index.
+                assertFalse(journal.getIndex(name).contains(k1));
+
+                /*
+                 * commit tx1. verify that the write is still not visible in tx2
+                 * but that it is now visible in the unisolated index.
+                 */
+
+                // commit tx1.
+                final long commitTime1 = journal.commit(tx1);
+                assertNotSame(0L, commitTime1);
+
+                // still not visible in the other tx.
+                assertFalse(journal.getIndex(name, tx2).contains(k1));
+
+                // but now visible in the unisolated index.
+                assertTrue(journal.getIndex(name).contains(k1));
+
+                // check the version timestamp in the unisolated index.
+                {
+
+                    final BTree btree = ((BTree) journal.getIndex(name));
+
+                    final ITuple tuple = btree.lookup(k1, new Tuple(btree,
+                            IRangeQuery.ALL));
+
+                    assertNotNull(tuple);
+
+                    assertFalse(tuple.isDeletedVersion());
+
+                    // FIXME verify the revision timestamp!
+//                    assertEquals("versionTimestamp", commitTime1, tuple
+//                            .getVersionTimestamp());
+
+                }
+
+                /*
+                 * write a conflicting entry in tx2 and verify that validation
+                 * of tx2 fails.
+                 */
+
+                assertNull(journal.getIndex(name, tx2).insert(k1, v1a));
+
+                // check the version counter in tx2.
+                {
+
+                    final IsolatedFusedView isolatedView = (IsolatedFusedView) journal
+                            .getIndex(name, tx2);
+
+                    final BTree btree = ((BTree) journal.getIndex(name));
+
+                    Tuple tuple = btree.lookup(k1, new Tuple(btree,
+                            IRangeQuery.ALL));
+
+                    tuple = isolatedView.getWriteSet().lookup(k1, tuple);
+
+                    assertNotNull(tuple);
+
+                    assertFalse(tuple.isDeletedVersion());
+
+                    // FIXME verify the revision timestamp!
+//                    assertEquals("versionTimestamp", tx2, tuple
+//                            .getVersionTimestamp());
+
+                }
+
+//                ITx tmp = journal.getTx(tx2);
+
+                try {
+
+                    journal.commit(tx2);
+
+                    fail("Expecting: " + ValidationError.class);
+
+                } catch (ValidationError ex) {
+
+                    System.err.println("Ignoring expected exception: " + ex);
+
+                }
+
+//                assertTrue(tmp.isAborted());
+
             }
 
-            ITx tmp = journal.getTx(tx2);
-            
-            try {
+        } finally {
 
-                journal.commit(tx2);
-                
-                fail("Expecting: "+ValidationError.class);
-                
-            } catch(ValidationError ex) {
-                
-                System.err.println("Ignoring expected exception: "+ex);
-                
-            }
-            
-            assertTrue(tmp.isAborted());
-            
+            journal.destroy();
+
         }
-        
-        journal.destroy();
         
     }
 
@@ -472,93 +503,99 @@ public class TestTx extends ProxyTestCase<Journal> {
      */
     public void test_delete001() {
 
-        Journal journal = new Journal(getProperties());
+        final Journal journal = getStore();
 
-        String name = "abc";
+        try {
 
-        {
+            final String name = "abc";
+
+            {
+                /*
+                 * register an index and commit the journal.
+                 */
+                IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
+
+                md.setIsolatable(true);
+
+                journal.registerIndex(md);
+
+                journal.commit();
+
+            }
+
             /*
-             * register an index and commit the journal.
+             * create transactions.
              */
-            IndexMetadata md = new IndexMetadata(name,UUID.randomUUID());
-            
-            md.setIsolatable(true);
-            
-            journal.registerIndex(md);
-            
-            journal.commit();
+
+            final long tx0 = journal.newTx(ITx.UNISOLATED);
+
+            final long tx1 = journal.newTx(ITx.UNISOLATED);
+
+            assertNotSame(tx0, tx1);
+
+            assertTrue(Math.abs(tx0) >= journal.getRootBlockView().getLastCommitTime());
+
+            assertTrue(Math.abs(tx1) > Math.abs(tx0));
+
+            /*
+             * Write v0 on tx0.
+             */
+            final byte[] id0 = new byte[] { 0 };
+            final byte[] v0 = getRandomData().array();
+
+            journal.getIndex(name, tx0).insert(id0, v0);
+
+            assertEquals(v0, journal.getIndex(name, tx0).lookup(id0));
+
+            /*
+             * Verify that the version does NOT show up in a concurrent
+             * transaction.
+             */
+            assertFalse(journal.getIndex(name, tx1).contains(id0));
+
+            // delete the version.
+            assertEquals(v0, journal.getIndex(name, tx0).remove(id0));
+
+            // no longer visible in that transaction.
+            assertFalse(journal.getIndex(name, tx0).contains(id0));
+
+            /*
+             * Test delete after delete (succeeds, but returns null).
+             */
+            assertNull(journal.getIndex(name, tx0).remove(id0));
+
+            /*
+             * Test write after delete (succeeds, returning null).
+             */
+            final byte[] v1 = getRandomData().array();
+            assertNull(journal.getIndex(name, tx0).insert(id0, v1));
+
+            // Still not visible in concurrent transaction.
+            assertFalse(journal.getIndex(name, tx1).contains(id0));
+
+            // Still not visible in global scope.
+            assertFalse(journal.getIndex(name).contains(id0));
+
+            // Prepare and commit tx0.
+            assertNotSame(0L, journal.commit(tx0));
+
+            // Still not visible in concurrent transaction.
+            assertFalse(journal.getIndex(name, tx1).contains(id0));
+
+            // Now visible in global scope.
+            assertTrue(journal.getIndex(name).contains(id0));
+
+            // Prepare and commit tx1 (no writes).
+            assertEquals(0L, journal.commit(tx1));
+
+            // Still visible in global scope.
+            assertTrue(journal.getIndex(name).contains(id0));
+
+        } finally {
+
+            journal.destroy();
 
         }
-
-        /*
-         * create transactions.
-         */
-
-        final long tx0 = journal.newTx(ITx.UNISOLATED);
-
-        final long tx1 = journal.newTx(ITx.UNISOLATED);
-
-        assertNotSame(tx0, tx1);
-
-        assertTrue(tx0 >= journal.getRootBlockView().getLastCommitTime());
-        
-        assertTrue(tx1 > tx0);
-        
-        /*
-         * Write v0 on tx0.
-         */
-        final byte[] id0 = new byte[] { 0 };
-        final byte[] v0 = getRandomData().array();
-        
-        journal.getIndex(name,tx0).insert(id0, v0);
-        
-        assertEquals(v0, journal.getIndex(name,tx0).lookup(id0));
-
-        /*
-         * Verify that the version does NOT show up in a concurrent transaction.
-         */
-         assertFalse(journal.getIndex(name,tx1).contains(id0));
-
-         // delete the version.
-         assertEquals(v0, journal.getIndex(name, tx0).
-                 remove(id0));
-
-         // no longer visible in that transaction.
-         assertFalse(journal.getIndex(name,tx0).contains(id0));
-
-         /*
-          * Test delete after delete (succeeds, but returns null).
-          */
-         assertNull(journal.getIndex(name,tx0).remove(id0));
-
-         /*
-          * Test write after delete (succeeds, returning null).
-          */
-         final byte[] v1 = getRandomData().array();
-         assertNull(journal.getIndex(name,tx0).insert(id0, v1));
-
-         // Still not visible in concurrent transaction.
-         assertFalse(journal.getIndex(name,tx1).contains(id0));
-
-         // Still not visible in global scope.
-         assertFalse(journal.getIndex(name).contains(id0));
-
-         // Prepare and commit tx0.
-         assertNotSame(0L,journal.commit(tx0));
-
-         // Still not visible in concurrent transaction.
-         assertFalse(journal.getIndex(name,tx1).contains(id0));
-
-         // Now visible in global scope.
-         assertTrue(journal.getIndex(name).contains(id0));
-
-         // Prepare and commit tx1 (no writes).
-         assertEquals(0L,journal.commit(tx1));
-
-         // Still visible in global scope.
-         assertTrue(journal.getIndex(name).contains(id0));
-
-         journal.destroy();
     
     }
 
@@ -573,108 +610,114 @@ public class TestTx extends ProxyTestCase<Journal> {
      */
     public void test_delete002() {
 
-        Journal journal = new Journal(getProperties());
+        final Journal journal = getStore();
 
-        String name = "abc";
+        try {
 
-        {
+            final String name = "abc";
+
+            {
+                /*
+                 * register an index and commit the journal.
+                 */
+                IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
+
+                md.setIsolatable(true);
+
+                journal.registerIndex(md);
+
+                journal.commit();
+
+            }
+
             /*
-             * register an index and commit the journal.
+             * create transactions.
              */
-            IndexMetadata md = new IndexMetadata(name,UUID.randomUUID());
-            
-            md.setIsolatable(true);
-            
-            journal.registerIndex(md);
-            
-            journal.commit();
+
+            final long tx0 = journal.newTx(ITx.UNISOLATED);
+
+            final long tx1 = journal.newTx(ITx.UNISOLATED);
+
+            assertNotSame(tx0, tx1);
+
+            assertTrue(Math.abs(tx0) >= journal.getRootBlockView().getLastCommitTime());
+
+            assertTrue(Math.abs(tx1) > Math.abs(tx0));
+
+            /*
+             * Write v0 on tx0.
+             */
+            final byte[] id0 = new byte[] { 1 };
+            final byte[] v0 = getRandomData().array();
+            journal.getIndex(name, tx0).insert(id0, v0);
+            assertEquals(v0, journal.getIndex(name, tx0).lookup(id0));
+
+            /*
+             * Verify that the version does NOT show up in a concurrent
+             * transaction.
+             */
+            assertFalse(journal.getIndex(name, tx1).contains(id0));
+
+            // delete the version.
+            assertEquals(v0, (byte[]) journal.getIndex(name, tx0).remove(id0));
+
+            // no longer visible in that transaction.
+            assertFalse(journal.getIndex(name, tx0).contains(id0));
+
+            /*
+             * Test delete after delete (succeeds, but returns null).
+             */
+            assertNull(journal.getIndex(name, tx0).remove(id0));
+
+            /*
+             * Test write after delete (succeeds, returning null).
+             */
+            final byte[] v1 = getRandomData().array();
+            assertNull(journal.getIndex(name, tx0).insert(id0, v1));
+
+            // Still not visible in concurrent transaction.
+            assertFalse(journal.getIndex(name, tx1).contains(id0));
+
+            // Still not visible in global scope.
+            assertFalse(journal.getIndex(name).contains(id0));
+
+            /*
+             * Delete v1.
+             */
+            assertEquals(v1, (byte[]) journal.getIndex(name, tx0).remove(id0));
+
+            // Still not visible in concurrent transaction.
+            assertFalse(journal.getIndex(name, tx1).contains(id0));
+
+            // Still not visible in global scope.
+            assertFalse(journal.getIndex(name).contains(id0));
+
+            /*
+             * Prepare and commit tx0.
+             * 
+             * Note: We MUST NOT propagate a delete marker onto the unisolated
+             * index since no entry for that key is visible was visible when the
+             * tx0 began.
+             */
+            assertNotSame(0L, journal.commit(tx0));
+
+            // Still not visible in concurrent transaction.
+            assertFalse(journal.getIndex(name, tx1).contains(id0));
+
+            // Still not visible in global scope.
+            assertFalse(journal.getIndex(name).contains(id0));
+
+            // Prepare and commit tx1 (no writes).
+            assertEquals(0L, journal.commit(tx1));
+
+            // Still not visible in global scope.
+            assertFalse(journal.getIndex(name).contains(id0));
+
+        } finally {
+
+            journal.destroy();
 
         }
-
-        /*
-         * create transactions.
-         */
-
-        final long tx0 = journal.newTx(ITx.UNISOLATED);
-
-        final long tx1 = journal.newTx(ITx.UNISOLATED);
-
-        assertNotSame(tx0, tx1);
-
-        assertTrue(tx0 >= journal.getRootBlockView().getLastCommitTime());
-        
-        assertTrue(tx1 > tx0);
-        
-        /*
-         * Write v0 on tx0.
-         */
-        final byte[] id0 = new byte[] { 1 };
-        final byte[] v0 = getRandomData().array();
-        journal.getIndex(name,tx0).insert(id0, v0);
-        assertEquals(v0, journal.getIndex(name,tx0).lookup(id0));
-
-        /*
-         * Verify that the version does NOT show up in a concurrent transaction.
-         */
-        assertFalse(journal.getIndex(name,tx1).contains(id0));
-
-        // delete the version.
-        assertEquals(v0, (byte[]) journal.getIndex(name,tx0)
-                .remove(id0));
-
-        // no longer visible in that transaction.
-        assertFalse(journal.getIndex(name,tx0).contains(id0));
-
-        /*
-         * Test delete after delete (succeeds, but returns null).
-         */
-        assertNull(journal.getIndex(name,tx0).remove(id0));
-
-        /*
-         * Test write after delete (succeeds, returning null).
-         */
-        final byte[] v1 = getRandomData().array();
-        assertNull(journal.getIndex(name,tx0).insert(id0, v1));
-
-        // Still not visible in concurrent transaction.
-        assertFalse(journal.getIndex(name,tx1).contains(id0));
-
-        // Still not visible in global scope.
-        assertFalse(journal.getIndex(name).contains(id0));
-
-        /*
-         * Delete v1.
-         */
-        assertEquals(v1, (byte[]) journal.getIndex(name,tx0).remove(id0));
-
-        // Still not visible in concurrent transaction.
-        assertFalse(journal.getIndex(name,tx1).contains(id0));
-
-        // Still not visible in global scope.
-        assertFalse(journal.getIndex(name).contains(id0));
-
-        /*
-         * Prepare and commit tx0.
-         * 
-         * Note: We MUST NOT propagate a delete marker onto the unisolated index
-         * since no entry for that key is visible was visible when the tx0
-         * began.
-         */
-        assertNotSame(0L, journal.commit(tx0));
-
-        // Still not visible in concurrent transaction.
-        assertFalse(journal.getIndex(name,tx1).contains(id0));
-
-        // Still not visible in global scope.
-        assertFalse(journal.getIndex(name).contains(id0));
-
-        // Prepare and commit tx1 (no writes).
-        assertEquals(0L,journal.commit(tx1));
-
-        // Still not visible in global scope.
-        assertFalse(journal.getIndex(name).contains(id0));
-
-        journal.destroy();
 
     }
 
@@ -690,87 +733,94 @@ public class TestTx extends ProxyTestCase<Journal> {
      */
     public void test_delete003() {
 
-        Journal journal = new Journal(getProperties());
+        final Journal journal = getStore();
 
-        String name = "abc";
+        try {
 
-        {
+            final String name = "abc";
+
+            {
+                /*
+                 * register an index and commit the journal.
+                 */
+                IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
+
+                md.setIsolatable(true);
+
+                journal.registerIndex(md);
+
+                journal.commit();
+
+            }
+
             /*
-             * register an index and commit the journal.
+             * create transactions.
              */
-            IndexMetadata md = new IndexMetadata(name,UUID.randomUUID());
-            
-            md.setIsolatable(true);
-            
-            journal.registerIndex(md);
-            
-            journal.commit();
+
+            final long tx0 = journal.newTx(ITx.UNISOLATED);
+
+            final long tx1 = journal.newTx(ITx.UNISOLATED);
+
+            assertNotSame(tx0, tx1);
+
+            assertTrue(Math.abs(tx0) >= journal.getRootBlockView()
+                    .getLastCommitTime());
+
+            assertTrue(Math.abs(tx1) > Math.abs(tx0));
+
+            /*
+             * Write v0 on tx0.
+             */
+            final byte[] id0 = new byte[] { 1 };
+            final byte[] v0 = getRandomData().array();
+            journal.getIndex(name, tx0).insert(id0, v0);
+            assertEquals(v0, journal.getIndex(name, tx0).lookup(id0));
+
+            /*
+             * Verify that the version does NOT show up in a concurrent
+             * transaction.
+             */
+            assertFalse(journal.getIndex(name, tx1).contains(id0));
+
+            // delete the version.
+            assertEquals(v0, (byte[]) journal.getIndex(name, tx0).remove(id0));
+
+            // no longer visible in that transaction.
+            assertFalse(journal.getIndex(name, tx0).contains(id0));
+
+            /*
+             * write(id0,v1) in tx1.
+             */
+            final byte[] v1 = getRandomData().array();
+            assertNull(journal.getIndex(name, tx1).insert(id0, v1));
+
+            // Still not visible in concurrent transaction.
+            assertFalse(journal.getIndex(name, tx0).contains(id0));
+
+            // Still not visible in global scope.
+            assertFalse(journal.getIndex(name).contains(id0));
+
+            /*
+             * Prepare and commit tx0.
+             * 
+             * Note: We MUST NOT propagate a delete marker onto the unisolated
+             * index since no entry for that key is visible was visible when the
+             * tx0 began.
+             */
+            assertNotSame(0L, journal.commit(tx0));
+
+            // Prepare and commit tx1.
+            assertNotSame(0L, journal.commit(tx1));
+
+            // (id0,v1) is now visible in global scope.
+            assertTrue(journal.getIndex(name).contains(id0));
+            assertEquals(v1, (byte[]) journal.getIndex(name).lookup(id0));
+
+        } finally {
+
+            journal.destroy();
 
         }
-
-        /*
-         * create transactions.
-         */
-
-        final long tx0 = journal.newTx(ITx.UNISOLATED);
-
-        final long tx1 = journal.newTx(ITx.UNISOLATED);
-
-        assertNotSame(tx0, tx1);
-
-        assertTrue(tx0 >= journal.getRootBlockView().getLastCommitTime());
-        
-        assertTrue(tx1 > tx0);
-        
-        /*
-         * Write v0 on tx0.
-         */
-        final byte[] id0 = new byte[] { 1 };
-        final byte[] v0 = getRandomData().array();
-        journal.getIndex(name,tx0).insert(id0, v0);
-        assertEquals(v0, journal.getIndex(name,tx0).lookup(id0));
-
-        /*
-         * Verify that the version does NOT show up in a concurrent transaction.
-         */
-        assertFalse(journal.getIndex(name,tx1).contains(id0));
-
-        // delete the version.
-        assertEquals(v0, (byte[]) journal.getIndex(name,tx0)
-                .remove(id0));
-
-        // no longer visible in that transaction.
-        assertFalse(journal.getIndex(name,tx0).contains(id0));
-        
-        /*
-         * write(id0,v1) in tx1.
-         */
-        final byte[] v1 = getRandomData().array();
-        assertNull(journal.getIndex(name,tx1).insert(id0, v1));
-
-        // Still not visible in concurrent transaction.
-        assertFalse(journal.getIndex(name,tx0).contains(id0));
-
-        // Still not visible in global scope.
-        assertFalse(journal.getIndex(name).contains(id0));
-
-        /*
-         * Prepare and commit tx0.
-         * 
-         * Note: We MUST NOT propagate a delete marker onto the unisolated index
-         * since no entry for that key is visible was visible when the tx0
-         * began.
-         */
-        assertNotSame(0L, journal.commit(tx0));
-
-        // Prepare and commit tx1.
-        assertNotSame(0L,journal.commit(tx1));
-
-        // (id0,v1) is now visible in global scope.
-        assertTrue(journal.getIndex(name).contains(id0));
-        assertEquals(v1, (byte[])journal.getIndex(name).lookup(id0));
-
-        journal.destroy();
 
     }
 
@@ -788,118 +838,131 @@ public class TestTx extends ProxyTestCase<Journal> {
      */
     public void test_commit_noConflict01() {
 
-        Journal journal = new Journal(getProperties());
-        
-        final String name = "abc";
-        final long commitTime0;
-        {
-            
-            IndexMetadata md = new IndexMetadata(name,UUID.randomUUID());
-            
-            md.setIsolatable(true);
-            
-            journal.registerIndex(md);
-            
-            commitTime0 = journal.commit();
-            System.err.println("commitTime0: "+journal.getCommitRecord());
-            
-            assertNotSame(0L,commitTime0);
-            assertEquals("commitCounter",1L,journal.getCommitRecord().getCommitCounter());
-            
+        final Journal journal = getStore();
+
+        try {
+
+            final String name = "abc";
+            final long commitTime0;
+            {
+
+                IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
+
+                md.setIsolatable(true);
+
+                journal.registerIndex(md);
+
+                commitTime0 = journal.commit();
+                System.err.println("commitTime0: " + journal.getCommitRecord());
+
+                assertNotSame(0L, commitTime0);
+                assertEquals("commitCounter", 1L, journal.getCommitRecord()
+                        .getCommitCounter());
+
+            }
+
+            /*
+             * Transaction that starts before the transaction on which we write.
+             * The change will not be visible in this scope.
+             */
+            final long tx0 = journal.newTx(ITx.UNISOLATED);
+
+            // transaction on which we write and later commit.
+            final long tx1 = journal.newTx(ITx.UNISOLATED);
+
+            // new transaction - commit will not be visible in this scope.
+            final long tx2 = journal.newTx(ITx.UNISOLATED);
+
+            System.err.println("commitTime0   =" + commitTime0);
+            System.err.println("tx0: startTime=" + tx0);
+            System.err.println("tx1: startTime=" + tx1);
+            System.err.println("tx2: startTime=" + tx2);
+
+            assertTrue(commitTime0 <= Math.abs(tx0));
+            assertTrue(Math.abs(tx0) < Math.abs(tx1));
+            assertTrue(Math.abs(tx1) < Math.abs(tx2));
+
+            final byte[] id1 = new byte[] { 1 };
+
+            final byte[] v0 = getRandomData().array();
+
+            // write data version on tx1
+            assertNull(journal.getIndex(name, tx1).insert(id1, v0));
+
+            // data version visible in tx1.
+            assertEquals(v0, (byte[]) journal.getIndex(name, tx1).lookup(id1));
+
+            // data version not visible in global scope.
+            assertNull(journal.getIndex(name).lookup(id1));
+
+            // data version not visible in tx0.
+            assertNull(journal.getIndex(name, tx0).lookup(id1));
+
+            // data version not visible in tx2.
+            assertNull(journal.getIndex(name, tx2).lookup(id1));
+
+            // commit.
+            final long tx1CommitTime = journal.commit(tx1);
+            assertNotSame(0L, tx1CommitTime);
+            System.err.println("tx1: startTime=" + tx1 + ", commitTime="
+                    + tx1CommitTime);
+            System.err.println("tx1: after commit: "
+                    + journal.getCommitRecord());
+            assertEquals("commitCounter", 2L, journal.getCommitRecord()
+                    .getCommitCounter());
+
+            // data version now visible in global scope.
+            assertEquals(v0, (byte[]) journal.getIndex(name).lookup(id1));
+
+            // new transaction - commit is visible in this scope.
+            final long tx3 = journal.newTx(ITx.UNISOLATED);
+            assertTrue(Math.abs(tx2) < Math.abs(tx3));
+            assertTrue(Math.abs(tx3) >= tx1CommitTime);
+            System.err.println("tx3: startTime=" + tx3);
+            // System.err.println("tx3: ground state:
+            // "+((Tx)journal.getTx(tx3)).commitRecord);
+
+            // data version still not visible in tx0.
+            assertNull(journal.getIndex(name, tx0).lookup(id1));
+
+            // data version still not visible in tx2.
+            assertNull(journal.getIndex(name, tx2).lookup(id1));
+
+            /*
+             * What commit record was written by tx1 and what commit record is
+             * being used by tx3?
+             */
+
+            // data version visible in the new tx (tx3).
+            assertEquals(v0, (byte[]) journal.getIndex(name, tx3).lookup(id1));
+
+            /*
+             * commit tx0 - nothing was written, no conflict should result.
+             */
+            assertEquals(0L, journal.commit(tx0));
+            assertEquals("commitCounter", 2L, journal.getCommitRecord()
+                    .getCommitCounter());
+
+            /*
+             * commit tx1 - nothing was written, no conflict should result.
+             */
+            assertEquals(0L, journal.commit(tx2));
+            assertEquals("commitCounter", 2L, journal.getCommitRecord()
+                    .getCommitCounter());
+
+            // commit tx3 - nothing was written, no conflict should result.
+            assertEquals(0L, journal.commit(tx3));
+            assertEquals("commitCounter", 2L, journal.getCommitRecord()
+                    .getCommitCounter());
+
+            // data version in global scope was not changed by any other commit.
+            assertEquals(v0, (byte[]) journal.getIndex(name).lookup(id1));
+
+        } finally {
+
+            journal.destroy();
+
         }
-
-        /*
-         * Transaction that starts before the transaction on which we write. The
-         * change will not be visible in this scope.
-         */
-        final long tx0 = journal.newTx(ITx.UNISOLATED);
-
-        // transaction on which we write and later commit.
-        final long tx1 = journal.newTx(ITx.UNISOLATED);
-
-        // new transaction - commit will not be visible in this scope.
-        final long tx2 = journal.newTx(ITx.UNISOLATED);
-
-        System.err.println("commitTime0   ="+commitTime0);
-        System.err.println("tx0: startTime="+tx0);
-        System.err.println("tx1: startTime="+tx1);
-        System.err.println("tx2: startTime="+tx2);
-
-        assertTrue(commitTime0<=tx0);
-        assertTrue(tx0<tx1);
-        assertTrue(tx1<tx2);
-        
-        final byte[] id1 = new byte[]{1};
-
-        final byte[] v0 = getRandomData().array();
-
-        // write data version on tx1
-        assertNull(journal.getIndex(name,tx1).insert(id1, v0));
-
-        // data version visible in tx1.
-        assertEquals(v0, (byte[])journal.getIndex(name,tx1).lookup(id1));
-
-        // data version not visible in global scope.
-        assertNull(journal.getIndex(name).lookup(id1));
-
-        // data version not visible in tx0.
-        assertNull(journal.getIndex(name,tx0).lookup(id1));
-
-        // data version not visible in tx2.
-        assertNull(journal.getIndex(name,tx2).lookup(id1));
-
-        // commit.
-        final long tx1CommitTime = journal.commit(tx1);
-        assertNotSame(0L,tx1CommitTime);
-        System.err.println("tx1: startTime="+tx1+", commitTime="+tx1CommitTime);
-        System.err.println("tx1: after commit: "+journal.getCommitRecord());
-        assertEquals("commitCounter",2L,journal.getCommitRecord().getCommitCounter());
-
-        // data version now visible in global scope.
-        assertEquals(v0, (byte[])journal.getIndex(name).lookup(id1));
-
-        // new transaction - commit is visible in this scope.
-        final long tx3 = journal.newTx(ITx.UNISOLATED);
-        assertTrue(tx2<tx3);
-        assertTrue(tx3>=tx1CommitTime);
-        System.err.println("tx3: startTime="+tx3);
-//        System.err.println("tx3: ground state: "+((Tx)journal.getTx(tx3)).commitRecord);
-        
-        // data version still not visible in tx0.
-        assertNull(journal.getIndex(name,tx0).lookup(id1));
-
-        // data version still not visible in tx2.
-        assertNull(journal.getIndex(name,tx2).lookup(id1));
-
-        /*
-         * What commit record was written by tx1 and what commit record is being
-         * used by tx3?
-         */
-        
-        // data version visible in the new tx (tx3).
-        assertEquals(v0, (byte[])journal.getIndex(name,tx3).lookup(id1));
-
-        /*
-         * commit tx0 - nothing was written, no conflict should result.
-         */
-        assertEquals(0L,journal.commit(tx0));
-        assertEquals("commitCounter",2L,journal.getCommitRecord().getCommitCounter());
-
-        /*
-         * commit tx1 - nothing was written, no conflict should result.
-         */
-        assertEquals(0L,journal.commit(tx2));
-        assertEquals("commitCounter",2L,journal.getCommitRecord().getCommitCounter());
-
-        // commit tx3 - nothing was written, no conflict should result.
-        assertEquals(0L,journal.commit(tx3));
-        assertEquals("commitCounter",2L,journal.getCommitRecord().getCommitCounter());
-
-        // data version in global scope was not changed by any other commit.
-        assertEquals(v0, (byte[]) journal.getIndex(name).lookup(
-                id1));
-
-        journal.destroy();
 
     }
 
@@ -909,61 +972,67 @@ public class TestTx extends ProxyTestCase<Journal> {
      */
     public void test_deletePreExistingVersion_noConflict() {
 
-        Journal journal = new Journal(getProperties());
+        final Journal journal = getStore();
 
-        final String name = "abc";
-        
-        {
-            IndexMetadata md = new IndexMetadata(name,UUID.randomUUID());
-            
-            md.setIsolatable(true);
-            
-            journal.registerIndex(md);
-                        
+        try {
+
+            final String name = "abc";
+
+            {
+                IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
+
+                md.setIsolatable(true);
+
+                journal.registerIndex(md);
+
+                journal.commit();
+
+            }
+
+            final byte[] id0 = new byte[] { 1 };
+
+            final byte[] v0 = getRandomData().array();
+
+            // data version not visible in global scope.
+            assertNull(journal.getIndex(name).lookup(id0));
+
+            // write data version in global scope.
+            journal.getIndex(name).insert(id0, v0);
+
+            // data version visible in global scope.
+            assertEquals(v0, journal.getIndex(name).lookup(id0));
+
+            // commit the unisolated write.
             journal.commit();
-            
+
+            // start transaction.
+            final long tx0 = journal.newTx(ITx.UNISOLATED);
+
+            // data version visible in the transaction.
+            assertEquals(v0, journal.getIndex(name, tx0).lookup(id0));
+
+            // delete version in transaction scope.
+            assertEquals(v0, journal.getIndex(name, tx0).remove(id0));
+
+            // data version still visible in global scope.
+            assertTrue(journal.getIndex(name).contains(id0));
+            assertEquals(v0, journal.getIndex(name).lookup(id0));
+
+            // data version not visible in transaction.
+            assertFalse(journal.getIndex(name, tx0).contains(id0));
+            assertNull(journal.getIndex(name, tx0).lookup(id0));
+
+            // commit.
+            journal.commit(tx0);
+
+            // data version now deleted in global scope.
+            assertFalse(journal.getIndex(name).contains(id0));
+
+        } finally {
+
+            journal.destroy();
+
         }
-        
-        final byte[] id0 = new byte[] { 1 };
-
-        final byte[] v0 = getRandomData().array();
-
-        // data version not visible in global scope.
-        assertNull(journal.getIndex(name).lookup(id0));
-
-        // write data version in global scope.
-        journal.getIndex(name).insert(id0, v0);
-
-        // data version visible in global scope.
-        assertEquals(v0, journal.getIndex(name).lookup(id0));
-
-        // commit the unisolated write.
-        journal.commit();
-
-        // start transaction.
-        final long tx0 = journal.newTx(ITx.UNISOLATED);
-
-        // data version visible in the transaction.
-        assertEquals(v0, journal.getIndex(name, tx0).lookup(id0));
-
-        // delete version in transaction scope.
-        assertEquals(v0, journal.getIndex(name, tx0).remove(id0));
-
-        // data version still visible in global scope.
-        assertTrue(journal.getIndex(name).contains(id0));
-        assertEquals(v0, journal.getIndex(name).lookup(id0));
-
-        // data version not visible in transaction.
-        assertFalse(journal.getIndex(name, tx0).contains(id0));
-        assertNull(journal.getIndex(name, tx0).lookup(id0));
-
-        // commit.
-        journal.commit(tx0);
-
-        // data version now deleted in global scope.
-        assertFalse(journal.getIndex(name).contains(id0));
-
-        journal.destroy();
 
     }
 

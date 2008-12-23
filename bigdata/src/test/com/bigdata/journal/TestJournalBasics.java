@@ -89,17 +89,7 @@ public class TestJournalBasics extends TestCase {
         /*
          * tests of transaction support.
          */
-        
-        // tests of transitions in the transaction RunState state machine.
-        suite.addTest( AbstractTestTxRunState.suite() );
-        // @todo update these tests of the tx-journal integration.
-        suite.addTestSuite( TestTxJournalProtocol.class );
-        // tests of read-write transactions and isolation.
-        suite.addTestSuite( TestTx.class );
-        // tests of read-only transactions.
-        suite.addTestSuite( TestReadOnlyTx.class );
-        // tests of read-committed transactions.
-        suite.addTestSuite( TestReadCommittedTx.class );
+        suite.addTest(TestTransactionSupport.suite());
         
         /*
          * Tests of concurrent execution of readers, writers, and transactions

@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -41,11 +42,15 @@ import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import com.bigdata.btree.BTree;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.concurrent.LockManagerTask;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
+import com.bigdata.journal.CommitRecordIndex;
 import com.bigdata.journal.ITransactionService;
+import com.bigdata.journal.ITx;
+import com.bigdata.journal.Journal;
 import com.bigdata.journal.RunState;
 import com.bigdata.resources.StoreManager;
 import com.bigdata.util.concurrent.ExecutionExceptions;
@@ -67,6 +72,13 @@ public abstract class DistributedTransactionService extends
      */
     public interface Options extends AbstractTransactionService.Options {
 
+        /**
+         * The directory in which the persistent state of this service will be
+         * stored.
+         */
+        String DATA_DIR = DistributedTransactionService.class.getName()
+                + ".dataDir";
+        
     }
 
     /**
@@ -83,17 +95,62 @@ public abstract class DistributedTransactionService extends
             0/* maxConcurrencyIsIgnored */, true/* predeclareLocks */);
 
     /**
+     * A {@link BTree} containing a log of the historical commit points.
+     * 
+     * @todo for a {@link Journal} we can use the existing
+     *       {@link CommitRecordIndex}.
+     * 
+     * @todo Subclass {@link BTree} for long keys and arbitrary values and move
+     *       the find() and findNext() methods onto that class and make the
+     *       value type generic. That same logic is replicated right now in
+     *       several places and there is no reason for that.
+     * 
+     * @todo If this is not restart safe then on restart the commit points in
+     *       the federation will have to be reported to the transaction service
+     *       so that it knows the timestamp intervals within which it can make
+     *       its choices for read-historical transactions. It would be trivial
+     *       to make this restart safe using a {@link Journal}.
+     * 
+     * @todo we should be using a read-write store rather than a Journal for
+     *       this as the length of the backing store will otherwise grow without
+     *       bounds.
+     */
+    private final CommitTimeIndex commitTimeIndex = CommitTimeIndex.createTransient();
+
+    private final File dataDir;
+    
+    /**
      * @param properties
      */
     public DistributedTransactionService(final Properties properties) {
 
         super(properties);
 
+        if(properties.getProperty(Options.DATA_DIR)==null) {
+            
+            throw new RuntimeException("Required property: "+Options.DATA_DIR);
+            
+        }
+        
+        dataDir = new File(properties.getProperty(Options.DATA_DIR));
+        
+        dataDir.mkdirs();
+        
         final AbstractFederation fed = (AbstractFederation) getFederation();
 
         // @todo config options
         fed.addScheduledTask(new NotifyReleaseTimeTask(), 60/* initialDelay */,
                 60/* delay */, TimeUnit.SECONDS);
+        
+    }
+    
+    public void destroy() {
+        
+        super.destroy();
+
+        // @todo journal.destroy()
+        
+        dataDir.delete();
         
     }
 
@@ -189,8 +246,8 @@ public abstract class DistributedTransactionService extends
         // the set of resources across all data services on which the tx wrote.
         final String resource[] = state.getResources();
         
-        // declare resource(s) to lock (exclusive locks are used).
-        lockManager.addResource(resource);
+//        // declare resource(s) to lock (exclusive locks are used).
+//        lockManager.addResource(resource);
 
         // delegate will handle lock acquisition and invoke doTask().
         final LockManagerTask<String, Long> delegate = new LockManagerTask<String, Long>(
@@ -835,7 +892,73 @@ public abstract class DistributedTransactionService extends
                 
     }
 
+    protected long findCommitTime(final long timestamp) {
+        
+        synchronized(commitTimeIndex) {
+            
+            return commitTimeIndex.find(timestamp);
+            
+        }
+        
+    }
+
+    protected long findNextCommitTime(long commitTime) {
+        
+        synchronized(commitTimeIndex) {
+            
+            return commitTimeIndex.findNext(commitTime);
+            
+        }
+
+    }
+    
+    /**
+     * @todo Is it a problem if the commit notices do not arrive in sequence?
+     *       Because they will not. Unisolated operations will participate in
+     *       group commits using timestamps obtained from the transaction
+     *       service, but those commit operations will not be serialize and
+     *       their reporting of the timestamps for the commits will likewise not
+     *       be serialized.
+     *       <p>
+     *       The danger is that we could assign a read-historical transaction
+     *       start time based on the {@link #commitTimeIndex} and then have
+     *       commit timestamps arrive that are within the interval in which we
+     *       made the assignment. Essentially, our interval was too large and
+     *       the assigned start time may have been on either side of a
+     *       concurrent commit. However, this can only occur for unisolated
+     *       operations (non-transactional commits). The selected timestamp will
+     *       always be coherent with respect to transaction commits since those
+     *       are coordinated and use a shared commit time.
+     *       <p>
+     *       This issue can only arise when requesting historical reads for
+     *       timestamps that are "close" to the most recent commit point since
+     *       the latency involve would otherwise not effect the assignment of
+     *       transaction start times. However, it can occur either when
+     *       specifying the symbolic constant {@link ITx#READ_COMMITTED} to
+     *       {@link #newTx(long)} or when specifying the exact commitTime
+     *       reported by a transaction commit.
+     *       <p>
+     *       Simply stated, there is NO protection against concurrently
+     *       unisolated operations committing. If such operations are used on
+     *       the same indices as transactions, then it IS possible that the
+     *       application will be unable to read from exactly the post-commit
+     *       state of the transaction for a brief period (10s of milliseconds)
+     *       until the unisolated commit notices have been propagated to the
+     *       {@link DistributedTransactionService}. This issue will only occur
+     *       when there is also a lot of contention for reading on the desired
+     *       timestamp since otherwise the commitTime itself may be used as a
+     *       transaction start time.
+     */
     final public void notifyCommit(final long commitTime) {
+
+        synchronized(commitTimeIndex) {
+
+            /*
+             * Add all commit times
+             */
+            commitTimeIndex.add(commitTime);
+            
+        }
         
         synchronized(lastCommitTimeLock) {
             
@@ -908,6 +1031,13 @@ public abstract class DistributedTransactionService extends
         this.releaseTime = releaseTime;
         
     }
+    
+    public long getReleaseTime() {
+        
+        return releaseTime;
+        
+    }
+    
     /**
      * 
      * @todo The release time on startup should be set to
@@ -1000,9 +1130,8 @@ public abstract class DistributedTransactionService extends
      * 
      * @todo add a run state counter.
      * 
-     * @todo add counter for #of tx started, completed, committed, and aborted,
-     *       the #of read-only and the #of read-write tx started and active, and
-     *       the min(abs(tx)) (earliest) active tx).
+     * @todo add counter for the #of read-only and the #of read-write tx started
+     *       and active, and the min(abs(tx)) (earliest) active tx).
      */
     synchronized public CounterSet getCounters() {
         
@@ -1028,6 +1157,24 @@ public abstract class DistributedTransactionService extends
                 }
             });
 
+            countersRoot.addCounter("startCount", new Instrument<Long>() {
+                protected void sample() {
+                    setValue(getStartCount());
+                }
+            });
+            
+            countersRoot.addCounter("abortCount", new Instrument<Long>() {
+                protected void sample() {
+                    setValue(getAbortCount());
+                }
+            });
+            
+            countersRoot.addCounter("commitCount", new Instrument<Long>() {
+                protected void sample() {
+                    setValue(getCommitCount());
+                }
+            });
+            
             /*
              * The lock manager imposing a partial ordering on transaction
              * commits.

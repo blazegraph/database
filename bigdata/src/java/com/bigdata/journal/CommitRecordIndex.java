@@ -96,6 +96,19 @@ public class CommitRecordIndex extends BTree {
         
     }
 
+    static public CommitRecordIndex createTransient() {
+        
+        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+        
+        metadata.setBTreeClassName(CommitRecordIndex.class.getName());
+        
+        metadata.setTupleSerializer(new CommitRecordIndexTupleSerializer(
+                new ASCIIKeyBuilderFactory(Bytes.SIZEOF_LONG)));
+        
+        return (CommitRecordIndex) BTree.createTransient(metadata);
+        
+    }
+
     /**
      * Load from the store.
      * 
