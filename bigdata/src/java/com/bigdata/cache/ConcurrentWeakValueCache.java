@@ -128,7 +128,7 @@ public class ConcurrentWeakValueCache<K, V> {
      * Uses the default load factor (0.75) and concurrency level (16).
      * 
      * @param queueCapacity
-     *            The queue capacity.
+     *            The {@link HardReferenceQueue} capacity.
      */
     public ConcurrentWeakValueCache(final int queueCapacity) {
 
@@ -140,7 +140,7 @@ public class ConcurrentWeakValueCache<K, V> {
      * Uses the specified values.
      * 
      * @param queueCapacity
-     *            The queue capacity.
+     *            The {@link HardReferenceQueue} capacity.
      * @param loadFactor
      *            The load factor.
      * @param concurrencyLevel
@@ -158,7 +158,7 @@ public class ConcurrentWeakValueCache<K, V> {
      * without a timeout.
      * 
      * @param queueCapacity
-     *            The capacity of the hard reference queue.
+     *            The {@link HardReferenceQueue} capacity.
      * @param loadFactor
      *            The load factor.
      * @param concurrencyLevel
@@ -182,7 +182,7 @@ public class ConcurrentWeakValueCache<K, V> {
      * Uses the specified values.
      * 
      * @param queue
-     *            The hard reference queue.
+     *            The {@link HardReferenceQueue} capacity.
      * @param loadFactor
      *            The load factor.
      * @param concurrencyLevel
@@ -255,8 +255,8 @@ public class ConcurrentWeakValueCache<K, V> {
 
                 /*
                  * The reference paired with the key has not been cleared so we
-                 * append it to the queue in order so that the reference will be
-                 * retained longer).
+                 * append it to the queue so that the reference will be retained
+                 * longer (a touch).
                  */
                 
                 synchronized (queue) {
@@ -275,6 +275,56 @@ public class ConcurrentWeakValueCache<K, V> {
 //        removeClearedEntries();
         
         return null;
+
+    }
+
+    /**
+     * Return <code>true</code> iff the map contains an entry for the key
+     * whose weak reference has not been cleared.
+     * 
+     * @param k
+     *            The key.
+     *            
+     * @return <code>true</code> iff the map contains an entry for that key
+     *         whose weak reference has not been cleared.
+     */
+    public boolean containsKey(final K k) {
+
+        final WeakReference<V> ref = map.get(k);
+
+        if (ref != null) {
+
+            /*
+             * There is an entry under the key, so get the reference paired to
+             * the key.
+             */
+
+            final V v = ref.get();
+
+            if (v != null) {
+
+                /*
+                 * The reference paired with the key has not been cleared so we
+                 * append it to the queue so that the reference will be retained
+                 * longer (a touch).
+                 */
+
+                synchronized (queue) {
+
+                    queue.append(v);
+
+                }
+
+                return true;
+
+            }
+
+        }
+
+        // Note: Done by put().
+        // removeClearedEntries();
+
+        return false;
 
     }
 

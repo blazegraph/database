@@ -1146,45 +1146,68 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         
         if (isReadWriteTx) {
 
-            /*
-             * A read-write transaction.
-             */
-
-            final ITx tmp = transactionManager.getTx(timestamp); 
+            if (resourceManager instanceof ResourceManager) {
             
-            if (tmp == null && resourceManager instanceof ResourceManager) {
-                
+                /*
+                 * This is a read-write transaction with a distributed database.
+                 */
+
+                // UUID of the dataService on which the tx will run.
                 final UUID dataServiceUUID = ((ResourceManager) resourceManager)
                         .getDataServiceUUID();
                 
                 try {
 
                     /*
-                     * Notify the transaction service.
+                     * Notify the transaction service. We send both the UUID of
+                     * the dataService and the array of the named resources
+                     * which the operation isolated by that transaction has
+                     * requested. Transaction commits are placed into a partial
+                     * order to avoid deadlocks where that ordered is determined
+                     * by sorting the resources declared by the tx througout its
+                     * life cycle and the obtaining locks on all of those
+                     * resources (in the distributed transaction service) before
+                     * the commit may start. This is very similar to how we
+                     * avoid deadlocks for unisolated operations running on a
+                     * single journal or data service.
                      * 
-                     * Note: Throws IllegalStateException if not permitted.
+                     * Note: Throws IllegalStateException if [timestamp] does
+                     * not identify an active transaction.
+                     * 
+                     * FIXME In order to permit concurrent operations by the
+                     * same transaction it MUST establish locks on the isolated
+                     * resources.  Those resources MUST be locatable (they will
+                     * exist on a temporary store choose by the tx when it first
+                     * started on this data service).
                      */
-                    transactionManager.getTransactionService().startOn(
-                            timestamp, dataServiceUUID);
 
-                    // start tx on this data service.
-                    tx = new Tx(transactionManager, resourceManager, timestamp);
-
+                    transactionManager.getTransactionService().declareResources(
+                            timestamp, dataServiceUUID, resource);
+                    
                 } catch (IOException e) {
 
                     // RMI problem.
                     throw new RuntimeException(e);
                     
                 }
-                
-            } else {
-                
-                // unknown tx (standalone database).
-                
-                throw new IllegalStateException("Unknown tx: "+timestamp);
+
+                if (transactionManager.getTx(timestamp) == null) {
+
+                    // start tx on this data service.
+                    new Tx(transactionManager, resourceManager, timestamp);
+
+                }
 
             }
 
+            tx = transactionManager.getTx(timestamp); 
+            
+            if (tx == null) {
+                
+                throw new IllegalStateException("Unknown tx: "+timestamp);
+                
+            }
+            
             if (!tx.isActive()) {
 
                 throw new IllegalStateException("Tx not active: "+timestamp);

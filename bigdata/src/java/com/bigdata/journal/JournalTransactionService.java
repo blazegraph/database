@@ -58,7 +58,7 @@ abstract public class JournalTransactionService extends
         this.journal = journal;
 
     }
-
+    
     /**
      * Extended to register the new tx in the
      * {@link AbstractLocalTransactionManager}.

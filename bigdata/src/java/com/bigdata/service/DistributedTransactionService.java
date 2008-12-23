@@ -42,6 +42,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import com.bigdata.concurrent.LockManager;
+import com.bigdata.concurrent.LockManagerTask;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.journal.ITransactionService;
@@ -74,7 +75,13 @@ public abstract class DistributedTransactionService extends
      * @todo config for initial capacity and concurrency?
      */
     private final ConcurrentHashMap<Long/* tx */, TxState/* state */> commitList = new ConcurrentHashMap<Long, TxState>();
-    
+
+    /**
+     * The {@link LockManager} used to impose a partial ordering on tx commits.
+     */
+    private final LockManager<String> lockManager = new LockManager<String>(
+            0/* maxConcurrencyIsIgnored */, true/* predeclareLocks */);
+
     /**
      * @param properties
      */
@@ -135,19 +142,42 @@ public abstract class DistributedTransactionService extends
         
     }
 
+    /**
+     * Transaction commits for a distributed database MUST be executed in a
+     * partial order so that they do not deadlock when acquiring the necessary
+     * locks on the named indices on the local data services. Commits could be
+     * serialized, but that restricts the possible throughput. The maximum
+     * possible concurrency is achieved by ordering the commits using the set of
+     * named index (partitions) on which the transaction has written. A partial
+     * ordering could also be established based on the {@link IDataService}s,
+     * or the scale-out index names, but both of those orderings would limit the
+     * possible concurrency.
+     * <p>
+     * The partial ordering is imposed on commit requests using a
+     * {@link LockManager}. A commit must obtain a lock on all of the necessary
+     * resources before proceeding. If there is an existing commit using some of
+     * those resources, then any concurrent commit requiring any of those
+     * resources will block. The {@link LockManager} is configured to require
+     * that commits pre-declare their locks. Deadlocks are NOT possible when the
+     * locks are pre-declared.
+     * 
+     * @todo Single phase commits currently contend for the resource locks.
+     *       However, they could also executed without acquiring those locks
+     *       since they will be serialized locally by the {@link IDataService}
+     *       on which they are executing.
+     */
     @Override
     protected long commitImpl(final TxState state) throws Exception {
         
-        if (state.isReadOnly() || state.isEmptyWriteSet()) {
+        if (state.isReadOnly() || state.getDataServiceCount() == 0) {
             
             /*
              * Note: We do not maintain any transaction state on the client for
              * read-only transactionss.
              * 
-             * Note: If the write set is empty then the transaction was never
-             * started on any data service so we do not need to notify any data
-             * service. In effect, the tx was writable but no writes were
-             * requested.
+             * Note: If the transaction was never started on any data service so
+             * we do not need to notify any data service. In effect, the tx was
+             * started but never used.
              */
 
             state.setRunState(RunState.Committed);
@@ -155,19 +185,73 @@ public abstract class DistributedTransactionService extends
             return 0L;
             
         }
+     
+        // the set of resources across all data services on which the tx wrote.
+        final String resource[] = state.getResources();
         
-        if (state.isDistributedTx()) {
+        // declare resource(s) to lock (exclusive locks are used).
+        lockManager.addResource(resource);
 
-            return distributedCommit(state);
+        // delegate will handle lock acquisition and invoke doTask().
+        final LockManagerTask<String, Long> delegate = new LockManagerTask<String, Long>(
+                lockManager, resource, new TxCommitTask(state));
 
-        } else {
+        /*
+         * This queues the commit request until it holds the necessary locks and
+         * then commits the tx.
+         */
 
-            return singlePhaseCommit(state);
+        return delegate.call();
+        
+    }
+
+    /**
+     * Task runs the commit for the transaction once the necessary resource
+     * locks have been required.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private class TxCommitTask implements Callable<Long> {
+
+        private final TxState state;
+
+        public TxCommitTask(final TxState state) {
+
+            if (state == null)
+                throw new IllegalArgumentException();
+            
+            if(!state.lock.isHeldByCurrentThread())
+                throw new IllegalMonitorStateException();
+            
+            this.state = state;
+
+        }
+
+        /**
+         * This method will be invoked by the {@link LockManagerTask} once it
+         * holds all of the necessary resource locks. This is how we impose a
+         * partial order. Deadlocks can not arise because we predeclare the
+         * locks required for the commit and {@link LockManager} can guarentee
+         * no deadlocks in that case by sorting the requested resources and
+         * acquiring the locks in the sorted order.
+         */
+        public Long call() throws Exception {
+
+            if (state.isDistributedTx()) {
+
+                return distributedCommit(state);
+
+            } else {
+
+                return singlePhaseCommit(state);
+
+            }
 
         }
 
     }
-
+    
     /**
      * Prepare and commit a read-write transactions that has written on a single
      * data service.
@@ -299,31 +383,11 @@ public abstract class DistributedTransactionService extends
      * arise where two distributed commits were each seeking the exclusive write
      * lock on resources, one of which was already held by the other commit.
      * 
-     * @todo The <code>synchronized</code> keyword imposes a sufficient
-     *       constraint to avoid deadlock, but it restricts the possible
-     *       throughput. The maximum concurrency would be achieved if we knew
-     *       the specific named index (partitions) on which the transaction had
-     *       written, which would require both communicating more state from the
-     *       {@link IDataService}. A partial ordering could also be established
-     *       based on the {@link IDataService}s or the scale-out index names.
-     *       <p>
-     *       A partial ordering can then be imposed on a queue of requested
-     *       commits using a {@link LockManager}. Any commit must obtain a lock
-     *       on all of the necessary resources before proceeding. If there is an
-     *       existing commit using some of those resources, then other commits
-     *       will block.
-     *       <p>
-     *       Note: Single phase commits may contend for the resource locks, but
-     *       they could also run without acquiring those locks since they will
-     *       be serialized locally by the {@link IDataService} on which they are
-     *       executing.
-     * 
      * @throws Exception
      *             if anything goes wrong.
      * 
      * @return The commit time for the transaction.
      */
-    synchronized 
     protected long distributedCommit(final TxState state) throws Exception {
 
         if(!state.lock.isHeldByCurrentThread())
@@ -699,7 +763,7 @@ public abstract class DistributedTransactionService extends
         
         try {
         
-            if(!state.isWrittenOn(dataService)) {
+            if(!state.isStartedOn(dataService)) {
                 
                 throw new IllegalArgumentException();
                 
@@ -749,7 +813,7 @@ public abstract class DistributedTransactionService extends
         
         try {
         
-            if(!state.isWrittenOn(dataService)) {
+            if(!state.isStartedOn(dataService)) {
                 
                 throw new IllegalArgumentException();
                 
@@ -963,6 +1027,13 @@ public abstract class DistributedTransactionService extends
                     setValue(releaseTime);
                 }
             });
+
+            /*
+             * The lock manager imposing a partial ordering on transaction
+             * commits.
+             */
+            countersRoot.makePath("Lock Manager").attach(
+                    lockManager.getCounters());
 
         }
         

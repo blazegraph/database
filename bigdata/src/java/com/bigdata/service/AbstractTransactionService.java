@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Properties;
 import java.util.Set;
@@ -39,6 +40,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.concurrent.LockManager;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTestTxRunState;
 import com.bigdata.journal.ITransactionService;
@@ -678,9 +680,27 @@ abstract public class AbstractTransactionService extends TimestampService implem
 
     }
 
-    public void startOn(final long tx, final UUID dataServiceUUID)
-            throws IllegalStateException {
+    /**
+     * Note: Only those {@link DataService}s on which a read-write transaction
+     * has started will participate in the commit. If there is only a single
+     * such {@link IDataService}, then a single-phase commit will be used.
+     * Otherwise a distributed transaction commit protocol will be used.
+     * <p>
+     * Note: The commits requests are placed into a partial order by sorting the
+     * total set of resources which the transaction declares (via this method)
+     * across all operations executed by the transaction and then contending for
+     * locks on the named resources using a {@link LockManager}. This is handled
+     * by the {@link DistributedTransactionService}.
+     */
+    public void declareResources(final long tx, final UUID dataServiceUUID,
+            final String[] resource) throws IllegalStateException {
 
+        if (dataServiceUUID == null)
+            throw new IllegalArgumentException();
+
+        if (resource == null)
+            throw new IllegalArgumentException();
+        
         final TxState state = activeTx.get(tx);
 
         if (state == null) {
@@ -705,7 +725,7 @@ abstract public class AbstractTransactionService extends TimestampService implem
 
             }
 
-            state.startOn(dataServiceUUID);
+            state.declareResources(dataServiceUUID, resource);
             
         } finally {
 
@@ -853,11 +873,36 @@ abstract public class AbstractTransactionService extends TimestampService implem
         /**
          * The set of {@link DataService}s on which a read-write transaction
          * has been started and <code>null</code> if this is not a read-write
-         * transaction (we only track data services on which the transaction
-         * starts).
+         * transaction.
+         * <p>
+         * Note: We only track this information for a distributed database.
          */
-        private final Set<UUID/* logicalDataServiceUUID */> startedOn;
+        private final Set<UUID/* dataService */> dataServices;
 
+        /**
+         * The set of named resources that the transaction has declared across
+         * all {@link IDataService}s on which it has written and
+         * <code>null</code> if this is not a read-write transaction.
+         * <p>
+         * Note: We only track this information for a distributed database.
+         */
+        private final Set<String/* name */> resources;
+
+        /**
+         * Return the resources declared by the transaction.
+         */
+        public String[] getResources() {
+
+            if (!lock.isHeldByCurrentThread())
+                throw new IllegalMonitorStateException();
+
+            if (resources == null)
+                return new String[] {};
+
+            return resources.toArray(new String[] {});
+            
+        }
+        
         /**
          * Return <code>true</code> iff the dataService identified by the
          * {@link UUID} is one on which this transaction has been started.
@@ -869,7 +914,7 @@ abstract public class AbstractTransactionService extends TimestampService implem
          *         that {@link IDataService}. <code>false</code> for
          *         read-only transactions.
          */
-        public boolean isWrittenOn(final UUID dataServiceUUID) {
+        public boolean isStartedOn(final UUID dataServiceUUID) {
             
             if(!lock.isHeldByCurrentThread())
                 throw new IllegalMonitorStateException();
@@ -877,10 +922,10 @@ abstract public class AbstractTransactionService extends TimestampService implem
             if (dataServiceUUID == null)
                 throw new IllegalArgumentException();
             
-            if (startedOn == null)
+            if (dataServices == null)
                 return false;
 
-            return startedOn.contains(dataServiceUUID);
+            return dataServices.contains(dataServiceUUID);
             
         }
         
@@ -896,10 +941,10 @@ abstract public class AbstractTransactionService extends TimestampService implem
             if(!lock.isHeldByCurrentThread())
                 throw new IllegalMonitorStateException();
             
-            if (startedOn == null)
+            if (dataServices == null)
                 throw new IllegalStateException();
             
-            return startedOn.toArray(new UUID[] {});
+            return dataServices.toArray(new UUID[] {});
             
         }
         
@@ -925,7 +970,9 @@ abstract public class AbstractTransactionService extends TimestampService implem
             // pre-compute the hash code for the transaction.
             this.hashCode = Long.valueOf(tx).hashCode();
 
-            this.startedOn = readOnly ? null : new LinkedHashSet<UUID>();
+            this.dataServices = readOnly ? null : new LinkedHashSet<UUID>();
+
+            this.resources = readOnly ? null : new LinkedHashSet<String>();
             
         }
 
@@ -953,19 +1000,31 @@ abstract public class AbstractTransactionService extends TimestampService implem
         }
 
         /**
-         * Declares a data service instance on which the transaction will write.
+         * Declares resources on a data service instance on which the
+         * transaction will write.
          * 
-         * @param locator
-         *            The locator for the data service instance.
+         * @param dataService
+         *            The data service identifier.
+         * @param resource
+         *            An array of named resources on the data service on which
+         *            the transaction will write (or at least for which it
+         *            requires an exclusive write lock).
          * 
          * @throws IllegalStateException
          *             if the transaction is read-only.
          * @throws IllegalStateException
          *             if the transaction is not active.
          */
-        final public void startOn(final UUID dataServiceUUID) {
+        final public void declareResources(final UUID dataService,
+                final String[] resource) {
 
-            if(!lock.isHeldByCurrentThread())
+            if (dataService == null)
+                throw new IllegalArgumentException();
+            
+            if (resource == null)
+                throw new IllegalArgumentException();
+            
+            if (!lock.isHeldByCurrentThread())
                 throw new IllegalMonitorStateException();
 
             if (readOnly)
@@ -974,32 +1033,59 @@ abstract public class AbstractTransactionService extends TimestampService implem
             if (!isActive())
                 throw new IllegalStateException(ERR_NOT_ACTIVE);
 
-            startedOn.add(dataServiceUUID);
+            dataServices.add(dataService);
+            
+            resources.addAll(Arrays.asList(resource));
             
             if (INFO)
-                log.info("Started on: " + dataServiceUUID);
+                log.info("dataService=" + dataService + ", resource="
+                        + resource);
 
         }
 
-        /**
-         * Return <code>true</code> if the transaction is read-only or if a
-         * read-write transaction has not been started on any
-         * {@link IDataService}s.
-         * <p>
-         * <strong>WARNING: This method should only be used for distributed
-         * databases. It will always report [false] for a standalone database
-         * since {@link ITransactionService#startOn(long, UUID)} is not invoked
-         * for a standalone database!</strong>
-         */
-        final public boolean isEmptyWriteSet() {
+//        /**
+//         * Return <code>true</code> if the transaction is read-only or if a
+//         * read-write transaction has not been started on any
+//         * {@link IDataService}s.
+//         * <p>
+//         * <strong>WARNING: This method should only be used for distributed
+//         * databases. It will always report [false] for a standalone database
+//         * since
+//         * {@link ITransactionService#declareResources(long, UUID, String[])} is
+//         * not invoked for a standalone database!</strong>
+//         */
+//        final public boolean isEmptyWriteSet() {
+//
+//            if(!lock.isHeldByCurrentThread())
+//                throw new IllegalMonitorStateException();
+//
+//            return readOnly || dataServices.isEmpty();
+//
+//        }
 
+        /**
+         * Return the #of {@link IDataService}s on which a read-write
+         * transaction has executed an operation.
+         * 
+         * @return The #of {@link IDataService}.
+         * 
+         * @throws IllegalStateException
+         *             if the transaction is read-only.
+         * @throws IllegalMonitorStateException
+         *             if the caller does not hold the lock.
+         */
+        final public int getDataServiceCount() {
+            
             if(!lock.isHeldByCurrentThread())
                 throw new IllegalMonitorStateException();
 
-            return readOnly || startedOn.isEmpty();
+            if(readOnly)
+                throw new IllegalStateException(ERR_READ_ONLY);
+            
+            return dataServices.size();
 
         }
-
+        
         /**
          * Return <code>true</code> iff a read-write transaction has started on
          * more than one {@link IDataService}.
@@ -1009,7 +1095,7 @@ abstract public class AbstractTransactionService extends TimestampService implem
             if(!lock.isHeldByCurrentThread())
                 throw new IllegalMonitorStateException();
 
-            return !readOnly && startedOn.size() > 1;
+            return !readOnly && dataServices.size() > 1;
 
         }
 
