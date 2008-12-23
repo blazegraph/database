@@ -63,7 +63,11 @@ import org.apache.log4j.Logger;
  */
 public class ResourceQueue<R, T> {
 
-    public static final Logger log = Logger.getLogger(ResourceQueue.class);
+    protected static final Logger log = Logger.getLogger(ResourceQueue.class);
+    
+    protected static final boolean INFO = log.isInfoEnabled();
+
+    protected static final boolean DEBUG = log.isDebugEnabled();
 
     /**
      * 
@@ -271,7 +275,7 @@ public class ResourceQueue<R, T> {
      *             if the request would cause a deadlock among the running
      *             transactions.
      */
-    public void lock(T tx) throws InterruptedException, DeadlockException {
+    public void lock(final T tx) throws InterruptedException, DeadlockException {
 
         lock(tx, 0L);
 
@@ -286,14 +290,14 @@ public class ResourceQueue<R, T> {
      *            The timeout (ms) -or- 0L to wait forever.
      * 
      * @throws InterruptedException
-     *             if the lock was interrupted (the transaction should
-     *             handle this exception by aborting).
+     *             if the lock was interrupted (the transaction should handle
+     *             this exception by aborting).
      * @throws DeadlockException
      *             if the request would cause a deadlock among the running
      *             transactions.
      */
-    public void lock(final T tx, final long timeout) throws InterruptedException,
-            DeadlockException {
+    public void lock(final T tx, final long timeout)
+            throws InterruptedException, DeadlockException {
 
         /*
          * Note: Since blocked transactions do not run a transaction can be
@@ -306,13 +310,13 @@ public class ResourceQueue<R, T> {
         if (timeout < 0L)
             throw new IllegalArgumentException();
 
-        if (log.isDebugEnabled())
+        if (DEBUG)
             log.debug("enter: tx=" + tx + ", queue=" + this);
 
         // obtain the private lock.
         lock.lock();
 
-        if (log.isDebugEnabled())
+        if (DEBUG)
             log.debug("have private lock: tx=" + tx + ", queue=" + this);
 
         final long begin = System.currentTimeMillis();
@@ -324,7 +328,7 @@ public class ResourceQueue<R, T> {
             // already locked.
             if (queue.peek() == tx) {
 
-                if (log.isInfoEnabled())
+                if (INFO)
                     log.info("Already owns lock: tx=" + tx + ", queue=" + this);
 
                 return;
@@ -337,7 +341,7 @@ public class ResourceQueue<R, T> {
 
                 queue.add(tx);
 
-                if (log.isInfoEnabled())
+                if (INFO)
                     log.info("Granted lock with empty queue: tx=" + tx
                             + ", queue=" + this);
 
@@ -406,7 +410,7 @@ public class ResourceQueue<R, T> {
     
                     }
     
-                    if (log.isInfoEnabled())
+                    if (INFO)
                         log.info("Awaiting resource: tx=" + tx + ", queue="
                                 + this);
     
@@ -437,7 +441,7 @@ public class ResourceQueue<R, T> {
                      * a timeout (handled above) -or- for no reason.
                      */
     
-                    if (log.isInfoEnabled())
+                    if (INFO)
                         log.info("Continuing after wait: tx=" + tx + ", queue="
                                 + this);
     
@@ -455,7 +459,7 @@ public class ResourceQueue<R, T> {
                          * the lock.
                          */
     
-                        if (log.isInfoEnabled())
+                        if (INFO)
                             log.info("Lock granted after wait: tx=" + tx
                                     + ", queue=" + this);
     
@@ -542,7 +546,7 @@ public class ResourceQueue<R, T> {
 
             lock.unlock();
 
-            if (log.isDebugEnabled())
+            if (DEBUG)
                 log.debug("released private lock: tx=" + tx + ", queue="
                                 + this);
 
@@ -559,13 +563,15 @@ public class ResourceQueue<R, T> {
      * @exception IllegalStateException
      *                if the transaction does not hold the lock.
      */
-    public void unlock(T tx) {
+    public void unlock(final T tx) {
 
-        log.debug("enter");
+        if(DEBUG)
+            log.debug("enter");
 
         lock.lock();
 
-        log.debug("have private lock");
+        if(DEBUG)
+            log.debug("have private lock");
 
         try {
 
@@ -623,13 +629,15 @@ public class ResourceQueue<R, T> {
 
             if (queue.isEmpty()) {
 
-                log.info("Nothing pending");
+                if(INFO)
+                    log.info("Nothing pending");
 
                 return;
 
             }
 
-            log.info("Signaling blocked requestors");
+            if(INFO)
+                log.info("Signaling blocked requestors");
 
             available.signalAll();
 
@@ -637,7 +645,8 @@ public class ResourceQueue<R, T> {
 
             lock.unlock();
 
-            log.debug("released private lock");
+            if(DEBUG)
+                log.debug("released private lock");
 
         }
 

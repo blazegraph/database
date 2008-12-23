@@ -33,7 +33,6 @@ import java.util.concurrent.BrokenBarrierException;
 
 import com.bigdata.isolation.IConflictResolver;
 import com.bigdata.resources.ResourceManager;
-import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ITxCommitProtocol;
 
@@ -263,22 +262,28 @@ public interface ITransactionService extends ITimestampService {
     
     /**
      * An {@link IDataService} MUST invoke this method before permitting an
-     * unknown read-write transaction to start on that {@link IDataService}.
-     * Only those {@link DataService}s on which a read-write transaction has
-     * started will participate in the commit. If there is only a single such
-     * {@link IDataService}, then a single-phase commit will be used. Otherwise
-     * a distributed transaction commit protocol will be used.
+     * operation isolated by a read-write transaction to execute with access to
+     * the named resources (this applies only to distributed databases). The
+     * declared resources are used in the commit phase of the read-write tx to
+     * impose a partial order on commits. That partial order guarentees that
+     * commits do not deadlock in contention for the same resources.
      * 
      * @param tx
      *            The transaction identifier.
      * @param dataService
      *            The {@link UUID} an {@link IDataService} on which the
      *            transaction will write.
+     * @param resource
+     *            An array of the named resources which the transaction will use
+     *            on that {@link IDataService} (this may be different for each
+     *            operation submitted by that transaction to the
+     *            {@link IDataService}).
      * 
      * @return {@link IllegalStateException} if the transaction is not an active
      *         read-write transaction.
      */
-    public void startOn(long tx, UUID dataService) throws IOException;
+    public void declareResources(long tx, UUID dataService, String[] resource)
+            throws IOException;
 
     /**
      * Callback by an {@link IDataService} participating in a two phase commit

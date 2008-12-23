@@ -43,8 +43,12 @@ import com.bigdata.concurrent.LockManager.HorridTaskDeath;
  * @version $Id$
  * 
  * @param R
- *            The type of the object that identifies a resource for the purposes
- *            of the locking system. This is typically the name of an index.
+ *            The generic type of the object that identifies a resource for the
+ *            purposes of the locking system. This is typically the <i>name</i>
+ *            of an index.
+ * @param T
+ *            The generic type of the return value of the delegate
+ *            {@link Callable}.
  */
 public class LockManagerTask<R extends Comparable<R>,T> implements
         Callable<T> {
@@ -83,7 +87,7 @@ public class LockManagerTask<R extends Comparable<R>,T> implements
         
     }
     
-    public int setMaxLockTries(int newValue) {
+    public int setMaxLockTries(final int newValue) {
 
         if (newValue < 1)
             throw new IllegalArgumentException();
@@ -116,9 +120,9 @@ public class LockManagerTask<R extends Comparable<R>,T> implements
 
     }
 
-    public long setLockTimeout(long newValue) {
+    public long setLockTimeout(final long newValue) {
 
-        long t = this.lockTimeout;
+        final long t = this.lockTimeout;
 
         this.lockTimeout = newValue;
 
@@ -147,7 +151,8 @@ public class LockManagerTask<R extends Comparable<R>,T> implements
      *            The {@link Runnable} target that will be invoked iff the locks
      *            are successfully acquired.
      */
-    public LockManagerTask(LockManager<R> lockManager, R[] resource, Callable<T> target) {
+    public LockManagerTask(final LockManager<R> lockManager,
+            final R[] resource, final Callable<T> target) {
 
         if (lockManager == null)
             throw new NullPointerException();
