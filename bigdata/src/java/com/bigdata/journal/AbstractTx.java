@@ -164,14 +164,12 @@ abstract public class AbstractTx implements ITx {
 
         this.readOnly = TimestampUtility.isReadOnly(startTime);
 
-//        this.level = level;
-        
+        this.runState = RunState.Active;
+
         // pre-compute the hash code for the transaction.
         this.hashCode = Long.valueOf(startTime).hashCode();
         
         localTransactionManager.activateTx(this);
-
-        this.runState = RunState.Active;
 
         // report event.
         ResourceManager.openTx(startTime);
@@ -275,6 +273,10 @@ abstract public class AbstractTx implements ITx {
         
     }
 
+    /**
+     * @deprecate - move into the {@link JournalTransactionService} and the
+     *            {@link DataService}.
+     */
     final public void abort() {
         
         lock.lock();
@@ -289,9 +291,9 @@ abstract public class AbstractTx implements ITx {
 
             try {
 
-                runState = RunState.Aborted;
+                setRunState(RunState.Aborted);
 
-                localTransactionManager.completedTx(this);
+                localTransactionManager.deactivateTx(this);
 
                 ResourceManager.closeTx(startTime, 0L/* commitTime */, true);
 
@@ -380,9 +382,9 @@ abstract public class AbstractTx implements ITx {
 
             }
 
-            localTransactionManager.preparedTx(this);
+//            localTransactionManager.preparedTx(this);
 
-            runState = RunState.Prepared;
+            setRunState(RunState.Prepared);
 
         } finally {
 

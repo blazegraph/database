@@ -97,7 +97,7 @@ import com.bigdata.service.IDataService;
  *       isolated index when we are releasing our various resources. The
  *       isolated index will thereafter be unusable, which is what we want.)
  */
-public class Tx extends AbstractTx implements ITx {
+public class Tx extends AbstractTx {
 
     /**
      * A temporary store used to hold write sets for read-write transactions. It

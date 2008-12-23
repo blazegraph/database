@@ -151,7 +151,7 @@ public class CommitTimeIndex extends BTree {
             
         }
         
-        return decodeKey(valueAt(index));
+        return decodeKey(keyAt(index));
 
     }
 

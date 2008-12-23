@@ -233,7 +233,7 @@ public class TestLockManager extends TestCase implements IComparisonTest {
 
             resources[i] = "resource" + i;
 
-            assertTrue(db.addResource(resources[i]));
+//            assertTrue(db.addResource(resources[i]));
             
         }
 

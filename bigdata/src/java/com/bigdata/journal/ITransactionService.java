@@ -33,6 +33,7 @@ import java.util.concurrent.BrokenBarrierException;
 
 import com.bigdata.isolation.IConflictResolver;
 import com.bigdata.resources.ResourceManager;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ITxCommitProtocol;
 
@@ -152,13 +153,17 @@ public interface ITransactionService extends ITimestampService {
      * @return The unique transaction identifier.
      * 
      * @throws IllegalStateException
+     *             if the requested timestamp is greater than
+     *             {@link #lastCommitTime()}.
+     * @throws IllegalStateException
      *             if the requested timestamp is for a commit point that is no
      *             longer preserved by the database (the resources for that
      *             commit point have been released).
      * @throws IOException
      *             RMI errors.
-     *             
-     * @todo specialize exception for a timestamp that is no longer preserved?
+     * 
+     * @todo specialize exception for a timestamp that is no longer preserved
+     *       and for one that is in the future?
      */
     public long newTx(long timestamp) throws IOException;
     
@@ -217,6 +222,10 @@ public interface ITransactionService extends ITimestampService {
      * with the given timestamp (which it assigned) and that it should update
      * its lastCommitTime iff the given commitTime is GT its current
      * lastCommitTime.
+     * <p>
+     * Note: This is used to inform the {@link ITransactionService} of commits
+     * that DO NOT involve transaction commits. That is, local unisolated writes
+     * on individual {@link IDataService}s in an {@link IBigdataFederation}.
      * 
      * @param commitTime
      *            The commit time.

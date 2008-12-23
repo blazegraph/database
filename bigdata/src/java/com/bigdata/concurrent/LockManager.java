@@ -27,10 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.concurrent;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -38,7 +38,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.log4j.Logger;
 
 import com.bigdata.cache.ConcurrentWeakValueCache;
-import com.bigdata.cache.WeakValueCache;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 
@@ -116,15 +115,16 @@ public class LockManager</*T,*/R extends Comparable<R>> {
      *       the hard reference that we need and does not otherwise disturb the
      *       logic for locking and unlocking resources.
      */
-    final private ConcurrentHashMap<R, ResourceQueue<R, Thread>> resourceQueues = new ConcurrentHashMap<R, ResourceQueue<R, Thread>>(
-            1000/* nresources */);
-//    final private ConcurrentWeakValueCache<R, ResourceQueue<R, Thread>> resourceQueues = new ConcurrentWeakValueCache<R, ResourceQueue<R, Thread>>(
+//    final private ConcurrentHashMap<R, ResourceQueue<R, Thread>> resourceQueues = new ConcurrentHashMap<R, ResourceQueue<R, Thread>>(
 //            1000/* nresources */);
+    final private ConcurrentWeakValueCache<R, ResourceQueue<R, Thread>> resourceQueues = new ConcurrentWeakValueCache<R, ResourceQueue<R, Thread>>(
+            1000/* nresources */);
 
     /**
      * The set of locks held by each transaction.
      */
-    final private ConcurrentHashMap<Thread, Collection<R>> lockedResources;
+//    final private ConcurrentHashMap<Thread, Collection<R>> lockedResources;
+    final private ConcurrentHashMap<Thread, Collection<ResourceQueue<R,Thread>>> lockedResources;
 
     //        /**
     //         * Used to lock regions of code that add and drop resources.
@@ -350,7 +350,7 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
         this.sortLockRequests = sortLockRequests;
 
-        lockedResources = new ConcurrentHashMap<Thread, Collection<R>>(
+        lockedResources = new ConcurrentHashMap<Thread, Collection<ResourceQueue<R, Thread>>>(
                 maxConcurrency);
 
         if (predeclareLocks) {
@@ -385,35 +385,33 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
     }
 
-    /**
-     * Declare resource(s) on which locks may be obtained.
-     * <p>
-     * Note: This is done implicitly so you DO NOT need to do this explicitly.
-     * 
-     * @param resource
-     *            The resource(s).
-     */
-    public void addResource(final R[] resource) {
-        
-        for (int i = 0; i < resource.length; i++) {
-
-            addResource(resource[i]);
-
-        }
-        
-    }
+//    /**
+//     * Declare resource(s) on which locks may be obtained.
+//     * <p>
+//     * Note: This is done implicitly so you DO NOT need to do this explicitly.
+//     * 
+//     * @param resource
+//     *            The resource(s).
+//     */
+//    public void addResource(final R[] resource) {
+//        
+//        for (int i = 0; i < resource.length; i++) {
+//
+//            addResource(resource[i]);
+//
+//        }
+//        
+//    }
     
     /**
-     * Declare a resource on which locks may be obtained.
-     * <p>
-     * Note: This is done implicitly so you DO NOT need to do this explicitly.
+     * Add if absent and return a {@link ResourceQueue} for the named resource.
      * 
      * @param resource
      *            The resource.
      * 
-     * @return true if the resource was not already declared.
+     * @return The {@link ResourceQueue}.
      */
-    public boolean addResource(final R resource) {
+    private ResourceQueue<R,Thread> declareResource(final R resource) {
 
         //            resourceManagementLock.lock();
         //
@@ -422,24 +420,36 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 //        // synchronize before possible modification.
 //        synchronized (resourceQueues) {
 
-        if (resourceQueues.containsKey(resource)) {
+        // test 1st to avoid creating a new ResourceQueue if it already exists.
+        ResourceQueue<R, Thread> resourceQueue = resourceQueues.get(resource);
+        
+//        if (resourceQueues.containsKey(resource)) {
+//
+//            /*
+//             * test 1st to avoid creating a resource queue if we do not need
+//             * one.
+//             */
+//
+//            return false;
+//
+//        }
 
-            /*
-             * test 1st to avoid creating a resource queue if we do not need
-             * one.
-             */
+        // not found, so create a new ResourceQueue for that resource.
+        resourceQueue = new ResourceQueue<R, Thread>(resource, waitsFor);
 
-            return false;
+        // put if absent.
+        final ResourceQueue<R, Thread> oldval = resourceQueues.putIfAbsent(
+                resource, resourceQueue);
 
+        if (oldval != null) {
+
+            // concurrent insert, so use the winner's resource queue.
+            return oldval;
+            
         }
-
-        final ResourceQueue<R, Thread> resourceQueue = new ResourceQueue<R, Thread>(
-                resource, waitsFor);
-
-        final ResourceQueue tmp = resourceQueues.putIfAbsent(resource,
-                resourceQueue);
-
-        return tmp == null;
+        
+        // we were the winner, so return the our new resource queue.
+        return resourceQueue;
             
 //        }
 
@@ -557,11 +567,15 @@ public class LockManager</*T,*/R extends Comparable<R>> {
         if (predeclareLocks) {
 
             // verify that no locks are held for this operation.
-            final Collection<R> resources = lockedResources.get(t);
+            final Collection<ResourceQueue<R,Thread>> resources = lockedResources.get(t);
 
             if (resources != null) {
 
-                // the operation are already declared its locks.
+                /*
+                 * The operation has already declared some locks. Since
+                 * [predeclareLocks] is true it is not permitted to grow the set
+                 * of declared locks, so we throw an exception.
+                 */
 
                 throw new IllegalStateException(
                         "Operation already has lock(s): " + t);
@@ -598,18 +612,26 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
         if (lockedResources.get(t) == null) {
 
-            /*
-             * Note: This is optimized for the case when the task has
-             * pre-declared its locks and puts an ArrayList of the exact
-             * capacity into place.
-             */
+//            /*
+//             * Note: This is optimized for the case when the task has
+//             * pre-declared its locks and puts an ArrayList of the exact
+//             * capacity into place.
+//             */
             
-            lockedResources.put(t, new ArrayList<R>(resource.length));
+//            lockedResources.put(t, new ArrayList<R>(resource.length));
+            
+            final int initialCapacity = resource.length > 16 ? resource.length
+                    : 16;
+
+            lockedResources.put(t, new LinkedHashSet<ResourceQueue<R, Thread>>(
+                    initialCapacity));
 
         }
 
         for (int i = 0; i < resource.length; i++) {
 
+//            declareResource(resource[i]);
+            
             lock(t, resource[i], timeout);
 
         }
@@ -639,19 +661,40 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
         //            try {
 
-        final ResourceQueue<R, Thread> resourceQueue = resourceQueues
-                .get(resource);
+//        final ResourceQueue<R, Thread> resourceQueue = resourceQueues
+//                .get(resource);
+//
+//        if (resourceQueue == null) {
+//
+//            /*
+//             * Note: This would indicate a failure to declare the resource
+//             * before calling this method.
+//             */
+//
+//            throw new IllegalArgumentException("No such resource: " + resource);
+//
+//        }
 
-        if (resourceQueue == null)
-            throw new IllegalArgumentException("No such resource: " + resource);
-
+        // make sure queue exists for this resource.
+        final ResourceQueue<R, Thread> resourceQueue = declareResource(resource);
+        
+        // acquire the lock.
         resourceQueue.lock(t, timeout);
 
-        final Collection<R> resources = lockedResources.get(t);
+        // add queue to the set of queues whose locks are held by this task.
+        final Collection<ResourceQueue<R, Thread>> tmp = lockedResources.get(t);
 
-        assert resources != null;
+        if (tmp == null) {
+
+            /*
+             * Note: The caller should have created this collection first.
+             */
+
+            throw new AssertionError();
+            
+        }
         
-        resources.add(resource);
+        tmp.add(resourceQueue);
 
         //            } finally {
 
@@ -693,7 +736,8 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
         try {
 
-            final Collection<R> resources = lockedResources.remove(t);
+            final Collection<ResourceQueue<R, Thread>> resources = lockedResources
+                    .remove(t);
 
             if (resources == null) {
 
@@ -712,20 +756,32 @@ public class LockManager</*T,*/R extends Comparable<R>> {
              * there are any negative consequences to this.
              */
 
-            if(INFO) log.info("Releasing resource locks: resources=" + resources);
+            if (INFO)
+                log.info("Releasing resource locks: resources=" + resources);
 
-            final Iterator<R> itr = resources.iterator();
+            final Iterator<ResourceQueue<R,Thread>> itr = resources.iterator();
 
             while (itr.hasNext()) {
 
-                final R resource = itr.next();
+                final ResourceQueue<R,Thread> resourceQueue = itr.next();
 
-                final ResourceQueue<R, Thread> resourceQueue = resourceQueues
-                        .get(resource);
+                final R resource = resourceQueue.getResource();
+                
+//                final ResourceQueue<R, Thread> resourceQueue = resourceQueues
+//                        .get(resource);
 
-                if (resourceQueue == null)
+                if (!resourceQueues.containsKey(resource)) {
+                 
+                    /*
+                     * Note: This would indicate a failure of the mechanisms
+                     * which keep the resource queues around while there are
+                     * tasks seeking or holding locks for those queues.
+                     */
+                    
                     throw new IllegalStateException("No queue for resource: "
                             + resource);
+                    
+                }
 
                 try {
 
@@ -743,11 +799,13 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
                 }
 
-                if(INFO) log.info("Released lock: "+resource);
+                if (INFO)
+                    log.info("Released lock: " + resource);
 
             }
 
-            if(INFO) log.info("Released resource locks: resources=" + resources);
+            if (INFO)
+                log.info("Released resource locks: resources=" + resources);
 
         } catch (Throwable ex) {
 

@@ -84,6 +84,8 @@ public interface ILocalTransactionManager extends /*ITransactionManager,*/ IServ
      * 
      * @param commitTime
      *            The commit time.
+     * 
+     * @see ITransactionService#notifyCommit(long)
      */
     public void notifyCommit(long commitTime);
 

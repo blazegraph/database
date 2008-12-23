@@ -35,14 +35,13 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BTree;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.AbstractTestTxRunState;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -61,7 +60,7 @@ import com.bigdata.util.InnerCause;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo The transactionserver should make sure that time does not go backwards
+ * @todo The transaction server should make sure that time does not go backwards
  *       when it starts up (with respect to the last time that it issued). Note
  *       that {@link AbstractJournal#commit(long)} already protects against this
  *       problem.
@@ -191,32 +190,25 @@ abstract public class AbstractTransactionService extends TimestampService implem
         super.shutdownNow();
         
     }
+
+    /**
+     * Immediatly shutdown the service and destroy any persistent state
+     * associated with the service.
+     */
+    synchronized public void destroy() {
+        
+        shutdownNow();
+        
+    }
     
     /**
      * Note: There is an upper bound of one read-write transaction that may be
      * created per millisecond (the resolution of {@link #nextTimestamp()}) and
      * requests for new read-write transactions contend with other requests for
      * {@link #nextTimestamp()}.
-     * 
-     * @todo write unit tests for fence posts for the assigned transaction
-     *       identifers and the resolution of the correct commit time for both
-     *       read-only and read-write transactions.
-     * 
-     * @todo write unit tests for read-only transaction identifiers (the
-     *       existing tests only cover read-committed and read-write at the
-     *       moment). See {@link AbstractTestTxRunState}.
-     * 
-     * @todo Ideally create a proxy test suite that will let me run the tx test
-     *       suite against any journal without running the entire journal test
-     *       suite and also against any {@link IBigdataFederation} instance so
-     *       that I can reuse this test suite as part of the distributed
-     *       transaction test suite, but the latter also needs to include tests
-     *       of single phase vs distributed transactions.
-     * 
-     * @todo write unit tests for distinct read-only transaction identifiers
-     *       under heavy load (forces contention for the distinct identifiers
-     *       and could lead to deadlocks if you try to hold more than one
-     *       read-only tx at a time).
+     * <p>
+     * Note: The transaction service will refuse to start new transactions whose
+     * timestamps are LTE to {@link #getReleaseTime()}.
      */
     public long newTx(final long timestamp) {
 
@@ -232,13 +224,72 @@ abstract public class AbstractTransactionService extends TimestampService implem
 
         synchronized (newTxLock) {
 
-            return assignTransactionIdentifier(timestamp);
+            final long tx = assignTransactionIdentifier(timestamp);
+
+            activateTx(new TxState(tx));
+            
+            return tx;
             
         }
 
     }
+
     private final Object newTxLock = new Object();
 
+    /** #of transactions started. */
+    private long startCount = 0L;
+
+    /** #of transactions aborted. */
+    private long abortCount = 0L;
+
+    /** #of transactions committed. */
+    private long commitCount = 0L;
+
+    /** #of active read-write transactions. */
+    private final AtomicLong readWriteActiveCount = new AtomicLong(0L);
+
+    /** #of active read-only transactions. */
+    private final AtomicLong readOnlyActiveCount = new AtomicLong(0L);
+
+    /** #of transaction started. */
+    public long getStartCount() {
+        
+        return startCount;
+        
+    }
+    
+    /** #of transaction aborted. */
+    public long getAbortCount() {
+        
+        return abortCount;
+        
+    }
+    
+    /** #of transaction committed. */
+    public long getCommitCount() {
+        
+        return commitCount;
+        
+    }
+    
+    public long getReadOnlyActiveCount() {
+        
+        return readOnlyActiveCount.get();
+        
+    }
+    
+    public long getReadWriteActiveCount() {
+        
+        return readWriteActiveCount.get();
+        
+    }
+    
+    /**
+     * Return the release time (the timestamp whose historical data MAY be
+     * released).
+     */
+    protected abstract long getReleaseTime();
+    
     /**
      * Adds the transaction from to the local tables.
      * 
@@ -258,6 +309,18 @@ abstract public class AbstractTransactionService extends TimestampService implem
                 throw new IllegalArgumentException();
             
             activeTx.put(state.tx, state);
+
+            startCount++;
+
+            if(state.isReadOnly()) {
+                
+                readOnlyActiveCount.incrementAndGet();
+                
+            } else {
+                
+                readWriteActiveCount.incrementAndGet();
+                
+            }
             
         } finally {
             
@@ -285,7 +348,31 @@ abstract public class AbstractTransactionService extends TimestampService implem
             if (!state.isComplete())
                 throw new IllegalArgumentException();
             
-            activeTx.remove(state);
+            if(state.isAborted()) {
+                
+                abortCount++;
+                
+            } else {
+                
+                commitCount++;
+                
+            }
+            
+            if(state.isReadOnly()) {
+                
+                readOnlyActiveCount.decrementAndGet();
+                
+            } else {
+                
+                readWriteActiveCount.decrementAndGet();
+                
+            }
+
+            if (activeTx.remove(state.tx) == null) {
+                
+                log.warn("Transaction not in table: " + state);
+                
+            }
             
         } finally {
             
@@ -314,11 +401,12 @@ abstract public class AbstractTransactionService extends TimestampService implem
              * distinct timestamp (with its sign bit flipped).
              * 
              * Note: This is guarenteed to be a valid start time since it is LT
-             * the next possible commit point for the database. When we
-             * validate, we will read from [-startTime] and the journal will
-             * identify the 1st commit point LTE [-startTime], which will be the
-             * most recent commit point on the database as of the moment when we
-             * assigned this transaction identifier.
+             * the next possible commit point for the database.
+             * 
+             * Note: When we validate, we will read from [-startTime] and the
+             * journal will identify the 1st commit point LTE [-startTime],
+             * which will be the most recent commit point on the database as of
+             * the moment when we assigned this transaction identifier.
              */
 
             return -nextTimestamp();
@@ -327,16 +415,6 @@ abstract public class AbstractTransactionService extends TimestampService implem
 
         final long lastCommitTime = lastCommitTime();
 
-        if (timestamp == lastCommitTime) {
-            
-            /*
-             * Special case.  We just return the next timestamp.
-             */
-            
-            return nextTimestamp();
-            
-        }
-        
         if (timestamp > lastCommitTime) {
 
             /*
@@ -344,8 +422,21 @@ abstract public class AbstractTransactionService extends TimestampService implem
              * yet been issued by this service!
              */
             
-            throw new IllegalArgumentException("Timestamp is in the future.");
+            throw new IllegalStateException(
+                    "Timestamp is in the future: timestamp=" + timestamp
+                            + ", lastCommitTime=" + lastCommitTime);
 
+        } else if (timestamp == lastCommitTime) {
+            
+            /*
+             * Special case. We just return the next timestamp.
+             * 
+             * Note: This is equivalent to a request using the symbolic constant
+             * READ_COMMITTED.
+             */
+            
+            return nextTimestamp();
+            
         }
         
         if (timestamp == ITx.READ_COMMITTED) {
@@ -356,9 +447,30 @@ abstract public class AbstractTransactionService extends TimestampService implem
              * 
              * Note: Once again we can just issue a timestamp since it will be
              * GT lastCommitTime.
+             * 
+             * Note: If [lastCommitTime == 0], we will still issue the next
+             * timestamp.
              */
 
             return nextTimestamp();
+            
+        }
+        
+        final long releaseTime = getReleaseTime();
+        
+        if (timestamp <= releaseTime) {
+
+            /*
+             * This exception is thrown if there is an attempt to start a new
+             * transaction that would read from historical data which has been
+             * released. While the data MIGHT still be around, there is no way
+             * to assert a read lock for that data since the releaseTime is
+             * already in the future.
+             */
+            
+            throw new IllegalStateException(
+                    "Timestamp is less than the release time: timestamp="
+                            + timestamp + ", releaseTime=" + releaseTime);
             
         }
         
@@ -382,13 +494,13 @@ abstract public class AbstractTransactionService extends TimestampService implem
      */
     protected long getStartTime(final long timestamp) {
 
-        synchronized(commitTimeIndex) {
+//        synchronized(commitTimeIndex) {
         
             /*
-             * Fine the commit time from which the tx will read (largest
+             * Find the commit time from which the tx will read (largest
              * commitTime LTE timestamp).
              */
-            final long commitTime = commitTimeIndex.find(timestamp);
+            final long commitTime = findCommitTime(timestamp);
             
             if (commitTime == -1L) {
 
@@ -404,7 +516,7 @@ abstract public class AbstractTransactionService extends TimestampService implem
             /*
              * The commit time for the successor of that commit point (GT).
              */
-            final long nextCommitTime = commitTimeIndex.findNext(commitTime);
+            final long nextCommitTime = findNextCommitTime(commitTime);
 
             if (nextCommitTime == -1L) {
 
@@ -423,9 +535,31 @@ abstract public class AbstractTransactionService extends TimestampService implem
             // Find a valid, unused timestamp.
             return findUnusedTimestamp(commitTime, nextCommitTime);
 
-        }
+//        }
 
     }
+
+    /**
+     * Find the commit time from which the tx will read (largest commitTime LTE
+     * timestamp).
+     * 
+     * @param timestamp
+     *            The timestamp.
+     * 
+     * @return The commit time and -1L if there is no such commit time.
+     */
+    protected abstract long findCommitTime(long timestamp);
+
+    /**
+     * Return the commit time for the successor of that commit point have the
+     * specified timestamp (a commit time strictly GT the given value).
+     * 
+     * @param commitTime
+     *            The probe.
+     * @return The successor or -1L iff the is no successor for that commit
+     *         time.
+     */
+    protected abstract long findNextCommitTime(long commitTime);
     
     /**
      * Find a valid, unused timestamp.
@@ -474,17 +608,6 @@ abstract public class AbstractTransactionService extends TimestampService implem
         
     }
     
-    /**
-     * A {@link BTree} containing a log of the historical commit points. <
-     * 
-     * @todo If this is not restart safe then on restart the commit points in
-     *       the federation will have to be reported to the transaction service
-     *       so that it knows the timestamp intervals within which it can make
-     *       its choices for read-historical transactions. It would be trivial
-     *       to make this restart safe using a {@link Journal}.
-     */
-    private final CommitTimeIndex commitTimeIndex = CommitTimeIndex.createTransient();
-
     /**
      * Note: Declared abstract so that we can hide the {@link IOException}.
      */
@@ -652,19 +775,23 @@ abstract public class AbstractTransactionService extends TimestampService implem
 
                 final long commitTime = commitImpl(state);
 
-                assert state.isCommitted();
+                assert state.isCommitted() : "tx="+state;
 
                 return commitTime;
 
             } catch (Throwable t2) {
 
-                assert state.isAborted();
+                log.error(t2.getMessage(),t2);// @todo remove.
+                
+                assert state.isAborted() : "ex=" + t2 + ", tx=" + state;
 
                 if (InnerCause.isInnerCause(t2, ValidationError.class)) {
 
                     throw new ValidationError();
 
                 }
+                
+                log.error(t2.getMessage(),t2);
 
                 throw new RuntimeException(t2);
 
@@ -1106,7 +1233,10 @@ abstract public class AbstractTransactionService extends TimestampService implem
          */
         final public String toString() {
 
-            return Long.toString(tx);
+//            return Long.toString(tx);
+            
+            return "Tx={tx=" + tx + ",readOnly=" + readOnly + ",runState="
+                    + runState + "}";
 
         }
 

@@ -66,8 +66,69 @@ abstract public class JournalTransactionService extends
     protected void activateTx(final TxState state) {
 
         super.activateTx(state);
+
+        if (TimestampUtility.isReadWriteTx(state.tx)) {
+
+            /*
+             * Register read-write transactions with the local transaction
+             * manager.
+             */
+
+            new Tx(journal.getLocalTransactionManager(), journal, state.tx);
+
+        }
+
+    }
+
+    protected void deactivateTx(final TxState state) {
+
+        super.deactivateTx(state);
+                
+        if (TimestampUtility.isReadWriteTx(state.tx)) {
+
+            /*
+             * Unregister read-write transactions.
+             */
+
+            final AbstractTx localState = journal.getLocalTransactionManager()
+                    .getTx(state.tx);
+
+            if (localState != null) {
+
+                journal.getLocalTransactionManager().deactivateTx(localState);
+
+            }
+
+        }
+
+    }
+
+    protected long findCommitTime(final long timestamp) {
+
+        final ICommitRecord commitRecord = journal.getCommitRecord(timestamp);
+
+        if (commitRecord == null) {
+
+            return -1L;
+
+        }
+
+        return commitRecord.getTimestamp();
         
-        new Tx(journal.getLocalTransactionManager(), journal, state.tx);
+    }
+
+    protected long findNextCommitTime(long commitTime) {
+        
+        final ICommitRecord commitRecord = journal.getCommitRecordIndex()
+                .findNext(commitTime);
+        
+        if(commitRecord == null) {
+            
+            return -1L;
+            
+        }
+        
+        return commitRecord.getTimestamp();
         
     }
     
@@ -100,7 +161,14 @@ abstract public class JournalTransactionService extends
 
             if (localState == null) {
 
-                throw new AssertionError();
+                /*
+                 * The client should maintain the local state of the transaction
+                 * until the transaction service either commits or aborts the
+                 * tx.
+                 */
+                
+                throw new AssertionError("Local tx state not found: tx="
+                        + state);
 
             }
 
@@ -144,8 +212,6 @@ abstract public class JournalTransactionService extends
      * If the task succeeds, then return the commit time for the task.
      * Otherwise, the write set of the transaction will have been discarded and
      * the transaction will be marked as aborted.
-     * 
-     * FIXME make sure the tx is removed from the local tables.
      */
     protected long commitImpl(final TxState state) throws ExecutionException,
             InterruptedException {
@@ -172,7 +238,7 @@ abstract public class JournalTransactionService extends
 
         if (localState == null) {
 
-            throw new AssertionError();
+            throw new AssertionError("Not in local tables: " + state);
 
         }
 
@@ -193,13 +259,16 @@ abstract public class JournalTransactionService extends
 
                 if (localState.isEmptyWriteSet()) {
 
+                    /*
+                     * Sort of a NOP commit. 
+                     */
+                    
                     localState.setRunState(RunState.Committed);
 
-                    localState.releaseResources();
-                    
                     state.setRunState(RunState.Committed);
                     
-                    journal.getLocalTransactionManager().completedTx(localState);
+                    journal.getLocalTransactionManager().deactivateTx(
+                            localState);
                     
                     return 0L;
 
@@ -223,13 +292,23 @@ abstract public class JournalTransactionService extends
             
             // submit and wait for the result.
             concurrencyManager.getWriteService().submit(task).get();
-            
+
+            /*
+             * @todo these state changes need to be made inside of
+             * SinglePhaseTask while it is holding the lock.
+             */
             state.setRunState(RunState.Committed);
             
+            journal.getLocalTransactionManager().deactivateTx(localState);
+
         } catch(Throwable t) {
+            
+            log.error(t.getMessage(),t);//@todo remove.
             
             state.setRunState(RunState.Aborted);
             
+            journal.getLocalTransactionManager().deactivateTx(localState);
+
         }
 
         /*
@@ -343,6 +422,17 @@ abstract public class JournalTransactionService extends
         
     }
     
+    /**
+     * Always returns ZERO (0L).
+     */
+    @Override
+    protected long getReleaseTime() {
+
+        return 0L;
+        
+    }
+
+
     /**
      * Throws exception since distributed transactions are not used for a single
      * {@link Journal}.

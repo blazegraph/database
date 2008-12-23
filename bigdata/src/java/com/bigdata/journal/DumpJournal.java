@@ -250,7 +250,8 @@ public class DumpJournal {
 
                 System.err.println("Historical commit points follow in temporal sequence (first to last):");
                 
-                CommitRecordIndex commitRecordIndex = journal._commitRecordIndex;
+                CommitRecordIndex commitRecordIndex = journal.getCommitRecordIndex();
+//                CommitRecordIndex commitRecordIndex = journal._commitRecordIndex;
                 
                 ITupleIterator<CommitRecordIndex.Entry> itr = commitRecordIndex.rangeIterator();
                 

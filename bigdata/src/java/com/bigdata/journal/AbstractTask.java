@@ -1662,8 +1662,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         if(INFO)
             log.info("Unisolated write task: " + this + ", thread=" + t);
 
-        // declare resource(s) to lock (exclusive locks are used).
-        lockManager.addResource(resource);
+//        // declare resource(s) to lock (exclusive locks are used).
+//        lockManager.addResource(resource);
 
         // delegate will handle lock acquisition and invoke doTask().
         final LockManagerTask<String,T> delegate = new LockManagerTask<String,T>(lockManager,
