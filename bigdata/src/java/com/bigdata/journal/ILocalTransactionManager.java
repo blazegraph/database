@@ -39,7 +39,8 @@ import com.bigdata.service.IServiceShutdown;
  * 
  * @todo we don't really need an interface for this as there is only one impl.
  */
-public interface ILocalTransactionManager extends /*ITransactionManager,*/ IServiceShutdown {
+public interface ILocalTransactionManager extends
+        /* ITransactionManager, */IServiceShutdown {
 
     /**
      * The server side of the transaction manager (possibly remote, in which

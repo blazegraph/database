@@ -117,33 +117,7 @@ public interface ITx {
 //     */
 //    public long getRevisionTimestamp();
     
-    /**
-     * Validate the write set of the named indices isolated transaction and
-     * merge down that write set onto the corresponding unisolated indices but
-     * DOES NOT commit the data. As a post-condition, the {@link RunState} of
-     * the transaction will be {@link RunState#Prepared} iff successful and
-     * {@link RunState#Aborted} otherwise.
-     * <p>
-     * For a single-phase commit the caller MUST hold an exclusive lock on the
-     * unisolated indices on which this operation will write.
-     * <p>
-     * For a distributed transaction, the caller MUST hold a lock on the
-     * {@link WriteExecutorService} for each {@link IDataService} on which the
-     * transaction has written.
-     * 
-     * @param revisionTime
-     *            The revision time assigned by a centralized transaction
-     *            manager service -or- ZERO (0L) IFF the transaction is
-     *            read-only.
-     * 
-     * @throws IllegalStateException
-     *             if the transaction is not active. If the transaction is not
-     *             complete, then it will be aborted.
-     * @throws ValidationError
-     *             If the transaction can not be validated. If this exception is
-     *             thrown, then the transaction was aborted.
-     */
-    public void prepare(long revisionTime);
+//    public void prepare(long revisionTime);
 
 //    /**
 //     * Merge down the write set of a transaction that has already been
@@ -180,19 +154,14 @@ public interface ITx {
 //     */
 //    public void mergeDown(final long revisionTime);
 
-    /**
-     * Abort the transaction.
-     * 
-     * @throws IllegalStateException
-     *             if the transaction is already complete.
-     */
-    public void abort();
+//    /**
+//     * Abort the transaction.
+//     * 
+//     * @throws IllegalStateException
+//     *             if the transaction is already complete.
+//     */
+//    public void abort();
 
-    /**
-     * When true, the transaction will reject writes.
-     */
-    public boolean isReadOnly();
-    
     /**
      * When true, the transaction has an empty write set.
      */

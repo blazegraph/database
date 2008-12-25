@@ -1280,8 +1280,22 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
     /*
      * Note: You need to extend Remote in order for these APIs to be exported!
      */
-    
+
+    /**
+     * 
+     */
     public static interface RemoteAdministrable extends Remote, Administrable {
+
+        /**
+         * Shutdown the service, but do not destroy its persistent data.
+         */
+        public void shutdown() throws IOException;
+
+        /**
+         * Immediate or fast shutdown for the service, but does not destroy its
+         * persistent data.
+         */
+        public void shutdownNow() throws IOException;
         
     }
     

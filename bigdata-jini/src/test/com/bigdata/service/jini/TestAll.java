@@ -104,6 +104,11 @@ public class TestAll extends TestCase {
             //        suite.addTestSuite( TestServer.class ); // Does not implement TestCase.
 
             /*
+             * Basic integration tests for zookeeper.
+             */
+            suite.addTestSuite( TestZookeeper.class );
+            
+            /*
              * Test of a single client talking to a single data service instance
              * without the use of the metadata service or a transaction manager.
              */

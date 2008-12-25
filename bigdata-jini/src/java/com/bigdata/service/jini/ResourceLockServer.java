@@ -97,15 +97,15 @@ public class ResourceLockServer extends AbstractServer {
     }
 
     @Override
-    protected ResourceLockService newService(Properties properties) {
+    protected ZooResourceLockService newService(Properties properties) {
         
-        final ResourceLockService service = new AdministrableResourceLockService(this, properties);
+        final ZooResourceLockService service = new AdministrableResourceLockService(this, properties);
         
         /*
          * Setup a delegate that let's us customize some of the federation
          * behaviors on the behalf of the data service.
          */
-        getClient().setDelegate(new DefaultServiceFederationDelegate<ResourceLockService>(service));
+        getClient().setDelegate(new DefaultServiceFederationDelegate<ZooResourceLockService>(service));
 
         return service;
         
@@ -117,7 +117,7 @@ public class ResourceLockServer extends AbstractServer {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class AdministrableResourceLockService extends ResourceLockService
+    public static class AdministrableResourceLockService extends ZooResourceLockService
             implements RemoteAdministrable, RemoteDestroyAdmin {
 
         protected ResourceLockServer server;

@@ -722,7 +722,7 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
 
         }
         
-        public void setReleaseTime(final long releaseTime) {
+        public void setEarliestTxStartTime(final long releaseTime) {
             
             for (DataService ds : dataService) {
 

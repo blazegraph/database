@@ -1569,28 +1569,27 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             if (isReadWriteTx) {
 
                 if (INFO)
-                    log.info("Running isolated operation: timestamp="
-                            + timestamp);
+                    log.info("Running read-write tx: timestamp=" + timestamp);
                 
-                if(tx.isReadOnly()) {
-
-                    try {
-
-                        nanoTime_beginWork = System.nanoTime();
-                        
-                        return doTask();
-
-                    } finally {
-
-                        nanoTime_finishedWork = System.nanoTime();
-                        
-                        // release hard references to named read-only indices.
-                        
-                        clearIndexCache();
-                        
-                    }
-
-                }
+//                if(tx.isReadOnly()) {
+//
+//                    try {
+//
+//                        nanoTime_beginWork = System.nanoTime();
+//                        
+//                        return doTask();
+//
+//                    } finally {
+//
+//                        nanoTime_finishedWork = System.nanoTime();
+//                        
+//                        // release hard references to named read-only indices.
+//                        
+//                        clearIndexCache();
+//                        
+//                    }
+//
+//                }
                 
                 /*
                  * Delegate handles handshaking for writable transactions.

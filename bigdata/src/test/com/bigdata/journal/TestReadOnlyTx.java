@@ -31,27 +31,15 @@ import java.util.UUID;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.service.IBigdataFederation;
 
 /**
  * Test suite for fully isolated read-only transactions reading from a caller
  * specified start time.
  * 
- * @todo this test suite needs to be updated as the semantics have changed. it
- *       needs to explore in more depth the ability to create a read-only
- *       transaction reading from the commit point corresponding to the caller
- *       specified timestamp, the ability to create more than one such
- *       concurrent read-only transaction for the same commit point (the
- *       assigned transaction identifiers must differ).
- * 
- * @todo this test suite should be extended for {@link IBigdataFederation}s to
- *       also test the interaction with the releaseTime (distributed read
- *       locks).
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestReadOnlyTx extends ProxyTestCase {
+public class TestReadOnlyTx<S extends Journal> extends ProxyTestCase<S> {
 
     /**
      * 
@@ -66,94 +54,97 @@ public class TestReadOnlyTx extends ProxyTestCase {
         super(name);
     }
 
-    /**
-     * Test verifies that you can not write on a read-only transaction.
-     */
-    public void test_isReadOnly() {
+    public void test_readOnly() {
 
-        Journal journal = new Journal(getProperties());
+        final Journal journal = getStore();
         
-        String name = "abc";
-        
-        final byte[] k1 = new byte[]{1};
+        try {
 
-        final byte[] v1 = new byte[]{1};
+            final String name = "abc";
 
-        final long ts1;
-        {
-            
-            /*
-             * register an index, write on the index, and commit the journal.
-             */
-            IndexMetadata md = new IndexMetadata(name,UUID.randomUUID());
-            
-            md.setIsolatable(true);
-            
-            journal.registerIndex(md);
+            final byte[] k1 = new byte[] { 1 };
 
-            IIndex ndx = journal.getIndex(name);
+            final byte[] v1 = new byte[] { 1 };
 
-            ndx.insert(k1, v1);
+            final long ts1;
+            {
 
-            ts1 = journal.commit();
-            
-        }
-        
-        {
-            
-            /*
-             * create a read-only transaction, verify that we can read the
-             * value written on the index but that we can not write on the
-             * index.
-             */
-            
-            final long tx1 = journal.newTx(ts1);
-            
-            IIndex ndx = journal.getIndex(name,tx1);
+                /*
+                 * register an index, write on the index, and commit the journal.
+                 */
+                IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
 
-            assertNotNull(ndx);
-            
-            assertEquals((byte[])v1,(byte[])ndx.lookup(k1));
-         
-            try {
-                ndx.insert(k1,new byte[]{1,2,3});
-                fail("Expecting: "+UnsupportedOperationException.class);
-                } catch( UnsupportedOperationException ex) {
-                System.err.println("Ignoring expected exception: "+ex);
+                md.setIsolatable(true);
+
+                journal.registerIndex(md);
+
+                IIndex ndx = journal.getIndex(name);
+
+                ndx.insert(k1, v1);
+
+                ts1 = journal.commit();
+
             }
-            
-            journal.commit(tx1);
-            
-        }
-        
-        {
-            
-            /*
-             * do it again, but this time we will abort the read-only
-             * transaction.
-             */
-            
-            final long tx1 = journal.newTx(ts1);
-            
-            IIndex ndx = journal.getIndex(name,tx1);
 
-            assertNotNull(ndx);
-            
-            assertEquals((byte[])v1,(byte[])ndx.lookup(k1));
-         
-            try {
-                ndx.insert(k1,new byte[]{1,2,3});
-                fail("Expecting: "+UnsupportedOperationException.class);
-                } catch( UnsupportedOperationException ex) {
-                System.err.println("Ignoring expected exception: "+ex);
+            {
+
+                /*
+                 * create a read-only transaction, verify that we can read the
+                 * value written on the index but that we can not write on the
+                 * index.
+                 */
+
+                final long tx1 = journal.newTx(ts1);
+
+                IIndex ndx = journal.getIndex(name, tx1);
+
+                assertNotNull(ndx);
+
+                assertEquals((byte[]) v1, (byte[]) ndx.lookup(k1));
+
+                try {
+                    ndx.insert(k1, new byte[] { 1, 2, 3 });
+                    fail("Expecting: " + UnsupportedOperationException.class);
+                } catch (UnsupportedOperationException ex) {
+                    System.err.println("Ignoring expected exception: " + ex);
+                }
+
+                journal.commit(tx1);
+
             }
-            
-            journal.abort(tx1);
-            
+
+            {
+
+                /*
+                 * do it again, but this time we will abort the read-only
+                 * transaction.
+                 */
+
+                final long tx1 = journal.newTx(ts1);
+
+                IIndex ndx = journal.getIndex(name, tx1);
+
+                assertNotNull(ndx);
+
+                assertEquals((byte[]) v1, (byte[]) ndx.lookup(k1));
+
+                try {
+                    ndx.insert(k1, new byte[] { 1, 2, 3 });
+                    fail("Expecting: " + UnsupportedOperationException.class);
+                } catch (UnsupportedOperationException ex) {
+                    System.err.println("Ignoring expected exception: " + ex);
+                }
+
+                journal.abort(tx1);
+
+            }
+
+        } finally {
+
+            journal.destroy();
+
         }
 
-        journal.destroy();
-        
     }
 
 }

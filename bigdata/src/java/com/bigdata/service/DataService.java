@@ -54,7 +54,6 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.AbstractTask;
-import com.bigdata.journal.AbstractTx;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.DropIndexTask;
 import com.bigdata.journal.IConcurrencyManager;
@@ -66,7 +65,9 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.IndexProcedureTask;
 import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.RegisterIndexTask;
+import com.bigdata.journal.RunState;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.journal.Tx;
 import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.journal.JournalTransactionService.SinglePhaseCommit;
 import com.bigdata.mdi.IResourceMetadata;
@@ -652,13 +653,13 @@ abstract public class DataService extends AbstractService
             concurrencyManager.shutdown();
             concurrencyManager = null;
         }
-        
-        if(localTransactionManager!=null) {
+
+        if (localTransactionManager != null) {
             localTransactionManager.shutdown();
             localTransactionManager = null;
         }
 
-        if(resourceManager!=null) {
+        if (resourceManager != null) {
             resourceManager.shutdown();
             resourceManager = null;
         }
@@ -673,7 +674,8 @@ abstract public class DataService extends AbstractService
      */
     synchronized public void shutdownNow() {
 
-        if(!isOpen()) return;
+        if (!isOpen())
+            return;
 
         if (concurrencyManager != null) {
             concurrencyManager.shutdownNow();
@@ -775,8 +777,7 @@ abstract public class DataService extends AbstractService
                 
             }
             
-            final AbstractTx state = (AbstractTx) getLocalTransactionManager()
-                    .getTx(tx);
+            final Tx state = (Tx) getLocalTransactionManager().getTx(tx);
 
             if (state == null) {
 
@@ -833,8 +834,7 @@ abstract public class DataService extends AbstractService
                 
             }
             
-            final AbstractTx state = (AbstractTx) getLocalTransactionManager()
-                    .getTx(tx);
+            final Tx state = (Tx) getLocalTransactionManager().getTx(tx);
 
             if (state == null) {
 
@@ -877,7 +877,7 @@ abstract public class DataService extends AbstractService
         // ctor arg.
         private final ResourceManager resourceManager;
         private UUID dataServiceUUID;
-        private final AbstractTx state;
+        private final Tx state;
         private final long revisionTime;
         
         // derived.
@@ -887,40 +887,41 @@ abstract public class DataService extends AbstractService
          * @param concurrencyManager
          * @param resourceManager
          * @param dataServiceUUID
-         * @param state
+         * @param localState
          * @param revisionTime
          */
         public DistributedCommitTask(
                 final ConcurrencyManager concurrencyManager,//
                 final ResourceManager resourceManager,//
                 final UUID dataServiceUUID,//
-                final AbstractTx state,//
+                final Tx localState,//
                 final long revisionTime//
-                ) {
+        ) {
 
-            super(concurrencyManager, ITx.UNISOLATED, state.getDirtyResource());
+            super(concurrencyManager, ITx.UNISOLATED, localState
+                    .getDirtyResource());
 
             if (resourceManager == null)
                 throw new IllegalArgumentException();
 
-            if (state == null)
+            if (localState == null)
                 throw new IllegalArgumentException();
             
             if (revisionTime == 0L)
                 throw new IllegalArgumentException();
             
-            if (revisionTime <= state.getStartTimestamp())
+            if (revisionTime <= localState.getStartTimestamp())
                 throw new IllegalArgumentException();
 
             this.resourceManager = resourceManager;
 
             this.dataServiceUUID = dataServiceUUID;
 
-            this.state = state;
+            this.state = localState;
 
             this.revisionTime = revisionTime;
 
-            this.tx = state.getStartTimestamp();
+            this.tx = localState.getStartTimestamp();
 
         }
 
@@ -1071,14 +1072,22 @@ abstract public class DataService extends AbstractService
 
         try {
 
-            final AbstractTx localState = (AbstractTx) getLocalTransactionManager()
-                    .getTx(tx);
+            final Tx localState = (Tx) getLocalTransactionManager().getTx(tx);
 
             if (localState == null)
                 throw new IllegalArgumentException();
-            
-            // FIXME review and reconcile w/ standalone version.
-            localState.abort();
+
+            localState.lock.lock();
+
+            try {
+
+                localState.setRunState(RunState.Aborted);
+
+            } finally {
+
+                localState.lock.unlock();
+
+            }
             
         } finally {
             

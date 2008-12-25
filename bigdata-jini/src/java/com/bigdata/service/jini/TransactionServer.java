@@ -205,8 +205,9 @@ public class TransactionServer extends AbstractServer {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class AdministrableTransactionService extends DistributedTransactionService
-            implements RemoteAdministrable, RemoteDestroyAdmin {
+    public static class AdministrableTransactionService extends
+            DistributedTransactionService implements RemoteAdministrable,
+            RemoteDestroyAdmin {
 
         protected TransactionServer server;
 
@@ -298,15 +299,13 @@ public class TransactionServer extends AbstractServer {
 
         /**
          * Destroy the service.
-         * 
-         * @throws RemoteException
          */
-        public void destroy() throws RemoteException {
+        public void destroy() {
 
             if (INFO)
                 log.info("" + getServiceUUID());
 
-            new Thread() {
+            final Thread t = new Thread() {
 
                 public void run() {
 
@@ -317,28 +316,32 @@ public class TransactionServer extends AbstractServer {
 
                 }
 
-            }.start();
+            };
+            
+//            t.setDaemon(true);
+            
+            t.start();
 
         }
 
-        synchronized public void shutdown() {
-            
-            // normal service shutdown.
-            super.shutdown();
-            
+        public void shutdown() {
+
+            // normal shutdown for the transaction service (blocks).
+            shutdown();
+
             // jini service and server shutdown.
             server.shutdownNow();
-            
+
         }
-        
-        synchronized public void shutdownNow() {
-            
-            // immediate service shutdown.
-            super.shutdownNow();
-            
+
+        public void shutdownNow() {
+
+            // immediate service shutdown (blocks).
+            shutdownNow();
+
             // jini service and server shutdown.
             server.shutdownNow();
-            
+
         }
 
         /**

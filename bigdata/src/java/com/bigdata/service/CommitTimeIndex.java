@@ -18,6 +18,13 @@ import com.bigdata.rawstore.IRawStore;
  * {@link BTree} whose keys are commit times. No values are stored in the
  * {@link BTree}.
  * 
+ * @todo Subclass {@link BTree} for long keys and arbitrary values and move the
+ *       find() and findNext() methods onto that class and make the value type
+ *       generic. That same logic is replicated right now in several places and
+ *       there is no reason for that. Allow 0L for {@link #find(long)}, but
+ *       check all callers first to see who might use that for error checking
+ *       and then modify callers using 1L to use 0L.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

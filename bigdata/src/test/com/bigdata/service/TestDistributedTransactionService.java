@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Dec 23, 2008
  */
 
-package com.bigdata.journal;
+package com.bigdata.service;
 
 import com.bigdata.service.DistributedTransactionService;
 

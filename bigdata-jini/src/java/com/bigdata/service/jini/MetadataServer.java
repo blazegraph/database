@@ -259,7 +259,7 @@ public class MetadataServer extends DataServer {
 
         synchronized public void shutdown() {
             
-            // normal service shutdown.
+            // normal service shutdown (blocks).
             super.shutdown();
             
             // jini service and server shutdown.
@@ -269,7 +269,7 @@ public class MetadataServer extends DataServer {
         
         synchronized public void shutdownNow() {
             
-            // immediate service shutdown.
+            // immediate service shutdown (blocks).
             super.shutdownNow();
             
             // jini service and server shutdown.

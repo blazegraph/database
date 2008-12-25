@@ -40,7 +40,11 @@ import com.bigdata.isolation.IsolatedFusedView;
 /**
  * Test suite for fully-isolated read-write transactions.
  * 
- * @todo verify with writes on multiple indices.
+ * @todo verify with writes on multiple indices (partial ordering over the
+ *       commits)
+ * 
+ * @todo verify partial ordering imposed on concurrent operations on the same tx
+ *       for indices declared by those operations, etc.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -380,12 +384,14 @@ public class TestTx extends ProxyTestCase<Journal> {
             {
 
                 /*
-                 * write an entry in tx1. verify that the entry is not visible
-                 * in the unisolated index or in the index as isolated by tx2.
+                 * Write an entry in tx1.
+                 * 
+                 * Verify that the entry is not visible in the unisolated index
+                 * or in the index as isolated by tx2.
                  */
 
-                IsolatedFusedView ndx1 = (IsolatedFusedView) journal.getIndex(
-                        name, tx1);
+                final IsolatedFusedView ndx1 = (IsolatedFusedView) journal
+                        .getIndex(name, tx1);
 
                 assertFalse(ndx1.contains(k1));
 
@@ -401,9 +407,15 @@ public class TestTx extends ProxyTestCase<Journal> {
                 assertFalse(journal.getIndex(name).contains(k1));
 
                 /*
-                 * commit tx1. verify that the write is still not visible in tx2
-                 * but that it is now visible in the unisolated index.
+                 * Commit tx1.
+                 * 
+                 * Verify that the write is still not visible in tx2 but that it
+                 * is now visible in the unisolated index.
                  */
+
+                // grab hard ref. to the local state for the tx before commit()
+                final Tx localState = journal.getLocalTransactionManager()
+                        .getTx(tx1);
 
                 // commit tx1.
                 final long commitTime1 = journal.commit(tx1);
@@ -427,9 +439,12 @@ public class TestTx extends ProxyTestCase<Journal> {
 
                     assertFalse(tuple.isDeletedVersion());
 
-                    // FIXME verify the revision timestamp!
-//                    assertEquals("versionTimestamp", commitTime1, tuple
-//                            .getVersionTimestamp());
+                    /*
+                     * Verify that the revisionTime was written onto the tuple
+                     * in the post-commit view of the unisolated index.
+                     */
+                    assertEquals("revisionTime", localState.getRevisionTime(),
+                            tuple.getVersionTimestamp());
 
                 }
 
@@ -457,13 +472,15 @@ public class TestTx extends ProxyTestCase<Journal> {
 
                     assertFalse(tuple.isDeletedVersion());
 
-                    // FIXME verify the revision timestamp!
-//                    assertEquals("versionTimestamp", tx2, tuple
-//                            .getVersionTimestamp());
+                    /*
+                     * Verify the versionTimestamp on the tuple in the view
+                     * isolated by [tx2]. It should now be the start time for
+                     * tx2 since we just overwrote that tuple.
+                     */
+                    assertEquals("versionTimestamp", Math.abs(tx2), tuple
+                            .getVersionTimestamp());
 
                 }
-
-//                ITx tmp = journal.getTx(tx2);
 
                 try {
 
@@ -476,8 +493,6 @@ public class TestTx extends ProxyTestCase<Journal> {
                     System.err.println("Ignoring expected exception: " + ex);
 
                 }
-
-//                assertTrue(tmp.isAborted());
 
             }
 
@@ -698,8 +713,12 @@ public class TestTx extends ProxyTestCase<Journal> {
              * Note: We MUST NOT propagate a delete marker onto the unisolated
              * index since no entry for that key is visible was visible when the
              * tx0 began.
+             * 
+             * Note: this should wind up as a NOP commit since the net result
+             * will be no writes on the unisolated index and hence no writes
+             * on the backing store.
              */
-            assertNotSame(0L, journal.commit(tx0));
+            assertEquals(0L, journal.commit(tx0));
 
             // Still not visible in concurrent transaction.
             assertFalse(journal.getIndex(name, tx1).contains(id0));
@@ -806,8 +825,12 @@ public class TestTx extends ProxyTestCase<Journal> {
              * Note: We MUST NOT propagate a delete marker onto the unisolated
              * index since no entry for that key is visible was visible when the
              * tx0 began.
+             * 
+             * Note: this should wind up as a NOP commit since the net result
+             * will be no writes on the unisolated index and hence no writes
+             * on the backing store.
              */
-            assertNotSame(0L, journal.commit(tx0));
+            assertEquals(0L, journal.commit(tx0));
 
             // Prepare and commit tx1.
             assertNotSame(0L, journal.commit(tx1));

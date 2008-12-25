@@ -38,6 +38,7 @@ import junit.framework.TestCase2;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.CommitTimeIndex;
+import com.bigdata.service.TxServiceRunState;
 
 /**
  * Unit tests of the {@link AbstractTransactionService} using a mock client.
@@ -45,31 +46,36 @@ import com.bigdata.service.CommitTimeIndex;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestStandaloneTransactionService extends TestCase2 {
+public class TestTransactionService extends TestCase2 {
 
     /**
      * 
      */
-    public TestStandaloneTransactionService() {
+    public TestTransactionService() {
     }
 
     /**
      * @param arg0
      */
-    public TestStandaloneTransactionService(String arg0) {
+    public TestTransactionService(String arg0) {
         super(arg0);
     }
 
     /**
-     * Default implementation uses a mock client.
-     * 
-     * @param indexManagerIsIgnored 
-     * 
-     * @return
+     * Implementation uses a mock client.
      */
     protected AbstractTransactionService newFixture() {
         
-        return new AbstractTransactionService(new Properties()) {
+        return newFixture(new Properties());
+        
+    }
+    
+    /**
+     * Implementation uses a mock client.
+     */
+    protected AbstractTransactionService newFixture(Properties p) {
+        
+        return new AbstractTransactionService(p) {
 
             @Override
             public AbstractFederation getFederation() {
@@ -87,15 +93,28 @@ public class TestStandaloneTransactionService extends TestCase2 {
             protected long commitImpl(TxState state) throws Exception {
 
                 state.setRunState(RunState.Committed);
+
+                final long commitTime = nextTimestamp();
                 
-                return nextTimestamp();
+                notifyCommit(commitTime);
+                
+                return commitTime;
+                
             }
 
+            /**
+             * Note: We are not testing distributed commits here so this is not
+             * implemented.
+             */
             public long prepared(long tx, UUID dataService) throws 
                     InterruptedException, BrokenBarrierException {
                 return 0;
             }
 
+            /**
+             * Note: We are not testing distributed commits here so this is not
+             * implemented.
+             */
             public boolean committed(long tx, UUID dataService)
                     throws IOException, InterruptedException,
                     BrokenBarrierException {
@@ -103,33 +122,13 @@ public class TestStandaloneTransactionService extends TestCase2 {
             }
 
             @Override
-            public long lastCommitTime() {
+            public long getLastCommitTime() {
 
                 return lastCommitTime;
                 
             }
 
             private long lastCommitTime = 0L;
-
-            public void setReleaseTime(long releaseTime) {
-
-                if (releaseTime < this.releaseTime) {
-
-                    throw new IllegalStateException();
-                    
-                }
-                
-                this.releaseTime = releaseTime;
-
-            }
-
-            protected long getReleaseTime() {
-                
-                return releaseTime;
-                
-            }
-            
-            private long releaseTime = 0L;
 
             protected long findCommitTime(final long timestamp) {
                 
@@ -162,10 +161,6 @@ public class TestStandaloneTransactionService extends TestCase2 {
                      */
                     commitTimeIndex.add(commitTime);
                     
-                }
-                
-                synchronized(lastCommitTimeLock) {
-                    
                     /*
                      * Note: commit time notifications can be overlap such that they
                      * appear out of sequence with respect to their values. This is Ok.
@@ -183,10 +178,18 @@ public class TestStandaloneTransactionService extends TestCase2 {
                 }
                 
             }
-            
-            private final Object lastCommitTimeLock = new Object();
 
-        };
+//            /**
+//             * Note: minReleaseAge is zero for this test suite.
+//             */
+//            @Override
+//            public long getMinReleaseAge() {
+//                
+//                return 0;
+//                
+//            }
+
+        }.start();
         
     }
 
@@ -413,7 +416,7 @@ public class TestStandaloneTransactionService extends TestCase2 {
 
             service.notifyCommit(service.nextTimestamp());
             
-            final long lastCommitTime = service.lastCommitTime();
+            final long lastCommitTime = service.getLastCommitTime();
 
             final long t0 = service.nextTimestamp();
 
@@ -470,7 +473,7 @@ public class TestStandaloneTransactionService extends TestCase2 {
 
             assertEquals(0, service.getActiveCount());
 
-            final long lastCommitTime = service.lastCommitTime();
+            final long lastCommitTime = service.getLastCommitTime();
 
             final long t0 = service.nextTimestamp();
 
@@ -537,22 +540,30 @@ public class TestStandaloneTransactionService extends TestCase2 {
      */
     public void test_newTx_readOnly() throws IOException {
 
-        final AbstractTransactionService service = newFixture();
+        final Properties properties = new Properties();
+        
+        // setup as an immortal database.
+        properties.setProperty(
+                AbstractTransactionService.Options.MIN_RELEASE_AGE,
+                ""+Long.MAX_VALUE);
+        
+        final AbstractTransactionService service = newFixture(properties);
 
         try {
 
             // populate the commit log on the service.
 
-            final long commitTime = 10;
-            final long nextCommitTime = 20;
+            final long commitTime = service.nextTimestamp();
+            
+            final long nextCommitTime = service.nextTimestamp();
             
             service.notifyCommit(commitTime);
             
-            assertEquals(commitTime,service.lastCommitTime());
+            assertEquals(commitTime,service.getLastCommitTime());
             
             service.notifyCommit(nextCommitTime);
             
-            assertEquals(nextCommitTime,service.lastCommitTime());
+            assertEquals(nextCommitTime,service.getLastCommitTime());
 
             // a tx for the commit point whose commitTime is 10.
             final long tx1 = service.newTx(commitTime);
@@ -576,7 +587,7 @@ public class TestStandaloneTransactionService extends TestCase2 {
 
             // commit tx1 (releases its start time so that it may be reused).
             service.commit(tx1);
-
+            
             // another tx for the same commit point.
             final long tx3 = service.newTx(commitTime);
 
@@ -619,11 +630,11 @@ public class TestStandaloneTransactionService extends TestCase2 {
             
             service.notifyCommit(commitTime);
             
-            assertEquals(commitTime,service.lastCommitTime());
+            assertEquals(commitTime,service.getLastCommitTime());
             
             service.notifyCommit(nextCommitTime);
             
-            assertEquals(nextCommitTime,service.lastCommitTime());
+            assertEquals(nextCommitTime,service.getLastCommitTime());
 
             // a tx for the commit point whose commitTime is 10.
             final long tx1 = service.newTx(commitTime);
@@ -641,25 +652,94 @@ public class TestStandaloneTransactionService extends TestCase2 {
             
             assertNotSame(tx1, tx2);
 
-            /*
-             * Another tx for the same commit point - this should block.
-             * 
-             * @todo this unit test setups a contention but it is not written
-             * with the threading necessary to test the ability of
-             * {@link AbstractTransactionService#newTx(long)} to block when
-             * there is no start time available. However, the implementation
-             * itself does not handle this case yet either. So, fix both the
-             * test and the impl.
-             */
-            final long tx3 = service.newTx(commitTime);
+            {
+                
+                /*
+                 * First try to obtain a new tx for the same commit point in a
+                 * thread. This should block. We wait for a bit (in the main
+                 * thread) to make sure that the thread is not progressing and
+                 * then interrupt this thread. This is to prove to ourselves
+                 * that the txService can not grant a tx for this commit point
+                 * right now.
+                 */
+                final Thread t = new Thread() {
+                    
+                    public void run() {
+                        
+                        final long tx3 = service.newTx(commitTime);
 
-//            System.err.println("tx3=" + tx3);
-//
-//            assertTrue(tx3 >= commitTime && tx3 < nextCommitTime);
-//
-//            // tx3 must be distinct from any active tx.
-//            assertNotSame(tx3, tx2);
+                        fail("Not expecting service to create tx: " + tx3);
+                        
+                    }
+                    
+                };
+                
+                t.start();
+                
+                try {
+                    Thread.sleep(250);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                
+                // interrupt thread so that the test will continue.
+                t.interrupt();
+                
+            }
+            {
+            
+                /*
+                 * Run a thread that sleeps for a moment and then terminates one
+                 * of the transactions that is keeping us from being able to
+                 * allocate a newTx for the desired commit point. Once [tx2] is
+                 * terminated, the main thread should be granted a new tx.
+                 */
+                new Thread() {
 
+                    public void run() {
+
+                        try {
+                            log.info("sleeping in 2nd thread.");
+                            Thread.sleep(250/* ms */);
+                            log.info("woke up in 2nd thread.");
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+
+                        /*
+                         * Terminate a running tx for the desired commit point,
+                         * freeing a timestamp that may be used for the newTx()
+                         * request in the main thread.
+                         */
+                        
+                        log.info("will terminate tx2: " + tx2);
+                        
+                        service.commit(tx2);
+                        
+                        log.info("did terminate tx2: " + tx2);
+
+                    }
+
+                }.start();
+
+                /*
+                 * This should block for a moment while the thread is sleeping
+                 * and then succeed.
+                 * 
+                 * Note: The assigned transaction identifier will be the same as
+                 * the transaction identifier for [tx2]. This is because we are
+                 * in fact waiting on that transaction identifier to become free
+                 * so that we can continue.
+                 */
+
+                log.info("requesting another tx for the same commit point");
+                
+                assertEquals(tx2,service.newTx(commitTime));
+                
+                log.info("have another tx for that commit point.");
+
+            }
+            
         } finally {
 
             service.destroy();
@@ -685,7 +765,7 @@ public class TestStandaloneTransactionService extends TestCase2 {
             // make this a valid commit time.
             service.notifyCommit(lastCommitTime);
 
-            assertEquals(lastCommitTime, service.lastCommitTime());
+            assertEquals(lastCommitTime, service.getLastCommitTime());
 
             final long t0 = service.nextTimestamp();
 
@@ -762,14 +842,51 @@ public class TestStandaloneTransactionService extends TestCase2 {
 
         try {
 
-            service.notifyCommit(10);
+            /*
+             * Verify that the service is not retaining history beyond the last
+             * commit point.
+             */
+            assertEquals(0L, service.getMinReleaseAge());
 
-            service.notifyCommit(20);
+            final long oldReleaseTime = service.getReleaseTime();
+            
+            assertEquals(0L,oldReleaseTime);
+            
+            // this will be the earliest running tx until it completes.
+            final long tx0 = service.newTx(ITx.UNISOLATED);
 
-            service.setReleaseTime(15);
+            // timestamp GT [tx0] and LT [tx1].
+            final long ts = service.nextTimestamp();
+            
+            // this will become the earliest running tx if tx0 completes first.
+            final long tx1 = service.newTx(ITx.UNISOLATED);
+
+            // commit the tx0 - this will update the release time.
+//            final long commitTime0 = 
+                service.commit(tx0);
+            
+            final long newReleaseTime = service.getReleaseTime();
+            
+            // verify release time was updated.
+            if (oldReleaseTime == newReleaseTime) {
+
+                fail("releaseTime not updated: releaseTime=" + newReleaseTime);
+                
+            }
+            
+            /*
+             * Should have advanced the release time right up to (but LT) the
+             * transaction which is now the earliest running tx (that will be
+             * tx1). (This assumes [minReleaseAge==0].)
+             */
+            assertEquals(Math.abs(tx1) - 1, newReleaseTime);
             
             try {
-                service.newTx(10);
+                /*
+                 * Try to read from [ts]. Since [minReleaseAge==0] the history
+                 * should be gone and this should fail.
+                 */
+                service.newTx(ts);
                 fail("Expecting: "+IllegalStateException.class);
             } catch(IllegalStateException ex) {
                 log.info("Ignoring expected exception: "+ex);
@@ -781,6 +898,145 @@ public class TestStandaloneTransactionService extends TestCase2 {
 
         }
 
+    }
+
+    /**
+     * Test verifies the advance of the release time when the earliest running
+     * transaction completes. This version focuses on when there are no active
+     * transactions once the earliest transaction completes. In this case the
+     * [lastCommitTime] is the exclusive upper bound for the new releaseTime.
+     * 
+     * @throws IOException
+     */
+    public void test_updateReleaseTime_noTxRemaining() throws IOException {
+
+        final AbstractTransactionService service = newFixture();
+
+        try {
+
+            /*
+             * Note: We have to force a commit time on the log.
+             * 
+             * Note that if [lastCommitTime==0] the releaseTime can not be
+             * advanced if there are also no running transactions.
+             */
+            service.notifyCommit(service.nextTimestamp());
+            
+            assertEquals(0L, service.getReleaseTime());
+
+            final long tx0 = service.newTx(ITx.UNISOLATED);
+
+            final long tx1 = service.newTx(ITx.UNISOLATED);
+
+            // unchanged.
+            assertEquals(0L, service.getReleaseTime());
+
+            // Abort the 2nd tx.
+            service.abort(tx1);
+
+            // unchanged.
+            assertEquals(0L, service.getReleaseTime());
+
+            // terminate the 1st tx.
+            service.abort(tx0);
+
+            // verify that releaseTime was updated.
+            final long releaseTime = service.getReleaseTime();
+            final long lastCommitTime = service.getLastCommitTime();
+            System.err.println("tx0=" + tx0);
+            System.err.println("tx1=" + tx1);
+            System.err.println("releaseTime=" + releaseTime);
+            System.err.println("lastCommitTime=" + lastCommitTime);
+            assertNotSame(0L, releaseTime);
+
+            /*
+             * Note: The release time MUST NOT be advanced to the last commit
+             * time!!! That would cause ALL commit points to be released.
+             * 
+             * Note: Both tx1 and tx0 are GT lastCommitTime so we can not test
+             * against those here, but see the other test.
+             */
+            assertTrue(releaseTime < lastCommitTime);
+
+        } finally {
+
+            service.destroy();
+
+        }
+
+    }
+
+    /**
+     * A unit test of advancing the last release time for the case where there
+     * are still active transactions running once the earliest active
+     * transaction commits.
+     * 
+     * @throws IOException
+     */
+    public void test_updateReleaseTime_otherTxStillActive() throws IOException {
+
+        final AbstractTransactionService service = newFixture();
+
+        try {
+
+//            /*
+//             * Note: We have to force a commit time on the log since we are not
+//             * really integrated with a database and if [lastCommitTime==0] the
+//             * releaseTime can not be advanced if there are also no running
+//             * transactions.
+//             */
+//            service.notifyCommit(service.nextTimestamp());
+            
+            assertEquals(0L, service.getReleaseTime());
+
+            final long tx0 = service.newTx(ITx.UNISOLATED);
+
+            final long tx1 = service.newTx(ITx.UNISOLATED);
+
+            final long tx2 = service.newTx(ITx.UNISOLATED);
+
+            // unchanged.
+            assertEquals(0L, service.getReleaseTime());
+
+            // Commit the 2nd tx
+            service.commit(tx1);
+
+            // unchanged.
+            assertEquals(0L, service.getReleaseTime());
+
+            // terminate the 1st tx.
+            service.abort(tx0);
+
+            // verify that releaseTime was updated.
+            final long releaseTime = service.getReleaseTime();
+            final long lastCommitTime = service.getLastCommitTime();
+            System.err.println("tx0           =" + tx0);
+            System.err.println("tx1           =" + tx1);
+            System.err.println("tx2           =" + tx2);
+            System.err.println("releaseTime   = " + releaseTime);
+            System.err.println("lastCommitTime= " + lastCommitTime);
+            assertNotSame(0L, releaseTime);
+
+            /*
+             * Note: The release time MUST NOT be advanced to the last commit
+             * time!!!
+             * 
+             * That would cause ALL commit points to be released.
+             */
+            assertTrue(releaseTime < lastCommitTime);
+            
+            // releaseTime GTE [tx0].
+            assertTrue(releaseTime >= Math.abs(tx0));
+
+            // releaseTime is LT [tx2].
+            assertTrue(releaseTime < Math.abs(tx2));
+            
+        } finally {
+
+            service.destroy();
+
+        }
+        
     }
 
     /**
@@ -824,5 +1080,325 @@ public class TestStandaloneTransactionService extends TestCase2 {
         }
 
     }
-    
+
+    /**
+     * Verifies that we can shutdown() the service when there are no
+     * active transactions.
+     */
+    public void test_shutdown_nothingRunning() {
+
+        final AbstractTransactionService service = newFixture();
+
+        try {
+            
+            service.shutdown();
+            
+        } finally {
+
+            service.destroy();
+            
+        }
+        
+    }
+
+    /**
+     * Test that the service will wait for a read-write tx to commit.
+     * 
+     * @throws InterruptedException
+     */
+    public void test_shutdown_waitsForReadWriteTx_commits()
+            throws InterruptedException {
+
+        final AbstractTransactionService service = newFixture();
+
+        try {
+
+            final long tx = service.newTx(ITx.UNISOLATED);
+
+            final Thread t = new Thread() {
+            
+                public void run() {
+
+                    service.shutdown();
+                    
+                }
+                
+            };
+            
+            t.setDaemon(true);
+            
+            t.start();
+
+            awaitRunState(service, TxServiceRunState.Shutdown);
+
+            // commit the running tx.
+            service.commit(tx);
+
+            awaitRunState(service, TxServiceRunState.Halted);
+
+        } finally {
+
+            service.destroy();
+
+        }
+
+    }
+
+    /**
+     * Test that the service will wait for a read-write tx to abort.
+     * 
+     * @throws InterruptedException
+     */
+    public void test_shutdown_waitsForReadWriteTx_aborts()
+            throws InterruptedException {
+
+        final AbstractTransactionService service = newFixture();
+
+        try {
+
+            final long tx = service.newTx(ITx.UNISOLATED);
+
+            final Thread t = new Thread() {
+            
+                public void run() {
+
+                    service.shutdown();
+                    
+                }
+                
+            };
+            
+            t.setDaemon(true);
+            
+            t.start();
+
+            awaitRunState(service, TxServiceRunState.Shutdown);
+
+            // abort the running tx.
+            service.abort(tx);
+
+            awaitRunState(service, TxServiceRunState.Halted);
+
+        } finally {
+
+            service.destroy();
+            
+        }
+        
+    }
+
+    /**
+     * Test that shutdown() does not permit new tx to start (a variety of things
+     * are not permitted during shutdown).
+     * 
+     * @throws InterruptedException
+     */
+    public void test_shutdown_newTxNotAllowed() throws InterruptedException {
+
+        final AbstractTransactionService service = newFixture();
+
+        try {
+
+            final long tx = service.newTx(ITx.UNISOLATED);
+
+            final Thread t = new Thread() {
+            
+                public void run() {
+                    
+                    service.shutdown();
+                    
+                }
+                
+            };
+            
+            t.setDaemon(true);
+            
+            t.start();
+
+            awaitRunState(service, TxServiceRunState.Shutdown);
+
+            try {
+
+                service.newTx(ITx.UNISOLATED);
+                
+                fail("Expecting: " + IllegalStateException.class);
+                
+            } catch (IllegalStateException ex) {
+                
+                log.info("Ignoring expected exception: " + ex);
+                
+            }
+            
+            // abort the running tx.
+            service.abort(tx);
+
+            awaitRunState(service, TxServiceRunState.Halted);
+
+        } finally {
+
+            service.destroy();
+            
+        }
+        
+    }
+
+    /**
+     * Awaits the specified run state.
+     * 
+     * @param service
+     *            The service.
+     * @param runState
+     *            The expected run state.
+     *            
+     * @throws InterruptedException
+     * @throws AssertionError
+     */
+    protected void awaitRunState(final AbstractTransactionService service,
+            final TxServiceRunState runState) throws InterruptedException {
+        
+        if (service == null)
+            throw new IllegalArgumentException();
+
+        if (runState == null)
+            throw new IllegalArgumentException();
+        
+        int i = 0;
+        while (runState != service.getRunState() && i < 100) {
+
+            Thread.sleep(10/* ms */);
+
+            i++;
+
+        }
+
+        assertEquals(runState, service.getRunState());
+
+    }
+
+    /**
+     * Test that the service will wait for a read-only tx to commit.
+     */
+    public void test_shutdown_waitsForReadOnlyTx_commits()
+            throws InterruptedException {
+
+        final AbstractTransactionService service = newFixture();
+
+        try {
+
+            final long tx = service.newTx(ITx.UNISOLATED);
+
+            final Thread t = new Thread() {
+
+                public void run() {
+
+                    service.shutdown();
+
+                }
+
+            };
+
+            t.setDaemon(true);
+
+            t.start();
+
+            awaitRunState(service, TxServiceRunState.Shutdown);
+
+            // commit the running tx.
+            service.commit(tx);
+
+            awaitRunState(service, TxServiceRunState.Halted);
+
+        } finally {
+
+            service.destroy();
+
+        }
+
+    }
+
+    /**
+     * Test that the service will wait for a read-only tx to abort.
+     */
+    public void test_shutdown_waitsForReadOnlyTx_aborts()
+            throws InterruptedException {
+
+        final AbstractTransactionService service = newFixture();
+
+        try {
+
+            final long tx = service.newTx(ITx.UNISOLATED);
+
+            final Thread t = new Thread() {
+
+                public void run() {
+
+                    service.shutdown();
+
+                }
+
+            };
+
+            t.setDaemon(true);
+
+            t.start();
+
+            awaitRunState(service, TxServiceRunState.Shutdown);
+
+            // abort the running tx.
+            service.abort(tx);
+
+            awaitRunState(service, TxServiceRunState.Halted);
+
+        } finally {
+
+            service.destroy();
+
+        }
+
+    }
+
+    /**
+     * Test that shutdown() may be interrupted while waiting for a tx to
+     * complete and that it will convert to shutdownNow() which does not wait.
+     * 
+     * @throws InterruptedException
+     */
+    public void test_shutdown_interrupted() throws InterruptedException {
+
+        final AbstractTransactionService service = newFixture();
+
+        try {
+
+//            final long tx = 
+                service.newTx(ITx.UNISOLATED);
+
+            final Thread t = new Thread() {
+
+                public void run() {
+
+                    service.shutdown();
+                    
+                }
+
+            };
+
+            t.setDaemon(true);
+
+            t.start();
+
+            awaitRunState(service, TxServiceRunState.Shutdown);
+
+            // interrupt the thread running shutdown().
+            t.interrupt();
+
+            awaitRunState(service, TxServiceRunState.Halted);
+
+        } finally {
+
+            service.destroy();
+
+        }
+
+    }
+
 }
