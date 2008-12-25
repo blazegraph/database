@@ -58,26 +58,20 @@ public class TestTransactionSupport extends ProxyTestCase {
         /*
          * Test suite for the transaction service using a mock client.
          */
-        suite.addTestSuite(TestStandaloneTransactionService.class);
+        suite.addTestSuite(TestTransactionService.class);
 
         /*
          * Isolation tests with a standalone database (Journal).
          */
 
         // tests of read-write transactions and isolation.
-        suite.addTestSuite( TestTx.class );
-        
-        // tests of read-only transactions.
-        suite.addTestSuite( TestReadOnlyTx.class );
-        
-        // tests of read-committed transactions.
-        suite.addTestSuite( TestReadCommittedTx.class );
+        suite.addTestSuite(TestTx.class);
 
-        /*
-         * @todo test of the transaction service with a federation, potentially
-         * including tests with mock clients (just the client commit protocol).
-         */
-        suite.addTestSuite(TestDistributedTransactionService.class);
+        // tests of read-only transactions.
+        suite.addTestSuite(TestReadOnlyTx.class);
+
+        // tests of transactions starting from the last committed state.
+        suite.addTestSuite(TestReadCommittedTx.class);
 
         return suite;
         

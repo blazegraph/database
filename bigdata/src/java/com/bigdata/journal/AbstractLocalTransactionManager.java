@@ -18,13 +18,14 @@ import com.bigdata.service.IDataService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractLocalTransactionManager extends TimestampUtility
-        implements ILocalTransactionManager {
+abstract public class AbstractLocalTransactionManager implements
+        ILocalTransactionManager {
 
     /**
      * Logger.
      */
-    protected static final Logger log = Logger.getLogger(IJournal.class);
+    protected static final Logger log = Logger
+            .getLogger(AbstractLocalTransactionManager.class);
 
     /**
      * True iff the {@link #log} level is INFO or less.
@@ -43,7 +44,7 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility
     /*
      * ILocalTransactionManager
      */
-    
+
     /**
      * A hash map containing all active transactions. A transaction that is
      * preparing will remain in this collection until it has either successfully
@@ -51,100 +52,75 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility
      * 
      * @todo config initial capacity and concurrency.
      */
-    final private ConcurrentHashMap<Long, AbstractTx> activeTx = new ConcurrentHashMap<Long, AbstractTx>();
-
-//    /**
-//     * A hash map containing all transactions that have prepared but not yet
-//     * either committed or aborted.
-//     * 
-//     * @todo use only a single map for all running tx?
-//     * 
-//     * @todo A transaction will be in this map only while it is actively
-//     *       committing, so this is always a "map" of one and could be replaced
-//     *       by a scalar reference (except that we may allow concurrent prepare
-//     *       and commit of read-only transactions).
-//     */
-//    final protected Map<Long, ITx> preparedTx = new ConcurrentHashMap<Long, ITx>();
+    final private ConcurrentHashMap<Long, Tx> activeTx = new ConcurrentHashMap<Long, Tx>();
 
     /**
      * Notify the journal that a new transaction is being activated (starting on
      * the journal).
-     * 
-     * @param tx
-     *            The transaction.
-     * 
-     * @throws IllegalStateException
-     */
-    public void activateTx(final AbstractTx tx) throws IllegalStateException {
-
-        if (activeTx.putIfAbsent(tx.getStartTimestamp(), tx) != null) {
-
-            throw new IllegalStateException("Already in local table: tx=" + tx);
-
-        }
-
-    }
-
-// /**
-// * Notify the journal that a transaction has prepared (and hence is no
-//     * longer active).
-//     * 
-//     * @param tx
-//     *            The transaction
-//     * 
-//     * @throws IllegalStateException
-//     * 
-//     * @deprecated we don't need this callaback.
-//     */
-//    public void preparedTx(final ITx tx) throws IllegalStateException {
-//
-//        final Long startTime = tx.getStartTimestamp();
-//
-//        final ITx tx2 = activeTx.remove(startTime);
-//
-//        if (tx2 == null)
-//            throw new IllegalStateException("Not active: tx=" + tx);
-//
-//        assert tx == tx2;
-//
-//        if (preparedTx.containsKey(startTime)) {
-//
-//            throw new IllegalStateException("Already preparing: tx=" + tx);
-//        
-//        }
-//
-//        preparedTx.put(startTime, tx);
-//
-//    }
-
-    /**
-     * Notify the journal that a transaction is completed (either aborted or
-     * committed).
      * 
      * @param localState
      *            The transaction.
      * 
      * @throws IllegalStateException
      */
-    protected void deactivateTx(final AbstractTx localState)
+    public void activateTx(final Tx localState) throws IllegalStateException {
+
+        if (localState == null)
+            throw new IllegalArgumentException();
+
+        localState.lock.lock();
+
+        try {
+
+            if (activeTx
+                    .putIfAbsent(localState.getStartTimestamp(), localState) != null) {
+
+                throw new IllegalStateException("Already in local table: tx="
+                        + localState);
+
+            }
+
+        } finally {
+
+            localState.lock.unlock();
+
+        }
+
+    }
+
+    /**
+     * Removes the transaction from the local tables.
+     * 
+     * @param localState
+     *            The transaction.
+     */
+    protected void deactivateTx(final Tx localState)
             throws IllegalStateException {
 
         if (localState == null)
             throw new IllegalArgumentException();
 
-        // @todo verify caller holds lock else IllegalMonitorStateException.
+        localState.lock.lock();
 
-        if (!localState.isComplete())
-            throw new IllegalStateException();
+        try {
 
-        // release any local resources.
-        localState.releaseResources();
+            if (!localState.isComplete())
+                throw new IllegalStateException("Not complete: "+localState);
 
-        if (activeTx.remove(localState.getStartTimestamp()) == null) {
+            // release any local resources.
+            localState.releaseResources();
 
-            throw new IllegalStateException("Not in local tables: tx="
-                    + localState);
+            if (activeTx.remove(localState.getStartTimestamp()) == null) {
 
+                throw new IllegalStateException("Not in local tables: tx="
+                        + localState);
+
+            }
+            
+        } finally {
+
+            localState.lock.unlock();
+            
         }
 
     }
@@ -159,7 +135,7 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility
      *         <code>null</code> if the start time is not mapped to either an
      *         active or prepared transaction.
      */
-    public AbstractTx getTx(final long tx) {
+    public Tx getTx(final long tx) {
 
         return activeTx.get(tx);
 
@@ -171,11 +147,9 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility
         
     }
     
-    private boolean open = true;
+    private volatile boolean open = true;
     
     synchronized public void shutdown() {
-        
-        // Note: currently a NOP.
         
         if(!open) return;
         
@@ -346,12 +320,6 @@ abstract public class AbstractLocalTransactionManager extends TimestampUtility
                     setValue(activeTx.size());
                 }
             });
-
-//            countersRoot.addCounter("#prepared", new Instrument<Integer>() {
-//                protected void sample() {
-//                    setValue(preparedTx.size());
-//                }
-//            });
 
         }
         

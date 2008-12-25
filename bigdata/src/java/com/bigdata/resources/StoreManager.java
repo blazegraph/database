@@ -100,6 +100,7 @@ import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.locator.DefaultResourceLocator;
+import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.MetadataService;
@@ -204,6 +205,9 @@ abstract public class StoreManager extends ResourceEvents implements
          * @see #MIN_RELEASE_AGE_1D
          * @see #MIN_RELEASE_AGE_1W
          * @see #MIN_RELEASE_AGE_NEVER
+         * 
+         * @deprecated May be replaced by a property with the same purpose on
+         *             the {@link AbstractTransactionService}.
          */
         String MIN_RELEASE_AGE = StoreManager.class.getName()+".minReleaseAge";
         
@@ -1297,16 +1301,16 @@ abstract public class StoreManager extends ResourceEvents implements
              */
             purgeIncompleteMoves();
             
-            /*
-             * Notify the timestamp service of the last commit time for the live
-             * journal for this data service. This will be zero (0L) iff this is
-             * a new journal on a new data service. This notification is
-             * required to allow clients that use the global lastCommitTime to
-             * pose queries after restart of a federation.
-             */
-
-            getConcurrencyManager().getTransactionManager().notifyCommit(
-                    liveJournalRef.get().getLastCommitTime());
+//            /*
+//             * Notify the timestamp service of the last commit time for the live
+//             * journal for this data service. This will be zero (0L) iff this is
+//             * a new journal on a new data service. This notification is
+//             * required to allow clients that use the global lastCommitTime to
+//             * pose queries after restart of a federation.
+//             */
+//
+//            getConcurrencyManager().getTransactionManager().notifyCommit(
+//                    liveJournalRef.get().getLastCommitTime());
             
         }
 

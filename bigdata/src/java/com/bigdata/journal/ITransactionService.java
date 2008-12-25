@@ -32,7 +32,6 @@ import java.util.UUID;
 import java.util.concurrent.BrokenBarrierException;
 
 import com.bigdata.isolation.IConflictResolver;
-import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ITxCommitProtocol;
@@ -154,7 +153,7 @@ public interface ITransactionService extends ITimestampService {
      * 
      * @throws IllegalStateException
      *             if the requested timestamp is greater than
-     *             {@link #lastCommitTime()}.
+     *             {@link #getLastCommitTime()}.
      * @throws IllegalStateException
      *             if the requested timestamp is for a commit point that is no
      *             longer preserved by the database (the resources for that
@@ -235,37 +234,18 @@ public interface ITransactionService extends ITimestampService {
     public void notifyCommit(long commitTime) throws IOException;
 
     /**
-     * Return the last commit time reported to the {@link ITimestampService}.
+     * Return the last commitTime reported to the {@link ITransactionService}.
      * 
      * @return The last known commit time.
      * 
      * @throws IOException
      */
-    public long lastCommitTime() throws IOException;
+    public long getLastCommitTime() throws IOException;
 
     /**
-     * Advance the release time, thereby releasing any read locks on views older
-     * than the specified timestamp. The caller is responsible for ensuring that
-     * the release time is advanced once there are no longer any readers for
-     * timestamps earlier than the new release time.
-     * <p>
-     * Normally this is invoked by the transaction manager. Whenever a read
-     * historical transaction completes it consults its internal state and
-     * decides if there are existing readers still reading from an earlier
-     * timestamp. If not, then it can choose to advance the release time. Data
-     * services MAY release data for views whose timestamp is less than or equal
-     * to the specified release time IFF that action would be in keeping with
-     * their local history retention policy (minReleaseAge) AND if the data is
-     * not required for the most current committed state (data for the most
-     * current committed state is not releasable regardless of the release time
-     * or the minReleaseAge).
      * 
-     * @param releaseTime
-     *            The timestamp.
-     * 
-     * @throws IOException
-     * 
-     * @see ResourceManager#getMinReleaseAge()
+     * @deprecated This will go away. Caller's will achieve the same effects
+     *             using read-only transactions.
      */
     public void setReleaseTime(long releaseTime) throws IOException;
     

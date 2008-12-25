@@ -168,18 +168,9 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         }.start();
 
-        final AbstractTransactionService abstractTransactionService = new JournalTransactionService(
-                properties, this) {
+        final JournalTransactionService abstractTransactionService = new JournalTransactionService(
+                properties, this).start();
 
-            @Override
-            public AbstractFederation getFederation() {
-
-                throw new UnsupportedOperationException();
-                
-            }
-
-        };
-        
         localTransactionManager = new AbstractLocalTransactionManager() {
 
             public AbstractTransactionService getTransactionService() {
@@ -187,15 +178,35 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 return abstractTransactionService;
                 
             }
-            
+
+            /**
+             * Extended to shutdown the embedded transaction service.
+             */
+            public void shutdown() {
+
+                ((JournalTransactionService) getTransactionService())
+                        .shutdown();
+
+                super.shutdown();
+
+            }
+
+            /**
+             * Extended to shutdown the embedded transaction service.
+             */
+            public void shutdownNow() {
+
+                ((JournalTransactionService) getTransactionService())
+                        .shutdownNow();
+
+                super.shutdownNow();
+
+            }
+        
         };
 
-        // notify the transaction manager of the last commit point on restart.
-        localTransactionManager.notifyCommit(getRootBlockView().getLastCommitTime());
-        
-        concurrencyManager = new ConcurrencyManager(properties, localTransactionManager, this);
-
-//        localTransactionManager.setConcurrencyManager(concurrencyManager);
+        concurrencyManager = new ConcurrencyManager(properties,
+                localTransactionManager, this);
 
     }
 
@@ -458,30 +469,42 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         }
 
         final boolean isReadWriteTx = TimestampUtility.isReadWriteTx(timestamp);
-        
-        final ITx tx = (isReadWriteTx ? getConcurrencyManager()
-                .getTransactionManager().getTx(timestamp) : null); 
-        
-        if(isReadWriteTx) {
 
-            if(tx == null) {
-                
-                log.warn("Unknown transaction: name="+name+", tx="+timestamp);
-                
+        final Tx tx = (Tx) (isReadWriteTx ? getConcurrencyManager()
+                .getTransactionManager().getTx(timestamp) : null);
+
+        if (isReadWriteTx) {
+
+            if (tx == null) {
+
+                log.warn("Unknown transaction: name=" + name + ", tx="
+                        + timestamp);
+
                 return null;
-                    
+
             }
-            
-            if(!tx.isActive()) {
-                
-                // typically this means that the transaction has already prepared.
-                log.warn("Transaction not active: name=" + name + ", tx="
-                        + timestamp + ", prepared=" + tx.isPrepared()
-                        + ", complete=" + tx.isComplete() + ", aborted="
-                        + tx.isAborted());
 
-                return null;
-                
+            tx.lock.lock();
+
+            try {
+
+                if (!tx.isActive()) {
+
+                    // typically this means that the transaction has already
+                    // prepared.
+                    log.warn("Transaction not active: name=" + name + ", tx="
+                            + timestamp + ", prepared=" + tx.isPrepared()
+                            + ", complete=" + tx.isComplete() + ", aborted="
+                            + tx.isAborted());
+
+                    return null;
+
+                }
+
+            } finally {
+
+                tx.lock.unlock();
+
             }
                                 
         }
@@ -751,25 +774,28 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     }
     
     /**
-     * Note: The {@link #executorService} is shutdown first, then the
-     * {@link IConcurrencyManager}, the {@link ITransactionService} and finally
-     * the {@link IResourceManager}.
-     * 
-     * FIXME The {@link Journal} MUST maintain a counter of the #of open
-     * read-only transactions. On {@link #shutdown()} it must not allow new
-     * transactions to be opened (shutting down the
-     * {@link ILocalTransactionManager} will do this) and then await the
-     * read-only transaction counter to reach ZERO. At that point it can
-     * shutdown the {@link JournalTransactionService} as well.
+     * Note: The transaction service si shutdown first, then the
+     * {@link #executorService}, then the {@link IConcurrencyManager}, the
+     * {@link ITransactionService} and finally the {@link IResourceLockService}.
      */
     synchronized public void shutdown() {
         
         if (!isOpen())
             return;
 
+        /*
+         * Shutdown the transaction service. This will not permit new
+         * transactions to start and will wait until running transactions either
+         * commit or abort.
+         */
+        localTransactionManager.shutdown();
+
+        /*
+         * Shutdown the executor service. This will wait for any tasks being run
+         * on that service by the application to complete.
+         */
         try {
 
-            // shutdown service and await termination.
             new ShutdownHelper(executorService, 1000/* logTimeout */,
                     TimeUnit.MILLISECONDS) {
                
@@ -797,9 +823,12 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         }
 
+        /*
+         * Shutdown the concurrency manager - this will allow existing
+         * non-transactional operations to complete but prevent additional
+         * operations from starting.
+         */
         concurrencyManager.shutdown();
-       
-        localTransactionManager.shutdown();
         
         if (resourceLockManager != null) {
 

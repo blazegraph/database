@@ -28,7 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -40,23 +46,29 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.zip.Adler32;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.concurrent.LockManagerTask;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
-import com.bigdata.journal.CommitRecordIndex;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.RunState;
-import com.bigdata.resources.StoreManager;
 import com.bigdata.util.concurrent.ExecutionExceptions;
+import com.ibm.icu.impl.ByteBuffer;
 
 /**
- * Implementation for an {@link IBigdataFederation}.
+ * Implementation for an {@link IBigdataFederation} supporting both single-phase
+ * commits (for transactions that execute on a single {@link IDataService}) and
+ * distributed commits.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -97,28 +109,50 @@ public abstract class DistributedTransactionService extends
     /**
      * A {@link BTree} containing a log of the historical commit points.
      * 
-     * @todo for a {@link Journal} we can use the existing
-     *       {@link CommitRecordIndex}.
-     * 
-     * @todo Subclass {@link BTree} for long keys and arbitrary values and move
-     *       the find() and findNext() methods onto that class and make the
-     *       value type generic. That same logic is replicated right now in
-     *       several places and there is no reason for that.
-     * 
-     * @todo If this is not restart safe then on restart the commit points in
-     *       the federation will have to be reported to the transaction service
-     *       so that it knows the timestamp intervals within which it can make
-     *       its choices for read-historical transactions. It would be trivial
-     *       to make this restart safe using a {@link Journal}.
-     * 
-     * @todo we should be using a read-write store rather than a Journal for
-     *       this as the length of the backing store will otherwise grow without
-     *       bounds.
+     * @todo there are several ways to make this persistent:
+     *       <p>
+     *       Use a {@link BTree} on a {@link Journal}. One downside is that the
+     *       journal will grow without bound. We could periodically do a custom
+     *       overflow operations to address that or we could create a read-write
+     *       store using some of the same logic as the journal. Note: In order
+     *       to have atomic updates on the journal will require a commit of that
+     *       journal per commit time reported to the transaction service. That
+     *       will also require making the nodes in the {@link BTree} persistent,
+     *       which will cause the {@link Journal} to grow much faster than would
+     *       otherwise be warranted.
+     *       <p>
+     *       Use a transient {@link BTree} and periodically snapshot the ordered
+     *       array of commit times onto a binary image on a file. There could be
+     *       two of these images, with one being overwritten each time a newer
+     *       image is written.
+     *       <p>
+     *       Use a transient {@link BTree} and only write it on the disk during
+     *       {@link #shutdown()}. This option is probably fine if there are
+     *       failover services running.
+     *       <p>
+     *       Since there is going to be high overhead associated with having an
+     *       ACID log of the commit times, it is well worth asking what is at
+     *       stake if we loose part of the commit time log. The main things that
+     *       it gives us are (a) the half-open ranges within which we can
+     *       allocate read-historical transactions; and (b) the last commit time
+     *       on record. It seems that creating an image of the log every N
+     *       seconds should be sufficient.
      */
-    private final CommitTimeIndex commitTimeIndex = CommitTimeIndex.createTransient();
+    private final CommitTimeIndex commitTimeIndex;
 
     private final File dataDir;
+
+    /**
+     * The interval in milliseconds between logging an image of the
+     * {@link #commitTimeIndex}.
+     */
+    private final long commitTimeLogInterval = 5 * 60 * 1000;
     
+    /**
+     * The last (known) commit time.
+     */
+    private volatile long lastCommitTime = 0L;
+
     /**
      * @param properties
      */
@@ -126,34 +160,420 @@ public abstract class DistributedTransactionService extends
 
         super(properties);
 
-        if(properties.getProperty(Options.DATA_DIR)==null) {
+        if (properties.getProperty(Options.DATA_DIR) == null) {
+
+            throw new RuntimeException("Required property: " + Options.DATA_DIR);
+
+        }
+
+        dataDir = new File(properties.getProperty(Options.DATA_DIR));
+
+        // Create transient BTree for the commit time log.
+        commitTimeIndex = CommitTimeIndex.createTransient();
+
+        setup();
+        
+        if (INFO)
+            log.info("lastCommitTime=" + lastCommitTime + ", #commitTimes="
+                    + commitTimeIndex.getEntryCount());
+        
+    }
+
+    /**
+     * Either creates the data directory or reads the {@link #commitTimeIndex}
+     * from files in an existing data directory.
+     */
+    private void setup() {
+
+        if (!dataDir.exists()) {
+
+            /*
+             * New service if its data directory does not exist.
+             */
+
+            if (!dataDir.mkdirs()) {
+
+                throw new RuntimeException("Could not create: " + dataDir);
+
+            }
+
+            // nothing committed yet.
+            lastCommitTime = 0L;
+
+            return;
+
+        }
+
+        {
+
+            // the files on which the images should have been written.
+            final File file0 = new File(dataDir, BASENAME + "0" + LOG);
+
+            final File file1 = new File(dataDir, BASENAME + "1" + LOG);
+
+            if (!file0.exists() && !file1.exists()) {
+
+                log.warn("No commit time logs - assuming new service.");
+
+                // nothing committed yet.
+                lastCommitTime = 0L;
+
+                return;
+
+            }
+            // timestamps on those files.
+            final long time0 = file0.lastModified();
+            final long time1 = file1.lastModified();
+
+            // true iff file0 is more recent.
+            final boolean isFile0 = time0 < time1;
+
+            final File file = isFile0 ? file0 : file1;
+
+            try {
+
+                // read most recent image.
+                final FileInputStream is = new FileInputStream(file);
+
+                try {
+
+                    final BufferedInputStream bis = new BufferedInputStream(is);
+
+                    final DataInputStream dis = new DataInputStream(bis);
+
+                    CommitTimeImage.read(commitTimeIndex, dis);
+
+                } finally {
+
+                    is.close();
+
+                }
+
+            } catch (IOException ex) {
+
+                throw new RuntimeException("Could not read file: " + file, ex);
+
+            }
+
+        }
+
+        if (commitTimeIndex.getEntryCount() == 0) {
+
+            // nothing in the commit time log.
+            lastCommitTime = 0;
+
+        } else {
+
+            // the last commit time in the log. @todo write unit test to
+            // verify on restart.
+            lastCommitTime = commitTimeIndex.decodeKey(commitTimeIndex
+                    .keyAt(commitTimeIndex.getEntryCount() - 1));
+
+        }
+
+    }
+
+    /**
+     * Basename for the files written in the {@link #dataDir} containing images
+     * of the {@link #commitTimeIndex}.
+     */
+    static private final String BASENAME = "commitTime";
+    
+    /**
+     * Extension for the files written in the {@link #dataDir} containing images
+     * of the {@link #commitTimeIndex}.
+     */
+    static private final String LOG = ".log";
+    
+    /**
+     * #of times we have written the image of the {@link #commitTimeIndex}.
+     */
+    private long commitTimeIndexWriteCount = 0L;
+    
+    /**
+     * A task that writes an image of the commit time index onto a pair of
+     * alternating files. This is in the spirit of the Challis algorithm, but
+     * the approach is less rigerous.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private class WriteCommitTimeIndexTask implements Runnable {
+      
+        /**
+         * Note: Anything thrown out of this method will cause the task to no
+         * longer be scheduled!
+         */
+        public void run() {
             
-            throw new RuntimeException("Required property: "+Options.DATA_DIR);
+            lock.lock();
+            
+            try {
+
+                final long begin = System.currentTimeMillis();
+
+                // either 0 or 1.
+                final int i = (int) commitTimeIndexWriteCount % 2;
+                
+                final File file = new File(dataDir, BASENAME + i + LOG);
+                
+                try {
+
+                    writeIndexOnLogFile(file);
+
+                } catch (IOException ex) {
+
+                    log.error(ex.getMessage(), ex);
+
+                }
+
+                // increment counter iff successful.
+                commitTimeIndexWriteCount++;
+                
+                final long elapsed = System.currentTimeMillis() - begin;
+                
+                log.warn("wrote commit time log: count="
+                        + commitTimeIndexWriteCount + ", file=" + file
+                        + ", elapsed=" + elapsed);
+
+            } finally {
+
+                lock.unlock();
+
+            }
+
+        }
+
+        private void writeIndexOnLogFile(final File file) throws IOException {
+
+            synchronized (commitTimeIndex) {
+                
+                final FileOutputStream os = new FileOutputStream(file);
+
+                try {
+
+                    final BufferedOutputStream bos = new BufferedOutputStream(os);
+                    
+                    final DataOutputStream dos = new DataOutputStream(bos);
+                    
+                    // write the image on the file.
+                    CommitTimeImage.write(commitTimeIndex, dos);
+                    
+                    dos.flush();
+                    
+                    bos.flush();
+
+                } finally {
+
+                    os.close();
+
+                }
+                
+            }
             
         }
         
-        dataDir = new File(properties.getProperty(Options.DATA_DIR));
-        
-        dataDir.mkdirs();
-        
-        final AbstractFederation fed = (AbstractFederation) getFederation();
+    };
+    
+    /**
+     * A helper class for reading and writing images of the commit time index.
+     * The image contains the commit timestamps in order.
+     * <p>
+     * Note: The caller must prevent concurrent changes to the index.
+     * 
+     * @todo write counters into the files since the system clock could be
+     *       messed with on before a restart but the counters will always be
+     *       valid. we would then either read both and choose one, or have a
+     *       method to report the header with the earlier counter.
+     * 
+     * @todo Checksum the commit time log file? this is easily done either using
+     *       a {@link ByteBuffer} or using {@link Adler32}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class CommitTimeImage {
+       
+        static public void read(CommitTimeIndex ndx, DataInputStream is)
+                throws IOException {
 
-        // @todo config options
-        fed.addScheduledTask(new NotifyReleaseTimeTask(), 60/* initialDelay */,
-                60/* delay */, TimeUnit.SECONDS);
+            final int n = is.readInt();
+
+            for (int i = 0; i < n; i++) {
+
+                ndx.add(is.readLong());
+
+            }
+            
+        }
+
+        static public void write(CommitTimeIndex ndx, DataOutputStream os)
+                throws IOException {
+
+            final int entryCount = ndx.getEntryCount();
+            
+            os.writeInt(entryCount);
+            
+            final ITupleIterator itr = ndx.rangeIterator();
+
+            int n = 0;
+            
+            while (itr.hasNext()) {
+
+                final ITuple tuple = itr.next();
+
+                final long commitTime = ndx.decodeKey(tuple.getKey());
+
+                os.writeLong(commitTime);
+
+            }
+            
+            if (n != entryCount) {
+                
+                /*
+                 * Note: probable error is the caller not preventing concurrent
+                 * modification.
+                 */
+                
+                throw new AssertionError();
+                
+            }
+            
+        }
         
     }
     
-    public void destroy() {
-        
-        super.destroy();
+    public DistributedTransactionService start() {
 
-        // @todo journal.destroy()
+        /*
+         * Note: lock makes operation _mostly_ atomic even though the base class
+         * changes the runState. For example, new transactions can not start
+         * without this lock.
+         */
+        lock.lock();
+
+        try {
+
+            super.start();
+            
+            final AbstractFederation fed = (AbstractFederation) getFederation();
+
+            // @todo config options (verify units).
+            notifyFuture = fed.addScheduledTask(new NotifyReleaseTimeTask(),
+                    60/* initialDelay */, 60/* delay */, TimeUnit.SECONDS);
+
+            // @todo config options (verify units).
+            writeFuture = fed.addScheduledTask(new WriteCommitTimeIndexTask(),
+                    commitTimeLogInterval/* initialDelay */,
+                    commitTimeLogInterval/* delay */, TimeUnit.MILLISECONDS);
+
+            return this;
+
+        } finally {
+
+            lock.unlock();
+
+        }
         
-        dataDir.delete();
+    }
+    
+    private ScheduledFuture notifyFuture = null;
+    private ScheduledFuture writeFuture = null;
+    
+    public void shutdown() {
+        
+        lock.lock();
+        
+        try {
+
+            /*
+             * First make sure that all tx are terminated - this is important
+             * otherwise we will write the commit time index image before we
+             * have the last commit times on hand.
+             */
+            super.shutdown();
+
+            /*
+             * No need to interrupt this task. It will complete soon enough.
+             * However, we do want to cancel it so it will stop running.
+             */
+            if (notifyFuture != null)
+                notifyFuture.cancel(false/* mayInterruptIfRunning */);
+
+            /*
+             * Cancel this task, but DO NOT interrupt it to avoid a partial
+             * write if there is a write in progress. If there is a write in
+             * progress, then we will wind up writing it again immediately since
+             * we do that below. This is Ok. We will just have a current image
+             * and a nearly current image.
+             */
+            if (writeFuture != null)
+                writeFuture.cancel(false/* mayInterruptIfRunning */);
+
+            // write a final image during shutdown.
+            new WriteCommitTimeIndexTask().run();
+
+        } finally {
+
+            lock.unlock();
+
+        }
+
+    }
+    
+    public void destroy() {
+
+        lock.lock();
+
+        try {
+
+            super.destroy();
+
+            // delete the commit time index log files.
+            new File(dataDir, BASENAME + "0" + LOG).delete();
+            new File(dataDir, BASENAME + "1" + LOG).delete();
+
+            // delete the data directory (works iff it is empty).
+            dataDir.delete();
+
+        } finally {
+
+            lock.unlock();
+            
+        }
         
     }
 
+    /*
+     * FIXME write unit tests for truncating the log.
+     */
+    public void setReleaseTime(final long releaseTime) {
+        
+        super.setReleaseTime(releaseTime);
+
+        /*
+         * Truncate the head of the commit time index since we will no longer
+         * grant transactions whose start time is LTE the new releaseTime.
+         */
+        synchronized (commitTimeIndex) {
+
+            final ITupleIterator itr = commitTimeIndex.rangeIterator(0L,
+                    releaseTime, 0/* capacity */, IRangeQuery.KEYS
+                            | IRangeQuery.CURSOR, null/* filter */);
+
+            while (itr.hasNext()) {
+
+                itr.next();
+
+                // remove the tuple from the index.
+                itr.remove();
+                
+            }
+            
+        }
+        
+    }
+    
     @Override
     protected void abortImpl(final TxState state) {
 
@@ -218,10 +638,10 @@ public abstract class DistributedTransactionService extends
      * that commits pre-declare their locks. Deadlocks are NOT possible when the
      * locks are pre-declared.
      * 
-     * @todo Single phase commits currently contend for the resource locks.
-     *       However, they could also executed without acquiring those locks
-     *       since they will be serialized locally by the {@link IDataService}
-     *       on which they are executing.
+     * @todo Single phase commits currently contend for the named resource locks
+     *       (locks on the index names). However, they could also executed
+     *       without acquiring those locks since they will be serialized locally
+     *       by the {@link IDataService} on which they are executing.
      */
     @Override
     protected long commitImpl(final TxState state) throws Exception {
@@ -243,15 +663,12 @@ public abstract class DistributedTransactionService extends
             
         }
      
-        // the set of resources across all data services on which the tx wrote.
-        final String resource[] = state.getResources();
-        
-//        // declare resource(s) to lock (exclusive locks are used).
-//        lockManager.addResource(resource);
-
-        // delegate will handle lock acquisition and invoke doTask().
+        /*
+         * The LockManagerTask will handle lock acquisition for the named
+         * resources and then invoke our task to perform the commit.
+         */
         final LockManagerTask<String, Long> delegate = new LockManagerTask<String, Long>(
-                lockManager, resource, new TxCommitTask(state));
+                lockManager, state.getResources(), new TxCommitTask(state));
 
         /*
          * This queues the commit request until it holds the necessary locks and
@@ -958,10 +1375,6 @@ public abstract class DistributedTransactionService extends
              */
             commitTimeIndex.add(commitTime);
             
-        }
-        
-        synchronized(lastCommitTimeLock) {
-            
             /*
              * Note: commit time notifications can be overlap such that they
              * appear out of sequence with respect to their values. This is Ok.
@@ -980,85 +1393,12 @@ public abstract class DistributedTransactionService extends
         
     }
     
-    final public long lastCommitTime() {
+    final public long getLastCommitTime() {
         
         return lastCommitTime;
         
     }
     
-    /**
-     * The last (known) commit time.
-     * 
-     * @todo must be restart safe. can be obtained by querying data services or
-     *       written in a local file. (the last timestamp issued must also be
-     *       restart safe.)
-     */
-    private volatile long lastCommitTime = 0L;
-    private final Object lastCommitTimeLock = new Object();
-
-    /**
-     * Set the new release time. A scheduled task will periodically notify the
-     * discovered {@link IDataService}s of the new release time. Sometime after
-     * notification an {@link IDataService} may choose to release resources up
-     * to the new release time.
-     * 
-     * @param releaseTime
-     *            The new release time (must strictly advance).
-     * 
-     * @throws IllegalArgumentException
-     *             if <i>releaseTime</i> would be decreased.
-     * 
-     * @todo must also notify the metadata service once it is partitioned.
-     * 
-     * @todo Advance this value each time the transaction with the smallest
-     *       value for [abs(tx)] completes. This needs to be integrated with how
-     *       we assign transaction identifiers.
-     * 
-     * FIXME This should be a protected method since applications should not be
-     * doing this themselves.
-     * 
-     * FIXME Enable the check against the releaseTime going backward once
-     * closure is reworked for the triple store to use read-only transactions.
-     */
-    synchronized public void setReleaseTime(final long releaseTime) {
-        
-//        if (releaseTime < this.releaseTime) {
-//            
-//            throw new IllegalStateException();
-//            
-//        }
-        
-        this.releaseTime = releaseTime;
-        
-    }
-    
-    public long getReleaseTime() {
-        
-        return releaseTime;
-        
-    }
-    
-    /**
-     * 
-     * @todo The release time on startup should be set to
-     *       {@link #nextTimestamp()} - minReleaseAge.
-     *       <p>
-     *       Move the minReleaseAge configuration property here from the
-     *       {@link StoreManager} and have the {@link StoreManager} refuse to
-     *       release history until it has been notified of a releaseTime. This
-     *       will centralize the value for the minimum amount of history that
-     *       will be preserved across the federation.
-     *       <p>
-     *       If minReleaseTime is increased, then the release time can be
-     *       changed to match, but only by NOT advancing it until we are
-     *       retaining enough history.
-     *       <p>
-     *       If minReleaseTime is decreased, then we can immediately release
-     *       more history (or at least as soon as the task runs to notify the
-     *       discovered data services of the new release time).
-     */
-    private long releaseTime = 0L;
-
     /**
      * Task periodically notifies the discovered {@link IDataService}s of the
      * new release time.
@@ -1069,15 +1409,19 @@ public abstract class DistributedTransactionService extends
      * introduce a lock for this task on the {@link AbstractTransactionService}
      * so that instances of the task must run in sequence.
      * 
+     * @todo must also notify the metadata service once it is partitioned.
+     * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
     protected class NotifyReleaseTimeTask implements Runnable {
         
         /**
-         * Notifies all {@link IDataService}s of the current release time. The
-         * current release time is discovered when this method runs and the same
-         * value is sent to each discovered {@link IDataService}.
+         * Notifies all {@link IDataService}s of the current release time.
+         * <p>
+         * Note: An {@link IDataService} WILL NOT release its most current
+         * commit point, regardless of the releaseTime that is sent to that
+         * service.
          * <p>
          * Note: If this method throws an exception then the task will no longer
          * be scheduled!
@@ -1087,24 +1431,13 @@ public abstract class DistributedTransactionService extends
          */
         public void run() {
 
-            /*
-             * Choose a consistent value for the notices that we will generate.
-             * 
-             * FIXME When migrating [minReleaseAge] here the logic MUST use
-             * 
-             * Math.min(currentTime-minReleaseAge,releaseTime)
-             * 
-             * This allows us to update the releaseTime on the tx service each
-             * time the oldest tx completes while respecting the global
-             * constraint on the minReleaseAge.  The code for this is already
-             * in the StoreManager.
-             */
-            final long releaseTime = DistributedTransactionService.this.releaseTime;
+            final long releaseTime = getReleaseTime();
 
             final IBigdataFederation fed = getFederation();
 
             final UUID[] a = fed.getDataServiceUUIDs(0/* maxCount */);
 
+            // @todo notify in parallel?
             for (UUID serviceUUID : a) {
 
                 try {
@@ -1124,69 +1457,65 @@ public abstract class DistributedTransactionService extends
     }
 
     /**
-     * Return the {@link CounterSet}.
-     * 
-     * @todo define interface declaring the counters reported here.
-     * 
-     * @todo add a run state counter.
-     * 
-     * @todo add counter for the #of read-only and the #of read-write tx started
-     *       and active, and the min(abs(tx)) (earliest) active tx).
+     * Adds counters for the {@link LockManager}.
      */
     synchronized public CounterSet getCounters() {
-        
+
         if (countersRoot == null) {
-
-            countersRoot = new CounterSet();
-
-            countersRoot.addCounter("#active", new Instrument<Integer>() {
-                protected void sample() {
-                    setValue(getActiveCount());
-                }
-            });
-
-            countersRoot.addCounter("lastCommitTime", new Instrument<Long>() {
-                protected void sample() {
-                    setValue(lastCommitTime());
-                }
-            });
             
-            countersRoot.addCounter("releaseTime", new Instrument<Long>() {
-                protected void sample() {
-                    setValue(releaseTime);
-                }
-            });
+            /*
+             * Setup basic counters.
+             */
+            super.getCounters();
 
-            countersRoot.addCounter("startCount", new Instrument<Long>() {
-                protected void sample() {
-                    setValue(getStartCount());
-                }
-            });
-            
-            countersRoot.addCounter("abortCount", new Instrument<Long>() {
-                protected void sample() {
-                    setValue(getAbortCount());
-                }
-            });
-            
-            countersRoot.addCounter("commitCount", new Instrument<Long>() {
-                protected void sample() {
-                    setValue(getCommitCount());
-                }
-            });
-            
             /*
              * The lock manager imposing a partial ordering on transaction
              * commits.
              */
             countersRoot.makePath("Lock Manager").attach(
-                    lockManager.getCounters());
+                    ((DistributedTransactionService) this).lockManager
+                            .getCounters());
+
+            countersRoot.addCounter("logFileWriteCount",
+                    new Instrument<Long>() {
+                        protected void sample() {
+                            setValue(commitTimeIndexWriteCount);
+                        }
+                    });
+
+            /**
+             * The #of distributed transaction commits that are currently in
+             * progress.
+             */
+            countersRoot.addCounter("distributedCommitsInProgressCount",
+                    new Instrument<Integer>() {
+                        protected void sample() {
+                            setValue(commitList.size());
+                        }
+                    });
+
+            /**
+             * The #of commit times that are currently accessible.
+             */
+            countersRoot.addCounter("commitTimesCount",
+                    new Instrument<Integer>() {
+                        protected void sample() {
+                            synchronized (commitTimeIndex) {
+                                setValue(commitTimeIndex.getEntryCount());
+                            }
+                        }
+                    });
+
+            countersRoot.addCounter("dataDir", new Instrument<String>() {
+                protected void sample() {
+                    setValue(dataDir.toString());
+                }
+            });
 
         }
-        
+
         return countersRoot;
-        
+
     }
-    private CounterSet countersRoot;
 
 }

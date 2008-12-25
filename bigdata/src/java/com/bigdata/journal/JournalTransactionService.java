@@ -33,6 +33,7 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
+import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.DataService;
 
@@ -42,8 +43,7 @@ import com.bigdata.service.DataService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class JournalTransactionService extends
-        AbstractTransactionService {
+public class JournalTransactionService extends AbstractTransactionService {
 
     protected final Journal journal;
 
@@ -59,6 +59,14 @@ abstract public class JournalTransactionService extends
 
     }
     
+    public JournalTransactionService start() {
+        
+        super.start();
+        
+        return this;
+        
+    }
+
     /**
      * Extended to register the new tx in the
      * {@link AbstractLocalTransactionManager}.
@@ -90,7 +98,7 @@ abstract public class JournalTransactionService extends
              * Unregister read-write transactions.
              */
 
-            final AbstractTx localState = journal.getLocalTransactionManager()
+            final Tx localState = journal.getLocalTransactionManager()
                     .getTx(state.tx);
 
             if (localState != null) {
@@ -156,8 +164,8 @@ abstract public class JournalTransactionService extends
             /*
              * The local (client-side) state for this tx.
              */
-            final AbstractTx localState = (AbstractTx) journal
-                    .getLocalTransactionManager().getTx(state.tx);
+            final Tx localState = journal.getLocalTransactionManager().getTx(
+                    state.tx);
 
             if (localState == null) {
 
@@ -182,7 +190,17 @@ abstract public class JournalTransactionService extends
              * automatically discarded if it fails.
              */
 
-            localState.abort();
+            localState.lock.lock();
+            
+            try {
+            
+                localState.setRunState(RunState.Aborted);
+                
+            } finally {
+                
+                localState.lock.unlock();
+                
+            }
 
         } finally {
             
@@ -192,27 +210,6 @@ abstract public class JournalTransactionService extends
 
     }
 
-    /**
-     * Single-phase commit for a transaction (synchronous).
-     * <p>
-     * Read-only transactions and transactions without write sets are processed
-     * immediately and will have a commit time of ZERO (0L).
-     * <p>
-     * For a transaction with a non-empty write set, an {@link ITx#UNISOLATED}
-     * task is placed onto the {@link WriteExecutorService} and the caller will
-     * block until the transaction either commits or aborts. That task names the
-     * indices that were isolated by the transaction on the so that the task
-     * will have exclusive access to those indices during the commit protocol.
-     * That task will:
-     * <ol>
-     * <li> Validate the write sets of the transaction;</li>
-     * <li> Merge down the validated write sets onto the live (unisolated
-     * indices).</li>
-     * </ol>
-     * If the task succeeds, then return the commit time for the task.
-     * Otherwise, the write set of the transaction will have been discarded and
-     * the transaction will be marked as aborted.
-     */
     protected long commitImpl(final TxState state) throws ExecutionException,
             InterruptedException {
 
@@ -233,8 +230,8 @@ abstract public class JournalTransactionService extends
             
         }
         
-        final AbstractTx localState = (AbstractTx) journal
-                .getLocalTransactionManager().getTx(state.tx);
+        final Tx localState = journal.getLocalTransactionManager().getTx(
+                state.tx);
 
         if (localState == null) {
 
@@ -265,10 +262,10 @@ abstract public class JournalTransactionService extends
                     
                     localState.setRunState(RunState.Committed);
 
-                    state.setRunState(RunState.Committed);
-                    
                     journal.getLocalTransactionManager().deactivateTx(
                             localState);
+                    
+                    state.setRunState(RunState.Committed);
                     
                     return 0L;
 
@@ -294,20 +291,51 @@ abstract public class JournalTransactionService extends
             concurrencyManager.getWriteService().submit(task).get();
 
             /*
-             * @todo these state changes need to be made inside of
-             * SinglePhaseTask while it is holding the lock.
+             * FIXME The state changes for the local tx should be atomic across
+             * this operation. In order to do that we have to make those changes
+             * inside of SinglePhaseTask while it is holding the lock, but after
+             * it has committed. Perhaps the best way to do this is with a pre-
+             * and post- call() API since we can not hold the lock across the
+             * task otherwise (it will deadlock).
              */
-            state.setRunState(RunState.Committed);
-            
-            journal.getLocalTransactionManager().deactivateTx(localState);
 
-        } catch(Throwable t) {
+            localState.lock.lock();
             
-            log.error(t.getMessage(),t);//@todo remove.
+            try {
             
-            state.setRunState(RunState.Aborted);
+                localState.setRunState(RunState.Committed);
+
+                journal.getLocalTransactionManager().deactivateTx(localState);
             
-            journal.getLocalTransactionManager().deactivateTx(localState);
+                state.setRunState(RunState.Committed);
+
+            } finally {
+                
+                localState.lock.unlock();
+                
+            }
+
+        } catch (Throwable t) {
+
+//            log.error(t.getMessage(), t);
+
+            localState.lock.lock();
+
+            try {
+
+                localState.setRunState(RunState.Aborted);
+
+                journal.getLocalTransactionManager().deactivateTx(localState);
+
+                state.setRunState(RunState.Aborted);
+
+                throw new RuntimeException(t);
+                
+            } finally {
+                
+                localState.lock.unlock();
+
+            }
 
         }
 
@@ -315,6 +343,8 @@ abstract public class JournalTransactionService extends
          * Note: This is returning the commitTime set on the task when it was
          * committed as part of a group commit.
          */
+        
+//        log.warn("\n" + state + "\n" + localState);
 
         return task.getCommitTime();
 
@@ -340,13 +370,13 @@ abstract public class JournalTransactionService extends
         /**
          * The transaction that is being committed.
          */
-        private final AbstractTx state;
+        private final Tx state;
 
         private final ILocalTransactionManager localTransactionManager;
         
         public SinglePhaseCommit(final IConcurrencyManager concurrencyManager,
                 final ILocalTransactionManager localTransactionManager,
-                final AbstractTx state) {
+                final Tx state) {
 
             super(concurrencyManager, ITx.UNISOLATED, state.getDirtyResource());
 
@@ -397,7 +427,7 @@ abstract public class JournalTransactionService extends
     /**
      * The last commit time from the current root block.
      */
-    final public long lastCommitTime() {
+    final public long getLastCommitTime() {
         
         return journal.getRootBlockView().getLastCommitTime();
         
@@ -414,24 +444,15 @@ abstract public class JournalTransactionService extends
     }
 
     /**
-     * Ignored since the {@link Journal} can not release history.
-     */
-    public void setReleaseTime(long releaseTime) throws IOException {
-        
-        // NOP
-        
-    }
-    
-    /**
-     * Always returns ZERO (0L).
+     * Always returns ZERO (0L) since history can not be released on the
+     * {@link Journal}.
      */
     @Override
-    protected long getReleaseTime() {
+    public long getReleaseTime() {
 
         return 0L;
         
     }
-
 
     /**
      * Throws exception since distributed transactions are not used for a single
@@ -448,6 +469,19 @@ abstract public class JournalTransactionService extends
      * {@link Journal}.
      */
     public boolean committed(long tx, UUID dataService) throws IOException {
+
+        throw new UnsupportedOperationException();
+        
+    }
+
+    /**
+     * Throws exception.
+     * 
+     * @throws UnsupportedOperationException
+     *             always.
+     */
+    @Override
+    public AbstractFederation getFederation() {
 
         throw new UnsupportedOperationException();
         

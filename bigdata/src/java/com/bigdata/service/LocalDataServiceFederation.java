@@ -83,7 +83,7 @@ public class LocalDataServiceFederation extends AbstractFederation {
                 
             }
             
-            public void setReleaseTime(final long releaseTime) {
+            public void setEarliestTxStartTime(final long releaseTime) {
                 
                 dataService.setReleaseTime(releaseTime);
                 

@@ -93,6 +93,10 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
         // when the data are persistent use the test to name the data directory.
         properties.setProperty(EmbeddedClient.Options.DATA_DIR, getName());
         
+        // when the data are persistent use the test to name the data directory.
+        properties.setProperty(DistributedTransactionService.Options.DATA_DIR,
+                new File(getName(), "txService").toString());
+        
         /*
          * Disable the o/s specific statistics collection for the test run.
          * 
