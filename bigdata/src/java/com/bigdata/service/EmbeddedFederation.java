@@ -256,34 +256,12 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
                         ""+Options.DEFAULT_CREATE_TEMP_FILE));
 
         /*
-         * Start the timestamp service.
-         */
-        abstractTransactionService = new EmbeddedTransactionServiceImpl(UUID.randomUUID(),
-                properties).start();
-
-        /*
-         * Start the lock manager.
-         */
-        resourceLockManager = new EmbeddedResourceLockServiceImpl(UUID.randomUUID(),
-                properties).start();
-        
-        /*
-         * Start the load balancer.
-         */
-        loadBalancerService = new EmbeddedLoadBalancerServiceImpl(UUID.randomUUID(),
-                properties).start();
-
-        /*
          * The directory in which the data files will reside.
          */
         if (isTransient) {
 
+            // No data directory.
             dataDir = null;
-            
-            /*
-             * Always do first time startup since there is no persistent state.
-             */
-            ndataServices = createFederation(properties, isTransient);
 
         } else {
 
@@ -349,6 +327,59 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
                                 + dataDir.getAbsolutePath());
 
             }
+            
+        }
+        
+        /*
+         * Start the transaction service.
+         */
+        {
+
+            final Properties p = new Properties(properties);
+            
+            if (isTransient) {
+
+                // disable snapshots
+                p.setProperty(
+                                EmbeddedTransactionServiceImpl.Options.SHAPSHOT_INTERVAL,
+                                "0");
+                
+            } else {
+                
+                // specify the data directory for the txService.
+                p.setProperty(EmbeddedTransactionServiceImpl.Options.DATA_DIR,
+                        new File(dataDir, "txService").toString());
+                
+            }
+            
+            abstractTransactionService = new EmbeddedTransactionServiceImpl(
+                    UUID.randomUUID(), p).start();
+            
+        }
+
+        /*
+         * Start the lock manager.
+         */
+        resourceLockManager = new EmbeddedResourceLockServiceImpl(UUID.randomUUID(),
+                properties).start();
+        
+        /*
+         * Start the load balancer.
+         */
+        loadBalancerService = new EmbeddedLoadBalancerServiceImpl(UUID.randomUUID(),
+                properties).start();
+
+        /*
+         * The directory in which the data files will reside.
+         */
+        if (isTransient) {
+
+            /*
+             * Always do first time startup since there is no persistent state.
+             */
+            ndataServices = createFederation(properties, isTransient);
+
+        } else {
 
             /*
              * Persistent (re-)start.

@@ -89,10 +89,10 @@ public class TestAll extends TestCase {
         // test ability to re-open an embedded federation.
         suite.addTestSuite( TestRestartSafe.class );
 
-        /*
-         * @todo test of the transaction service with a federation, potentially
-         * including tests with mock clients (just the client commit protocol).
-         */
+        // unit tests for the distributed transaction service's snapshots.
+        suite.addTestSuite(TestSnapshotHelper.class);
+
+        // unit tests of the transaction service.
         suite.addTestSuite(TestDistributedTransactionService.class);
         
         // test journal overflow scenarios (split/join).

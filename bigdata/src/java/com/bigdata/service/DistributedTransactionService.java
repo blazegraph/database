@@ -56,11 +56,11 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.concurrent.LockManagerTask;
+import com.bigdata.config.LongValidator;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.Journal;
 import com.bigdata.journal.RunState;
 import com.bigdata.util.concurrent.ExecutionExceptions;
 import com.ibm.icu.impl.ByteBuffer;
@@ -90,7 +90,29 @@ public abstract class DistributedTransactionService extends
          */
         String DATA_DIR = DistributedTransactionService.class.getName()
                 + ".dataDir";
-        
+
+        /**
+         * The interval in milliseconds between writing a snapshot of the index
+         * of accessible commit points into the {@link #DATA_DIR} ({@value #DEFAULT_SHAPSHOT_INTERVAL}).
+         * <p>
+         * Two snapshots are retained of the commit time index so that those
+         * historical commit times required for reading on committed states of
+         * the database GT the <i>releaseTime</i> may be on hand after a
+         * service restart. Two snapshots are maintained, with the older
+         * snapshot being overwritten each time. A snapshot is written every N
+         * milliseconds, where N is configured using this property, and also
+         * when the service is shutdown.
+         * <p>
+         * This MAY be ZERO (0L) to disable snapshots - a feature that is used
+         * by the {@link EmbeddedFederation} when run in a diskless mode.
+         */
+        String SHAPSHOT_INTERVAL = DistributedTransactionService.class
+                .getName()
+                + ".snapshotInterval";
+
+        /** 5 minutes (in millseconds). */
+        String DEFAULT_SHAPSHOT_INTERVAL = ""
+                + (5 * 60 * 1000); 
     }
 
     /**
@@ -108,45 +130,34 @@ public abstract class DistributedTransactionService extends
 
     /**
      * A {@link BTree} containing a log of the historical commit points.
-     * 
-     * @todo there are several ways to make this persistent:
-     *       <p>
-     *       Use a {@link BTree} on a {@link Journal}. One downside is that the
-     *       journal will grow without bound. We could periodically do a custom
-     *       overflow operations to address that or we could create a read-write
-     *       store using some of the same logic as the journal. Note: In order
-     *       to have atomic updates on the journal will require a commit of that
-     *       journal per commit time reported to the transaction service. That
-     *       will also require making the nodes in the {@link BTree} persistent,
-     *       which will cause the {@link Journal} to grow much faster than would
-     *       otherwise be warranted.
-     *       <p>
-     *       Use a transient {@link BTree} and periodically snapshot the ordered
-     *       array of commit times onto a binary image on a file. There could be
-     *       two of these images, with one being overwritten each time a newer
-     *       image is written.
-     *       <p>
-     *       Use a transient {@link BTree} and only write it on the disk during
-     *       {@link #shutdown()}. This option is probably fine if there are
-     *       failover services running.
-     *       <p>
-     *       Since there is going to be high overhead associated with having an
-     *       ACID log of the commit times, it is well worth asking what is at
-     *       stake if we loose part of the commit time log. The main things that
-     *       it gives us are (a) the half-open ranges within which we can
-     *       allocate read-historical transactions; and (b) the last commit time
-     *       on record. It seems that creating an image of the log every N
-     *       seconds should be sufficient.
+     * <p>
+     * The main things that it gives us are (a) the half-open ranges within
+     * which we can allocate read-historical transactions; and (b) the last
+     * commit time on record. It seems that creating an image of the log every N
+     * seconds should be sufficient.
+     * <p>
+     * Note: Read and write operations on this index MUST be synchronized on the
+     * index object.
      */
-    private final CommitTimeIndex commitTimeIndex;
+    protected final CommitTimeIndex commitTimeIndex;
 
-    private final File dataDir;
+    /**
+     * True iff the service does not write any state on the disk.
+     */
+    private final boolean isTransient;
+    
+    /**
+     * The data directory -or- <code>null</code> iff the service is transient.
+     */
+    protected final File dataDir;
 
     /**
      * The interval in milliseconds between logging an image of the
      * {@link #commitTimeIndex}.
+     * 
+     * @see Options#COMMIT_TIME_INDEX_SHAPSHOT_INTERVAL
      */
-    private final long commitTimeLogInterval = 5 * 60 * 1000;
+    private final long snapshotInterval;
     
     /**
      * The last (known) commit time.
@@ -165,9 +176,30 @@ public abstract class DistributedTransactionService extends
             throw new RuntimeException("Required property: " + Options.DATA_DIR);
 
         }
+        
+        snapshotInterval = LongValidator.GTE_ZERO.parse(
+                Options.SHAPSHOT_INTERVAL, properties.getProperty(
+                        Options.SHAPSHOT_INTERVAL,
+                        Options.DEFAULT_SHAPSHOT_INTERVAL));
 
-        dataDir = new File(properties.getProperty(Options.DATA_DIR));
+        if (INFO)
+            log.info(Options.SHAPSHOT_INTERVAL + "=" + snapshotInterval);
 
+        isTransient = snapshotInterval == 0;
+
+        if (isTransient) {
+            
+            dataDir = null;
+            
+        } else {
+            
+            dataDir = new File(properties.getProperty(Options.DATA_DIR));
+
+            if (INFO)
+                log.info(Options.DATA_DIR + "=" + dataDir);
+            
+        }
+        
         // Create transient BTree for the commit time log.
         commitTimeIndex = CommitTimeIndex.createTransient();
 
@@ -185,6 +217,15 @@ public abstract class DistributedTransactionService extends
      */
     private void setup() {
 
+        if(isTransient) {
+            
+            // nothing committed yet.
+            lastCommitTime = 0L;
+
+            return;
+
+        }
+        
         if (!dataDir.exists()) {
 
             /*
@@ -207,13 +248,14 @@ public abstract class DistributedTransactionService extends
         {
 
             // the files on which the images should have been written.
-            final File file0 = new File(dataDir, BASENAME + "0" + LOG);
+            final File file0 = new File(dataDir, BASENAME + "0" + EXT);
 
-            final File file1 = new File(dataDir, BASENAME + "1" + LOG);
+            final File file1 = new File(dataDir, BASENAME + "1" + EXT);
 
             if (!file0.exists() && !file1.exists()) {
 
-                log.warn("No commit time logs - assuming new service.");
+                log.warn("No commit time logs - assuming new service: dataDir="
+                        + dataDir);
 
                 // nothing committed yet.
                 lastCommitTime = 0L;
@@ -221,34 +263,44 @@ public abstract class DistributedTransactionService extends
                 return;
 
             }
-            // timestamps on those files.
+            // timestamps on those files (zero if the file does not exist)
             final long time0 = file0.lastModified();
             final long time1 = file1.lastModified();
 
             // true iff file0 is more recent.
-            final boolean isFile0 = time0 < time1;
+            final boolean isFile0 = (time0 != 0L && time1 != 0L) //
+                ? (time0 > time1 ? true: false)// Note: both files exist.
+                : (time0 != 0L ? true: false)// Note: only one file exists
+                ;
 
             final File file = isFile0 ? file0 : file1;
+
+//            System.err.println("file0: "+file0.lastModified());
+//            System.err.println("file1: "+file1.lastModified());
+//            System.err.println("isFile0="+isFile0);
+
+            /*
+             * Note: On restart the value of this counter is set to either
+             * ONE(1) or TWO(1) depending on which snapshot file is more
+             * current.
+             * 
+             * It is ONE(1) if we read file0 since the counter would be ONE(1)
+             * after we write file0 for the first time.
+             * 
+             * It is TWO(2) if we read file1 since the counter would be TWO(2)
+             * after we write file1 for the first time.
+             */
+            snapshotCount = isFile0 ? 1 : 2;
 
             try {
 
                 // read most recent image.
-                final FileInputStream is = new FileInputStream(file);
+                final int entryCount = SnapshotHelper.read(commitTimeIndex,
+                        file);
 
-                try {
-
-                    final BufferedInputStream bis = new BufferedInputStream(is);
-
-                    final DataInputStream dis = new DataInputStream(bis);
-
-                    CommitTimeImage.read(commitTimeIndex, dis);
-
-                } finally {
-
-                    is.close();
-
-                }
-
+                log.warn("Read snapshot: entryCount=" + entryCount + ", file="
+                        + file);
+                
             } catch (IOException ex) {
 
                 throw new RuntimeException("Could not read file: " + file, ex);
@@ -277,28 +329,37 @@ public abstract class DistributedTransactionService extends
      * Basename for the files written in the {@link #dataDir} containing images
      * of the {@link #commitTimeIndex}.
      */
-    static private final String BASENAME = "commitTime";
+    static protected final String BASENAME = "commitTime";
     
     /**
-     * Extension for the files written in the {@link #dataDir} containing images
-     * of the {@link #commitTimeIndex}.
+     * Extension for the files written in the {@link #dataDir} containing
+     * snapshots of the {@link #commitTimeIndex}.
      */
-    static private final String LOG = ".log";
+    static protected final String EXT = ".snapshot";
     
     /**
-     * #of times we have written the image of the {@link #commitTimeIndex}.
+     * #of times we have written a snapshot of the {@link #commitTimeIndex}.
      */
-    private long commitTimeIndexWriteCount = 0L;
+    private long snapshotCount = 0L;
     
     /**
-     * A task that writes an image of the commit time index onto a pair of
+     * Runs the {@link SnapshotTask} once.
+     */
+    public void snapshot() {
+        
+        new SnapshotTask().run();
+
+    }
+    
+    /**
+     * A task that writes a snapshot of the commit time index onto a pair of
      * alternating files. This is in the spirit of the Challis algorithm, but
      * the approach is less rigerous.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private class WriteCommitTimeIndexTask implements Runnable {
+    private class SnapshotTask implements Runnable {
       
         /**
          * Note: Anything thrown out of this method will cause the task to no
@@ -306,35 +367,45 @@ public abstract class DistributedTransactionService extends
          */
         public void run() {
             
-            lock.lock();
+            if(isTransient) {
+
+                // snapshot not supported for transient service.
+                throw new RuntimeException("Service is transient");
+                
+            }
             
+            lock.lock();
+
             try {
 
                 final long begin = System.currentTimeMillis();
 
                 // either 0 or 1.
-                final int i = (int) commitTimeIndexWriteCount % 2;
-                
-                final File file = new File(dataDir, BASENAME + i + LOG);
-                
-                try {
+                final int i = (int) snapshotCount % 2;
 
-                    writeIndexOnLogFile(file);
+                final File file = new File(dataDir, BASENAME + i + EXT);
 
-                } catch (IOException ex) {
+                final int entryCount;
+                synchronized (commitTimeIndex) {
 
-                    log.error(ex.getMessage(), ex);
+                    entryCount = SnapshotHelper.write(commitTimeIndex, file);
 
                 }
 
                 // increment counter iff successful.
-                commitTimeIndexWriteCount++;
-                
+                snapshotCount++;
+
                 final long elapsed = System.currentTimeMillis() - begin;
-                
-                log.warn("wrote commit time log: count="
-                        + commitTimeIndexWriteCount + ", file=" + file
+
+                log.warn("snapshot: snapshotCount=" + snapshotCount
+                        + ", entryCount=" + entryCount + ", file=" + file
                         + ", elapsed=" + elapsed);
+
+            } catch (Throwable t) {
+
+                log.error(t.getMessage(), t);
+
+                return;
 
             } finally {
 
@@ -343,41 +414,12 @@ public abstract class DistributedTransactionService extends
             }
 
         }
-
-        private void writeIndexOnLogFile(final File file) throws IOException {
-
-            synchronized (commitTimeIndex) {
-                
-                final FileOutputStream os = new FileOutputStream(file);
-
-                try {
-
-                    final BufferedOutputStream bos = new BufferedOutputStream(os);
-                    
-                    final DataOutputStream dos = new DataOutputStream(bos);
-                    
-                    // write the image on the file.
-                    CommitTimeImage.write(commitTimeIndex, dos);
-                    
-                    dos.flush();
-                    
-                    bos.flush();
-
-                } finally {
-
-                    os.close();
-
-                }
-                
-            }
-            
-        }
         
     };
     
     /**
-     * A helper class for reading and writing images of the commit time index.
-     * The image contains the commit timestamps in order.
+     * A helper class for reading and writing snapshots of the commit time
+     * index. The image contains the commit timestamps in order.
      * <p>
      * Note: The caller must prevent concurrent changes to the index.
      * 
@@ -392,9 +434,30 @@ public abstract class DistributedTransactionService extends
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class CommitTimeImage {
-       
-        static public void read(CommitTimeIndex ndx, DataInputStream is)
+    public static class SnapshotHelper {
+
+        static public int read(CommitTimeIndex ndx, File file)
+                throws IOException {
+
+            final FileInputStream is = new FileInputStream(file);
+
+            try {
+
+                final BufferedInputStream bis = new BufferedInputStream(is);
+
+                final DataInputStream dis = new DataInputStream(bis);
+
+                return SnapshotHelper.read(ndx, dis);
+
+            } finally {
+
+                is.close();
+
+            }
+
+        }
+        
+        static public int read(CommitTimeIndex ndx, DataInputStream is)
                 throws IOException {
 
             final int n = is.readInt();
@@ -404,10 +467,40 @@ public abstract class DistributedTransactionService extends
                 ndx.add(is.readLong());
 
             }
+
+            return n;
             
         }
 
-        static public void write(CommitTimeIndex ndx, DataOutputStream os)
+        static public int write(CommitTimeIndex ndx, File file)
+                throws IOException {
+
+            final FileOutputStream os = new FileOutputStream(file);
+
+            try {
+
+                final BufferedOutputStream bos = new BufferedOutputStream(os);
+
+                final DataOutputStream dos = new DataOutputStream(bos);
+
+                // write the image on the file.
+                final int entryCount = SnapshotHelper.write(ndx, dos);
+
+                dos.flush();
+                
+                bos.flush();
+
+                return entryCount;
+                
+            } finally {
+
+                os.close();
+
+            }
+
+        }
+        
+        static public int write(CommitTimeIndex ndx, DataOutputStream os)
                 throws IOException {
 
             final int entryCount = ndx.getEntryCount();
@@ -426,6 +519,8 @@ public abstract class DistributedTransactionService extends
 
                 os.writeLong(commitTime);
 
+                n++;
+                
             }
             
             if (n != entryCount) {
@@ -438,6 +533,8 @@ public abstract class DistributedTransactionService extends
                 throw new AssertionError();
                 
             }
+            
+            return entryCount;
             
         }
         
@@ -455,18 +552,9 @@ public abstract class DistributedTransactionService extends
         try {
 
             super.start();
+
+            addScheduledTasks();
             
-            final AbstractFederation fed = (AbstractFederation) getFederation();
-
-            // @todo config options (verify units).
-            notifyFuture = fed.addScheduledTask(new NotifyReleaseTimeTask(),
-                    60/* initialDelay */, 60/* delay */, TimeUnit.SECONDS);
-
-            // @todo config options (verify units).
-            writeFuture = fed.addScheduledTask(new WriteCommitTimeIndexTask(),
-                    commitTimeLogInterval/* initialDelay */,
-                    commitTimeLogInterval/* delay */, TimeUnit.MILLISECONDS);
-
             return this;
 
         } finally {
@@ -477,14 +565,48 @@ public abstract class DistributedTransactionService extends
         
     }
     
+    /**
+     * Adds the scheduled tasks.
+     */
+    protected void addScheduledTasks() {
+
+        if (!lock.isHeldByCurrentThread())
+            throw new IllegalMonitorStateException();
+
+        final AbstractFederation fed = (AbstractFederation) getFederation();
+
+        // @todo config options (verify units).
+        notifyFuture = fed.addScheduledTask(new NotifyReleaseTimeTask(),
+                60/* initialDelay */, 60/* delay */, TimeUnit.SECONDS);
+
+        if (snapshotInterval != 0L) {
+
+            // start the snapshot task.
+
+            writeFuture = fed.addScheduledTask(
+                    new SnapshotTask(),
+                    snapshotInterval/* initialDelay */,
+                    snapshotInterval/* delay */,
+                    TimeUnit.MILLISECONDS);
+
+        }
+
+    }
+    
     private ScheduledFuture notifyFuture = null;
     private ScheduledFuture writeFuture = null;
     
     public void shutdown() {
         
         lock.lock();
-        
         try {
+
+            switch (getRunState()) {
+            case Shutdown:
+            case ShutdownNow:
+            case Halted:
+                return;
+            }
 
             /*
              * First make sure that all tx are terminated - this is important
@@ -510,13 +632,65 @@ public abstract class DistributedTransactionService extends
             if (writeFuture != null)
                 writeFuture.cancel(false/* mayInterruptIfRunning */);
 
-            // write a final image during shutdown.
-            new WriteCommitTimeIndexTask().run();
+            if (snapshotInterval != 0L) {
+             
+                // write a final image during shutdown.
+                new SnapshotTask().run();
+                
+            }
 
         } finally {
 
             lock.unlock();
 
+        }
+
+    }
+
+    public void shutdownNow() {
+
+        lock.lock();
+        try {
+            
+            switch (getRunState()) {
+            case ShutdownNow:
+            case Halted:
+                return;
+            }
+
+            /*
+             * First make sure that all tx are terminated - this is important
+             * otherwise we will write the commit time index image before we
+             * have the last commit times on hand.
+             */
+            super.shutdownNow();
+
+            /*
+             * Cancel and interrupt if running.
+             */
+            if (notifyFuture != null)
+                notifyFuture.cancel(true/* mayInterruptIfRunning */);
+
+            /*
+             * Cancel this task and interrupt if running. Interrupting this will
+             * leave a partial snapshot on the disk, but we do not advance the
+             * counter unless the snapshot is successful so we will overwrite
+             * that partial snapshot below when we write a final snapshot.
+             */
+            if (writeFuture != null)
+                writeFuture.cancel(true/* mayInterruptIfRunning */);
+
+            if (snapshotInterval != 0L) {
+
+                // write a final snapshot during shutdown.
+                snapshot();
+                
+            }
+
+        } finally {
+
+            lock.unlock();
+            
         }
 
     }
@@ -529,12 +703,16 @@ public abstract class DistributedTransactionService extends
 
             super.destroy();
 
-            // delete the commit time index log files.
-            new File(dataDir, BASENAME + "0" + LOG).delete();
-            new File(dataDir, BASENAME + "1" + LOG).delete();
+            if (!isTransient) {
 
-            // delete the data directory (works iff it is empty).
-            dataDir.delete();
+                // delete the commit time index log files.
+                new File(dataDir, BASENAME + "0" + EXT).delete();
+                new File(dataDir, BASENAME + "1" + EXT).delete();
+
+                // delete the data directory (works iff it is empty).
+                dataDir.delete();
+
+            }
 
         } finally {
 
@@ -544,10 +722,12 @@ public abstract class DistributedTransactionService extends
         
     }
 
-    /*
-     * FIXME write unit tests for truncating the log.
+    /**
+     * Extended to truncate the head of the {@link #commitTimeIndex} such only
+     * the commit times requires for reading on timestamps GTE to the new
+     * releaseTime are retained.
      */
-    public void setReleaseTime(final long releaseTime) {
+    protected void setReleaseTime(long releaseTime) {
         
         super.setReleaseTime(releaseTime);
 
@@ -555,19 +735,33 @@ public abstract class DistributedTransactionService extends
          * Truncate the head of the commit time index since we will no longer
          * grant transactions whose start time is LTE the new releaseTime.
          */
-        synchronized (commitTimeIndex) {
+        
+        // Note: Use the current value.
+        releaseTime = getReleaseTime();
+        
+        if (releaseTime > 0) {
+        
+            synchronized (commitTimeIndex) {
 
-            final ITupleIterator itr = commitTimeIndex.rangeIterator(0L,
-                    releaseTime, 0/* capacity */, IRangeQuery.KEYS
-                            | IRangeQuery.CURSOR, null/* filter */);
+                /*
+                 * The exclusive upper bound is the timestamp of the earliest
+                 * commit point on which we can read with this [releaseTime].
+                 */
+                final long toKey = commitTimeIndex.find(releaseTime + 1);
 
-            while (itr.hasNext()) {
+                final ITupleIterator itr = commitTimeIndex.rangeIterator(0L,
+                        toKey, 0/* capacity */, IRangeQuery.KEYS
+                                | IRangeQuery.CURSOR, null/* filter */);
 
-                itr.next();
+                while (itr.hasNext()) {
 
-                // remove the tuple from the index.
-                itr.remove();
-                
+                    itr.next();
+
+                    // remove the tuple from the index.
+                    itr.remove();
+
+                }
+
             }
             
         }
@@ -1476,10 +1670,10 @@ public abstract class DistributedTransactionService extends
                     ((DistributedTransactionService) this).lockManager
                             .getCounters());
 
-            countersRoot.addCounter("logFileWriteCount",
+            countersRoot.addCounter("snapshotCount",
                     new Instrument<Long>() {
                         protected void sample() {
-                            setValue(commitTimeIndexWriteCount);
+                            setValue(snapshotCount);
                         }
                     });
 

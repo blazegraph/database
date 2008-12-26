@@ -242,12 +242,12 @@ public interface ITransactionService extends ITimestampService {
      */
     public long getLastCommitTime() throws IOException;
 
-    /**
-     * 
-     * @deprecated This will go away. Caller's will achieve the same effects
-     *             using read-only transactions.
-     */
-    public void setReleaseTime(long releaseTime) throws IOException;
+//    /**
+//     * 
+//     * @deprecated This will go away. Caller's will achieve the same effects
+//     *             using read-only transactions.
+//     */
+//    public void setReleaseTime(long releaseTime) throws IOException;
     
     /**
      * An {@link IDataService} MUST invoke this method before permitting an
