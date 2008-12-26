@@ -23,28 +23,45 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Dec 23, 2008
+ * Created on Dec 26, 2008
  */
 
 package com.bigdata.service;
 
-import java.io.File;
-import java.util.Properties;
+import java.io.IOException;
+import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 
-import junit.framework.TestCase2;
-
-import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.proc.IIndexProcedure;
+import com.bigdata.journal.ITx;
 
 /**
- * Unit tests of the {@link DistributedTransactionService}.
+ * Unit tests of local (all writes are on a single data service) and distributed
+ * abort and commit protocols for an {@link IBigdataFederation} using the
+ * {@link DistributedTransactionService}.
  * 
- * @todo unit tests of distributed tx commits with mock clients?
+ * @todo the easiest way to set this up is to place different indices onto
+ *       different data services, using just 2 data services to make setup
+ *       easier.
+ *       <p>
+ *       An alternative setup would pre-partition a single scale-out index so
+ *       that it was on both data services.
+ * 
+ * @todo There should be explicit tests of distributed transactions that involve
+ *       different indices, including the case where the MDS is participating in
+ *       the tx. This should really be no different, but the tests should cover
+ *       the case anyway.  In point, perhaps the easiest thing to do is to register
+ *       different indices on each data service since the commit protocol is
+ *       entirely in terms of the local index resources (it pays no attention
+ *       to scale-out indices, so this is best really).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestDistributedTransactionService extends TestCase2 {
+public class TestDistributedTransactionService extends
+        AbstractEmbeddedFederationTestCase {
 
     /**
      * 
@@ -59,318 +76,118 @@ public class TestDistributedTransactionService extends TestCase2 {
         super(arg0);
     }
 
-    protected static class MockDistributedTransactionService extends DistributedTransactionService {
+    /**
+     * Unit test of abort of a read-write tx that writes on a single data
+     * service.
+     * 
+     * @throws ExecutionException
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    public void test_localTxAbort() throws IOException, InterruptedException, ExecutionException {
         
-        public MockDistributedTransactionService(
-                Properties properties) {
-            
-            super(properties);
-            
-        }
+        final String name1 = "ndx1";
+        
+        dataService1.registerIndex(name1, new IndexMetadata(name1, UUID
+                .randomUUID()));
+        
+        final long tx = fed.getTransactionService().newTx(ITx.UNISOLATED);
+        
+        // submit write operation to the ds.
+        dataService1.submit(tx, name1, new IIndexProcedure(){
 
-        @Override
-        public AbstractFederation getFederation() {
-
-            throw new UnsupportedOperationException();
-
-        }
-
-        protected void setReleaseTime(final long releaseTime) {
-            
-            lock.lock();
-            
-            try {
+            public Object apply(IIndex ndx) {
                 
-                super.setReleaseTime(releaseTime);
+                // write on the index.
+                ndx.insert(new byte[]{1}, new byte[]{1});
                 
-            } finally {
-                
-                lock.unlock();
-                
+                return null;
             }
-            
-        }
+
+            public boolean isReadOnly() {
+                return false;// read-write.
+            }});
         
-        /**
-         * Note: The scheduled tasks are disabled for the unit test since we do
-         * not have a federation for this test.
-         */
-        @Override
-        protected void addScheduledTasks() {
+        // verify write not visible to unisolated operation.
+        dataService1.submit(ITx.UNISOLATED, name1, new IIndexProcedure(){
 
-            // NOP.
+            public Object apply(IIndex ndx) {
+                
+                // verify not in the index.
+                assertFalse(ndx.contains(new byte[]{1}));
+                
+                return null;
+            }
 
-        }
+            public boolean isReadOnly() {
+                return false;// read-write.
+            }});
 
-        public MockDistributedTransactionService start() {
+        // abort the tx.
+        fed.getTransactionService().abort(tx);
 
-            super.start();
+        // verify write still not visible.
+        dataService1.submit(ITx.UNISOLATED, name1, new IIndexProcedure(){
 
-            return this;
-            
-        }
+            public Object apply(IIndex ndx) {
+                
+                // verify not in the index.
+                assertFalse(ndx.contains(new byte[]{1}));
+                
+                return null;
+            }
 
-        /**
-         * Exposed to the unit tests.
-         */
-        CommitTimeIndex getCommitTimeIndex() {
-            
-            return commitTimeIndex;
-            
+            public boolean isReadOnly() {
+                return false;// read-write.
+            }});
+
+        // verify operation rejected for aborted read-write tx.
+        try {
+        dataService1.submit(tx, name1, new IIndexProcedure(){
+
+            public Object apply(IIndex ndx) {
+                // NOP
+                return null;
+            }
+
+            public boolean isReadOnly() {
+                return false;// read-write.
+            }});
+        fail("Expecting exception");
+        } catch(Throwable t) {
+            log.info("Ignoring expected error: "+t);
         }
         
     }
     
     /**
-     * Return an array containing the ordered keys in the
-     * {@link CommitTimeIndex}.
-     * 
-     * @param ndx
-     * 
-     * @return The array.
+     * @todo unit test of abort of a read-write tx that writes on a more than
+     *       one data service.
      */
-    long[] toArray(CommitTimeIndex ndx) {
+    public void test_distTxAbort() {
         
-        synchronized(ndx) {
-            
-            long[] a = new long[ndx.getEntryCount()];
-            
-            final ITupleIterator itr = ndx.rangeIterator();
-            
-            int i = 0;
-            
-            while(itr.hasNext()) {
-                
-                final ITuple tuple = itr.next();
-                
-                a[i] = ndx.decodeKey(tuple.getKey());
-                
-                i++;
-                
-            }
-            
-            return a;
-            
-        }
+        fail("write test");
         
     }
     
     /**
-     * Unit tests verifies that the head of the commit time index is truncated
-     * when the release time is advanced and that it is still possible to obtain
-     * a read-only tx as of the timestamp immediately after the current release
-     * time.
-     * 
+     * @todo unit test of commit of a read-write tx that writes on a single data
+     *       service.
      */
-    public void test_setReleaseTime() {
-
-        final Properties properties = new Properties();
-
-        properties.setProperty(DistributedTransactionService.Options.DATA_DIR,
-                getName());
-
-        MockDistributedTransactionService service = new MockDistributedTransactionService(
-                properties).start();
-
-        try {
-
-            /*
-             * populate the commit index.
-             */
-            service.notifyCommit(10L);
-
-            service.notifyCommit(20L);
-
-            // verify the commit index.
-            {
-
-                CommitTimeIndex ndx = service.getCommitTimeIndex();
-
-                synchronized (ndx) {
-
-                    assertEquals(2, ndx.getEntryCount());
-
-                    assertEquals(new long[] { 10, 20 }, toArray(ndx));
-
-                }
-
-            }
-
-            // verify that we can obtain a read-only tx.
-            service.abort(service.newTx(10L));
-
-            // verify that we can obtain a read-only tx.
-            service.abort(service.newTx(20L));
-
-            service.setReleaseTime(20L - 1);
-            {
-
-                final CommitTimeIndex ndx = service.getCommitTimeIndex();
-
-                synchronized (ndx) {
-                    
-                    assertEquals(1, ndx.getEntryCount());
-                    
-                    assertEquals(new long[] { 20 }, toArray(ndx));
-                    
-                }
-
-            }
-            
-            // verify that we can still obtain a read-only tx for that commit time.
-            service.abort(service.newTx(20L));
-
-            /*
-             * Verify that we can not release the lastCommitTime.
-             */
-            assertEquals(20L,service.getLastCommitTime());
-            service.setReleaseTime(20L);
-            {
-
-                final CommitTimeIndex ndx = service.getCommitTimeIndex();
-
-                synchronized (ndx) {
-                    
-                    assertEquals(1, ndx.getEntryCount());
-                    
-                    assertEquals(new long[] { 20 }, toArray(ndx));
-                    
-                }
-
-            }
-            
-
-        }
-
-        finally {
-
-            service.destroy();
-
-        }
-
+    public void test_localTxCommit() {
+        
+        fail("write test");
+        
     }
 
     /**
-     * Unit test of the ability to snapshot the commit index. The test setups up
-     * the expected state of the commit index, verifies that state, shuts down
-     * the service, and verifies that a snapshot was written during shutdown.
-     * The test then restarts the service, and verifies that the commit index
-     * has the expected values (read from the snapshot). Another entry is then
-     * added to the commit index and the release time is advanced, which should
-     * cause the head of the commit index to be truncated. The test then
-     * verifies the expected state of the commit index, shuts down the service,
-     * and verifies that another snapshot file was written. Finally, we restart
-     * the service one more time and verify that the commit index has the data
-     * that we would expect if it had read the 2nd snapshot.
+     * @todo unit test of commit of a read-write tx that writes on a more than
+     *       one data service.
      */
-    public void test_snapshotCommitIndex() {
-
-        final Properties properties = new Properties();
-
-        properties.setProperty(DistributedTransactionService.Options.DATA_DIR,
-                getName());
-
-        MockDistributedTransactionService service = new MockDistributedTransactionService(
-                properties).start();
-
-        final File file0 = new File(service.dataDir,
-                DistributedTransactionService.BASENAME + "0"
-                        + DistributedTransactionService.EXT);
-
-        final File file1 = new File(service.dataDir,
-                DistributedTransactionService.BASENAME + "1"
-                        + DistributedTransactionService.EXT);
-
-        try {
-
-            /*
-             * populate the commit log.
-             */
-            service.notifyCommit(10L);
-
-            service.notifyCommit(20L);
-
-            {
-                
-                CommitTimeIndex ndx = service.getCommitTimeIndex();
-                
-                synchronized(ndx) {
-                    
-                    assertEquals(2, ndx.getEntryCount());
-
-                    assertEquals(new long[] { 10, 20 }, toArray(ndx));
-                    
-                }
-                
-            }
-
-            // should do a snapshot.
-            service.shutdown();
-
-            assertTrue(file0.exists());
-            assertFalse(file1.exists());
-
-            // restart the service.
-            service = new MockDistributedTransactionService(properties).start();
-
-            // verify the commit time index.
-            {
-                
-                final CommitTimeIndex ndx = service.getCommitTimeIndex();
-                
-                synchronized(ndx) {
-                    
-                    assertEquals(2, ndx.getEntryCount());
-
-                    assertEquals(new long[] { 10, 20 }, toArray(ndx));
-                    
-                }
-                
-            }
-
-            service.setReleaseTime(20L - 1);
-            {
-                
-                final CommitTimeIndex ndx = service.getCommitTimeIndex();
-
-                synchronized (ndx) {
-                    assertEquals(1, ndx.getEntryCount());
-                    assertEquals(new long[] { 20 }, toArray(ndx));
-                }
-
-            }
-
-            // should do a snapshot.
-            service.shutdown();
-
-//            System.err.println("file0: "+file0.lastModified());
-//            System.err.println("file1: "+file1.lastModified());
-            assertTrue(file0.exists());
-            assertTrue(file1.exists());
-
-            // restart the service.
-            service = new MockDistributedTransactionService(properties).start();
-            
-//          verify the commit time index.
-            {
-                
-                CommitTimeIndex ndx = service.getCommitTimeIndex();
-                
-                synchronized(ndx) {
-                    
-                    assertEquals(1, ndx.getEntryCount());
-
-                    assertEquals(new long[] { 20 }, toArray(ndx));
-                    
-                }
-                
-            }
-
-        } finally {
-
-            service.destroy();
-
-        }
-
+    public void test_distTxCommit() {
+        
+        fail("write test");
+        
     }
+
 }

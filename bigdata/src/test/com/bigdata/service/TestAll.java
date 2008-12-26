@@ -92,7 +92,10 @@ public class TestAll extends TestCase {
         // unit tests for the distributed transaction service's snapshots.
         suite.addTestSuite(TestSnapshotHelper.class);
 
-        // unit tests of the transaction service.
+        // unit tests of the commit time index for the dist. transaction service.
+        suite.addTestSuite(TestDistributedTransactionServiceRestart.class);
+        
+        // unit tests of single-phase and distributed tx commit protocol.
         suite.addTestSuite(TestDistributedTransactionService.class);
         
         // test journal overflow scenarios (split/join).
