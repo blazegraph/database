@@ -1301,16 +1301,26 @@ abstract public class StoreManager extends ResourceEvents implements
              */
             purgeIncompleteMoves();
             
-//            /*
-//             * Notify the timestamp service of the last commit time for the live
-//             * journal for this data service. This will be zero (0L) iff this is
-//             * a new journal on a new data service. This notification is
-//             * required to allow clients that use the global lastCommitTime to
-//             * pose queries after restart of a federation.
-//             */
-//
-//            getConcurrencyManager().getTransactionManager().notifyCommit(
-//                    liveJournalRef.get().getLastCommitTime());
+            /*
+             * Notify the transaction service of the last commit time for the
+             * live journal for this data service. This will be zero (0L) iff
+             * this is a new journal on a new data service.
+             * 
+             * Note: This notification is not required unless the commit time
+             * log for the transaction service is lost. In that case it provides
+             * a backup allowing new transactions to read from the last global
+             * commit point (once all data services have joined).
+             */
+
+            final long lastCommitTime = liveJournalRef.get()
+                    .getLastCommitTime();
+
+            if (lastCommitTime != 0L) {
+
+                getConcurrencyManager().getTransactionManager().notifyCommit(
+                        lastCommitTime);
+
+            }
             
         }
 

@@ -290,23 +290,23 @@ public class ProgramTask implements IProgramTask,
                     
                 }
                 
-                if (indexManager instanceof IBigdataFederation) {
-
-                    /*
-                     * Reset the release time to 0L after the ProgramTask is
-                     * finished so that we are no longer holding onto any historical
-                     * views.
-                     * 
-                     * FIXME This is a hack. We should be using a read-historical
-                     * transaction and letting the transaction manager handle the
-                     * release time for us. See my notes in executeMutation() for
-                     * more on this.
-                     */
-
-                    ((IBigdataFederation) indexManager).getTransactionService()
-                            .setReleaseTime(0L/* releaseTime */);
-                    
-                }
+//                if (indexManager instanceof IBigdataFederation) {
+//
+//                    /*
+//                     * Reset the release time to 0L after the ProgramTask is
+//                     * finished so that we are no longer holding onto any historical
+//                     * views.
+//                     * 
+//                     * FIXME This is a hack. We should be using a read-historical
+//                     * transaction and letting the transaction manager handle the
+//                     * release time for us. See my notes in executeMutation() for
+//                     * more on this.
+//                     */
+//
+//                    ((IBigdataFederation) indexManager).getTransactionService()
+//                            .setReleaseTime(0L/* releaseTime */);
+//                    
+//                }
 
                 return totals.mutationCount.get();
                 
@@ -472,6 +472,8 @@ public class ProgramTask implements IProgramTask,
         if (!action.isMutation())
             throw new IllegalArgumentException();
         
+        long tx = 0L;
+        try {
         if (indexManager instanceof IBigdataFederation) {
 
             /*
@@ -490,63 +492,86 @@ public class ProgramTask implements IProgramTask,
             
             final long lastCommitTime = indexManager.getLastCommitTime();
 
+            try {
+                /*
+                 * A read-only tx reading from the lastCommitTime.
+                 * 
+                 * Note: This provides a read-lock on the commit time from which
+                 * the mutation task will read.
+                 * 
+                 * @todo we could use the [tx] as the readTimestamp and we could
+                 * use ITx.READ_COMMITTED rather that explicitly looking up the
+                 * lastCommitTime.
+                 */
+                    tx = ((IBigdataFederation) indexManager)
+                        .getTransactionService().newTx(lastCommitTime);
+            } catch (IOException ex) {
+                throw new RuntimeException(ex);
+            }
+            
             // the timestamp that we will read on for this step.
             joinNexusFactory.setReadTimestamp(TimestampUtility
-                    .asHistoricalRead(lastCommitTime));
-
-            try {
-                
-                /*
-                 * Allow the data services to release data for older views.
-                 * 
-                 * FIXME This is being done in order to prevent the release of
-                 * data associated with the [readTimestamp] while the rule(s)
-                 * are reading on those views. In fact, the rules should be
-                 * using a read-historical transaction and releasing the
-                 * transaction when they are finished which would allow the
-                 * transaction manager to take responsibility for globally
-                 * determining the releaseTime for the federation. In the
-                 * absence of that facility, this has been hacked so that we can
-                 * do scale-out closure without having our views disrupted by
-                 * overflow allowing resources to be purge that are in use by
-                 * those views. Basically, we are declaring a read lock.
-                 * 
-                 * The problem discussed here can be readily observed if you
-                 * attempt the closure of a large data set (U20 may do it, U50
-                 * will) or if you reduce the journal extent so that overflow is
-                 * triggered more frequently, in which case you may be able to
-                 * demonstrate the problem with a much smaller data set.
-                 * 
-                 * Also note that this is globally advancing the release time.
-                 * This means that you can not compute closure for two different
-                 * RDF DBs within the same federation at the same time.
-                 * 
-                 * Also see the code that resets the release time to 0L after
-                 * the ProgramTask is finished.
-                 */
-                
-                if (lastCommitTime != 0L) {
-
-                    /*
-                     * There is some committed state, so update the release time
-                     * such that the timestamp specified by [lastCommitTime]
-                     * does not get released.
-                     */
-                    
-                    final long releaseTime = lastCommitTime - 1;
-
-                    log.warn("readLock: releaseTime="+releaseTime+", step="+step.getName());
-                    
-                    ((IBigdataFederation) indexManager).getTransactionService()
-                            .setReleaseTime(releaseTime);
-
-                }
-
-            } catch (IOException e) {
+                  .asHistoricalRead(lastCommitTime));
             
-                throw new RuntimeException(e);
-                
-            }
+//            final long lastCommitTime = indexManager.getLastCommitTime();
+//
+//            // the timestamp that we will read on for this step.
+//            joinNexusFactory.setReadTimestamp(TimestampUtility
+//                    .asHistoricalRead(lastCommitTime));
+//
+//            try {
+//                
+//                /*
+//                 * Allow the data services to release data for older views.
+//                 * 
+//                 * FIXME This is being done in order to prevent the release of
+//                 * data associated with the [readTimestamp] while the rule(s)
+//                 * are reading on those views. In fact, the rules should be
+//                 * using a read-historical transaction and releasing the
+//                 * transaction when they are finished which would allow the
+//                 * transaction manager to take responsibility for globally
+//                 * determining the releaseTime for the federation. In the
+//                 * absence of that facility, this has been hacked so that we can
+//                 * do scale-out closure without having our views disrupted by
+//                 * overflow allowing resources to be purge that are in use by
+//                 * those views. Basically, we are declaring a read lock.
+//                 * 
+//                 * The problem discussed here can be readily observed if you
+//                 * attempt the closure of a large data set (U20 may do it, U50
+//                 * will) or if you reduce the journal extent so that overflow is
+//                 * triggered more frequently, in which case you may be able to
+//                 * demonstrate the problem with a much smaller data set.
+//                 * 
+//                 * Also note that this is globally advancing the release time.
+//                 * This means that you can not compute closure for two different
+//                 * RDF DBs within the same federation at the same time.
+//                 * 
+//                 * Also see the code that resets the release time to 0L after
+//                 * the ProgramTask is finished.
+//                 */
+//                
+//                if (lastCommitTime != 0L) {
+//
+//                    /*
+//                     * There is some committed state, so update the release time
+//                     * such that the timestamp specified by [lastCommitTime]
+//                     * does not get released.
+//                     */
+//                    
+//                    final long releaseTime = lastCommitTime - 1;
+//
+//                    log.warn("readLock: releaseTime="+releaseTime+", step="+step.getName());
+//                    
+//                    ((IBigdataFederation) indexManager).getTransactionService()
+//                            .setReleaseTime(releaseTime);
+//
+//                }
+//
+//            } catch (IOException e) {
+//            
+//                throw new RuntimeException(e);
+//                
+//            }
             
         }
 
@@ -563,7 +588,18 @@ public class ProgramTask implements IProgramTask,
          * Note: The task is responsible for computing the aggregate mutation
          * count.
          */
-        return mutationTask.submit().get();
+            return mutationTask.submit().get();
+        } finally {
+            if (tx != 0L) {
+                // terminate the read-only tx (releases the read-lock).
+                try {
+                    ((IBigdataFederation) indexManager).getTransactionService()
+                            .abort(tx);
+                } catch (IOException ex) {
+                    throw new RuntimeException(ex);
+                }
+            }
+        }
         
     }
 

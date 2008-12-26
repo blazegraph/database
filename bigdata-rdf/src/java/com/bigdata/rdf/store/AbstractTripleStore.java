@@ -174,7 +174,7 @@ import com.bigdata.striterator.IKeyOrder;
  *       scale-out index, such as {@link #getExactStatementCount()} or
  *       {@link #getExactStatementCount()}.
  *       <p>
- *       The workaround is to use {@link ITimestampService#setReleaseTime(long)}
+ *       The workaround is to use {@link ITimestampService#setEarliestTxStartTime(long)}
  *       to ensure that the data for the historical view are not released during
  *       the operation.
  *       <p>

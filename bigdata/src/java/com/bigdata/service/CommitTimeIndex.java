@@ -23,7 +23,9 @@ import com.bigdata.rawstore.IRawStore;
  *       generic. That same logic is replicated right now in several places and
  *       there is no reason for that. Allow 0L for {@link #find(long)}, but
  *       check all callers first to see who might use that for error checking
- *       and then modify callers using 1L to use 0L.
+ *       and then modify callers using 1L to use 0L. In fact,
+ *       {@link #find(long)} should probably accept the value to be returned in
+ *       case there is no LTE entry (that is, in case the index is empty).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -49,9 +51,8 @@ public class CommitTimeIndex extends BTree {
         metadata.setTupleSerializer(new TupleSerializer(
                 new ASCIIKeyBuilderFactory(Bytes.SIZEOF_LONG)));
 
-        return (CommitTimeIndex) BTree
-                .createTransient(/* store, */metadata);
-        
+        return (CommitTimeIndex) BTree.createTransient(/* store, */metadata);
+
     }
 
     /**
@@ -217,10 +218,10 @@ public class CommitTimeIndex extends BTree {
      * 
      * @exception IllegalArgumentException
      *                if <i>commitTime</i> is <code>0L</code>.
-     * @exception IllegalArgumentException
-     *                if there is already an entry registered under for the
-     *                given timestamp.
      */
+//    * @exception IllegalArgumentException
+//    *                if there is already an entry registered under for the
+//    *                given timestamp.
     public void add(final long commitTime) {
 
         if (commitTime == 0L)
@@ -228,14 +229,16 @@ public class CommitTimeIndex extends BTree {
         
         final byte[] key = encodeKey(commitTime);
         
-        if(super.contains(key)) {
+        if(!super.contains(key)) {
             
-            throw new IllegalArgumentException("entry exists: timestamp="
-                    + commitTime);
-            
-        }
+//            throw new IllegalArgumentException("entry exists: timestamp="
+//                    + commitTime);
+//            
+//        }
         
         super.insert(key, null);
+        
+        }
         
     }
     

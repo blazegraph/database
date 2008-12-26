@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.TimeUnit;
 
 import junit.framework.TestCase2;
 
@@ -64,135 +65,192 @@ public class TestTransactionService extends TestCase2 {
     /**
      * Implementation uses a mock client.
      */
-    protected AbstractTransactionService newFixture() {
-        
-        return newFixture(new Properties());
-        
+    protected MockTransactionService newFixture() {
+
+        return new MockTransactionService(new Properties()).start();
+
     }
-    
+
     /**
      * Implementation uses a mock client.
      */
-    protected AbstractTransactionService newFixture(Properties p) {
-        
-        return new AbstractTransactionService(p) {
+    protected MockTransactionService newFixture(Properties p) {
 
-            @Override
-            public AbstractFederation getFederation() {
-                return null;
-            }
+        return new MockTransactionService(p).start();
 
-            @Override
-            protected void abortImpl(TxState state) {
-                
-                state.setRunState(RunState.Aborted);
-                
-            }
-
-            @Override
-            protected long commitImpl(TxState state) throws Exception {
-
-                state.setRunState(RunState.Committed);
-
-                final long commitTime = nextTimestamp();
-                
-                notifyCommit(commitTime);
-                
-                return commitTime;
-                
-            }
-
-            /**
-             * Note: We are not testing distributed commits here so this is not
-             * implemented.
-             */
-            public long prepared(long tx, UUID dataService) throws 
-                    InterruptedException, BrokenBarrierException {
-                return 0;
-            }
-
-            /**
-             * Note: We are not testing distributed commits here so this is not
-             * implemented.
-             */
-            public boolean committed(long tx, UUID dataService)
-                    throws IOException, InterruptedException,
-                    BrokenBarrierException {
-                return false;
-            }
-
-            @Override
-            public long getLastCommitTime() {
-
-                return lastCommitTime;
-                
-            }
-
-            private long lastCommitTime = 0L;
-
-            protected long findCommitTime(final long timestamp) {
-                
-                synchronized(commitTimeIndex) {
-                    
-                    return commitTimeIndex.find(timestamp);
-                    
-                }
-                
-            }
-
-            protected long findNextCommitTime(long commitTime) {
-                
-                synchronized(commitTimeIndex) {
-                    
-                    return commitTimeIndex.findNext(commitTime);
-                    
-                }
-
-            }
-            
-            private final CommitTimeIndex commitTimeIndex = CommitTimeIndex.createTransient();
-
-            public void notifyCommit(long commitTime) {
-
-                synchronized(commitTimeIndex) {
-
-                    /*
-                     * Add all commit times
-                     */
-                    commitTimeIndex.add(commitTime);
-                    
-                    /*
-                     * Note: commit time notifications can be overlap such that they
-                     * appear out of sequence with respect to their values. This is Ok.
-                     * We just ignore any older commit times. However we do need to be
-                     * synchronized here such that the commit time notices themselves
-                     * are serialized so that we do not miss any.
-                     */
-                    
-                    if (lastCommitTime < commitTime) {
-
-                        lastCommitTime = commitTime;
-                        
-                    }
-                    
-                }
-                
-            }
-
-//            /**
-//             * Note: minReleaseAge is zero for this test suite.
-//             */
-//            @Override
-//            public long getMinReleaseAge() {
-//                
-//                return 0;
-//                
-//            }
-
-        }.start();
-        
     }
 
+    protected static class MockTransactionService extends
+            AbstractTransactionService {
+
+        public MockTransactionService(Properties p) {
+
+            super(p);
+
+        }
+
+        public MockTransactionService start() {
+            
+            super.start();
+            
+            return this;
+            
+        }
+        
+        @Override
+        public AbstractFederation getFederation() {
+            return null;
+        }
+
+        @Override
+        protected void abortImpl(TxState state) {
+
+            state.setRunState(RunState.Aborted);
+
+        }
+
+        @Override
+        protected long commitImpl(TxState state) throws Exception {
+
+            state.setRunState(RunState.Committed);
+
+            final long commitTime = nextTimestamp();
+
+            notifyCommit(commitTime);
+
+            return commitTime;
+
+        }
+
+        /**
+         * Note: We are not testing distributed commits here so this is not
+         * implemented.
+         */
+        public long prepared(long tx, UUID dataService)
+                throws InterruptedException, BrokenBarrierException {
+            return 0;
+        }
+
+        /**
+         * Note: We are not testing distributed commits here so this is not
+         * implemented.
+         */
+        public boolean committed(long tx, UUID dataService) throws IOException,
+                InterruptedException, BrokenBarrierException {
+            return false;
+        }
+
+        @Override
+        public long getLastCommitTime() {
+
+            return lastCommitTime;
+
+        }
+
+        private long lastCommitTime = 0L;
+
+        protected long findCommitTime(final long timestamp) {
+
+            synchronized (commitTimeIndex) {
+
+                return commitTimeIndex.find(timestamp);
+
+            }
+
+        }
+
+        protected long findNextCommitTime(long commitTime) {
+
+            synchronized (commitTimeIndex) {
+
+                return commitTimeIndex.findNext(commitTime);
+
+            }
+
+        }
+
+        private final CommitTimeIndex commitTimeIndex = CommitTimeIndex
+                .createTransient();
+
+        public void notifyCommit(long commitTime) {
+
+            synchronized (commitTimeIndex) {
+
+                /*
+                 * Add all commit times
+                 */
+                commitTimeIndex.add(commitTime);
+
+                /*
+                 * Note: commit time notifications can be overlap such that they
+                 * appear out of sequence with respect to their values. This is
+                 * Ok. We just ignore any older commit times. However we do need
+                 * to be synchronized here such that the commit time notices
+                 * themselves are serialized so that we do not miss any.
+                 */
+
+                if (lastCommitTime < commitTime) {
+
+                    lastCommitTime = commitTime;
+
+                }
+
+            }
+
+        }
+
+        /**
+         * Awaits the specified run state.
+         * 
+         * @param service
+         *            The service.
+         * @param expectedRunState
+         *            The expected run state.
+         * 
+         * @throws InterruptedException
+         * @throws AssertionError
+         */
+        public void awaitRunState(final TxServiceRunState expectedRunState)
+                throws InterruptedException {
+
+            if (expectedRunState == null)
+                throw new IllegalArgumentException();
+
+            lock.lock();
+            try {
+
+                int i = 0;
+                while (i < 100) {
+
+                    if (expectedRunState == getRunState()) {
+
+                        return;
+
+                    }
+
+                    txDeactivate.await(10/* ms */, TimeUnit.MILLISECONDS);
+
+                    i++;
+
+                }
+
+                /*
+                 * Note: This will generally fail since we did not achieve the
+                 * desired run state in the loop above.
+                 */
+
+                assertEquals(expectedRunState, getRunState());
+
+            } finally {
+
+                lock.unlock();
+            
+            }
+
+        }
+
+    }
+       
     /**
      * Create a new read-write tx and then abort it.
      * <p>
@@ -205,7 +263,7 @@ public class TestTransactionService extends TestCase2 {
      */
     public void test_newTx_readWrite_01() {
 
-        final AbstractTransactionService service = newFixture();
+        final MockTransactionService service = newFixture();
 
         try {
 
@@ -259,7 +317,7 @@ public class TestTransactionService extends TestCase2 {
      */
     public void test_newTx_readWrite_02() {
 
-        final AbstractTransactionService service = newFixture();
+        final MockTransactionService service = newFixture();
 
         try {
 
@@ -311,7 +369,7 @@ public class TestTransactionService extends TestCase2 {
      */
     public void test_newTx_readWrite_03() {
         
-        final AbstractTransactionService service = newFixture();
+        final MockTransactionService service = newFixture();
 
         try {
 
@@ -364,7 +422,7 @@ public class TestTransactionService extends TestCase2 {
      */
     public void test_newTx_readWrite_txComplete_postConditions() {
         
-        final AbstractTransactionService service = newFixture();
+        final MockTransactionService service = newFixture();
 
         try {
 
@@ -408,7 +466,7 @@ public class TestTransactionService extends TestCase2 {
      */
     public void test_newTx_readCommitted01() throws IOException {
 
-        final AbstractTransactionService service = newFixture();
+        final MockTransactionService service = newFixture();
 
         try {
 
@@ -467,7 +525,7 @@ public class TestTransactionService extends TestCase2 {
      */
     public void test_newTx_readCommitted02() {
 
-        final AbstractTransactionService service = newFixture();
+        final MockTransactionService service = newFixture();
 
         try {
 
@@ -547,7 +605,7 @@ public class TestTransactionService extends TestCase2 {
                 AbstractTransactionService.Options.MIN_RELEASE_AGE,
                 ""+Long.MAX_VALUE);
         
-        final AbstractTransactionService service = newFixture(properties);
+        final MockTransactionService service = newFixture(properties);
 
         try {
 
@@ -619,7 +677,7 @@ public class TestTransactionService extends TestCase2 {
      */
     public void test_newTx_readOnly_contention() throws IOException {
 
-        final AbstractTransactionService service = newFixture();
+        final MockTransactionService service = newFixture();
 
         try {
 
@@ -756,7 +814,7 @@ public class TestTransactionService extends TestCase2 {
      */
     public void test_newTx_readOnly_timestamp_is_lastCommitTime() throws IOException {
         
-        final AbstractTransactionService service = newFixture();
+        final MockTransactionService service = newFixture();
 
         try {
 
@@ -803,7 +861,7 @@ public class TestTransactionService extends TestCase2 {
      */
     public void test_newTx_readOnly_timestampInFuture() {
         
-        final AbstractTransactionService service = newFixture();
+        final MockTransactionService service = newFixture();
 
         try {
 
@@ -838,7 +896,7 @@ public class TestTransactionService extends TestCase2 {
      */
     public void test_newTx_readOnly_historyGone() throws IOException {
         
-        final AbstractTransactionService service = newFixture();
+        final MockTransactionService service = newFixture();
 
         try {
 
@@ -910,7 +968,7 @@ public class TestTransactionService extends TestCase2 {
      */
     public void test_updateReleaseTime_noTxRemaining() throws IOException {
 
-        final AbstractTransactionService service = newFixture();
+        final MockTransactionService service = newFixture();
 
         try {
 
@@ -975,7 +1033,7 @@ public class TestTransactionService extends TestCase2 {
      */
     public void test_updateReleaseTime_otherTxStillActive() throws IOException {
 
-        final AbstractTransactionService service = newFixture();
+        final MockTransactionService service = newFixture();
 
         try {
 
@@ -1048,7 +1106,7 @@ public class TestTransactionService extends TestCase2 {
      */
     public void test_newTx_readOnly_txComplete_postConditions() throws IOException {
         
-        final AbstractTransactionService service = newFixture();
+        final MockTransactionService service = newFixture();
 
         try {
 
@@ -1087,7 +1145,7 @@ public class TestTransactionService extends TestCase2 {
      */
     public void test_shutdown_nothingRunning() {
 
-        final AbstractTransactionService service = newFixture();
+        final MockTransactionService service = newFixture();
 
         try {
             
@@ -1109,7 +1167,7 @@ public class TestTransactionService extends TestCase2 {
     public void test_shutdown_waitsForReadWriteTx_commits()
             throws InterruptedException {
 
-        final AbstractTransactionService service = newFixture();
+        final MockTransactionService service = newFixture();
 
         try {
 
@@ -1129,12 +1187,12 @@ public class TestTransactionService extends TestCase2 {
             
             t.start();
 
-            awaitRunState(service, TxServiceRunState.Shutdown);
+            service.awaitRunState( TxServiceRunState.Shutdown);
 
             // commit the running tx.
             service.commit(tx);
 
-            awaitRunState(service, TxServiceRunState.Halted);
+            service.awaitRunState( TxServiceRunState.Halted);
 
         } finally {
 
@@ -1152,7 +1210,7 @@ public class TestTransactionService extends TestCase2 {
     public void test_shutdown_waitsForReadWriteTx_aborts()
             throws InterruptedException {
 
-        final AbstractTransactionService service = newFixture();
+        final MockTransactionService service = newFixture();
 
         try {
 
@@ -1172,12 +1230,12 @@ public class TestTransactionService extends TestCase2 {
             
             t.start();
 
-            awaitRunState(service, TxServiceRunState.Shutdown);
+            service.awaitRunState( TxServiceRunState.Shutdown);
 
             // abort the running tx.
             service.abort(tx);
 
-            awaitRunState(service, TxServiceRunState.Halted);
+            service.awaitRunState( TxServiceRunState.Halted);
 
         } finally {
 
@@ -1195,7 +1253,7 @@ public class TestTransactionService extends TestCase2 {
      */
     public void test_shutdown_newTxNotAllowed() throws InterruptedException {
 
-        final AbstractTransactionService service = newFixture();
+        final MockTransactionService service = newFixture();
 
         try {
 
@@ -1215,8 +1273,10 @@ public class TestTransactionService extends TestCase2 {
             
             t.start();
 
-            awaitRunState(service, TxServiceRunState.Shutdown);
+            // verify service is shutting down.
+            service.awaitRunState( TxServiceRunState.Shutdown);
 
+            // verify newTx() is disallowed during shutdown.
             try {
 
                 service.newTx(ITx.UNISOLATED);
@@ -1228,11 +1288,18 @@ public class TestTransactionService extends TestCase2 {
                 log.info("Ignoring expected exception: " + ex);
                 
             }
-            
-            // abort the running tx.
+
+            // one tx left.
+            assertEquals(1,service.getActiveCount());
+
+            // abort the last running tx.
             service.abort(tx);
 
-            awaitRunState(service, TxServiceRunState.Halted);
+            // no tx left.
+            assertEquals(0,service.getActiveCount());
+            
+            // wait until the service halts.
+            service.awaitRunState(TxServiceRunState.Halted);
 
         } finally {
 
@@ -1243,45 +1310,12 @@ public class TestTransactionService extends TestCase2 {
     }
 
     /**
-     * Awaits the specified run state.
-     * 
-     * @param service
-     *            The service.
-     * @param runState
-     *            The expected run state.
-     *            
-     * @throws InterruptedException
-     * @throws AssertionError
-     */
-    protected void awaitRunState(final AbstractTransactionService service,
-            final TxServiceRunState runState) throws InterruptedException {
-        
-        if (service == null)
-            throw new IllegalArgumentException();
-
-        if (runState == null)
-            throw new IllegalArgumentException();
-        
-        int i = 0;
-        while (runState != service.getRunState() && i < 100) {
-
-            Thread.sleep(10/* ms */);
-
-            i++;
-
-        }
-
-        assertEquals(runState, service.getRunState());
-
-    }
-
-    /**
      * Test that the service will wait for a read-only tx to commit.
      */
     public void test_shutdown_waitsForReadOnlyTx_commits()
             throws InterruptedException {
 
-        final AbstractTransactionService service = newFixture();
+        final MockTransactionService service = newFixture();
 
         try {
 
@@ -1301,12 +1335,12 @@ public class TestTransactionService extends TestCase2 {
 
             t.start();
 
-            awaitRunState(service, TxServiceRunState.Shutdown);
+            service.awaitRunState( TxServiceRunState.Shutdown);
 
             // commit the running tx.
             service.commit(tx);
 
-            awaitRunState(service, TxServiceRunState.Halted);
+            service.awaitRunState( TxServiceRunState.Halted);
 
         } finally {
 
@@ -1322,7 +1356,7 @@ public class TestTransactionService extends TestCase2 {
     public void test_shutdown_waitsForReadOnlyTx_aborts()
             throws InterruptedException {
 
-        final AbstractTransactionService service = newFixture();
+        final MockTransactionService service = newFixture();
 
         try {
 
@@ -1342,12 +1376,12 @@ public class TestTransactionService extends TestCase2 {
 
             t.start();
 
-            awaitRunState(service, TxServiceRunState.Shutdown);
+            service.awaitRunState( TxServiceRunState.Shutdown);
 
             // abort the running tx.
             service.abort(tx);
 
-            awaitRunState(service, TxServiceRunState.Halted);
+            service.awaitRunState( TxServiceRunState.Halted);
 
         } finally {
 
@@ -1365,7 +1399,7 @@ public class TestTransactionService extends TestCase2 {
      */
     public void test_shutdown_interrupted() throws InterruptedException {
 
-        final AbstractTransactionService service = newFixture();
+        final MockTransactionService service = newFixture();
 
         try {
 
@@ -1386,12 +1420,12 @@ public class TestTransactionService extends TestCase2 {
 
             t.start();
 
-            awaitRunState(service, TxServiceRunState.Shutdown);
+            service.awaitRunState( TxServiceRunState.Shutdown);
 
             // interrupt the thread running shutdown().
             t.interrupt();
 
-            awaitRunState(service, TxServiceRunState.Halted);
+            service.awaitRunState( TxServiceRunState.Halted);
 
         } finally {
 

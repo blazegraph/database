@@ -2717,11 +2717,86 @@ x. write unit tests
 ============================================================
 Conferences and papers:
 
-**** Semtech
+Semtech (submitted)
      
      http://www.semantic-conference.com/2009/cfptopics/.
 
      June 14-18, 2009 at the Fairmont Hotel in San Jose, California.
+
+- Semantic Community - Semantic Exchange Workshop, Tuesday, February
+  17, 2009
+
+  You are cordially invited to be attend a one-day conference /
+  workshop in Washington, DC on February 17, 2009, that will be hosted
+  by Computer Science Corporation at their Executive Briefing
+  Center. Please see the agenda at
+  http://semanticommunity.wik.is/Semantic_Community-Semantic_Exchange_February_17%2c_2009
+  and register by providing the following in an email: Name,
+  Organization, Address, Phone Number, and In-person or Remote
+  Attendance to niemann.brand@epa.gov.
+
+  ----------------------------------------
+
+  With a new administration being installed in January, the goal of this
+  conference is to envision changes coming to next stage web-based systems
+  in government, and to map the role of Web 2.0 and Web 3.0 semantic
+  technologies in the evolution of government information systems from
+  e-gov (silos with web front ends) to connected governance (e.g.
+  distributed social computing environments for collaborative work,
+  information sharing, knowledge management, and decision-making.)
+
+  Our keynote session will highlight recent findings, conclusions and
+  recommendations from a recent United Nation's study that examined the
+  current state and direction of evolution of e-government world-wide. It
+  will also feature "running your organization on semantics" by the Dutch
+  government.
+
+  The keynotes will be followed by an overview presentation by Brand
+  Niemann and Mills Davis which will envision the role of Web 2.0 and Web
+  3.0 semantic technologies in next stage government social computing
+  environments for serious collaboration. This presentation will present
+  an overall model, with illustrations, and will reference unique
+  capabilities that each of our panelists brings to next--generation
+  solutions.
+
+  Following the overview, we convene the panel where panelists offer a
+  brief position statement about the capabilities they provide and the
+  value their commercial solutions bring. However, the goal of the panel
+  discussion will be to talk about how the capabilities of different
+  panelists might be combined to further enhance the value to government,
+  business, and citizenry.
+
+  After lunch, the conference will feature demos. Each panelist will have
+  the opportunity (about 15 minutes) to present.  A topic we would like
+  them to feature would be what sort of free trial or quickstart package
+  (s) they offer that government agencies can access to learn more or get
+  started.
+
+  The conference call to action will be to ask government agencies and
+  system integrators present to do pilot projects that integrate their
+  capabilities into next generation environments for collaborative work,
+  information sharing, and knowledge management, and connected governance.
+
+
+Java ONE
+
+     Missed deadline (10 Dec), but maybe....[followup on Jan3rd]
+
+     - http://java.sun.com/javaone/
+     - http://www28.cplan.com/cfp_prod/CFPLogin.jsp?wId=69MQ81 
+     - http://blogs.sun.com/bblfish/entry/javaone_2009_call_for_papers
+     - http://blogs.sun.com/bblfish/entry/three_semantic_web_talks_at
+     - http://bblfish.net/
+
+European Semantic Web Conference (ESWC2009) 
+
+	http://www.eswc2009.org/
+	http://www.eswc2009.org/calls
+
+	31 May - 4 June 2009, Heraklion, Greece
+	
+	Note: Missed the abstract date.  Do they have a late breaking
+	track? 
 
 **** VLDB
 
@@ -3018,6 +3093,10 @@ Commit notes:
 
     - zookeeper for locks/barriers and service startup.
 
+      http://hadoop.apache.org/zookeeper/docs/current/index.html
+      http://hadoop.apache.org/zookeeper/docs/current/api/index.html
+      http://hadoop.apache.org/zookeeper/docs/current/zookeeperProgrammers.html
+
       Run zoo on one master.  Defer failover setup.  Populate with
       configuration data which specifies the #of each kind of service
       {lbs=1, tx=1, mds=1, ds=N} and optionally binds specific
@@ -3047,6 +3126,9 @@ Commit notes:
 	  B) Start a bigdata service using jini to discover the joined
 	  services and contending for locks on configuration nodes for
 	  various services.
+	  
+	  See http://www.capify.org/ and http://reductivelabs.com/trac/puppet
+	  for cluster admin helpers.
 
     - Distributed dynamic generation of the LUBM data sets.
 
@@ -3132,6 +3214,17 @@ Commit notes:
     - Move is definately the weakness of the system.  Look at making
       this much faster.  E.g., take a compacting merge and then blast
       it across to another data service on a raw socket.
+
+    - Hold hard references to the index partitions for which we will
+      do split, move or join operations and make sure that we do not
+      let the probable candidates get flushed off of the LRU when we
+      are making those decisions.  E.g., start with the active indices
+      first and then scan Name2Addr (or just stuff the active indices
+      into a hard reference collection).  Potentially identify the
+      index partitions during synchronous overflow (how long does this
+      take?) since that would make it easier to hold the hard
+      references and even stuff them into the move, split, join, etc
+      tasks.
 
     - Pointless having a MOVE during the initial round robin period.
       Should detect that and avoid moves until we have real scores.
@@ -3319,3 +3412,95 @@ Why are all index partitions being moved off of one of the two embedded data ser
 ------------------------------------------------------------
 Commit log
 
+Note: At this point I have closure working with read-only tx.  I still
+want full distributed tx commits to make the split/join/move
+operations more robust.  Also, we will need zookeeper for service
+startup, master election (for closure), etc.
+
+- Added support for full transactions, including distributed
+  transactions and both single phase and multi-phase commit protocols.
+
+- Added unit tests for distributed transactions that start on a single
+  data service.
+
+- Added unit tests for distributed transactions that start on more
+  than one data service.
+
+- Added unit tests for rollback of the journal if a distributed commit
+  fails.
+
+- Modified the concurrency control mechanisms in AbstractTask to
+  support the distributed transaction commit protocol.
+
+- Modified the concurrency control mechanisms in AbstractTask to
+  acquire exclusive write locks for the _isolated_ indices by placing
+  those indices into a namespace for the transaction.  Since the
+  transactions write set will be located on a specific temporary
+  store, that namespace should use "__tx.txid.name" for its pattern
+  and the temporary store should be registered with the locator such
+  that the indices isolated by the transaction are discovered on the
+  temporary store.
+
+- Support full concurrency for writers on transactions.
+
+  Use a Temporary journal rather than a TemporaryStore.
+
+  Use the same write executor service to manage access to the isolated
+  indices, checkpointing isolated indices onto their backing store at
+  the end of an AbstractTask?, etc.
+
+  The locator must be chained to find the indices on the temporary
+  journals.
+
+  The temporary journals either need their own write service instance,
+  but must share the same lock manager (to avoid possible deadlocks)
+  and concurrency manager.
+  
+  This will take some looking into....  We can limit the tx
+  concurrency in the meanwhile (one operation per tx) simply be
+  declaring the tx id as one of the locks.
+
+- Further hardened the split, join, and move index partition
+  operations, including the use of full transactions to ensure ACID
+  updates of the MDS and the source and target data services.  (May
+  require allowing tx identifiers for some MDS operations.)
+
+- Disable split, join and move for index partitions with active
+  transactions (other than those we create to make those operations
+  ACID).
+
+- Support split, join, and move for index partitions with active
+  transactions (must split / join / move the isolated indices along
+  with the unisolated ones).
+
+  This requires that we enumerate the active transactions on the data
+  service and then enumerate the names of the indices which they have
+  isolated in order to identify transactions whose isolated write sets
+  must be split, joined or moved as well.
+
+  The operation which handles the split, join or move must notify the
+  transactionService with the new resources on which the tx will write
+  - these will have new index partition names.  In the case of move,
+  the new index partition will be located on a different data service.
+
+  Note: Build, merge, and copy do not cause problems because they do
+  not change the index partition names.
+
+- Added an event logging interface on the federation with reporting to
+  the LBS for now.  The goal is to allow plotting of events against
+  timeline data, such as CPU performance counters.  The interface was
+  refactored from the ResourceManager.  There are event classes.  The
+  service name is in the event.  Reporting includes a timestamp and an
+  event identifier.  Timestamps MAY be global (nextTimestamp) or they
+  may be local times.  The receiver can compute elapsed times and map
+  the timestamps onto its own clock based the receipt time.  Events
+  can be correlated by their event identifiers.
+
+- Modified AbstractTask to be extended on for special cases and
+  instead provided an interface for access to critical methods which
+  it was exposing: getJournal(), getIndex(), etc.
+
+- Moved the MIN_RELEASE_AGE and related options from the StoreManager
+  to the TransactionService so that they may be globally administered
+  (moved in part since you do configured the minReleaseAge on the
+  txService).

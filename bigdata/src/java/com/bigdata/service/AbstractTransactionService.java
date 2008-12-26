@@ -37,6 +37,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
@@ -54,7 +55,6 @@ import com.bigdata.journal.Journal;
 import com.bigdata.journal.RunState;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.journal.ValidationError;
-import com.bigdata.relation.rule.eval.ProgramTask;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StoreManager;
 import com.bigdata.util.InnerCause;
@@ -250,6 +250,9 @@ abstract public class AbstractTransactionService extends AbstractService
      */
     public TxServiceRunState getRunState() {
         
+        if(!lock.isHeldByCurrentThread())
+            throw new IllegalMonitorStateException();
+        
         return runState;
         
     }
@@ -291,16 +294,19 @@ abstract public class AbstractTransactionService extends AbstractService
      * (either aborted or committed).
      */
     public void shutdown() {
-        
-        switch (getRunState()) {
-        case Shutdown:
-        case ShutdownNow:
-        case Halted:
-            return;
-        }
+
+        if(INFO) 
+            log.info("");
 
         lock.lock();
         try {
+
+            switch (getRunState()) {
+            case Shutdown:
+            case ShutdownNow:
+            case Halted:
+                return;
+            }
 
             // Do not allow new transactions to start.
             setRunState(TxServiceRunState.Shutdown);
@@ -308,22 +314,24 @@ abstract public class AbstractTransactionService extends AbstractService
             try {
 
                 // wait for running transactions to complete.
-                awaitRunningTx(1000/* logTimeout */, TimeUnit.MILLISECONDS);
+                awaitRunningTx(10/* logTimeout */, TimeUnit.MILLISECONDS);
 
             } catch (InterruptedException ex) {
 
                 // convert to fast shutdown.
 
+                log.warn("Interrupted during shutdown - will do fast shutdown: "+ex, ex);
+                
                 shutdownNow();
 
                 return;
 
             }
 
+            super.shutdown();
+
             // Service is halted.
             setRunState(TxServiceRunState.Halted);
-
-            super.shutdown();
 
         } finally {
 
@@ -356,14 +364,27 @@ abstract public class AbstractTransactionService extends AbstractService
         logTimeout = unit.toNanos(logTimeout);
 
         long elapsed = 0L;
-        
-        // timeout awaiting for each pass through the loop.
-        final long awaitTimeout = 100; // ms
-        
+
+        if(INFO)
+            log.info("activeCount="+getActiveCount());
+
         while (getActiveCount() > 0) {
 
             // wait for a transaction to complete.
-            txDeactivate.await(awaitTimeout,TimeUnit.MILLISECONDS);
+            if (txDeactivate.await(logTimeout, TimeUnit.NANOSECONDS)
+                    && getActiveCount() == 0) {
+
+                // no more tx are active.
+
+                // update the elapsed time.
+                elapsed = System.nanoTime() - begin;
+
+                if(INFO)
+                    log.info("No transactions remaining: elapsed="+elapsed);
+                
+                return;
+                
+            }
             
             // update the elapsed time.
             elapsed = System.nanoTime() - begin;
@@ -424,15 +445,17 @@ abstract public class AbstractTransactionService extends AbstractService
      */
     public void shutdownNow() {
 
-        switch (getRunState()) {
-        case ShutdownNow:
-        case Halted:
-            return;
-        }
+        if(INFO) 
+            log.info("");
 
         lock.lock();
-
         try {
+
+            switch (getRunState()) {
+            case ShutdownNow:
+            case Halted:
+                return;
+            }
 
             setRunState(TxServiceRunState.ShutdownNow);
 
@@ -484,9 +507,9 @@ abstract public class AbstractTransactionService extends AbstractService
 
             }
 
-            setRunState(TxServiceRunState.Halted);
-
             super.shutdownNow();
+
+            setRunState(TxServiceRunState.Halted);
 
         } finally {
 
@@ -502,12 +525,16 @@ abstract public class AbstractTransactionService extends AbstractService
      */
     synchronized public void destroy() {
 
+        log.warn("");
+        
         lock.lock();
 
         try {
 
             shutdownNow();
 
+            // Note: no persistent state in this abstract impl.
+            
         } finally {
 
             lock.unlock();
@@ -564,18 +591,19 @@ abstract public class AbstractTransactionService extends AbstractService
      * <p>
      * Note: The transaction service will refuse to start new transactions whose
      * timestamps are LTE to {@link #getEarliestTxStartTime()}.
+     * 
+     * @throws RuntimeException
+     *             Wrapping {@link TimeoutException} if a timeout occurs
+     *             awaiting a start time which would satisify the request for a
+     *             read-only transaction (this can occur only for read-only
+     *             transactions which must contend for start times which will
+     *             read from the appropriate historical commit point).
      */
     public long newTx(final long timestamp) {
 
         setupLoggingContext();
 
         try {
-
-            if (TxServiceRunState.Running != runState) {
-
-                throw new IllegalStateException(ERR_SERVICE_NOT_AVAIL);
-
-            }
 
             /*
              * Note: It may be possible to increase the concurrency of this
@@ -585,10 +613,25 @@ abstract public class AbstractTransactionService extends AbstractService
              * for a start time that can read from a specific commit point. Even
              * then we may be able to reduce contention using atomic operations
              * on [activeTx], e.g., putIfAbsent().
+             * 
+             * However, pay attention to [lock]. Certainly it is serializing
+             * newTx() at this point as well several other methods on this API.
+             * Higher concurrency will require relaxing constraints on atomic
+             * state transitions governed by [lock]. Perhaps by introducing
+             * additional locks that are more specific. I don't want to relax
+             * those constaints until I have a better sense of what must be
+             * exclusive operations.
              */
 
             lock.lock();
             
+            switch (getRunState()) {
+            case Running:
+                break;
+            default:
+                throw new IllegalStateException(ERR_SERVICE_NOT_AVAIL);
+            }
+
             try {
 
                 final long tx = assignTransactionIdentifier(timestamp);
@@ -597,6 +640,10 @@ abstract public class AbstractTransactionService extends AbstractService
 
                 return tx;
 
+            } catch(TimeoutException ex) {
+                
+                throw new RuntimeException(ex);
+                
             } catch(InterruptedException ex) {
                 
                 throw new RuntimeException(ex);
@@ -626,7 +673,7 @@ abstract public class AbstractTransactionService extends AbstractService
     /**
      * Signalled by {@link #deactivateTx(TxState)}.
      */
-    private final Condition txDeactivate = lock.newCondition();
+    protected final Condition txDeactivate = lock.newCondition();
 
     /** #of transactions started. */
     private long startCount = 0L;
@@ -697,15 +744,10 @@ abstract public class AbstractTransactionService extends AbstractService
     }
     private volatile long releaseTime = 0L;
     
-    /**
-     * FIXME make this a protected method. once {@link ProgramTask} no longer
-     * requires it and instead uses read-only tx for closure.
-     */
-    public void setReleaseTime(long newValue) {
+    protected void setReleaseTime(long newValue) {
 
-        // @todo uncomment this once the method is protected.
-//        if(!lock.isHeldByCurrentThread())
-//            throw new IllegalMonitorStateException();
+        if(!lock.isHeldByCurrentThread())
+            throw new IllegalMonitorStateException();
         
         log.warn("newValue="+newValue);
         
@@ -1024,11 +1066,18 @@ abstract public class AbstractTransactionService extends AbstractService
      * 
      * @param timestamp
      *            The timestamp.
-     *            
+     * 
      * @return The assigned transaction identifier.
+     * 
+     * @throws InterruptedException
+     *             if interrupted while awaiting a start time which would
+     *             satisify the request.
+     * @throws InterruptedException
+     *             if a timeout occurs while awaiting a start time which would
+     *             satisify the request.
      */
     protected long assignTransactionIdentifier(final long timestamp)
-            throws InterruptedException {
+            throws InterruptedException, TimeoutException {
         
         if (timestamp == ITx.UNISOLATED) {
 
@@ -1129,7 +1178,7 @@ abstract public class AbstractTransactionService extends AbstractService
      *         from the same commit point.
      */
     protected long getStartTime(final long timestamp)
-            throws InterruptedException {
+            throws InterruptedException, TimeoutException {
 
         /*
          * Find the commit time from which the tx will read (largest commitTime
@@ -1167,7 +1216,8 @@ abstract public class AbstractTransactionService extends AbstractService
         }
 
         // Find a valid, unused timestamp.
-        return findUnusedTimestamp(commitTime, nextCommitTime);
+        return findUnusedTimestamp(commitTime, nextCommitTime,
+                1000/* timeout */, TimeUnit.MILLISECONDS);
 
     }
 
@@ -1206,57 +1256,75 @@ abstract public class AbstractTransactionService extends AbstractService
      *            commit point).
      * @param nextCommitTime
      *            The commit time for the successor of that commit point.
+     * @param timeout
+     *            The maximum length of time to await an available timestamp.
+     * @param unit
+     *            The unit in which <i>timeout</i> is expressed.
      */
     protected long findUnusedTimestamp(final long commitTime,
-            final long nextCommitTime) throws InterruptedException {
+            final long nextCommitTime, final long timeout, final TimeUnit unit)
+            throws InterruptedException, TimeoutException {
 
-        while (true) {
+        long nanos = unit.toNanos(timeout);
+
+        final long begin = System.nanoTime();
+        
+        while (nanos >= 0) {
+
+            for (long t = commitTime; t < nextCommitTime; t++) {
+
+                if (activeTx.containsKey(t) || activeTx.containsKey(-t)) {
+
+                    /*
+                     * Note: We do not accept an active read-only startTime.
+                     * 
+                     * Note: We do not accept a start time that corresponds to
+                     * the absolute value of an active read-write transaction
+                     * either. This latter constraint is imposed so that the
+                     * keys in the [startTimeIndex] can be the absolute value of
+                     * the assigned timestamp and still be unique.
+                     * 
+                     * @todo We could grap the timestamp using an atomic
+                     * putIfAbsent and a special value and the replace the value
+                     * with the desired one (or just construct the TxState
+                     * object each time and discard it if the map contains that
+                     * key). This might let us increase concurrency for newTx().
+                     */
+
+                    continue;
+
+                }
+
+                return t;
+
+            }
+
+            /*
+             * Wait for a tx to terminate. If it is in the desired half-open
+             * range it will be detected by the loop above.
+             * 
+             * Note: This requires that we use signalAll() since we could be
+             * waiting on more than one half-open range.
+             * 
+             * @todo if we used a Condition for the half-open range then we
+             * could signal exactly that condition.
+             * 
+             * Note: throws InterruptedException
+             */
             
-        for (long t = commitTime; t < nextCommitTime; t++) {
+            nanos -= (System.nanoTime() - begin);
 
-            if (activeTx.containsKey(t) || activeTx.containsKey(-t)) {
+            if(!txDeactivate.await(nanos, TimeUnit.NANOSECONDS)) {
 
-                /*
-                 * Note: We do not accept an active read-only startTime.
-                 * 
-                 * Note: We do not accept a start time that corresponds to the
-                 * absolute value of an active read-write transaction either.
-                 * This latter constraint is imposed so that the keys in the
-                 * [startTimeIndex] can be the absolute value of the assigned
-                 * timestamp and still be unique.
-                 * 
-                 * @todo We could grap the timestamp using an atomic putIfAbsent
-                 * and a special value and the replace the value with the
-                 * desired one (or just construct the TxState object each time
-                 * and discard it if the map contains that key). This might let
-                 * us increase concurrency for newTx().
-                 */
-                
-                continue;
+                throw new TimeoutException();
                 
             }
-            
-            return t;
-            
+
+            nanos -= (System.nanoTime() - begin);
+
         }
 
-        /*
-         * Wait for a tx to terminate. If it is in the desired half-open range
-         * it will be detected by the loop above.
-         * 
-         * Note: This requires that we use signalAll() since we could be waiting
-         * on more than one half-open range.
-         * 
-         * @todo if we used a Condition for the half-open range then we could
-         * signal exactly that condition.
-         * 
-         * Note: throws InterruptedException
-         */
-        txDeactivate.await();
-            
-//            throw new RuntimeException("No timestamp available: commitTime="
-//                    + commitTime + ", nextCommitTime=" + nextCommitTime);
-        }
+        throw new TimeoutException();
         
     }
     
@@ -1985,11 +2053,18 @@ abstract public class AbstractTransactionService extends AbstractService
 
         if(INFO) 
             log.info("");
-        
+
         lock.lock();
 
         try {
 
+            switch (getRunState()) {
+            case Starting:
+                break;
+            default:
+                throw new IllegalStateException();
+            }
+            
             final long timestamp = _nextTimestamp();
 
             final long lastCommitTime = getLastCommitTime();
