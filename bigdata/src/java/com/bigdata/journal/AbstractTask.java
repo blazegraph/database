@@ -238,7 +238,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * The transaction object iff the operation is isolated by a transaction
      * and otherwise <code>null</code>. 
      */
-    protected final ITx tx;
+    protected final Tx tx;
     
     /**
      * Cache of named indices resolved by this task for its {@link #timestamp}.
@@ -1207,11 +1207,16 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                 throw new IllegalStateException("Unknown tx: "+timestamp);
                 
             }
-            
-            if (!tx.isActive()) {
 
-                throw new IllegalStateException("Tx not active: "+timestamp);
+            tx.lock.lock();
+            try {
+                if (!tx.isActive()) {
 
+                    throw new IllegalStateException("Not active: " + tx);
+
+                }
+            } finally {
+                tx.lock.unlock();
             }
             
             taskCounters = this.concurrencyManager.countersTX;
@@ -1827,9 +1832,9 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      */
     static protected class InnerReadWriteTxServiceCallable extends DelegateTask {
 
-        final ITx tx;
+        final Tx tx;
         
-        InnerReadWriteTxServiceCallable(AbstractTask delegate, ITx tx) {
+        InnerReadWriteTxServiceCallable(AbstractTask delegate, Tx tx) {
             
             super( delegate );
             
@@ -1850,9 +1855,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             try {
 
                 delegate.nanoTime_beginWork = System.nanoTime();
-                
+                tx.lock.lock();
+                try {
                 return delegate.doTask();
-                
+                } finally {
+                    tx.lock.unlock();
+                }
             } finally {
 
                 delegate.nanoTime_finishedWork = System.nanoTime();

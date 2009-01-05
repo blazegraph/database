@@ -70,6 +70,16 @@ import com.bigdata.service.DataService.DataServiceFederationDelegate;
 public class MetadataServer extends DataServer {
 
     /**
+     * Options for this server.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public interface Options extends AdministrableMetadataService.Options {
+
+    }
+    
+    /**
      * @param args
      */
     public MetadataServer(String[] args) {

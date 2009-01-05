@@ -38,6 +38,16 @@ import com.bigdata.service.LoadBalancerService;
  * @version $Id$
  */
 public class LoadBalancerServer extends AbstractServer {
+
+    /**
+     * Options for this server.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public interface Options extends AdministrableLoadBalancer.Options {
+        
+    }
     
     /**
      * Creates a new {@link DataServer}.

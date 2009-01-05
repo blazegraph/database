@@ -28,9 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -186,12 +186,12 @@ public class Tx implements ITx {
 
     /**
      * Indices isolated by this transactions.
-     * 
-     * @todo this must be thread-safe to support concurrent operations on the
-     *       same tx. the temporary store for the transaction's isolated state
-     *       must also be thread safe.
+     * <p>
+     * Note: This must be thread-safe to support concurrent operations for the
+     * same transaction (however, those operations will be serialized if they
+     * declare any named indices in common).
      */
-    private Map<String, IIndex> indices = new HashMap<String, IIndex>();
+    private ConcurrentHashMap<String, IIndex> indices = new ConcurrentHashMap<String, IIndex>();
 
     /**
      * Create a transaction reading from the most recent committed state not

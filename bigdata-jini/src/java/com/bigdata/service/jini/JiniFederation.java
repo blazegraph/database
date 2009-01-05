@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Future;
 
 import net.jini.config.Configuration;
@@ -49,6 +50,10 @@ import net.jini.jeri.InvocationLayerFactory;
 import net.jini.jeri.tcp.TcpServerEndpoint;
 import net.jini.lookup.ServiceDiscoveryEvent;
 import net.jini.lookup.ServiceDiscoveryListener;
+
+import org.apache.zookeeper.WatchedEvent;
+import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.ZooKeeper;
 
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.io.IStreamSerializer;
@@ -76,6 +81,7 @@ import com.bigdata.service.proxy.RemoteBuffer;
 import com.bigdata.service.proxy.RemoteBufferImpl;
 import com.bigdata.service.proxy.RemoteFuture;
 import com.bigdata.service.proxy.RemoteFutureImpl;
+import com.bigdata.zookeeper.ZookeeperClientConfig;
 import com.sun.jini.admin.DestroyAdmin;
 
 /**
@@ -85,7 +91,7 @@ import com.sun.jini.admin.DestroyAdmin;
  * @version $Id$
  */
 public class JiniFederation extends AbstractDistributedFederation implements
-        ServiceDiscoveryListener {
+        ServiceDiscoveryListener, Watcher {
 
     protected DataServicesClient dataServicesClient;
 
@@ -97,6 +103,28 @@ public class JiniFederation extends AbstractDistributedFederation implements
     
     protected DiscoveryManagement discoveryManager;
 
+    protected ZooKeeper zookeeper;
+    
+    private final ZookeeperClientConfig zooConfig;
+    
+    /**
+     * Return the zookeeper client configuration.
+     */
+    public ZookeeperClientConfig getZooConfig() {
+        
+        return zooConfig;
+        
+    }
+    
+    /**
+     * Return the zookeeper client.
+     */
+    public ZooKeeper getZookeeper() {
+        
+        return zookeeper;
+        
+    }
+    
     public DiscoveryManagement getDiscoveryManagement() {
         
         return discoveryManager;
@@ -110,7 +138,8 @@ public class JiniFederation extends AbstractDistributedFederation implements
      * @param client
      *            The client.
      */
-    public JiniFederation(final JiniClient client, final JiniConfig jiniConfig) {
+    public JiniFederation(final JiniClient client, final JiniConfig jiniConfig,
+            final ZookeeperClientConfig zooConfig) {
 
         super(client);
     
@@ -125,6 +154,17 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
         try {
 
+            /*
+             * Connect to zookeeper.
+             * 
+             * @todo what is the behavior here if no connection is possible? it
+             * would be nice if the federation was opened anyway since that is
+             * how we handle it for jini and just allow lazy connections.
+             */
+            this.zooConfig = zooConfig;
+            zookeeper = new ZooKeeper(zooConfig.servers,
+                    zooConfig.sessionTimeout, this/* watcher */);
+            
             /*
              * Note: This class will perform multicast discovery if ALL_GROUPS
              * is specified and otherwise requires you to specify one or more
@@ -297,7 +337,7 @@ public class JiniFederation extends AbstractDistributedFederation implements
         super.shutdownNow();
         
         terminateDiscoveryProcesses();
-
+        
         final long elapsed = System.currentTimeMillis() - begin;
         
         if (INFO)
@@ -350,6 +390,25 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
         }
 
+        if (zookeeper != null) {
+            try {
+
+                // close the zookeeper client.
+                zookeeper.close();
+
+            } catch (InterruptedException e) {
+
+                throw new RuntimeException(e);
+
+            }
+
+            zookeeper = null;
+
+        }
+
+        // discard all zookeeper watchers.
+        watchers.clear();
+        
     }
 
     private static final String ERR_RESOLVE = "Could not resolve: ";
@@ -962,4 +1021,59 @@ public class JiniFederation extends AbstractDistributedFederation implements
         
     }
 
+    public void process(WatchedEvent event) {
+        
+        if(INFO)
+            log.info(event.toString());
+        
+        for(Watcher w : watchers) {
+            
+            w.process(event);
+            
+        }
+        
+    }
+    
+    /**
+     * Adds a {@link Watcher} which will receive {@link WatchedEvent}s until it
+     * is removed.
+     * 
+     * @param w
+     *            The watcher.
+     * 
+     * @todo we can specify the watcher for a watch, so we don't really need the
+     *       addWatcher API on the JiniFederation.
+     */
+    public void addWatcher(final Watcher w) {
+
+        if (w == null)
+            throw new IllegalArgumentException();
+
+        if(INFO)
+            log.info("watcher="+w);
+        
+        watchers.add(w);
+
+    }
+
+    /**
+     * Remove a {@link Watcher}.
+     * 
+     * @param w
+     *            The watcher.
+     */
+    public void removeWatcher(final Watcher w) {
+
+        if (w == null)
+            throw new IllegalArgumentException();
+
+        if(INFO)
+            log.info("watcher="+w);
+
+        watchers.remove(w);
+
+    }
+
+    private final CopyOnWriteArrayList<Watcher> watchers = new CopyOnWriteArrayList<Watcher>();
+    
 }

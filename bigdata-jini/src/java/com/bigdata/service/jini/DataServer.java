@@ -67,6 +67,16 @@ import com.bigdata.service.DataService.DataServiceFederationDelegate;
 public class DataServer extends AbstractServer {
 
     /**
+     * Options for this server.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public interface Options extends AdministrableDataService.Options {
+        
+    }
+    
+    /**
      * Creates a new {@link DataServer}.
      * 
      * @param args

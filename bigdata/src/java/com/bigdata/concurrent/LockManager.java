@@ -55,10 +55,6 @@ import com.bigdata.counters.Instrument;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @param T
- *            The type of the object that represents an operation,
- *            transaction, etc. This is often a Thread.
- * 
  * @param R
  *            The type of the object that identifies a resource for the
  *            purposes of the locking system. This is typically the name of
@@ -97,43 +93,17 @@ public class LockManager</*T,*/R extends Comparable<R>> {
      * Each resource that can be locked has an associated {@link ResourceQueue}.
      * <p>
      * Note: This is a concurrent collection since new resources may be added
-     * while concurrent operations resolve resources to their queues.
-     * 
-     * @todo I expect the #of resources to be on the order of 1000s at most for
-     *       a given data service, but it could be larger on a transaction
-     *       server and the {@link ResourceQueue}s for unused resources should
-     *       be purged, e.g., by using a map with weak values.
-     *       <p>
-     *       In order to do this, each operation that is using a resource would
-     *       also have to hold a hard reference to the corresponding
-     *       {@link ResourceQueue} so that {@link ResourceQueue}s are not
-     *       cleared while they are in use.
-     *       <p>
-     *       The best way to make this change is to change the generic type of
-     *       {@link #lockedResources} to be a map whose values are the
-     *       {@link ResourceQueue}s instead. That will automatically give us
-     *       the hard reference that we need and does not otherwise disturb the
-     *       logic for locking and unlocking resources.
+     * while concurrent operations resolve resources to their queues. Stale
+     * {@link ResourceQueue}s are purged after they become only weakly
+     * reachable.
      */
-//    final private ConcurrentHashMap<R, ResourceQueue<R, Thread>> resourceQueues = new ConcurrentHashMap<R, ResourceQueue<R, Thread>>(
-//            1000/* nresources */);
     final private ConcurrentWeakValueCache<R, ResourceQueue<R, Thread>> resourceQueues = new ConcurrentWeakValueCache<R, ResourceQueue<R, Thread>>(
             1000/* nresources */);
 
     /**
      * The set of locks held by each transaction.
      */
-//    final private ConcurrentHashMap<Thread, Collection<R>> lockedResources;
     final private ConcurrentHashMap<Thread, Collection<ResourceQueue<R,Thread>>> lockedResources;
-
-    //        /**
-    //         * Used to lock regions of code that add and drop resources.
-    //         * 
-    //         * @todo if used in lock()/releaseLocks() then we need to also use a
-    //         *       {@link Condition} so that we do not block progress by other
-    //         *       tasks while holding this lock.
-    //         */
-    //        final Lock resourceManagementLock = new ReentrantLock();
 
     /**
      * True iff locks MUST be predeclared by the operation - this is a special
@@ -287,7 +257,7 @@ public class LockManager</*T,*/R extends Comparable<R>> {
      *            and by sorting the resources in each lock request into a
      *            common order we are able to avoid deadlocks entirely.
      */
-    public LockManager(int maxConcurrency, boolean predeclareLocks) {
+    public LockManager(final int maxConcurrency, final boolean predeclareLocks) {
 
         this(maxConcurrency, predeclareLocks, true/* sortLockRequests */);
 
@@ -384,24 +354,6 @@ public class LockManager</*T,*/R extends Comparable<R>> {
         }
 
     }
-
-//    /**
-//     * Declare resource(s) on which locks may be obtained.
-//     * <p>
-//     * Note: This is done implicitly so you DO NOT need to do this explicitly.
-//     * 
-//     * @param resource
-//     *            The resource(s).
-//     */
-//    public void addResource(final R[] resource) {
-//        
-//        for (int i = 0; i < resource.length; i++) {
-//
-//            addResource(resource[i]);
-//
-//        }
-//        
-//    }
     
     /**
      * Add if absent and return a {@link ResourceQueue} for the named resource.
@@ -413,26 +365,8 @@ public class LockManager</*T,*/R extends Comparable<R>> {
      */
     private ResourceQueue<R,Thread> declareResource(final R resource) {
 
-        //            resourceManagementLock.lock();
-        //
-        //            try {
-
-//        // synchronize before possible modification.
-//        synchronized (resourceQueues) {
-
         // test 1st to avoid creating a new ResourceQueue if it already exists.
         ResourceQueue<R, Thread> resourceQueue = resourceQueues.get(resource);
-        
-//        if (resourceQueues.containsKey(resource)) {
-//
-//            /*
-//             * test 1st to avoid creating a resource queue if we do not need
-//             * one.
-//             */
-//
-//            return false;
-//
-//        }
 
         // not found, so create a new ResourceQueue for that resource.
         resourceQueue = new ResourceQueue<R, Thread>(resource, waitsFor);
@@ -450,14 +384,6 @@ public class LockManager</*T,*/R extends Comparable<R>> {
         
         // we were the winner, so return the our new resource queue.
         return resourceQueue;
-            
-//        }
-
-        //            } finally {
-        //
-        //                resourceManagementLock.unlock();
-        //
-        //            }
 
     }
 
@@ -476,10 +402,6 @@ public class LockManager</*T,*/R extends Comparable<R>> {
      *             if the caller does not have a lock on the resource.
      */
     void dropResource(final R resource) {
-
-        //            resourceManagementLock.lock();
-
-        //            try {
 
         final Thread tx = Thread.currentThread();
 
@@ -506,12 +428,6 @@ public class LockManager</*T,*/R extends Comparable<R>> {
             resourceQueues.remove(resource);
 
         }
-
-        //            } finally {
-        //
-        //                resourceManagementLock.unlock();
-        //
-        //            }
 
     }
 
@@ -611,15 +527,7 @@ public class LockManager</*T,*/R extends Comparable<R>> {
         }
 
         if (lockedResources.get(t) == null) {
-
-//            /*
-//             * Note: This is optimized for the case when the task has
-//             * pre-declared its locks and puts an ArrayList of the exact
-//             * capacity into place.
-//             */
-            
-//            lockedResources.put(t, new ArrayList<R>(resource.length));
-            
+    
             final int initialCapacity = resource.length > 16 ? resource.length
                     : 16;
 
@@ -630,8 +538,6 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
         for (int i = 0; i < resource.length; i++) {
 
-//            declareResource(resource[i]);
-            
             lock(t, resource[i], timeout);
 
         }
@@ -657,24 +563,6 @@ public class LockManager</*T,*/R extends Comparable<R>> {
     private void lock(final Thread t, final R resource, final long timeout)
             throws InterruptedException {
 
-        //            resourceManagementLock.lock();
-
-        //            try {
-
-//        final ResourceQueue<R, Thread> resourceQueue = resourceQueues
-//                .get(resource);
-//
-//        if (resourceQueue == null) {
-//
-//            /*
-//             * Note: This would indicate a failure to declare the resource
-//             * before calling this method.
-//             */
-//
-//            throw new IllegalArgumentException("No such resource: " + resource);
-//
-//        }
-
         // make sure queue exists for this resource.
         final ResourceQueue<R, Thread> resourceQueue = declareResource(resource);
         
@@ -695,12 +583,6 @@ public class LockManager</*T,*/R extends Comparable<R>> {
         }
         
         tmp.add(resourceQueue);
-
-        //            } finally {
-
-        //                resourceManagementLock.unlock();
-
-        //            }
 
     }
 

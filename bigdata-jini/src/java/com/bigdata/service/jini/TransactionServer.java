@@ -60,6 +60,16 @@ import com.bigdata.service.DistributedTransactionService;
 public class TransactionServer extends AbstractServer {
 
     /**
+     * Options for this server.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public interface Options extends AdministrableTransactionService.Options {
+
+    }
+    
+    /**
      * @param args
      */
     public TransactionServer(String[] args) {

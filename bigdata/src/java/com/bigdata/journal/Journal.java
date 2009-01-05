@@ -736,18 +736,18 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     }
 
-    /**
-     * @deprecated This method in particular should be hidden from the
-     *             {@link Journal} as it exposes the {@link ITx} which really
-     *             deals with the client-side state of a transaction and which
-     *             should not be visible to applications - they should just use
-     *             the [long] transaction identifier.
-     */
-    public ITx getTx(long startTime) {
-    
-        return localTransactionManager.getTx(startTime);
-        
-    }
+//    /**
+//     * @deprecated This method in particular should be hidden from the
+//     *             {@link Journal} as it exposes the {@link ITx} which really
+//     *             deals with the client-side state of a transaction and which
+//     *             should not be visible to applications - they should just use
+//     *             the [long] transaction identifier.
+//     */
+//    public ITx getTx(long startTime) {
+//    
+//        return localTransactionManager.getTx(startTime);
+//        
+//    }
 
     /**
      * Returns the next timestamp from the {@link ILocalTransactionManager}.

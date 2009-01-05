@@ -146,7 +146,7 @@ public abstract class AbstractServerTestCase extends TestCase2 {
      * @exception AssertionFailedError
      *                if the port is not available.
      */
-    protected static void assertOpenPort(int port) throws IOException {
+    protected static void assertOpenPort(final int port) throws IOException {
         
         ServerSocket openSocket;
 

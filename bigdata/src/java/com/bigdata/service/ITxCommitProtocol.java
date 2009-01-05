@@ -108,34 +108,6 @@ public interface ITxCommitProtocol extends Remote {
     public long singlePhaseCommit(long tx) throws InterruptedException,
             ExecutionException, IOException;
 
-//    /**
-//     * Request that {@link IDataService} prepare for a 2-phase commit.
-//     * 
-//     * @param tx
-//     *            The transaction identifier.
-//     * @param revisionTime
-//     *            The timestamp that will be written into the {@link ITuple}s
-//     *            when the write set of the validated transaction is merged down
-//     *            onto the unisolated indices.
-//     * 
-//     * @return The {@link Future} of the task running the commit protocol on the
-//     *         {@link IDataService} (this may be used to cancel validation while
-//     *         it is already in progress).
-//     * 
-//     * @throws IllegalArgumentException
-//     *             if the transaction is read-only.
-//     * @throws IllegalStateException
-//     *             if the transaction is not known to the data service.
-//     * @throws InterruptedException
-//     *             if interrupted.
-//     * @throws ExecutionException
-//     *             This will wrap a {@link ValidationError} if validation fails.
-//     * @throws IOException
-//     *             if there is an RMI problem.
-//     */
-//    public Future<Void> twoPhasePrepare(long tx, long revisionTime)
-//            throws InterruptedException, ExecutionException, IOException;
-
     /**
      * Request that the {@link IDataService} participate in a 3-phase commit.
      * <p>
@@ -192,8 +164,8 @@ public interface ITxCommitProtocol extends Remote {
      *   |                     |                                   |
      *   |                     | &lt;------------------- prepared(tx) +
      *   |                     |  
-     *   |                  barrier
-     *   |                     | [4]
+     *   |       "prepared" barrier [4]
+     *   |                     |
      *   |                     | -- (commitTime) +  
      *   |                     | -------------------- (commitTime) +
      *   |                     | [5]             |                 |
@@ -201,7 +173,7 @@ public interface ITxCommitProtocol extends Remote {
      *   |                     | [6]             |
      *   |                     | &lt;--committed(tx)+
      *   |                     | 
-     *   |                  barrier [7]
+     *   |       "comitted" barrier [7]
      *   |                     | [8]
      *   |                     | ------ (success)+  
      *   |                     | [9]             |

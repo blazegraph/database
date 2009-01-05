@@ -535,6 +535,18 @@ public class FileMetadata {
                 }
                 
                 switch (bufferMode) {
+                case BufferedDisk: {
+                    /*
+                     * FIXME read the data from the disk into the buffer, but
+                     * only up to the maximum extent of the buffer. Perhaps do
+                     * this lazily in the BufferedDiskStrategy so that we can
+                     * avoid reading in the data when scanning the dataDir
+                     * during StoreManager startup.
+                     */
+                    if(true)
+                        throw new UnsupportedOperationException();
+                    break;
+                }
                 case Direct: {
                     // Allocate the buffer buffer.
                     buffer = (useDirectBuffers ? ByteBuffer

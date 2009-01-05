@@ -80,8 +80,8 @@ import com.sun.jini.start.ServiceStarter;
  *          java -Djava.security.policy=policy.all -cp lib\jini-ext.jar;lib\start.jar com.sun.jini.start.ServiceStarter src/test/com/bigdata/service/TestServerStarter.config
  * </pre>
  * 
- * Other command line options MAY be recommended depending on the server that
- * you are starting, e.g., <code>-server -XX:MaxDirectMemorySize=256M </code>.
+ * Other command line options MAY be recommended depending on the JVM and the
+ * service that you are starting, e.g., <code>-server</code>.
  * <p>
  * The server MAY be started using a <code>main</code> routine:
  * </p>
@@ -127,10 +127,10 @@ import com.sun.jini.start.ServiceStarter;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractServer implements Runnable, LeaseListener, ServiceIDListener
-{
+abstract public class AbstractServer implements Runnable, LeaseListener,
+        ServiceIDListener {
     
-    protected static final transient Logger log = Logger.getLogger(AbstractServer.class);
+    final static protected Logger log = Logger.getLogger(AbstractServer.class);
 
     /**
      * True iff the {@link #log} level is INFO or less.
@@ -151,6 +151,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
     /**
      * The label in the {@link Configuration} file for the service advertisment
      * data (also used by {@link JiniClient}).
+     * 
+     * @todo change to the concrete server class name?
      */
     public final static transient String ADVERT_LABEL = "AdvertDescription";
 

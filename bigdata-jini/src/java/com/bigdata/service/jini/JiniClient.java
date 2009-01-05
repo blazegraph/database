@@ -36,12 +36,15 @@ import java.util.Arrays;
 import java.util.Properties;
 
 import net.jini.config.Configuration;
+import net.jini.config.ConfigurationException;
+import net.jini.config.ConfigurationFile;
 import net.jini.config.ConfigurationProvider;
 import net.jini.core.discovery.LookupLocator;
 import net.jini.discovery.LookupDiscovery;
 
 import com.bigdata.service.AbstractScaleOutClient;
 import com.bigdata.util.NV;
+import com.bigdata.zookeeper.ZookeeperClientConfig;
 
 /**
  * A client capable of connecting to a distributed bigdata federation using
@@ -147,7 +150,7 @@ public class JiniClient extends AbstractScaleOutClient {
 
         if (fed == null) {
 
-            fed = new JiniFederation(this, jiniConfig);
+            fed = new JiniFederation(this, jiniConfig, zooConfig);
 
         }
 
@@ -161,14 +164,21 @@ public class JiniClient extends AbstractScaleOutClient {
     private final JiniConfig jiniConfig;
 
     /**
+     * The zookeeper configuration.
+     */
+    private final ZookeeperClientConfig zooConfig;
+
+    /**
      * 
      * @param jiniConfig
      */
-    protected JiniClient(final JiniConfig jiniConfig) {
+    protected JiniClient(final JiniConfig jiniConfig, final ZookeeperClientConfig zooConfig) {
 
         super(jiniConfig.properties);
 
         this.jiniConfig = jiniConfig;
+        
+        this.zooConfig = zooConfig;
 
     }
     
@@ -179,7 +189,7 @@ public class JiniClient extends AbstractScaleOutClient {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static protected class JiniConfig {
+    static public class JiniConfig {
         
         final Configuration config;
         final String[] groups;
@@ -187,7 +197,8 @@ public class JiniClient extends AbstractScaleOutClient {
         final Properties properties;
 
         public JiniConfig(Configuration config, String[] groups,
-                LookupLocator[] lookupLocators, Properties properties) {
+                LookupLocator[] lookupLocators, 
+                Properties properties) {
 
             this.config = config;
             
@@ -197,7 +208,7 @@ public class JiniClient extends AbstractScaleOutClient {
             
             this.properties = properties;
             
-            if(log.isInfoEnabled()) {
+            if(INFO) {
                 
                 log.info(toString());
                 
@@ -218,6 +229,113 @@ public class JiniClient extends AbstractScaleOutClient {
             
         }
         
+        /**
+         * Return the configuration data for the client.
+         * <p>
+         * This helper method reads {@link Configuration} data from the file(s)
+         * named by <i>args</i>, reads the <i>properties</i> file named in the
+         * {@value #CLIENT_LABEL} section of the {@link Configuration} file, and
+         * returns the configured client.
+         * 
+         * @param args
+         *            The command line arguments.
+         * 
+         * @return The configuration data for the client.
+         * 
+         * @throws ConfigurationException
+         *             if there is a problem reading the jini configuration for
+         *             the client.
+         * @throws IOException
+         *             if there is a problem reading the optional properties
+         *             file (a properties file may be specified as part of the
+         *             configuration).
+         */
+        static public JiniConfig readConfiguration(final Configuration config)
+                throws ConfigurationException, IOException {
+
+            final String[] groups;
+            final LookupLocator[] lookupLocators;
+            final Properties properties;
+
+            /*
+             * Extract how the client will discover services from the
+             * Configuration.
+             */
+            groups = (String[]) config
+                    .getEntry(AbstractServer.ADVERT_LABEL, "groups",
+                            String[].class, LookupDiscovery.ALL_GROUPS/* default */);
+
+            /*
+             * Note: multicast discovery is used regardless if
+             * LookupDiscovery.ALL_GROUPS is selected above. That is why there
+             * is no default for the lookupLocators. The default "ALL_GROUPS"
+             * means that the lookupLocators are ignored.
+             */
+
+            lookupLocators = (LookupLocator[]) config.getEntry(
+                    AbstractServer.ADVERT_LABEL, "unicastLocators",
+                    LookupLocator[].class, null/* default */);
+
+            {
+
+                /*
+                 * Extract the name of the optional properties file.
+                 */
+
+                final File propertyFile = (File) config.getEntry(
+                        AbstractServer.SERVICE_LABEL, "propertyFile",
+                        File.class, null/* defaultValue */);
+
+                if (propertyFile != null) {
+
+                    /*
+                     * Read the properties file.
+                     */
+
+                    properties = getProperties(propertyFile);
+
+                } else {
+
+                    /*
+                     * Start with an empty properties map.
+                     */
+
+                    properties = new Properties();
+
+                }
+
+            }
+
+            {
+
+                /*
+                 * Read the optional [properties] array.
+                 * 
+                 * @todo this could be replaced by explicit use of the java
+                 * identifier corresponding to the Option and simply collecting
+                 * all such properties into a Properties object using their
+                 * native type (as reported by the ConfigurationFile).
+                 */
+
+                final NV[] tmp = (NV[]) config.getEntry(
+                        AbstractServer.SERVICE_LABEL, "properties", NV[].class,
+                        new NV[] {}/* defaultValue */);
+
+                for (NV nv : tmp) {
+
+                    if (INFO)
+                        log.info(nv.toString());
+
+                    properties.setProperty(nv.getName(), nv.getValue());
+
+                }
+
+            }
+
+            return new JiniConfig(config, groups, lookupLocators, properties);
+
+        }
+
     }
 
     /**
@@ -236,17 +354,32 @@ public class JiniClient extends AbstractScaleOutClient {
      *             client; reading the properties for the client; starting
      *             service discovery, etc.
      */
-    public static JiniClient newInstance(String[] args) {
+    public static JiniClient newInstance(final String[] args) {
 
         // set the security manager.
         setSecurityManager();
 
-        // read all the configuration data and the properties file.
-        final JiniConfig jiniConfig = readConfiguration(args);
+        try {
 
-        // return the client.
-        return new JiniClient(jiniConfig);
-        
+            // Obtain the configuration object.
+            final ConfigurationFile config = (ConfigurationFile) ConfigurationProvider
+                    .getInstance(args);
+
+            // read all the configuration data and the properties file.
+            final JiniConfig jiniConfig = JiniConfig.readConfiguration(config);
+
+            // read the zookeeper client configuration.
+            final ZookeeperClientConfig zooConfig = ZookeeperClientConfig.readConfiguration(config);
+
+            // return the client.
+            return new JiniClient(jiniConfig, zooConfig);
+
+        } catch (Exception ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+
     }
     
     /**
@@ -277,120 +410,6 @@ public class JiniClient extends AbstractScaleOutClient {
     }
     
     /**
-     * Return the configuration data for the client.
-     * <p>
-     * This helper method reads {@link Configuration} data from the file(s)
-     * named by <i>args</i>, reads the <i>properties</i> file named in the
-     * {@value #CLIENT_LABEL} section of the {@link Configuration} file, and
-     * returns the configured client.
-     * 
-     * @param args
-     *            The command line arguments.
-     * 
-     * @return The configuration data for the client.
-     * 
-     * @throws RuntimeException
-     *             if there is a problem reading the jini configuration for the
-     *             client or reading the identified properties file.
-     */
-    static protected JiniConfig readConfiguration(String[] args) {
-
-        final String[] groups;
-        final LookupLocator[] lookupLocators;
-        final Properties properties;
-        try {
-
-            // Obtain the configuration object.
-            final Configuration config = ConfigurationProvider
-                    .getInstance(args);
-
-            /*
-             * Extract how the client will discover services from the
-             * Configuration.
-             */
-            groups = (String[]) config
-                    .getEntry(AbstractServer.ADVERT_LABEL, "groups",
-                            String[].class, LookupDiscovery.ALL_GROUPS/* default */);
-
-            /*
-             * Note: multicast discovery is used regardless if
-             * LookupDiscovery.ALL_GROUPS is selected above. That is why there
-             * is no default for the lookupLocators. The default "ALL_GROUPS"
-             * means that the lookupLocators are ignored.
-             */
-
-            lookupLocators = (LookupLocator[]) config
-                    .getEntry(
-                    AbstractServer.ADVERT_LABEL, "unicastLocators",
-                    LookupLocator[].class, null/* default */);
-
-            {
-                
-                /*
-                 * Extract the name of the optional properties file.
-                 */
-                
-                final File propertyFile = (File) config.getEntry(
-                        AbstractServer.SERVICE_LABEL, "propertyFile",
-                        File.class, null/* defaultValue */);
-
-                if (propertyFile != null) {
-
-                    /*
-                     * Read the properties file.
-                     */
-
-                    properties = getProperties(propertyFile);
-
-                } else {
-
-                    /*
-                     * Start with an empty properties map.
-                     */
-                    
-                    properties = new Properties();
-
-                }
-
-            }
-            
-            {
-                
-                /*
-                 * Read the optional [properties] array.
-                 */
-                
-                final NV[] tmp = (NV[]) config
-                        .getEntry(AbstractServer.SERVICE_LABEL, "properties",
-                                NV[].class, new NV[] {}/* defaultValue */);
-                
-                for(NV nv : tmp) {
-
-                    if (INFO)
-                        log.info(nv.toString());
-                        
-                    properties.setProperty(nv.getName(), nv.getValue());
-                    
-                }
-            
-            }
-
-            return new JiniConfig(config, groups, lookupLocators, properties);
-            
-        } catch (Exception ex) {
-
-            /*
-             * Note: No asynchronous processes have been started so we just wrap
-             * the exception and throw it out.
-             */
-
-            throw new RuntimeException(ex);
-
-        }
-
-    }
-
-    /**
      * Read and return the content of the properties file.
      * 
      * @param propertyFile
@@ -398,7 +417,7 @@ public class JiniClient extends AbstractScaleOutClient {
      * 
      * @throws IOException
      */
-    static protected Properties getProperties(File propertyFile)
+    static protected Properties getProperties(final File propertyFile)
             throws IOException {
 
         if(INFO) {

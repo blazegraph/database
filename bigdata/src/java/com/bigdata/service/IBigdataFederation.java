@@ -126,6 +126,9 @@ public interface IBigdataFederation extends IIndexManager {
     
     /**
      * Return an array UUIDs for {@link IDataService}s.
+     * <p>
+     * Note: This method will also resolve the {@link UUID} of an
+     * {@link IMetadataService}.
      * 
      * @param maxCount
      *            The maximum #of data services whose UUIDs will be returned.
@@ -135,6 +138,17 @@ public interface IBigdataFederation extends IIndexManager {
      * @return An array of {@link UUID}s for data services.
      */
     public UUID[] getDataServiceUUIDs(int maxCount);
+    
+    /**
+     * Return an array of {@link IDataService} references that is correlated
+     * with the given array of {@link IDataService} {@link UUID}s.
+     * 
+     * @param uuids
+     *            The (meta)data service UUIDs.
+     * 
+     * @return The (meta)data service proxies.
+     */
+    public IDataService[] getDataServices(UUID[] uuid);
     
     /**
      * Resolve the service identifier to an {@link IDataService}.

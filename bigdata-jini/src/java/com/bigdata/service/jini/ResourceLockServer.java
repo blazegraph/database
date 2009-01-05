@@ -42,6 +42,16 @@ import com.bigdata.service.LoadBalancerService;
 public class ResourceLockServer extends AbstractServer {
     
     /**
+     * Options for this server.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public interface Options extends AdministrableResourceLockService.Options {
+        
+    }
+    
+    /**
      * Creates a new service.
      * 
      * @param args

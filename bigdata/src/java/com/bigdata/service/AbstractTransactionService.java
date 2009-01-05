@@ -482,11 +482,21 @@ abstract public class AbstractTransactionService extends AbstractService
 
                         // if (!state.isReadOnly()) {
 
-                        abortImpl(state);
+                        try {
 
-                        assert state.isAborted();
+                            abortImpl(state);
 
-                        deactivateTx(state);
+                            assert state.isAborted() : state.toString();
+                            
+                        } catch(Throwable t) {
+                            
+                            log.error(state.toString(), t);
+                            
+                        } finally {
+
+                            deactivateTx(state);
+                            
+                        }
 
                     }
 
@@ -744,12 +754,13 @@ abstract public class AbstractTransactionService extends AbstractService
     }
     private volatile long releaseTime = 0L;
     
-    protected void setReleaseTime(long newValue) {
+    protected void setReleaseTime(final long newValue) {
 
         if(!lock.isHeldByCurrentThread())
             throw new IllegalMonitorStateException();
         
-        log.warn("newValue="+newValue);
+        if (INFO)
+            log.info("newValue="+newValue);
         
         this.releaseTime = newValue;
         
@@ -1351,12 +1362,11 @@ abstract public class AbstractTransactionService extends AbstractService
      * read-write transactions only).</li>
      * </ol>
      * <p>
-     * This method SHOULD NOT throw any exceptions.
      * 
      * @param state
      *            The transaction state as maintained by the transaction server.
      */
-    abstract protected void abortImpl(final TxState state);
+    abstract protected void abortImpl(final TxState state) throws Exception;
 
     /**
      * Implementation must either single-phase commit (standalone journal or a
@@ -1439,11 +1449,21 @@ abstract public class AbstractTransactionService extends AbstractService
 
                 }
 
-                abortImpl(state);
+                try {
 
-                assert state.isAborted();
+                    abortImpl(state);
+                    
+                    assert state.isAborted() : state.toString();
 
-                deactivateTx(state);
+                } catch (Throwable t) {
+
+                    log.error(state.toString(),t);
+                    
+                } finally {
+
+                    deactivateTx(state);
+                    
+                }
 
             } finally {
 
@@ -1550,9 +1570,10 @@ abstract public class AbstractTransactionService extends AbstractService
 
         setupLoggingContext();
 
+        lock.lock();
         try {
 
-            switch (runState) {
+            switch (getRunState()) {
             case Running:
             case Shutdown:
                 break;
@@ -1600,6 +1621,7 @@ abstract public class AbstractTransactionService extends AbstractService
 
         } finally {
 
+            lock.unlock();
             clearLoggingContext();
 
         }
@@ -1730,20 +1752,6 @@ abstract public class AbstractTransactionService extends AbstractService
 
         }
         
-        /**
-         * Barrier used to await the
-         * {@link ITransactionService#prepared(long, UUID)} messages during a
-         * distributed read-write transaction commit.
-         */
-        protected CyclicBarrier preparedBarrier = null;
-
-        /**
-         * Barrier used to await the
-         * {@link ITransactionService#committed(long, UUID)} messages during a
-         * distributed read-write transaction commit.
-         */
-        protected CyclicBarrier committedBarrier = null;
-
         /**
          * The set of {@link DataService}s on which a read-write transaction
          * has been started and <code>null</code> if this is not a read-write
@@ -1909,11 +1917,12 @@ abstract public class AbstractTransactionService extends AbstractService
 
             dataServices.add(dataService);
             
+            // Note: sufficient to prevent deadlocks when there are shared indices.
             resources.addAll(Arrays.asList(resource));
             
             if (INFO)
                 log.info("dataService=" + dataService + ", resource="
-                        + resource);
+                        + Arrays.toString(resource));
 
         }
 

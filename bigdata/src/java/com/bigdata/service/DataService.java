@@ -195,7 +195,7 @@ abstract public class DataService extends AbstractService
 
     private ResourceManager resourceManager;
     private ConcurrencyManager concurrencyManager;
-    private AbstractLocalTransactionManager localTransactionManager;
+    private DataServiceTransactionManager localTransactionManager;
     
     /**
      * The object used to manage the local resources.
@@ -373,6 +373,33 @@ abstract public class DataService extends AbstractService
     }
     
     /**
+     * Concrete implementation manages the local state of transactions executing
+     * on a {@link DataService}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public class DataServiceTransactionManager extends
+            AbstractLocalTransactionManager {
+
+        public ITransactionService getTransactionService() {
+
+            return DataService.this.getFederation().getTransactionService();
+
+        }
+
+        /**
+         * Exposed to {@link DataService#singlePhaseCommit(long)}
+         */
+        public void deactivateTx(final Tx localState) {
+
+            super.deactivateTx(localState);
+
+        }
+
+    }
+
+    /**
      * Starts the {@link DataService}.
      * 
      * @todo it would be nice if {@link #start()} could restart after
@@ -421,16 +448,8 @@ abstract public class DataService extends AbstractService
             
         }
         
-        localTransactionManager = new AbstractLocalTransactionManager() {
-
-            public ITransactionService getTransactionService() {
-                
-                return DataService.this.getFederation().getTransactionService();
-                
-            }
-                        
-        };
-
+        localTransactionManager = new DataServiceTransactionManager();
+        
         concurrencyManager = new ConcurrencyManager(properties,
                 localTransactionManager, resourceManager);
 
@@ -777,9 +796,9 @@ abstract public class DataService extends AbstractService
                 
             }
             
-            final Tx state = (Tx) getLocalTransactionManager().getTx(tx);
+            final Tx localState = (Tx) getLocalTransactionManager().getTx(tx);
 
-            if (state == null) {
+            if (localState == null) {
 
                 /*
                  * This is not an active transaction.
@@ -788,19 +807,122 @@ abstract public class DataService extends AbstractService
                 throw new IllegalStateException();
 
             }
+            
+            /*
+             * Note: This code is shared (copy-by-value) by the
+             * JournalTransactionService commitImpl(...)
+             */
+            final ManagedJournal journal = getResourceManager().getLiveJournal();
+            
+            {
 
-            final AbstractTask task = new SinglePhaseCommit(
-                    getConcurrencyManager(), getLocalTransactionManager(),
-                    state);
+                /*
+                 * A transaction with an empty write set can commit immediately
+                 * since validation and commit are basically NOPs (this is the same
+                 * as the read-only case.)
+                 * 
+                 * Note: We lock out other operations on this tx so that this
+                 * decision will be atomic.
+                 */
 
-            // submit commit task and await its future.
-            getConcurrencyManager().submit(task).get();
+                localState.lock.lock();
+
+                try {
+
+                    if (localState.isEmptyWriteSet()) {
+
+                        /*
+                         * Sort of a NOP commit. 
+                         */
+                        
+                        localState.setRunState(RunState.Committed);
+
+                        journal.getLocalTransactionManager().deactivateTx(
+                                localState);
+                        
+//                        state.setRunState(RunState.Committed);
+                        
+                        return 0L;
+
+                    }
+
+                } finally {
+
+                    localState.lock.unlock();
+
+                }
+
+            }
+
+            final IConcurrencyManager concurrencyManager = /*journal.*/getConcurrencyManager();
+
+            final AbstractTask<Void> task = new SinglePhaseCommit(
+                    concurrencyManager, journal.getLocalTransactionManager(),
+                    localState);
+
+            try {
+                
+                // submit and wait for the result.
+                concurrencyManager.getWriteService().submit(task).get();
+
+                /*
+                 * FIXME The state changes for the local tx should be atomic across
+                 * this operation. In order to do that we have to make those changes
+                 * inside of SinglePhaseTask while it is holding the lock, but after
+                 * it has committed. Perhaps the best way to do this is with a pre-
+                 * and post- call() API since we can not hold the lock across the
+                 * task otherwise (it will deadlock).
+                 */
+
+                localState.lock.lock();
+                
+                try {
+                
+                    localState.setRunState(RunState.Committed);
+
+                    journal.getLocalTransactionManager().deactivateTx(localState);
+                
+//                    state.setRunState(RunState.Committed);
+
+                } finally {
+                    
+                    localState.lock.unlock();
+                    
+                }
+
+            } catch (Throwable t) {
+
+//                log.error(t.getMessage(), t);
+
+                localState.lock.lock();
+
+                try {
+
+                    localState.setRunState(RunState.Aborted);
+
+                    journal.getLocalTransactionManager().deactivateTx(localState);
+
+//                    state.setRunState(RunState.Aborted);
+
+                    throw new RuntimeException(t);
+                    
+                } finally {
+                    
+                    localState.lock.unlock();
+
+                }
+
+            }
 
             /*
-             * Note: The assigned commit time is on the AbstractTask itself.
+             * Note: This is returning the commitTime set on the task when it was
+             * committed as part of a group commit.
              */
-            return task.getCommitTime();
             
+//            log.warn("\n" + state + "\n" + localState);
+
+            return task.getCommitTime();
+
         } finally {
             
             clearLoggingContext();

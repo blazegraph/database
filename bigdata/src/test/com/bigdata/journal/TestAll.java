@@ -110,6 +110,8 @@ public class TestAll extends TestCase {
 
         suite.addTest( TestDiskJournal.suite() );
 
+        suite.addTest( TestBufferedDiskJournal.suite() );
+
         return suite;
 
     }

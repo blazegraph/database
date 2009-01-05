@@ -93,13 +93,11 @@ public class JiniServicesHelper {
         threadPool.execute(resourceLockServer0 = new ResourceLockServer(
                 new String[] { path + "ResourceLockServer0.config" }));
 
-
         /*
          * Start up a timestamp server.
          */
         threadPool.execute(timestampServer0 = new TransactionServer(
                 new String[] { path + "TimestampServer0.config" }));
-
         
         /*
          * Start up a data server before the metadata server so that we can
