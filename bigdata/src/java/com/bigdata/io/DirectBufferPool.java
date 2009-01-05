@@ -255,7 +255,7 @@ public class DirectBufferPool {
      *            The capacity of the {@link ByteBuffer}s managed by this
      *            pool.
      */
-    DirectBufferPool(final int poolCapacity, final int bufferCapacity) {
+    protected DirectBufferPool(final int poolCapacity, final int bufferCapacity) {
 
         if (poolCapacity <= 0)
             throw new IllegalArgumentException();

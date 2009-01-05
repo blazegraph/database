@@ -76,6 +76,41 @@ public class TestDistributedTransactionService extends
         super(arg0);
     }
 
+//    /**
+//     * Writes a key/val pair on a named index on the specified
+//     * {@link IDataService}.
+//     * 
+//     * @param tx
+//     *            The timestamp or transaction identifer.
+//     * @param ds
+//     *            The {@link IDataService}.
+//     * @param name
+//     *            The index name.
+//     *            
+//     * @throws InterruptedException
+//     * @throws ExecutionException
+//     * @throws IOException
+//     */
+//    protected void doWrite(long tx, IDataService ds, String name)
+//            throws InterruptedException, ExecutionException, IOException {
+//
+//        ds.submit(tx, name, new IIndexProcedure() {
+//
+//            public Object apply(IIndex ndx) {
+//                
+//                // write on the index.
+//                ndx.insert(new byte[]{1}, new byte[]{1});
+//                
+//                return null;
+//            }
+//
+//            /** read-write. */
+//            public boolean isReadOnly() {
+//                return false;
+//            }});
+//    
+//    }
+    
     /**
      * Unit test of abort of a read-write tx that writes on a single data
      * service.
@@ -88,8 +123,14 @@ public class TestDistributedTransactionService extends
         
         final String name1 = "ndx1";
         
-        dataService1.registerIndex(name1, new IndexMetadata(name1, UUID
-                .randomUUID()));
+        {
+            final IndexMetadata md = new IndexMetadata(name1, UUID
+                    .randomUUID());
+            
+            md.setIsolatable(true);
+            
+            dataService1.registerIndex(name1, md);
+        }
         
         final long tx = fed.getTransactionService().newTx(ITx.UNISOLATED);
         
@@ -161,6 +202,97 @@ public class TestDistributedTransactionService extends
     }
     
     /**
+     * unit test of commit of a read-write tx that writes on a single data
+     *       service.
+     * 
+     * @throws IOException 
+     * @throws ExecutionException 
+     * @throws InterruptedException 
+     */
+    public void test_localTxCommit() throws InterruptedException,
+            ExecutionException, IOException {
+        
+        final String name1 = "ndx1";
+        
+        {
+            final IndexMetadata md = new IndexMetadata(name1, UUID
+                    .randomUUID());
+            
+            md.setIsolatable(true);
+            
+            dataService1.registerIndex(name1, md);
+        }
+        
+        final long tx = fed.getTransactionService().newTx(ITx.UNISOLATED);
+        
+        // submit write operation to the ds.
+        dataService1.submit(tx, name1, new IIndexProcedure(){
+
+            public Object apply(IIndex ndx) {
+                
+                // write on the index.
+                ndx.insert(new byte[]{1}, new byte[]{1});
+                
+                return null;
+            }
+
+            public boolean isReadOnly() {
+                return false;// read-write.
+            }});
+        
+        // verify write not visible to unisolated operation.
+        dataService1.submit(ITx.UNISOLATED, name1, new IIndexProcedure(){
+
+            public Object apply(IIndex ndx) {
+                
+                // verify not in the index.
+                assertFalse(ndx.contains(new byte[]{1}));
+                
+                return null;
+            }
+
+            public boolean isReadOnly() {
+                return false;// read-write.
+            }});
+
+        // commit the tx.
+        final long commitTime = fed.getTransactionService().commit(tx);
+
+        // verify write now visible as of that commit time.
+        dataService1.submit(commitTime, name1, new IIndexProcedure(){
+
+            public Object apply(IIndex ndx) {
+                
+                // verify in the index.
+                assertTrue(ndx.contains(new byte[]{1}));
+                
+                return null;
+            }
+
+            public boolean isReadOnly() {
+                return true;// read-only.
+            }});
+
+        // verify operation rejected for committed read-write tx.
+        try {
+        dataService1.submit(tx, name1, new IIndexProcedure(){
+
+            public Object apply(IIndex ndx) {
+                // NOP
+                return null;
+            }
+
+            public boolean isReadOnly() {
+                return false;// read-write.
+            }});
+        fail("Expecting exception");
+        } catch(Throwable t) {
+            log.info("Ignoring expected error: "+t);
+        }
+        
+    }
+
+    /**
      * @todo unit test of abort of a read-write tx that writes on a more than
      *       one data service.
      */
@@ -170,16 +302,6 @@ public class TestDistributedTransactionService extends
         
     }
     
-    /**
-     * @todo unit test of commit of a read-write tx that writes on a single data
-     *       service.
-     */
-    public void test_localTxCommit() {
-        
-        fail("write test");
-        
-    }
-
     /**
      * @todo unit test of commit of a read-write tx that writes on a more than
      *       one data service.

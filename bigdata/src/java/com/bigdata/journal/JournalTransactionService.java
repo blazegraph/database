@@ -239,6 +239,10 @@ public class JournalTransactionService extends AbstractTransactionService {
 
         }
 
+        /*
+         * Note: This code is shared (copy by value) by the DataService
+         * singlePhaseCommit.
+         */
         {
 
             /*

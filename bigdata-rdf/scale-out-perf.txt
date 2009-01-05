@@ -1929,12 +1929,30 @@ x. Map/reduce harvest pipeline and info arch changes w/ MikeP towards
 
 x. Resource lock manager
 
-   - ZooKeeper integration for resource lock manager?
+   - This service is deprecated, but might be repurposed as a
+     distributed barrier and queue service.
 
-   - Jini smart proxy for ResourceLock.
-	    
-     The state is just the lock UUID, so this can be done easily
-     enough.
+     Full transactions provide all of the benefits and, zookeeper, can
+     either guarentee no deadlock detection (when it is configured to
+     require that processes predeclare their locks) or it can support
+     2PL with deadlock detection (bigdata does not use the LockManager
+     in this manner, but it is supported).
+
+     The LockManager needs to be rewritten along a single-threaded
+     model in order to be used for non-local processes (it assumes
+     that a process is a Thread). hierarchal locks can be added, but
+     are not strictly necessary with a full transaction since we will
+     pre-declare the locks when the tx commits. bigdata and jini use
+     the java namespace pattern, while zookeeper uses the unix
+     filename pattern so we need to convert between them (which is not
+     possible in the case where the basename has an extension unless
+     the extension is mapped onto something besides ".", e.g., "_").
+
+     Modify the row store to support transactions and then we can
+     register scale-out indices and create relations and their
+     containers within a transaction.  This uses the natural database
+     mechanisms for locking (MVCC with predeclared locks for the tx
+     commit protocol).
 
 ============================================================
 
@@ -3061,20 +3079,6 @@ Commit notes:
 
     hypertree: http://hypertree.sourceforge.net/
 
-- Global resource locks and barriers using zookeeper.
-
-  - Creating a triple store.
-
-  - The closure operation must be executed by a single host, not all
-    three. [well, it might work, but it would be very weird.]  I can
-    either fix this (e.g., global lock service based on zookeeper) or
-    I can work around it by doing a load first followed by a closure
-    and then followed by query.  Both closure and query need to be run
-    by a single client while load can be run by multiple clients that
-    divide the work among themselves.  The other way to work around
-    this is to have a single client do the load, but that won't scale
-    to 16 machines.
-
 - Performance testing on DP for U100, U1500, U8000 with split / join /
   move / build / merge.
 
@@ -3091,48 +3095,7 @@ Commit notes:
 
   - Main issues:
 
-    - zookeeper for locks/barriers and service startup.
-
-      http://hadoop.apache.org/zookeeper/docs/current/index.html
-      http://hadoop.apache.org/zookeeper/docs/current/api/index.html
-      http://hadoop.apache.org/zookeeper/docs/current/zookeeperProgrammers.html
-
-      Run zoo on one master.  Defer failover setup.  Populate with
-      configuration data which specifies the #of each kind of service
-      {lbs=1, tx=1, mds=1, ds=N} and optionally binds specific
-      services (lbs, tx, mds) to specific hosts.
-
-      Run codebase http service on one master with appropriately
-      (un)jared resources.  No idea how to setup failover for that.
-      Perhaps DNS magic?  Actually, the codebase is a list of URIs
-      that is easy enough to do but the codebase is set at startup so
-      this is not going to be dynamic.
-
-      Run jini on one master.  The IP of this host needs to be in the
-      configuration file for each jini service.  Unless those service
-      descriptions are generated dynamically this needs to be a known
-      constant.  Alternatively, we can use multicast service discovery
-      and then jini is whereever you find it.
-
-      For each host, either
-
-	  A) Start the service activation daemon that will be used to
-	  start services on this host.  In this case the master runs a
-	  service that decides where to place the other services by
-	  consulting zookeeper (for the #of services to run) and by
-	  consulting the LBS (when deciding where to place new heavy
-	  services, e.g., DS instances).
-
-	  B) Start a bigdata service using jini to discover the joined
-	  services and contending for locks on configuration nodes for
-	  various services.
-	  
-	  See http://www.capify.org/ and http://reductivelabs.com/trac/puppet
-	  for cluster admin helpers.
-
-    - Distributed dynamic generation of the LUBM data sets.
-
-    - Read-historical tx for closure.  The code will have to be
+    - Done. Read-historical tx for closure.  The code will have to be
       modified to explicitly start and commit a read-only tx for the
       desired timestamp for each mutation operation in ProgramTask.
       The releaseTime will be automatically maintained by the tx
@@ -3410,7 +3373,7 @@ tmpDir space under WinNT?
 Why are all index partitions being moved off of one of the two embedded data services under WinNT U50?
 
 ------------------------------------------------------------
-Commit log
+Full distributed transaction support:
 
 Note: At this point I have closure working with read-only tx.  I still
 want full distributed tx commits to make the split/join/move
@@ -3419,6 +3382,9 @@ startup, master election (for closure), etc.
 
 - Added support for full transactions, including distributed
   transactions and both single phase and multi-phase commit protocols.
+
+- Added unit tests for the DistributedTransactionService's protocol
+  using mock ITxCommitProtocol (renamed ITxCommitter).
 
 - Added unit tests for distributed transactions that start on a single
   data service.
@@ -3431,6 +3397,59 @@ startup, master election (for closure), etc.
 
 - Modified the concurrency control mechanisms in AbstractTask to
   support the distributed transaction commit protocol.
+
+  Isolation is provided by creating an IsolatedView where the mutable
+  BTree isolates writes and the rest of the view reads from the ground
+  state of the tx.  This needs to be on a tmp store since (A) the
+  journal does not overflow; and (B) for a data service, we do not
+  want to overflow the mutable BTree.  The TemporaryStore is fine for
+  this purpose, excepting only that it is not (verify this) MRMW, so
+  we should use a Temporary Journal instead, probably changing the
+  temp store factory.
+
+  The first time we isolate an index within a tx we assign its name
+  within the then current tmpStore and remember the name of the
+  isolated index inside the LocalTxState object.  This allows for the
+  possibility that one tempStore may fill up and another be created
+  during the live of a tx.  It is just as easy to put all indices
+  isolated by a tx onto the same tempStore - just old its reference
+  directly.
+
+  When an tx operation completes, its indices will be checkpointed by
+  AbstractTask.  The index will write the checkpoint on its backing
+  store, so that is Ok.  However, we do need to have Name2Addr for
+  that backing store updated.  This is very similar to how we handle
+  unisolated tx today.  Among other things, it will let us atomically
+  register an index within a tx, which is nice.
+
+  An tx task essentially is an unisolated task with exclusive access to
+  the isolated indices which it requests and whose mutable btrees are
+  found on tempStores rather than the live journal.  The normal
+  Name2Addr mechanisms would work, except that they are not atomic
+  with group commit.  Hence the same sort of thing will have to be
+  done for each Name2Addr for the backing store of an isolated index.
+
+  The tx commit is an unisolated task that declares the name of the
+  unisolated indices AND the name of the isolated indices. Note that
+  any number of unisolated tasks and single-phase commits may join the
+  same commit group, and at MOST ONE distributed tx.
+
+  When the write service sees a task finish its work it MUST check the
+  task to determine if it is a distributed tx commit.  If so, then it
+  MUST run the group commit with that task and obtain the commit
+  timestamp using the distributed commit protocol rather than
+  nextTimestamp().
+
+  This suggests that DistributedCommitTask extends AbstractTask.
+  doTask() will validate the index using the revisionTime assigned to
+  the task and then wait at the "prepared" barrier.  Once that barrier
+  breaks, the assigned commit time is written onto the AbstractTask
+  and doTask() is done.  The write service notices that this is a
+  distributed commit task.  If there is a problem, including with
+  doTask(), then it will handle the distributed abort (all it needs to
+  do is throw an exception).  Otherwise it immediately runs a
+  groupCommit WITHOUT waiting for other tasks to join using the
+  commitTime already assigned to the task.
 
 - Modified the concurrency control mechanisms in AbstractTask to
   acquire exclusive write locks for the _isolated_ indices by placing
@@ -3460,11 +3479,6 @@ startup, master election (for closure), etc.
   concurrency in the meanwhile (one operation per tx) simply be
   declaring the tx id as one of the locks.
 
-- Further hardened the split, join, and move index partition
-  operations, including the use of full transactions to ensure ACID
-  updates of the MDS and the source and target data services.  (May
-  require allowing tx identifiers for some MDS operations.)
-
 - Disable split, join and move for index partitions with active
   transactions (other than those we create to make those operations
   ACID).
@@ -3486,6 +3500,40 @@ startup, master election (for closure), etc.
   Note: Build, merge, and copy do not cause problems because they do
   not change the index partition names.
 
+- Modified AbstractTask to be extended on for special cases and
+  instead provided an interface for access to critical methods which
+  it was exposing: getJournal(), getIndex(), etc.
+
+- Moved the MIN_RELEASE_AGE and related options from the StoreManager
+  to the TransactionService so that they may be globally administered
+  (moved in part since you do configured the minReleaseAge on the
+  txService).
+
+------------------------------------------------------------
+Asynchronous overflow
+
+- Further hardened the split, join, and move index partition
+  operations, including the use of full transactions to ensure ACID
+  updates of the MDS and the source and target data services.  (May
+  require allowing tx identifiers for some MDS operations or using a
+  distributed lock system.)
+
+- Faster and more robust asynchronous overflow processing: ensure that
+  index hard references are not discarded (could be wired via
+  IndexMetadata); ensure that closeForWrites() correctly configures
+  the unisolated indices on the journal as historical indices for the
+  lastCommitTime with their buffers, etc. in place; fully buffered
+  journal for less IO Wait during asynchronous overflow; asynchronous
+  overflow must be 100% complete before the journal may overflow
+  again;
+
+- Move could blast resources across a socket.  We will certainly need
+  to do that for failover, since an index segment will be built by the
+  primary data service and replicated (once built) to the secondaries.
+
+------------------------------------------------------------
+Event logging and graphs with correlated events.
+
 - Added an event logging interface on the federation with reporting to
   the LBS for now.  The goal is to allow plotting of events against
   timeline data, such as CPU performance counters.  The interface was
@@ -3496,11 +3544,127 @@ startup, master election (for closure), etc.
   the timestamps onto its own clock based the receipt time.  Events
   can be correlated by their event identifiers.
 
-- Modified AbstractTask to be extended on for special cases and
-  instead provided an interface for access to critical methods which
-  it was exposing: getJournal(), getIndex(), etc.
+------------------------------------------------------------
+BufferedDiskStrategy
 
-- Moved the MIN_RELEASE_AGE and related options from the StoreManager
-  to the TransactionService so that they may be globally administered
-  (moved in part since you do configured the minReleaseAge on the
-  txService).
+- Introduced a "BufferedDisk" IBufferStrategy for the backing
+  store. This is a persistent on-disk implementation with a direct
+  buffer size to the maximum expected size of the store (nominally
+  200M).  The rationale for this is to fully buffer reads on the
+  historical journal during asynchronous overflow processing in order
+  to reduce latency for that operation.  A new implementation was used
+  rather than the DirectBuffer because the latter can not be extended.
+  The idea is to have asynchronous overflow processing complete (all
+  indices handled) before we allow another overflow event.  Using this
+  approach we will allocate 2 x 200M buffers - one to the live journal
+  and one for the historical journal.  If asynchronous overflow
+  processing can not complete before the live journal would overflow,
+  then the live journal is extended, which is why the DirectBuffer is
+  not a good fit.  When the journal must be extended, the buffer IS
+  NOT extended to cover the new user extent.  The rationale for that
+  is the Sun bug in releasing direct ByteBuffers.  This mode should
+  have higher read concurrency since the data are (typically) fully
+  buffered and much higher read throughput should be expected.
+
+  Some possible drawbacks which may need to be addressed:
+
+  - Higher write throughput is possible if writes treat the buffer as
+    a cache rather than always writing through to the disk, but that
+    might result in higher commit latency unless we asynchronously
+    "catch up".  Consider that 20M have been written onto the end of
+    the buffer since the last commit.  If those data are only on the
+    buffer, then we need to transfer 20M from the buffer to the disk
+    during the commit.  However, if we write through the buffer onto
+    the disk then the OS disk cache should provide much the same
+    throughput AND handle asynchronous writes through to the disk.
+    The only time when this will not be true is when the OS/disk cache
+    is disabled.  For that case, we would definately be better of
+    handling the "write behind" ourselves.
+
+  - On restart, the buffer needs to be filled with data read from the
+    file.  However, we do not what to do that during the StoreManager
+    startup since it may scan files which it does not need to fully
+    open.
+
+  - The writes MUST always be made using a direct buffer in order to
+    avoid memory leaks.  This means that the data must be transferred
+    onto either the backing buffer (if it lies within the user extent)
+    or onto the manditory write cache (if it crosses or lies beyond
+    the user extent).
+
+  - Asynchronous writes could be realized by locks surrounding updates
+    of the last offset written (by the application) and the last
+    offset transferred onto the disk (by a write thread).  The force()
+    method will have to ensure that buffered writes up to the offset
+    at which that method was invoked (or the offset which it
+    specifies) have been transferred to the disk before synching the
+    disk.
+
+------------------------------------------------------------
+
+Zookeeper integration: service starter, master for closure, CDL w/
+restart (know what files have (not) been processed (or generated in
+the case of LUBM)), etc.
+
+- Global resource locks and barriers using zookeeper.
+
+  - Creating a triple store (exclusive lock on the node for the triple
+    store).
+
+  - The closure operation must be executed by a single host, not all
+    three. [well, it might work, but it would be very weird.]  I can
+    either fix this (e.g., global lock service based on zookeeper) or
+    I can work around it by doing a load first followed by a closure
+    and then followed by query.  Both closure and query need to be run
+    by a single client while load can be run by multiple clients that
+    divide the work among themselves.  The other way to work around
+    this is to have a single client do the load, but that won't scale
+    to 16 machines.
+
+    - zookeeper for locks/barriers and service startup.
+
+      http://hadoop.apache.org/zookeeper/docs/current/index.html
+      http://hadoop.apache.org/zookeeper/docs/current/api/index.html
+      http://hadoop.apache.org/zookeeper/docs/current/zookeeperProgrammers.html
+
+      Run zoo on one master.  Defer failover setup.  Populate with
+      configuration data which specifies the #of each kind of service
+      {lbs=1, tx=1, mds=1, ds=N} and optionally binds specific
+      services (lbs, tx, mds) to specific hosts.
+
+      Run codebase http service on one master with appropriately
+      (un)jared resources.  No idea how to setup failover for that.
+      Perhaps DNS magic?  Actually, the codebase is a list of URIs
+      that is easy enough to do but the codebase is set at startup so
+      this is not going to be dynamic.
+
+      Run jini on one master.  The IP of this host needs to be in the
+      configuration file for each jini service.  Unless those service
+      descriptions are generated dynamically this needs to be a known
+      constant.  Alternatively, we can use multicast service discovery
+      and then jini is whereever you find it.
+
+      For each host, either
+
+	  A) Start the service activation daemon that will be used to
+	  start services on this host.  In this case the master runs a
+	  service that decides where to place the other services by
+	  consulting zookeeper (for the #of services to run) and by
+	  consulting the LBS (when deciding where to place new heavy
+	  services, e.g., DS instances).
+
+	  B) Start a bigdata service using jini to discover the joined
+	  services and contending for locks on configuration nodes for
+	  various services.
+	  
+	  See http://www.capify.org/ and http://reductivelabs.com/trac/puppet
+	  for cluster admin helpers.
+
+    - Distributed dynamic generation of the LUBM data sets.
+
+------------------------------------------------------------
+Commit log
+
+- Changed log4j dependency to 1.2.15.  This has support for
+  isTraceEnabled(), etc and is a dependency for zookeeper. Moved the
+  JAR from bigdata/lib to bigdata/lib/apache.

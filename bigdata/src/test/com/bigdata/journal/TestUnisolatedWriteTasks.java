@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.util.Arrays;
-import java.util.Properties;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -50,7 +49,7 @@ import com.bigdata.btree.keys.KeyBuilder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestUnisolatedWriteTasks extends ProxyTestCase {
+public class TestUnisolatedWriteTasks extends ProxyTestCase<Journal> {
 
     /**
      * 
@@ -77,9 +76,9 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
      */
     public void test_writeOneIndex() throws InterruptedException, ExecutionException {
         
-        Properties properties = getProperties();
+        final Journal journal = getStore();
         
-        Journal journal = new Journal(properties);
+        try {
         
         final String[] resource = new String[]{"foo"};
         
@@ -210,9 +209,11 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
         assertEquals("commitCounter", commitCounterBefore + 1, journal
                 .getRootBlockView().getCommitCounter());
 
-        journal.shutdown();
-        
-        journal.deleteResources();
+        } finally {
+            
+            journal.destroy();
+            
+        }
         
     }
     
@@ -228,9 +229,9 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
      */
     public void test_writeTwoIndex() throws InterruptedException, ExecutionException {
         
-        Properties properties = getProperties();
+        final Journal journal = getStore();
         
-        Journal journal = new Journal(properties);
+        try {
         
         final String[] resource = new String[]{"foo","bar"};
         
@@ -412,10 +413,12 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
         // verify commit was NOT performed.
         assertEquals("commitCounter", commitCounterBefore + 1, journal
                 .getRootBlockView().getCommitCounter());
-
-        journal.shutdown();
         
-        journal.deleteResources();
+        } finally {
+            
+            journal.destroy();
+            
+        }
         
     }
    
@@ -435,10 +438,10 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
      */
     public void test_writeManyIndices() throws InterruptedException, ExecutionException {
         
-        Properties properties = getProperties();
-        
-        Journal journal = new Journal(properties);
+        final Journal journal = getStore();
 
+        try {
+        
         /*
          * Note: This SHOULD be larger than the capacity of the LRUCache in
          * Name2Addr.
@@ -589,11 +592,13 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
         // verify commit was NOT performed.
         assertEquals("commitCounter", commitCounterBefore + 1, journal
                 .getRootBlockView().getCommitCounter());
-
-        journal.shutdown();
-
-        journal.deleteResources();
-
+        
+        } finally {
+            
+            journal.destroy();
+            
+        }
+        
     }
 
 }

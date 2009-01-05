@@ -74,7 +74,6 @@ import com.bigdata.concurrent.NamedLock;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.CommitRecordIndex;
 import com.bigdata.journal.ConcurrencyManager;
@@ -104,6 +103,7 @@ import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.MetadataService;
+import com.bigdata.service.DataService.DataServiceTransactionManager;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -2231,9 +2231,9 @@ abstract public class StoreManager extends ResourceEvents implements
             
         }
 
-        public AbstractLocalTransactionManager getLocalTransactionManager() {
+        public DataServiceTransactionManager getLocalTransactionManager() {
 
-            return (AbstractLocalTransactionManager) getConcurrencyManager()
+            return (DataServiceTransactionManager) getConcurrencyManager()
                     .getTransactionManager();
 
         }

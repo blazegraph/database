@@ -640,6 +640,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
         }
 
+        // Note: 
         final boolean useDirectBuffers = Boolean
                 .parseBoolean(getProperty(Options.USE_DIRECT_BUFFERS,
                         Options.DEFAULT_USE_DIRECT_BUFFERS));
@@ -984,6 +985,38 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             
         }
 
+        case BufferedDisk: {
+
+            /*
+             * Setup the buffer strategy.
+             * 
+             * FIXME Must set the initial and maximumExtent from the supplied
+             * DirectBufferPool (or another static instance for that purpose in
+             * which case we just ignore these parameters), not the other way
+             * around. Always use direct buffers for this mode. NO readCache.
+             * 
+             * FIXME Modify FileMetadata to fully buffer the (user?) extent (up
+             * to the available bytes) on restart.
+             */
+
+            if(true)throw new UnsupportedOperationException();
+            
+            fileMetadata = new FileMetadata(file, BufferMode.BufferedDisk,
+                    useDirectBuffers, initialExtent, maximumExtent, create,
+                    isEmptyFile, deleteOnExit, readOnly, forceWrites,
+                    offsetBits, readCacheCapacity, readCacheMaxRecordSize,
+                    readOnly ? null : writeCache, validateChecksum,
+                    createTime, checker, alternateRootBlock);
+
+            _bufferStrategy = new DiskOnlyStrategy(
+                    0L/* soft limit for maximumExtent */, fileMetadata);
+
+            this._rootBlock = fileMetadata.rootBlock;
+
+            break;
+
+        }
+        
         default:
 
             throw new AssertionError();

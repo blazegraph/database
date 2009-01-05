@@ -573,6 +573,11 @@ public class AbstractResourceManagerTestCase extends
             // TODO Auto-generated method stub
             return null;
         }
+
+        public IDataService[] getDataServices(UUID[] uuid) {
+            // TODO Auto-generated method stub
+            return null;
+        }
         
     }
     

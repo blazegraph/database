@@ -811,6 +811,12 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
 
         super.shutdown();
         
+        if (abstractTransactionService != null) {
+
+            abstractTransactionService.shutdown();
+
+        }
+
         for (int i = 0; i < dataService.length; i++) {
 
             DataService ds = this.dataService[i];
@@ -829,14 +835,6 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
             
         }
         
-        if (abstractTransactionService != null) {
-
-            abstractTransactionService.shutdown();
-
-            abstractTransactionService = null;
-
-        }
-
         if (resourceLockManager != null) {
 
             resourceLockManager.shutdown();
@@ -845,6 +843,9 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
 
         }
         
+        // Note: don't clear ref until all down since nextTimestamp() still active.
+        abstractTransactionService = null;
+
         if (INFO)
             log.info("done");
 
@@ -859,6 +860,12 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
             log.info("begin");
 
         super.shutdownNow();
+
+        if (abstractTransactionService != null) {
+
+            abstractTransactionService.shutdownNow();
+
+        }
 
         for (int i = 0; i < dataService.length; i++) {
 
@@ -878,14 +885,6 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
             
         }
         
-        if (abstractTransactionService != null) {
-
-            abstractTransactionService.shutdownNow();
-
-            abstractTransactionService = null;
-
-        }
-
         if (resourceLockManager != null) {
 
             resourceLockManager.shutdownNow();
@@ -893,7 +892,10 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
             resourceLockManager = null;
 
         }
-        
+
+        // Note: don't clear ref until all down since nextTimestamp() still active.
+        abstractTransactionService = null;
+
         if (INFO)
             log.info("done");
 
@@ -904,6 +906,8 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
         if (INFO)
             log.info("");
 
+        abstractTransactionService.shutdownNow();
+        
         for (int i = 0; i < dataService.length; i++) {
 
             IDataService ds = dataService[i];
@@ -941,9 +945,8 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
         loadBalancerService.shutdownNow();
         
         loadBalancerService = null;
-        
-        abstractTransactionService.shutdownNow();
-        
+
+        // Note: don't clear ref until all down since nextTimestamp() still active.
         abstractTransactionService = null;
         
     }

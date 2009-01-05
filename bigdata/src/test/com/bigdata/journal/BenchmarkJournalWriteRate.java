@@ -459,7 +459,7 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
         
         // @todo rewrite as a Task submitted to the journal using that timestamp.
         IIndex ndx = (tx == 0 ? journal.getIndex(name)
-                : journal.getTx(tx).getIndex(name));
+                : journal.getLocalTransactionManager().getTx(tx).getIndex(name));
 
         System.err.println("Begin: index write rate, isolated="
                 + (tx == 0 ? "no" : "yes") + ", isolatable="

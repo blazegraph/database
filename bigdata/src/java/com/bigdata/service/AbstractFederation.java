@@ -1187,4 +1187,68 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
 
     }
 
+    /**
+     * @todo it may be possible to optimize this for the jini case.
+     */
+    public IDataService[] getDataServices(final UUID[] uuids) {
+        
+        final IDataService[] services = new IDataService[uuids.length];
+
+        final IBigdataFederation fed = this;
+        
+        int i = 0;
+        
+        // UUID of the metadata service (if forced to discover it).
+        UUID mdsUUID = null;
+
+        for (UUID uuid : uuids) {
+
+            IDataService service = fed.getDataService(uuid);
+
+            if (service == null) {
+
+                if (mdsUUID == null) {
+                
+                    try {
+                    
+                        mdsUUID = fed.getMetadataService().getServiceUUID();
+                        
+                    } catch (IOException ex) {
+                        
+                        throw new RuntimeException(ex);
+                    
+                    }
+                    
+                }
+                
+                if (uuid == mdsUUID) {
+
+                    /*
+                     * @todo getDataServices(int maxCount) DOES NOT return MDS
+                     * UUIDs because we don't want people storing application
+                     * data there, but getDataService(UUID) should probably work
+                     * for the MDS UUID also since once you have the UUID you
+                     * want the service.
+                     */
+
+                    service = fed.getMetadataService();
+                }
+                
+            }
+
+            if (service == null) {
+
+                throw new RuntimeException("Could not discover service: uuid="
+                        + uuid);
+
+            }
+
+            services[i++] = service;
+
+        }
+        
+        return services;
+
+    }
+
 }

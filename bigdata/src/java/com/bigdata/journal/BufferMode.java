@@ -25,6 +25,8 @@ package com.bigdata.journal;
 
 import java.nio.ByteBuffer;
 
+import com.bigdata.service.DataService;
+
 /**
  * <p>
  * The buffer mode in which the journal is opened.
@@ -48,6 +50,8 @@ public enum BufferMode {
      * is useful for segments whose contents do not require persistence, applets,
      * etc.
      * </p>
+     * 
+     * @see TransientBufferStrategy
      */
     Transient(false/*stable*/),
     
@@ -66,6 +70,8 @@ public enum BufferMode {
      * This option offers wires an image of the journal file into memory and
      * allows the journal to optimize IO operations.
      * </p>
+     * 
+     * @see DirectBufferStrategy
      */
     Direct(true/*stable*/),
     
@@ -85,6 +91,7 @@ public enum BufferMode {
      * </p>
      * 
      * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=4724038
+     * @see MappedBufferStrategy
      */
     Mapped(true/*stable*/),
     
@@ -92,11 +99,12 @@ public enum BufferMode {
      * <p>
      * The journal is managed on disk. This option may be used with files of
      * more than {@link Integer#MAX_VALUE} bytes in extent, but no more than
-     * {@link Integer#MAX_VAlUE} slots. Large files are NOT the normal use case
-     * for bigdata. Journal performance for large files should be fair on write,
-     * but performance will degrade as the the object and allocation indices
-     * grow and the journal is NOT optimized for random reads (poor locality).
+     * {@link Integer#MAX_VAlUE} slots. Journal performance for large files
+     * should be fair on write, but performance will degrade as the journal is
+     * NOT optimized for random reads (poor locality).
      * </p>
+     * 
+     * @see DiskOnlyStrategy
      */
     Disk(true/*stable*/),
     
@@ -107,8 +115,26 @@ public enum BufferMode {
      * and scales-up to very large temporary files. The backing file (if any) is
      * always destroyed when the store is closed.
      * </p>
+     * 
+     * @see DiskOnlyStrategy
      */
-    Temporary(false/*stable*/);
+    Temporary(false/*stable*/),
+    
+    /**
+     * <p>
+     * The journal is managed on disk, but with a direct {@link ByteBuffer}
+     * equal in size to the {@link Options#INITIAL_EXTENT}. This option is
+     * designed for use with periodic overflow of the live journal for a
+     * {@link DataService}. You pay a modest premium for the fully buffered
+     * journal (~200M of RAM per journal, and the data service maintains both
+     * the live journal and the historical journal). However, this mode offers
+     * higher read concurrency than {@link #Disk} and faster asynchronous
+     * overflow processing (since it is not reading through to the disk).
+     * </p>
+     * 
+     * @see BufferedDiskStrategy
+     */
+    BufferedDisk(true/*stable*/);
     
     private final boolean stable;
     
