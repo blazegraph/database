@@ -1938,6 +1938,8 @@ public abstract class DistributedTransactionService extends
      */
     protected class NotifyReleaseTimeTask implements Runnable {
 
+        private long lastReleaseTime = 0L;
+        
         /**
          * Notifies all {@link IDataService}s of the current release time.
          * <p>
@@ -1954,6 +1956,13 @@ public abstract class DistributedTransactionService extends
 
                 final long releaseTime = getReleaseTime();
 
+                if (releaseTime == lastReleaseTime) {
+
+                    // The release time has not been advanced.
+                    return;
+                    
+                }
+                
                 final IBigdataFederation fed = getFederation();
 
                 final UUID[] a = fed.getDataServiceUUIDs(0/* maxCount */);
@@ -1992,6 +2001,9 @@ public abstract class DistributedTransactionService extends
 
                 }
 
+                // update the last release time.
+                lastReleaseTime = releaseTime;
+                
             } catch (Throwable t) {
 
                 log.error(t.getLocalizedMessage(), t);
