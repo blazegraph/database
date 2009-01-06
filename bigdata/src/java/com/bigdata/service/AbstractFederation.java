@@ -673,6 +673,8 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
      */
     public String getServiceName() {
     
+        assertOpen();
+
         return client.getDelegate().getServiceName();
         
     }
@@ -681,7 +683,9 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
      * Delegated.
      */
     public Class getServiceIface() {
-    
+
+        assertOpen();
+
         return client.getDelegate().getServiceIface();
         
     }
@@ -691,6 +695,8 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
      */
     public UUID getServiceUUID() {
         
+        assertOpen();
+
         return client.getDelegate().getServiceUUID();
         
     }
@@ -699,6 +705,8 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
      * Delegated.
      */
     public boolean isServiceReady() {
+
+        assertOpen();
         
         return client.getDelegate().isServiceReady();
         
@@ -709,6 +717,8 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
      */
     public void reattachDynamicCounters() {
         
+        assertOpen();
+
         client.getDelegate().reattachDynamicCounters();
         
     }
@@ -717,7 +727,9 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
      * Delegated.
      */
     public void didStart() {
-        
+
+        assertOpen();
+
         client.getDelegate().didStart();
         
     }
@@ -729,7 +741,9 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
             log.info("service=" + service + ", serviceUUID" + serviceUUID);
             
         }
-        
+
+        assertOpen();
+
         client.getDelegate().serviceJoin(service, serviceUUID);
         
     }
@@ -741,7 +755,8 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
             log.info("serviceUUID="+serviceUUID);
             
         }
-        
+
+        // @todo really, we should test like this everywhere.
         final AbstractClient client = this.client;
 
         if (client != null && client.isConnected()) {

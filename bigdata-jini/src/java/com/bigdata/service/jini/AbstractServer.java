@@ -37,7 +37,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.rmi.Remote;
 import java.rmi.server.ExportException;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Properties;
+import java.util.UUID;
 
 import net.jini.admin.Administrable;
 import net.jini.admin.JoinAdmin;
@@ -57,9 +60,15 @@ import net.jini.lookup.ServiceIDListener;
 import net.jini.lookup.entry.Name;
 
 import org.apache.log4j.Logger;
+import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.ZooDefs.Ids;
+import org.apache.zookeeper.data.ACL;
 
 import com.bigdata.Banner;
 import com.bigdata.counters.AbstractStatisticsCollector;
+import com.bigdata.io.SerializerUtil;
 import com.bigdata.service.AbstractService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IServiceShutdown;
@@ -121,6 +130,9 @@ import com.sun.jini.start.ServiceStarter;
  * 
  * @todo put a lock on the serviceIdFile while the server is running.
  * 
+ * @todo make the serviceId ASCII hex digits (that is not the jini standard
+ *       practice)?
+ * 
  * @todo document exit status codes and unify their use in this and derived
  *       classes.
  * 
@@ -168,6 +180,20 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      */
     protected File serviceIdFile;
 
+    /**
+     * The zpath (zookeeper path) to the znode for the logical service of which
+     * this service is an instance. This is read from the {@link Configuration}.
+     */
+    protected String logicalServiceZPath;
+
+    /**
+     * The path to the ephemeral znode (zookeeper node) for this service
+     * instance. This path is assigned when the service creates a
+     * {@link CreateMode#EPHEMERAL_SEQUENTIAL} child of
+     * {@link #logicalServiceZPath}.
+     */
+    protected String physicalServiceZPath;
+    
     /**
      * The {@link JiniClient} is used to locate the other services in the
      * {@link IBigdataFederation}.
@@ -426,6 +452,17 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                     Exporter.class // type (of the return object)
                     );
 
+            /*
+             * The zpath of the logical service.
+             * 
+             * @todo null allowed if zookeeper not in use. make required if
+             * zookeeper is a required integration, but then you will really
+             * need to use the ServicesManager to start any service since the
+             * zookeeper configuration needs to be established as well.
+             */
+            logicalServiceZPath = (String) config.getEntry(SERVICE_LABEL,
+                    "logicalServiceZPath", String.class, null/* default */);
+            
             // The file on which the ServiceID will be written. 
             serviceIdFile = (File) config.getEntry(SERVICE_LABEL,
                     "serviceIdFile", File.class); // default
@@ -583,23 +620,29 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             assert proxy != null;
             
             if (serviceID != null) {
+
                 /*
                  * We read the serviceID from local storage.
                  */
+                
                 joinManager = new JoinManager(proxy, // service proxy
                         entries, // attr sets
                         serviceID, // ServiceID
                         client.getFederation().discoveryManager, // DiscoveryManager
                         new LeaseRenewalManager());
+                
             } else {
+                
                 /*
                  * We are requesting a serviceID from the registrar.
                  */
+                
                 joinManager = new JoinManager(proxy, // service proxy
                         entries, // attr sets
                         this, // ServiceIDListener
                         client.getFederation().discoveryManager, // DiscoveryManager
                         new LeaseRenewalManager());
+            
             }
             
         } catch (IOException ex) {
@@ -608,14 +651,12 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             
         }
         
-        if (readServiceIDFromFile && impl != null && impl instanceof AbstractService) {
-
+        if (readServiceIDFromFile) {
+            
             /*
              * Notify the service that it's service UUID has been set.
              */
-
-            ((AbstractService) impl).setServiceUUID(JiniUtil
-                    .serviceID2UUID(serviceID));
+            notifyServiceUUID(serviceID);
 
         }
         
@@ -707,7 +748,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * @exception IOException
      *                if the {@link ServiceID} could not be read from the file.
      */
-    public ServiceID readServiceId(File file) throws IOException {
+    public ServiceID readServiceId(final File file) throws IOException {
 
         final FileInputStream is = new FileInputStream(file);
 
@@ -736,7 +777,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * @param serviceID
      *            The assigned {@link ServiceID}.
      */
-    public void serviceIDNotify(ServiceID serviceID) {
+    public void serviceIDNotify(final ServiceID serviceID) {
 
         if (INFO)
             log.info("serviceID=" + serviceID);
@@ -773,15 +814,152 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             }
             
         }
+
+        notifyServiceUUID(serviceID);
+        
+    }
+    
+    /**
+     * Notify the {@link AbstractService} that it's service UUID has been set.
+     */
+    protected void notifyServiceUUID(final ServiceID serviceId) {
+
+        if (serviceId == null)
+            throw new IllegalArgumentException();
         
         if(impl != null && impl instanceof AbstractService) {
 
-            /*
-             * Notify the service that it's service UUID has been set.
-             */
+            final UUID serviceUUID = JiniUtil.serviceID2UUID(serviceID);
+
+            final AbstractService service = ((AbstractService) impl);
             
-            ((AbstractService) impl).setServiceUUID(JiniUtil
-                    .serviceID2UUID(serviceID));
+            service.setServiceUUID(serviceUUID);
+            
+            try {
+
+                final JiniFederation fed = (JiniFederation) service
+                        .getFederation();
+
+                notifyZookeeper(fed.getZookeeper(), serviceUUID);
+
+            } catch (Throwable t) {
+
+                log.error("Could not register service with zookeeper: " + t, t);
+
+            }
+
+        }
+
+    }
+    
+    /**
+     * Create a {@link CreateMode#EPHEMERAL} node in zookeeper that is a child
+     * of the {@link #logicalServiceZPath}. The znode name is generated by
+     * appending the assigned <i>serviceUUID</i>. That name is <strong>stable</strong>.
+     * If the service is shutdown and then restarted it will re-create the SAME
+     * znode.
+     * 
+     * @param zookeeper
+     * @param serviceUUID
+     * 
+     * @throws KeeperException
+     * @throws InterruptedException
+     * 
+     * FIXME Since the order of the physical service znodes for a given logical
+     * service is essentially random, a separate election must be maintained for
+     * the logical service in order to choose the failover chain (which service
+     * is the primary, the secondary, etc.)
+     * 
+     * FIXME Any failover protocol in which the service can restart MUST provide
+     * for re-synchronization of the service when it restarts with the current
+     * primary / active ensemble.
+     * 
+     * @todo test failover w/ death and restart of both individual zookeeper
+     *       instances and of the zookeeper ensemble. unless there are failover
+     *       zookeeper instances it is going to lose track of our services (they
+     *       are represented by ephemeral znodes). On reconnect to zookeeper,
+     *       the service should should verify that its ephemeral node is present
+     *       and create it if it is not present and re-negotiate the service
+     *       failover chain.
+     */
+    protected void notifyZookeeper(final ZooKeeper zookeeper,
+            final UUID serviceUUID) throws KeeperException, InterruptedException {
+        
+        if (zookeeper == null) {
+            
+            /*
+             * @todo This is checked in case zookeeper is not integrated. If
+             * we decide that zookeeper is a manditory component then change
+             * this to throw an exception instead (or perhaps
+             * fed.getZookeeper() will throw that exception).
+             */
+
+            log.warn("No zookeeper: will not create service znode.");
+
+            return;
+            
+        }
+
+        if (logicalServiceZPath == null) {
+
+            /*
+             * @todo This is checked so that you can use a standalone
+             * configuration file without having an assigned logical service
+             * zpath that exists in zookeeper. If we take out this test then
+             * all configuration files would have to specify the logical
+             * service path, which might be an end state for the zookeeper
+             * integration.
+             */
+
+            log
+                    .warn("No logicalServiceZPath: will not create service znode.");
+
+            return;
+            
+        }
+        
+        if (serviceUUID == null)
+            throw new IllegalArgumentException();
+        
+//        if (logicalServiceZPath == null) {
+//
+//            throw new IllegalStateException(
+//                    "Logical service zpath not assigned.");
+//
+//        }
+
+        // Note: makes if(physicalServiceZPath!=null) atomic.
+        synchronized (logicalServiceZPath) {
+
+            if (physicalServiceZPath != null) {
+
+                throw new IllegalStateException(
+                        "Physical service zpath already assigned.");
+
+            }
+
+            final List<ACL> acl = Ids.OPEN_ACL_UNSAFE;
+            
+//            final List<ACL> acl = new LinkedList<ACL>();
+//
+//            // the service has all permissions for this node.
+//            acl.addAll(Ids.CREATOR_ALL_ACL);
+//            
+//            // but anyone can read the node's data.
+//            acl.addAll(Ids.READ_ACL_UNSAFE);
+            
+            /*
+             * Note: The znode is created using the assigned service UUID. This
+             * means that the total zpath for the physical service is stable and
+             * can be re-created on restart of the service.
+             */
+            physicalServiceZPath = zookeeper.create(logicalServiceZPath + "/"
+                    + "physicalService" + serviceUUID, SerializerUtil
+                    .serialize(serviceUUID), acl, CreateMode.EPHEMERAL);
+
+            if (INFO)
+                log.info("registered with zookeeper: zpath="
+                        + physicalServiceZPath);
             
         }
 
@@ -888,20 +1066,57 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
          */
         try {
         
-            if(INFO) log.info("Unexporting the service proxy.");
-            
+            if (INFO)
+                log.info("Unexporting the service proxy.");
+
             unexport(true/* force */);
-            
-        } catch (Exception ex) {
-            
+
+        } catch (Throwable ex) {
+
             log.error("Problem unexporting service: " + ex, ex);
-            
+
             /* Ignore */
-            
+
         }
 
         /*
-         * Invoke the services own logic to shutdown its processing.
+         * Note: We don't have to do this explicitly. The node will go away as
+         * soon as we close the Zookeeper client.
+         */
+//        /*
+//         * Unregister the service from zookeeper (delete its ephemeral node).
+//         */
+//        if (impl != null && impl instanceof AbstractService) {
+//
+//            try {
+//                
+//                final JiniFederation fed = (JiniFederation) ((AbstractService) impl)
+//                        .getFederation();
+//
+//                final ZooKeeper zookeeper = fed.getZookeeper();
+//
+//                if (zookeeper != null) {
+//
+//                    if (INFO)
+//                        log.info("Deleting service znode: "
+//                                + physicalServiceZPath);
+//
+//                    zookeeper.delete(physicalServiceZPath, -1/* version */);
+//
+//                }
+//                
+//            } catch (Throwable t) {
+//
+//                log.error("Problem deleting service znode: " + t, t);
+//
+//                /* Ignore */
+//
+//            }
+//
+//        }
+
+        /*
+         * Invoke the service's own logic to shutdown its processing.
          */
         if (impl != null && impl instanceof IServiceShutdown) {
             
@@ -924,7 +1139,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                     
                 }
                 
-            } catch(Exception ex) {
+            } catch(Throwable ex) {
                 
                 log.error("Problem with service shutdown: "+ex, ex);
                 
@@ -946,9 +1161,10 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
             terminate();
         
-        } catch (Exception ex) {
+        } catch (Throwable ex) {
             
-            log.error("Could not terminate jini processing: "+ex, ex);
+            log.error("Could not terminate async threads (jini, zookeeper): "
+                    + ex, ex);
             
             // ignore.
 
@@ -963,7 +1179,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
                 lifeCycle.unregister(this);
 
-            } catch (Exception ex) {
+            } catch (Throwable ex) {
 
                 log.error("Could not unregister lifeCycle: " + ex, ex);
 
@@ -999,7 +1215,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
                 joinManager.terminate();
 
-            } catch (Exception ex) {
+            } catch (Throwable ex) {
 
                 log.error("Could not terminate the join manager: " + ex, ex);
 
@@ -1014,7 +1230,12 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         if (client != null) {
 
             if(client.isConnected()) {
-            
+
+                /*
+                 * Note: This will close the zookeeper client and that will
+                 * cause the ephemeral znode for the service to be removed.
+                 */
+
                 client.disconnect(true/* immediateShutdown */);
                 
             }

@@ -172,7 +172,8 @@ public class JiniClient extends AbstractScaleOutClient {
      * 
      * @param jiniConfig
      */
-    protected JiniClient(final JiniConfig jiniConfig, final ZookeeperClientConfig zooConfig) {
+    protected JiniClient(final JiniConfig jiniConfig,
+            final ZookeeperClientConfig zooConfig) {
 
         super(jiniConfig.properties);
 
@@ -196,9 +197,9 @@ public class JiniClient extends AbstractScaleOutClient {
         final LookupLocator[] lookupLocators;
         final Properties properties;
 
-        public JiniConfig(Configuration config, String[] groups,
-                LookupLocator[] lookupLocators, 
-                Properties properties) {
+        public JiniConfig(final Configuration config, final String[] groups,
+                final LookupLocator[] lookupLocators,
+                final Properties properties) {
 
             this.config = config;
             
@@ -267,11 +268,10 @@ public class JiniClient extends AbstractScaleOutClient {
 
             /*
              * Note: multicast discovery is used regardless if
-             * LookupDiscovery.ALL_GROUPS is selected above. That is why there
-             * is no default for the lookupLocators. The default "ALL_GROUPS"
-             * means that the lookupLocators are ignored.
+             * LookupDiscovery.ALL_GROUPS is selected above. The default for the
+             * lookupLocators is [null] so that the default "ALL_GROUPS" means
+             * that the lookupLocators are ignored.
              */
-
             lookupLocators = (LookupLocator[]) config.getEntry(
                     AbstractServer.ADVERT_LABEL, "unicastLocators",
                     LookupLocator[].class, null/* default */);

@@ -82,7 +82,7 @@ abstract public class AbstractService implements IService {
      * @throws IllegalStateException
      *             if the service {@link UUID} has already been set.
      */
-    synchronized public void setServiceUUID(UUID serviceUUID)
+    synchronized public void setServiceUUID(final UUID serviceUUID)
             throws IllegalStateException {
 
         if (serviceUUID == null)

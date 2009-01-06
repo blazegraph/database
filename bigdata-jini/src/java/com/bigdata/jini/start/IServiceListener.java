@@ -22,39 +22,21 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Jan 4, 2009
+ * Created on Jan 5, 2009
  */
 
 package com.bigdata.jini.start;
 
-import net.jini.config.Configuration;
-import net.jini.config.ConfigurationException;
-
 /**
- * Somewhat specialized configuration for jini.
+ * Interface used to report local service life cycle events.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class JiniServiceConfiguration extends ServiceConfiguration {
+public interface IServiceListener {
 
-    /**
-     * 
-     */
-    private static final long serialVersionUID = 4601254369003651017L;
+    public void add(ProcessHelper service);
 
-    /**
-     * @param config
-     * 
-     * @throws ConfigurationException
-     * 
-     * FIXME extract the params from the AdvertDecription.
-     */
-    public JiniServiceConfiguration(Configuration config)
-            throws ConfigurationException {
-
-        super("jini", config);
-        
-    }
+    public void remove(ProcessHelper service);
 
 }

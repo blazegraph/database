@@ -9,7 +9,11 @@ import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceRegistrar;
 import net.jini.discovery.LookupLocatorDiscovery;
 
+import org.apache.log4j.Logger;
+import org.apache.zookeeper.ZooKeeper;
+
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.zookeeper.ZookeeperClientConfig;
 
 /**
  * A helper class that starts all the necessary services for a Jini federation.
@@ -29,6 +33,9 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  */
 public class JiniServicesHelper {
 
+    protected final static Logger log = Logger
+            .getLogger(JiniServicesHelper.class);
+
     public MetadataServer metadataServer0;
 
     public DataServer dataServer1;
@@ -37,12 +44,16 @@ public class JiniServicesHelper {
 
     public LoadBalancerServer loadBalancerServer0;
 
-    public TransactionServer timestampServer0;
+    public TransactionServer transactionServer0;
 
     public ResourceLockServer resourceLockServer0;
 
     public JiniClient client;
 
+    public ZooKeeper zookeeper;
+    
+    public ZookeeperClientConfig zooConfig;
+    
     /**
      * Looks for configuration files in the directory identified by the path
      * and starts the various services required by a {@link JiniFederation}.
@@ -55,7 +66,7 @@ public class JiniServicesHelper {
      * <li>DataServer0.config</li>
      * <li>DataServer1.config</li>
      * <li>LoadBalancerServer0.config</li>
-     * <li>TimestampServer0.config</li>
+     * <li>TransactionServer0.config</li>
      * <li>Client.config</li>
      * </ul>
      * 
@@ -87,102 +98,69 @@ public class JiniServicesHelper {
         // @todo verify that this belongs here vs in a main(String[]).
         System.setSecurityManager(new SecurityManager());
 
+        final String[] options = new String[] {
+                "com.bigdata.zookeeper.zroot = \"/bigdata-standalone\"",
+                "com.bigdata.zookeeper.servers = \"localhost:2181\""
+        };
+        
         /*
          * Start up a resource lock server.
          */
-        threadPool.execute(resourceLockServer0 = new ResourceLockServer(
-                new String[] { path + "ResourceLockServer0.config" }));
+        threadPool
+                .execute(resourceLockServer0 = new ResourceLockServer(concat(
+                        new String[] { path + "ResourceLockServer0.config" },
+                        options)));
 
         /*
          * Start up a timestamp server.
          */
-        threadPool.execute(timestampServer0 = new TransactionServer(
-                new String[] { path + "TimestampServer0.config" }));
-        
+        threadPool.execute(transactionServer0 = new TransactionServer(concat(
+                new String[] { path + "TransactionServer0.config" }, options)));
+
         /*
-         * Start up a data server before the metadata server so that we can
-         * make sure that it is detected by the metadata server once it
-         * starts up.
+         * Start up a data server before the metadata server so that we can make
+         * sure that it is detected by the metadata server once it starts up.
          */
-        threadPool.execute(dataServer1 = new DataServer(
-                new String[] { path + "DataServer1.config" }));
+        threadPool.execute(dataServer1 = new DataServer(concat(
+                new String[] { path + "DataServer1.config" }, options)));
 
         /*
          * Start up a load balancer server.
          */
-        threadPool.execute(loadBalancerServer0 = new LoadBalancerServer(
-                new String[] { path + "LoadBalancerServer0.config" }));
+        threadPool
+                .execute(loadBalancerServer0 = new LoadBalancerServer(concat(
+                        new String[] { path + "LoadBalancerServer0.config" },
+                        options)));
 
         /*
          * Start the metadata server.
          */
-        threadPool.execute(metadataServer0 = new MetadataServer(
-                new String[] { path + "MetadataServer0.config" }));
+        threadPool.execute(metadataServer0 = new MetadataServer(concat(
+                new String[] { path + "MetadataServer0.config" }, options)));
 
         /*
-         * Start up a data server after the metadata server so that we can
-         * make sure that it is detected by the metadata server once it
-         * starts up.
+         * Start up a data server after the metadata server so that we can make
+         * sure that it is detected by the metadata server once it starts up.
          */
-        threadPool.execute(dataServer0 = new DataServer(new String[] { path
-                + "DataServer0.config" }));
+        threadPool.execute(dataServer0 = new DataServer(concat(
+                new String[] { path + "DataServer0.config" }, options)));
 
-        client = JiniClient
-                .newInstance(new String[] { path + "Client.config" });
+        client = JiniClient.newInstance(concat(new String[] { path
+                + "Client.config" }, options));
 
         // connect the client - this will get discovery running.
-        client.connect();
+        final JiniFederation fed = client.connect();
 
+        zookeeper = fed.getZookeeper();
+        zooConfig = fed.getZooConfig();
+        
         // Wait until all the services are up.
         getServiceID(resourceLockServer0);
-        getServiceID(timestampServer0);
+        getServiceID(transactionServer0);
         getServiceID(metadataServer0);
         getServiceID(dataServer0);
         getServiceID(dataServer1);
         getServiceID(loadBalancerServer0);
-
-        //          // wait/verify that the client has/can get the various services.
-        //          for (int i = 0; i < 3; i++) {
-        //
-        //                int nwaiting = 0;
-        //
-        //                if (fed.getResourceLockService() == null) {
-        //                    log.warn("No resource lock service yet...");
-        //                    nwaiting++;
-        //                }
-        //
-        //                if (fed.getMetadataService() == null) {
-        //                    log.warn("No metadata service yet...");
-        //                    nwaiting++;
-        //                }
-        //
-        //                if (fed.getTimestampService() == null) {
-        //                    log.warn("No timestamp service yet...");
-        //                    nwaiting++;
-        //                }
-        //
-        //                if (fed.getLoadBalancerService() == null) {
-        //                    log.warn("No load balancer service yet...");
-        //                    nwaiting++;
-        //                }
-        //
-        //                if (nwaiting > 0) {
-        //
-        //                    log.warn("Waiting for " + nwaiting + " services");
-        //
-        //                    Thread.sleep(1000/* ms */);
-        //
-        //                }
-        //
-        //            }
-        //
-        //          assertNotNull("No lock service?", fed.getResourceLockService());
-        //
-        //          assertNotNull("No timestamp service?", fed.getTimestampService());
-        //
-        //          assertNotNull("No metadata service?", fed.getMetadataService());
-        //
-        //          assertNotNull("No load balancer service?", fed.getLoadBalancerService());
 
     }
 
@@ -200,54 +178,6 @@ public class JiniServicesHelper {
         }
         
         threadPool.shutdownNow();
-        
-//        if (metadataServer0 != null) {
-//
-//            metadataServer0.shutdownNow();
-//
-//            metadataServer0 = null;
-//
-//        }
-//
-//        if (dataServer0 != null) {
-//
-//            dataServer0.shutdownNow();
-//
-//            dataServer0 = null;
-//
-//        }
-//
-//        if (dataServer1 != null) {
-//
-//            dataServer1.shutdownNow();
-//
-//            dataServer1 = null;
-//
-//        }
-//
-//        if (loadBalancerServer0 != null) {
-//
-//            loadBalancerServer0.shutdownNow();
-//
-//            loadBalancerServer0 = null;
-//
-//        }
-//
-//        if (timestampServer0 != null) {
-//
-//            timestampServer0.shutdownNow();
-//
-//            timestampServer0 = null;
-//
-//        }
-//
-//        if (resourceLockServer0 != null) {
-//
-//            resourceLockServer0.shutdownNow();
-//
-//            resourceLockServer0 = null;
-//
-//        }
 
     }
 
@@ -268,6 +198,23 @@ public class JiniServicesHelper {
      * These messages can be safely ignored IF they occur during this method.
      */
     public void destroy() {
+
+        if (zookeeper != null && zooConfig != null) {
+
+            try {
+
+                // clear out everything in zookeeper for this federation.
+                zookeeper.delete(zooConfig.zroot, -1/* version */);
+                
+            } catch (Exception e) {
+                
+                // ignore.
+                log.warn("zroot=" + zooConfig.zroot + " : "
+                        + e.getLocalizedMessage(), e);
+                
+            }
+            
+        }
 
         if (client != null && client.isConnected()) {
 
@@ -309,11 +256,11 @@ public class JiniServicesHelper {
 
         }
 
-        if (timestampServer0 != null) {
+        if (transactionServer0 != null) {
 
-            timestampServer0.destroy();
+            transactionServer0.destroy();
 
-            timestampServer0 = null;
+            transactionServer0 = null;
 
         }
 
@@ -429,12 +376,13 @@ public class JiniServicesHelper {
 
             while ((elapsed = (System.currentTimeMillis() - begin)) < timeout) {
 
-                ServiceRegistrar[] registrars = discovery.getRegistrars();
+                final ServiceRegistrar[] registrars = discovery.getRegistrars();
 
                 if (registrars.length > 0) {
 
-                    System.err.println("Found " + registrars.length
-                            + " registrars in " + elapsed + "ms.");
+                    if(log.isInfoEnabled())
+                        log.info("Found " + registrars.length
+                                + " registrars in " + elapsed + "ms.");
 
                     return true;
 
@@ -442,8 +390,8 @@ public class JiniServicesHelper {
 
             }
 
-            System.err
-                    .println("Could not find any service registrars on localhost after "
+            log
+                    .error("Could not find any service registrars on localhost after "
                             + elapsed + " ms");
 
             return false;
@@ -453,6 +401,30 @@ public class JiniServicesHelper {
             discovery.terminate();
 
         }
+
+    }
+
+    /**
+     * Combines the two arrays, appending the contents of the 2nd array to the
+     * contents of the first array.
+     * 
+     * @param a
+     * @param b
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+    protected static <T> T[] concat(final T[] a, final T[] b) {
+
+        final T[] c = (T[]) java.lang.reflect.Array.newInstance(a.getClass()
+                .getComponentType(), a.length + b.length);
+
+        // final String[] c = new String[a.length + b.length];
+
+        System.arraycopy(a, 0, c, 0, a.length);
+
+        System.arraycopy(b, 0, c, a.length, b.length);
+
+        return c;
 
     }
 

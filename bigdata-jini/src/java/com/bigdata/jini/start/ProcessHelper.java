@@ -32,6 +32,8 @@ public class ProcessHelper {
      */
     public final String name;
     
+    final IServiceListener listener;
+
     /**
      * The {@link Process}.
      */
@@ -43,14 +45,24 @@ public class ProcessHelper {
     
     private final AtomicInteger exitValue = new AtomicInteger(-1);
     
-    /**
-     * Return <code>true</code> iff the process is still executing.
-     */
-    public boolean isRunning() {
-
-        return exitValue.get() != -1;
-
-    }
+//    /**
+//     * Return <code>true</code> iff the process is still executing.
+//     */
+//    public boolean isRunning() {
+//
+//        lock.lock();
+//
+//        try {
+//
+//            return exitValue.get() != -1;
+//
+//        } finally {
+//
+//            lock.unlock();
+//
+//        }
+//
+//    }
     
     /**
      * Await the exit value and return it when it becomes available.
@@ -139,6 +151,10 @@ public class ProcessHelper {
 
     /**
      * Destroy the process.
+     * <p>
+     * Note: {@link Process#destroy()} does not appear to be synchronous. If you
+     * want to wait for the process to terminate, use {@link #exitValue()} or
+     * {@link #exitValue(long, TimeUnit)}.
      */
     public void destroy() {
         
@@ -146,6 +162,15 @@ public class ProcessHelper {
 
         process.destroy();
         
+//        /*
+//         * Enforce wait for process death since destroy() does not appear to be
+//         * synchronous.
+//         */
+////        exitValue.set(process.waitFor());
+//        exitValue(2000, TimeUnit.MILLISECONDS);
+
+        listener.remove(this);
+
     }
     
     /**
@@ -162,8 +187,8 @@ public class ProcessHelper {
     
     /**
      * Starts the {@link Process}, starts a {@link Thread} to consume its
-     * output, and registers the {@link Process} in the
-     * {@link ServicesManager#runningProcesses} collection.
+     * output, and registers the {@link Process} with the
+     * {@link IServiceListener}.
      * 
      * @param name
      *            A useful name for the process.
@@ -175,7 +200,7 @@ public class ProcessHelper {
      * @throws IOException
      */
     public ProcessHelper(final String name, final ProcessBuilder builder,
-            final Queue<ProcessHelper> running) throws IOException {
+            final IServiceListener listener) throws IOException {
 
         if (name == null)
             throw new IllegalArgumentException();
@@ -183,58 +208,58 @@ public class ProcessHelper {
         if (builder == null)
             throw new IllegalArgumentException();
 
-        if (running == null)
+        if (listener == null)
             throw new IllegalArgumentException();
 
         this.name = name;
 
-        if (INFO)
-            log.info("process: name=" + name + ", cmd="
-                    + builder.command());
+        // save the listener reference.
+        this.listener = listener;
+        
+        /*
+         * Merge stdout and stderr so that we only need one thread to drain the
+         * output of the process.
+         */
+        builder.redirectErrorStream(true);
 
+        // start the process (it may take a bit to be really running).
         this.process = builder.start();
 
+        // add to queue of running (or at any rate, started) processes.
+        listener.add(ProcessHelper.this);
+        
         final Thread thread = new Thread(name) {
 
             public void run() {
 
-                // add to queue.
-                running.add(ProcessHelper.this);
-                
                 try {
 
                     consumeOutput();
 
                 } finally {
 
+                    // no longer running.
+                    lock.lock();
                     try {
 
                         // ensure process is destroyed.
                         process.destroy();
 
+                        // wait for the exit value from the process.
+                        exitValue.set(process.exitValue());
+
+                        // signal so that anyone waiting will awaken.
+                        dead.signalAll();
+
+                        // remove the element from queue.
+                        listener.remove(ProcessHelper.this);
+
+                        // log event.
+                        log.warn("Process destroyed: " + name);
+
                     } finally {
 
-                        // no longer running.
-                        lock.lock();
-                        try {
-
-                            // set the exit value from the process.
-                            exitValue.set(process.exitValue());
-                            
-                            // signal so that anyone waiting will awaken.
-                            dead.signalAll();
-                            
-                            // remove the element from queue.
-                            running.remove(ProcessHelper.this);
-
-                            // log event.
-                            log.warn("Process destroyed: " + name);
-
-                        } finally {
-                        
-                            lock.unlock();
-                            
-                        }
+                        lock.unlock();
 
                     }
 
@@ -247,6 +272,10 @@ public class ProcessHelper {
         thread.setDaemon(false);
 
         thread.start();
+
+        if (INFO)
+            log.info("Process starting: name=" + name + ", cmd="
+                    + builder.command() + ", env=" + builder.environment());
 
     }
 
@@ -278,6 +307,76 @@ public class ProcessHelper {
             log.error(ex, ex);
 
         }
+
+    }
+
+    /**
+     * Interrupts the caller's {@link Thread} if the process dies within the
+     * specified timeout.
+     * 
+     * @param timeout
+     *            The timeout.
+     * @param unit
+     *            The timeout unit.
+     * 
+     * @todo isRunning() does not appear to be atomic with respect to the
+     *       interrupt of the caller. In fact, it seems like you have to use
+     *       {@link #exitValue(long, TimeUnit)} with a small timeout to verify
+     *       that the process is in fact dead. That is weird. I am even forcing
+     *       the wait for the exit value in this method but to no avail.
+     */
+    public void interruptWhenProcessDies(final long timeout, final TimeUnit unit) {
+
+        final long nanos = unit.toNanos(timeout);
+
+        final Thread callersThread = Thread.currentThread();
+
+        final Thread t = new Thread() {
+
+            public void run() {
+
+                lock.lock();
+
+                try {
+
+                    if (dead.await(nanos, TimeUnit.NANOSECONDS)) {
+
+                        // force a wait until the exitValue has been set.
+                        final int exitValue = exitValue();
+                        
+                        if (INFO)
+                            log.info("Process is dead: name=" + name
+                                    + ", exitValue=" + exitValue);
+                        
+                        // The process is dead, so interrupt the caller.
+                        callersThread.interrupt();
+
+                        // done
+                        return;
+                        
+                    }
+
+                    // timeout.
+                    return;
+
+                } catch (InterruptedException e) {
+
+                    // halt.
+                    return;
+
+                } finally {
+
+                    lock.unlock();
+
+                }
+
+            }
+
+        };
+
+        t.setDaemon(true);
+
+        t.start();
 
     }
 

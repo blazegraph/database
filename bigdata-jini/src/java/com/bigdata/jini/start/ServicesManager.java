@@ -28,10 +28,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.jini.start;
 
 import java.io.File;
-import java.io.Serializable;
 import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import net.jini.config.Configuration;
@@ -45,6 +45,7 @@ import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.ACL;
+import org.apache.zookeeper.data.Stat;
 
 import com.bigdata.Banner;
 import com.bigdata.io.SerializerUtil;
@@ -58,7 +59,6 @@ import com.bigdata.service.jini.MetadataServer;
 import com.bigdata.service.jini.ResourceLockServer;
 import com.bigdata.service.jini.TransactionServer;
 import com.bigdata.service.jini.AbstractServer.RemoteAdministrable;
-import com.bigdata.zookeeper.ZooElection;
 import com.sun.jini.tool.ClassServer;
 
 /**
@@ -89,21 +89,26 @@ import com.sun.jini.tool.ClassServer;
  * running this class are use an identical {@link Configuration}. Thereafter,
  * zookeeper will be used to manage the services in the federation.
  * <p>
- * Once running, the {@link ServicesManager} will watch the zookeeper
- * nodes for the various kinds of services and will start or stop services as
- * the state of those nodes changes.
+ * Once running, the {@link ServicesManager} will watch the zookeeper nodes for
+ * the various kinds of services and will start or stop services as the state of
+ * those nodes changes.
  * 
  * @todo document dependencies for performance counter reporting and supported
  *       platforms.
  * 
- * @todo document the zookeeper nodes and their state which specify the bigdata
- *       federation configuration and which aspects of that configuration may be
- *       changed dynamically by edits to those nodes.
+ * @todo make this a discoverable service (using jini) and support destroy of
+ *       that service.
+ * 
+ * FIXME Add a federation identifier and use it as a filter for service
+ * discovery in order to make it impossible for one federation to "pickup"
+ * services from another. That identifier should also be used as the [zroot] of
+ * the federation in zookeeper (and the parameter for that removed from the
+ * zookeeper client config since we have it on the federation client).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ServicesManager {
+public class ServicesManager implements IServiceListener {
 
     protected static final Logger log = Logger.getLogger(ServicesManager.class);
     
@@ -127,20 +132,19 @@ public class ServicesManager {
         String NAMESPACE = "com.bigdata.jini.start";
         
         /**
-         * Command line arguments that will be included in any
-         * {@link JavaServiceConfiguration}.
+         * {@link ACL} that will be used if we create the root znode for the
+         * federation.
          */
-        String JVM_ARGS = "jvmargs"; 
+        String ACL = "acl";
         
         /**
          * {@link File} that will be executed to start jini.
+         * 
+         * @todo not used yet. probably move into the jini service configuration
+         *       (an subclass of {@link ServiceConfiguration} that is
+         *       specialized for starting jini).
          */
         String JINI = "jini";
-        
-        /**
-         * {@link ACL} for the federation zroot.
-         */
-        String ACL = "acl";
         
     }
     
@@ -177,6 +181,15 @@ public class ServicesManager {
      */
     private JiniFederation fed;
     
+    public JiniFederation getFederation() {
+        
+        if (fed == null)
+            throw new IllegalStateException();
+
+        return fed;
+        
+    }
+    
     /**
      * The set of currently running {@link Process}es. A {@link Process} is
      * automatically added to this collection by the {@link ProcessHelper} and
@@ -186,7 +199,19 @@ public class ServicesManager {
      * registered by the {@link ProcessHelper} in this collection, then it will
      * automatically become unregistered.
      */
-    final protected ConcurrentLinkedQueue<ProcessHelper> runningProcesses = new ConcurrentLinkedQueue<ProcessHelper>();
+    final private ConcurrentLinkedQueue<ProcessHelper> runningProcesses = new ConcurrentLinkedQueue<ProcessHelper>();
+    
+    public void add(ProcessHelper service) {
+        
+        runningProcesses.add(service);
+        
+    }
+
+    public void remove(ProcessHelper service) {
+        
+        runningProcesses.remove(service);
+        
+    }
     
     /**
      * Invoked by {@link #main(String[])}.
@@ -212,9 +237,7 @@ public class ServicesManager {
         checkDependencies();
 
         // if necessary, start zookeeper (a server instance).
-        ZookeeperProcessHelper.startZookeeper(config, runningProcesses);
-
-        System.err.println("Connecting to federation.");
+        ZookeeperProcessHelper.startZookeeper(config, this/*listener*/);
 
         /*
          * Connect to jini and zookeeper.
@@ -225,8 +248,6 @@ public class ServicesManager {
          * started by the watcher.
          */
         fed = JiniClient.newInstance(args).connect();
-
-        System.err.println("Connected to federation.");
         
 //        // add watcher to manage our services.
 //        fed.addWatcher(new ServiceManager());
@@ -249,11 +270,21 @@ public class ServicesManager {
             final boolean exists = zoo.exists(zroot, false/* watch */) != null;
             
             // watch [zroot] itself.
-            zoo.exists(zroot, true/* watch */);
-            zoo.exists(zconfig, true/* watch */);
+            // zoo.exists(zroot, true/* watch */);
+
+            /*
+             * Watcher for service configuration nodes.
+             */
+            final ServiceConfigurationWatcher serviceConfigWatcher = new ServiceConfigurationWatcher();
+
+            /*
+             * Watch the config znode. If any children are added then this
+             * watcher will set up a watcher on the service configuration node.
+             */
+            zoo.exists(zconfig, new ConfigWatcher(serviceConfigWatcher));
             
             /*
-             * Watch for various service configuration changes.
+             * Set watch for service configuration changes.
              * 
              * Note: zookeeper only allows a "." to appears as a filename
              * extension, so it is not directly compatible with fully qualified
@@ -266,6 +297,9 @@ public class ServicesManager {
             zoo.exists(zconfig + ZSLASH + MetadataServer.class.getSimpleName(), true/* watch */);
             zoo.exists(zconfig + ZSLASH + DataServer.class.getSimpleName(), true/* watch */);
             zoo.exists(zconfig + ZSLASH + LoadBalancerServer.class.getSimpleName(), true/* watch */);
+
+            new TransactionServiceConfiguration(config).newServiceStarter(fed, this, zconfig
+                    + ZSLASH + TransactionServer.class.getSimpleName());
             
             if (!exists) {
                 
@@ -286,26 +320,26 @@ public class ServicesManager {
                 final List<ACL> acl = Arrays.asList((ACL[]) config.getEntry(
                         Options.NAMESPACE, "acl", ACL[].class));
                 
-                final ServiceConfiguration jiniConfig = new JiniServiceConfiguration(
-                        config);
-                
-                final ServiceConfiguration classServerConfig = new JavaServiceConfiguration(
-                        ClassServer.class, config);
-
-                final ServiceConfiguration transactionServerConfig = new BigdataServiceConfiguration(
-                        TransactionServer.class, config);
-
-                final ServiceConfiguration metadataServerConfig = new BigdataServiceConfiguration(
-                        MetadataServer.class, config);
-
-                final ServiceConfiguration dataServerConfig = new BigdataServiceConfiguration(
-                        DataServer.class, config);
-
-                final ServiceConfiguration resourceLockServerConfig = new BigdataServiceConfiguration(
-                        ResourceLockServer.class, config);
-
-                final ServiceConfiguration loadBalancerServerConfig = new BigdataServiceConfiguration(
-                        LoadBalancerServer.class, config);
+//                final ServiceConfiguration jiniConfig = new JiniServiceConfiguration(
+//                        config);
+//                
+//                final ServiceConfiguration classServerConfig = new JavaServiceConfiguration(
+//                        ClassServer.class, config);
+//
+//                final ServiceConfiguration transactionServerConfig = new BigdataServiceConfiguration(
+//                        TransactionServer.class, config);
+//
+//                final ServiceConfiguration metadataServerConfig = new BigdataServiceConfiguration(
+//                        MetadataServer.class, config);
+//
+//                final ServiceConfiguration dataServerConfig = new BigdataServiceConfiguration(
+//                        DataServer.class, config);
+//
+//                final ServiceConfiguration resourceLockServerConfig = new BigdataServiceConfiguration(
+//                        ResourceLockServer.class, config);
+//
+//                final ServiceConfiguration loadBalancerServerConfig = new BigdataServiceConfiguration(
+//                        LoadBalancerServer.class, config);
 
                 try {
 
@@ -315,45 +349,45 @@ public class ServicesManager {
                     zoo.create(zconfig, new byte[] {}/* data */, acl,
                             CreateMode.PERSISTENT);
 
-                    // jini registrar(s).
-                    zoo.create(zconfig + ZSLASH + "jini", SerializerUtil
-                            .serialize(jiniConfig), acl, CreateMode.PERSISTENT);
-
-                    // class server(s).
-                    zoo.create(zconfig + ZSLASH
-                            + ClassServer.class.getSimpleName(), SerializerUtil
-                            .serialize(classServerConfig), acl,
-                            CreateMode.PERSISTENT);
-
-                    // transaction server(s).
-                    zoo.create(zconfig + ZSLASH
-                            + TransactionServer.class.getSimpleName(),
-                            SerializerUtil.serialize(transactionServerConfig),
-                            acl, CreateMode.PERSISTENT);
-
-                    // metadata server(s).
-                    zoo.create(zconfig + ZSLASH
-                            + MetadataServer.class.getSimpleName(),
-                            SerializerUtil.serialize(metadataServerConfig),
-                            acl, CreateMode.PERSISTENT);
-
-                    // data server(s).
-                    zoo.create(zconfig + ZSLASH
-                            + DataServer.class.getSimpleName(), SerializerUtil
-                            .serialize(dataServerConfig), acl,
-                            CreateMode.PERSISTENT);
-
-                    // resource lock server(s).
-                    zoo.create(zconfig + ZSLASH
-                            + ResourceLockServer.class.getSimpleName(),
-                            SerializerUtil.serialize(resourceLockServerConfig),
-                            acl, CreateMode.PERSISTENT);
-
-                    // load balancer server(s).
-                    zoo.create(zconfig + ZSLASH
-                            + LoadBalancerServer.class.getSimpleName(),
-                            SerializerUtil.serialize(loadBalancerServerConfig),
-                            acl, CreateMode.PERSISTENT);
+//                    // jini registrar(s).
+//                    zoo.create(zconfig + ZSLASH + "jini", SerializerUtil
+//                            .serialize(jiniConfig), acl, CreateMode.PERSISTENT);
+//
+//                    // class server(s).
+//                    zoo.create(zconfig + ZSLASH
+//                            + ClassServer.class.getSimpleName(), SerializerUtil
+//                            .serialize(classServerConfig), acl,
+//                            CreateMode.PERSISTENT);
+//
+//                    // transaction server(s).
+//                    zoo.create(zconfig + ZSLASH
+//                            + TransactionServer.class.getSimpleName(),
+//                            SerializerUtil.serialize(transactionServerConfig),
+//                            acl, CreateMode.PERSISTENT);
+//                    
+//                    // metadata server(s).
+//                    zoo.create(zconfig + ZSLASH
+//                            + MetadataServer.class.getSimpleName(),
+//                            SerializerUtil.serialize(metadataServerConfig),
+//                            acl, CreateMode.PERSISTENT);
+//
+//                    // data server(s).
+//                    zoo.create(zconfig + ZSLASH
+//                            + DataServer.class.getSimpleName(), SerializerUtil
+//                            .serialize(dataServerConfig), acl,
+//                            CreateMode.PERSISTENT);
+//
+//                    // resource lock server(s).
+//                    zoo.create(zconfig + ZSLASH
+//                            + ResourceLockServer.class.getSimpleName(),
+//                            SerializerUtil.serialize(resourceLockServerConfig),
+//                            acl, CreateMode.PERSISTENT);
+//
+//                    // load balancer server(s).
+//                    zoo.create(zconfig + ZSLASH
+//                            + LoadBalancerServer.class.getSimpleName(),
+//                            SerializerUtil.serialize(loadBalancerServerConfig),
+//                            acl, CreateMode.PERSISTENT);
                     
                 } catch (KeeperException ex) {
 
@@ -574,11 +608,96 @@ public class ServicesManager {
     }
     
     /**
+     * Watcher for the <code>config</code> znode. The children are service
+     * configurations. The watcher registers a
+     * {@link ServiceConfigurationWatcher} for each child to monitor changes in
+     * its {@link ServiceConfiguration}.
+     * 
+     * @todo run the {@link ServiceConfigurationWatcher} for each pre-existing
+     *       child in case there is an action which could be triggered based on
+     *       its current state?
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected class ConfigWatcher implements Watcher {
+
+        private final ServiceConfigurationWatcher serviceConfWatcher;
+        
+        /** The path to the "config" znode. */
+        private final String zconfig;
+        
+        public ConfigWatcher(
+                final ServiceConfigurationWatcher serviceConfWatcher)
+                throws KeeperException, InterruptedException {
+
+            this.zconfig = fed.getZooConfig().zroot + "/config";
+
+            this.serviceConfWatcher = serviceConfWatcher;
+
+            updateWatchers();
+            
+        }
+        
+        public void process(final WatchedEvent event) {
+    
+            try {
+
+                updateWatchers();
+                
+            } catch (Exception ex) {
+                
+                log.error(ex.getLocalizedMessage(), ex);
+                
+            }
+            
+        }
+        
+        /**
+         * (Re)sets a watch on the {@link #zconfig} node, on its children (if
+         * the node exists), and on each child that exists at this time. This
+         * class watches the {@link #zconfig} node and its list of children
+         * while the {@link #serviceConfWatcher} watches the child nodes
+         * themselves.
+         */
+        protected void updateWatchers() throws KeeperException, InterruptedException {
+           
+            // set watch on the zconfig node.
+            fed.getZookeeper().exists(zconfig, this);
+            
+            final List<String> children;
+            try {
+
+                /*
+                 * Get list of children (and set watch on the list of children).
+                 */
+               
+                children = fed.getZookeeper().getChildren(zconfig, this);
+                
+            } catch (KeeperException.NoNodeException ex) {
+
+                return;
+                
+            }
+
+            for (String child : children) {
+
+                // set watch on each child.
+                fed.getZookeeper().exists(zconfig + ZSLASH + child,
+                        serviceConfWatcher);
+                
+            }
+            
+        }
+        
+    }
+    
+    /**
      * Watcher that manages service instances, creating new one as necessary.
      * 
      * <pre>
      * 
-     * fed 
+     * zroot-for-federation
      *     / config 
      *              / jini {ServiceConfiguration}
      *                  ...
@@ -656,7 +775,7 @@ public class ServicesManager {
      * jini sometime after it starts and then recorded in the zookeeper znode
      * for that physical service instance.
      * 
-     * The phyiscal service instances use an election to determine which of them
+     * The physical service instances use an election to determine which of them
      * is the primary, which are the secondaries, and the order for replicating
      * data to the secondaries.
      * 
@@ -695,6 +814,8 @@ public class ServicesManager {
     protected class ServiceConfigurationWatcher implements Watcher {
 
         /**
+         * @see https://deployutil.dev.java.net/
+         * 
          * FIXME using zookeeper, contend for a lock on the root node for the
          * bigdata federation instance. If there is no such node, then create,
          * populate it with the federation configuration, and set a watch.
@@ -745,6 +866,82 @@ public class ServicesManager {
             if(INFO)
                 log.info(event.toString());
             
+            final String zpath = event.getPath();
+            
+            final ZooKeeper zookeeper = getFederation().getZookeeper();
+
+            try {
+
+                // get the service configuration (and reset our watch).
+                final ServiceConfiguration config = (ServiceConfiguration) SerializerUtil
+                        .deserialize(zookeeper.getData(zpath, this, new Stat()));
+
+                /*
+                 * Verify that we could start this service.
+                 * 
+                 * @todo add load-based constraints, e.g., can not start a new
+                 * service if heavily swapping, near limits on RAM or on disk.
+                 */
+                for (IServiceConstraint constraint : config.constraints) {
+
+                    if (!constraint.allow(getFederation())) {
+
+                        if (INFO)
+                            log.info("Constraint(s) do not allow service start: "
+                                            + config);
+                        
+                        return;
+                        
+                    }
+                    
+                }
+                
+                /*
+                 * FIXME Examine priority queue to figure out which
+                 * ServicesManager is best suited to start the service instance.
+                 * Only ServiceManagers which satisify the constraints are
+                 * allowed to participate, so we need to make that an election
+                 * for the specific service, give everyone some time to process
+                 * the event, and then see who is the best candidate to start
+                 * the service.
+                 * 
+                 * @todo does this design violate zookeeper design principles?
+                 * Especially, we can't wait for asynchronous events so the
+                 * election will have to be on a created and the ephemeral
+                 * sequential joins with the election will have to wait for the
+                 * timeout or for the last to join (satisified the N vs timeout
+                 * criterion) to write the winner into the data.
+                 * 
+                 * Or, how about if we have different standing elections
+                 * corresponding to different constraints and have the hosts
+                 * update each election every 60 seconds with their current
+                 * priority (if it has changed significantly).  The problem
+                 * with this is that a host can't allow replicated instances
+                 * of a service onto the same host.
+                 */
+                
+                // get task to start the service.
+                final Callable task = config.newServiceStarter(getFederation(),
+                        ServicesManager.this, zpath);
+                
+                /*
+                 * Submit the task.
+                 * 
+                 * The service will either start or fail to start. We don't
+                 * check the future since all watcher events are serialized.
+                 */
+                getFederation().getExecutorService().submit(task)
+                .get()// forces immediate start of the service.
+                ;
+                
+            } catch (Throwable e) {
+
+                log.error("zpath=" + zpath, e);
+
+                throw new RuntimeException(e);
+
+            }
+
         }
 
     }

@@ -54,6 +54,10 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite(TestZookeeperServerEntry.class);
 
+        suite.addTestSuite(TestServiceConfiguration.class);
+
+        suite.addTestSuite(TestServiceStarter.class);
+        
         return suite;
         
     }

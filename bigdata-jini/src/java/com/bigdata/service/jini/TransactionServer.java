@@ -218,7 +218,7 @@ public class TransactionServer extends AbstractServer {
     public static class AdministrableTransactionService extends
             DistributedTransactionService implements RemoteAdministrable,
             RemoteDestroyAdmin {
-
+        
         protected TransactionServer server;
 
         public AdministrableTransactionService(TransactionServer server,
@@ -337,7 +337,7 @@ public class TransactionServer extends AbstractServer {
         public void shutdown() {
 
             // normal shutdown for the transaction service (blocks).
-            shutdown();
+            super.shutdown();
 
             // jini service and server shutdown.
             server.shutdownNow();
@@ -347,7 +347,7 @@ public class TransactionServer extends AbstractServer {
         public void shutdownNow() {
 
             // immediate service shutdown (blocks).
-            shutdownNow();
+            super.shutdownNow();
 
             // jini service and server shutdown.
             server.shutdownNow();

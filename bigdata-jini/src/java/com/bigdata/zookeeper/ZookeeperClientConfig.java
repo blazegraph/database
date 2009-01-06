@@ -1,9 +1,14 @@
 package com.bigdata.zookeeper;
 
+import java.io.IOException;
+import java.io.Writer;
+
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
 
 import org.apache.zookeeper.ZooKeeper;
+
+import com.bigdata.jini.start.ServiceConfiguration;
 
 /**
  * Helper class for the zookeeper client configuration.
@@ -70,12 +75,30 @@ public class ZookeeperClientConfig {
 
     public String toString() {
 
-        return "ZooConfig"//
+        return getClass().getSimpleName()//
                 + "{ zroot=" + zroot//
                 + ", sessionTimeout=" + sessionTimeout//
                 + ", servers=" + servers//
                 + "}";
 
+    }
+
+    /**
+     * Writes out the configuration in a manner that is compatible with
+     * {@link #readConfiguration(Configuration)}.
+     */
+    public void writeConfiguration(Writer w) throws IOException {
+        
+        w.write(Options.NAMESPACE + " {\n");
+
+        w.write(Options.ZROOT + "=" + ServiceConfiguration.q(zroot) + ";\n");
+
+        w.write(Options.SERVERS + "=" + ServiceConfiguration.q(servers) + ";\n");
+
+        w.write(Options.SESSION_TIMEOUT + "=" + sessionTimeout + ";\n");
+        
+        w.write("}\n");
+        
     }
 
     /**

@@ -6,12 +6,10 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.net.InetAddress;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
-import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -24,6 +22,7 @@ import org.apache.zookeeper.server.PurgeTxnLog;
 import org.apache.zookeeper.server.quorum.QuorumPeerMain;
 
 import com.bigdata.io.FileLockUtility;
+import com.bigdata.jini.start.ServiceConfiguration.Options;
 import com.bigdata.zookeeper.ZooHelper;
 
 /**
@@ -40,6 +39,10 @@ import com.bigdata.zookeeper.ZooHelper;
  *       their associated logs which are no longer required for service restart.
  * 
  * @todo periodic purge of snapshots and logs, etc.
+ * 
+ * @todo rewrite as a {@link JavaServiceConfiguration} with a custom service
+ *       starter? (This is the first service starter written and it is less well
+ *       organized for that.)
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -60,9 +63,9 @@ public class ZookeeperProcessHelper extends ProcessHelper {
      * @throws IOException
      */
     public ZookeeperProcessHelper(String name, ProcessBuilder builder,
-            Queue<ProcessHelper> running, int clientPort) throws IOException {
+            IServiceListener listener, int clientPort) throws IOException {
 
-        super(name, builder, running);
+        super(name, builder, listener);
 
         this.clientPort = clientPort;
 
@@ -125,7 +128,7 @@ public class ZookeeperProcessHelper extends ProcessHelper {
         final List<ZookeeperServerEntry> serverEntries = new LinkedList<ZookeeperServerEntry>();
 
         // split into zero or more server entry declarations.
-        final String[] fields = servers.split("\\s+");
+        final String[] fields = servers.split("\\s*,\\s*");
         
 //        System.err.println("servers: "+servers);
 //        System.err.println("fields : "+Arrays.toString(fields));
@@ -155,7 +158,8 @@ public class ZookeeperProcessHelper extends ProcessHelper {
             
             serverEntries.add(entry);
 
-            System.err.println(entry.toString());
+            if (INFO)
+                log.info(entry.toString());
             
         }
         
@@ -220,14 +224,12 @@ public class ZookeeperProcessHelper extends ProcessHelper {
      *       connect to zookeeper instances, but those could be read out of its
      *       own property file.
      * 
-     * @todo an alternative to the queue would be a notification interface.
-     * 
      * @see http://hadoop.apache.org/zookeeper/docs/current/zookeeperStarted.html
      * @see http://hadoop.apache.org/zookeeper/docs/current/zookeeperAdmin.html
      */
     static public boolean startZookeeper(final ConfigurationFile config,
-            final Queue<ProcessHelper> running) throws ConfigurationException,
-            IOException {
+            final IServiceListener listener)
+            throws ConfigurationException, IOException {
 
         final File dataDir = (File) config.getEntry(ZOOKEEPER_LABEL,
                 "dataDir", File.class, null/* defaultValue */);
@@ -296,7 +298,7 @@ public class ZookeeperProcessHelper extends ProcessHelper {
                 if (INFO)
                     log.info("Zookeeper instance is local: " + entry);
 
-                return startZookeeper(config, running, dataDir, entry);
+                return startZookeeper(config, listener, dataDir, entry);
 
             }
 
@@ -323,7 +325,7 @@ public class ZookeeperProcessHelper extends ProcessHelper {
      * @throws ConfigurationException 
      */
     static public boolean startZookeeper(final ConfigurationFile config,
-            final Queue<ProcessHelper> running, final File dataDir,
+            final IServiceListener listener, final File dataDir,
             final ZookeeperServerEntry entry) throws IOException,
             ConfigurationException {
 
@@ -396,8 +398,9 @@ public class ZookeeperProcessHelper extends ProcessHelper {
                  * the zookeeper configuration file.
                  */
                 final Set<String> reserved = new HashSet<String>(
-                        Arrays.asList(new String[] { "servers", "args",
-                                "classpath" }));
+                        ServiceConfiguration.Options.reserved);
+
+                reserved.add("servers");
                 
                 /*
                  * Collect all property values (other than "servers" or other
@@ -465,11 +468,11 @@ public class ZookeeperProcessHelper extends ProcessHelper {
                  * Optional properties to be specified to java on the command
                  * line, e.g., the heap size, etc.
                  */
-                final String[] args = (String[]) config
-                        .getEntry(ZOOKEEPER_LABEL, "args", String[].class,
-                                new String[] {}/* defaultValue */);
+                final String[] jvmargs = (String[]) config.getEntry(
+                        ZOOKEEPER_LABEL, Options.ARGS,
+                        String[].class, new String[] {}/* defaultValue */);
 
-                for (String arg : args) {
+                for (String arg : jvmargs) {
 
                     cmds.add(arg);
 
@@ -478,9 +481,10 @@ public class ZookeeperProcessHelper extends ProcessHelper {
                 /*
                  * Optional classpath override.
                  */
-                final String classpath = (String) config
-                        .getEntry(ZOOKEEPER_LABEL, "classpath", String.class,
-                                null/* defaultValue */);
+                final String classpath = (String) config.getEntry(
+                        ZOOKEEPER_LABEL,
+                        JavaServiceConfiguration.Options.CLASSPATH,
+                        String.class, null/* defaultValue */);
 
                 if (classpath != null) {
 
@@ -496,7 +500,8 @@ public class ZookeeperProcessHelper extends ProcessHelper {
                 }
 
                 final String log4jURI = (String) config.getEntry(
-                        ZOOKEEPER_LABEL, "log4j", String.class,
+                        ZOOKEEPER_LABEL,
+                        JavaServiceConfiguration.Options.LOG4J, String.class,
                         null/* defaultValue */);
 
                 if (log4jURI != null) {
@@ -526,7 +531,7 @@ public class ZookeeperProcessHelper extends ProcessHelper {
 
                 // start zookeeper.
                 final ZookeeperProcessHelper helper = new ZookeeperProcessHelper(
-                        "zookeeper(" + entry.id + ")", b, running, clientPort);
+                        "zookeeper(" + entry.id + ")", b, listener, clientPort);
 
                 /*
                  * Wait a bit to see if the process starts successfully. If not,
@@ -594,6 +599,8 @@ public class ZookeeperProcessHelper extends ProcessHelper {
 
     /**
      * The basename of the zookeeper configuration file.
+     * 
+     * @todo put in an Options interface w/ a default value.
      */
     private final static transient String ZOO_CONFIG = "zoo.config";
 

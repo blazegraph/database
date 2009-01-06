@@ -155,15 +155,31 @@ public class JiniFederation extends AbstractDistributedFederation implements
         try {
 
             /*
-             * Connect to zookeeper.
-             * 
-             * @todo what is the behavior here if no connection is possible? it
-             * would be nice if the federation was opened anyway since that is
-             * how we handle it for jini and just allow lazy connections.
+             * Connect to a zookeeper service in the declare ensemble of
+             * zookeeper servers.
              */
+            
             this.zooConfig = zooConfig;
+
             zookeeper = new ZooKeeper(zooConfig.servers,
                     zooConfig.sessionTimeout, this/* watcher */);
+            
+            if (zookeeper.exists(zooConfig.zroot, false/* watch */) == null) {
+                
+                /*
+                 * Note: We don't just create the zroot here since there needs
+                 * to be an appropriate ACL.
+                 * 
+                 * @todo Do bigdata integration with zookeeper ACLs for the
+                 * purpose of permitting the zookeeper pluggable authentication
+                 * schemes to operate when a client connects to zookeeper (NOT
+                 * for method or index level authentication of client requires
+                 * to bigdata services).
+                 */
+
+                log.warn("federation zroot does not exist: " + zooConfig.zroot);
+                
+            }
             
             /*
              * Note: This class will perform multicast discovery if ALL_GROUPS
@@ -391,6 +407,7 @@ public class JiniFederation extends AbstractDistributedFederation implements
         }
 
         if (zookeeper != null) {
+            
             try {
 
                 // close the zookeeper client.
@@ -558,7 +575,22 @@ public class JiniFederation extends AbstractDistributedFederation implements
     public void destroy() {
 
         assertOpen();
-        
+
+        if (zookeeper != null) {
+
+            try {
+
+                // clear out everything in zookeeper for this federation.
+                zookeeper.delete(zooConfig.zroot, -1/* version */);
+                
+            } catch (Exception e) {
+                
+                throw new RuntimeException(e);
+                
+            }
+            
+        }
+
         // destroy the transaction service(s).
         if (transactionServiceClient != null) {
 
