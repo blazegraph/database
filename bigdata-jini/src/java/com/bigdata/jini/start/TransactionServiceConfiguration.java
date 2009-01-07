@@ -65,7 +65,7 @@ public class TransactionServiceConfiguration extends
 
     }
 
-    protected class TransactionServiceStarter<V> extends
+    protected class TransactionServiceStarter<V extends ProcessHelper> extends
             BigdataServiceStarter<V> {
 
         /**

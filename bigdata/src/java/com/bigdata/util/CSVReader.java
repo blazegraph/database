@@ -551,7 +551,7 @@ public class CSVReader implements Iterator<Map<String, Object>> {
      * 
      * @return A map containing the parsed data.
      */
-    protected Map<String, Object> parse(String[] values) {
+    protected Map<String, Object> parse(final String[] values) {
 
         Map<String, Object> map = new TreeMap<String, Object>();
 

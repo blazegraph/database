@@ -126,7 +126,8 @@ abstract public class BigdataServiceConfiguration extends
      * @version $Id$
      * @param <V>
      */
-    protected class BigdataServiceStarter<V> extends JiniServiceStarter<V> {
+    protected class BigdataServiceStarter<V extends ProcessHelper> extends
+            JiniServiceStarter<V> {
 
         /**
          * @param fed

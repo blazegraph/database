@@ -27,19 +27,36 @@
 
 package com.bigdata.zookeeper;
 
-import java.net.InetAddress;
+import java.io.File;
+import java.io.IOException;
+import java.net.BindException;
+import java.net.ServerSocket;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.locks.ReentrantLock;
 
+import junit.framework.TestCase2;
+import net.jini.config.Configuration;
+import net.jini.config.ConfigurationProvider;
+
 import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.ZooDefs.Ids;
+import org.apache.zookeeper.data.ACL;
+import org.apache.zookeeper.server.quorum.QuorumPeerMain;
 
-import junit.framework.TestCase2;
+import com.bigdata.jini.start.MockListener;
+import com.bigdata.jini.start.ProcessHelper;
+import com.bigdata.jini.start.ServiceConfiguration;
+import com.bigdata.jini.start.ZookeeperProcessHelper;
+import com.bigdata.resources.ResourceFileFilter;
 
 /**
+ * Abstract base class for zookeeper integration tests.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -56,19 +73,94 @@ public abstract class AbstractZooTestCase extends TestCase2 {
         super(name);
     }
     
+    /**
+     * Return an open port on current machine. Try the suggested port first. If
+     * suggestedPort is zero, just select a random port
+     */
+    protected static int getPort(final int suggestedPort) throws IOException {
+        
+        ServerSocket openSocket;
+        
+        try {
+        
+            openSocket = new ServerSocket(suggestedPort);
+            
+        } catch (BindException ex) {
+            
+            // the port is busy, so look for a random open port
+            openSocket = new ServerSocket(0);
+        
+        }
+
+        final int port = openSocket.getLocalPort();
+        
+        openSocket.close();
+
+        return port;
+        
+    }
+
+    /**
+     * A configuration file used by some of the unit tests in this package. It
+     * contains a description of the zookeeper server instance in case we need
+     * to start one.
+     */
+    protected final String configFile = "file:src/test/com/bigdata/zookeeper/testzoo.config";
+
     final int sessionTimeout = 2000;// ms
 
-    ZooKeeper zookeeper;
+    protected ZooKeeper zookeeper;
 
+    /**
+     * ACL used by the unit tests.
+     */
+    protected final List<ACL> acl = Ids.OPEN_ACL_UNSAFE;
+    
+    protected final MockListener listener = new MockListener();
+
+    private File dataDir = null;
+    
+//    int clientPort;
+    
     public void setUp() throws Exception {
 
-        // FIXME remove default for this property and report error if not set.
-        final int clientPort = Integer.parseInt(System.getProperty(
-                "clientPort", "2181"));
+        // find ports that are not in use.
+        final int clientPort = getPort(2181/* suggestedPort */);
+        final int peerPort = getPort(2888/* suggestedPort */);
+        final int leaderPort = getPort(3888/* suggestedPort */);
+        final String servers = "1=localhost:" + peerPort + ":" + leaderPort;
+
+        // create a temporary file for zookeeper's state.
+        dataDir = File.createTempFile("test", ".zoo");
+        // delete the file so that it can be re-created as a directory.
+        dataDir.delete();
+        // recreate the file as a directory.
+        dataDir.mkdirs();
         
-        // verify server is alive on that port.
-        ZooHelper
-                .ruok(InetAddress.getLocalHost(), clientPort, 100/*timeout(ms)*/);
+        final String[] args = new String[] {
+        // The configuration file (overrides follow).
+                configFile,
+                // overrides the clientPort to be unique.
+                QuorumPeerMain.class.getName() + "."
+                        + ZookeeperProcessHelper.Options.CLIENT_PORT + "="
+                        + +clientPort,
+                // overrides servers declaration.
+                QuorumPeerMain.class.getName() + "."
+                        + ZookeeperProcessHelper.Options.SERVERS + "=\""
+                        + servers + "\"",
+                // overrides the dataDir
+                QuorumPeerMain.class.getName() + "."
+                        + ZookeeperProcessHelper.Options.DATA_DIR
+                        + "=new java.io.File("
+                        + ServiceConfiguration.q(dataDir.toString()) + ")"//
+        };
+        
+        System.err.println("args=" + Arrays.toString(args));
+
+        final Configuration config = ConfigurationProvider.getInstance(args);
+
+        // if necessary, start zookeeper (a server instance).
+        ZookeeperProcessHelper.startZookeeper(config, listener);
 
         zookeeper = new ZooKeeper("localhost:" + clientPort, sessionTimeout,
 
@@ -81,23 +173,42 @@ public abstract class AbstractZooTestCase extends TestCase2 {
                     }
                 });
      
-        // all unit tests use children of this node.
         try {
-            zookeeper.create("/test", new byte[] {}, Ids.OPEN_ACL_UNSAFE,
-                    CreateMode.PERSISTENT);
-        } catch (KeeperException.NodeExistsException ex) {
+            
+            /*
+             * Since all unit tests use children of this node we must make sure
+             * that it exists.
+             */
+            zookeeper
+                    .create("/test", new byte[] {}, acl, CreateMode.PERSISTENT);
+
+        } catch (NodeExistsException ex) {
+
             log.info("/test already exits.");
+
         }
-        
+
     }
 
     public void tearDown() throws Exception {
-        
+
         if (zookeeper != null) {
 
-            // @todo clean up /test?
-            
             zookeeper.close();
+
+        }
+        
+        for(ProcessHelper h : listener.running) {
+            
+            // destroy zookeeper service iff we started it.
+            h.destroy();
+
+        }
+
+        if (dataDir != null) {
+
+            // clean out the zookeeper data dir.
+            recursiveDelete(dataDir);
 
         }
         
@@ -140,7 +251,7 @@ public abstract class AbstractZooTestCase extends TestCase2 {
 
         public void run() {
 
-            try {
+            try { 
 
                 run2();
 
@@ -157,6 +268,40 @@ public abstract class AbstractZooTestCase extends TestCase2 {
         }
 
         abstract void run2() throws Exception;
+
+    }
+
+    /**
+     * Recursively removes any files and subdirectories and then removes the
+     * file (or directory) itself.
+     * <p>
+     * Note: Files that are not recognized will be logged by the
+     * {@link ResourceFileFilter}.
+     * 
+     * @param f
+     *            A file or directory.
+     */
+    private void recursiveDelete(File f) {
+
+        if (f.isDirectory()) {
+
+            final File[] children = f.listFiles();
+
+            for (int i = 0; i < children.length; i++) {
+
+                recursiveDelete(children[i]);
+
+            }
+
+        }
+
+        log.info("Removing: " + f);
+
+        if (f.exists() && !f.delete()) {
+
+            log.warn("Could not remove: " + f);
+
+        }
 
     }
 

@@ -46,6 +46,15 @@ public class ProcessHelper {
     private final Condition dead = lock.newCondition();
     
     private final AtomicInteger exitValue = new AtomicInteger(-1);
+
+    public String toString() {
+        
+        final int exitValue = this.exitValue.get();
+        
+        return getClass().getSimpleName() + "{name=" + name
+                + (exitValue != -1 ? ", exitValue=" + exitValue : "") + "}";
+        
+    }
     
 //    /**
 //     * Return <code>true</code> iff the process is still executing.

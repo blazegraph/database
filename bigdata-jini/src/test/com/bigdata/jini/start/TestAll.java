@@ -52,11 +52,17 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("bigdata services manager");
 
+        // test suite for parsing zookeeper server entries.
         suite.addTestSuite(TestZookeeperServerEntry.class);
 
+        // test suite for parsing service configurations, etc.
         suite.addTestSuite(TestServiceConfiguration.class);
 
+        // test suite for starting a bigdata service from a service config.
         suite.addTestSuite(TestServiceStarter.class);
+        
+        // test suite for managing a logical service using a watcher.
+        suite.addTestSuite(TestServiceConfigurationWatcher.class);
         
         return suite;
         

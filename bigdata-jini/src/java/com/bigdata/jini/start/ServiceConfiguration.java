@@ -506,8 +506,6 @@ abstract public class ServiceConfiguration implements Serializable {
      *            The value.
      * 
      * @return The quoted value.
-     * 
-     * @todo does not handle embedded escapes, etc.
      */
     static public String q(String v) {
         

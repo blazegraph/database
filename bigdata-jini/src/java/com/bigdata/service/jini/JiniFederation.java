@@ -157,6 +157,10 @@ public class JiniFederation extends AbstractDistributedFederation implements
             /*
              * Connect to a zookeeper service in the declare ensemble of
              * zookeeper servers.
+             * 
+             * @todo if the zookeeper integration is to be optional then we can
+             * not insist on the zooconfig an this section needs to be
+             * conditional on whether or not zookeeper was configured.
              */
             
             this.zooConfig = zooConfig;

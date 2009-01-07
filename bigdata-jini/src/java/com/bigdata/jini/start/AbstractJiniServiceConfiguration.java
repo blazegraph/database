@@ -64,6 +64,7 @@ import sun.security.jca.ServiceId;
 
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.JiniUtil;
+import com.bigdata.zookeeper.ZNodeCreatedWatcher;
 import com.bigdata.zookeeper.ZookeeperClientConfig;
 
 /**
@@ -180,7 +181,8 @@ abstract public class AbstractJiniServiceConfiguration extends
      * @version $Id$
      * @param <V>
      */
-    protected class JiniServiceStarter<V> extends JavaServiceStarter<V> {
+    protected class JiniServiceStarter<V extends ProcessHelper> extends
+            JavaServiceStarter<V> {
         
         /**
          * The basename of the service configuration file.
@@ -246,25 +248,16 @@ abstract public class AbstractJiniServiceConfiguration extends
             };
             
         }
-        
+
         /**
          * Extended to specify the configuration file (in the service directory)
-         * as an argument to the java class whose main routine will be invoked.
-         */
-        protected List<String> getCommandLine() {
-            
-            final List<String> cmds = super.getCommandLine();
-
-            cmds.add(configFile.toString());
-
-            return cmds;
-            
-        }
-        
-        /**
-         * Extended to add the {@link Options#JINI_OPTIONS}.
+         * as an argument to the java class whose main routine will be invoked
+         * and to add the {@link Options#JINI_OPTIONS}.
          */
         protected void addServiceOptions(List<String> cmds) {
+
+            // The configuration file goes 1st.
+            cmds.add(configFile.toString());
 
             super.addServiceOptions(cmds);
             
@@ -802,20 +795,14 @@ abstract public class AbstractJiniServiceConfiguration extends
             final UUID serviceUUID = JiniUtil.serviceID2UUID(serviceItem.serviceID);
             
             // this is the zpath that the service will create.
-            final String physicalServiceZPath = logicalServiceZPath
-                    + "/physicalService" + serviceUUID; 
-            
-            final ZNodeCreatedWatcher watcher = new ZNodeCreatedWatcher(
-                    zookeeper);
+            final String physicalServiceZPath = logicalServiceZPath + "/"
+                    + BigdataZooDefs.PHYSICAL_SERVICE + serviceUUID;
 
-            if (zookeeper.exists(physicalServiceZPath, watcher) == null) {
+            if (!ZNodeCreatedWatcher.awaitCreate(zookeeper,
+                    physicalServiceZPath, timeout, unit)) {
 
-                if (INFO)
-                    log.info("Waiting on znode create: zpath="
-                            + physicalServiceZPath);
-
-                // Note: throws TimeoutException if watched znode not created.
-                watcher.awaitInsert(timeout, unit);
+                throw new TimeoutException("zpath does not exist: "
+                        + physicalServiceZPath);
 
             }
 

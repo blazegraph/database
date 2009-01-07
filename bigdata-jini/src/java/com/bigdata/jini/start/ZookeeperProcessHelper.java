@@ -1,10 +1,14 @@
 package com.bigdata.jini.start;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.io.RandomAccessFile;
+import java.io.StringWriter;
+import java.io.Writer;
+import java.net.BindException;
 import java.net.InetAddress;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -22,7 +26,7 @@ import org.apache.zookeeper.server.PurgeTxnLog;
 import org.apache.zookeeper.server.quorum.QuorumPeerMain;
 
 import com.bigdata.io.FileLockUtility;
-import com.bigdata.jini.start.ServiceConfiguration.Options;
+import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.zookeeper.ZooHelper;
 
 /**
@@ -40,9 +44,11 @@ import com.bigdata.zookeeper.ZooHelper;
  * 
  * @todo periodic purge of snapshots and logs, etc.
  * 
- * @todo rewrite as a {@link JavaServiceConfiguration} with a custom service
- *       starter? (This is the first service starter written and it is less well
- *       organized for that.)
+ * @todo While there is a lot of overflow with the {@link ServiceConfiguration}
+ *       class, the two can not be readily merged. The problem is that this
+ *       class must operate without reference to a {@link JiniFederation}. The
+ *       shared logic deals mainly with options for java programs and starting
+ *       java programs.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -50,9 +56,63 @@ import com.bigdata.zookeeper.ZooHelper;
 public class ZookeeperProcessHelper extends ProcessHelper {
 
     /**
+     * Zookeeper server configuration options.
+     * <p>
+     * Note: ANY values in this namespace that are not recognized will be copied
+     * into the generated zookeeper configuration file.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @see http://hadoop.apache.org/zookeeper/docs/current/zookeeperStarted.html
+     * @see http://hadoop.apache.org/zookeeper/docs/current/zookeeperAdmin.html
+     */
+    public interface Options extends ServiceConfiguration.Options {
+
+//        /**
+//         * The namespace for the zookeeper server options.
+//         */
+//        String NAMESPACE = QuorumPeerMain.class.getName();
+
+        /**
+         * The basename of the zookeeper configuration file.
+         */
+        String CONFIG_FILE = "configFile";
+
+        /**
+         * Default for {@link #CONFIG_FILE}
+         */
+        String DEFAULT_CONFIG_FILE = "zoo.config";
+
+        /**
+         * The port at which clients will connect to the zookeeper ensemble.
+         */
+        String CLIENT_PORT = "clientPort";
+
+        /**
+         * Option specifies the data directory (required).
+         */
+        String DATA_DIR = "dataDir";
+        
+        /**
+         * Options specifies the server configuration entries. This is a comma
+         * deliminted set of zookeeper server descriptions. Each element of the
+         * set has the form <code>myid=hostname:port:port</code> where <i>myid</i>
+         * is the identifier for that service instance.
+         */
+        String SERVERS = "servers";
+        
+    }
+
+    /**
+     * The namespace for the {@link Options}.
+     */
+    public static final String COMPONENT = QuorumPeerMain.class.getName();
+    
+    /**
      * The zookeeper client port.
      */
-    public final int clientPort;
+    protected final int clientPort;
 
     /**
      * @param name
@@ -114,17 +174,13 @@ public class ZookeeperProcessHelper extends ProcessHelper {
     static public ZookeeperServerEntry[] getZookeeperServerEntries(
             Configuration config) throws ConfigurationException {
 
-        final String servers = (String) config.getEntry(ZOOKEEPER_LABEL,
-                "servers", String.class, null/* defaultValue */);
+        final String servers = (String) config
+                .getEntry(QuorumPeerMain.class.getName(), Options.SERVERS,
+                        String.class, ""/* defaultValue */);
 
-        if (servers == null) {
-
-            log.warn("Assuming local zookeeper instance already running.");
-
-            return new ZookeeperServerEntry[]{};
-            
-        }
-
+        if (INFO)
+            log.info(Options.SERVERS + "=" + servers);
+        
         final List<ZookeeperServerEntry> serverEntries = new LinkedList<ZookeeperServerEntry>();
 
         // split into zero or more server entry declarations.
@@ -134,12 +190,19 @@ public class ZookeeperProcessHelper extends ProcessHelper {
 //        System.err.println("fields : "+Arrays.toString(fields));
 //        
         for (String field : fields) {
-
+            
 //            System.err.println("field  : "+field);
             
-            final int pos = field.indexOf('=');
+            if (field.length() == 0) {
+                
+                // note: handles missing "servers" option.
+                continue;
+                
+            }
             
-            if(pos==-1) {
+            final int pos = field.indexOf('=');
+
+            if (pos == -1) {
 
                 throw new ConfigurationException("Expecting '=' : " + servers);
                 
@@ -149,13 +212,15 @@ public class ZookeeperProcessHelper extends ProcessHelper {
 
             final String entryFields = field.substring(pos+1);
             
-//            System.err.println("idField="+idField);
-//            System.err.println("entryFields="+entryFields);
-            
+
+            // System.err.println("idField="+idField);
+            // System.err.println("entryFields="+entryFields);
+
             final int id = Integer.parseInt(idField);
 
-            final ZookeeperServerEntry entry = new ZookeeperServerEntry(id, entryFields);
-            
+            final ZookeeperServerEntry entry = new ZookeeperServerEntry(id,
+                    entryFields);
+
             serverEntries.add(entry);
 
             if (INFO)
@@ -168,85 +233,38 @@ public class ZookeeperProcessHelper extends ProcessHelper {
     }
     
     /**
-     * Starts a zookeeper instance IFF this host is one of those identified by a
-     * <code>server.#</code> property found in the {@link #ZOOKEEPER_LABEL} of
-     * the {@link Configuration}.
-     * <p>
-     * A configuration file will be generated for the instance using the
-     * properties specified in the {@link #ZOOKEEPER_LABEL} section of the
-     * {@link #config}.
-     * <p>
-     * Required parameters:
-     * <dl>
-     * <dt>clientPort</dt>
-     * <dd>The port at which clients will connect to the zookeeper ensemble
-     * (required). This property is required, even if we will not be starting a
-     * zookeeper instance, since all clients must connect to zookeeper.</dd>
-     * </dl>
-     * Optional parameters:
-     * <dt>servers</dt>
-     * <dd>A meta-property whose value is a semicolon deliminted set of
-     * zookeeper server descriptions. Each element of the set has the form <i>id</i>=hostname:port:port.
-     * This meta-property was required because constructions such as "server.1"
-     * are not valid Java identifiers and hence can not be used within a
-     * {@link Configuration}.</dd>
-     * <dl>
-     * <dt>tickTime</dt>
-     * <dd></dd>
-     * <dt>dataDir</dt>
-     * <dd>The data directory for the zookeeper instance (optional). If this
-     * property is not specified, then we will not attempt to start a zookeeper
-     * instance. If the property is specified, a <code>server.#</code>
-     * property exists, and the hostname component of that server property is a
-     * hostname (or IP address) for this machine, and the dataDir does not
-     * exist, then an attempt will be made to start a zookeeper instance in that
-     * dataDir. Race conditions will be resolved by whichever process is able to
-     * obtain an exclusive lock on the <code>myid</code> file, verify that the
-     * file is empty while holding the lock, and write the service id# into the
-     * file. The lock is then released, but only the process which wrote the
-     * service # into the file will start the zookeeper instance.</dd>
-     * </dl>
-     * <dt>dataLogDir</dt>
-     * <dd></dd>
-     * <dt>...</dt>
-     * <dd></dd>
-     * </dl>
+     * (Re-)starts any zookeeper server(s) for the localhost that are identified
+     * in the {@link ConfigurationFile} and are not currently running. The
+     * difference between a "start" and a "restart" is whether the zookeeper
+     * "myid" file exists in the data directory for the service. If it does,
+     * then we "restart" zookeeper using the existing configuration. If it does
+     * not, then we generate the zookeeper configuration file and the myid file
+     * and then start zookeeper. Of course, how a server restart for zookeeper
+     * fairs depends on whether you took down the service or if it crashed, etc.
      * 
-     * @return <code>true</code> iff a zookeeper instance was started.
+     * @return the #of instances (re-)started.
      * 
      * @throws ConfigurationException
      * @throws IOException
      * 
-     * @todo An alternative to specifying the zookeeper configuration inline
-     *       would be to specify the name of the zookeeper configuration file
-     *       and then parse that ourselves. We need the [clientPort] and the
-     *       list of the {@link ZookeeperServerEntry}s in order to be able to
-     *       connect to zookeeper instances, but those could be read out of its
-     *       own property file.
+     * @see Options
      * 
-     * @see http://hadoop.apache.org/zookeeper/docs/current/zookeeperStarted.html
-     * @see http://hadoop.apache.org/zookeeper/docs/current/zookeeperAdmin.html
+     * @todo You CAN NOT start multiple instances using this class.
+     *       <p>
+     *       A tighter zookeeper integration could probably fix this issue. In
+     *       order to tell whether or not zookeeper is already running we test
+     *       "ruok" for the client port (it we don't test then we might see a
+     *       {@link BindException} in the process output, but we don't get an
+     *       error when we execute the JVM to run zookeeper). Since all
+     *       instances use the same {@link Options#CLIENT_PORT}, all we know is
+     *       whether or not there are any instances running which were
+     *       configured for that client port, but not how many and not which
+     *       ones.
      */
-    static public boolean startZookeeper(final ConfigurationFile config,
-            final IServiceListener listener)
-            throws ConfigurationException, IOException {
+    static public int startZookeeper(final Configuration config,
+            final IServiceListener listener) throws ConfigurationException,
+            IOException {
 
-        final File dataDir = (File) config.getEntry(ZOOKEEPER_LABEL,
-                "dataDir", File.class, null/* defaultValue */);
-
-        if (dataDir == null) {
-
-            /*
-             * This is Ok. You can configure zookeeper separately or share an
-             * instance that is already running.
-             */
-            
-            log.warn("No zookeeper configuration.");
-            
-            return false;
-            
-        }
-        
         /*
          * Note: jini can not handle the zookeeper [server.#] properties since
          * the property name is not a legal java identifier. Therefore I have
@@ -264,6 +282,8 @@ public class ZookeeperProcessHelper extends ProcessHelper {
 
         final ZookeeperServerEntry[] entries = getZookeeperServerEntries(config);
 
+        int nstart = 0;
+        
         for (ZookeeperServerEntry entry : entries) {
 
             final InetAddress addr = InetAddress.getByName(entry.hostname);
@@ -298,310 +318,406 @@ public class ZookeeperProcessHelper extends ProcessHelper {
                 if (INFO)
                     log.info("Zookeeper instance is local: " + entry);
 
-                return startZookeeper(config, listener, dataDir, entry);
+                try {
+                    
+                    if (startZookeeper(config, listener, entry)) {
+
+                        nstart++;
+
+                    }
+                    
+                } catch (InterruptedException ex) {
+                    
+                    log.error("Could not start: entry=" + entry, ex);
+                    
+                }
 
             }
 
-        }
+        } // next entry
 
-        if(INFO)
-            log.info("No local zookeeper instances.");
+        if (INFO)
+            log.info("started=" + nstart + " instances");
         
-        return false;
+        return nstart;
 
     }
 
     /**
-     * Attempts to start the server instance.
+     * (Re-)starts the zookeeper server instance identified in the
+     * {@link ZookeeperServerEntry} unless it is already running using the
+     * properties defined in the {@link Configuration}.
      * 
-     * @param dataDir
-     *            The data directory for the service.
+     * @param config
+     * @param listener
      * @param entry
      *            A description of the service (host, ports).
      * 
      * @return <code>true</code> iff the instance was started by this process.
      * 
      * @throws IOException
-     * @throws ConfigurationException 
+     * @throws ConfigurationException
+     * @throws InterruptedException
      */
-    static public boolean startZookeeper(final ConfigurationFile config,
-            final IServiceListener listener, final File dataDir,
-            final ZookeeperServerEntry entry) throws IOException,
-            ConfigurationException {
+    static public boolean startZookeeper(final Configuration config,
+            final IServiceListener listener, final ZookeeperServerEntry entry)
+            throws IOException, ConfigurationException, InterruptedException {
 
-        /*
-         * Note: This is a required parameter. Even if we are not starting a
-         * zookeeper instance, we need to know the port at which we can connect
-         * to zookeeper.
-         */
-        final int clientPort = (Integer) config.getEntry(ZOOKEEPER_LABEL,
-                "clientPort", Integer.TYPE);
+        final int clientPort = (Integer) config.getEntry(COMPONENT,
+                Options.CLIENT_PORT, Integer.TYPE);
 
         if (INFO)
-            log.info("zooClientPort=" + clientPort);
-        
-        if(!dataDir.exists()) {
-            
+            log.info(Options.CLIENT_PORT + "=" + clientPort);
+
+        final File dataDir = (File) config.getEntry(COMPONENT, Options.DATA_DIR, File.class);
+
+        if (INFO)
+            log.info(Options.DATA_DIR + "=" + dataDir);
+
+        if (!dataDir.exists()) {
+
             dataDir.mkdirs();
-            
+
         }
 
-        /*
-         * Figure out whether or not this process will be the one to start the
-         * zookeeper instance.
-         * 
-         * Note: Only the process that successfully writes the server [id] on
-         * the [myid] file will start zookeeper. If the dataDir already contains
-         * a non-empty [myid] file, then a new instance will not be started.
-         */
-        final File myidFile = new File(dataDir, "myid");
-        {
-         
-            final RandomAccessFile raf = FileLockUtility.openFile(myidFile,
-                    "rw", true/* useFileLock */);
+        // the zookeeper configuration file to be generated. 
+        final File configFile = new File(dataDir, (String) config.getEntry(
+                COMPONENT, Options.CONFIG_FILE, String.class,
+                Options.DEFAULT_CONFIG_FILE));
 
-            try {
-
-                if (raf.length() != 0) {
-
-                    log
-                            .warn("Service id already assigned - will not start zookeeper: file="
-                                    + myidFile);
-                    
-                    // another process won the race.
-                    return false;
-
-                }
-
-                /*
-                 * Note: writes ASCII digits in [0:9] (not unicode).
-                 */
-                raf.writeBytes(Integer.toString(entry.id));
-
-            } finally {
-
-                FileLockUtility.closeFile(myidFile, raf);
-
-            }
-            
-        }
-
-        try {
+        if (INFO)
+            log.info(Options.CONFIG_FILE + "=" + configFile);
         
+        final File myidFile = new File(dataDir, "myid");
+
+//        boolean wroteMyIdFile = false;
+//        try {
+
             /*
-             * Create the configuration file inside of the [dataDir].
+             * Figure out whether or not this process will be the one to start the
+             * zookeeper instance.
+             * 
+             * Note: Only the process that successfully writes the server [id] on
+             * the [myid] file will start zookeeper. If the dataDir already contains
+             * a non-empty [myid] file, then a new instance will not be started.
              */
             {
 
-                /*
-                 * A set of reserved properties that are not copied through to
-                 * the zookeeper configuration file.
-                 */
-                final Set<String> reserved = new HashSet<String>(
-                        ServiceConfiguration.Options.reserved);
-
-                reserved.add("servers");
-                
-                /*
-                 * Collect all property values (other than "servers" or other
-                 * special properties which we define) in a Properties object
-                 * (it would be easier if the zookeeper properties had their own
-                 * namespace).
-                 */
-                final Set<String> names = config.getEntryNames();
-
-                final Properties properties = new Properties();
-
-                for (String name : names) {
-
-                    if (!name.startsWith(ZOOKEEPER_LABEL))
-                        continue;
-
-                    // the name of the property
-                    final String s = name
-                            .substring(ZOOKEEPER_LABEL.length() + 1);
-
-                    // skip our meta-property.
-                    if(reserved.contains(s)) continue;
-                    
-                    /*
-                     * The value of that property (using whatever is its natural
-                     * type).
-                     */
-                    final Object v = config.getEntry(ZOOKEEPER_LABEL, s,
-                            ((ConfigurationFile) config).getEntryType(
-                                    ZOOKEEPER_LABEL, s));
-
-                    // add to the map.
-                    properties.setProperty(s, v.toString());
-
-                }
-
-                /*
-                 * Generate the zookeeper configuration file.
-                 */
-                final OutputStream out = new FileOutputStream(new File(dataDir,
-                        ZOO_CONFIG));
+                final RandomAccessFile raf = FileLockUtility.openFile(myidFile,
+                        "rw", true/* useFileLock */);
 
                 try {
 
-                    properties.store(out, "Zookeeper Configuration");
+                    if (raf.length() != 0) {
+
+                        /*
+                         * restart the zookeeper instance.
+                         */
+
+                        try {
+
+                            /*
+                             * Query for an instance already running on local
+                             * host at that port.
+                             */
+
+                            ZooHelper.ruok(InetAddress.getLocalHost(),
+                                    clientPort, 250/* timeout(ms) */);
+
+                            if (INFO)
+                                log
+                                        .info("Zookeeper already running on localhost: clientport="
+                                                + clientPort);
+
+                            return false;
+
+                        } catch (IOException ex) {
+
+                            return startZookeeper(config, configFile, listener,
+                                    clientPort, "zookeeper(" + entry.id + ")");
+                        }
+
+                    }
+
+                    /*
+                     * Note: writes ASCII digits in [0:9] (not unicode).
+                     */
+                    raf.writeBytes(Integer.toString(entry.id));
+
+//                    wroteMyIdFile = true;
 
                 } finally {
 
-                    out.close();
+                    FileLockUtility.closeFile(myidFile, raf);
 
                 }
-            
+
             }
-            
-            /*
-             * Start zookeeper.
-             */
-            {
-                
-                final List<String> cmds = new LinkedList<String>();
 
-                cmds.add("java");
+            writeConfigFile(config, configFile);
 
-                /*
-                 * Optional properties to be specified to java on the command
-                 * line, e.g., the heap size, etc.
-                 */
-                final String[] jvmargs = (String[]) config.getEntry(
-                        ZOOKEEPER_LABEL, Options.ARGS,
-                        String[].class, new String[] {}/* defaultValue */);
+            return startZookeeper(config, configFile, listener, clientPort,
+                    "zookeeper(" + entry.id + ")");
 
-                for (String arg : jvmargs) {
-
-                    cmds.add(arg);
-
-                }
-                
-                /*
-                 * Optional classpath override.
-                 */
-                final String classpath = (String) config.getEntry(
-                        ZOOKEEPER_LABEL,
-                        JavaServiceConfiguration.Options.CLASSPATH,
-                        String.class, null/* defaultValue */);
-
-                if (classpath != null) {
-
-                    /*
-                     * When [classpath] is specified, we explicitly set that
-                     * command line argument.
-                     */
-                    
-                    cmds.add("-cp");
-                    
-                    cmds.add(classpath);
-                    
-                }
-
-                final String log4jURI = (String) config.getEntry(
-                        ZOOKEEPER_LABEL,
-                        JavaServiceConfiguration.Options.LOG4J, String.class,
-                        null/* defaultValue */);
-
-                if (log4jURI != null) {
-
-                    cmds.add("-Dlog4j.configuration=\"" + log4jURI + "\"");
-                    
-                }
-                
-                // the class to be executed.
-                cmds.add("org.apache.zookeeper.server.quorum.QuorumPeerMain");
-
-                // the configuration file (in the data directory).
-                cmds.add(new File(dataDir,ZOO_CONFIG).toString());
-                
-                final ProcessBuilder b = new ProcessBuilder(cmds);
-                
-                /*
-                 * Note: DO NOT change to the dataDir. That leads to a recursion
-                 * where zookeeper creates a its own "dataDir" inside of the
-                 * exiting dataDir.
-                 */
-//                 specify the startup directory.
-//                b.directory(dataDir);
-                
-                // merge stdout and stderr.
-                b.redirectErrorStream(true);
-
-                // start zookeeper.
-                final ZookeeperProcessHelper helper = new ZookeeperProcessHelper(
-                        "zookeeper(" + entry.id + ")", b, listener, clientPort);
-
-                /*
-                 * Wait a bit to see if the process starts successfully. If not,
-                 * then we need to do some cleanup.
-                 * 
-                 * @todo the cleanup could be specified as a runnable and given
-                 * with a timeout to the process helper, but we don't want to
-                 * delete the myid file if [ruok] has ever responded. After that
-                 * the service should be restarted.
-                 */
-                try {
-
-                    final int exitValue = helper.exitValue(1000,
-                            TimeUnit.MILLISECONDS);
-
-                    throw new IOException("exitValue=" + exitValue);
-                    
-                } catch (TimeoutException ex) {
-
-                    /*
-                     * Verify up and running by connecting to the client port on
-                     * the local host.
-                     */
-
-                    ZooHelper.ruok(InetAddress.getLocalHost(), clientPort,
-                                    100/* timeout(ms) */);
-
-//                    log.warn(helper.stat(InetAddress.getLocalHost(),
-//                            zooClientPort).toString());
+//        } catch (Exception t) {
 //
-//                    log.warn(helper.dump(InetAddress.getLocalHost(),
-//                            zooClientPort).toString());
-                    
-                    log.warn("Started zookeeper");
+//            log.warn("Zookeeper startup problem: " + t);
+//
+//            /*
+//             * If anything goes wrong during service startup and WE wrote the
+//             * [myid] file, then we delete the [myid] file so that someone else
+//             * gets a shot at starting this zookeeper instance.
+//             */
+//
+//            if (wroteMyIdFile)
+//                myidFile.delete();
+//
+//            throw new RuntimeException(t);
+//
+//        }
 
-                    return true;
-
-                }
-                
-            }
-            
-        } catch(Throwable t) {
-            
-            log.warn("Zookeeper startup problem: " + t);
-            
-            /*
-             * If anything goes wrong during service startup we will delete the
-             * [myid] file so that someone else gets a shot at starting this
-             * zookeeper instance.
-             */
-            
-            myidFile.delete();
-            
-            throw new RuntimeException(t);
-            
-        }
-        
     }
 
     /**
-     * The label in the {@link Configuration} file for the zookeeper service
-     * description.
+     * Create the configuration file inside of the [dataDir].
+     * 
+     * @throws ConfigurationException
+     * @throws IOException 
      */
-    private final static transient String ZOOKEEPER_LABEL = "org.apache.zookeeper";
+    static void writeConfigFile(Configuration config, File configFile)
+            throws ConfigurationException, IOException {
+
+        /*
+         * A set of reserved properties that are not copied through to the
+         * zookeeper configuration file.
+         */
+        final Set<String> reserved = new HashSet<String>(
+                ServiceConfiguration.Options.reserved);
+
+        reserved.add("servers");
+
+        /*
+         * Collect all property values (other than "servers" or other special
+         * properties which we define) in a Properties object (it would be
+         * easier if the zookeeper properties had their own namespace).
+         * 
+         * @todo this introduces a dependency on ConfigurationFile. We could
+         * just declare all the properties of interest in Options and handle
+         * them explicitly if we had to, but then we need to stay onto of new
+         * zookeeper options as they are defined (or maybe zookeeper declares
+         * the known options in a source file somewhere and we can use those
+         * decls?)
+         */
+        final Set<String> names = ((ConfigurationFile) config).getEntryNames();
+
+        final Properties properties = new Properties();
+
+        for (String name : names) {
+
+            if (!name.startsWith(COMPONENT))
+                continue;
+
+            // the name of the property
+            final String s = name.substring(COMPONENT.length() + 1);
+
+            // skip our meta-property.
+            if (reserved.contains(s))
+                continue;
+
+            /*
+             * The value of that property (using whatever is its natural type).
+             * 
+             * @todo Again, this introduces a dependency on ConfigurationFile.
+             * If we enumerate the zookeeper options in Options we would still
+             * need their natural types to copy the properties into the
+             * generated configuration file.
+             */
+            final Object v = config.getEntry(COMPONENT, s,
+                    ((ConfigurationFile) config).getEntryType(COMPONENT, s));
+
+            // add to the map.
+            properties.setProperty(s, v.toString());
+
+        }
+
+        /*
+         * Write the properties into a flat text format.
+         */
+        final String contents;
+        {
+
+            final StringWriter out = new StringWriter();
+
+            properties.store(out, "Zookeeper Configuration");
+
+            contents = out.toString();
+
+        }
+
+        if (INFO)
+            log.info("configFile=" + configFile + "\n" + contents);
+
+        /*
+         * Write the configuration onto the file.
+         */
+        {
+            final Writer out2 = new OutputStreamWriter(
+                    new BufferedOutputStream(new FileOutputStream(configFile)));
+
+            try {
+
+                out2.write(contents);
+
+                out2.flush();
+
+            } finally {
+
+                out2.close();
+
+            }
+
+        }
+
+    }
 
     /**
-     * The basename of the zookeeper configuration file.
+     * Start zookeeper with an existing configuration file.
      * 
-     * @todo put in an Options interface w/ a default value.
+     * @param config
+     * @param configFile
+     * @param listener
+     * @param clientPort
+     * @param processName
+     * 
+     * @return
+     * 
+     * @throws ConfigurationException
+     * @throws IOException
+     * @throws InterruptedException
      */
-    private final static transient String ZOO_CONFIG = "zoo.config";
+    static private boolean startZookeeper(final Configuration config,
+            final File configFile, final IServiceListener listener,
+            final int clientPort, final String processName)
+            throws ConfigurationException, IOException, InterruptedException {
+
+        final String className = QuorumPeerMain.class.getName();
+
+        final List<String> cmds = new LinkedList<String>();
+
+        // executable.
+        cmds.add(JavaServiceConfiguration.getJava(className, config));
+
+        /*
+         * Optional properties to be specified to java on the command line,
+         * e.g., the heap size, etc.
+         */
+        final String[] args = ServiceConfiguration.concat(
+                JavaServiceConfiguration.getDefaultJavaArgs(className, config),
+                JavaServiceConfiguration.getArgs(className, config));
+
+        for (String arg : args) {
+
+            cmds.add(arg);
+
+        }
+
+        /*
+         * Optional classpath override.
+         */
+        final String[] classpath = JavaServiceConfiguration.getClasspath(
+                className, config);
+
+        if (classpath != null) {
+
+            /*
+             * When [classpath] is specified, we explicitly set that command
+             * line argument.
+             */
+
+            cmds.add("-cp");
+
+            final StringBuilder sb = new StringBuilder();
+
+            for (String e : classpath) {
+
+                if (sb.length() > 0)
+                    sb.append(File.pathSeparatorChar);
+
+                sb.append(e);
+
+            }
+
+            cmds.add(sb.toString());
+
+        }
+
+        final String log4jURI = JavaServiceConfiguration.getLog4j(className,
+                config);
+
+        if (log4jURI != null) {
+
+            cmds.add("-Dlog4j.configuration="
+                    + ServiceConfiguration.q(log4jURI));
+
+        }
+
+        // the class to be executed.
+        cmds.add(className);
+
+        // the configuration file.
+        cmds.add(configFile.toString());
+
+        final ProcessBuilder b = new ProcessBuilder(cmds);
+
+        /*
+         * Note: DO NOT change to the dataDir. That leads to a recursion where
+         * zookeeper creates a its own "dataDir" inside of the exiting dataDir.
+         */
+        // specify the startup directory.
+        // b.directory(dataDir);
+        // merge stdout and stderr.
+        b.redirectErrorStream(true);
+
+        // start zookeeper.
+        final ZookeeperProcessHelper helper = new ZookeeperProcessHelper(
+                processName, b, listener, clientPort);
+
+        /*
+         * Wait a bit to see if the process starts successfully. If not, then we
+         * need to do some cleanup.
+         */
+        try {
+
+            final int exitValue = helper.exitValue(1000, TimeUnit.MILLISECONDS);
+
+            throw new IOException("exitValue=" + exitValue);
+
+        } catch (TimeoutException ex) {
+
+            /*
+             * Verify up and running by connecting to the client port on the
+             * local host.
+             * 
+             * @todo This does not tell us that the instance that we started is
+             * running, just that there is a server responding at that
+             * clientPort.  That could have already been true.
+             */
+
+            ZooHelper
+                    .ruok(InetAddress.getLocalHost(), clientPort, 100/* timeout(ms) */);
+
+            // log.warn(helper.stat(InetAddress.getLocalHost(),
+            // zooClientPort).toString());
+            //
+            // log.warn(helper.dump(InetAddress.getLocalHost(),
+            // zooClientPort).toString());
+
+            log.warn("Started zookeeper");
+
+            return true;
+
+        }
+
+    }
 
 }

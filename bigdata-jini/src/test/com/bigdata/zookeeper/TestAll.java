@@ -49,8 +49,12 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("zookeeper client library");
 
-        // basic zookeeper tests.
+        // @todo basic zookeeper tests.
         suite.addTestSuite(TestZookeeper.class);
+
+        suite.addTestSuite(TestZNodeCreatedWatcher.class);
+        
+        suite.addTestSuite(TestZNodeDeletedWatcher.class);
 
         // a barrier pattern.
         suite.addTestSuite(TestZooBarrier.class);

@@ -66,8 +66,11 @@ public class TestServiceConfiguration extends TestCase2 {
     public TestServiceConfiguration(String arg0) {
         super(arg0);
     }
-    
-    private final String configFile = "file:src/test/com/bigdata/jini/start/TestServiceConfiguration-test01.config";
+
+    /**
+     * A configuration file used by some of the unit tests in this package.
+     */
+    private final String configFile = "file:src/test/com/bigdata/jini/start/testfed.config";
 
     /**
      * 
@@ -86,9 +89,11 @@ public class TestServiceConfiguration extends TestCase2 {
 
         assertEquals(TransactionServer.class.getName(), serviceConfig.className);
 
-        assertEquals(new String[] {"-Xmx:1G", "-server"}, serviceConfig.args);
+        assertEquals(new String[] {"-Xmx1G", "-server"}, serviceConfig.args);
 
-        assertEquals(new String[] {"foo=bar"}, serviceConfig.options);
+        assertEquals(
+                new String[] { "com.bigdata.service.jini.TransactionServer.Options.SNAPSHOT_INTERVAL=60000" },
+                serviceConfig.options);
 
         assertEquals(new File("test-fed"), serviceConfig.serviceDir);
 

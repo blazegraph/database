@@ -159,20 +159,8 @@ public class ReduceServer extends AbstractServer {
          */
         public void destroy() throws RemoteException {
 
-            log.info(""+getServiceUUID());
-
-            new Thread() {
-
-                public void run() {
-
-                    server.destroy();
-                    
-                    log.info(getServiceUUID()+" - Service stopped.");
-
-                }
-
-            }.start();
-
+            server.runDestroy();
+            
         }
 
         synchronized public void shutdown() {

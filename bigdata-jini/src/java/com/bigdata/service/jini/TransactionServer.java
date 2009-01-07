@@ -312,25 +312,7 @@ public class TransactionServer extends AbstractServer {
          */
         public void destroy() {
 
-            if (INFO)
-                log.info("" + getServiceUUID());
-
-            final Thread t = new Thread() {
-
-                public void run() {
-
-                    server.destroy();
-                    
-                    if (INFO)
-                        log.info(getServiceUUID() + " - Service stopped.");
-
-                }
-
-            };
-            
-//            t.setDaemon(true);
-            
-            t.start();
+            server.runDestroy();
 
         }
 

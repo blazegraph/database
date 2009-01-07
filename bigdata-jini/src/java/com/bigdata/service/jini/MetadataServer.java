@@ -250,20 +250,7 @@ public class MetadataServer extends DataServer {
          */
         public void destroy() throws RemoteException {
 
-            log.info(""+getServiceUUID());
-
-            new Thread() {
-
-                public void run() {
-
-                    server.destroy();
-
-                    if (INFO)
-                        log.info(getServiceUUID()+" - Service stopped.");
-
-                }
-
-            }.start();
+            server.runDestroy();
 
         }
 

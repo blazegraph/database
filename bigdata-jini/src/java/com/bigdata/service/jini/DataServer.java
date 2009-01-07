@@ -268,20 +268,7 @@ public class DataServer extends AbstractServer {
          */
         public void destroy() throws RemoteException {
 
-            if(INFO) log.info(""+getServiceUUID());
-
-            new Thread() {
-
-                public void run() {
-
-                    server.destroy();
-                    
-                    if (INFO)
-                        log.info(getServiceUUID()+" - Service stopped.");
-
-                }
-
-            }.start();
+            server.runDestroy();
 
         }
 

@@ -60,12 +60,6 @@ public class LoadBalancerServer extends AbstractServer {
         super(args);
         
     }
-    
-//    public DataServer(String[] args, LifeCycle lifeCycle) {
-//        
-//        super( args, lifeCycle );
-//        
-//    }
 
     /**
      * Starts a new {@link LoadBalancerServer}. This can be done
@@ -295,21 +289,7 @@ public class LoadBalancerServer extends AbstractServer {
          */
         public void destroy() throws RemoteException {
 
-            if (INFO)
-                log.info("" + getServiceUUID());
-
-            new Thread() {
-
-                public void run() {
-
-                    server.destroy();
-
-                    if (INFO)
-                        log.info(getServiceUUID() + " - Service stopped.");
-
-                }
-
-            }.start();
+            server.runDestroy();
 
         }
 

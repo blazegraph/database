@@ -68,6 +68,7 @@ import org.apache.zookeeper.data.ACL;
 import com.bigdata.Banner;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.jini.start.BigdataZooDefs;
 import com.bigdata.service.AbstractService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IServiceShutdown;
@@ -880,6 +881,11 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      *       the service should should verify that its ephemeral node is present
      *       and create it if it is not present and re-negotiate the service
      *       failover chain.
+     * 
+     * @todo The logical UUID is for compatibility with the bigdata APIs, which
+     *       expect to refer to a service by a UUID. Lookup by UUID against jini
+     *       will require hashing the physical services by their logical service
+     *       UUID in the client, which is not hard.
      */
     protected void notifyZookeeper(final ZooKeeper zookeeper,
             final UUID serviceUUID) throws KeeperException,
@@ -953,14 +959,16 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
              * means that the total zpath for the physical service is stable and
              * can be re-created on restart of the service.
              */
+            physicalServiceZPath = logicalServiceZPath + "/"
+                    + BigdataZooDefs.PHYSICAL_SERVICE + serviceUUID;
+
             log.warn("will register with zookeeper: zpath="
                     + physicalServiceZPath);
             
-            physicalServiceZPath = zookeeper.create(logicalServiceZPath + "/"
-                    + "physicalService" + serviceUUID, SerializerUtil
+            zookeeper.create(physicalServiceZPath, SerializerUtil
                     .serialize(serviceUUID), acl, CreateMode.EPHEMERAL);
 
-//            if (INFO)
+// if (INFO)
 //                log.info
                 log.warn("registered with zookeeper: zpath="
                         + physicalServiceZPath);
@@ -1197,6 +1205,13 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
         }
         
+        // wake up so that run() will exit. 
+        synchronized(keepAlive) {
+            
+            keepAlive.notify();
+            
+        }
+        
     }
     private boolean shuttingDown = false;
 
@@ -1240,6 +1255,9 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                  * cause the ephemeral znode for the service to be removed.
                  */
 
+//                if (INFO)
+//                    log.info("Disconnecting from federation");
+                
                 client.disconnect(true/* immediateShutdown */);
                 
             }
@@ -1318,8 +1336,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
          * Wait until the server is terminated.
          */
         
-        Object keepAlive = new Object();
-        
         synchronized (keepAlive) {
             
             try {
@@ -1343,6 +1359,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         
     }
 
+    private Object keepAlive = new Object();
+    
     /**
      * Runs {@link AbstractServer#shutdownNow()} and terminates all asynchronous
      * processing, including discovery.
@@ -1354,12 +1372,16 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         
         final AbstractServer server;
         
-        public ShutdownThread(AbstractServer server) {
+        public ShutdownThread(final AbstractServer server) {
+            
+            super("shutdownThread");
             
             if (server == null)
                 throw new IllegalArgumentException();
             
             this.server = server;
+            
+            setDaemon(true);
             
         }
         
@@ -1397,11 +1419,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * Concrete subclasses MUST extend this method to destroy their persistent
      * state.
      */
-    public void destroy() {
+    synchronized public void destroy() {
 
-        if (INFO)
-            log.info("");
-        
         shutdownNow();
         
         if (INFO)
@@ -1413,6 +1432,44 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
         }
         
+    }
+
+    /**
+     * Runs {@link #destroy()} and logs start and end events.
+     */
+    public void runDestroy() {
+
+        final Thread t = new Thread("destroyService") {
+
+            public void run() {
+
+                // note: MAY be null.
+                final Remote impl = AbstractServer.this.impl;
+                
+                // note: MAY be null.
+                final ServiceID serviceID = AbstractServer.this.serviceID;
+                
+                // format log message.
+                final String msg = "name="
+                        + serviceName
+                        + (impl == null ? "" : ", class="+impl.getClass())
+                        + (serviceID == null ? "" : ", serviceUUID="
+                                + JiniUtil.serviceID2UUID(serviceID));
+                
+                log.warn("will destroy service: " + msg);
+
+                AbstractServer.this.destroy();
+
+                log.warn("service destroyed: " + msg);
+
+            }
+
+        };
+
+        t.setDaemon(true);
+
+        t.start();
+
     }
     
 //    /**

@@ -184,7 +184,8 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
      * @version $Id$
      * @param <V>
      */
-    protected class JavaServiceStarter<V> extends AbstractServiceStarter<V> {
+    protected class JavaServiceStarter<V extends ProcessHelper> extends
+            AbstractServiceStarter<V> {
 
         /**
          * The class for the service that we are going to start.
@@ -384,12 +385,21 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
 
             } finally {
 
-                if (future != null)
+                if (future != null) {
+
+                    /*
+                     * Note: We MUST cancel the thread monitoring the process
+                     * before we leave this scope or it may cause a spurious
+                     * interrupt of this thread in some other context!
+                     */
+                    
                     future.cancel(true/* mayInterruptIfRunning */);
+                    
+                }
 
             }
 
-            return null;
+            return (V)processHelper;
 
         }
 
@@ -564,7 +574,7 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
         if (java == null) {
 
             java = (String) config.getEntry(Options.NAMESPACE, Options.JAVA,
-                    String.class, null/* defaultValue */);
+                    String.class, "java");
 
         }
 
