@@ -37,7 +37,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.rmi.Remote;
 import java.rmi.server.ExportException;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
@@ -865,14 +864,14 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * @throws KeeperException
      * @throws InterruptedException
      * 
-     * FIXME Since the order of the physical service znodes for a given logical
-     * service is essentially random, a separate election must be maintained for
-     * the logical service in order to choose the failover chain (which service
-     * is the primary, the secondary, etc.)
+     * @todo Since the order of the physical service znodes for a given logical
+     *       service is essentially random, a separate election must be
+     *       maintained for the logical service in order to choose the failover
+     *       chain (which service is the primary, the secondary, etc.)
      * 
-     * FIXME Any failover protocol in which the service can restart MUST provide
-     * for re-synchronization of the service when it restarts with the current
-     * primary / active ensemble.
+     * @todo Any failover protocol in which the service can restart MUST provide
+     *       for re-synchronization of the service when it restarts with the
+     *       current primary / active ensemble.
      * 
      * @todo test failover w/ death and restart of both individual zookeeper
      *       instances and of the zookeeper ensemble. unless there are failover
@@ -883,7 +882,18 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      *       failover chain.
      */
     protected void notifyZookeeper(final ZooKeeper zookeeper,
-            final UUID serviceUUID) throws KeeperException, InterruptedException {
+            final UUID serviceUUID) throws KeeperException,
+            InterruptedException {
+        
+        if (serviceUUID == null)
+            throw new IllegalArgumentException();
+        
+//        if (logicalServiceZPath == null) {
+//
+//            throw new IllegalStateException(
+//                    "Logical service zpath not assigned.");
+//
+//        }
         
         if (zookeeper == null) {
             
@@ -917,16 +927,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             return;
             
         }
-        
-        if (serviceUUID == null)
-            throw new IllegalArgumentException();
-        
-//        if (logicalServiceZPath == null) {
-//
-//            throw new IllegalStateException(
-//                    "Logical service zpath not assigned.");
-//
-//        }
 
         // Note: makes if(physicalServiceZPath!=null) atomic.
         synchronized (logicalServiceZPath) {
@@ -953,12 +953,16 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
              * means that the total zpath for the physical service is stable and
              * can be re-created on restart of the service.
              */
+            log.warn("will register with zookeeper: zpath="
+                    + physicalServiceZPath);
+            
             physicalServiceZPath = zookeeper.create(logicalServiceZPath + "/"
                     + "physicalService" + serviceUUID, SerializerUtil
                     .serialize(serviceUUID), acl, CreateMode.EPHEMERAL);
 
-            if (INFO)
-                log.info("registered with zookeeper: zpath="
+//            if (INFO)
+//                log.info
+                log.warn("registered with zookeeper: zpath="
                         + physicalServiceZPath);
             
         }

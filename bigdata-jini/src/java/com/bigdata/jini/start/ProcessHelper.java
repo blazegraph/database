@@ -4,6 +4,8 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Queue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -269,7 +271,11 @@ public class ProcessHelper {
 
         };
 
-        thread.setDaemon(false);
+        /*
+         * Note: the service starter can fail to exit properly if this is not a
+         * daemon thread.
+         */
+        thread.setDaemon(true);
 
         thread.start();
 
@@ -313,11 +319,18 @@ public class ProcessHelper {
     /**
      * Interrupts the caller's {@link Thread} if the process dies within the
      * specified timeout.
+     * <p>
+     * This thread can still be running after call() has returned and it can
+     * cause a spurious interrupt. To avoid that you MUST cancel the thread
+     * monitoring for the process death using the returned {@link Future}.
      * 
      * @param timeout
      *            The timeout.
      * @param unit
      *            The timeout unit.
+     * 
+     * @return The {@link Future} for the {@link Thread} awaiting the task
+     *         death.
      * 
      * @todo isRunning() does not appear to be atomic with respect to the
      *       interrupt of the caller. In fact, it seems like you have to use
@@ -325,11 +338,14 @@ public class ProcessHelper {
      *       that the process is in fact dead. That is weird. I am even forcing
      *       the wait for the exit value in this method but to no avail.
      */
-    public void interruptWhenProcessDies(final long timeout, final TimeUnit unit) {
+    public Future interruptWhenProcessDies(final long timeout,
+            final TimeUnit unit) {
 
         final long nanos = unit.toNanos(timeout);
 
         final Thread callersThread = Thread.currentThread();
+
+        final Condition done = lock.newCondition();
 
         final Thread t = new Thread() {
 
@@ -366,6 +382,8 @@ public class ProcessHelper {
 
                 } finally {
 
+                    done.signalAll();
+                    
                     lock.unlock();
 
                 }
@@ -377,6 +395,52 @@ public class ProcessHelper {
         t.setDaemon(true);
 
         t.start();
+        
+        return new Future() {
+
+            private volatile boolean cancelled = false;
+            
+            public boolean cancel(boolean mayInterruptIfRunning) {
+                if (t.isAlive() && mayInterruptIfRunning) {
+                    t.interrupt();
+                    return true;
+                }
+                cancelled = true;
+                return false;
+            }
+
+            public Object get() throws InterruptedException, ExecutionException {
+                try {
+                    return get(Long.MAX_VALUE, TimeUnit.SECONDS);
+                } catch (TimeoutException e) {
+                    // TimeoutException should not be thrown.
+                    throw new AssertionError();
+                }
+            }
+
+            public Object get(long timeout, TimeUnit unit)
+                    throws InterruptedException, ExecutionException,
+                    TimeoutException {
+                lock.lock();
+                try {
+                    if (t.isAlive()) {
+                        done.await(timeout, unit);
+                    }
+                } finally {
+                    lock.unlock();
+                }
+                return null;
+            }
+
+            public boolean isCancelled() {
+                return cancelled;
+            }
+
+            public boolean isDone() {
+                return !t.isAlive();
+            }
+            
+        };
 
     }
 

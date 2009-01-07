@@ -1,26 +1,26 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+ Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
-Contact:
-     SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+ Contact:
+ SYSTAP, LLC
+ 4501 Tower Road
+ Greensboro, NC 27410
+ licenses@bigdata.com
 
-This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; version 2 of the License.
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; version 2 of the License.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*/
+ You should have received a copy of the GNU General Public License
+ along with this program; if not, write to the Free Software
+ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
 /*
  * Created on Jan 4, 2009
  */
@@ -34,6 +34,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -45,7 +46,7 @@ import org.apache.zookeeper.data.ACL;
 import com.bigdata.service.jini.JiniFederation;
 
 /**
- * A service that is implemented in java and started directly using java.  The
+ * A service that is implemented in java and started directly using java. The
  * value of the "jvmargs" property in the <code>com.bigdata.jini.start</code>
  * component will be combined with the "args" property for the specific service.
  * 
@@ -76,7 +77,7 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
          * property.
          */
         String JAVA = "java";
-        
+
         /**
          * Command line arguments represented as a {@link String}[] that will
          * be interpreted as arguments to the JVM when starting a new service
@@ -106,35 +107,35 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
         String LOG4J = "log4j";
 
     }
-    
+
     /**
      * The java executable.
      * 
      * @see Options#JAVA
      */
     public final String java;
-    
+
     /**
      * Default JVM command line arguments.
      * 
      * @see Options#DEFAULT_JAVA_ARGS
      */
     public final String[] defaultJavaArgs;
-    
+
     /**
      * The log4j URI (if specified and otherwise <code>null</code>).
      * 
      * @see Options#LOG4J
      */
     public final String log4j;
-    
+
     /**
      * Optional classpath override and otherwise <code>null</code>.
      * 
      * @see Options#CLASSPATH
      */
     public final String[] classpath;
-    
+
     protected void toString(StringBuilder sb) {
 
         super.toString(sb);
@@ -147,9 +148,9 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
         sb.append(", " + Options.LOG4J + "=" + log4j);
 
         sb.append(", " + Options.CLASSPATH + "=" + Arrays.toString(classpath));
-           
+
     }
-    
+
     /**
      * @param cls
      * @param config
@@ -167,15 +168,15 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
         this.log4j = getLog4j(cls.getName(), config);
 
         this.classpath = getClasspath(cls.getName(), config);
-        
+
     }
 
-//    public AbstractServiceStarter newServiceStarter(
-//            ServicesManager servicesManager, String zpath) throws Exception {
-//
-//        return new JavaServiceStarter(servicesManager, zpath);
-//        
-//    }
+    // public AbstractServiceStarter newServiceStarter(
+    // ServicesManager servicesManager, String zpath) throws Exception {
+    //
+    // return new JavaServiceStarter(servicesManager, zpath);
+    //        
+    // }
 
     /**
      * 
@@ -197,14 +198,14 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
         protected final String logicalServiceZNode;
 
         /**
-         * A unique token assigned to the service.  This is used to recognize
-         * the service when it joins with a jini registrar, which is how we
-         * know that the service has started successfully and how we learn
-         * the physicalServiceZPath which is only available once it is created
-         * by the service instance.
+         * A unique token assigned to the service. This is used to recognize the
+         * service when it joins with a jini registrar, which is how we know
+         * that the service has started successfully and how we learn the
+         * physicalServiceZPath which is only available once it is created by
+         * the service instance.
          */
         protected final UUID serviceToken;
-        
+
         /**
          * The canonical service name. This is formed in much the same manner as
          * the {@link #serviceDir} using the service type, the
@@ -214,7 +215,7 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
          * service by its type and logical instance.
          */
         protected final String serviceName;
-        
+
         /**
          * The service instance directory. This is where we put any
          * configuration files and should be the default location for the
@@ -250,22 +251,22 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
             }
 
             // just the child name for the logical service.
-            logicalServiceZNode = logicalServiceZPath.substring(logicalServiceZPath
-                    .lastIndexOf('/') + 1);
+            logicalServiceZNode = logicalServiceZPath
+                    .substring(logicalServiceZPath.lastIndexOf('/') + 1);
 
             // unique token used to recognize the service when it starts.
             serviceToken = UUID.randomUUID();
 
-            // The canonical service name. 
+            // The canonical service name.
             serviceName = cls.getSimpleName() + "/" + logicalServiceZNode + "/"
                     + serviceToken;
-            
+
             // The actual service directory (choosen at runtime).
             serviceDir = new File(new File(new File(
                     JavaServiceConfiguration.this.serviceDir, cls
                             .getSimpleName()), logicalServiceZNode),
                     serviceToken.toString());
-            
+
         }
 
         /**
@@ -282,7 +283,7 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
 
             if (INFO)
                 log.info("config: " + JavaServiceConfiguration.this);
-            
+
             if (zookeeper.exists(logicalServiceZPath, false/* watch */) == null) {
 
                 throw new IllegalStateException(
@@ -301,18 +302,66 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
 
             // allow override of the environment for the child.
             setUpEnvironment(processBuilder.environment());
-            
+
             // specify the startup directory?
             // processBuilder.directory(dataDir);
 
             // start the process.
             final ProcessHelper processHelper = new ProcessHelper(className,
                     processBuilder, listener);
-            
+
+            /*
+             * Note: If the services is not started after a timeout then we kill
+             * the process. The semantics of "started" is provided by the
+             * awaitServiceStart() method and can be overriden depending on the
+             * service type.
+             */
+            Future future = null;
             try {
-            
+
+                /*
+                 * Set a thread that will interrupt the [currentThread] if it
+                 * notices that the process has died.
+                 * 
+                 * Note: This provides an upper bound on how long we will wait
+                 * to decide that the service has started.
+                 * 
+                 * @todo config timeout
+                 */
+                final long timeout = 60L;
+                final TimeUnit unit = TimeUnit.SECONDS;
+                future = processHelper.interruptWhenProcessDies(timeout, unit);
+
                 // attempt to detect a service start failure.
-                awaitServiceStart(processHelper);
+                awaitServiceStart(processHelper, timeout, unit);
+
+            } catch (InterruptedException ex) {
+
+                /*
+                 * If we were interrupted because the process is dead then add
+                 * that information to the exception.
+                 */
+                try {
+
+                    /*
+                     * @todo a little wait here appears to be necessary
+                     * indicating that there is some problem with
+                     * ProcessHelper#interruptWhenProcessDies().
+                     */
+                    final int exitValue = processHelper.exitValue(10,
+                            TimeUnit.MILLISECONDS);
+
+                    throw new IOException("Process is dead: exitValue="
+                            + exitValue);
+
+                } catch (TimeoutException ex2) {
+
+                    // ignore.
+
+                }
+
+                // otherwise just rethrow the exception.
+                throw ex;
 
             } catch (Throwable t) {
 
@@ -320,7 +369,7 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
                  * The service did not start normally. kill the process and log
                  * an error.
                  */
-                
+
                 try {
 
                     log.error("Startup problem: " + className, t);
@@ -333,31 +382,37 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
 
                 }
 
+            } finally {
+
+                if (future != null)
+                    future.cancel(true/* mayInterruptIfRunning */);
+
             }
-            
+
             return null;
-            
+
         }
 
         /**
          * Hook for modification of the child environment.
          * 
-         * @param env A map.  Modifications to the map will be written into
-         * the child environment.
+         * @param env
+         *            A map. Modifications to the map will be written into the
+         *            child environment.
          * 
          * @see ProcessBuilder#environment()
          */
         protected void setUpEnvironment(Map<String, String> env) {
-            
+
             if (classpath == null) {
-             
+
                 // pass on our classpath to the child.
                 env.put("CLASSPATH", System.getProperty("java.class.path"));
-                
+
             }
-            
+
         }
-        
+
         /**
          * Waits a bit to see if the process returns an exit code. If an exit is
          * NOT available after a timeout, then assumes that the process started
@@ -365,7 +420,7 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
          * <p>
          * Note: <strong>This DOES NOT provide direct confirmation that the
          * service is running in a non-error and available for answering
-         * requests.</strong> You may override this method if you have a
+         * requests.</strong> You SHOULD override this method if you have a
          * service specific means of obtaining such confirmation.
          * 
          * @throws Exception
@@ -373,20 +428,19 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
          *             will kill the process and log an error if any exception
          *             is thrown).
          */
-        protected void awaitServiceStart(final ProcessHelper processHelper)
-                throws Exception {
-            
+        protected void awaitServiceStart(final ProcessHelper processHelper,
+                final long timeout, final TimeUnit unit) throws Exception {
+
             try {
 
-                final int exitValue = processHelper.exitValue(1000,
-                        TimeUnit.MILLISECONDS);
+                final int exitValue = processHelper.exitValue(timeout, unit);
 
                 throw new IOException("exitValue=" + exitValue);
 
             } catch (TimeoutException ex) {
 
                 /*
-                 * Note: Assumes the service started normally! 
+                 * Note: Assumes the service started normally!
                  */
 
                 log.warn("Started service: " + className);
@@ -394,14 +448,14 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
                 return;
 
             }
-            
+
         }
-        
+
         /**
          * Generate the command line that will be used to start the service.
          */
         protected List<String> getCommandLine() {
-            
+
             final List<String> cmds = new LinkedList<String>();
 
             cmds.add(java != null ? java : "java");
@@ -483,7 +537,7 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
             }
 
         }
-        
+
         /**
          * Hook for extending the pre-start setup for the service.
          * <p>
@@ -504,9 +558,8 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
     public static String getJava(final String className,
             final Configuration config) throws ConfigurationException {
 
-        String java = (String) config
-                .getEntry(className, Options.JAVA,
-                        String.class, null/* defaultValue */);
+        String java = (String) config.getEntry(className, Options.JAVA,
+                String.class, null/* defaultValue */);
 
         if (java == null) {
 
@@ -537,9 +590,8 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
     public static String getLog4j(final String className,
             final Configuration config) throws ConfigurationException {
 
-        String log4j = (String) config
-                .getEntry(className, Options.LOG4J,
-                        String.class, null/* defaultValue */);
+        String log4j = (String) config.getEntry(className, Options.LOG4J,
+                String.class, null/* defaultValue */);
 
         if (log4j == null) {
 
@@ -572,7 +624,7 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
             throws ConfigurationException {
 
         return getStringArray(Options.CLASSPATH, className, config, null/* defaultValue */);
-    
+
     }
 
 }

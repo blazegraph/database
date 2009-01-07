@@ -268,7 +268,7 @@ public class TestServiceStarter extends TestCase2 {
          */
         try {
 
-            watcher.awaitRemove(5000, TimeUnit.MILLISECONDS);
+            watcher.awaitRemove(10000, TimeUnit.MILLISECONDS);
 
         } catch (TimeoutException ex) {
 

@@ -58,10 +58,12 @@ import net.jini.lookup.entry.Comment;
 import net.jini.lookup.entry.Name;
 
 import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
 
 import sun.security.jca.ServiceId;
 
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.jini.JiniUtil;
 import com.bigdata.zookeeper.ZookeeperClientConfig;
 
 /**
@@ -635,31 +637,61 @@ abstract public class AbstractJiniServiceConfiguration extends
         }
         
         /**
-         * Overriden to monitor for the join of the service. If the services
-         * DOES NOT join after a timeout then we kill the process. We recognize
-         * the service by the present of the assigned {@link ServiceToken}
-         * attribute. If a service with that {@link ServiceToken} attribute can
-         * not be discovered by jini after a timeout, then we presume that the
-         * service could not start and throw an exception.
+         * Overriden to monitor for the jini join of the service and the
+         * creation of the znode corresponding to the physical service instance.
          * 
-         * @todo Also monitor for the create of the physicalServiceZNode, which
-         *       should include the serviceUUID and perhaps the serviceToken?
+         * @todo we could also verify the service using its proxy, e.g., by
+         *       testing for a normal run state.
          */
-        protected void awaitServiceStart(final ProcessHelper processHelper)
-                throws Exception {
-           
-            // @todo config timeout. 60s?
-            final long timeout = TimeUnit.SECONDS.toNanos(60L);
+        protected void awaitServiceStart(final ProcessHelper processHelper,
+                final long timeout, final TimeUnit unit) throws Exception,
+                TimeoutException, InterruptedException {
+
+            final long begin = System.nanoTime();
+            
+            long nanos = unit.toNanos(timeout);
+            
+            // wait for the service to be discovered
+            final ServiceItem serviceItem = awaitServiceDiscoveryOrDeath(
+                    processHelper, nanos, TimeUnit.NANOSECONDS);
+
+            // subtract out the time we already waited.
+            nanos -= (System.nanoTime() - begin);
+
+            // wait for the ephemeral znode for the service to be created
+            awaitZNodeCreatedOrDeath(serviceItem, processHelper,
+                    nanos, TimeUnit.NANOSECONDS);
+
+        }
+
+        /**
+         * Waits up to timeout units for the service to either by discovered by
+         * jini or to die.
+         * <p>
+         * Note: We recognize the service by the present of the assigned
+         * {@link ServiceToken} attribute. If a service with that
+         * {@link ServiceToken} can not be discovered by jini after a timeout,
+         * then we presume that the service could not start and throw an
+         * exception. The {@link ServiceToken} provides an attribute which is
+         * assigned by the service starter while the {@link ServiceId} is
+         * assigned by jini only after the service has joined with a jini
+         * registrar.
+         * 
+         * @param processHelper
+         * @param timeout
+         * @param unit
+         * @return The {@link ServiceItem} for the discovered service.
+         * @throws Exception
+         */
+        protected ServiceItem awaitServiceDiscoveryOrDeath(
+                final ProcessHelper processHelper, long timeout,
+                final TimeUnit unit) throws Exception, TimeoutException,
+                InterruptedException {
+            
+            // convert to ms for jini lookup() waitDur.
+            timeout = unit.toMillis(timeout);
             
             final long begin = System.currentTimeMillis();
-            
-            /*
-             * Set a thread that will interrupt the service discovery if it
-             * notices that the process has died. This keeps us from waiting up
-             * to the timeout for a process which does not start normally.
-             */
-            processHelper.interruptWhenProcessDies(timeout,
-                    TimeUnit.NANOSECONDS);
             
             ServiceDiscoveryManager serviceDiscoveryManager = null;
             try {
@@ -705,35 +737,37 @@ abstract public class AbstractJiniServiceConfiguration extends
                             + ", name=" + processHelper.name + ", item="
                             + items[0]);
 
-            } catch(InterruptedException ex) {
+                return items[0];
                 
-//                if (!processHelper.isRunning()) {
-//                 
+//            } catch(InterruptedException ex) {
+//                
+////                if (!processHelper.isRunning()) {
+////                 
+////                    throw new IOException("Process is dead: exitValue="
+////                            + processHelper.exitValue());
+////                    
+////                }
+//                
+//                /*
+//                 * If we were interrupted because the process is dead then
+//                 * add that information to the exception.
+//                 */
+//                try {
+//                
+//                    final int exitValue = processHelper.exitValue(10,
+//                            TimeUnit.MILLISECONDS);
+//                    
 //                    throw new IOException("Process is dead: exitValue="
-//                            + processHelper.exitValue());
+//                            + exitValue);
+//                
+//                } catch(TimeoutException ex2) {
+//                    
+//                    // ignore.
 //                    
 //                }
-                
-                /*
-                 * If we were interrupted because the process is dead then
-                 * add that information to the exception.
-                 */
-                try {
-                
-                    final int exitValue = processHelper.exitValue(10,
-                            TimeUnit.MILLISECONDS);
-                    
-                    throw new IOException("Process is dead: exitValue="
-                            + exitValue);
-                
-                } catch(TimeoutException ex2) {
-                    
-                    // ignore.
-                    
-                }
-                
-                // otherwise just rethrow the exception.
-                throw ex;
+//                
+//                // otherwise just rethrow the exception.
+//                throw ex;
                 
             } finally {
 
@@ -747,6 +781,52 @@ abstract public class AbstractJiniServiceConfiguration extends
 
         }
         
+        /**
+         * Waits up to timeout units for the znode for the phsyical service to
+         * be created or the process to die.
+         * 
+         * @param processHelper
+         * @param timeout
+         * @param unit
+         * 
+         * @throws TimeoutException
+         * @throws InterruptedException
+         * @throws KeeperException
+         */
+        public void awaitZNodeCreatedOrDeath(final ServiceItem serviceItem,
+                final ProcessHelper processHelper, final long timeout,
+                final TimeUnit unit) throws KeeperException,
+                InterruptedException, TimeoutException {
+
+            // convert to a standard UUID.
+            final UUID serviceUUID = JiniUtil.serviceID2UUID(serviceItem.serviceID);
+            
+            // this is the zpath that the service will create.
+            final String physicalServiceZPath = logicalServiceZPath
+                    + "/physicalService" + serviceUUID; 
+            
+            final ZNodeCreatedWatcher watcher = new ZNodeCreatedWatcher(
+                    zookeeper);
+
+            if (zookeeper.exists(physicalServiceZPath, watcher) == null) {
+
+                if (INFO)
+                    log.info("Waiting on znode create: zpath="
+                            + physicalServiceZPath);
+
+                // Note: throws TimeoutException if watched znode not created.
+                watcher.awaitInsert(timeout, unit);
+
+            }
+
+            if (INFO)
+                log.info("znode exists: zpath=" + physicalServiceZPath);
+
+            // success.
+            return;
+            
+        }
+
     }
 
     public static Entry[] getEntries(String className, Configuration config)
