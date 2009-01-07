@@ -352,11 +352,17 @@ public class TypeperfCollector extends AbstractProcessCollector {
                 
             } catch (IOException ex) {
 
+                /*
+                 * Note: An IOException thrown out here often indicates an
+                 * asynchronous close of of the reader. A common and benign
+                 * cause of that is closing the input stream because the service
+                 * is shutting down.
+                 */
+                
                 if (!Thread.currentThread().isInterrupted())
                     throw ex;
                 
-                if(INFO)
-                    log.info("Interrupted - done.");
+                throw new InterruptedException();
                 
             }
 
