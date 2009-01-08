@@ -36,12 +36,16 @@ import org.apache.zookeeper.data.ACL;
  * normally accomplished by naming the lock node for a resource with a well
  * known identity.
  * <p>
- * This class only watches the previous child in the queue (if any). If the lock
- * node is destroyed, then the watcher will throw an exception back to the
- * caller rather than returning normally. However, destroying the lock node will
- * not cause the lock to be persistently destroyed if the conditions still exist
- * under which processes will contend for that lock as processes will simply
- * re-create the lock node and re-populate the queue.
+ * This class only watches the previous child in the queue (if any). Zookeeper
+ * does not permit you to delete the parent without deleting the children, so
+ * you will always the queue purged of children before the lock node itself is
+ * deleted. If the child deleted from the queue, the next child in the queue
+ * will be granted the lock.
+ * <p>
+ * Destroying the lock node will not cause the lock to be persistently destroyed
+ * if the conditions still exist under which processes will contend for that
+ * lock as some process will simply re-create the lock node and the queue will
+ * become re-populated over time.
  * <p>
  * While a queue may seem excessive for one time operations, it provides
  * failover if the process holding the lock dies.
@@ -76,9 +80,11 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
      * queue. This is the only znode that we actually watch. When we are in the
      * first position in the queue we don't watch anything.
      * 
-     * @todo could watch self when in the first position in the queue to allow
-     *       the process to be responsive if the its lock was cancelled by
-     *       deleting its znode from the head of the queue.
+     * @todo Could watch self when in the first position in the queue to allow
+     *       the process to notice if the its lock was cancelled by deleting its
+     *       znode from the head of the queue. However, we would need a means to
+     *       interrupt that process. E.g., by noting the Thread that invoked
+     *       lock() and interrupting it.
      */
     private volatile String priorChildZNode = null;
     
@@ -240,13 +246,19 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
      * 
      * @param zookeeper
      * @param zpath
-     * @param acl
      * 
      * @return
      * 
      * @throws KeeperException
      * @throws InterruptedException
      */
+    public static ZLock getLock(final ZooKeeper zookeeper, final String zpath)
+    throws KeeperException, InterruptedException {
+
+        return getLock(zookeeper, zpath, Ids.OPEN_ACL_UNSAFE);
+        
+    }
+    
     public static ZLock getLock(final ZooKeeper zookeeper, final String zpath,
             final List<ACL> acl) throws KeeperException, InterruptedException {
 
@@ -255,7 +267,7 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
             /*
              * Ensure that the lock node exists.
              */
-
+            
             zookeeper.create(zpath, new byte[0], acl, CreateMode.PERSISTENT);
 
         } catch (NodeExistsException ex) {
@@ -300,6 +312,17 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
          * It is used by {@link #unlock()} to release the lock.
          */
         private volatile ZNodeLockWatcher watcher = null;
+        
+        /**
+         * Non-blocking representation of lock state (does not tell you if the
+         * lock is held).
+         */
+        public String toString() {
+            
+            return "ZLock{zpath=" + zpath + ", watcher=" + (watcher != null)
+                    + "}";
+            
+        }
         
         /**
          * The zpath of the lock node.
@@ -494,6 +517,10 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
 
         }
 
+        /**
+         * Note: In the case where the lock was stolen by deleting the zchild
+         * node this method logs a warning but does not throw an exception.
+         */
         public void unlock() throws KeeperException, InterruptedException {
 
             lock.lock();
@@ -518,10 +545,25 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
                     final String zchild = watcher.zchild;
 
                     // delete the child (releases the lock).
-                    zookeeper.delete(zpath + "/" + zchild, -1/* version */);
+                    try {
 
-                    if (INFO)
-                        log.info("released lock: "+watcher);
+                        zookeeper
+                                .delete(zpath + "/" + zchild, -1/* version */);
+                        
+                        if (INFO)
+                            log.info("released lock: "+watcher);
+
+                    } catch (NoNodeException ex) {
+                        
+                        /*
+                         * Someone has stomped on the child, so the process does
+                         * not hold the lock anymore.
+                         */
+                        
+                        log.warn("child already deleted: zpath=" + zpath
+                                + ", child=" + zchild);
+                        
+                    }
 
                 }
                 
@@ -533,6 +575,74 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
                 
             }
 
+        }
+
+        /**
+         * Deletes all children in the queue in reverse lexical order so as to
+         * not trigger cascades of watchers and finally deletes the lock node
+         * itself.
+         * 
+         * @todo write unit tests for this.
+         * 
+         * @todo This can fail under heavy writes on the queue for at least two
+         *       reasons:
+         *       <p>
+         *       1) since zookeeper does not have transactions, it is possible
+         *       for other processes to add znodes under the lock faster than we
+         *       can delete them (you have to delete the children before you can
+         *       delete the parent).
+         *       <p>
+         *       2) there is a gap (not covered by a tx) between the moment when
+         *       we delete the last child and the moment when we delete the
+         *       parent. it is possible for a new child to be added, in which
+         *       case we can't delete the parent.
+         *       <p>
+         *       One way to deal with some of this is to add an "invalid"
+         *       semaphore. Once that exists no new locks are permitted.
+         * 
+         * @todo verify {@link #unlock()} succeeds after {@link #destroyLock()}
+         * 
+         * @todo consider allowing even if you do not hold the lock.
+         */
+        public void destroyLock() throws KeeperException, InterruptedException {
+
+            lock.lock();
+            
+            try {
+
+                if (!isLockHeld())
+                    throw new IllegalStateException("Lock not held.");
+                
+                List<String> children;
+                
+                // until only the owner is left.
+                while ((children = zookeeper.getChildren(zpath, false)).size() > 1) {
+
+                    // @todo method for this idiom.
+                    final String[] a = children.toArray(new String[] {});
+                    
+                    // sort
+                    Arrays.sort(a);
+
+                    // process in reverse order to avoid cascades of watchers.
+                    for (int i = a.length - 1; i >= 0; i--) {
+
+                        final String child = a[i];
+
+                        zookeeper.delete(zpath + "/" + child, -1/* version */);
+                        
+                    }
+                    
+                }
+
+                zookeeper.delete(zpath, -1/* version */);
+                
+            } finally {
+             
+                lock.unlock();
+                
+            }
+            
         }
 
     }

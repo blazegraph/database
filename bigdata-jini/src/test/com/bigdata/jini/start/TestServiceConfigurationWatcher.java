@@ -27,6 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.jini.start;
 
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
 import net.jini.config.ConfigurationException;
 
 import org.apache.zookeeper.CreateMode;
@@ -35,7 +40,6 @@ import org.apache.zookeeper.ZooKeeper;
 
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.service.jini.TransactionServer;
-import com.bigdata.zookeeper.AbstractZNodeConditionWatcher;
 
 /**
  * Test suite for managing state changes for a {@link ServiceConfiguration}
@@ -63,6 +67,8 @@ public class TestServiceConfigurationWatcher extends AbstractFedZooTestCase {
      * @throws InterruptedException
      * @throws KeeperException
      * @throws ConfigurationException
+     * @throws ExecutionException 
+     * @throws TimeoutException 
      * 
      * @todo Unit test where the appropriate watchers are established and we
      *       then create the service configuration znode and let the watchers
@@ -76,15 +82,10 @@ public class TestServiceConfigurationWatcher extends AbstractFedZooTestCase {
      *       should be true as the znode is created using the assigned service
      *       UUID rather than SEQUENTIAL so that it can be a restart safe
      *       zpath).
-     * 
-     * FIXME use {@link AbstractZNodeConditionWatcher} pattern for
-     * {@link ServiceConfigurationWatcher}.
      */
     public void test_logicalServiceWatcher() throws KeeperException,
-            InterruptedException, ConfigurationException {
-
-//        // create a unique fake zroot
-//        final String zroot = createTestZRoot();
+            InterruptedException, ConfigurationException, ExecutionException,
+            TimeoutException {
 
         // the config for that fake zroot.
         final String zconfig = fed.getZooConfig().zroot + BigdataZooDefs.ZSLASH
@@ -92,20 +93,28 @@ public class TestServiceConfigurationWatcher extends AbstractFedZooTestCase {
 
         final ZooKeeper zookeeper = fed.getZookeeper();
 
-        final TransactionServiceConfiguration serviceConfig = new TransactionServiceConfiguration(
-                config);
+        final int numBefore = listener.running.size();
         
         // zpath for the service configuration znode.
         final String serviceConfigurationZPath = zconfig
                 + BigdataZooDefs.ZSLASH
-                + TransactionServer.class.getSimpleName();
+                + TransactionServer.class.getName();
         
-        // create the watcher.
-        final ServiceConfigurationWatcher watcher = new ServiceConfigurationWatcher(
-                fed, listener, serviceConfigurationZPath);
+        // create monitor task that will compete for locks and start procsses.
+        MonitorCreatePhysicalServiceLocks task1 = new MonitorCreatePhysicalServiceLocks(
+                fed, listener);
 
-        // set watcher on that znode : @todo clear watcher when node is destroyed?
-        zookeeper.exists(serviceConfigurationZPath, watcher);
+        final Future f1 = fed.getExecutorService().submit(task1);
+
+        assertFalse(f1.isDone());
+        
+        // create monitor task for new service config nodes.
+        ServiceConfigurationZNodeMonitorTask task = new ServiceConfigurationZNodeMonitorTask(
+                fed, listener, TransactionServer.class.getName());
+
+        final Future f = fed.getExecutorService().submit(task);
+        
+        assertFalse(f.isDone());
         
         /*
          * Create znode for the ServiceConfiguration.
@@ -113,13 +122,44 @@ public class TestServiceConfigurationWatcher extends AbstractFedZooTestCase {
          * Note: This should trigger the watcher. In turn, then watcher should
          * create an instance of the service on our behalf.
          */
+        log.info("Creating zpath: " + serviceConfigurationZPath);
         zookeeper.create(serviceConfigurationZPath, SerializerUtil
-                .serialize(serviceConfig), acl, CreateMode.PERSISTENT);
+                .serialize(new TransactionServiceConfiguration(config)), acl,
+                CreateMode.PERSISTENT);
+        log.info("Created zpath: " + serviceConfigurationZPath);
 
+        /*
+         * Run the task for a few seconds and then cancel it (it should still be
+         * running).
+         * 
+         * This give the task the chance to notice the ServiceConfiguration
+         * znode (we just created it) and to execute the task that creates the
+         * new logical service.
+         */
+        try {
+            f.get(2L, TimeUnit.SECONDS);
+            fail("Not expecting task to quit by itself.");
+        } catch(TimeoutException ex) {
+            log.info("Ignoring expected exception: "+ex);
+        }
+        
+        /*
+         * Verify that a logicalService znode was created for that configuration
+         * znode.
+         */
+        
+        log.info("logicalServices: "
+                + zookeeper.getChildren(serviceConfigurationZPath, false));
+        
+        assertEquals(1, zookeeper.getChildren(serviceConfigurationZPath, false)
+                .size());
+        
         /*
          * FIXME verify service is created, query service, shutdown service and
          * then verify service restart re-creates the same ephemeral node.
          */
+        Thread.sleep(5000/*ms*/);
+        assertEquals(numBefore + 1, listener.running.size());
         
     }
 

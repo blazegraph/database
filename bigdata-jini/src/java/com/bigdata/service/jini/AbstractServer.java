@@ -210,7 +210,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * The {@link Configuration} read based on the args[] provided when the
      * server is started.
      */
-    private Configuration config;
+    protected Configuration config;
 
     /**
      * A configured name for the service -or- <code>null</code> if no
@@ -317,7 +317,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * <code>java.rmi.server.codebase</code> property specified for the VM
      * running the service.
      */
-    protected void setSecurityManager() {
+    final protected void setSecurityManager() {
 
         final SecurityManager sm = System.getSecurityManager();
         
@@ -1049,11 +1049,13 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * <p>
      * Note: All errors are trapped, logged, and ignored.
      * <p>
-     * Note: Subclasses SHOULD extend this method to terminate any additional
-     * processing and release any additional resources, taking care to (a)
-     * declare the method as <strong>synchronized</strong>, conditionally halt
-     * any asynchonrous processing not already halted, conditionally release any
-     * resources not already released, and trap, log, and ignored all errors.
+     * Note: Normally, extended shutdown behavior is handled by the service
+     * implementation, not the server. However, subclasses MAY extend this
+     * method to terminate any additional processing and release any additional
+     * resources, taking care to (a) declare the method as <strong>synchronized</strong>,
+     * conditionally halt any asynchonrous processing not already halted,
+     * conditionally release any resources not already released, and trap, log,
+     * and ignored all errors.
      * <p>
      * Note: This is run from within the {@link ShutdownThread} in response to a
      * request to destroy the service.

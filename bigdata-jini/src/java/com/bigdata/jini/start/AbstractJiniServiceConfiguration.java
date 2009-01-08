@@ -95,7 +95,7 @@ abstract public class AbstractJiniServiceConfiguration extends
          * might break :-).
          * 
          * @todo this will have to be handled specially for the
-         *       {@link ServicesManager} instances.
+         *       {@link ServicesManagerServer} instances.
          */
         String ENTRIES = "entries";
 

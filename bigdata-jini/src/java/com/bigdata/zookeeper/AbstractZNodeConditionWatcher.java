@@ -334,7 +334,7 @@ abstract public class AbstractZNodeConditionWatcher implements Watcher {
      * @throws TimeoutException
      * @throws InterruptedException
      */
-    protected boolean awaitCondition(final long timeout, final TimeUnit unit)
+    public boolean awaitCondition(final long timeout, final TimeUnit unit)
             throws InterruptedException {
 
         synchronized (this) {
@@ -360,7 +360,7 @@ abstract public class AbstractZNodeConditionWatcher implements Watcher {
                  * 
                  * Note: by falling through we handle the case where the client
                  * was not connected to a server when the caller made their
-                 * request.
+                 * request or where a node does not yet exist, etc.
                  */
                 
             }

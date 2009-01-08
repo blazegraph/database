@@ -5,6 +5,7 @@ import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
 
@@ -85,7 +86,7 @@ abstract public class ServiceConfiguration implements Serializable {
 
         /**
          * The #of logical instances of the services type that should be
-         * maintained. The {@link ServicesManager} will attempt to maintain this
+         * maintained. The {@link ServicesManagerServer} will attempt to maintain this
          * many instances of the logical service.
          */
         String SERVICE_COUNT = "serviceCount";
@@ -321,7 +322,19 @@ abstract public class ServiceConfiguration implements Serializable {
     abstract public AbstractServiceStarter newServiceStarter(
             JiniFederation fed, IServiceListener listener,
             String logicalServiceZPath) throws Exception;
-    
+
+    /**
+     * Return a task that will correct any imbalance between the
+     * {@link ServiceConfiguration} and the #of logical services.
+     */
+    public ManageLogicalServiceTask newLogicalServiceTask(JiniFederation fed,
+            IServiceListener listener, String configZPath, List<String> children) {
+
+        return new ManageLogicalServiceTask<ServiceConfiguration>(fed,
+                listener, configZPath, children, this);
+
+    }
+
     /**
      * A runnable object that will start an instance of a service described by
      * its {@link ServiceConfiguration}.

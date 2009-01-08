@@ -68,8 +68,6 @@ public class TestZNodeLockWatcher extends AbstractZooTestCase {
      * 
      * @todo test w/ timeout.
      * 
-     * FIXME test when we cancel a lock by deleting the zchild. 
-     * 
      * @throws KeeperException
      * @throws InterruptedException
      */
@@ -181,8 +179,11 @@ public class TestZNodeLockWatcher extends AbstractZooTestCase {
     }
 
     /**
-     * Unit test explores behavior when someone stomps on the lock node while a
-     * lock is held and another lock is in the queue.
+     * Unit test explores behavior when someone stomps on the zchild while a
+     * lock is held and another lock is in the queue (note that you can not
+     * delete the parent without deleting the children in zookeeper, so you will
+     * always see a queue purged of children before the queue node itself is
+     * deleted).
      * 
      * @throws InterruptedException
      * @throws KeeperException
@@ -279,6 +280,9 @@ public class TestZNodeLockWatcher extends AbstractZooTestCase {
         assertTrue(!lock1.isLockHeld());
 
         assertTrue(lock2.isLockHeld());
+
+        // 
+        lock1.unlock();
         
     }
     

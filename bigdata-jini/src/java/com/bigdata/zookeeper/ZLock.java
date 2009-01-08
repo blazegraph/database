@@ -6,7 +6,7 @@ import java.util.concurrent.TimeoutException;
 import org.apache.zookeeper.KeeperException;
 
 /**
- * Interface for distributed synchronous locks using zookeeper.
+ * Distributed synchronous lock.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -50,6 +50,15 @@ public interface ZLock {
      */
     public void unlock() throws KeeperException, InterruptedException;
 
+    /**
+     * Destroys the lock (deletes everyone in the queue and deletes the lock
+     * node).  The caller MUST own the lock.
+     * 
+     * @throws KeeperException
+     * @throws InterruptedException
+     */
+    public void destroyLock() throws KeeperException, InterruptedException;
+    
     /**
      * Return <code>true</code> if the lock is currently held (this verifies
      * that the zchild for the lock is in fact the leader in the queue of

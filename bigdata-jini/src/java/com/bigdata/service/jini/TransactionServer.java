@@ -198,7 +198,7 @@ public class TransactionServer extends AbstractServer {
 
         /*
          * Setup a delegate that let's us customize some of the federation
-         * behaviors on the behalf of the data service.
+         * behaviors on the behalf of the service.
          */
         getClient()
                 .setDelegate(

@@ -2,10 +2,10 @@ package com.bigdata.jini.start;
 
 import java.util.UUID;
 
-import org.apache.zookeeper.CreateMode;
-
 import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceItem;
+
+import org.apache.zookeeper.CreateMode;
 
 import com.bigdata.service.AbstractService;
 import com.bigdata.service.jini.JiniUtil;
@@ -30,6 +30,24 @@ public interface BigdataZooDefs {
      */
     String CONFIG = "config";
 
+    /**
+     * The zname of the child of the zroot where we put all of our lock nodes.
+     */
+    String LOCKS = "locks";
+    
+    /**
+     * Relative path to a child of the zroot that is watched by the
+     * {@link ServicesManagerService}s. Any time a new lock is created under
+     * this znode, running {@link ServicesManagerServer} will contend for that
+     * lock if they can satisify the {@link IServiceConstraint}s for the new
+     * service. The lock node data itself contains the zpath to the
+     * logicalService for which a new physicalService must be created. The
+     * {@link ServiceConfiguration} is fetched from that zpath and gives the
+     * {@link IServiceConstraint}s that must be satisified.
+     */
+    String LOCKS_CREATE_PHYSICAL_SERVICE = LOCKS + ZSLASH
+            + "createPhysicalService";
+    
     /**
      * The prefix for the name of a znode that represents a logical service.
      * This znode is a {@link CreateMode#PERSISTENT_SEQUENTIAL} child of the

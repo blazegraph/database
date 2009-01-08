@@ -110,7 +110,10 @@ public class AbstractFedZooTestCase extends TestCase2 {
 
         final String zconfig = zroot + BigdataZooDefs.ZSLASH
                 + BigdataZooDefs.CONFIG;
-        
+
+        final String zlocks = zroot + BigdataZooDefs.ZSLASH
+                + BigdataZooDefs.LOCKS;
+
         /*
          * Create the zroot and config nodes
          */
@@ -120,11 +123,11 @@ public class AbstractFedZooTestCase extends TestCase2 {
             // make sure /test exists so that we can create its child.
             zookeeper.create("/test", new byte[] {}/* data */, acl,
                     CreateMode.PERSISTENT);
-            
+
         } catch (NodeExistsException ex) {
-            
+
             // ignore.
-            
+
         }
 
         zookeeper.create(zroot, new byte[] {}/* data */, acl,
@@ -133,7 +136,12 @@ public class AbstractFedZooTestCase extends TestCase2 {
         zookeeper.create(zconfig, new byte[] {}/* data */, acl,
                 CreateMode.PERSISTENT);
 
+        zookeeper.create(zlocks, new byte[0], acl, CreateMode.PERSISTENT);
 
+        zookeeper.create(zroot + "/"
+                + BigdataZooDefs.LOCKS_CREATE_PHYSICAL_SERVICE, new byte[0],
+                acl, CreateMode.PERSISTENT);
+        
     }
     
     public void tearDown() throws Exception {
@@ -150,36 +158,8 @@ public class AbstractFedZooTestCase extends TestCase2 {
             fed.shutdownNow();
             
         }
-
-//        helper.destroy();
         
     }
 
-//    /**
-//     * Create a new zroot and a {@link BigdataZooDefs#CONFIG} znode under that
-//     * root that is unique in the /test/fed namespace. This keeps the unit test
-//     * behavior isolated from the behavior of the federation described in the
-//     * config file.
-//     * 
-//     * @return The zpath of the mock federation zroot.
-//     * 
-//     * @throws InterruptedException
-//     * @throws KeeperException
-//     */
-//    protected String createTestZRoot() throws KeeperException,
-//            InterruptedException {
-//
-//        final ZooKeeper zookeeper = fed.getZookeeper();
-//
-//        // Note: uses SEQUENTIAL to make this unique.
-//        final String zroot = zookeeper.create("/test/fed", new byte[0], acl,
-//                CreateMode.PERSISTENT_SEQUENTIAL);
-//
-//        zookeeper.create(zroot + "/config", new byte[0], acl,
-//                CreateMode.PERSISTENT);
-//
-//        return zroot;
-//        
-//    }
 
 }

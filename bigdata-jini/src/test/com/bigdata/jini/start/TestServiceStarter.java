@@ -103,7 +103,7 @@ public class TestServiceStarter extends AbstractFedZooTestCase {
         final String zserviceConfig = zookeeper.create(fed.getZooConfig().zroot
                 + BigdataZooDefs.ZSLASH + BigdataZooDefs.CONFIG
                 + BigdataZooDefs.ZSLASH
-                + TransactionServer.class.getSimpleName(), SerializerUtil
+                + TransactionServer.class.getName(), SerializerUtil
                 .serialize(serviceConfig), acl, CreateMode.PERSISTENT);
 
         /*
