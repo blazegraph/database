@@ -185,6 +185,9 @@ abstract public class AbstractZooQueue<E extends Serializable> extends
 
             }
 
+            if(true) // FIXME Must sort the elements!
+                throw new UnsupportedOperationException();
+            
             // first element (lex order is also sorted for sequential ids).
             final String selected = zroot + "/" + list.get(0);
             

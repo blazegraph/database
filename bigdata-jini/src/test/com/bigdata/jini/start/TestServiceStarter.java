@@ -58,7 +58,7 @@ import com.bigdata.zookeeper.ZNodeDeletedWatcher;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestServiceStarter extends AbstractTestCase {
+public class TestServiceStarter extends AbstractFedZooTestCase {
 
     /**
      * 

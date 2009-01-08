@@ -41,7 +41,7 @@ import org.apache.zookeeper.ZooKeeper;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ZNodeCreatedWatcher extends AbstractAwaitZNodeConditionWatcher {
+public class ZNodeCreatedWatcher extends AbstractZNodeConditionWatcher {
 
 //    final static protected Logger log = Logger.getLogger(ZNodeCreatedWatcher.class);
 //
@@ -360,7 +360,8 @@ public class ZNodeCreatedWatcher extends AbstractAwaitZNodeConditionWatcher {
         
     }
     
-    protected boolean isConditionSatisified(WatchedEvent event) {
+    protected boolean isConditionSatisified(WatchedEvent event)
+            throws KeeperException, InterruptedException {
 
         return event.getType().equals(
                 Watcher.Event.EventType.NodeCreated);
@@ -369,7 +370,15 @@ public class ZNodeCreatedWatcher extends AbstractAwaitZNodeConditionWatcher {
 
     protected boolean isConditionSatisified() throws KeeperException,
             InterruptedException {
+        
         return zookeeper.exists(zpath, this) != null;
+
+    }
+
+    protected void clearWatch() throws KeeperException, InterruptedException {
+
+        // clears the watch.
+        zookeeper.exists(zpath, false);
 
     }
 

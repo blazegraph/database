@@ -51,18 +51,18 @@ import com.bigdata.zookeeper.ZookeeperClientConfig;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class AbstractTestCase extends TestCase2 {
+public class AbstractFedZooTestCase extends TestCase2 {
 
     /**
      * 
      */
-    public AbstractTestCase() {
+    public AbstractFedZooTestCase() {
     }
 
     /**
      * @param arg0
      */
-    public AbstractTestCase(String arg0) {
+    public AbstractFedZooTestCase(String arg0) {
         super(arg0);
     }
 
@@ -74,8 +74,6 @@ public class AbstractTestCase extends TestCase2 {
     // ACL used for the unit tests.
     protected final List<ACL> acl = Ids.OPEN_ACL_UNSAFE;
 
-//    JiniServicesHelper helper;
-
     Configuration config;
 
     MockListener listener = new MockListener();
@@ -83,10 +81,6 @@ public class AbstractTestCase extends TestCase2 {
     JiniFederation fed;
 
     public void setUp() throws Exception {
-
-//        helper = new JiniServicesHelper("src/resources/config/standalone/");
-//
-//        helper.start();
 
         // a unique zroot in the /test namespace.
         final String zroot = "/test/" + getName() + UUID.randomUUID();
@@ -103,8 +97,6 @@ public class AbstractTestCase extends TestCase2 {
 
         // if necessary, start zookeeper (a server instance).
         ZookeeperProcessHelper.startZookeeper(config, listener);
-
-// fed = helper.client.connect();
         
         fed = JiniClient.newInstance(args).connect();
 

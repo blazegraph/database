@@ -35,7 +35,7 @@ import org.apache.zookeeper.ZooKeeper;
 
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.service.jini.TransactionServer;
-
+import com.bigdata.zookeeper.AbstractZNodeConditionWatcher;
 
 /**
  * Test suite for managing state changes for a {@link ServiceConfiguration}
@@ -44,7 +44,7 @@ import com.bigdata.service.jini.TransactionServer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestServiceConfigurationWatcher extends AbstractTestCase {
+public class TestServiceConfigurationWatcher extends AbstractFedZooTestCase {
 
     /**
      * 
@@ -63,6 +63,7 @@ public class TestServiceConfigurationWatcher extends AbstractTestCase {
      * @throws InterruptedException
      * @throws KeeperException
      * @throws ConfigurationException
+     * 
      * @todo Unit test where the appropriate watchers are established and we
      *       then create the service configuration znode and let the watchers
      *       handle the creation of the logical and physical services and their
@@ -75,6 +76,9 @@ public class TestServiceConfigurationWatcher extends AbstractTestCase {
      *       should be true as the znode is created using the assigned service
      *       UUID rather than SEQUENTIAL so that it can be a restart safe
      *       zpath).
+     * 
+     * FIXME use {@link AbstractZNodeConditionWatcher} pattern for
+     * {@link ServiceConfigurationWatcher}.
      */
     public void test_logicalServiceWatcher() throws KeeperException,
             InterruptedException, ConfigurationException {
@@ -98,7 +102,7 @@ public class TestServiceConfigurationWatcher extends AbstractTestCase {
         
         // create the watcher.
         final ServiceConfigurationWatcher watcher = new ServiceConfigurationWatcher(
-                fed, listener);
+                fed, listener, serviceConfigurationZPath);
 
         // set watcher on that znode : @todo clear watcher when node is destroyed?
         zookeeper.exists(serviceConfigurationZPath, watcher);
@@ -116,23 +120,6 @@ public class TestServiceConfigurationWatcher extends AbstractTestCase {
          * FIXME verify service is created, query service, shutdown service and
          * then verify service restart re-creates the same ephemeral node.
          */
-        
-//        /*
-//         * znode for a logical service (the logical service is either a
-//         * collection of peers or a service failover chain, depending on the
-//         * type of the service). Logical services are persistent. Each one is
-//         * assigned a unique (sequential) identifier by zookeeper. It is also
-//         * assigned a random UUID.
-//         */
-//        final String logicalServiceZPath = zookeeper.create(serviceConfigurationZPath
-//                + BigdataZooDefs.LOGICAL_SERVICE, SerializerUtil.serialize(UUID
-//                .randomUUID()), acl, CreateMode.PERSISTENT_SEQUENTIAL);
-//
-//        // will be zero unless we started a zookeeper server above.
-//        final int processCountBefore = listener.running.size();
-//        
-//        final JavaServiceStarter serviceStarter = (JavaServiceStarter) serviceConfig
-//                .newServiceStarter(fed, listener, logicalServiceZPath);
         
     }
 
