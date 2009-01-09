@@ -6,6 +6,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.apache.log4j.Logger;
+import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
@@ -46,9 +47,12 @@ public class UnknownChildrenWatcher implements Watcher {
     /**
      * @param zookeeper
      * @param zpath
+     * 
+     * @throws InterruptedException 
+     * @throws KeeperException 
      */
     protected UnknownChildrenWatcher(final ZooKeeper zookeeper,
-            final String zpath) {
+            final String zpath) throws KeeperException, InterruptedException {
 
         if (zookeeper == null)
             throw new IllegalArgumentException();
@@ -59,10 +63,19 @@ public class UnknownChildrenWatcher implements Watcher {
 
         this.zpath = zpath;
         
+        if(INFO)
+            log.info("watching: "+zpath);
+        
+        // set watch.
+        acceptChildren(zookeeper.getChildren(zpath, this));
+        
     }
 
     synchronized public void process(WatchedEvent event) {
-        
+
+        if(INFO)
+            log.info(event.toString());
+
         switch(event.getState()) {
         case Disconnected:
             return;
@@ -77,13 +90,16 @@ public class UnknownChildrenWatcher implements Watcher {
             return;
         }
 
-        final List<String> children;
         try {
-            children = zookeeper.getChildren(zpath, this);
+            acceptChildren(zookeeper.getChildren(zpath, this));
         } catch (Exception e) {
             log.error(this, e);
             return;
         }
+        
+    }
+
+    private void acceptChildren(final List<String> children) {
         
         int nadded = 0;
         
@@ -110,7 +126,7 @@ public class UnknownChildrenWatcher implements Watcher {
             log.info("added " + nadded + " : known=" + knownLocks.size());
 
     }
-
+    
     /**
      * Cancel the watch.
      * <p>

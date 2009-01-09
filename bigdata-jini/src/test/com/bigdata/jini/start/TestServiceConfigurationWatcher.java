@@ -29,7 +29,6 @@ package com.bigdata.jini.start;
 
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import net.jini.config.ConfigurationException;
@@ -75,8 +74,6 @@ public class TestServiceConfigurationWatcher extends AbstractFedZooTestCase {
      *       handle the creation of the logical and physical services and their
      *       znodes.
      * 
-     * @todo could do shutdown or destory using the proxy.
-     * 
      * @todo verify that normal service shutdown does remove the ephemeral znode
      *       and that service restart re-creates the SAME ephemeral znode (both
      *       should be true as the znode is created using the assigned service
@@ -108,7 +105,7 @@ public class TestServiceConfigurationWatcher extends AbstractFedZooTestCase {
 
         assertFalse(f1.isDone());
         
-        // create monitor task for new service config nodes.
+        // create monitor task for a specific service config node.
         ServiceConfigurationZNodeMonitorTask task = new ServiceConfigurationZNodeMonitorTask(
                 fed, listener, TransactionServer.class.getName());
 
@@ -129,25 +126,13 @@ public class TestServiceConfigurationWatcher extends AbstractFedZooTestCase {
         log.info("Created zpath: " + serviceConfigurationZPath);
 
         /*
-         * Run the task for a few seconds and then cancel it (it should still be
-         * running).
-         * 
-         * This give the task the chance to notice the ServiceConfiguration
-         * znode (we just created it) and to execute the task that creates the
-         * new logical service.
-         */
-        try {
-            f.get(2L, TimeUnit.SECONDS);
-            fail("Not expecting task to quit by itself.");
-        } catch(TimeoutException ex) {
-            log.info("Ignoring expected exception: "+ex);
-        }
-        
-        /*
          * Verify that a logicalService znode was created for that configuration
          * znode.
          */
         
+        // pause a moment.
+        Thread.sleep(1000/*ms*/);
+
         log.info("logicalServices: "
                 + zookeeper.getChildren(serviceConfigurationZPath, false));
         
@@ -155,10 +140,34 @@ public class TestServiceConfigurationWatcher extends AbstractFedZooTestCase {
                 .size());
         
         /*
-         * FIXME verify service is created, query service, shutdown service and
-         * then verify service restart re-creates the same ephemeral node.
+         * Let things run for few seconds.
+         * 
+         * This give the task the chance to notice the ServiceConfiguration
+         * znode (we just created it) and to execute the task that creates the
+         * new logical service.
          */
-        Thread.sleep(5000/*ms*/);
+
+        Thread.sleep(10000/*ms*/);
+
+        if (f.isDone()) {
+            f.get();
+            fail("not expecting task to end by itself.");
+        } else
+            f.cancel(true/* mayInterruptIfRunning */);
+        
+        if (f1.isDone()) {
+            f1.get();
+            fail("not expecting task to end by itself.");
+        } else
+            f1.cancel(true/* mayInterruptIfRunning */);
+        
+        /*
+         * FIXME verify service is created, discover and query that service and
+         * verify that it is the instance that we wanted, then shutdown service
+         * and then verify service restart re-creates the same ephemeral node.
+         */
+        
+        // verify a process was started.
         assertEquals(numBefore + 1, listener.running.size());
         
     }

@@ -124,9 +124,11 @@ abstract public class BigdataServiceConfiguration extends
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
+     * 
      * @param <V>
+     * 
      */
-    protected class BigdataServiceStarter<V extends ProcessHelper> extends
+    protected class BigdataServiceStarter<V extends JiniProcessHelper> extends
             JiniServiceStarter<V> {
 
         /**

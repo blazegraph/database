@@ -28,8 +28,8 @@ import com.sun.jini.tool.ClassServer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo fields should all be mutable to make it easy to update the data for a
- *       configuration znode.
+ * FIXME fields should all be mutable to make it easy to update the data for a
+ * configuration znode.
  */
 abstract public class ServiceConfiguration implements Serializable {
 

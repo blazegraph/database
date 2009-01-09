@@ -181,7 +181,7 @@ abstract public class AbstractJiniServiceConfiguration extends
      * @version $Id$
      * @param <V>
      */
-    protected class JiniServiceStarter<V extends ProcessHelper> extends
+    protected class JiniServiceStarter<V extends JiniProcessHelper> extends
             JavaServiceStarter<V> {
         
         /**
@@ -629,6 +629,14 @@ abstract public class AbstractJiniServiceConfiguration extends
             
         }
         
+        protected V newProcessHelper(String className,
+                ProcessBuilder processBuilder, IServiceListener listener)
+                throws IOException {
+
+            return (V) new JiniProcessHelper(className, processBuilder, listener);
+
+        }
+        
         /**
          * Overriden to monitor for the jini join of the service and the
          * creation of the znode corresponding to the physical service instance.
@@ -636,7 +644,7 @@ abstract public class AbstractJiniServiceConfiguration extends
          * @todo we could also verify the service using its proxy, e.g., by
          *       testing for a normal run state.
          */
-        protected void awaitServiceStart(final ProcessHelper processHelper,
+        protected void awaitServiceStart(final V processHelper,
                 final long timeout, final TimeUnit unit) throws Exception,
                 TimeoutException, InterruptedException {
 
@@ -648,6 +656,9 @@ abstract public class AbstractJiniServiceConfiguration extends
             final ServiceItem serviceItem = awaitServiceDiscoveryOrDeath(
                     processHelper, nanos, TimeUnit.NANOSECONDS);
 
+            // proxy will be used for destroy().
+            processHelper.setServiceItem(serviceItem);
+            
             // subtract out the time we already waited.
             nanos -= (System.nanoTime() - begin);
 
@@ -731,36 +742,6 @@ abstract public class AbstractJiniServiceConfiguration extends
                             + items[0]);
 
                 return items[0];
-                
-//            } catch(InterruptedException ex) {
-//                
-////                if (!processHelper.isRunning()) {
-////                 
-////                    throw new IOException("Process is dead: exitValue="
-////                            + processHelper.exitValue());
-////                    
-////                }
-//                
-//                /*
-//                 * If we were interrupted because the process is dead then
-//                 * add that information to the exception.
-//                 */
-//                try {
-//                
-//                    final int exitValue = processHelper.exitValue(10,
-//                            TimeUnit.MILLISECONDS);
-//                    
-//                    throw new IOException("Process is dead: exitValue="
-//                            + exitValue);
-//                
-//                } catch(TimeoutException ex2) {
-//                    
-//                    // ignore.
-//                    
-//                }
-//                
-//                // otherwise just rethrow the exception.
-//                throw ex;
                 
             } finally {
 

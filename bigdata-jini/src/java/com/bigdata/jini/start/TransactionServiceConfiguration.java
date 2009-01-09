@@ -65,8 +65,8 @@ public class TransactionServiceConfiguration extends
 
     }
 
-    protected class TransactionServiceStarter<V extends ProcessHelper> extends
-            BigdataServiceStarter<V> {
+    protected class TransactionServiceStarter<V extends JiniProcessHelper>
+            extends BigdataServiceStarter<V> {
 
         /**
          * @param fed

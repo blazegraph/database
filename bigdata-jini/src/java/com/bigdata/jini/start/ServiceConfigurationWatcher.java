@@ -87,39 +87,6 @@ public class ServiceConfigurationWatcher extends
             log.info(event.toString());
         
         return isConditionSatisified();
-
-//        switch (event.getType()) {
-//
-//        case NodeDeleted:
-//
-//            if (!zlock.isLockHeld()) {
-//
-//                // exit.
-//                return true;
-//
-//            }
-//
-//            // nothing to do until someone recreates the znode.
-//            return false;
-//
-//        case None:
-//        case NodeCreated:
-//        case NodeChildrenChanged:
-//        case NodeDataChanged:
-//
-//            /*
-//             * @todo this could be optimized by considering the data already in
-//             * the znode and its children, but we need both on hand to make any
-//             * decisions so the event is just delegated.
-//             */
-//
-//            return isConditionSatisified();
-//
-//        default:
-//
-//            throw new AssertionError("unknown event: " + event);
-//        
-//        }
         
     }
 

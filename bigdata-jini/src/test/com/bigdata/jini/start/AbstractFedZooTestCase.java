@@ -76,7 +76,7 @@ public class AbstractFedZooTestCase extends TestCase2 {
 
     Configuration config;
 
-    MockListener listener = new MockListener();
+    final protected MockListener listener = new MockListener();
 
     JiniFederation fed;
 
@@ -141,13 +141,13 @@ public class AbstractFedZooTestCase extends TestCase2 {
         zookeeper.create(zroot + "/"
                 + BigdataZooDefs.LOCKS_CREATE_PHYSICAL_SERVICE, new byte[0],
                 acl, CreateMode.PERSISTENT);
-        
+
     }
-    
+
     public void tearDown() throws Exception {
-        
+
         // destroy any processes started by this test suite.
-        for(ProcessHelper t : listener.running) {
+        for (ProcessHelper t : listener.running) {
             
             t.destroy();
             

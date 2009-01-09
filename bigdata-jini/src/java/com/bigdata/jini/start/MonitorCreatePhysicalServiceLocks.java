@@ -74,6 +74,9 @@ public class MonitorCreatePhysicalServiceLocks implements
                 // path to the new lock node.
                 final String zpath = locksZPath + "/" + znode;
 
+                if (INFO)
+                    log.info("new lock: zpath=" + zpath);
+                
                 try {
                     
                     handleNewLock(zpath);
@@ -107,18 +110,21 @@ public class MonitorCreatePhysicalServiceLocks implements
     /**
      * Verify that we could start this service.
      * 
-     * @todo add load-based constraints, e.g., can not start a new service
-     *       if heavily swapping, near limits on RAM or on disk.
+     * @todo add load-based constraints, e.g., can not start a new service if
+     *       heavily swapping, near limits on RAM or on disk.
+     *       <p>
+     *       Might be interesting to evaluate all constraints and see how many
+     *       cause us not to start the service.
      */
-    protected boolean canStartService(ServiceConfiguration config) {
+    protected boolean canStartService(final ServiceConfiguration config) {
         
         for (IServiceConstraint constraint : config.constraints) {
 
             if (!constraint.allow(fed)) {
 
-                if (INFO)
-                    log.info("Constraint(s) do not allow service start: "
-                                    + config);
+                if (INFO) 
+                    log.info("Constraint does not allow service start: "
+                            + constraint);
                 
                 return false;
                 
@@ -141,11 +147,17 @@ public class MonitorCreatePhysicalServiceLocks implements
      * @todo it could be safer to move the fetch of the
      *       {@link ServiceConfiguration} and the
      *       {@link #canStartService(ServiceConfiguration)} call to after we
-     *       hold the lock. that way we judge matters as they stand at the
-     *       time of the decision.
+     *       hold the lock. that way we judge matters as they stand at the time
+     *       of the decision.
      */
-    protected void handleNewLock(final String zpath)
-            throws KeeperException, InterruptedException {
+    protected void handleNewLock(final String zpath) throws KeeperException,
+            InterruptedException {
+
+        final String configZPath = (String) SerializerUtil
+                .deserialize(zookeeper.getData(zpath, false, new Stat()));
+
+        if (INFO)
+            log.info("configZPath=" + configZPath);
 
         // enter the competition.
         final ZLock zlock = ZNodeLockWatcher.getLock(zookeeper, zpath);
@@ -153,13 +165,24 @@ public class MonitorCreatePhysicalServiceLocks implements
         zlock.lock();
         try {
 
+            if (INFO)
+                log.info("have lock: zpath=" + zpath);
+
             final ServiceConfiguration config = (ServiceConfiguration) SerializerUtil
-                    .deserialize(zookeeper
-                            .getData(zpath, false, new Stat()));
+                    .deserialize(zookeeper.getData(configZPath, false,
+                            new Stat()));
+
+            if (INFO)
+                log.info("Considering: " + config);
 
             if (!canStartService(config)) {
 
                 // will not start this service.
+
+                if (INFO)
+                    log.info("Constraint(s) do not allow service start: "
+                            + config);
+
                 return;
 
             }
@@ -175,8 +198,7 @@ public class MonitorCreatePhysicalServiceLocks implements
             } catch (Exception e) {
 
                 // could not start.
-                // @todo should not need stack trace here - who is running this?
-                log.error(this, e);
+                log.error(this, e); // FIXME comment out - MUST watch its Future.
                 
                 throw new RuntimeException(e);
                 
@@ -200,9 +222,11 @@ public class MonitorCreatePhysicalServiceLocks implements
     protected void startService(ServiceConfiguration config, String zpath)
             throws Exception {
 
+        if (INFO)
+            log.info("config=" + config + ", zpath=" + zpath);
+        
         // get task to start the service.
-        final Callable task = config
-                .newServiceStarter(fed, listener, zpath);
+        final Callable task = config.newServiceStarter(fed, listener, zpath);
 
         // Submit the task and wait for its Future.
         fed.getExecutorService().submit(task).get();

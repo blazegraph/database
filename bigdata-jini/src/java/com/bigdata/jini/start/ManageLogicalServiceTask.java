@@ -244,7 +244,7 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
     /**
      * Destroy a logical service (must destroy the physical services first).
      * 
-     * FIXME not supported yet.
+     * FIXME {@link #destroyLogicalService()} not implemented yet.
      */
     protected void destroyLogicalService() {
 

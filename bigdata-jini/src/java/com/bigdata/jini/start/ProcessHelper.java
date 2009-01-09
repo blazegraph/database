@@ -163,22 +163,42 @@ public class ProcessHelper {
     /**
      * Destroy the process.
      * <p>
-     * Note: {@link Process#destroy()} does not appear to be synchronous. If you
-     * want to wait for the process to terminate, use {@link #exitValue()} or
-     * {@link #exitValue(long, TimeUnit)}.
+     * Note: {@link Process#destroy()} is non-blocking, but this method blocks
+     * until the process is terminated.
+     * <p>
+     * Note: processes with child processes (including any bigdata services
+     * since they start children to report OS performance counters) MUST exit
+     * normally (at least under windows) or the parent process will not be able
+     * to exit. Therefore it is very important to extend this method and send
+     * proper notice to the process requesting that it terminate itself.
      */
-    public void destroy() {
-        
-        log.warn("name=" + name);
+    synchronized public void destroy() {
 
-        process.destroy();
-        
-//        /*
-//         * Enforce wait for process death since destroy() does not appear to be
-//         * synchronous.
-//         */
-////        exitValue.set(process.waitFor());
-//        exitValue(2000, TimeUnit.MILLISECONDS);
+        log.warn(this);
+
+        try {
+            process.destroy();
+        } catch (Throwable t) {
+            log.warn(this, t);
+        }
+
+        try {
+
+            log.warn("Waiting on exitValue: " + this);
+
+            final int exitValue = exitValue();
+
+            log.warn("Process is dead: " + this + ", exitValue=" + exitValue);
+
+            // fall through
+
+        } catch (InterruptedException e) {
+
+            log.warn(this, e);
+
+            // fall through.
+            
+        }
 
         listener.remove(this);
 

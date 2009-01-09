@@ -416,13 +416,20 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             
             config = ConfigurationProvider.getInstance(args); 
 
+            final String defaultName = getClass().getName() + "@"
+                    + AbstractStatisticsCollector.fullyQualifiedHostName;
+            
             /*
              * Extract how the service will advertise itself from the
              * Configuration.
              */
 
             entries = (Entry[]) config.getEntry(ADVERT_LABEL, "entries",
-                    Entry[].class, null/* default */);
+                    Entry[].class, new Entry[] {
+                
+                new Name(defaultName)
+                
+            });
 
             /*
              * Extract the name(s) associated with the service.
@@ -438,6 +445,12 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                     
                 }
 
+            }
+            
+            if (serviceName == null) {
+                
+                serviceName = defaultName; 
+                
             }
             
             /*
@@ -921,14 +934,16 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             /*
              * @todo This is checked so that you can use a standalone
              * configuration file without having an assigned logical service
-             * zpath that exists in zookeeper. If we take out this test then
-             * all configuration files would have to specify the logical
-             * service path, which might be an end state for the zookeeper
-             * integration.
+             * zpath that exists in zookeeper.
+             * 
+             * If we take out this test then all configuration files would have
+             * to specify the logical service path, which might be an end state
+             * for the zookeeper integration.
              */
 
             log
-                    .warn("No logicalServiceZPath: will not create service znode.");
+                    .warn("No logicalServiceZPath in config file: will not create service znode: cls="
+                            + getClass().getName());
 
             return;
             

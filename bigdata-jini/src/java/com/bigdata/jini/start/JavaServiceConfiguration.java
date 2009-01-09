@@ -308,7 +308,7 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
             // processBuilder.directory(dataDir);
 
             // start the process.
-            final ProcessHelper processHelper = new ProcessHelper(className,
+            final V processHelper = (V) newProcessHelper(className,
                     processBuilder, listener);
 
             /*
@@ -399,10 +399,18 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
 
             }
 
-            return (V)processHelper;
+            return (V) processHelper;
 
         }
 
+        protected V newProcessHelper(String className,
+                ProcessBuilder processBuilder, IServiceListener listener)
+                throws IOException {
+
+            return (V) new ProcessHelper(className, processBuilder, listener);
+
+        }
+        
         /**
          * Hook for modification of the child environment.
          * 
@@ -438,7 +446,7 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
          *             will kill the process and log an error if any exception
          *             is thrown).
          */
-        protected void awaitServiceStart(final ProcessHelper processHelper,
+        protected void awaitServiceStart(final V processHelper,
                 final long timeout, final TimeUnit unit) throws Exception {
 
             try {

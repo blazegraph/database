@@ -51,9 +51,13 @@ import net.jini.jeri.tcp.TcpServerEndpoint;
 import net.jini.lookup.ServiceDiscoveryEvent;
 import net.jini.lookup.ServiceDiscoveryListener;
 
+import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.KeeperException.ConnectionLossException;
+import org.apache.zookeeper.KeeperException.NoNodeException;
+import org.apache.zookeeper.data.Stat;
 
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.io.IStreamSerializer;
@@ -168,8 +172,13 @@ public class JiniFederation extends AbstractDistributedFederation implements
             zookeeper = new ZooKeeper(zooConfig.servers,
                     zooConfig.sessionTimeout, this/* watcher */);
             
-            if (zookeeper.exists(zooConfig.zroot, false/* watch */) == null) {
+            try {
+
+                zookeeper.getData(zooConfig.zroot, false/* watch */,
+                        new Stat());
                 
+            } catch (NoNodeException ex) {
+
                 /*
                  * Note: We don't just create the zroot here since there needs
                  * to be an appropriate ACL.
@@ -182,6 +191,25 @@ public class JiniFederation extends AbstractDistributedFederation implements
                  */
 
                 log.warn("federation zroot does not exist: " + zooConfig.zroot);
+
+            } catch (ConnectionLossException ex) {
+
+                /*
+                 * Zookeeper might not be up. That is ok. We will start anyway
+                 * and it might come online later. The ZooKeeper client will
+                 * keep looking for a connection and will connection if a server
+                 * instance is started.
+                 */
+                
+                log.warn(this, ex);
+                
+            } catch(KeeperException ex) {
+                
+                /*
+                 * Some other ZooKeeper problem.  We will forge ahead.
+                 */
+                
+                log.warn(this, ex);
                 
             }
             
