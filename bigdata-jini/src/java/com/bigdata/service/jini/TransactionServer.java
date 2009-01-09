@@ -91,31 +91,7 @@ public class TransactionServer extends AbstractServer {
      */
     public static void main(String[] args) {
         
-        new TransactionServer(args) {
-            
-            /**
-             * Overriden to use {@link System#exit()} since this is the command
-             * line interface.
-             */
-            protected void fatal(String msg, Throwable t) {
-
-                log.fatal(msg, t);
-
-                try {
-
-                    shutdownNow();
-                    
-                } catch (Throwable t2) {
-                    
-                    log.error(t2.getMessage(), t2);
-
-                }
-
-                System.exit(1);
-
-            }
-
-        }.run();
+        new TransactionServer(args).run();
 
     }
 

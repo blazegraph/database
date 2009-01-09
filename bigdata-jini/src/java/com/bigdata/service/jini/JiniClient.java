@@ -32,18 +32,16 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Arrays;
 import java.util.Properties;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
 import net.jini.config.ConfigurationFile;
 import net.jini.config.ConfigurationProvider;
-import net.jini.core.discovery.LookupLocator;
-import net.jini.discovery.LookupDiscovery;
+
+import org.apache.zookeeper.ZooKeeper;
 
 import com.bigdata.service.AbstractScaleOutClient;
-import com.bigdata.util.NV;
 import com.bigdata.zookeeper.ZookeeperClientConfig;
 
 /**
@@ -75,11 +73,10 @@ public class JiniClient extends AbstractScaleOutClient {
          * 
          * @see DataServicesClient
          */
-        String CACHE_MISS_TIMEOUT = JiniClient.class.getName()
-                + ".cacheMissTimeout";
-        
+        String CACHE_MISS_TIMEOUT = "cacheMissTimeout";
+
         String DEFAULT_CACHE_MISS_TIMEOUT = "" + (2 * 1000);
-        
+     
     }
     
     /**
@@ -159,20 +156,23 @@ public class JiniClient extends AbstractScaleOutClient {
     }
 
     /**
-     * The jini configuration which will be used to connect to the federation.
+     * The {@link JiniClient} configuration.
      */
-    private final JiniConfig jiniConfig;
+    public final JiniClientConfig jiniConfig;
 
     /**
-     * The zookeeper configuration.
+     * The {@link ZooKeeper} client configuration.
      */
-    private final ZookeeperClientConfig zooConfig;
+    public final ZookeeperClientConfig zooConfig;
 
     /**
      * 
      * @param jiniConfig
+     *            Jini client configuration.
+     * @param zooConfig
+     *            ZooKeeper client configuration.
      */
-    protected JiniClient(final JiniConfig jiniConfig,
+    protected JiniClient(final JiniClientConfig jiniConfig,
             final ZookeeperClientConfig zooConfig) {
 
         super(jiniConfig.properties);
@@ -184,165 +184,11 @@ public class JiniClient extends AbstractScaleOutClient {
     }
     
     /**
-     * Helper class for passing pre-extracted Jini configuration information to
-     * the {@link JiniFederation}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static public class JiniConfig {
-        
-        final Configuration config;
-        final String[] groups;
-        final LookupLocator[] lookupLocators;
-        final Properties properties;
-
-        public JiniConfig(final Configuration config, final String[] groups,
-                final LookupLocator[] lookupLocators,
-                final Properties properties) {
-
-            this.config = config;
-            
-            this.groups = groups;
-
-            this.lookupLocators = lookupLocators;
-            
-            this.properties = properties;
-            
-            if(INFO) {
-                
-                log.info(toString());
-                
-            }
-            
-        }
-
-        public String toString() {
-            
-            return "JiniConfig"//
-                    + "{ groups="
-                    + (groups == null ? "N/A" : "" + Arrays.toString(groups))//
-                    + ", locators="
-                    + (lookupLocators == null ? "N/A" : ""
-                            + Arrays.toString(lookupLocators))//
-                    + ", properties="+properties
-                    + "}";
-            
-        }
-        
-        /**
-         * Return the configuration data for the client.
-         * <p>
-         * This helper method reads {@link Configuration} data from the file(s)
-         * named by <i>args</i>, reads the <i>properties</i> file named in the
-         * {@value #CLIENT_LABEL} section of the {@link Configuration} file, and
-         * returns the configured client.
-         * 
-         * @param args
-         *            The command line arguments.
-         * 
-         * @return The configuration data for the client.
-         * 
-         * @throws ConfigurationException
-         *             if there is a problem reading the jini configuration for
-         *             the client.
-         * @throws IOException
-         *             if there is a problem reading the optional properties
-         *             file (a properties file may be specified as part of the
-         *             configuration).
-         */
-        static public JiniConfig readConfiguration(final Configuration config)
-                throws ConfigurationException, IOException {
-
-            final String[] groups;
-            final LookupLocator[] lookupLocators;
-            final Properties properties;
-
-            /*
-             * Extract how the client will discover services from the
-             * Configuration.
-             */
-            groups = (String[]) config
-                    .getEntry(AbstractServer.ADVERT_LABEL, "groups",
-                            String[].class, LookupDiscovery.ALL_GROUPS/* default */);
-
-            /*
-             * Note: multicast discovery is used regardless if
-             * LookupDiscovery.ALL_GROUPS is selected above. The default for the
-             * lookupLocators is [null] so that the default "ALL_GROUPS" means
-             * that the lookupLocators are ignored.
-             */
-            lookupLocators = (LookupLocator[]) config.getEntry(
-                    AbstractServer.ADVERT_LABEL, "unicastLocators",
-                    LookupLocator[].class, null/* default */);
-
-            {
-
-                /*
-                 * Extract the name of the optional properties file.
-                 */
-
-                final File propertyFile = (File) config.getEntry(
-                        AbstractServer.SERVICE_LABEL, "propertyFile",
-                        File.class, null/* defaultValue */);
-
-                if (propertyFile != null) {
-
-                    /*
-                     * Read the properties file.
-                     */
-
-                    properties = getProperties(propertyFile);
-
-                } else {
-
-                    /*
-                     * Start with an empty properties map.
-                     */
-
-                    properties = new Properties();
-
-                }
-
-            }
-
-            {
-
-                /*
-                 * Read the optional [properties] array.
-                 * 
-                 * @todo this could be replaced by explicit use of the java
-                 * identifier corresponding to the Option and simply collecting
-                 * all such properties into a Properties object using their
-                 * native type (as reported by the ConfigurationFile).
-                 */
-
-                final NV[] tmp = (NV[]) config.getEntry(
-                        AbstractServer.SERVICE_LABEL, "properties", NV[].class,
-                        new NV[] {}/* defaultValue */);
-
-                for (NV nv : tmp) {
-
-                    if (INFO)
-                        log.info(nv.toString());
-
-                    properties.setProperty(nv.getName(), nv.getValue());
-
-                }
-
-            }
-
-            return new JiniConfig(config, groups, lookupLocators, properties);
-
-        }
-
-    }
-
-    /**
      * Conditionally installs a {@link SecurityManager}, reads
-     * {@link Configuration} data from the file(s) named by <i>args</i>, reads
-     * the <i>properties</i> file named in the {@value #CLIENT_LABEL} section
-     * of the {@link Configuration} file, and returns the configured client.
+     * {@link Configuration} data from the <i>args</i>, reads the <i>properties</i>
+     * and/or properties file named in the
+     * {@value AbstractServer#SERVICE_DESCRIPTION} section of the
+     * {@link Configuration} file, and returns the configured client.
      * 
      * @param args
      *            The command line arguments.
@@ -350,9 +196,8 @@ public class JiniClient extends AbstractScaleOutClient {
      * @return The new client.
      * 
      * @throws RuntimeException
-     *             if there is a problem: reading the jini configuration for the
-     *             client; reading the properties for the client; starting
-     *             service discovery, etc.
+     *             if there is a problem reading the jini configuration for the
+     *             client, reading the properties for the client, etc.
      */
     public static JiniClient newInstance(final String[] args) {
 
@@ -365,15 +210,8 @@ public class JiniClient extends AbstractScaleOutClient {
             final ConfigurationFile config = (ConfigurationFile) ConfigurationProvider
                     .getInstance(args);
 
-            // read all the configuration data and the properties file.
-            final JiniConfig jiniConfig = JiniConfig.readConfiguration(config);
-
-            // read the zookeeper client configuration.
-            final ZookeeperClientConfig zooConfig = ZookeeperClientConfig.readConfiguration(config);
-
-            // return the client.
-            return new JiniClient(jiniConfig, zooConfig);
-
+            return new JiniClient(JiniClient.class, config);
+            
         } catch (Exception ex) {
 
             throw new RuntimeException(ex);
@@ -381,7 +219,24 @@ public class JiniClient extends AbstractScaleOutClient {
         }
 
     }
-    
+
+    /**
+     * 
+     * @param config
+     *            The configuration object.
+     * @throws ConfigurationException
+     *             if the is a problem with the {@link Configuration}
+     * @throws IOException
+     *             if there is a problem reading the optional properties file.
+     */
+    public JiniClient(final Class cls, final Configuration config)
+            throws ConfigurationException {
+
+        this(new JiniClientConfig(cls, config), new ZookeeperClientConfig(
+                config));
+
+    }
+
     /**
      * Conditionally install a suitable security manager if there is none in
      * place. This is required before the client can download code. The code

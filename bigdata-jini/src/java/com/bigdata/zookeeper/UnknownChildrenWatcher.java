@@ -1,4 +1,4 @@
-package com.bigdata.jini.start;
+package com.bigdata.zookeeper;
 
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -51,7 +51,7 @@ public class UnknownChildrenWatcher implements Watcher {
      * @throws InterruptedException 
      * @throws KeeperException 
      */
-    protected UnknownChildrenWatcher(final ZooKeeper zookeeper,
+    public UnknownChildrenWatcher(final ZooKeeper zookeeper,
             final String zpath) throws KeeperException, InterruptedException {
 
         if (zookeeper == null)
@@ -66,8 +66,31 @@ public class UnknownChildrenWatcher implements Watcher {
         if(INFO)
             log.info("watching: "+zpath);
         
-        // set watch.
-        acceptChildren(zookeeper.getChildren(zpath, this));
+        // loop until we are able to set the watch.
+        while (true) {
+            
+            try {
+            
+                acceptChildren(zookeeper.getChildren(zpath, this));
+                
+                break;
+                
+            } catch (InterruptedException t) {
+                
+                // task was cancelled.
+                throw t;
+                
+            } catch (Throwable t) {
+                
+                if (INFO)
+                    log.info("will retry: " + this + " : " + t);
+
+                // sleep, but if we are interrupted then exit/
+                Thread.sleep(500/* ms */);
+                
+            }
+       
+        }
         
     }
 

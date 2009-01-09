@@ -35,6 +35,10 @@ import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
 import net.jini.config.ConfigurationProvider;
 
+import com.bigdata.jini.start.config.BigdataServiceConfiguration;
+import com.bigdata.jini.start.config.IServiceConstraint;
+import com.bigdata.jini.start.config.ServiceConfiguration;
+import com.bigdata.jini.start.config.TransactionServiceConfiguration;
 import com.bigdata.service.jini.TransactionServer;
 
 /**

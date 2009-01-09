@@ -450,7 +450,7 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
                 final List<ACL> acl = Ids.OPEN_ACL_UNSAFE;
                 
                 // create a child contending for that lock.
-                final String s = zookeeper.create(zpath + "/child",
+                final String s = zookeeper.create(zpath + "/lock",
                         new byte[0], acl, CreateMode.EPHEMERAL_SEQUENTIAL);
 
                 final String zchild = s.substring(s.lastIndexOf('/') + 1);
@@ -615,10 +615,9 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
                 
                 List<String> children;
                 
-                // until only the owner is left.
-                while ((children = zookeeper.getChildren(zpath, false)).size() > 1) {
+                // until empty.
+                while (!(children = zookeeper.getChildren(zpath, false)).isEmpty()) {
 
-                    // @todo method for this idiom.
                     final String[] a = children.toArray(new String[] {});
                     
                     // sort

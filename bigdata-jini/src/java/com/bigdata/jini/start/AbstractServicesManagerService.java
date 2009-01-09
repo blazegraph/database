@@ -1,10 +1,9 @@
 package com.bigdata.jini.start;
 
-import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.Future;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -15,12 +14,17 @@ import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.data.ACL;
 
-import com.bigdata.Banner;
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.jini.start.ServicesManagerServer.Options;
+import com.bigdata.jini.start.config.DataServiceConfiguration;
+import com.bigdata.jini.start.config.LoadBalancerServiceConfiguration;
+import com.bigdata.jini.start.config.MetadataServiceConfiguration;
+import com.bigdata.jini.start.config.ServiceConfiguration;
+import com.bigdata.jini.start.config.TransactionServiceConfiguration;
+import com.bigdata.jini.start.process.JiniProcessHelper;
+import com.bigdata.jini.start.process.ProcessHelper;
+import com.bigdata.jini.start.process.ZookeeperProcessHelper;
 import com.bigdata.service.AbstractService;
 import com.bigdata.service.jini.JiniFederation;
-import com.bigdata.service.jini.TransactionServer;
 
 /**
  * Core impl.
@@ -65,24 +69,73 @@ public abstract class AbstractServicesManagerService extends AbstractService
 
     }
 
-    protected AbstractServicesManagerService(Properties properties) {
+    protected AbstractServicesManagerService(final Properties properties) {
 
-        // show the copyright banner during statup.
-        Banner.banner();
-
+        super();
+        
         this.properties = (Properties) properties.clone();
 
     }
 
     /**
      * Destroys any managed services (those started by this process and
-     * represented in {@link #runningProcesses}).
+     * represented in {@link #runningProcesses}), but leaves the zookeeper and
+     * jini services for last.
+     * 
+     * FIXME make sure that we will not start new processes during shutdown.
+     * Anyone desiring to add a process should obtain a lock from the
+     * {@link IServiceListener} that is mutex with shutdown and no longer
+     * available once we start shutdown.
      */
     synchronized public void shutdown() {
-        // destroy any running processes.
+
+        if(true) return;
+        
+        final ConcurrentLinkedQueue<ProcessHelper> problems = new ConcurrentLinkedQueue<ProcessHelper>();
+        
+        // destroy any running processes
         for (ProcessHelper helper : runningProcesses) {
 
-            helper.destroy();
+            if (helper instanceof JiniProcessHelper)
+                continue;
+            
+            if (helper instanceof ZookeeperProcessHelper)
+                continue;
+
+            try {
+                helper.kill();
+            } catch (Throwable t) {
+                log.warn("Could not kill process: "+helper);
+                // add to list of problem processes.
+                problems.add(helper);
+                // remove from list of running processes.
+                runningProcesses.remove(helper);
+            }
+
+        }
+
+        // try again for the problem processes, raising the logging level.
+        for (ProcessHelper helper : problems) {
+
+            try {
+                helper.kill();
+            } catch (Throwable t) {
+                log.error("Could not kill process: " + helper);
+                problems.add(helper);
+            }
+
+        }
+
+        /*
+         * This time we take down zookeeper and jini.
+         */ 
+        for (ProcessHelper helper : runningProcesses) {
+
+            try {
+                helper.kill();
+            } catch (Throwable t) {
+                log.warn("Could not kill process: " + helper);
+            }
 
         }
 
@@ -111,7 +164,7 @@ public abstract class AbstractServicesManagerService extends AbstractService
         try {
 
             setup();
-
+            
         } catch (Exception e) {
 
             throw new RuntimeException(e);
@@ -147,52 +200,38 @@ public abstract class AbstractServicesManagerService extends AbstractService
          * service configuration node. From there everything will happen
          * automatically.
          * 
-         * FIXME MUST monitor future on this task and make sure that it is still
+         * We monitor future on this task and make sure that it is still
          * running, but it is really only used when the config znode children
          * are created.
          */
-        final MonitorConfigZNodeTask task = new MonitorConfigZNodeTask(fed,
-                this/* listener */);
+        fed.submitMonitoredTask(new MonitorConfigZNodeTask(fed, this/* listener */));
 
-        final Future f1 = fed.getExecutorService().submit(task);
+        /*
+         * Create and start task that will compete for locks to start physical
+         * service instances.
+         */
+        fed.submitMonitoredTask(new MonitorCreatePhysicalServiceLocks(fed,
+                        this/* listener */));
 
-        // ACL for the zroot.
-        final List<ACL> acl = Arrays.asList((ACL[]) config.getEntry(
-                Options.NAMESPACE, "acl", ACL[].class));
+        /*
+         * Generate service configurations based on the configuration file.
+         * 
+         * Note: This lets us validate things before we try to load them into
+         * zookeeper.
+         * 
+         * @todo if we declare the set of configurations in the Configuration
+         * file then we can add one more metalevel here.
+         */
+        final ServiceConfiguration[] serviceConfigurations = getServiceConfigurations(config);
 
-        try {
-
-            /*
-             * Create the configuration root.
-             * 
-             * If successful, we will populate the configuration.
-             * 
-             * Otherwise an exception is thrown and someone else has already
-             * done this concurrently.
-             * 
-             * Note: Since zookeeper does not support transaction across more
-             * than one request we validate all of the configuration entries
-             * before we create the zroot node.
-             */
-
-            zookeeper.create(zroot, new byte[] {}/* data */, acl,
-                    CreateMode.PERSISTENT);
-            
-        } catch (NodeExistsException ex) {
-
-            // that's fine - the configuration already exists.
-            if (INFO)
-                log.info("zroot exists: " + zroot);
-
-            return;
-
-        }
+        // ACL for the zroot, etc.
+        final List<ACL> acl = fed.getClient().zooConfig.acl;
 
         // create critical nodes used by the federation.
         createKeyZNodes(zookeeper, zroot, acl);
 
-        // load configuration from file into zookeeper.
-        loadConfiguration(zookeeper, zconfig, acl, config);
+        // load service configurations (will not overwrite those that exist).
+        loadConfiguration(zookeeper, zconfig, acl, serviceConfigurations);
         
     }
 
@@ -210,26 +249,56 @@ public abstract class AbstractServicesManagerService extends AbstractService
             final String zroot, final List<ACL> acl) throws KeeperException,
             InterruptedException {
 
-        // znode for configuration metadata.
-        zookeeper.create(zroot + BigdataZooDefs.ZSLASH + BigdataZooDefs.CONFIG,
-                new byte[0], acl, CreateMode.PERSISTENT);
+        final String[] a = new String[] {
+          
+                // znode for the federation root.
+                zroot,
+                
+                // znode for configuration metadata.
+                zroot + BigdataZooDefs.ZSLASH + BigdataZooDefs.CONFIG,
+          
+                // znode dominating most locks.
+                zroot + BigdataZooDefs.ZSLASH + BigdataZooDefs.LOCKS,
+                
+                zroot + "/"
+                + BigdataZooDefs.LOCKS_CREATE_PHYSICAL_SERVICE,
+                
+                zroot + "/"
+                + BigdataZooDefs.LOCKS_SERVICE_CONFIG_MONITOR,
+                
+        };
+        
+        for (String zpath : a) {
 
-        // znode for most locks.
-        zookeeper.create(zroot + BigdataZooDefs.ZSLASH + BigdataZooDefs.LOCKS,
-                new byte[0], acl, CreateMode.PERSISTENT);
+            try {
 
-        zookeeper.create(zroot + "/"
-                + BigdataZooDefs.LOCKS_CREATE_PHYSICAL_SERVICE, new byte[0],
-                acl, CreateMode.PERSISTENT);
+                zookeeper.create(zpath, new byte[] {}/* data */, acl,
+                        CreateMode.PERSISTENT);
+
+            } catch (NodeExistsException ex) {
+
+                // that's fine - the configuration already exists.
+                if (INFO)
+                    log.info("exists: " + zpath);
+
+                return;
+
+            }
+
+        }
 
     }
-    
+
     /**
-     * Load the initial configuration for the federation into zookeeper.
+     * Generates {@link ServiceConfiguration}s from the {@link Configuration}
+     * file.
      * 
+     * @param config The {@link Configuration} file.
+     * 
+     * @return An array of {@link ServiceConfiguration}s populated from the
+     *         {@link Configuration} file.
+     *         
      * @throws ConfigurationException 
-     * @throws InterruptedException 
-     * @throws KeeperException 
      * 
      * @todo start httpd for downloadable code. (contend for lock on node, start
      *       instance if insufficient instances are running). The codebase URI
@@ -257,59 +326,76 @@ public abstract class AbstractServicesManagerService extends AbstractService
      *       provide non-hierarchical locks w/o deadlock detection. Will be
      *       replaced by full transactions. A client library can provide queues
      *       and barriers using zookeeper.
+     */
+    public ServiceConfiguration[] getServiceConfigurations(Configuration config)
+            throws ConfigurationException {
+
+        final List<ServiceConfiguration> v = new LinkedList<ServiceConfiguration>();
+
+        // // jini registrar(s).
+            // zoo.create(zconfig + ZSLASH + "jini", SerializerUtil
+            // .serialize(jiniConfig), acl, CreateMode.PERSISTENT);
+            //
+            // // class server(s).
+            // zoo.create(zconfig + ZSLASH
+            // + ClassServer.class.getSimpleName(), SerializerUtil
+            // .serialize(classServerConfig), acl,
+            // CreateMode.PERSISTENT);
+
+            // transaction server
+            v.add(new TransactionServiceConfiguration(config));
+
+            // metadata server
+            v.add(new MetadataServiceConfiguration(config));
+
+            // data server(s) (lots!)
+            v.add(new DataServiceConfiguration(config));
+
+            // load balancer server.
+            v.add(new LoadBalancerServiceConfiguration(config));
+
+            // // resource lock server(s).
+            // zoo.create(zconfig + ZSLASH
+            // + ResourceLockServer.class.getSimpleName(),
+            // SerializerUtil.serialize(resourceLockServerConfig),
+            // acl, CreateMode.PERSISTENT);
+
+            return v.toArray(new ServiceConfiguration[0]);
+            
+    }
+    
+    /**
+     * Load the {@link ServiceConfiguration}s for the federation into
+     * zookeeper. 
      * 
-     * @todo Do the LBS.
+     * @throws ConfigurationException
+     * @throws InterruptedException
+     * @throws KeeperException
      * 
-     * @todo Do the MDS.
-     * 
-     * @todo Do the data services.
+     * @todo option to overwrite any that already exist?
      */
     protected void loadConfiguration(final ZooKeeper zookeeper,
             final String zconfig, final List<ACL> acl,
-            final Configuration config) throws KeeperException,
+            final ServiceConfiguration[] config) throws KeeperException,
             InterruptedException, ConfigurationException {
 
-        // // jini registrar(s).
-        // zoo.create(zconfig + ZSLASH + "jini", SerializerUtil
-        // .serialize(jiniConfig), acl, CreateMode.PERSISTENT);
-        //
-        // // class server(s).
-        // zoo.create(zconfig + ZSLASH
-        // + ClassServer.class.getSimpleName(), SerializerUtil
-        // .serialize(classServerConfig), acl,
-        // CreateMode.PERSISTENT);
+        for (ServiceConfiguration x : config) {
 
-        // transaction server(s).
-        zookeeper.create(zconfig + BigdataZooDefs.ZSLASH
-                + TransactionServer.class.getName(), SerializerUtil
-                .serialize(new TransactionServiceConfiguration(config)), acl,
-                CreateMode.PERSISTENT);
+            final String zpath = zconfig + BigdataZooDefs.ZSLASH + x.className;
 
-        // // metadata server(s).
-        // zoo.create(zconfig + ZSLASH
-        // + MetadataServer.class.getSimpleName(),
-        // SerializerUtil.serialize(metadataServerConfig),
-        // acl, CreateMode.PERSISTENT);
-        //
-        // // data server(s).
-        // zoo.create(zconfig + ZSLASH
-        // + DataServer.class.getSimpleName(), SerializerUtil
-        // .serialize(dataServerConfig), acl,
-        // CreateMode.PERSISTENT);
-        //
-        // // resource lock server(s).
-        // zoo.create(zconfig + ZSLASH
-        // + ResourceLockServer.class.getSimpleName(),
-        // SerializerUtil.serialize(resourceLockServerConfig),
-        // acl, CreateMode.PERSISTENT);
-        //
-        // // load balancer server(s).
-        // zoo.create(zconfig + ZSLASH
-        // + LoadBalancerServer.class.getSimpleName(),
-        // SerializerUtil.serialize(loadBalancerServerConfig),
-        // acl, CreateMode.PERSISTENT);
+            try {
+                
+                zookeeper.create(zpath, SerializerUtil.serialize(x), acl,
+                        CreateMode.PERSISTENT);
+                
+            } catch (NodeExistsException ex) {
 
-        
+                log.warn("ServiceConfiguration exists: " + zpath);
+
+            }
+
+        }
+
     }
-    
+
 }

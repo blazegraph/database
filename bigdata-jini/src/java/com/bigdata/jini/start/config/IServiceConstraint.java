@@ -1,4 +1,4 @@
-package com.bigdata.jini.start;
+package com.bigdata.jini.start.config;
 
 import java.io.Serializable;
 

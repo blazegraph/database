@@ -2,22 +2,35 @@ package com.bigdata.zookeeper;
 
 import java.io.IOException;
 import java.io.Writer;
+import java.util.Arrays;
+import java.util.List;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
 
+import org.apache.log4j.Logger;
 import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.ZooDefs.Ids;
+import org.apache.zookeeper.data.ACL;
+import org.apache.zookeeper.data.Id;
 
-import com.bigdata.jini.start.ServiceConfiguration;
+import com.bigdata.jini.start.config.ServiceConfiguration;
 
 /**
- * Helper class for the zookeeper client configuration.
+ * Helper class for the {@link ZooKeeper} client configuration.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class ZookeeperClientConfig {
 
+    final static protected Logger log = Logger
+            .getLogger(ZookeeperClientConfig.class);
+
+    final static protected boolean INFO = log.isInfoEnabled();
+
+    final static protected boolean DEBUG = log.isDebugEnabled();
+    
     /**
      * Zookeeper client options.
      * 
@@ -30,7 +43,7 @@ public class ZookeeperClientConfig {
         /**
          * The namespace for these options.
          */
-        String NAMESPACE = "com.bigdata.zookeeper";
+        String NAMESPACE = ZooKeeper.class.getName();
 
         /**
          * The root node in the zookeeper instance for the federation.
@@ -54,23 +67,79 @@ public class ZookeeperClientConfig {
          */
         String SERVERS = "servers";
 
+        /**
+         * The ACL that will be used to create various znodes on the behalf of
+         * the federation (the default is {@link Ids#OPEN_ACL_UNSAFE}).
+         */
+        String ACL = "acl";
+        
     }
 
+    /**
+     * The path to the zookeeper znode that is the root for all data for the
+     * federation.
+     * 
+     * @see Options#ZROOT
+     */
     public final String zroot;
 
+    /**
+     * The session timeout.
+     * 
+     * @see Options#SESSION_TIMEOUT
+     */
     public final int sessionTimeout;
 
+    /**
+     * A comma delimited list of servers.
+     * 
+     * @see Options#SERVERS
+     */
     public final String servers;
 
-    public ZookeeperClientConfig(final String zroot, final int sessionTimeout,
-            final String servers) {
+    /**
+     * The ACL used to create znodes on the behalf of the federation.
+     * 
+     * @see Options#ACL
+     */
+    public final List<ACL> acl;
+    
+    /**
+     * Reads the zookeeper client configuration from a {@link Configuration}.
+     * 
+     * @param config
+     *            The configuration object.
+     * 
+     * @return The client configuration.
+     * 
+     * @throws ConfigurationException
+     */
+    public ZookeeperClientConfig(final Configuration config)
+            throws ConfigurationException {
 
-        this.zroot = zroot;
+        // root node for federation within zookeeper.
+        zroot = (String) config.getEntry(Options.NAMESPACE, Options.ZROOT,
+                String.class);
 
-        this.sessionTimeout = sessionTimeout;
+        // session timeout.
+        sessionTimeout = (Integer) config.getEntry(Options.NAMESPACE,
+                Options.SESSION_TIMEOUT, Integer.TYPE,
+                Options.DEFAULT_SESSION_TIMEOUT);
 
-        this.servers = servers;
+        // comma separated list of zookeeper services.
+        servers = (String) config.getEntry(Options.NAMESPACE, Options.SERVERS,
+                String.class);
+        
+        // ACLs used to create various znodes.
+        acl = Arrays.asList((ACL[]) config.getEntry(Options.NAMESPACE,
+                Options.ACL, ACL[].class,
+                // default ACL
+                Ids.OPEN_ACL_UNSAFE.toArray(new ACL[0])//
+                ));
 
+        if(INFO)
+            log.info(this.toString());
+        
     }
 
     public String toString() {
@@ -79,6 +148,7 @@ public class ZookeeperClientConfig {
                 + "{ zroot=" + zroot//
                 + ", sessionTimeout=" + sessionTimeout//
                 + ", servers=" + servers//
+                + ", acl=" + acl//
                 + "}";
 
     }
@@ -96,41 +166,33 @@ public class ZookeeperClientConfig {
         w.write(Options.SERVERS + "=" + ServiceConfiguration.q(servers) + ";\n");
 
         w.write(Options.SESSION_TIMEOUT + "=" + sessionTimeout + ";\n");
-        
+
+        w.write(Options.ACL + "= new " + ACL.class.getName() + "[] {\n");
+
+        for (ACL x : acl) {
+
+            w.write("new " + ACL.class.getName() + "(");
+
+            w.write(Integer.toString(x.getPerms()));
+
+            w.write(",");
+
+            w.write("new " + Id.class.getName() + "(");
+
+            w.write(ServiceConfiguration.q(x.getId().getScheme()));
+
+            w.write(",");
+
+            w.write(ServiceConfiguration.q(x.getId().getId()));
+
+            w.write(")),\n");
+
+        }
+
+        w.write("};\n");
+
         w.write("}\n");
         
-    }
-
-    /**
-     * Reads the zookeeper client configuration from a {@link Configuration}.
-     * 
-     * @param config
-     *            The configuration object.
-     *            
-     * @return The client configuration.
-     * 
-     * @throws ConfigurationException
-     */
-    static public ZookeeperClientConfig readConfiguration(
-            final Configuration config) throws ConfigurationException {
-
-        // root node for federation within zookeeper.
-        final String zroot = (String) config.getEntry(
-                Options.NAMESPACE, Options.ZROOT,
-                String.class);
-
-        // session timeout.
-        final int sessionTimeout = (Integer) config.getEntry(
-                Options.NAMESPACE, Options.SESSION_TIMEOUT,
-                Integer.TYPE, Options.DEFAULT_SESSION_TIMEOUT);
-
-        // comma separated list of zookeeper services.
-        final String servers = (String) config.getEntry(
-                Options.NAMESPACE, Options.SERVERS,
-                String.class);
-
-        return new ZookeeperClientConfig(zroot, sessionTimeout, servers);
-
     }
 
 }

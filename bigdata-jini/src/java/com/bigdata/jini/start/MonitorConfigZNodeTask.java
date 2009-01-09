@@ -9,8 +9,10 @@ import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.Stat;
 
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.util.InnerCause;
+import com.bigdata.zookeeper.UnknownChildrenWatcher;
 
 /**
  * Task monitors the {@link BigdataZooDefs#CONFIG} znode and creates a new
@@ -138,12 +140,11 @@ public class MonitorConfigZNodeTask implements Callable {
                 fed, listener, config.className);
 
         /*
-         * Start task.
+         * Start monitored task.
          * 
-         * FIXME monitor this future - the task should not terminate unless
-         * cancelled.
+         * Note: the task should not terminate unless cancelled.
          */
-        final Future f = fed.getExecutorService().submit(task);
+        fed.submitMonitoredTask(task);
 
     }
 

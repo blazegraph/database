@@ -1,24 +1,26 @@
 package com.bigdata.jini.start;
 
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
-import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.Stat;
 
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.jini.start.config.IServiceConstraint;
+import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.zookeeper.UnknownChildrenWatcher;
 import com.bigdata.zookeeper.ZLock;
 import com.bigdata.zookeeper.ZNodeLockWatcher;
 
 /**
- * Notices when new a new lock node is created and contends for the lock if
- * the localhost can satisify the {@link IServiceConstraint}s for the new
- * physical service. The {@link ServiceConfiguration} is fetched from the
- * zpath written into the data of the lock node. The
- * {@link IServiceConstraint}s found are in that
- * {@link ServiceConfiguration}.
+ * Notices when new a new lock node is created and contends for the lock if the
+ * localhost can satisify the {@link IServiceConstraint}s for the new physical
+ * service. The {@link ServiceConfiguration} is fetched using the zpath written
+ * into the data of the lock node. The {@link IServiceConstraint}s found are in
+ * that {@link ServiceConfiguration}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -56,6 +58,9 @@ public class MonitorCreatePhysicalServiceLocks implements
 
     }
 
+    /**
+     * Task runs until cancelled.
+     */
     public Void call() throws Exception {
 
         // all the locks of interest are created here.
@@ -64,7 +69,7 @@ public class MonitorCreatePhysicalServiceLocks implements
 
         final UnknownChildrenWatcher watcher = new UnknownChildrenWatcher(
                 zookeeper, locksZPath);
-
+     
         try {
 
             while (true) {
@@ -89,11 +94,15 @@ public class MonitorCreatePhysicalServiceLocks implements
                     
                     return null;
                     
-                } catch (KeeperException ex) {
+                } catch (Throwable t) {
                     
-                    // continue processing if there are errors.
+                    /*
+                     * Continue processing if there are errors since we still
+                     * want to monitor for new service start requests and see if
+                     * we can handle them.
+                     */
                     
-                    log.error(this, ex);
+                    log.error(this, t);
                     
                 }
                 
@@ -137,39 +146,52 @@ public class MonitorCreatePhysicalServiceLocks implements
     }
 
     /**
+     * Contends for the {@link ZLock} and starts the service if the the
+     * {@link IServiceConstraint}s are satisified.
+     * <p>
+     * Note: This fetches the {@link ServiceConfiguration} and tests the
+     * {@link IServiceConstraint}s after we hold the {@link ZLock} and then
+     * makes the decision whether or not to start the service. That way it
+     * judges matters as they stand at the time of the decision, rather than
+     * when we joined the queue to contend for the {@link ZLock}.
      * 
-     * @param zpath
-     *            The path to the logical service znode.
+     * @param lockNodeZPath
+     *            The path to the lock node.
      * 
-     * @throws KeeperException
-     * @throws InterruptedException
+     * @return <code>true</code> if we started the service.
      * 
-     * @todo it could be safer to move the fetch of the
-     *       {@link ServiceConfiguration} and the
-     *       {@link #canStartService(ServiceConfiguration)} call to after we
-     *       hold the lock. that way we judge matters as they stand at the time
-     *       of the decision.
+     * @throws Exception
+     *             if we could not start the service.
      */
-    protected void handleNewLock(final String zpath) throws KeeperException,
-            InterruptedException {
+    protected boolean handleNewLock(final String lockNodeZPath) throws Exception {
 
-        final String configZPath = (String) SerializerUtil
-                .deserialize(zookeeper.getData(zpath, false, new Stat()));
+        /*
+         * Note: The data is the logicalService zpath.
+         */
+        final String logicalServiceZPath = (String) SerializerUtil
+                .deserialize(zookeeper.getData(lockNodeZPath, false, new Stat()));
 
+        /*
+         * If we hack off the last path component, we now have the zpath for
+         * the ServiceConfiguration znode.
+         */
+        final String serviceConfigZPath = logicalServiceZPath.substring(0,
+                logicalServiceZPath.lastIndexOf('/'));
+        
         if (INFO)
-            log.info("configZPath=" + configZPath);
+            log.info("logicalServiceZPath=" + logicalServiceZPath);
 
         // enter the competition.
-        final ZLock zlock = ZNodeLockWatcher.getLock(zookeeper, zpath);
+        final ZLock zlock = ZNodeLockWatcher.getLock(zookeeper, lockNodeZPath);
 
         zlock.lock();
         try {
 
             if (INFO)
-                log.info("have lock: zpath=" + zpath);
+                log.info("have lock: zpath=" + lockNodeZPath);
 
             final ServiceConfiguration config = (ServiceConfiguration) SerializerUtil
-                    .deserialize(zookeeper.getData(configZPath, false,
+                    .deserialize(zookeeper.getData(serviceConfigZPath, false,
                             new Stat()));
 
             if (INFO)
@@ -183,27 +205,18 @@ public class MonitorCreatePhysicalServiceLocks implements
                     log.info("Constraint(s) do not allow service start: "
                             + config);
 
-                return;
+                return false;
 
             }
 
-            try {
-                
-                // start the service.
-                startService(config, zpath);
+            // start the service.
+            startService(config, logicalServiceZPath);
 
-                // iff successful, then destroy the lock.
-                zlock.destroyLock();
-                
-            } catch (Exception e) {
-
-                // could not start.
-                log.error(this, e); // FIXME comment out - MUST watch its Future.
-                
-                throw new RuntimeException(e);
-                
-            }
-
+            // iff successful, then destroy the lock.
+            zlock.destroyLock();
+            
+            return true;
+            
         } finally {
             
             zlock.unlock();
@@ -216,20 +229,29 @@ public class MonitorCreatePhysicalServiceLocks implements
      * Start the service.
      * 
      * @param config
-     * @param zpath
+     * @param logicalServiceZPath
      * @throws Exception
      */
-    protected void startService(ServiceConfiguration config, String zpath)
-            throws Exception {
+    protected void startService(final ServiceConfiguration config,
+            final String logicalServiceZPath) throws Exception {
 
         if (INFO)
-            log.info("config=" + config + ", zpath=" + zpath);
-        
-        // get task to start the service.
-        final Callable task = config.newServiceStarter(fed, listener, zpath);
+            log.info("config=" + config + ", zpath=" + logicalServiceZPath);
 
-        // Submit the task and wait for its Future.
-        fed.getExecutorService().submit(task).get();
+        // get task to start the service.
+        final Callable task = config.newServiceStarter(fed, listener,
+                logicalServiceZPath);
+
+        /*
+         * Submit the task and wait for its Future.
+         * 
+         * Note: this places a timeout in the startup of the service. The
+         * timeout is pretty generous. Service start and service restart should
+         * be very fast -- seconds at most.
+         * 
+         * @todo the service start timeout should be a configuration parameter.
+         */
+        fed.getExecutorService().submit(task).get(60, TimeUnit.SECONDS);
 
     }
 

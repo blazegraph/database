@@ -26,12 +26,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.jini;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 
 import com.bigdata.service.jini.AbstractServerTestCase;
 

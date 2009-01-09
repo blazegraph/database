@@ -40,6 +40,8 @@ import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.ZooDefs.Ids;
 import org.apache.zookeeper.data.ACL;
 
+import com.bigdata.jini.start.process.ProcessHelper;
+import com.bigdata.jini.start.process.ZookeeperProcessHelper;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.zookeeper.ZookeeperClientConfig;
@@ -149,7 +151,7 @@ public class AbstractFedZooTestCase extends TestCase2 {
         // destroy any processes started by this test suite.
         for (ProcessHelper t : listener.running) {
             
-            t.destroy();
+            t.kill();
             
         }
         

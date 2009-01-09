@@ -49,9 +49,9 @@ import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.server.quorum.QuorumPeerMain;
 
 import com.bigdata.jini.start.MockListener;
-import com.bigdata.jini.start.ProcessHelper;
-import com.bigdata.jini.start.ServiceConfiguration;
-import com.bigdata.jini.start.ZookeeperProcessHelper;
+import com.bigdata.jini.start.config.ServiceConfiguration;
+import com.bigdata.jini.start.process.ProcessHelper;
+import com.bigdata.jini.start.process.ZookeeperProcessHelper;
 import com.bigdata.resources.ResourceFileFilter;
 
 /**
@@ -201,7 +201,7 @@ public abstract class AbstractZooTestCase extends TestCase2 {
         for(ProcessHelper h : listener.running) {
             
             // destroy zookeeper service iff we started it.
-            h.destroy();
+            h.kill();
 
         }
 

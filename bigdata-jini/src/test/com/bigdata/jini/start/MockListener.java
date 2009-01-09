@@ -5,6 +5,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.jini.start.process.ProcessHelper;
+
 /**
  * Mock implementation used by some unit tests.
  * 

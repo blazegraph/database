@@ -25,12 +25,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jan 4, 2009
  */
 
-package com.bigdata.jini.start;
+package com.bigdata.jini.start.config;
 
-import com.bigdata.service.jini.JiniFederation;
+import java.io.File;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
+
+import com.bigdata.jini.start.IServiceListener;
+import com.bigdata.service.jini.JiniFederation;
 
 /**
  * Somewhat specialized configuration for a jini registrar instance.
@@ -45,6 +48,27 @@ public class JiniRegistrarServiceConfiguration extends ServiceConfiguration {
      */
     private static final long serialVersionUID = 4601254369003651017L;
 
+    /**
+     * Configuration options.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public interface Options extends ServiceConfiguration.Options {
+        
+        /**
+         * {@link File} that will be executed to start jini (could be "cmd" option
+         * and then we could get rid of the "java" option).
+         * 
+         * @todo not used yet. probably move into the
+         *       {@link JiniRegistrarServiceConfiguration} (an subclass of
+         *       {@link ServiceConfiguration} that is specialized for starting
+         *       jini).
+         */
+        String JINI = "jini";
+
+    }
+    
     /**
      * @param config
      * 

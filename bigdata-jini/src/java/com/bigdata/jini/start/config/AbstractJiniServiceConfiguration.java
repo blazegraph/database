@@ -25,7 +25,7 @@
  * Created on Jan 5, 2009
  */
 
-package com.bigdata.jini.start;
+package com.bigdata.jini.start.config;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -37,7 +37,9 @@ import java.io.Writer;
 import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.Enumeration;
 import java.util.List;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -50,8 +52,10 @@ import net.jini.core.discovery.LookupLocator;
 import net.jini.core.entry.Entry;
 import net.jini.core.lookup.ServiceItem;
 import net.jini.core.lookup.ServiceTemplate;
-import net.jini.discovery.LookupDiscovery;
 import net.jini.entry.AbstractEntry;
+import net.jini.jeri.BasicILFactory;
+import net.jini.jeri.BasicJeriExporter;
+import net.jini.jeri.tcp.TcpServerEndpoint;
 import net.jini.lease.LeaseRenewalManager;
 import net.jini.lookup.ServiceDiscoveryManager;
 import net.jini.lookup.entry.Comment;
@@ -62,6 +66,15 @@ import org.apache.zookeeper.KeeperException;
 
 import sun.security.jca.ServiceId;
 
+import com.bigdata.jini.lookup.entry.Hostname;
+import com.bigdata.jini.lookup.entry.ServiceToken;
+import com.bigdata.jini.start.BigdataZooDefs;
+import com.bigdata.jini.start.IServiceListener;
+import com.bigdata.jini.start.process.JiniProcessHelper;
+import com.bigdata.jini.start.process.ProcessHelper;
+import com.bigdata.service.jini.AbstractServer;
+import com.bigdata.service.jini.JiniClient;
+import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.JiniUtil;
 import com.bigdata.zookeeper.ZNodeCreatedWatcher;
@@ -77,45 +90,23 @@ abstract public class AbstractJiniServiceConfiguration extends
         JavaServiceConfiguration {
 
     /**
-     * Additional options understood by the
+     * Additional {@link Configuration} options understood by
      * {@link AbstractJiniServiceConfiguration}.
+     * <p>
+     * Note: A <strong>canonical</strong> {@link Name} will be automatically
+     * added to the {@link Entry}[] using the class and znode of the service
+     * instance. It is a good idea not to specify additional service names as
+     * something might break :-).
+     * <p>
+     * Note: A {@link Hostname} attribute will be automatically added to the
+     * entries.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public interface Options extends JavaServiceConfiguration.Options {
+    public interface Options extends JavaServiceConfiguration.Options,
+            JiniClientConfig.Options {
      
-        /**
-         * {@link Entry}[] attributes used to describe the service.
-         * <p>
-         * Note: A {@link Name} and {@link Hostname} will be automatically added
-         * to this array using the class and znode of the service instance. The
-         * {@link Name} will be a <strong>canonical</strong> service name. It
-         * is a good idea not to specify additional service names as something
-         * might break :-).
-         * 
-         * @todo this will have to be handled specially for the
-         *       {@link ServicesManagerServer} instances.
-         */
-        String ENTRIES = "entries";
-
-        /**
-         * A {@link String}[] whose values are the group(s) to be used for
-         * discovery (no default). Note that multicast discovery is always used
-         * if {@link LookupDiscovery#ALL_GROUPS} (a <code>null</code>) is
-         * specified.
-         */
-        String GROUPS = "groups";
-
-        /**
-         * One or more {@link LookupLocator}s specifying unicast URIs of the
-         * form <code>jini://host/</code> or <code>jini://host:port/</code>
-         * (no default). This MAY be an empty array if you want to use multicast
-         * discovery <strong>and</strong> you have specified {@link #GROUPS} as
-         * {@link LookupDiscovery#ALL_GROUPS} (a <code>null</code>). .
-         */
-        String LOCATORS = "locators";
-
         /**
          * These options are fully qualified "name=value" parameter overrides
          * for the {@link Configuration} and will appear at the end of the
@@ -132,6 +123,7 @@ abstract public class AbstractJiniServiceConfiguration extends
     public final Entry[] entries;
     public final String[] groups;
     public final LookupLocator[] locators;
+    public final Properties properties;
     public final String[] jiniOptions;
     
     protected void toString(StringBuilder sb) {
@@ -144,6 +136,8 @@ abstract public class AbstractJiniServiceConfiguration extends
         
         sb.append(", locators=" + Arrays.toString(locators));
 
+        sb.append(", properties=" + properties);
+
         sb.append(", jiniOptions=" + Arrays.toString(jiniOptions));
 
     }
@@ -153,16 +147,20 @@ abstract public class AbstractJiniServiceConfiguration extends
      * @param config
      * @throws ConfigurationException
      */
-    public AbstractJiniServiceConfiguration(Class cls, Configuration config)
+    public AbstractJiniServiceConfiguration(final Class cls, final Configuration config)
             throws ConfigurationException {
  
         super(cls, config);
         
-        entries = getEntries(cls.getName(), config);
-
-        groups = getGroups(cls.getName(), config);
+        JiniClientConfig tmp = new JiniClientConfig(cls,config);
         
-        locators = getLocators(cls.getName(), config);
+        entries = tmp.entries;
+
+        groups = tmp.groups;
+        
+        locators = tmp.locators;
+        
+        properties = tmp.properties;
         
         jiniOptions = getJiniOptions(cls.getName(), config);
         
@@ -181,7 +179,7 @@ abstract public class AbstractJiniServiceConfiguration extends
      * @version $Id$
      * @param <V>
      */
-    protected class JiniServiceStarter<V extends JiniProcessHelper> extends
+    public class JiniServiceStarter<V extends JiniProcessHelper> extends
             JavaServiceStarter<V> {
         
         /**
@@ -375,8 +373,7 @@ abstract public class AbstractJiniServiceConfiguration extends
             }
             out.write("\n");
 
-            // AdvertDescription.
-            out.write("\n\nAdvertDescription {\n");
+            out.write("\n\n" + JiniClient.class.getName() + " {\n");
             {
 
                 writeEntries(out);
@@ -388,8 +385,7 @@ abstract public class AbstractJiniServiceConfiguration extends
             }
             out.write("}\n");
 
-            // @todo use the className for the component?
-            out.write("\n\nServiceDescription {\n");
+            out.write("\n\n" + className + " {\n");
             writeServiceDescription(out);
             out.write("}\n");
 
@@ -537,12 +533,13 @@ abstract public class AbstractJiniServiceConfiguration extends
 
         protected void writeLocators(Writer out) throws IOException {
 
-            out.write("\nlocators=new String[]{\n");
+            out.write("\nlocators=new " + LookupLocator.class.getName()
+                    + "[]{\n");
 
             for (LookupLocator e : locators) {
 
-                out.write("new LookupLocator(\"" + e.getHost() + "\","
-                        + e.getPort() + "\n");
+                out.write("new " + LookupLocator.class.getName() + "(\""
+                        + e.getHost() + "\"," + e.getPort() + "\n");
 
             }
 
@@ -563,8 +560,56 @@ abstract public class AbstractJiniServiceConfiguration extends
             
             writeLogicalServiceZPath(out);
 
+            writeProperties(out);
+            
         }
 
+        /**
+         * Writes the properties for the specificed class namespace into the
+         * generated service configuration file.
+         * 
+         * @param writer
+         * 
+         * @throws IOException
+         */
+        protected void writeProperties(final Writer out) throws IOException {
+
+            // extension hook.
+            final Properties properties = getProperties(AbstractJiniServiceConfiguration.this.properties);
+            
+            out.write("\nproperties = new NV[]{\n");
+
+            Enumeration e = properties.propertyNames();
+
+            while(e.hasMoreElements()) {
+
+                final String k = e.nextElement().toString();
+                
+                final String v = properties.getProperty(k);
+                
+                out.write("new NV( " + q(k) + ", " + q(v) + "),\n");
+                
+            }
+            
+            out.write("};\n");
+
+        }
+
+        /**
+         * Extension hook for adding or overriding properties.
+         * 
+         * @param properties
+         *            The configured properties.
+         *            
+         * @return The properties that will be written using
+         *         {@link #writeProperties(Writer)}
+         */
+        protected Properties getProperties(Properties properties) {
+            
+            return properties;
+            
+        }
+        
         /**
          * Writes the <code>exporter</code> entry. This object is used to
          * export the service proxy. The choice here effects the protocol that
@@ -572,12 +617,21 @@ abstract public class AbstractJiniServiceConfiguration extends
          * <p>
          * Note: specify the JVM property [-Dcom.sun.jini.jeri.tcp.useNIO=true]
          * to enable NIO.
+         * 
+         * FIXME the [exporter] is hardwired. Its value is used by the
+         * {@link AbstractServer} to export the proxy for the service.
+         * <p>
+         * Note: There are also hardwired exporters used by the
+         * {@link JiniFederation}. The whole issue needs to be resolved. The
+         * exported is a chunk of code, so it would have to be quoted to get
+         * passed along, which is why I am doing it this way.
          */
         protected void writeExporter(Writer out) throws IOException {
             
-            out
-                    .write("\nexporter = new BasicJeriExporter(TcpServerEndpoint.getInstance(0),\n"
-                            + "new BasicILFactory());\n");
+            out.write("\nexporter = new " + BasicJeriExporter.class.getName()
+                    + "(" + TcpServerEndpoint.class.getName()
+                    + ".getInstance(0)," + "new "
+                    + BasicILFactory.class.getName() + "());\n");
 
         }
         
@@ -794,37 +848,6 @@ abstract public class AbstractJiniServiceConfiguration extends
             return;
             
         }
-
-    }
-
-    public static Entry[] getEntries(String className, Configuration config)
-            throws ConfigurationException {
-
-        final Entry[] a = (Entry[]) config.getEntry(Options.NAMESPACE,
-                Options.ENTRIES, Entry[].class, new Entry[] {});
-        
-        final Entry[] b = (Entry[]) config.getEntry(className, Options.ENTRIES,
-                Entry[].class, new Entry[] {});
-        
-        return concat(a,b);
-                
-    }
-
-    // @todo default ALL_GROUPS?
-    public static String[] getGroups(String className, Configuration config)
-            throws ConfigurationException {
-
-        return (String[]) config.getEntry(Options.NAMESPACE, Options.GROUPS,
-                String[].class);
-
-    }
-
-    // @todo default empty LookupLocator[]?
-    public static LookupLocator[] getLocators(String className,
-            Configuration config) throws ConfigurationException {
-
-        return (LookupLocator[]) config.getEntry(Options.NAMESPACE,
-                Options.LOCATORS, LookupLocator[].class);
 
     }
 

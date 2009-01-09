@@ -76,33 +76,9 @@ public class ResourceLockServer extends AbstractServer {
      * @param args
      *            The name of the {@link Configuration} file for the service.
      */
-    public static void main(String[] args) {
+    public static void main(final String[] args) {
         
-        new ResourceLockServer(args) {
-            
-            /**
-             * Overriden to use {@link System#exit()} since this is the command
-             * line interface.
-             */
-            protected void fatal(String msg, Throwable t) {
-
-                log.fatal(msg, t);
-
-                try {
-
-                    shutdownNow();
-                    
-                } catch (Throwable t2) {
-                    
-                    log.error(t2.getMessage(), t2);
-                    
-                }
-
-                System.exit(1);
-
-            }
-            
-        }.run();
+        new ResourceLockServer(args).run();
         
     }
 

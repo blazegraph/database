@@ -25,7 +25,7 @@
  * Created on Jan 4, 2009
  */
 
-package com.bigdata.jini.start;
+package com.bigdata.jini.start.config;
 
 import java.io.File;
 import java.io.IOException;
@@ -43,6 +43,8 @@ import net.jini.config.ConfigurationException;
 
 import org.apache.zookeeper.data.ACL;
 
+import com.bigdata.jini.start.IServiceListener;
+import com.bigdata.jini.start.process.ProcessHelper;
 import com.bigdata.service.jini.JiniFederation;
 
 /**
@@ -184,19 +186,19 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
      * @version $Id$
      * @param <V>
      */
-    protected class JavaServiceStarter<V extends ProcessHelper> extends
+    public class JavaServiceStarter<V extends ProcessHelper> extends
             AbstractServiceStarter<V> {
 
         /**
          * The class for the service that we are going to start.
          */
-        protected final Class cls;
+        public final Class cls;
 
         /**
          * The znode for the logical service (the last component of the
          * {@link AbstractServiceStarter#logicalServiceZPath}.
          */
-        protected final String logicalServiceZNode;
+        public final String logicalServiceZNode;
 
         /**
          * A unique token assigned to the service. This is used to recognize the
@@ -205,7 +207,7 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
          * physicalServiceZPath which is only available once it is created by
          * the service instance.
          */
-        protected final UUID serviceToken;
+        public final UUID serviceToken;
 
         /**
          * The canonical service name. This is formed in much the same manner as
@@ -215,7 +217,7 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
          * of the service name make is possible to readily classify a physical
          * service by its type and logical instance.
          */
-        protected final String serviceName;
+        public final String serviceName;
 
         /**
          * The service instance directory. This is where we put any
@@ -228,7 +230,7 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
          * type, the {@link #logicalServiceZNode}, and finally the unique
          * {@link #serviceToken} assigned to the service.
          */
-        protected final File serviceDir;
+        public final File serviceDir;
 
         /**
          * @param fed
@@ -379,7 +381,7 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
 
                 } finally {
 
-                    processHelper.destroy();
+                    processHelper.kill();
 
                 }
 

@@ -32,6 +32,7 @@ import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.Banner;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.ITimestampService;
@@ -57,6 +58,10 @@ abstract public class AbstractService implements IService {
      */
     protected AbstractService() {
         
+        // show the copyright banner during statup.
+        Banner.banner();
+
+        //@todo reconcile with AbstractServer
         serviceName = getHostname() + "#" + getServiceIface().getName();
         
     }

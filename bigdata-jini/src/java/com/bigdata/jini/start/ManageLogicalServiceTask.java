@@ -35,14 +35,14 @@ import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
-import org.apache.zookeeper.ZooDefs.Ids;
 import org.apache.zookeeper.data.ACL;
 
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.service.DataService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.service.jini.JiniFederation;
-import com.bigdata.service.jini.AbstractServer.RemoteDestroyAdmin;
+import com.bigdata.service.jini.RemoteDestroyAdmin;
 import com.bigdata.zookeeper.ZLock;
 import com.sun.jini.tool.ClassServer;
 
@@ -195,14 +195,18 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
 
         final ZooKeeper zookeeper = fed.getZookeeper();
 
-        final List<ACL> acl = Ids.OPEN_ACL_UNSAFE;// @todo acl
+        final List<ACL> acl = fed.getZooConfig().acl;
         
         log.warn("serviceCount=" + config.serviceCount + ", actual="
                 + children.size() + ", configZPath=" + configZPath);
 
-        // create zpath for the new logical service.
+        /*
+         * Create zpath for the new logical service.
+         */
         final String logicalServiceZPath = zookeeper.create(configZPath
-                + "/logicalService", SerializerUtil.serialize(config), acl,
+                + "/logicalService", //
+                new byte[0], // SerializerUtil.serialize(config),
+                acl,//
                 CreateMode.PERSISTENT_SEQUENTIAL);
 
         try {
@@ -211,9 +215,8 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
              * Create the znode for the election of the primary physical service for
              * this logical service.
              */
-            
-            zookeeper.create(logicalServiceZPath + "/election", SerializerUtil
-                    .serialize(config), acl, CreateMode.PERSISTENT);
+            zookeeper.create(logicalServiceZPath + "/election", new byte[0],
+                    acl, CreateMode.PERSISTENT);
             
         } catch (NodeExistsException ex) {
             
@@ -226,11 +229,13 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
             /*
              * Create the znode used to decide the host on which the new
              * physical service will be created.
+             * 
+             * Note: The data is the zpath to the logicalService.
              */
-            
             zookeeper.create(fed.getZooConfig().zroot + "/"
-                    + BigdataZooDefs.LOCKS_CREATE_PHYSICAL_SERVICE + "/lock",
-                    SerializerUtil.serialize(logicalServiceZPath), acl,
+                    + BigdataZooDefs.LOCKS_CREATE_PHYSICAL_SERVICE
+                    + "/locknode", SerializerUtil
+                    .serialize(logicalServiceZPath), acl,
                     CreateMode.PERSISTENT_SEQUENTIAL);
             
         } catch (NodeExistsException ex) {

@@ -87,12 +87,6 @@ public class DataServer extends AbstractServer {
         super(args);
 
     }
-    
-//    public DataServer(String[] args, LifeCycle lifeCycle) {
-//        
-//        super( args, lifeCycle );
-//        
-//    }
 
     /**
      * Starts a new {@link DataServer}.  This can be done programmatically
@@ -107,31 +101,7 @@ public class DataServer extends AbstractServer {
      */
     public static void main(String[] args) {
         
-        new DataServer(args) {
-            
-            /**
-             * Overriden to use {@link System#exit()} since this is the command
-             * line interface.
-             */
-            protected void fatal(String msg, Throwable t) {
-
-                log.fatal(msg, t);
-
-                try {
-
-                    shutdownNow();
-                    
-                } catch (Throwable t2) {
-                    
-                    log.error(t2.getMessage(), t2);
-                    
-                }
-                
-                System.exit(1);
-
-            }
-            
-        }.run();
+        new DataServer(args).run();
         
     }
     

@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jan 2, 2009
  */
 
-package com.bigdata.jini.start;
+package com.bigdata.jini.start.config;
 
 /**
  * A description of a zookeeper <code>server</code> entry as found in a

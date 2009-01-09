@@ -1865,7 +1865,7 @@ abstract public class LoadBalancerService extends AbstractService
             if (INFO)
                 log.info("serviceUUID=" + serviceUUID);
 
-            if (!getFederation().getServiceUUID().equals(serviceUUID)) {
+            if (!serviceUUID.equals(getServiceUUID())) {
 
                 /*
                  * Don't do this for the load balancer itself!

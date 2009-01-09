@@ -44,11 +44,15 @@ import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.Stat;
 
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.jini.start.JavaServiceConfiguration.JavaServiceStarter;
+import com.bigdata.jini.start.config.BigdataServiceConfiguration;
+import com.bigdata.jini.start.config.ServiceConfiguration;
+import com.bigdata.jini.start.config.TransactionServiceConfiguration;
+import com.bigdata.jini.start.config.JavaServiceConfiguration.JavaServiceStarter;
+import com.bigdata.jini.start.process.ProcessHelper;
 import com.bigdata.service.IService;
 import com.bigdata.service.jini.JiniUtil;
+import com.bigdata.service.jini.RemoteDestroyAdmin;
 import com.bigdata.service.jini.TransactionServer;
-import com.bigdata.service.jini.AbstractServer.RemoteDestroyAdmin;
 import com.bigdata.zookeeper.ZNodeDeletedWatcher;
 
 /**

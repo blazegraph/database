@@ -27,9 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.zookeeper;
 
-import com.bigdata.journal.IResourceLockService;
-
 import junit.framework.TestCase2;
+
+import com.bigdata.journal.IResourceLockService;
+import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.jini.JiniServicesHelper;
 
 /**
  * Basic integration tests for zookeeper.

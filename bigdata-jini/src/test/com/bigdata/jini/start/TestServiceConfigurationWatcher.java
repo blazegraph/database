@@ -38,6 +38,8 @@ import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
 
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.jini.start.config.ServiceConfiguration;
+import com.bigdata.jini.start.config.TransactionServiceConfiguration;
 import com.bigdata.service.jini.TransactionServer;
 
 /**

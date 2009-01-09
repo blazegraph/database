@@ -41,7 +41,6 @@ import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 
-import net.jini.admin.Administrable;
 import net.jini.admin.JoinAdmin;
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -53,10 +52,11 @@ import net.jini.export.Exporter;
 import net.jini.lease.LeaseListener;
 import net.jini.lease.LeaseRenewalEvent;
 import net.jini.lease.LeaseRenewalManager;
-import net.jini.lookup.DiscoveryAdmin;
 import net.jini.lookup.JoinManager;
 import net.jini.lookup.ServiceIDListener;
 import net.jini.lookup.entry.Name;
+import net.jini.lookup.entry.ServiceType;
+import net.jini.lookup.entry.StatusType;
 
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.CreateMode;
@@ -73,7 +73,6 @@ import com.bigdata.service.AbstractService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IServiceShutdown;
 import com.sun.jini.admin.DestroyAdmin;
-import com.sun.jini.admin.StorageLocationAdmin;
 import com.sun.jini.start.LifeCycle;
 import com.sun.jini.start.NonActivatableServiceDescriptor;
 import com.sun.jini.start.ServiceDescriptor;
@@ -136,6 +135,11 @@ import com.sun.jini.start.ServiceStarter;
  * @todo document exit status codes and unify their use in this and derived
  *       classes.
  * 
+ * @todo add {@link StatusType} and link its values to the running state of the
+ *       service.
+ * 
+ * @todo add {@link ServiceType} with suitable pretty icons.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -154,19 +158,13 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      */
     final static protected boolean DEBUG = log.isDebugEnabled();
 
-    /**
-     * The label in the {@link Configuration} file for the service description
-     * (also used by {@link JiniClient}).
-     */
-    public final static transient String SERVICE_LABEL = "ServiceDescription";
-
-    /**
-     * The label in the {@link Configuration} file for the service advertisment
-     * data (also used by {@link JiniClient}).
-     * 
-     * @todo change to the concrete server class name?
-     */
-    public final static transient String ADVERT_LABEL = "AdvertDescription";
+//    /**
+//     * The label in the {@link Configuration} file for the service description
+//     * (also used by {@link JiniClient}).
+//     * 
+//     * @todo use the className for the component?
+//     */
+//    public final static transient String SERVICE_DESCRIPTION = "ServiceDescription";
 
     /**
      * The {@link ServiceID} for this server is either read from a local file or
@@ -215,6 +213,9 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     /**
      * A configured name for the service -or- <code>null</code> if no
      * {@link Name} was found in the {@link Configuration}.
+     * 
+     * @todo javadoc and reconcile with behavior of {@link AbstractService},
+     *       which assigns a different default service name.
      */
     private String serviceName;
 
@@ -284,15 +285,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         return serviceID;
         
     }
-
-//    protected DiscoveryManagement getDiscoveryManagement() {
-//        
-//        if (discoveryManager == null)
-//            throw new IllegalStateException();
-//        
-//        return discoveryManager;
-//        
-//    }
     
     protected JoinManager getJoinManager() {
         
@@ -377,7 +369,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * @param args
      *            The command line arguments.
      */
-    protected AbstractServer(String[] args) {
+    protected AbstractServer(final String[] args) {
 
         this( args, new FakeLifeCycle() );
         
@@ -393,7 +385,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * 
      * @see NonActivatableServiceDescriptor
      */
-    private AbstractServer(String[] args, LifeCycle lifeCycle ) {
+    private AbstractServer(final String[] args, final LifeCycle lifeCycle) {
         
         // Show the copyright banner during statup.
         Banner.banner();
@@ -412,45 +404,46 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         Entry[] entries = null;
         boolean readServiceIDFromFile = false;
         
+        final JiniClientConfig jiniClientConfig;
         try {
-            
-            config = ConfigurationProvider.getInstance(args); 
 
-            final String defaultName = getClass().getName() + "@"
-                    + AbstractStatisticsCollector.fullyQualifiedHostName;
+            config = ConfigurationProvider.getInstance(args);
+
+            jiniClientConfig = new JiniClientConfig(getClass(), config);
+
+            entries = jiniClientConfig.entries;
             
             /*
-             * Extract how the service will advertise itself from the
-             * Configuration.
+             * Extract a name associated with the service.
              */
-
-            entries = (Entry[]) config.getEntry(ADVERT_LABEL, "entries",
-                    Entry[].class, new Entry[] {
+            {
                 
-                new Name(defaultName)
-                
-            });
+                for (Entry e : entries) {
 
-            /*
-             * Extract the name(s) associated with the service.
-             */
-            for (Entry e : entries) {
+                    if (e instanceof Name) {
 
-                if (e instanceof Name) {
+                        // found a name.
+                        serviceName = ((Name) e).name;
 
-                    // found a name.
-                    serviceName = ((Name) e).name;
+                        break;
 
-                    break;
-                    
+                    }
+
                 }
 
-            }
+                if (serviceName == null) {
+
+                    // assign a default service name.
+                    
+                    final String defaultName = getClass().getName()
+                            + "@"
+                            + AbstractStatisticsCollector.fullyQualifiedHostName
+                            + "#" + hashCode();
+
+                    serviceName = defaultName;
+
+                }
             
-            if (serviceName == null) {
-                
-                serviceName = defaultName; 
-                
             }
             
             /*
@@ -460,7 +453,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
             // The exporter used to expose the service proxy.
             exporter = (Exporter) config.getEntry(//
-                    SERVICE_LABEL, // component
+                    getClass().getName(), // component
                     "exporter", // name
                     Exporter.class // type (of the return object)
                     );
@@ -473,11 +466,11 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
              * need to use the ServicesManager to start any service since the
              * zookeeper configuration needs to be established as well.
              */
-            logicalServiceZPath = (String) config.getEntry(SERVICE_LABEL,
+            logicalServiceZPath = (String) config.getEntry(getClass().getName(),
                     "logicalServiceZPath", String.class, null/* default */);
             
             // The file on which the ServiceID will be written. 
-            serviceIdFile = (File) config.getEntry(SERVICE_LABEL,
+            serviceIdFile = (File) config.getEntry(getClass().getName(),
                     "serviceIdFile", File.class); // default
 
             if(serviceIdFile.exists()) {
@@ -546,15 +539,15 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
          */
         try {
 
-            // read the client configuration.
-            client = JiniClient.newInstance(args);
+            // new client - defer connection to fed.
+            client = new JiniClient(getClass(), config);
 
 //            // connect to the federation (starts service discovery for the client).
 //            client.connect();
             
         } catch(Throwable t) {
             
-            fatal("Could not start client for federation: " + t, t);
+            fatal("Could not create JiniClient: " + t, t);
             
         }
         
@@ -1489,76 +1482,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
     }
     
-//    /**
-//     * Signal handler shuts down the server politely.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    static class ServerShutdownSignalHandler implements SignalHandler {
-//
-//        private final AbstractServer server;
-//        
-//        private SignalHandler oldHandler;
-//
-//        protected ServerShutdownSignalHandler(AbstractServer server) {
-//
-//            if(server == null) throw new IllegalArgumentException();
-//            
-//            this.server = server;
-//            
-//        }
-//
-//        /**
-//         * Install the signal handler.
-//         */
-//        public static SignalHandler install(String signalName,
-//                AbstractServer server) {
-//
-//            Signal signal = new Signal(signalName);
-//
-//            ServerShutdownSignalHandler newHandler = new ServerShutdownSignalHandler(
-//                    server);
-//
-//            newHandler.oldHandler = Signal.handle(signal, newHandler);
-//
-//            log.info("Installed handler: " + signal + ", oldHandler="
-//                    + newHandler.oldHandler);
-//
-//            return newHandler;
-//            
-//        }
-//
-//        public void handle(Signal sig) {
-//
-//            log.warn("Processing signal: "+sig);
-//            
-//            /*
-//             * Handle signal.
-//             */
-//            server.shutdownNow();
-//            
-//            try {
-//                
-//                // Chain back to previous handler, if one exists
-//                if ( oldHandler != SIG_DFL && oldHandler != SIG_IGN ) {
-//
-//                    oldHandler.handle(sig);
-//                    
-//                }
-//                
-//            } catch (Exception ex) {
-//                
-//                log.fatal("Signal handler failed, reason "+ex);
-//        
-//                System.exit(1);
-//                
-//            }
-//            
-//        }
-//        
-//    }
-
     /**
      * This method is responsible for creating the remote service implementation
      * object. This object MUST declare one or more interfaces that extent the
@@ -1577,44 +1500,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      *            command line arguments.
      */
     abstract protected Remote newService(Properties properties);
-
-    /*
-     * Note: You need to extend Remote in order for these APIs to be exported!
-     */
-
-    /**
-     * 
-     */
-    public static interface RemoteAdministrable extends Remote, Administrable {
-
-        /**
-         * Shutdown the service, but do not destroy its persistent data.
-         */
-        public void shutdown() throws IOException;
-
-        /**
-         * Immediate or fast shutdown for the service, but does not destroy its
-         * persistent data.
-         */
-        public void shutdownNow() throws IOException;
-        
-    }
-    
-    public static interface RemoteDestroyAdmin extends Remote, DestroyAdmin {
-
-    }
-
-    public static interface RemoteJoinAdmin extends Remote, JoinAdmin {
-
-    }
-
-    public static interface RemoteDiscoveryAdmin extends Remote, DiscoveryAdmin {
-
-    }
-
-    public static interface RemoteStorageLocationAdmin extends Remote, StorageLocationAdmin {
-
-    }
 
     private static class FakeLifeCycle implements LifeCycle {
 

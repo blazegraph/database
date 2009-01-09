@@ -10,6 +10,7 @@ import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.data.Stat;
 
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.zookeeper.AbstractZNodeConditionWatcher;
 import com.bigdata.zookeeper.ZLock;
@@ -127,7 +128,7 @@ public class ServiceConfigurationWatcher extends
         final ServiceConfiguration config = (ServiceConfiguration) SerializerUtil
                 .deserialize(zookeeper.getData(zpath, this, new Stat()));
 
-        // get children (and reset our watch).
+        // get children (the logical services) (and reset our watch).
         final List<String> children = zookeeper.getChildren(zpath, this);
 
         /*
@@ -176,26 +177,19 @@ public class ServiceConfigurationWatcher extends
 
         if (config.serviceCount != children.size()) {
 
-            /*
-             * Note: Since the Future can not be directly monitored without
-             * blocking we wrap it in a Runnable that cleans up and logs errors.
-             */
-            
+            // the task.
             final Callable task = config.newLogicalServiceTask(fed, listener, zpath,
                     children);
             
-            Runnable r = new Runnable() {
+            // wrap it up to notify us when it is done.
+            final Callable wrappedTask = new Callable() {
               
-                public void run() {
+                public Object call() throws Exception {
                  
                     try {
 
-                        task.call();
-                        
-                    } catch (Throwable t) {
-                        
-                        log.error(this, t);
-                        
+                        return task.call();
+                                                
                     } finally {
 
                         synchronized (ServiceConfigurationWatcher.this) {
@@ -219,7 +213,8 @@ public class ServiceConfigurationWatcher extends
                 
             };
             
-            future = fed.getExecutorService().submit(r);
+            // submit as a monitored task so that errors are logged.
+            future = fed.submitMonitoredTask(wrappedTask);
 
         }
         

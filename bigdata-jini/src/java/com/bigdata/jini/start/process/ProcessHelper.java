@@ -1,4 +1,4 @@
-package com.bigdata.jini.start;
+package com.bigdata.jini.start.process;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -13,6 +13,8 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
+
+import com.bigdata.jini.start.IServiceListener;
 
 /**
  * Helper object for a running {@link Process} that DOES NOT require any input.
@@ -88,7 +90,13 @@ public class ProcessHelper {
 
         try {
 
-            return exitValue(Long.MAX_VALUE, TimeUnit.SECONDS);
+            log.warn("Waiting on exitValue: " + this);
+
+            final int exitValue = exitValue(Long.MAX_VALUE, TimeUnit.SECONDS);
+
+            log.warn("Process is dead: " + this + ", exitValue=" + exitValue);
+
+            return exitValue;
             
         } catch(TimeoutException ex) {
             
@@ -161,46 +169,53 @@ public class ProcessHelper {
     }
 
     /**
-     * Destroy the process.
-     * <p>
-     * Note: {@link Process#destroy()} is non-blocking, but this method blocks
-     * until the process is terminated.
+     * Kill the process, blocking until it has terminated. The contract is only
+     * "kill" not "destroy" - the persistent state of the process SHOULD NOT be
+     * destroyed). Subclasses SHOULD override this method to request normal
+     * process termination where possible.
      * <p>
      * Note: processes with child processes (including any bigdata services
      * since they start children to report OS performance counters) MUST exit
      * normally (at least under windows) or the parent process will not be able
      * to exit. Therefore it is very important to extend this method and send
      * proper notice to the process requesting that it terminate itself.
+     * 
+     * @return The exitValue of the process.
+     * 
+     * @throws InterruptedException
+     *             if interrupted - the process may or may not have been killed
+     *             and the listener will not have been notified.
      */
-    synchronized public void destroy() {
+    synchronized public int kill() throws InterruptedException {
 
         log.warn(this);
 
         try {
+            
+            /*
+             * Note: destroy() appears to be non-blocking. It also appears to be
+             * safe to invoke on a process which has already been terminated.
+             */
+            
             process.destroy();
-        } catch (Throwable t) {
-            log.warn(this, t);
-        }
-
-        try {
-
-            log.warn("Waiting on exitValue: " + this);
-
-            final int exitValue = exitValue();
-
-            log.warn("Process is dead: " + this + ", exitValue=" + exitValue);
 
             // fall through
 
-        } catch (InterruptedException e) {
+        } catch (Throwable t) {
+        
+            log.warn(this, t);
 
-            log.warn(this, e);
+            // fall through
 
-            // fall through.
-            
         }
 
+        // wait for the process to die
+        final int exitValue = exitValue();
+
+        // notify listener.
         listener.remove(this);
+        
+        return exitValue;
 
     }
     

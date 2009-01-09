@@ -6,6 +6,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.ZooKeeper;
 
+import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.zookeeper.ZLock;
 import com.bigdata.zookeeper.ZNodeLockWatcher;
@@ -13,18 +14,18 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
 
 /**
  * This is a standing task whose {@link Future} is monitored by the
- * {@link ServicesManagerServer}. For each {@link ServiceConfiguration} znode, there
- * is one such task per {@link ServicesManagerServer}. The task with holding the
- * {@link ZLock} is the one that handles state changes for
+ * {@link ServicesManagerServer}. For each {@link ServiceConfiguration} znode,
+ * there is one such task per {@link ServicesManagerServer}. The task holding
+ * the {@link ZLock} is the one that handles state changes for
  * {@link ServiceConfiguration} znode, including its children, which are the
  * logical service instance znodes.
  * <p>
- * If the {@link ServicesManagerServer} dies, then its znodes will be deleted from the
- * lock queues and someone else (if anyone is left alive) will get the lock and
- * manage the logical service.
+ * If the {@link ServicesManagerServer} dies, then its znodes will be deleted
+ * from the lock queues and someone else (if anyone is left alive) will get the
+ * lock and manage the logical service.
  * <p>
- * If the task itself dies, then the {@link ServicesManagerServer} needs to log an
- * error and create a new instance of the task.
+ * If the task itself dies, then the {@link ServicesManagerServer} needs to log
+ * an error and create a new instance of the task.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -84,7 +85,8 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
         zroot = fed.getZooConfig().zroot;
         
         // zpath for the lock node.
-        lockZPath = zroot + "/" + BigdataZooDefs.LOCKS + "/" + className;
+        lockZPath = zroot + "/" + BigdataZooDefs.LOCKS_SERVICE_CONFIG_MONITOR
+                + "/" + className;
 
         // zpath for the service configuration node.
         serviceConfigZPath = zroot + "/" + BigdataZooDefs.CONFIG + "/" + className;

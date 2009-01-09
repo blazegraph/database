@@ -27,9 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.jini.start;
 
-import com.bigdata.jini.start.ZookeeperServerEntry;
-
 import junit.framework.TestCase2;
+
+import com.bigdata.jini.start.config.ZookeeperServerEntry;
 
 /**
  * Unit tests for the {@link ZookeeperServerEntry}.

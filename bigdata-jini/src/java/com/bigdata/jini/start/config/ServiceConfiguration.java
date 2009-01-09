@@ -1,4 +1,4 @@
-package com.bigdata.jini.start;
+package com.bigdata.jini.start.config;
 
 import java.io.File;
 import java.io.Serializable;
@@ -16,6 +16,9 @@ import org.apache.log4j.Logger;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.ZooKeeper;
 
+import com.bigdata.jini.start.IServiceListener;
+import com.bigdata.jini.start.ManageLogicalServiceTask;
+import com.bigdata.jini.start.ServicesManagerServer;
 import com.bigdata.service.jini.IReplicatableService;
 import com.bigdata.service.jini.JiniFederation;
 import com.sun.jini.tool.ClassServer;
@@ -270,7 +273,7 @@ abstract public class ServiceConfiguration implements Serializable {
 
         }
 
-        serviceDir = getServicesDir(className, config);
+        serviceDir = getServiceDir(className, config);
 
         if (serviceDir == null)
             throw new IllegalArgumentException();
@@ -341,6 +344,7 @@ abstract public class ServiceConfiguration implements Serializable {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
+     * @param <V>
      */
     public abstract class AbstractServiceStarter<V> implements Callable<V> {
         
@@ -392,26 +396,24 @@ abstract public class ServiceConfiguration implements Serializable {
      */
 
     /**
-     * Return the directory for the persistent state of the service will
-     * execute. This is where it will store its configuration, its serviceUUID
-     * (for jini services, once assigned by jini), and any persistent state
-     * maintained by the service.
+     * Return the directory for the persistent state of the service. This is
+     * where it will store its configuration, its serviceUUID (for jini
+     * services, once assigned by jini), and any persistent state maintained by
+     * the service.
      * 
      * @throws ConfigurationException
      * 
-     * @see Options#SERVICES_DIR
+     * @see Options#SERVICE_DIR
      */
-    public static File getServicesDir(final String className,
+    public static File getServiceDir(final String className,
             final Configuration config) throws ConfigurationException {
 
-        File val = (File) config
-                .getEntry(className, Options.SERVICE_DIR,
-                        File.class, null/* defaultValue */);
+        File val = (File) config.getEntry(className, Options.SERVICE_DIR,
+                File.class, null/* defaultValue */);
 
         if (val == null) {
 
-            val = (File) config
-                    .getEntry(Options.NAMESPACE,
+            val = (File) config.getEntry(Options.NAMESPACE,
                     Options.SERVICE_DIR, File.class, null/* defaultValue */);
 
         }
@@ -497,7 +499,7 @@ abstract public class ServiceConfiguration implements Serializable {
      * @return
      */
     @SuppressWarnings("unchecked")
-    protected static <T> T[] concat(final T[] a, final T[] b) {
+    public static <T> T[] concat(final T[] a, final T[] b) {
 
         final T[] c = (T[]) java.lang.reflect.Array.newInstance(a.getClass()
                 .getComponentType(), a.length + b.length);

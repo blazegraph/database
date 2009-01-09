@@ -25,47 +25,52 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jan 5, 2009
  */
 
-package com.bigdata.jini.start;
+package com.bigdata.jini.start.config;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
 
+import com.bigdata.jini.start.IServiceListener;
+import com.bigdata.jini.start.process.JiniProcessHelper;
 import com.bigdata.service.jini.JiniFederation;
-import com.bigdata.service.jini.TransactionServer;
+import com.bigdata.service.jini.MetadataServer;
 import com.bigdata.util.NV;
 
 /**
- * Configuration for the {@link TransactionServer}.
+ * Configuration for the {@link MetadataServer}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo could extend {@link DataServiceConfiguration} since they are nearly the
+ *       same kind of thing.
  */
-public class TransactionServiceConfiguration extends
+public class MetadataServiceConfiguration extends
         BigdataServiceConfiguration {
 
     /**
      * 
      */
-    private static final long serialVersionUID = 2616176455506215566L;
+    private static final long serialVersionUID = -3476429607652513836L;
 
     /**
      * @param config
      */
-    public TransactionServiceConfiguration(Configuration config)
+    public MetadataServiceConfiguration(Configuration config)
             throws ConfigurationException {
 
-        super(TransactionServer.class, config);
+        super(MetadataServer.class, config);
 
     }
 
-    public AbstractServiceStarter newServiceStarter(JiniFederation fed,
+    public MetadataServiceStarter newServiceStarter(JiniFederation fed,
             IServiceListener listener, String zpath) throws Exception {
 
-        return new TransactionServiceStarter(fed, listener, zpath);
+        return new MetadataServiceStarter(fed, listener, zpath);
 
     }
 
-    protected class TransactionServiceStarter<V extends JiniProcessHelper>
+    public class MetadataServiceStarter<V extends JiniProcessHelper>
             extends BigdataServiceStarter<V> {
 
         /**
@@ -73,16 +78,17 @@ public class TransactionServiceConfiguration extends
          * @param listener
          * @param zpath
          */
-        protected TransactionServiceStarter(JiniFederation fed,
+        protected MetadataServiceStarter(JiniFederation fed,
                 IServiceListener listener, String zpath) {
 
             super(fed, listener, zpath);
 
         }
 
+        @Override
         protected NV getDataDir() {
             
-            return new NV(TransactionServer.Options.DATA_DIR, serviceDir
+            return new NV(MetadataServer.Options.DATA_DIR, serviceDir
                     .toString());
             
         }

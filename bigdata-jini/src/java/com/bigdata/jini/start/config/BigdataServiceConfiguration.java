@@ -25,17 +25,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jan 4, 2009
  */
 
-package com.bigdata.jini.start;
+package com.bigdata.jini.start.config;
 
-import java.io.IOException;
-import java.io.Writer;
-import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.Properties;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
 
+import com.bigdata.jini.start.IServiceListener;
+import com.bigdata.jini.start.process.JiniProcessHelper;
 import com.bigdata.service.jini.AbstractServer;
 import com.bigdata.service.jini.DataServer;
 import com.bigdata.service.jini.JiniFederation;
@@ -64,17 +62,17 @@ abstract public class BigdataServiceConfiguration extends
      */
     public interface Options extends AbstractJiniServiceConfiguration.Options {
         
-        /**
-         * Service instance parameters represented as a {@link NV}[].
-         */
-        String PARAMS = "params";
+//        /**
+//         * Service instance parameters represented as a {@link NV}[].
+//         */
+//        String PARAMS = "params";
         
     }
     
-    /**
-     * The initial properties for new instances of the service type.
-     */
-    public final NV[] params;
+//    /**
+//     * The initial properties for new instances of the service type.
+//     */
+//    public final NV[] params;
 
     /**
      * @param cls
@@ -86,7 +84,7 @@ abstract public class BigdataServiceConfiguration extends
 
         super(cls, config);
 
-        this.params = getParams(cls.getName(), config);
+//        this.params = getParams(cls.getName(), config);
         
         if (log4j == null) {
             
@@ -100,17 +98,17 @@ abstract public class BigdataServiceConfiguration extends
 
         super.toString(sb);
 
-        sb.append(", " + Options.PARAMS + "=" + Arrays.toString(params));
+//        sb.append(", " + Options.PARAMS + "=" + Arrays.toString(params));
 
     }
 
-    public static NV[] getParams(String className, Configuration config)
-            throws ConfigurationException {
-
-        return (NV[]) config.getEntry(className, Options.PARAMS, NV[].class,
-                new NV[] {}/* defaultValue */);
-
-    }
+//    public static NV[] getParams(String className, Configuration config)
+//            throws ConfigurationException {
+//
+//        return (NV[]) config.getEntry(className, Options.PARAMS, NV[].class,
+//                new NV[] {}/* defaultValue */);
+//
+//    }
 
     public AbstractServiceStarter newServiceStarter(final JiniFederation fed,
             final IServiceListener listener, final String logicalServiceZPath)
@@ -124,11 +122,9 @@ abstract public class BigdataServiceConfiguration extends
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
-     * 
      * @param <V>
-     * 
      */
-    protected class BigdataServiceStarter<V extends JiniProcessHelper> extends
+    public class BigdataServiceStarter<V extends JiniProcessHelper> extends
             JiniServiceStarter<V> {
 
         /**
@@ -158,70 +154,30 @@ abstract public class BigdataServiceConfiguration extends
             return null;
             
         }
-        
+
         /**
-         * Returns the {@link NV}[] containing the service configuration
-         * properties (allows the override or addition of those properties at
-         * service creation time).
+         * Returns the service configuration properties (allows the override or
+         * addition of those properties at service creation time).
          * <p>
          * Note: If {@link #getDataDir()} returns non-<code>null</code> then
          * that property will be included in the returned array.
          */
-        protected NV[] getParams(NV[] params) throws IOException {
-
-            final List<NV> a = new LinkedList<NV>();
+        @Override
+        protected Properties getProperties(final Properties properties) {
 
             final NV dataDir = getDataDir();
 
             if (dataDir != null) {
 
                 // the data directory for this service type.
-                a.add(dataDir);
+                properties.setProperty(dataDir.getName(),dataDir.getValue());
 
             }
 
-            return concat(a.toArray(new NV[0]), params);
+            return properties;
 
         }
         
-        /**
-         * Adds the configured {@link BigdataServiceConfiguration#params} to the
-         * service description.
-         */
-        protected void writeServiceDescription(Writer out) throws IOException {
-
-            super.writeServiceDescription(out);
-
-            // allow service creation time override.
-            final NV[] params = getParams(BigdataServiceConfiguration.this.params);
-
-            writeParams(out,params);
-            
-        }
-
-        /**
-         * Writes the {@link NV} parameters into the generated service
-         * configuration file.
-         * 
-         * @param writer
-         * 
-         * @throws IOException
-         */
-        protected void writeParams(Writer out, NV[] params) throws IOException {
-
-            out.write("\nproperties = new NV[]{\n");
-
-            for (NV nv : params) {
-
-                out.write("new NV( " + q(nv.getName()) + ", "
-                        + q(nv.getValue()) + "),\n");
-
-            }
-
-            out.write("};\n");
-
-        }
-
     }
 
 }

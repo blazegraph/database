@@ -35,8 +35,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import net.jini.config.Configuration;
 import net.jini.core.discovery.LookupLocator;
@@ -51,6 +54,7 @@ import net.jini.jeri.tcp.TcpServerEndpoint;
 import net.jini.lookup.ServiceDiscoveryEvent;
 import net.jini.lookup.ServiceDiscoveryListener;
 
+import org.apache.log4j.Logger;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
@@ -67,12 +71,12 @@ import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.service.AbstractDistributedFederation;
+import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.IService;
 import com.bigdata.service.jini.DataServer.AdministrableDataService;
-import com.bigdata.service.jini.JiniClient.JiniConfig;
 import com.bigdata.service.jini.LoadBalancerServer.AdministrableLoadBalancer;
 import com.bigdata.service.jini.MetadataServer.AdministrableMetadataService;
 import com.bigdata.service.jini.ResourceLockServer.AdministrableResourceLockService;
@@ -142,19 +146,22 @@ public class JiniFederation extends AbstractDistributedFederation implements
      * @param client
      *            The client.
      */
-    public JiniFederation(final JiniClient client, final JiniConfig jiniConfig,
+    public JiniFederation(final JiniClient client, final JiniClientConfig jiniConfig,
             final ZookeeperClientConfig zooConfig) {
 
         super(client);
     
         open = true;
-        
+
+        // @todo config initalDelay and timeout
+        addScheduledTask(new MonitorFuturesTask(futures), 1, 5, TimeUnit.SECONDS);
+
         if (INFO)
             log.info(jiniConfig.toString());
         
         final String[] groups = jiniConfig.groups;
         
-        final LookupLocator[] lookupLocators = jiniConfig.lookupLocators;
+        final LookupLocator[] lookupLocators = jiniConfig.locators;
 
         try {
 
@@ -224,10 +231,10 @@ public class JiniFederation extends AbstractDistributedFederation implements
                     lookupLocators, null /* DiscoveryListener */
             );
 
-            final long cacheMissTimeout = Long.parseLong(jiniConfig.properties
+            final long cacheMissTimeout = Long.valueOf(jiniConfig.properties
                     .getProperty(JiniClient.Options.CACHE_MISS_TIMEOUT,
                             JiniClient.Options.DEFAULT_CACHE_MISS_TIMEOUT));
-            
+
             // Start discovery for data and metadata services.
             dataServicesClient = new DataServicesClient(discoveryManager, this,
                     cacheMissTimeout);
@@ -1104,9 +1111,6 @@ public class JiniFederation extends AbstractDistributedFederation implements
      * 
      * @param w
      *            The watcher.
-     * 
-     * @todo we can specify the watcher for a watch, so we don't really need the
-     *       addWatcher API on the JiniFederation.
      */
     public void addWatcher(final Watcher w) {
 
@@ -1139,5 +1143,127 @@ public class JiniFederation extends AbstractDistributedFederation implements
     }
 
     private final CopyOnWriteArrayList<Watcher> watchers = new CopyOnWriteArrayList<Watcher>();
+    
+    /**
+     * Submits the task for execution and monitors its {@link Future}.
+     * 
+     * @param task
+     *            The task.
+     * 
+     * @return The {@link Future}.
+     * 
+     * @todo move this up to {@link AbstractFederation}?
+     */
+    public Future submitMonitoredTask(Callable task) {
+        
+        if (task == null)
+            throw new IllegalArgumentException();
+        
+        assertOpen();
+        
+        final Future f = getExecutorService().submit(task);
+        
+        futures.add(new TaskFuture(task,f));
+        
+        return f;
+        
+    }
+    
+    /**
+     * Glue object.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static private class TaskFuture {
+
+        final Callable task;
+
+        final Future future;
+
+        public TaskFuture(final Callable task, final Future future) {
+
+            this.task = task;
+            this.future = future;
+            
+        }
+    
+    }
+    
+    /**
+     * A queue of futures that are monitored by a scheduled task.
+     */
+    final private ConcurrentLinkedQueue<TaskFuture> futures = new ConcurrentLinkedQueue<TaskFuture>();
+
+    /**
+     * Run as a scheduled task that monitors futures.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private static class MonitorFuturesTask implements Runnable {
+
+        protected static final Logger log = Logger.getLogger(MonitorFuturesTask.class);
+        
+        protected static final boolean INFO = log.isInfoEnabled();
+        
+        protected static final boolean DEBUG = log.isDebugEnabled();
+        
+        private final ConcurrentLinkedQueue<TaskFuture> futures;
+        
+        public MonitorFuturesTask(final ConcurrentLinkedQueue<TaskFuture> futures) {
+
+            if (futures == null)
+                throw new IllegalArgumentException();
+            
+            this.futures = futures;
+            
+        }
+        
+        /**
+         * Removes any futures that are done and logs errors if any have failed.
+         */
+        public void run() {
+            
+            if (DEBUG)
+                log.debug("#tasks=" + futures.size());
+            
+            for(TaskFuture f : futures) {
+                
+                if(f.future.isDone()) {
+                 
+                    futures.remove(f);
+                    
+                    try {
+                        
+                        // test the future for errors.
+                        f.future.get();
+                        
+                    } catch (InterruptedException e) {
+                        
+                        /*
+                         * Note: a cancelled task will throw an
+                         * InterruptedException.
+                         */
+                        
+                        if (INFO)
+                            log.info(f.task.toString(), e);
+                        else
+                            log.warn("Interrupted: task="
+                                    + f.task.getClass().getName());
+
+                    } catch (ExecutionException e) {
+                    
+                        log.error(f.task.toString(), e);
+                        
+                    }
+                    
+                }
+                
+            }
+            
+        }
+        
+    }
     
 }

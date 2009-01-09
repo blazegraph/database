@@ -33,13 +33,14 @@ import java.util.Properties;
 import java.util.UUID;
 
 import net.jini.config.Configuration;
-import net.jini.discovery.DiscoveryManagement;
 
 import org.apache.log4j.MDC;
 
 import com.bigdata.service.jini.AbstractServer;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniUtil;
+import com.bigdata.service.jini.RemoteAdministrable;
+import com.bigdata.service.jini.RemoteDestroyAdmin;
 import com.bigdata.service.mapred.ReduceService;
 
 /**
@@ -73,41 +74,12 @@ public class ReduceServer extends AbstractServer {
      * @param args
      *            The name of the {@link Configuration} file for the service.
      */
-    public static void main(String[] args) {
+    public static void main(final String[] args) {
         
-        new ReduceServer(args) {
-            
-            /**
-             * Overriden to use {@link System#exit()} since this is the command
-             * line interface.
-             */
-            protected void fatal(String msg, Throwable t) {
-
-                log.fatal(msg, t);
-
-                try {
-
-                    shutdownNow();
-                    
-                } catch (Throwable t2) {
-                    
-                    log.error(t2.getMessage(), t2);
-                    
-                }
-
-                System.exit(1);
-
-            }
-            
-        }.run();
+        new ReduceServer(args).run();
         
     }
    
-//    @Override
-//    protected void setupClients(DiscoveryManagement discoveryManager) throws Exception {
-//        
-//    }
-
     protected Remote newService(Properties properties) {
         
         return new AdministrableReduceService(this,properties);

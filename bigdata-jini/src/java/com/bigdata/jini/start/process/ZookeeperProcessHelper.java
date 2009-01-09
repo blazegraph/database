@@ -1,4 +1,4 @@
-package com.bigdata.jini.start;
+package com.bigdata.jini.start.process;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -26,6 +26,10 @@ import org.apache.zookeeper.server.PurgeTxnLog;
 import org.apache.zookeeper.server.quorum.QuorumPeerMain;
 
 import com.bigdata.io.FileLockUtility;
+import com.bigdata.jini.start.IServiceListener;
+import com.bigdata.jini.start.config.JavaServiceConfiguration;
+import com.bigdata.jini.start.config.ServiceConfiguration;
+import com.bigdata.jini.start.config.ZookeeperServerEntry;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.zookeeper.ZooHelper;
 
@@ -132,15 +136,23 @@ public class ZookeeperProcessHelper extends ProcessHelper {
     }
 
     /**
-     * Extended to send the <code>kill</code> message to the local
-     * zookeeper instance.
+     * Extended to send the <code>kill</code> message to the local zookeeper
+     * instance.
      * <p>
-     * Note: killing zookeeper requires sending a <code>kill</code>
-     * command from the host on which it is executing. zookeeper appears to
-     * fork a process which is the "real" zookeeper, so just killing the
-     * outer process does not do what we want.
+     * Note: killing zookeeper requires sending a <code>kill</code> command
+     * from the host on which it is executing. zookeeper appears to fork a
+     * process which is the "real" zookeeper, so just killing the outer process
+     * does not do what we want.
+     * <p>
+     * Note: Due to how zookeeper peers work, we don't really know which
+     * instance is answering requests for the clientPort. It could be any
+     * instance in the ensemble. Therefore, DO NOT run multiple zookeeper
+     * instances on the same host with this class! It will kill the current
+     * master!
+     * 
+     * @throws InterruptedException
      */
-    public void destroy() {
+    public int kill() throws InterruptedException {
 
         try {
 
@@ -154,11 +166,32 @@ public class ZookeeperProcessHelper extends ProcessHelper {
         } catch (IOException e) {
 
             log.error(e.getLocalizedMessage(), e);
+            
+            return super.kill();
 
         }
 
-        super.destroy();
-
+        try {
+            /*
+             * Wait for zookeeper to die, but only up to a timeout.
+             */
+            final int exitValue = exitValue(5, TimeUnit.SECONDS);
+            listener.remove(this);
+            return exitValue;
+        } catch (TimeoutException e) {
+            /*
+             * Since the process did not we probably killed the wrong instance.
+             * 
+             * @todo this tries to kill it using the super class to kill the
+             * process. This could cause two instances of zookeeper (on the
+             * localhost) to be killed since we may have already killed the
+             * wrong one above. An alternative here would be to wrap and rethrow
+             * the TimeoutException.
+             */
+            log.error(this, e);
+            return super.kill();
+        }
+        
     }
 
     /**
@@ -260,6 +293,10 @@ public class ZookeeperProcessHelper extends ProcessHelper {
      *       whether or not there are any instances running which were
      *       configured for that client port, but not how many and not which
      *       ones.
+     *       <p>
+     *       Also see {@link #kill()}, which has difficulties knowing which
+     *       instance should be killed - it will kill which one is currently
+     *       answering at the clientPost on the localhost!
      */
     static public int startZookeeper(final Configuration config,
             final IServiceListener listener) throws ConfigurationException,

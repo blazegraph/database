@@ -176,8 +176,12 @@ public class ActiveProcess {
      */
     public void stop() {
 
-        if (readerFuture == null)
-            throw new IllegalStateException();
+        if (readerFuture == null) {
+         
+            // not running.
+            return;
+            
+        }
 
         // attempt to cancel the reader.
         readerFuture.cancel(true/* mayInterruptIfRunning */);
