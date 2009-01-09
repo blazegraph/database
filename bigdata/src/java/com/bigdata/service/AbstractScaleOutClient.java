@@ -44,9 +44,10 @@ public abstract class AbstractScaleOutClient extends AbstractClient {
     /**
      * @param properties
      */
-    public AbstractScaleOutClient(Properties properties) {
+    public AbstractScaleOutClient(final Properties properties) {
+        
         super(properties);
-     
+        
     }
 
     /**
@@ -55,7 +56,7 @@ public abstract class AbstractScaleOutClient extends AbstractClient {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static interface Options extends IBigdataClient.Options {
+    public interface Options extends IBigdataClient.Options {
         
         /**
          * Option selects the policy that will be used to cache

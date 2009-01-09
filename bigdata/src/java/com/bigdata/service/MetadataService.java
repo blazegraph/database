@@ -100,26 +100,6 @@ abstract public class MetadataService extends DataService implements
         
     }
 
-//    /**
-//     * Overriden to use a {@link Journal} rather than a {@link ResourceManager}.
-//     * <p>
-//     * Note: There is a cyclic dependency of the {@link ResourceManager} on an
-//     * {@link IMetadataService} (for partition updates) and the
-//     * {@link MetadataService} on an {@link IResourceManager} (for managing its
-//     * files). This dependency grounds out because the {@link MetadataService}
-//     * establishes itself as the reference returned by
-//     * {@link #getMetadataService()}. However, since the {@link MetadataIndex}
-//     * does not support overflow this method has been overriden to use a
-//     * {@link Journal} rather than a {@link ResourceManager} as the
-//     * {@link IResourceManager} as the {@link IResourceManager} implementation
-//     * object.
-//     */
-//    protected IResourceManager newResourceManager(Properties properties) {
-//
-//        return new Journal(properties);
-//        
-//    }
-    
     /**
      * @param properties
      */
