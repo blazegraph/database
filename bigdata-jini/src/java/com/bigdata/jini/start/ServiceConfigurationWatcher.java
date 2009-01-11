@@ -10,6 +10,7 @@ import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.data.Stat;
 
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.jini.start.config.ManagedServiceConfiguration;
 import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.zookeeper.AbstractZNodeConditionWatcher;
@@ -125,10 +126,10 @@ public class ServiceConfigurationWatcher extends
         }
         
         // get the service configuration (and reset our watch).
-        final ServiceConfiguration config = (ServiceConfiguration) SerializerUtil
+        final ManagedServiceConfiguration config = (ManagedServiceConfiguration) SerializerUtil
                 .deserialize(zookeeper.getData(zpath, this, new Stat()));
 
-        // get children (the logical services) (and reset our watch).
+        // get children (the list of logical services) (and reset our watch).
         final List<String> children = zookeeper.getChildren(zpath, this);
 
         /*
@@ -178,8 +179,8 @@ public class ServiceConfigurationWatcher extends
         if (config.serviceCount != children.size()) {
 
             // the task.
-            final Callable task = config.newLogicalServiceTask(fed, listener, zpath,
-                    children);
+            final Callable task = config.newLogicalServiceTask(fed, listener,
+                    zpath, children);
             
             // wrap it up to notify us when it is done.
             final Callable wrappedTask = new Callable() {

@@ -1,26 +1,31 @@
 package com.bigdata.jini.start.config;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
 
 import org.apache.log4j.Logger;
-import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.ZooKeeper;
 
 import com.bigdata.jini.start.IServiceListener;
-import com.bigdata.jini.start.ManageLogicalServiceTask;
 import com.bigdata.jini.start.ServicesManagerServer;
+import com.bigdata.jini.start.process.ProcessHelper;
 import com.bigdata.service.jini.IReplicatableService;
 import com.bigdata.service.jini.JiniFederation;
+import com.sun.jini.config.ConfigUtil;
 import com.sun.jini.tool.ClassServer;
 
 /**
@@ -32,7 +37,9 @@ import com.sun.jini.tool.ClassServer;
  * @version $Id$
  * 
  * FIXME fields should all be mutable to make it easy to update the data for a
- * configuration znode.
+ * configuration znode. [add validation check during (de-)serialization and and
+ * also in the public ctor. that will let people set the fields to any values,
+ * but only valid data can be written into zookeeper]
  */
 abstract public class ServiceConfiguration implements Serializable {
 
@@ -110,6 +117,12 @@ abstract public class ServiceConfiguration implements Serializable {
          * @see IServiceConstraint
          */
         String CONSTRAINTS = "constraints";
+
+        /**
+         * The timeout in milliseconds for an instance of the service to start
+         * (the default is dependent on the service type).
+         */
+        String TIMEOUT = "timeout";
         
         /**
          * A immutable set of property names whose values are not directly
@@ -186,10 +199,15 @@ abstract public class ServiceConfiguration implements Serializable {
      * given IP address pattern, etc.
      * 
      * @see Options#CONSTRAINTS
-     * 
-     * @todo read from {@link Configuration}. 
      */
-    public final IServiceConstraint[] constraints = new IServiceConstraint[] {};
+    public final IServiceConstraint[] constraints;
+
+    /**
+     * The timeout in milliseconds for a service instance to start.
+     * 
+     * @see Options#TIMEOUT
+     */
+    public final long timeout;
     
     public String toString() {
 
@@ -205,6 +223,8 @@ abstract public class ServiceConfiguration implements Serializable {
 
         sb.append(", " + Options.SERVICE_DIR + "=" + serviceDir);
 
+        sb.append(", " + Options.TIMEOUT + "=" + timeout);
+        
         sb.append(", " + Options.SERVICE_COUNT + "=" + serviceCount);
 
         sb.append(", " + Options.REPLICATION_COUNT + "=" + replicationCount);
@@ -278,6 +298,8 @@ abstract public class ServiceConfiguration implements Serializable {
         if (serviceDir == null)
             throw new IllegalArgumentException();
 
+        timeout = getTimeout(className, config);
+        
         serviceCount = getServiceCount(className, config);
 
         if (serviceCount < 0) // @todo LTE ZERO?
@@ -306,37 +328,76 @@ abstract public class ServiceConfiguration implements Serializable {
             }
 
         }
+       
+        constraints = getConstraints(className, config);
+
+    }
+
+    /**
+     * The default used for {@link Options#TIMEOUT}.
+     */
+    protected static long getDefaultTimeout() {
+        
+        return TimeUnit.SECONDS.toMillis(20);
+
+    }
+
+    protected static long getTimeout(final String className,
+            final Configuration config) throws ConfigurationException {
+
+        return (Long) config.getEntry(className, Options.TIMEOUT, Long.TYPE, config
+                .getEntry(Options.NAMESPACE, Options.TIMEOUT, Long.TYPE,
+                        getDefaultTimeout()));
+        
+    }
+
+    /**
+     * Verify that we could start this service. All constraints that would be
+     * violated are logged.
+     * <p>
+     * Note: Constraints which can be evaluated without the federation reference
+     * MUST NOT throw an exception if that reference is <code>null</code>.
+     * This allows us to evaluate constraints for boostrap services as well as
+     * for {@link ManagedServiceConfiguration}s
+     * 
+     * @param fed
+     *            The federation.
+     */
+    public boolean canStartService(final JiniFederation fed) {
+
+        boolean canStart = true;
+        
+        for (IServiceConstraint constraint : constraints) {
+            
+            if (!constraint.allow(fed)) {
+
+                if (INFO) 
+                    log.info("Violates: " + constraint);
+                
+                canStart = false;
+                
+            }
+            
+        }
+        
+        if (INFO)
+            log.info("canStart=" + canStart+" : "+this);
+        
+        return canStart;
 
     }
 
     /**
      * Factory method returns an object that may be used to start an new
-     * instance of the service for the specified path.
+     * instance of the service.
      * 
-     * @param fed
      * @param listener
-     * @param logicalServiceZPath
-     *            The path to the logical service whose instance will be
-     *            started.
      * 
      * @throws Exception
      *             if there is a problem creating the service starter.
      */
-    abstract public AbstractServiceStarter newServiceStarter(
-            JiniFederation fed, IServiceListener listener,
-            String logicalServiceZPath) throws Exception;
-
-    /**
-     * Return a task that will correct any imbalance between the
-     * {@link ServiceConfiguration} and the #of logical services.
-     */
-    public ManageLogicalServiceTask newLogicalServiceTask(JiniFederation fed,
-            IServiceListener listener, String configZPath, List<String> children) {
-
-        return new ManageLogicalServiceTask<ServiceConfiguration>(fed,
-                listener, configZPath, children, this);
-
-    }
+    abstract protected AbstractServiceStarter newServiceStarter(
+            IServiceListener listener) throws Exception;
 
     /**
      * A runnable object that will start an instance of a service described by
@@ -346,49 +407,299 @@ abstract public class ServiceConfiguration implements Serializable {
      * @version $Id$
      * @param <V>
      */
-    public abstract class AbstractServiceStarter<V> implements Callable<V> {
+    public abstract class AbstractServiceStarter<V extends ProcessHelper>
+            implements Callable<V> {
         
-        protected final JiniFederation fed;
         protected final IServiceListener listener;
-        protected final String logicalServiceZPath;
-        protected final ZooKeeper zookeeper;
 
         /**
          * 
-         * @param fed
          * @param listener
-         * @param logicalServiceZPath
-         *            The zpath to the logical service whose instance will be
-         *            started. Note that the zpath to the
-         *            {@link CreateMode#EPHEMERAL_SEQUENTIAL} node for the
-         *            physical service instance MUST be created by that process
-         *            so that the life cycle of the ephemeral node is tied to
-         *            the life cycle of the process (or at least to its
-         *            {@link ZooKeeper} client).
          */
-        protected AbstractServiceStarter(final JiniFederation fed,
-                final IServiceListener listener,
-                final String logicalServiceZPath) {
+        protected AbstractServiceStarter(final IServiceListener listener) {
 
-            if (fed == null)
+             if (listener == null)
                 throw new IllegalArgumentException();
-
-            if (listener == null)
-                throw new IllegalArgumentException();
-
-            if (logicalServiceZPath == null)
-                throw new IllegalArgumentException();
-            
-            this.fed = fed;
-            
             this.listener = listener;
             
-            this.logicalServiceZPath = logicalServiceZPath;
+        }
+
+        /**
+         * Start a new instance of the service.
+         * <p>
+         * Note: Output of the child process will be copied onto the output of
+         * the parent process. That is where to look for any output that is
+         * written onto stdout or stderr. Normally you will want the services to
+         * write their logs on a file, syslogd, or an async appender.
+         */
+        public V call() throws Exception {
+
+            if (INFO)
+                log.info("config: " + this);
+
+            // hook for setup before the process starts.
+            setUp();
+
+            // create the command line.
+            final List<String> cmds = getCommandLine();
+
+            final ProcessBuilder processBuilder = newProcessBuilder(cmds);
+
+            // allow override of the environment for the child.
+            setUpEnvironment(processBuilder.environment());
+
+            // specify the startup directory?
+            // processBuilder.directory(dataDir);
+
+            // start the process.
+            final V processHelper = (V) newProcessHelper(className,
+                    processBuilder, listener);
+
+            /*
+             * Note: If the services is not started after a timeout then we kill
+             * the process. The semantics of "started" is provided by the
+             * awaitServiceStart() method and can be overriden depending on the
+             * service type.
+             */
+            Future future = null;
+            try {
+
+                /*
+                 * Set a thread that will interrupt the [currentThread] if it
+                 * notices that the process has died.
+                 * 
+                 * Note: This provides an upper bound on how long we will wait
+                 * to decide that the service has started.
+                 */
+                future = processHelper.interruptWhenProcessDies(timeout,
+                        TimeUnit.MILLISECONDS);
+
+                // attempt to detect a service start failure.
+                awaitServiceStart(processHelper, timeout, TimeUnit.MILLISECONDS);
+
+            } catch (InterruptedException ex) {
+
+                /*
+                 * If we were interrupted because the process is dead then add
+                 * that information to the exception.
+                 */
+                try {
+
+                    /*
+                     * @todo a little wait here appears to be necessary
+                     * indicating that there is some problem with
+                     * ProcessHelper#interruptWhenProcessDies().
+                     */
+                    final int exitValue = processHelper.exitValue(10,
+                            TimeUnit.MILLISECONDS);
+
+                    throw new IOException("Process is dead: exitValue="
+                            + exitValue);
+
+                } catch (TimeoutException ex2) {
+
+                    // ignore.
+
+                }
+
+                // otherwise just rethrow the exception.
+                throw ex;
+
+            } catch (Throwable t) {
+
+                /*
+                 * The service did not start normally. kill the process and log
+                 * an error.
+                 */
+
+                try {
+
+                    log.error("Startup problem: " + className, t);
+
+                    throw new RuntimeException(t);
+
+                } finally {
+
+                    processHelper.kill();
+
+                }
+
+            } finally {
+
+                if (future != null) {
+
+                    /*
+                     * Note: We MUST cancel the thread monitoring the process
+                     * before we leave this scope or it may cause a spurious
+                     * interrupt of this thread in some other context!
+                     */
+                    
+                    future.cancel(true/* mayInterruptIfRunning */);
+                    
+                }
+
+            }
+
+            return (V) processHelper;
+
+        }
+
+        /**
+         * Hook for extending the pre-start setup for the service.
+         */
+        protected void setUp() throws Exception {
+
+            // NOP
+
+        }
+
+        /**
+         * Return the {@link ProcessHelper} that will be used to manage the
+         * process.
+         * 
+         * @param className
+         * @param processBuilder
+         * @param listener
+         * 
+         * @return
+         * 
+         * @throws IOException
+         */
+        protected V newProcessHelper(String className,
+                ProcessBuilder processBuilder, IServiceListener listener)
+                throws IOException {
+
+            return (V) new ProcessHelper(className, processBuilder, listener);
+
+        }
+        
+        /**
+         * Hook for modification of the child environment.
+         * 
+         * @param env
+         *            A map. Modifications to the map will be written into the
+         *            child environment.
+         * 
+         * @see ProcessBuilder#environment()
+         */
+        protected void setUpEnvironment(Map<String, String> env) {
             
-            this.zookeeper = fed.getZookeeper();
+            // NOP
             
         }
         
+        /**
+         * Generate the command line that will be used to start the service.
+         */
+        protected List<String> getCommandLine() {
+
+            final List<String> cmds = new LinkedList<String>();
+
+            addCommand(cmds);
+
+            /**
+             * Append JVM args
+             */
+            addCommandArgs(cmds);
+
+            /**
+             * Append any service options.
+             */
+            addServiceOptions(cmds);
+
+            return cmds;
+
+        }
+
+        /**
+         * Create (and possibly configure) a {@link ProcessBuilder} that will be
+         * used to start the service.
+         * 
+         * @param cmds 
+         * 
+         * @return
+         */
+        protected ProcessBuilder newProcessBuilder(List<String> cmds) {
+
+            return new ProcessBuilder(cmds);
+
+        }
+        
+        /**
+         * Add the command to be executed (eg, "java", etc).
+         * 
+         * @param cmds
+         */
+        abstract protected void addCommand(List<String> cmds);
+        
+        /**
+         * Adds command arguments immediately following the executable name.
+         * 
+         * @param cmds
+         */
+        protected void addCommandArgs(List<String> cmds) {
+
+            for (String arg : args) {
+
+                cmds.add(arg);
+
+            }
+
+        }
+        
+        /**
+         * Add options at the end of the command line.
+         * 
+         * @param cmds
+         */
+        protected void addServiceOptions(List<String> cmds) {
+
+            for (String arg : options) {
+
+                cmds.add(arg);
+
+            }
+
+        }
+
+        /**
+         * Waits a bit to see if the process returns an exit code. If an exit is
+         * NOT available after a timeout, then assumes that the process started
+         * successfully.
+         * <p>
+         * Note: <strong>This DOES NOT provide direct confirmation that the
+         * service is running in a non-error and available for answering
+         * requests.</strong> You SHOULD override this method if you have a
+         * service specific means of obtaining such confirmation.
+         * 
+         * @throws Exception
+         *             If a service start failure could be detected (the caller
+         *             will kill the process and log an error if any exception
+         *             is thrown).
+         */
+        protected void awaitServiceStart(final V processHelper,
+                final long timeout, final TimeUnit unit) throws Exception {
+
+            try {
+
+                final int exitValue = processHelper.exitValue(timeout, unit);
+
+                throw new IOException("exitValue=" + exitValue);
+
+            } catch (TimeoutException ex) {
+
+                /*
+                 * Note: Assumes the service started normally!
+                 */
+
+                log.warn("Started service: " + className);
+
+                return;
+
+            }
+
+        }
+
     }
     
     /*
@@ -470,6 +781,28 @@ abstract public class ServiceConfiguration implements Serializable {
 
     }
 
+    protected static IServiceConstraint[] getConstraints(
+            final String className, final Configuration config)
+            throws ConfigurationException {
+
+        final IServiceConstraint[] a = (IServiceConstraint[]) config.getEntry(
+                className, Options.CONSTRAINTS, IServiceConstraint[].class,
+                null /* defaultValue */);
+
+        final IServiceConstraint[] b = (IServiceConstraint[]) config.getEntry(
+                Options.NAMESPACE, Options.CONSTRAINTS,
+                IServiceConstraint[].class, new IServiceConstraint[0]);
+
+        if (a != null && b != null)
+            return concat(a, b);
+
+        if (a != null)
+            return a;
+
+        return b;
+
+    }
+
     protected static String[] getStringArray(final String name,
             final String className, final Configuration config,
             final String[] defaultValue) throws ConfigurationException {
@@ -501,6 +834,15 @@ abstract public class ServiceConfiguration implements Serializable {
     @SuppressWarnings("unchecked")
     public static <T> T[] concat(final T[] a, final T[] b) {
 
+        if (a == null && b == null)
+            return a;
+
+        if (a == null)
+            return b;
+
+        if (b == null)
+            return a;
+
         final T[] c = (T[]) java.lang.reflect.Array.newInstance(a.getClass()
                 .getComponentType(), a.length + b.length);
 
@@ -521,6 +863,8 @@ abstract public class ServiceConfiguration implements Serializable {
      *            The value.
      * 
      * @return The quoted value.
+     * 
+     * @todo Use {@link ConfigUtil#stringLiteral(String)} instead?
      */
     static public String q(String v) {
         
@@ -551,6 +895,16 @@ abstract public class ServiceConfiguration implements Serializable {
         
         return sb.toString(); 
         
+    }
+
+    /**
+     * Splits the CLASSPATH as reported by {@link System#getProperty(String)}
+     * into a {@link String}[].
+     */
+    public static String[] getClassPath() {
+
+        return System.getProperty("java.class.path").split(File.pathSeparator);
+
     }
     
 }

@@ -70,7 +70,7 @@ import com.bigdata.jini.lookup.entry.Hostname;
 import com.bigdata.jini.lookup.entry.ServiceToken;
 import com.bigdata.jini.start.BigdataZooDefs;
 import com.bigdata.jini.start.IServiceListener;
-import com.bigdata.jini.start.process.JiniProcessHelper;
+import com.bigdata.jini.start.process.JiniServiceProcessHelper;
 import com.bigdata.jini.start.process.ProcessHelper;
 import com.bigdata.service.jini.AbstractServer;
 import com.bigdata.service.jini.JiniClient;
@@ -86,12 +86,12 @@ import com.bigdata.zookeeper.ZookeeperClientConfig;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractJiniServiceConfiguration extends
+abstract public class JiniServiceConfiguration extends
         JavaServiceConfiguration {
 
     /**
      * Additional {@link Configuration} options understood by
-     * {@link AbstractJiniServiceConfiguration}.
+     * {@link JiniServiceConfiguration}.
      * <p>
      * Note: A <strong>canonical</strong> {@link Name} will be automatically
      * added to the {@link Entry}[] using the class and znode of the service
@@ -147,7 +147,7 @@ abstract public class AbstractJiniServiceConfiguration extends
      * @param config
      * @throws ConfigurationException
      */
-    public AbstractJiniServiceConfiguration(final Class cls, final Configuration config)
+    public JiniServiceConfiguration(final Class cls, final Configuration config)
             throws ConfigurationException {
  
         super(cls, config);
@@ -179,7 +179,7 @@ abstract public class AbstractJiniServiceConfiguration extends
      * @version $Id$
      * @param <V>
      */
-    public class JiniServiceStarter<V extends JiniProcessHelper> extends
+    public class JiniServiceStarter<V extends JiniServiceProcessHelper> extends
             JavaServiceStarter<V> {
         
         /**
@@ -252,6 +252,7 @@ abstract public class AbstractJiniServiceConfiguration extends
          * as an argument to the java class whose main routine will be invoked
          * and to add the {@link Options#JINI_OPTIONS}.
          */
+        @Override
         protected void addServiceOptions(List<String> cmds) {
 
             // The configuration file goes 1st.
@@ -270,6 +271,7 @@ abstract public class AbstractJiniServiceConfiguration extends
         /**
          * Extended to write the configuration file in the service directory.
          */
+        @Override
         protected void setUp() throws Exception {
             
             super.setUp();
@@ -437,7 +439,7 @@ abstract public class AbstractJiniServiceConfiguration extends
          */
         protected void writeEntries(Writer out) throws IOException {
 
-            final Entry[] entries = getEntries(AbstractJiniServiceConfiguration.this.entries);
+            final Entry[] entries = getEntries(JiniServiceConfiguration.this.entries);
 
             out.write("\nentries=new Entry[]{\n");
 
@@ -575,7 +577,7 @@ abstract public class AbstractJiniServiceConfiguration extends
         protected void writeProperties(final Writer out) throws IOException {
 
             // extension hook.
-            final Properties properties = getProperties(AbstractJiniServiceConfiguration.this.properties);
+            final Properties properties = getProperties(JiniServiceConfiguration.this.properties);
             
             out.write("\nproperties = new NV[]{\n");
 
@@ -683,11 +685,12 @@ abstract public class AbstractJiniServiceConfiguration extends
             
         }
         
+        @Override
         protected V newProcessHelper(String className,
                 ProcessBuilder processBuilder, IServiceListener listener)
                 throws IOException {
 
-            return (V) new JiniProcessHelper(className, processBuilder, listener);
+            return (V) new JiniServiceProcessHelper(className, processBuilder, listener);
 
         }
         
@@ -698,6 +701,7 @@ abstract public class AbstractJiniServiceConfiguration extends
          * @todo we could also verify the service using its proxy, e.g., by
          *       testing for a normal run state.
          */
+        @Override
         protected void awaitServiceStart(final V processHelper,
                 final long timeout, final TimeUnit unit) throws Exception,
                 TimeoutException, InterruptedException {
@@ -831,7 +835,7 @@ abstract public class AbstractJiniServiceConfiguration extends
             
             // this is the zpath that the service will create.
             final String physicalServiceZPath = logicalServiceZPath + "/"
-                    + BigdataZooDefs.PHYSICAL_SERVICE + serviceUUID;
+                    + BigdataZooDefs.PHYSICAL_SERVICES + "/" + serviceUUID;
 
             if (!ZNodeCreatedWatcher.awaitCreate(zookeeper,
                     physicalServiceZPath, timeout, unit)) {

@@ -11,61 +11,74 @@ import org.apache.zookeeper.ZooKeeper;
 
 import com.bigdata.jini.start.config.IServiceConstraint;
 import com.bigdata.jini.start.config.ServiceConfiguration;
+import com.bigdata.journal.IResourceLockService;
 import com.bigdata.service.AbstractService;
 import com.bigdata.service.jini.JiniUtil;
 import com.bigdata.service.jini.TransactionServer;
+import com.bigdata.zookeeper.DumpZookeeper;
 import com.bigdata.zookeeper.ZLock;
 
 /**
  * Interface declaring constants that are used to name various znodes of
- * interest. The basic layout within zookeeper is as follows:
+ * interest. A {@link DumpZookeeper} sample output shows the layout of the
+ * znodes of interest within the federation.
  * 
  * <pre>
+ * test-fed 
+ *   locks 
+ *     serviceConfigMonitor 
+ *       com.bigdata.service.jini.DataServer 
+ *         lock0000000000 (Ephemeral) 
+ *       com.bigdata.service.jini.ResourceLockServer 
+ *         lock0000000000 (Ephemeral) 
+ *       com.bigdata.service.jini.LoadBalancerServer 
+ *         lock0000000000 (Ephemeral) 
+ *       com.bigdata.service.jini.MetadataServer 
+ *         lock0000000000 (Ephemeral) 
+ *       com.bigdata.service.jini.TransactionServer 
+ *         lock0000000000 (Ephemeral) 
+ *     createPhysicalService 
+ *   config 
+ *     com.bigdata.service.jini.DataServer {DataServiceConfiguration}
+ *       logicalService0000000001 
+ *         election 
+ *         physicalServiceea8d5902-c7b1-4dc2-9f01-dd343aed8230 (Ephemeral) {UUID}
+ *       logicalService0000000000 
+ *         election 
+ *         physicalServiceb2bf8b98-da0c-42f5-ac65-027bf3304429 (Ephemeral) {UUID}
+ *     com.bigdata.service.jini.LoadBalancerServer {LoadBalancerServiceConfiguration}
+ *       logicalService0000000000 
+ *         election 
+ *         physicalService911a9b28-7396-4932-ab80-77078119e7e2 (Ephemeral) {UUID}
+ *     com.bigdata.service.jini.MetadataServer {MetadataServiceConfiguration}
+ *       logicalService0000000000 
+ *         election 
+ *         physicalServicec0f35d2e-0a20-40c4-bb76-c97e7cb72eb3 (Ephemeral) {UUID}
+ *     com.bigdata.service.jini.TransactionServer {TransactionServiceConfiguration}
+ *       logicalService0000000000 
+ *         election 
+ *         physicalService87522080-2da6-42be-84a8-4a863b420042 (Ephemeral) {UUID}
+ * </pre>
  * 
- * zroot-for-federation
- *     / config 
- *              / jini {ServiceConfiguration}
- *                  ...
- *              / ClassServer {JavaConfiguration}
- *                  ...
- *              / TransactionServer {BigdataServiceConfiguration}
- *                  ...
- *              / MetadataServer
- *                  ...
- *              / DataServer {ServiceConfiguration}
- *                      / logicalService1 {logicalServiceUUID, params}
- *                                The order of the children determines
- *                                replication chain and new primary if the
- *                                master fails.
- *                          / physicalService1 {serviceUUID, host}
- *                          / physicalService2 {serviceUUID, host}
- *                          ...
- *                      / logicalService2 {logicalServiceUUID, params}
- *                  ...
- *              / LoadBalancerServer
- *                  ...
- *              / ResourceLockServer
- *                  ...
- *     / locks
- *          namespace used for some kinds of locks.
- *          / createPhysicalService (namespace monitored by service starters)
- * </pre> *
- * <p>
  * Each {@link ServiceConfiguration} znode defines the service type, the target
  * #of service instances, the replication count, etc for a service. The children
- * of the configuration node are the logical service instances and use
+ * of the configuration node are the logicalService instances and use
  * {@link CreateMode#PERSISTENT_SEQUENTIAL}.
  * <p>
- * The children of a logical service are the actual service instances. Those
- * nodes use {@link CreateMode#EPHEMERAL} so that zookeeper will remove them if
- * the client dies. The bigdata services DO NOT use the SEQUENTIAL flag since
- * they need to be able to restart with the save physical service znode.
- * Instead, they create the physical service znode using the {@link ServiceID}
- * assigned by jini. Since the physical services are NOT sequentially generated,
- * we maintain a {@link ZLock} for the logical service. Physical services
- * contend for that lock and whichever one holds the lock is the primary. The
- * order of the services in the lock queue is the failover order for the
- * secondaries.
+ * The children of a logicalService are "election" and "physicalServices". The
+ * <code>election</code> znode is a lock node that is used for master election
+ * and determining the failover chain for services which support failover. The
+ * children of the <code>physicalServices</code> {@link CreateMode#EPHEMERAL}
+ * znodes representing the physical service instances. Since they are ephemeral,
+ * zookeeper will remove them if the physical service dies.
+ * <p>
+ * Note: The bigdata services DO NOT use the SEQUENTIAL flag since they need to
+ * be able to restart with the save physical service znode. Instead, they create
+ * the physicalService znode using the {@link ServiceID} assigned by jini. Since
+ * the physical services are NOT sequentially generated, we maintain a
+ * {@link ZLock} for the logical service. Physical services contend for that
+ * lock and whichever one holds the lock is the primary. The order of the
+ * services in the lock queue is the failover order for the secondaries.
  * <p>
  * A {@link ServiceConfigurationZNodeMonitorTask} is run for the each discovered
  * {@link ServiceConfiguration} znode and sets a
@@ -169,25 +182,46 @@ public interface BigdataZooDefs {
             + "serviceConfigMonitor";
     
     /**
+     * The relative zpath to a node whose children are {@link ZLock} acquired
+     * using the {@link IResourceLockService}.
+     */
+    String LOCKS_RESOURCES = LOCKS + "/" + "resources";
+    
+    /**
      * The prefix for the name of a znode that represents a logical service.
      * This znode is a {@link CreateMode#PERSISTENT_SEQUENTIAL} child of the
-     * {@link #CONFIG} znode.
+     * {@link #CONFIG} znode. This znode should have two children:
+     * {@link #PHYSICAL_SERVICES} and {@link #PHYSICAL_SERVICE_ELECTION}.
      */
     String LOGICAL_SERVICE = "logicalService";
 
     /**
-     * The prefix for the name of a znode that represents a physical service.
-     * The actual znode of a physical service is formed by appending the service
-     * {@link UUID}. Jini will assign a {@link ServiceID} when the service is
-     * first registered and is available from {@link ServiceItem#serviceID}.
-     * The {@link ServiceID} can be converted to a normal {@link UUID} using
+     * The name of the znodes whose children represent the physical service
+     * instances.
+     * <p>
+     * The znode of a physical service is named by its service {@link UUID}.
+     * Jini will assign a {@link ServiceID} when the service is first registered
+     * and is available from {@link ServiceItem#serviceID}. The
+     * {@link ServiceID} is converted to a normal {@link UUID} using
      * {@link JiniUtil#serviceID2UUID(ServiceID)}. You can also request the
      * service {@link UUID} using the service proxy.
      * 
      * @see AbstractService#getServiceUUID()
      * 
-     * @todo the httpd URL could be written into this znode.
+     * @todo Write {@link ServiceConfiguration} into the node and then include
+     *       any additional properties there. On a push, those properties which
+     *       can be changed should be updated dynamically on the running service
+     *       instance. For example, this could be used to change the groups[] or
+     *       locators[]. (There are jini APIs for that as well.)
      */
-    String PHYSICAL_SERVICE = "physicalService";
+    String PHYSICAL_SERVICES = "physicalServices";
     
+    /**
+     * The name of the znode that is a child of {@link #LOGICAL_SERVICE} serving
+     * as a lock node for the election of the master physical service for that
+     * logical service.
+     * 
+     * @see ZLock
+     */
+    String PHYSICAL_SERVICE_ELECTION = "masterElection";
 }

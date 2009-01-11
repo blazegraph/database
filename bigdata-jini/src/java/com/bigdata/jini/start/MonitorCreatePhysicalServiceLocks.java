@@ -9,6 +9,7 @@ import org.apache.zookeeper.data.Stat;
 
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.jini.start.config.IServiceConstraint;
+import com.bigdata.jini.start.config.ManagedServiceConfiguration;
 import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.zookeeper.UnknownChildrenWatcher;
@@ -63,7 +64,7 @@ public class MonitorCreatePhysicalServiceLocks implements
      */
     public Void call() throws Exception {
 
-        // all the locks of interest are created here.
+        // all the locks of interest are children of this znode.
         final String locksZPath = fed.getZooConfig().zroot + "/"
                 + BigdataZooDefs.LOCKS_CREATE_PHYSICAL_SERVICE;
 
@@ -117,35 +118,6 @@ public class MonitorCreatePhysicalServiceLocks implements
     }
     
     /**
-     * Verify that we could start this service.
-     * 
-     * @todo add load-based constraints, e.g., can not start a new service if
-     *       heavily swapping, near limits on RAM or on disk.
-     *       <p>
-     *       Might be interesting to evaluate all constraints and see how many
-     *       cause us not to start the service.
-     */
-    protected boolean canStartService(final ServiceConfiguration config) {
-        
-        for (IServiceConstraint constraint : config.constraints) {
-
-            if (!constraint.allow(fed)) {
-
-                if (INFO) 
-                    log.info("Constraint does not allow service start: "
-                            + constraint);
-                
-                return false;
-                
-            }
-            
-        }
-        
-        return true;
-
-    }
-
-    /**
      * Contends for the {@link ZLock} and starts the service if the the
      * {@link IServiceConstraint}s are satisified.
      * <p>
@@ -190,14 +162,14 @@ public class MonitorCreatePhysicalServiceLocks implements
             if (INFO)
                 log.info("have lock: zpath=" + lockNodeZPath);
 
-            final ServiceConfiguration config = (ServiceConfiguration) SerializerUtil
+            final ManagedServiceConfiguration config = (ManagedServiceConfiguration) SerializerUtil
                     .deserialize(zookeeper.getData(serviceConfigZPath, false,
                             new Stat()));
 
             if (INFO)
                 log.info("Considering: " + config);
 
-            if (!canStartService(config)) {
+            if (!config.canStartService(fed)) {
 
                 // will not start this service.
 
@@ -232,7 +204,8 @@ public class MonitorCreatePhysicalServiceLocks implements
      * @param logicalServiceZPath
      * @throws Exception
      */
-    protected void startService(final ServiceConfiguration config,
+    @SuppressWarnings("unchecked")
+    protected void startService(final ManagedServiceConfiguration config,
             final String logicalServiceZPath) throws Exception {
 
         if (INFO)
@@ -243,15 +216,10 @@ public class MonitorCreatePhysicalServiceLocks implements
                 logicalServiceZPath);
 
         /*
-         * Submit the task and wait for its Future.
-         * 
-         * Note: this places a timeout in the startup of the service. The
-         * timeout is pretty generous. Service start and service restart should
-         * be very fast -- seconds at most.
-         * 
-         * @todo the service start timeout should be a configuration parameter.
+         * Submit the task and waits for its Future (up to the timeout).
          */
-        fed.getExecutorService().submit(task).get(60, TimeUnit.SECONDS);
+        fed.getExecutorService().submit(task).get(config.timeout,
+                TimeUnit.MILLISECONDS);
 
     }
 

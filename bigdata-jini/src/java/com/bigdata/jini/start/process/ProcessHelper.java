@@ -274,7 +274,7 @@ public class ProcessHelper {
         // add to queue of running (or at any rate, started) processes.
         listener.add(ProcessHelper.this);
         
-        final Thread thread = new Thread(name) {
+        final Thread thread = new Thread("consumeOutput: " + name) {
 
             public void run() {
 

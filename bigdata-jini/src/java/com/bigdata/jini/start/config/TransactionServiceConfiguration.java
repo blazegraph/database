@@ -31,7 +31,7 @@ import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
 
 import com.bigdata.jini.start.IServiceListener;
-import com.bigdata.jini.start.process.JiniProcessHelper;
+import com.bigdata.jini.start.process.JiniServiceProcessHelper;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.TransactionServer;
 import com.bigdata.util.NV;
@@ -67,7 +67,7 @@ public class TransactionServiceConfiguration extends
 
     }
 
-    public class TransactionServiceStarter<V extends JiniProcessHelper>
+    public class TransactionServiceStarter<V extends JiniServiceProcessHelper>
             extends BigdataServiceStarter<V> {
 
         /**

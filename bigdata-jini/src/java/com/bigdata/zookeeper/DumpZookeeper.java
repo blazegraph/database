@@ -88,7 +88,7 @@ public class DumpZookeeper {
         // relative znode to start dump.
         String znode = "test-fed";
 
-        boolean showData = true;
+        boolean showData = false;
         
         ZooKeeper z = new ZooKeeper(hosts, 2000/* sessionTimeout */,
                 new Watcher() {
@@ -128,27 +128,34 @@ public class DumpZookeeper {
         final byte[] data = z.getData(zpath, false, stat);
 
         System.out.print(i(depth) + znode
-                + (stat.getEphemeralOwner() != 0 ? " (Ephemeral)" : ""));
-        
-        if(showData) {
+                + (stat.getEphemeralOwner() != 0 ? " (Ephemeral)" : "") + " ");
 
+        {
             String obj;
             if (data == null)
-                obj = "<null>";
+                obj = "(null)";
             else if (data.length == 0)
-                obj = "<empty>";
+                obj = "(empty)";
             else {
                 try {
-                    obj = SerializerUtil.deserialize(data).toString();
-                } catch (Throwable t) {
-                    obj = Arrays.toString(data);
+                    final Object x = SerializerUtil.deserialize(data);
+                    if (showData) {
+                        obj = x.toString();
+                    } else {
+                        obj = "{"+x.getClass().getSimpleName()+"}";
+                    }
+                } catch (Throwable t2) {
+                    if (showData) {
+                        obj = Arrays.toString(data);
+                    } else {
+                        obj = "bytes[" + data.length + "]";
+                    }
                 }
+                System.out.print(obj);
+
             }
-
-            System.out.print(" " + obj);
-
         }
-        
+            
         System.out.println();
 
         List<String> children = z.getChildren(zpath, false);

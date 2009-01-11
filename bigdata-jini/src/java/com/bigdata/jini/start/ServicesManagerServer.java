@@ -27,12 +27,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.jini.start;
 
+import java.io.IOException;
 import java.net.InetAddress;
 import java.rmi.RemoteException;
 import java.rmi.server.ServerNotActiveException;
 import java.util.Properties;
 
 import net.jini.config.Configuration;
+import net.jini.config.ConfigurationException;
 import net.jini.export.ServerContext;
 import net.jini.io.context.ClientHost;
 import net.jini.io.context.ClientSubject;
@@ -43,6 +45,7 @@ import org.apache.log4j.MDC;
 import org.apache.zookeeper.ZooKeeper;
 
 import com.bigdata.jini.start.config.IServiceConstraint;
+import com.bigdata.jini.start.process.JiniCoreServicesProcessHelper;
 import com.bigdata.jini.start.process.ZookeeperProcessHelper;
 import com.bigdata.service.DefaultServiceFederationDelegate;
 import com.bigdata.service.IBigdataFederation;
@@ -150,6 +153,18 @@ import com.bigdata.service.jini.RemoteDestroyAdmin;
  * @todo if we constrain ourselves to one instance per host then this can be the
  *       process that reports host specific statistics to the LBS.
  * 
+ * @todo There is no straightfoward way to re-start a service that has been
+ *       shutdown. You can of course do this by hand, but there is no persistent
+ *       record in zookeeper of where services were started. The service
+ *       configuration of the physical service has all the necessary
+ *       information, but it is stored in an ephemeral znode.
+ * 
+ * @todo is it possible to create locks and queues using javaspaces in a manner
+ *       similar to zookeeper? It does support a concept similar to a watch, but
+ *       I am not sure that it has concepts similar to "ephermeral" or
+ *       "sequential". Also, I am not clear on its consistency guarentees. It
+ *       does support transactions, which could be another way to approach this.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
@@ -219,6 +234,9 @@ public class ServicesManagerServer extends AbstractServer {
 
         new ServicesManagerServer(args).run();
         
+//      System.exit(0);
+        Runtime.getRuntime().halt(0);
+
     }
     
     @Override
@@ -388,27 +406,60 @@ public class ServicesManagerServer extends AbstractServer {
 
         }
 
+        /**
+         * Extended to start zookeeper and/or the jini core services if they
+         * were specified as running on this host in the {@link Configuration}
+         * and they are not found to be running on the localhost.
+         */
         @Override
         public AdministrableServicesManagerService start() {
 
             try {
-             
-                // if necessary, start zookeeper (a server instance).
-                ZookeeperProcessHelper
-                        .startZookeeper(server.config, this/* listener */);
+
+                // start if configured to run on host and not running.
+                startZookeeperService();
+
+                // start if configured to run on this host and not running.
+                startJiniCoreServices();
                 
-            } catch (Exception e) {
-                
-                throw new RuntimeException(e);
+            } catch (Exception ex) {
+
+                throw new RuntimeException(ex);
                 
             }
-
+            
             super.start();
             
             return this;
             
         }
 
+        /**
+         * If necessary, start a zookeeper service on this host.
+         * 
+         * @throws IOException 
+         * @throws ConfigurationException 
+         */
+        protected void startZookeeperService() throws ConfigurationException,
+                IOException {
+
+            ZookeeperProcessHelper
+                    .startZookeeper(server.config, this/* listener */);
+
+        }
+        
+        /**
+         * If necessary, start the jini core services on this host.
+         * 
+         * @throws Exception 
+         */
+        protected void startJiniCoreServices() throws Exception {
+         
+            JiniCoreServicesProcessHelper
+                    .startCoreServices(server.config, this/* listener */);
+            
+        }
+        
     }
 
 }

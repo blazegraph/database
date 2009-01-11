@@ -102,7 +102,10 @@ public class MetadataServer extends DataServer {
     public static void main(String[] args) {
         
         new MetadataServer(args).run();
-        
+
+//      System.exit(0);
+        Runtime.getRuntime().halt(0);
+
     }
     
     protected MetadataService newService(Properties properties) {

@@ -43,18 +43,20 @@ import net.jini.lookup.ServiceItemFilter;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.journal.IResourceLockService;
+import com.bigdata.jini.start.IServicesManagerService;
 
 /**
- * Class handles discovery of an {@link IResourceLockService}.
+ * Class handles discovery of an {@link IServicesManagerService}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo this pattern could be handled by an abstract class and a generic type.
  */
-public class ResourceLockClient {
+public class ServicesManagerClient {
 
     protected static final transient Logger log = Logger
-            .getLogger(ResourceLockClient.class);
+            .getLogger(ServicesManagerClient.class);
 
     protected static final boolean INFO = log.isInfoEnabled();
     
@@ -70,13 +72,21 @@ public class ResourceLockClient {
     private final long timeout;
     
     /**
-     * Provides direct cached lookup of {@link IResourceLockService}s by their
-     * {@link ServiceID}.
+     * Provides direct cached lookup of proxies by their {@link ServiceID}.
      */
     private final ServiceCache serviceMap;
+    
+    /**
+     * Provides direct cached lookup of proxies by their {@link ServiceID}.
+     */
+    public ServiceCache getServiceCache() {
+        
+        return serviceMap;
+        
+    }
 
     /**
-     * Begins discovery for the {@link IResourceLockService} service.
+     * Begins service discovery.
      * 
      * @param discoveryManagement
      * @param listener
@@ -85,7 +95,7 @@ public class ResourceLockClient {
      *            The timeout in milliseconds that the client will await the
      *            discovery of a service if there is a cache miss.
      */
-    public ResourceLockClient(DiscoveryManagement discoveryManagement,
+    public ServicesManagerClient(DiscoveryManagement discoveryManagement,
             ServiceDiscoveryListener listener, long timeout) {
 
         if (timeout < 0)
@@ -119,11 +129,11 @@ public class ResourceLockClient {
         try {
             
             template = new ServiceTemplate(null,
-                    new Class[] { IResourceLockService.class }, null);
+                    new Class[] { IServicesManagerService.class }, null);
 
-            serviceLookupCache = serviceDiscoveryManager.createLookupCache(
-                    template, null /*new LoadBalancerFilter()*/ /* filter */,
-                    serviceMap/* ServiceDiscoveryListener */);
+            serviceLookupCache = serviceDiscoveryManager
+                    .createLookupCache(template, null /* filter */,
+                            serviceMap/* ServiceDiscoveryListener */);
 
         } catch (RemoteException ex) {
             
@@ -148,23 +158,19 @@ public class ResourceLockClient {
     }
 
     /**
-     * Return the {@link IResourceLockService} service from the cache -or-
+     * Return an arbitrary proxy for the service from the cache -or-
      * <code>null</code> if there is no such service in the cache and a remote
      * lookup times out.
-     * 
-     * @todo handle multiple service instances for failover but always designate
-     *       a primary.
      */
-    public IResourceLockService getResourceLockService() {
+    public IServicesManagerService getService() {
 
         ServiceItem item = serviceLookupCache.lookup(null);
 
         if (item == null) {
 
-            if(INFO)
-                log.info("Cache miss.");
+            if(INFO) log.info("Cache miss.");
 
-            item = handleCacheMiss(null/* filter */);
+            item = handleCacheMiss(null/*filter*/);
                         
             if (item == null) {
 
@@ -176,7 +182,7 @@ public class ResourceLockClient {
             
         }
         
-        return (IResourceLockService) item.service;
+        return (IServicesManagerService) item.service;
 
     }
 

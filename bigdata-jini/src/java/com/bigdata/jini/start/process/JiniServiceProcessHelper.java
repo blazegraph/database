@@ -40,12 +40,19 @@ import com.bigdata.service.jini.RemoteDestroyAdmin;
 import com.sun.jini.admin.DestroyAdmin;
 
 /**
- * Extended to prefer {@link RemoteDestroyAdmin} for {@link #kill()}
+ * Class for managing a service written using the jini framework. This extends
+ * the base class to prefer {@link RemoteDestroyAdmin} for {@link #kill()}. It
+ * will use {@link RemoteDestroyAdmin#shutdown()} (normal shutdown, allowing a
+ * service to be restarted) if defined and otherwise
+ * {@link DestroyAdmin#destroy()} (destroys the service along with its
+ * persistent state).
+ * <p>
+ * Note: {@link RemoteDestroyAdmin} is defined for the bigdata services.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class JiniProcessHelper extends ProcessHelper {
+public class JiniServiceProcessHelper extends ProcessHelper {
 
     /**
      * @param name
@@ -53,7 +60,7 @@ public class JiniProcessHelper extends ProcessHelper {
      * @param listener
      * @throws IOException
      */
-    public JiniProcessHelper(String name, ProcessBuilder builder,
+    public JiniServiceProcessHelper(String name, ProcessBuilder builder,
             IServiceListener listener) throws IOException {
 
         super(name, builder, listener);

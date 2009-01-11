@@ -33,7 +33,7 @@ import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
 
 import com.bigdata.jini.start.IServiceListener;
-import com.bigdata.jini.start.process.JiniProcessHelper;
+import com.bigdata.jini.start.process.JiniServiceProcessHelper;
 import com.bigdata.service.jini.AbstractServer;
 import com.bigdata.service.jini.DataServer;
 import com.bigdata.service.jini.JiniFederation;
@@ -47,7 +47,7 @@ import com.bigdata.util.NV;
  * @version $Id$
  */
 abstract public class BigdataServiceConfiguration extends
-        AbstractJiniServiceConfiguration {
+        JiniServiceConfiguration {
 
     /**
      * 
@@ -60,20 +60,10 @@ abstract public class BigdataServiceConfiguration extends
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public interface Options extends AbstractJiniServiceConfiguration.Options {
-        
-//        /**
-//         * Service instance parameters represented as a {@link NV}[].
-//         */
-//        String PARAMS = "params";
+    public interface Options extends JiniServiceConfiguration.Options {
         
     }
     
-//    /**
-//     * The initial properties for new instances of the service type.
-//     */
-//    public final NV[] params;
-
     /**
      * @param cls
      * @param config
@@ -84,8 +74,6 @@ abstract public class BigdataServiceConfiguration extends
 
         super(cls, config);
 
-//        this.params = getParams(cls.getName(), config);
-        
         if (log4j == null) {
             
             throw new ConfigurationException("Must specify: " + Options.LOG4J);
@@ -98,19 +86,9 @@ abstract public class BigdataServiceConfiguration extends
 
         super.toString(sb);
 
-//        sb.append(", " + Options.PARAMS + "=" + Arrays.toString(params));
-
     }
 
-//    public static NV[] getParams(String className, Configuration config)
-//            throws ConfigurationException {
-//
-//        return (NV[]) config.getEntry(className, Options.PARAMS, NV[].class,
-//                new NV[] {}/* defaultValue */);
-//
-//    }
-
-    public AbstractServiceStarter newServiceStarter(final JiniFederation fed,
+    public ManagedServiceStarter newServiceStarter(final JiniFederation fed,
             final IServiceListener listener, final String logicalServiceZPath)
             throws Exception {
 
@@ -124,7 +102,7 @@ abstract public class BigdataServiceConfiguration extends
      * @version $Id$
      * @param <V>
      */
-    public class BigdataServiceStarter<V extends JiniProcessHelper> extends
+    public class BigdataServiceStarter<V extends JiniServiceProcessHelper> extends
             JiniServiceStarter<V> {
 
         /**

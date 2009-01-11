@@ -79,6 +79,9 @@ public class MapServer extends AbstractServer {
         
         new MapServer(args).run();
         
+//      System.exit(0);
+        Runtime.getRuntime().halt(0);
+
     }
     
     protected Remote newService(Properties properties) {

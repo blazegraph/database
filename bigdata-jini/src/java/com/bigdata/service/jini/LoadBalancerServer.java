@@ -77,7 +77,10 @@ public class LoadBalancerServer extends AbstractServer {
     public static void main(String[] args) {
         
         new LoadBalancerServer(args).run();
-        
+
+//      System.exit(0);
+        Runtime.getRuntime().halt(0);
+
     }
 
     @Override

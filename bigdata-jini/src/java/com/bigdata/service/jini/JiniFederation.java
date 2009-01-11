@@ -79,7 +79,6 @@ import com.bigdata.service.IService;
 import com.bigdata.service.jini.DataServer.AdministrableDataService;
 import com.bigdata.service.jini.LoadBalancerServer.AdministrableLoadBalancer;
 import com.bigdata.service.jini.MetadataServer.AdministrableMetadataService;
-import com.bigdata.service.jini.ResourceLockServer.AdministrableResourceLockService;
 import com.bigdata.service.proxy.ClientAsynchronousIterator;
 import com.bigdata.service.proxy.ClientBuffer;
 import com.bigdata.service.proxy.ClientFuture;
@@ -89,6 +88,7 @@ import com.bigdata.service.proxy.RemoteBuffer;
 import com.bigdata.service.proxy.RemoteBufferImpl;
 import com.bigdata.service.proxy.RemoteFuture;
 import com.bigdata.service.proxy.RemoteFutureImpl;
+import com.bigdata.zookeeper.ZooResourceLockService;
 import com.bigdata.zookeeper.ZookeeperClientConfig;
 import com.sun.jini.admin.DestroyAdmin;
 
@@ -105,10 +105,12 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
     protected LoadBalancerClient loadBalancerClient;
 
-    protected ResourceLockClient resourceLockClient;
+    protected ZooResourceLockService resourceLockService = new ZooResourceLockService(this);
 
     protected TransactionServiceClient transactionServiceClient;
-    
+
+    protected ServicesManagerClient servicesManagerClient;
+
     protected DiscoveryManagement discoveryManager;
 
     protected ZooKeeper zookeeper;
@@ -247,8 +249,8 @@ public class JiniFederation extends AbstractDistributedFederation implements
             loadBalancerClient = new LoadBalancerClient(discoveryManager, this,
                     cacheMissTimeout);
 
-            // Start discovery for the resource lock manager.
-            resourceLockClient = new ResourceLockClient(discoveryManager, this,
+            // Start discovery for the services manager.
+            servicesManagerClient = new ServicesManagerClient(discoveryManager, this,
                     cacheMissTimeout);
 
         } catch (Exception ex) {
@@ -300,12 +302,8 @@ public class JiniFederation extends AbstractDistributedFederation implements
     
     public IResourceLockService getResourceLockService() {
         
-        // Note: return null if service not available/discovered.
-        if (resourceLockClient == null)
-            return null;
-
-        return resourceLockClient.getResourceLockService();
-
+        return resourceLockService;
+        
     }
     
     public IMetadataService getMetadataService() {
@@ -404,14 +402,6 @@ public class JiniFederation extends AbstractDistributedFederation implements
      * Stop various discovery processes.
      */
     private void terminateDiscoveryProcesses() {
-
-        if (resourceLockClient != null) {
-
-            resourceLockClient.terminate();
-
-            resourceLockClient = null;
-            
-        }
         
         if (transactionServiceClient != null) {
 
@@ -470,8 +460,6 @@ public class JiniFederation extends AbstractDistributedFederation implements
     private static final String ERR_RESOLVE = "Could not resolve: ";
 
     private static final String ERR_DESTROY_ADMIN = "Could not destroy: ";
-
-    private static final String ERR_NO_DESTROY_ADMIN = "Does not implement DestroyAdmin: ";
 
     /**
      * Shutdown the services in the distributed federation <strong>NOT</strong>
@@ -589,70 +577,83 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
         }
 
-        // shutdown the lock service
-        {
-
-            final AdministrableResourceLockService service = (AdministrableResourceLockService) getResourceLockService();
-
-            try {
-
-                if (immediate)
-                    service.shutdownNow();
-                else
-                    service.shutdown();
-
-            } catch (Throwable t) {
-
-                log.error(t.getMessage(), t);
-
-            }
-
-        }
-
     }
 
     public void destroy() {
 
         assertOpen();
 
-        if (zookeeper != null) {
+        /*
+         * Destroy services managers.
+         * 
+         * @todo we could handle all of them a bit more like this.
+         * 
+         * @todo it would be easy enough to write a shutdownAll() method as
+         * well.
+         */
+        if (servicesManagerClient != null) {
 
-            try {
-
-                // clear out everything in zookeeper for this federation.
-                zookeeper.delete(zooConfig.zroot, -1/* version */);
-                
-            } catch (Exception e) {
-                
-                throw new RuntimeException(e);
-                
-            }
+//            Object service;
+//            while ((service = servicesManagerClient.getService()) != null) {
+//
+//                try {
+//
+//                    System.err.println("Will destroy: " + service);
+//
+//                    ((RemoteDestroyAdmin) (service)).destroy();
+//
+//                } catch (IOException e) {
+//
+//                    log.error(ERR_DESTROY_ADMIN + service, e);
+//
+//                }
+//                
+//            }
             
+            // force a lookup.
+            servicesManagerClient.getService();
+            
+            final ServiceCache cache = servicesManagerClient.getServiceCache();
+            
+            // return everything in the cache.
+            final ServiceItem[] items = cache.getServiceItems(0/* maxCount */,
+                    null/* filter */);
+
+            for (ServiceItem item : items) {
+
+                try {
+                    
+                    log.warn("Will destroy: "+item);
+
+                    ((RemoteDestroyAdmin) (item.service)).destroy();
+
+                } catch (IOException e) {
+
+                    log.error(ERR_DESTROY_ADMIN + item, e);
+
+                }
+
+            }
+
         }
 
         // destroy the transaction service(s).
         if (transactionServiceClient != null) {
 
-            final ITransactionService transactionService = transactionServiceClient
+            final ITransactionService service = transactionServiceClient
                     .getTransactionService();
 
-            if (transactionService != null) {
+            if (service != null) {
 
-                if ((transactionService instanceof DestroyAdmin)) {
+                try {
 
-                    try {
+                    log.warn("Will destroy: " + service);
 
-                        ((DestroyAdmin) transactionService).destroy();
+                    ((DestroyAdmin) service).destroy();
 
-                    } catch (IOException e) {
+                } catch (IOException e) {
 
-                        log.error(ERR_DESTROY_ADMIN + transactionService, e);
-
-                    }
-
-                } else {
-
-                    log.warn(ERR_NO_DESTROY_ADMIN + transactionService);
+                    log.error(ERR_DESTROY_ADMIN + service, e);
 
                 }
 
@@ -683,6 +684,8 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
                 try {
 
+                    log.warn("Will destroy: "+service);
+
                     service.destroy();
 
                 } catch (IOException e) {
@@ -705,6 +708,8 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
                 try {
 
+                    log.warn("Will destroy: "+service);
+
                     service.destroy();
 
                 } catch (IOException e) {
@@ -725,21 +730,15 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
             if (service != null) {
 
-                if ((service instanceof DestroyAdmin)) {
+                try {
 
-                    try {
+                    log.warn("Will destroy: "+service);
 
-                        ((DestroyAdmin) service).destroy();
+                    ((DestroyAdmin) service).destroy();
 
-                    } catch (IOException e) {
+                } catch (IOException e) {
 
-                        log.error(ERR_DESTROY_ADMIN + service, e);
-
-                    }
-
-                } else {
-
-                    log.warn(ERR_NO_DESTROY_ADMIN + service);
+                    log.error(ERR_DESTROY_ADMIN + service, e);
 
                 }
 
@@ -747,38 +746,50 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
         }
 
-        // destroy lock service(s)
-        if (resourceLockClient != null) {
+        if (zookeeper != null) {
 
-            final IResourceLockService service = resourceLockClient
-                    .getResourceLockService();
+            try {
 
-            if (service != null) {
+                /*
+                 * Clear out everything in zookeeper for this federation.
+                 */
+                if (zookeeper.exists(zooConfig.zroot, false/* watch */) != null) {
 
-                if ((service instanceof DestroyAdmin)) {
-
-                    try {
-
-                        ((DestroyAdmin) service).destroy();
-
-                    } catch (IOException e) {
-
-                        log.error(ERR_DESTROY_ADMIN + service, e);
-
-                    }
-
-                } else {
-
-                    log.warn(ERR_NO_DESTROY_ADMIN + service);
+                    destroyZNodes(zookeeper, zooConfig.zroot, 0/* depth */);
 
                 }
-
+                
+            } catch (Exception e) {
+                
+                throw new RuntimeException(e);
+                
             }
-
+            
         }
 
     }
 
+    private void destroyZNodes(final ZooKeeper z, final String zpath,
+            final int depth) throws KeeperException,
+            InterruptedException {
+
+//        System.err.println("enter : " + zpath);
+
+        final List<String> children = z.getChildren(zpath, false);
+
+        for (String child : children) {
+
+            destroyZNodes(z, zpath + "/" + child, depth + 1);
+
+        }
+
+        if(INFO)
+            log.info("delete: " + zpath);
+
+        z.delete(zpath, -1/* version */);
+        
+    }
+    
     public long getLastCommitTime() {
 
         final ITransactionService transactionService = getTransactionService();

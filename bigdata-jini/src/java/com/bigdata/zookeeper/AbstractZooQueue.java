@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.zookeeper;
 
 import java.io.Serializable;
+import java.util.Arrays;
 import java.util.List;
 
 import org.apache.log4j.Logger;
@@ -184,12 +185,14 @@ abstract public class AbstractZooQueue<E extends Serializable> extends
                 continue;
 
             }
-
-            if(true) // FIXME Must sort the elements!
-                throw new UnsupportedOperationException();
+            
+            // put into sorted order.
+            final String[] a = list.toArray(new String[list.size()]);
+            
+            Arrays.sort(a);
             
             // first element (lex order is also sorted for sequential ids).
-            final String selected = zroot + "/" + list.get(0);
+            final String selected = zroot + "/" + a[0];
             
             final E e = (E) SerializerUtil.deserialize(zookeeper.getData(
                     selected, false/* watch */, new Stat()));

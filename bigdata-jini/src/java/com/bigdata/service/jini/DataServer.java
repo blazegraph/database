@@ -103,6 +103,9 @@ public class DataServer extends AbstractServer {
         
         new DataServer(args).run();
         
+//      System.exit(0);
+        Runtime.getRuntime().halt(0);
+        
     }
     
     protected DataService newService(Properties properties) {

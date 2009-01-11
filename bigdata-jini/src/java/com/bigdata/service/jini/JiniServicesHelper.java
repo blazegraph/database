@@ -1,17 +1,14 @@
 package com.bigdata.service.jini;
 
-import java.net.MalformedURLException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import net.jini.core.discovery.LookupLocator;
 import net.jini.core.lookup.ServiceID;
-import net.jini.core.lookup.ServiceRegistrar;
-import net.jini.discovery.LookupLocatorDiscovery;
 
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.ZooKeeper;
 
+import com.bigdata.jini.start.ServicesManagerServer;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.zookeeper.ZookeeperClientConfig;
 
@@ -30,12 +27,18 @@ import com.bigdata.zookeeper.ZookeeperClientConfig;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo you could also use the {@link ServicesManagerServer} for this.
  */
-public class JiniServicesHelper {
+public class JiniServicesHelper extends JiniCoreServicesHelper {
 
     protected final static Logger log = Logger
             .getLogger(JiniServicesHelper.class);
 
+    protected final static boolean INFO = log.isInfoEnabled();
+
+    protected final static boolean DEBUG = log.isDebugEnabled();
+    
     public MetadataServer metadataServer0;
 
     public DataServer dataServer1;
@@ -45,8 +48,6 @@ public class JiniServicesHelper {
     public LoadBalancerServer loadBalancerServer0;
 
     public TransactionServer transactionServer0;
-
-    public ResourceLockServer resourceLockServer0;
 
     public JiniClient client;
 
@@ -104,14 +105,6 @@ public class JiniServicesHelper {
         };
         
         /*
-         * Start up a resource lock server.
-         */
-        threadPool
-                .execute(resourceLockServer0 = new ResourceLockServer(concat(
-                        new String[] { path + "ResourceLockServer0.config" },
-                        options)));
-
-        /*
          * Start up a timestamp server.
          */
         threadPool.execute(transactionServer0 = new TransactionServer(concat(
@@ -155,7 +148,6 @@ public class JiniServicesHelper {
         zooConfig = fed.getZooConfig();
         
         // Wait until all the services are up.
-        getServiceID(resourceLockServer0);
         getServiceID(transactionServer0);
         getServiceID(metadataServer0);
         getServiceID(dataServer0);
@@ -264,14 +256,6 @@ public class JiniServicesHelper {
 
         }
 
-        if (resourceLockServer0 != null) {
-
-            resourceLockServer0.destroy();
-
-            resourceLockServer0 = null;
-
-        }
-
     }
 
     /**
@@ -324,107 +308,6 @@ public class JiniServicesHelper {
             throw new RuntimeException("Server did not start? "+server);
 
         return serviceID;
-
-    }
-
-    /**
-     * Return <code>true</code> if Jini appears to be running on the
-     * localhost.
-     * 
-     * @throws Exception
-     */
-    public static boolean isJiniRunning() {
-        
-        return isJiniRunning(new String[] { "jini://localhost/" });
-        
-    }
-    
-    /**
-     * @param url
-     *            One or more unicast URIs of the form <code>jini://host/</code>
-     *            or <code>jini://host:port/</code> -or- an empty array if you
-     *            want to use <em>multicast</em> discovery.
-     */
-    public static boolean isJiniRunning(String[] url) {
-        
-        final LookupLocator[] locators = new LookupLocator[url.length];
-
-        for (int i = 0; i < url.length; i++) {
-           
-            try {
-
-                locators[i] = new LookupLocator("jini://localhost/");
-
-            } catch (MalformedURLException e) {
-
-                throw new RuntimeException(e);
-
-            }
-            
-        }
-
-        final LookupLocatorDiscovery discovery = new LookupLocatorDiscovery(
-                locators);
-
-        try {
-
-            final long timeout = 2000; // ms
-
-            final long begin = System.currentTimeMillis();
-
-            long elapsed;
-
-            while ((elapsed = (System.currentTimeMillis() - begin)) < timeout) {
-
-                final ServiceRegistrar[] registrars = discovery.getRegistrars();
-
-                if (registrars.length > 0) {
-
-                    if(log.isInfoEnabled())
-                        log.info("Found " + registrars.length
-                                + " registrars in " + elapsed + "ms.");
-
-                    return true;
-
-                }
-
-            }
-
-            log
-                    .error("Could not find any service registrars on localhost after "
-                            + elapsed + " ms");
-
-            return false;
-
-        } finally {
-
-            discovery.terminate();
-
-        }
-
-    }
-
-    /**
-     * Combines the two arrays, appending the contents of the 2nd array to the
-     * contents of the first array.
-     * 
-     * @param a
-     * @param b
-     * @return
-     */
-    @SuppressWarnings("unchecked")
-    protected static <T> T[] concat(final T[] a, final T[] b) {
-
-        final T[] c = (T[]) java.lang.reflect.Array.newInstance(a.getClass()
-                .getComponentType(), a.length + b.length);
-
-        // final String[] c = new String[a.length + b.length];
-
-        System.arraycopy(a, 0, c, 0, a.length);
-
-        System.arraycopy(b, 0, c, a.length, b.length);
-
-        return c;
 
     }
 

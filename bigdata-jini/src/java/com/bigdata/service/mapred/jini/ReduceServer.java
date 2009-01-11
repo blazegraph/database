@@ -77,7 +77,10 @@ public class ReduceServer extends AbstractServer {
     public static void main(final String[] args) {
         
         new ReduceServer(args).run();
-        
+
+//      System.exit(0);
+        Runtime.getRuntime().halt(0);
+
     }
    
     protected Remote newService(Properties properties) {

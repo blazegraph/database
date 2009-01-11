@@ -20,9 +20,7 @@ import com.bigdata.jini.start.config.LoadBalancerServiceConfiguration;
 import com.bigdata.jini.start.config.MetadataServiceConfiguration;
 import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.jini.start.config.TransactionServiceConfiguration;
-import com.bigdata.jini.start.process.JiniProcessHelper;
 import com.bigdata.jini.start.process.ProcessHelper;
-import com.bigdata.jini.start.process.ZookeeperProcessHelper;
 import com.bigdata.service.AbstractService;
 import com.bigdata.service.jini.JiniFederation;
 
@@ -54,6 +52,9 @@ public abstract class AbstractServicesManagerService extends AbstractService
      * terminated). If you {@link Process#destroy()} a {@link Process}
      * registered by the {@link ProcessHelper} in this collection, then it will
      * automatically become unregistered.
+     * 
+     * @todo we don't really need this since we are not destroying the children
+     *       with the parent.
      */
     final private ConcurrentLinkedQueue<ProcessHelper> runningProcesses = new ConcurrentLinkedQueue<ProcessHelper>();
 
@@ -82,62 +83,61 @@ public abstract class AbstractServicesManagerService extends AbstractService
      * represented in {@link #runningProcesses}), but leaves the zookeeper and
      * jini services for last.
      * 
-     * FIXME make sure that we will not start new processes during shutdown.
-     * Anyone desiring to add a process should obtain a lock from the
-     * {@link IServiceListener} that is mutex with shutdown and no longer
-     * available once we start shutdown.
+     * @todo Do not permit new processes to start during shutdown? I am not sure
+     *       how much this matters. If the child was started, then it will just
+     *       run and succeed or die as it likes.
      */
     synchronized public void shutdown() {
 
-        if(true) return;
-        
-        final ConcurrentLinkedQueue<ProcessHelper> problems = new ConcurrentLinkedQueue<ProcessHelper>();
-        
-        // destroy any running processes
-        for (ProcessHelper helper : runningProcesses) {
-
-            if (helper instanceof JiniProcessHelper)
-                continue;
-            
-            if (helper instanceof ZookeeperProcessHelper)
-                continue;
-
-            try {
-                helper.kill();
-            } catch (Throwable t) {
-                log.warn("Could not kill process: "+helper);
-                // add to list of problem processes.
-                problems.add(helper);
-                // remove from list of running processes.
-                runningProcesses.remove(helper);
-            }
-
-        }
-
-        // try again for the problem processes, raising the logging level.
-        for (ProcessHelper helper : problems) {
-
-            try {
-                helper.kill();
-            } catch (Throwable t) {
-                log.error("Could not kill process: " + helper);
-                problems.add(helper);
-            }
-
-        }
-
-        /*
-         * This time we take down zookeeper and jini.
-         */ 
-        for (ProcessHelper helper : runningProcesses) {
-
-            try {
-                helper.kill();
-            } catch (Throwable t) {
-                log.warn("Could not kill process: " + helper);
-            }
-
-        }
+//        if(true) return;
+//        
+//        final ConcurrentLinkedQueue<ProcessHelper> problems = new ConcurrentLinkedQueue<ProcessHelper>();
+//        
+//        // destroy any running processes
+//        for (ProcessHelper helper : runningProcesses) {
+//
+//            if (helper instanceof JiniProcessHelper)
+//                continue;
+//            
+//            if (helper instanceof ZookeeperProcessHelper)
+//                continue;
+//
+//            try {
+//                helper.kill();
+//            } catch (Throwable t) {
+//                log.warn("Could not kill process: "+helper);
+//                // add to list of problem processes.
+//                problems.add(helper);
+//                // remove from list of running processes.
+//                runningProcesses.remove(helper);
+//            }
+//
+//        }
+//
+//        // try again for the problem processes, raising the logging level.
+//        for (ProcessHelper helper : problems) {
+//
+//            try {
+//                helper.kill();
+//            } catch (Throwable t) {
+//                log.error("Could not kill process: " + helper);
+//                problems.add(helper);
+//            }
+//
+//        }
+//
+//        /*
+//         * This time we take down zookeeper and jini.
+//         */ 
+//        for (ProcessHelper helper : runningProcesses) {
+//
+//            try {
+//                helper.kill();
+//            } catch (Throwable t) {
+//                log.warn("Could not kill process: " + helper);
+//            }
+//
+//        }
 
     }
 
@@ -220,7 +220,8 @@ public abstract class AbstractServicesManagerService extends AbstractService
          * zookeeper.
          * 
          * @todo if we declare the set of configurations in the Configuration
-         * file then we can add one more metalevel here.
+         * file then we can add one more metalevel here.  The jini service
+         * starter basically does that.
          */
         final ServiceConfiguration[] serviceConfigurations = getServiceConfigurations(config);
 
@@ -230,8 +231,8 @@ public abstract class AbstractServicesManagerService extends AbstractService
         // create critical nodes used by the federation.
         createKeyZNodes(zookeeper, zroot, acl);
 
-        // load service configurations (will not overwrite those that exist).
-        loadConfiguration(zookeeper, zconfig, acl, serviceConfigurations);
+        // push the service configurations into zookeeper (create/update).
+        pushConfiguration(zookeeper, zconfig, acl, serviceConfigurations);
         
     }
 
@@ -255,17 +256,15 @@ public abstract class AbstractServicesManagerService extends AbstractService
                 zroot,
                 
                 // znode for configuration metadata.
-                zroot + BigdataZooDefs.ZSLASH + BigdataZooDefs.CONFIG,
-          
+                zroot + "/" + BigdataZooDefs.CONFIG,
+
                 // znode dominating most locks.
-                zroot + BigdataZooDefs.ZSLASH + BigdataZooDefs.LOCKS,
-                
-                zroot + "/"
-                + BigdataZooDefs.LOCKS_CREATE_PHYSICAL_SERVICE,
-                
-                zroot + "/"
-                + BigdataZooDefs.LOCKS_SERVICE_CONFIG_MONITOR,
-                
+                zroot + "/" + BigdataZooDefs.LOCKS,
+
+                zroot + "/" + BigdataZooDefs.LOCKS_CREATE_PHYSICAL_SERVICE,
+
+                zroot + "/" + BigdataZooDefs.LOCKS_SERVICE_CONFIG_MONITOR,
+
         };
         
         for (String zpath : a) {
@@ -293,12 +292,13 @@ public abstract class AbstractServicesManagerService extends AbstractService
      * Generates {@link ServiceConfiguration}s from the {@link Configuration}
      * file.
      * 
-     * @param config The {@link Configuration} file.
+     * @param config
+     *            The {@link Configuration} file.
      * 
      * @return An array of {@link ServiceConfiguration}s populated from the
      *         {@link Configuration} file.
-     *         
-     * @throws ConfigurationException 
+     * 
+     * @throws ConfigurationException
      * 
      * @todo start httpd for downloadable code. (contend for lock on node, start
      *       instance if insufficient instances are running). The codebase URI
@@ -314,28 +314,14 @@ public abstract class AbstractServicesManagerService extends AbstractService
      * 
      * @see https://deployutil.dev.java.net/
      * 
-     * @todo start jini using configured RMI codebase URO (contend for lock on
-     *       node, start instance if insufficient instances are running). jini
-     *       should be started iff one of the locators corresponds to an address
-     *       for this host and jini is not found to be running. We will need
-     *       some sort of lock to resolve contention concerning which instance
-     *       of this class should start jini. That can be done using zookeeper.
-     * 
-     * @todo Do the resource lock server. NO dependencies (jini must be running
-     *       for it to be discoverable). For the short term, uses zookeeper to
-     *       provide non-hierarchical locks w/o deadlock detection. Will be
-     *       replaced by full transactions. A client library can provide queues
-     *       and barriers using zookeeper.
+     * @todo Use class server URL(s) when starting services for their RMI
+     *       codebase.
      */
     public ServiceConfiguration[] getServiceConfigurations(Configuration config)
             throws ConfigurationException {
 
         final List<ServiceConfiguration> v = new LinkedList<ServiceConfiguration>();
 
-        // // jini registrar(s).
-            // zoo.create(zconfig + ZSLASH + "jini", SerializerUtil
-            // .serialize(jiniConfig), acl, CreateMode.PERSISTENT);
-            //
             // // class server(s).
             // zoo.create(zconfig + ZSLASH
             // + ClassServer.class.getSimpleName(), SerializerUtil
@@ -353,28 +339,25 @@ public abstract class AbstractServicesManagerService extends AbstractService
 
             // load balancer server.
             v.add(new LoadBalancerServiceConfiguration(config));
-
-            // // resource lock server(s).
-            // zoo.create(zconfig + ZSLASH
-            // + ResourceLockServer.class.getSimpleName(),
-            // SerializerUtil.serialize(resourceLockServerConfig),
-            // acl, CreateMode.PERSISTENT);
-
+            
             return v.toArray(new ServiceConfiguration[0]);
             
     }
     
     /**
-     * Load the {@link ServiceConfiguration}s for the federation into
-     * zookeeper. 
+     * Pushs the {@link ServiceConfiguration}s for the federation into
+     * zookeeper. A new znode is created if none exists. Otherwise this
+     * overwrites the existing data for those znodes.
      * 
      * @throws ConfigurationException
      * @throws InterruptedException
      * @throws KeeperException
      * 
-     * @todo option to overwrite any that already exist?
+     * @todo We should either watch the configuration file and push the
+     *       configuration if it is updated or install a SIGHUP handled and push
+     *       the configuration if we receive that signal.
      */
-    protected void loadConfiguration(final ZooKeeper zookeeper,
+    protected void pushConfiguration(final ZooKeeper zookeeper,
             final String zconfig, final List<ACL> acl,
             final ServiceConfiguration[] config) throws KeeperException,
             InterruptedException, ConfigurationException {
@@ -383,15 +366,29 @@ public abstract class AbstractServicesManagerService extends AbstractService
 
             final String zpath = zconfig + BigdataZooDefs.ZSLASH + x.className;
 
+            final byte[] data = SerializerUtil.serialize(x);
+
             try {
-                
-                zookeeper.create(zpath, SerializerUtil.serialize(x), acl,
-                        CreateMode.PERSISTENT);
-                
+
+                zookeeper.create(zpath, data, acl, CreateMode.PERSISTENT);
+
+                if (INFO)
+                    log.info("Created: " + zpath + " : " + x);
+
             } catch (NodeExistsException ex) {
 
-                log.warn("ServiceConfiguration exists: " + zpath);
+                try {
+                    zookeeper.setData(zpath, data, -1/* version */);
 
+                    if (INFO)
+                        log.info("Updated: " + zpath + " : " + x);
+
+                } catch (KeeperException ex2) {
+
+                    log.error("Could not update: zpath=" + zpath);
+
+                }
+                
             }
 
         }

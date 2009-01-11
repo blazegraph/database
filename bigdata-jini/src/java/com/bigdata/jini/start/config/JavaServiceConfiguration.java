@@ -28,15 +28,10 @@
 package com.bigdata.jini.start.config;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Arrays;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -55,7 +50,8 @@ import com.bigdata.service.jini.JiniFederation;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class JavaServiceConfiguration extends ServiceConfiguration {
+abstract public class JavaServiceConfiguration extends
+        ManagedServiceConfiguration {
 
     /**
      * 
@@ -187,7 +183,7 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
      * @param <V>
      */
     public class JavaServiceStarter<V extends ProcessHelper> extends
-            AbstractServiceStarter<V> {
+            ManagedServiceStarter<V> {
 
         /**
          * The class for the service that we are going to start.
@@ -273,157 +269,16 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
         }
 
         /**
-         * Start a new instance of the service. Output of the child process will
-         * be copied onto the output of the parent process, so that is where to
-         * look for any log4j output that is written onto stdout or stderr.
-         * 
-         * @param servicesManager
-         * @param logicalServiceZPath
-         *            The path to the znode for the logical service an instance
-         *            of which will be started (must exist).
-         */
-        public V call() throws Exception {
-
-            if (INFO)
-                log.info("config: " + JavaServiceConfiguration.this);
-
-            if (zookeeper.exists(logicalServiceZPath, false/* watch */) == null) {
-
-                throw new IllegalStateException(
-                        "Logical service zpath not found: "
-                                + logicalServiceZPath);
-
-            }
-
-            // hook for setup before the process starts.
-            setUp();
-
-            // create the command line.
-            final List<String> cmds = getCommandLine();
-
-            final ProcessBuilder processBuilder = new ProcessBuilder(cmds);
-
-            // allow override of the environment for the child.
-            setUpEnvironment(processBuilder.environment());
-
-            // specify the startup directory?
-            // processBuilder.directory(dataDir);
-
-            // start the process.
-            final V processHelper = (V) newProcessHelper(className,
-                    processBuilder, listener);
-
-            /*
-             * Note: If the services is not started after a timeout then we kill
-             * the process. The semantics of "started" is provided by the
-             * awaitServiceStart() method and can be overriden depending on the
-             * service type.
-             */
-            Future future = null;
-            try {
-
-                /*
-                 * Set a thread that will interrupt the [currentThread] if it
-                 * notices that the process has died.
-                 * 
-                 * Note: This provides an upper bound on how long we will wait
-                 * to decide that the service has started.
-                 * 
-                 * @todo config timeout
-                 */
-                final long timeout = 60L;
-                final TimeUnit unit = TimeUnit.SECONDS;
-                future = processHelper.interruptWhenProcessDies(timeout, unit);
-
-                // attempt to detect a service start failure.
-                awaitServiceStart(processHelper, timeout, unit);
-
-            } catch (InterruptedException ex) {
-
-                /*
-                 * If we were interrupted because the process is dead then add
-                 * that information to the exception.
-                 */
-                try {
-
-                    /*
-                     * @todo a little wait here appears to be necessary
-                     * indicating that there is some problem with
-                     * ProcessHelper#interruptWhenProcessDies().
-                     */
-                    final int exitValue = processHelper.exitValue(10,
-                            TimeUnit.MILLISECONDS);
-
-                    throw new IOException("Process is dead: exitValue="
-                            + exitValue);
-
-                } catch (TimeoutException ex2) {
-
-                    // ignore.
-
-                }
-
-                // otherwise just rethrow the exception.
-                throw ex;
-
-            } catch (Throwable t) {
-
-                /*
-                 * The service did not start normally. kill the process and log
-                 * an error.
-                 */
-
-                try {
-
-                    log.error("Startup problem: " + className, t);
-
-                    throw new RuntimeException(t);
-
-                } finally {
-
-                    processHelper.kill();
-
-                }
-
-            } finally {
-
-                if (future != null) {
-
-                    /*
-                     * Note: We MUST cancel the thread monitoring the process
-                     * before we leave this scope or it may cause a spurious
-                     * interrupt of this thread in some other context!
-                     */
-                    
-                    future.cancel(true/* mayInterruptIfRunning */);
-                    
-                }
-
-            }
-
-            return (V) processHelper;
-
-        }
-
-        protected V newProcessHelper(String className,
-                ProcessBuilder processBuilder, IServiceListener listener)
-                throws IOException {
-
-            return (V) new ProcessHelper(className, processBuilder, listener);
-
-        }
-        
-        /**
-         * Hook for modification of the child environment.
+         * Puts the parent's CLASSPATH into the child's environment unless
+         * {@link Options#CLASSPATH} was specified.
          * 
          * @param env
-         *            A map. Modifications to the map will be written into the
-         *            child environment.
-         * 
-         * @see ProcessBuilder#environment()
          */
+        @Override
         protected void setUpEnvironment(Map<String, String> env) {
 
+            super.setUpEnvironment(env);
+            
             if (classpath == null) {
 
                 // pass on our classpath to the child.
@@ -434,67 +289,57 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
         }
 
         /**
-         * Waits a bit to see if the process returns an exit code. If an exit is
-         * NOT available after a timeout, then assumes that the process started
-         * successfully.
-         * <p>
-         * Note: <strong>This DOES NOT provide direct confirmation that the
-         * service is running in a non-error and available for answering
-         * requests.</strong> You SHOULD override this method if you have a
-         * service specific means of obtaining such confirmation.
-         * 
-         * @throws Exception
-         *             If a service start failure could be detected (the caller
-         *             will kill the process and log an error if any exception
-         *             is thrown).
+         * Extended to ensure that the {@link #serviceDir} exists.
          */
-        protected void awaitServiceStart(final V processHelper,
-                final long timeout, final TimeUnit unit) throws Exception {
+        @Override
+        protected void setUp() throws Exception {
 
-            try {
+            super.setUp();
+            
+            if (!serviceDir.exists()) {
 
-                final int exitValue = processHelper.exitValue(timeout, unit);
-
-                throw new IOException("exitValue=" + exitValue);
-
-            } catch (TimeoutException ex) {
-
-                /*
-                 * Note: Assumes the service started normally!
-                 */
-
-                log.warn("Started service: " + className);
-
-                return;
+                serviceDir.mkdirs();
 
             }
 
         }
 
         /**
-         * Generate the command line that will be used to start the service.
+         * Adds {@link Options#JAVA}.
          */
-        protected List<String> getCommandLine() {
-
-            final List<String> cmds = new LinkedList<String>();
+        @Override
+        protected void addCommand(List<String>cmds) {
 
             cmds.add(java != null ? java : "java");
 
+        }
+
+        /**
+         * Extended to add {@link Options#DEFAULT_JAVA_ARGS},
+         * {@link Options#CLASSPATH}, {@link Options#LOG4J}, and the
+         * {@link ServiceConfiguration#className} to the command line.
+         * 
+         * @param cmds
+         */
+        @Override
+        protected void addCommandArgs(List<String> cmds) {
+
             /*
-             * Optional properties to be specified to java on the command line,
-             * e.g., the heap size, etc.
+             * Add optional properties to be specified to java on the command
+             * line, e.g., the heap size, etc (added before args[] so that the
+             * latter will override the defaults).
              */
             for (String arg : defaultJavaArgs) {
 
                 cmds.add(arg);
 
             }
-            for (String arg : args) {
 
-                cmds.add(arg);
-
-            }
-
+            /*
+             * args[]
+             */
+            super.addCommandArgs(cmds);
+            
             /*
              * Optional classpath
              * 
@@ -533,43 +378,6 @@ abstract public class JavaServiceConfiguration extends ServiceConfiguration {
 
             // the class to be executed.
             cmds.add(className);
-
-            /**
-             * Append any service options.
-             */
-            addServiceOptions(cmds);
-
-            return cmds;
-
-        }
-
-        /**
-         * Add options at the end of the command line.
-         * 
-         * @param cmds
-         */
-        protected void addServiceOptions(List<String> cmds) {
-
-            for (String arg : options) {
-
-                cmds.add(arg);
-
-            }
-
-        }
-
-        /**
-         * Hook for extending the pre-start setup for the service.
-         * <p>
-         * This implementation ensures that the {@link #serviceDir} exists.
-         */
-        protected void setUp() throws Exception {
-
-            if (!serviceDir.exists()) {
-
-                serviceDir.mkdirs();
-
-            }
 
         }
 

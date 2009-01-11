@@ -93,6 +93,9 @@ public class TransactionServer extends AbstractServer {
         
         new TransactionServer(args).run();
 
+//        System.exit(0);
+        Runtime.getRuntime().halt(0);
+
     }
 
     /**

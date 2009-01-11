@@ -28,6 +28,7 @@ import org.apache.zookeeper.server.quorum.QuorumPeerMain;
 import com.bigdata.io.FileLockUtility;
 import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.config.JavaServiceConfiguration;
+import com.bigdata.jini.start.config.ManagedServiceConfiguration;
 import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.jini.start.config.ZookeeperServerEntry;
 import com.bigdata.service.jini.JiniFederation;
@@ -48,11 +49,13 @@ import com.bigdata.zookeeper.ZooHelper;
  * 
  * @todo periodic purge of snapshots and logs, etc.
  * 
- * @todo While there is a lot of overflow with the {@link ServiceConfiguration}
- *       class, the two can not be readily merged. The problem is that this
- *       class must operate without reference to a {@link JiniFederation}. The
- *       shared logic deals mainly with options for java programs and starting
- *       java programs.
+ * @todo [These could be merged now - I have refactored a bit to pull out the
+ *       concept of a {@link ManagedServiceConfiguration} which has these
+ *       additional dependencies.] While there is a lot of overflow with the
+ *       {@link ServiceConfiguration} class, the two can not be readily merged.
+ *       The problem is that this class must operate without reference to a
+ *       {@link JiniFederation}. The shared logic deals mainly with options for
+ *       java programs and starting java programs.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -94,9 +97,19 @@ public class ZookeeperProcessHelper extends ProcessHelper {
         String CLIENT_PORT = "clientPort";
 
         /**
-         * Option specifies the data directory (required).
+         * Option specifies the data directory (required). The [myid] value will
+         * be appended as a subdirectory so that different instances will always
+         * have separate data directories.
          */
         String DATA_DIR = "dataDir";
+        
+        /**
+         * Option specifies the directory for the data recovery logs (optional,
+         * but it is highly advised to place this on a fast local and dedicated
+         * device). The [myid] value will be appended as a subdirectory so that
+         * different instances will always have separate data log directories.
+         */
+        String DATA_LOG_DIR = "dataLogDir";
         
         /**
          * Options specifies the server configuration entries. This is a comma
@@ -406,7 +419,13 @@ public class ZookeeperProcessHelper extends ProcessHelper {
         if (INFO)
             log.info(Options.CLIENT_PORT + "=" + clientPort);
 
-        final File dataDir = (File) config.getEntry(COMPONENT, Options.DATA_DIR, File.class);
+        /*
+         * Note: The [myid] value is used as the last component of the zookeeper
+         * dataDir path so that different instances will be kept apart even if
+         * they are using the same data directory.
+         */
+        final File dataDir = new File((File) config.getEntry(COMPONENT,
+                Options.DATA_DIR, File.class), Integer.toString(entry.id));
 
         if (INFO)
             log.info(Options.DATA_DIR + "=" + dataDir);
@@ -414,6 +433,26 @@ public class ZookeeperProcessHelper extends ProcessHelper {
         if (!dataDir.exists()) {
 
             dataDir.mkdirs();
+
+        }
+
+        /*
+         * Note: The [myid] value is used as the last component of the zookeeper
+         * dataDir path so that different instances will be kept apart even if
+         * they are using the same data directory. The default is whatever was
+         * specified for the dataDir.
+         */
+        final File dataLogDir = new File((File) config.getEntry(COMPONENT,
+                Options.DATA_LOG_DIR, File.class, (File) config.getEntry(
+                        COMPONENT, Options.DATA_DIR, File.class)), Integer
+                .toString(entry.id));
+
+        if (INFO)
+            log.info(Options.DATA_LOG_DIR + "=" + dataLogDir);
+
+        if (!dataLogDir.exists()) {
+
+            dataLogDir.mkdirs();
 
         }
 
@@ -491,7 +530,7 @@ public class ZookeeperProcessHelper extends ProcessHelper {
 
             }
 
-            writeConfigFile(config, configFile);
+            writeConfigFile(config, configFile, dataDir, dataLogDir);
 
             return startZookeeper(config, configFile, listener, clientPort,
                     "zookeeper(" + entry.id + ")");
@@ -521,8 +560,9 @@ public class ZookeeperProcessHelper extends ProcessHelper {
      * @throws ConfigurationException
      * @throws IOException 
      */
-    static void writeConfigFile(Configuration config, File configFile)
-            throws ConfigurationException, IOException {
+    static void writeConfigFile(Configuration config, File configFile,
+            File dataDir, File dataLogDir) throws ConfigurationException,
+            IOException {
 
         /*
          * A set of reserved properties that are not copied through to the
@@ -531,12 +571,14 @@ public class ZookeeperProcessHelper extends ProcessHelper {
         final Set<String> reserved = new HashSet<String>(
                 ServiceConfiguration.Options.reserved);
 
-        reserved.add("servers");
+        reserved.add(Options.SERVERS);
+        reserved.add(Options.DATA_DIR); // because we override it.
+        reserved.add(Options.DATA_LOG_DIR); // again, we override it.
 
         /*
-         * Collect all property values (other than "servers" or other special
-         * properties which we define) in a Properties object (it would be
-         * easier if the zookeeper properties had their own namespace).
+         * Collect all property values (other than special properties which we
+         * define) in a Properties object (it would be easier if the zookeeper
+         * properties had their own namespace).
          * 
          * @todo this introduces a dependency on ConfigurationFile. We could
          * just declare all the properties of interest in Options and handle
@@ -577,6 +619,12 @@ public class ZookeeperProcessHelper extends ProcessHelper {
 
         }
 
+        // overriden with /id
+        properties.setProperty(Options.DATA_DIR, dataDir.toString());
+
+        // overriden with /id
+        properties.setProperty(Options.DATA_LOG_DIR, dataLogDir.toString());
+        
         /*
          * Write the properties into a flat text format.
          */

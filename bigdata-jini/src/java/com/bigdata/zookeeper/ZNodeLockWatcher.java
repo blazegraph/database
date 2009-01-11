@@ -423,7 +423,9 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
                 return ret;
 
             } finally {
+
                 lock.unlock();
+                
             }
 
         }

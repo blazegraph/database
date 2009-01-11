@@ -29,6 +29,7 @@ package com.bigdata.jini.start;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.util.Arrays;
 
 import junit.framework.TestCase2;
 import net.jini.config.Configuration;
@@ -74,6 +75,7 @@ public class TestServiceConfiguration extends TestCase2 {
     /**
      * A configuration file used by some of the unit tests in this package.
      */
+//    private final String configFile = "file:src/resources/config/bigdata.config";
     private final String configFile = "file:src/test/com/bigdata/jini/start/testfed.config";
 
     /**
@@ -88,6 +90,10 @@ public class TestServiceConfiguration extends TestCase2 {
         final Configuration config = ConfigurationProvider
                 .getInstance(new String[] { configFile });
 
+        System.err.println(Arrays.toString((String[])config.getEntry(
+                ServiceConfiguration.class.getName(), "classpath",
+                String[].class)));
+        
         final BigdataServiceConfiguration serviceConfig = new TransactionServiceConfiguration(
                 config);
 

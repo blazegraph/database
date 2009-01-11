@@ -40,6 +40,7 @@ import java.rmi.server.ExportException;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 
 import net.jini.admin.JoinAdmin;
 import net.jini.config.Configuration;
@@ -62,16 +63,17 @@ import org.apache.log4j.Logger;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
-import org.apache.zookeeper.ZooDefs.Ids;
+import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.data.ACL;
 
 import com.bigdata.Banner;
 import com.bigdata.counters.AbstractStatisticsCollector;
-import com.bigdata.io.SerializerUtil;
 import com.bigdata.jini.start.BigdataZooDefs;
 import com.bigdata.service.AbstractService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IServiceShutdown;
+import com.bigdata.zookeeper.ZLock;
+import com.bigdata.zookeeper.ZNodeLockWatcher;
 import com.sun.jini.admin.DestroyAdmin;
 import com.sun.jini.start.LifeCycle;
 import com.sun.jini.start.NonActivatableServiceDescriptor;
@@ -846,7 +848,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                 final JiniFederation fed = (JiniFederation) service
                         .getFederation();
 
-                notifyZookeeper(fed.getZookeeper(), serviceUUID);
+                notifyZookeeper(fed, serviceUUID);
 
             } catch (Throwable t) {
 
@@ -893,10 +895,13 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      *       will require hashing the physical services by their logical service
      *       UUID in the client, which is not hard.
      */
-    protected void notifyZookeeper(final ZooKeeper zookeeper,
+    protected void notifyZookeeper(final JiniFederation fed,
             final UUID serviceUUID) throws KeeperException,
             InterruptedException {
-        
+
+        if (fed == null)
+            throw new IllegalArgumentException();
+
         if (serviceUUID == null)
             throw new IllegalArgumentException();
         
@@ -906,6 +911,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 //                    "Logical service zpath not assigned.");
 //
 //        }
+        
+        final ZooKeeper zookeeper = fed.getZookeeper();
         
         if (zookeeper == null) {
             
@@ -952,15 +959,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
             }
 
-            final List<ACL> acl = Ids.OPEN_ACL_UNSAFE;
-            
-//            final List<ACL> acl = new LinkedList<ACL>();
-//
-//            // the service has all permissions for this node.
-//            acl.addAll(Ids.CREATOR_ALL_ACL);
-//            
-//            // but anyone can read the node's data.
-//            acl.addAll(Ids.READ_ACL_UNSAFE);
+            final List<ACL> acl = fed.getZooConfig().acl;
             
             /*
              * Note: The znode is created using the assigned service UUID. This
@@ -968,23 +967,152 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
              * can be re-created on restart of the service.
              */
             physicalServiceZPath = logicalServiceZPath + "/"
-                    + BigdataZooDefs.PHYSICAL_SERVICE + serviceUUID;
+                    + BigdataZooDefs.PHYSICAL_SERVICES + "/" + serviceUUID;
 
-            log.warn("will register with zookeeper: zpath="
-                    + physicalServiceZPath);
+            try {
             
-            zookeeper.create(physicalServiceZPath, SerializerUtil
-                    .serialize(serviceUUID), acl, CreateMode.EPHEMERAL);
+                // make sure the parent node exists.
+                zookeeper.create(logicalServiceZPath + "/"
+                        + BigdataZooDefs.PHYSICAL_SERVICES, new byte[0], acl,
+                        CreateMode.PERSISTENT);
 
-// if (INFO)
-//                log.info
-                log.warn("registered with zookeeper: zpath="
+            } catch (NodeExistsException ex) {
+                // ignore.
+            }
+
+            // create the ephemeral znode for this service.
+            zookeeper.create(physicalServiceZPath, new byte[0], acl,
+                    CreateMode.EPHEMERAL);
+
+            /*
+             * Enter into the master / failover competition for the logical
+             * service.
+             */
+            fed.submitMonitoredTask(new MasterElectionTask());
+
+            if (INFO)
+                log.info("registered with zookeeper: zpath="
                         + physicalServiceZPath);
             
         }
 
     }
 
+    /**
+     * Task runs forever competing to become the master.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected class MasterElectionTask implements Callable {
+        
+        public MasterElectionTask() {
+            
+        }
+        
+        /**
+         * calls {@link #runOnce()} until the service is shutdown, logging any
+         * errors.
+         */
+        public Object call() throws Exception {
+
+            while (!shuttingDown && impl != null) {
+
+                try {
+
+                    runOnce();
+
+                } catch (Throwable t) {
+
+                    log.error(this, t);
+
+                }
+                
+            }
+            
+            return null;
+
+        }
+
+        /**
+         * Competes for the {@link BigdataZooDefs#PHYSICAL_SERVICE_ELECTION}
+         * {@link ZLock}. If it gains the lock, then invoked
+         * {@link #runAsMaster()}.
+         * 
+         * @throws Exception
+         */
+        protected void runOnce() throws Exception {
+
+            final AbstractService service = ((AbstractService) impl);
+            
+            final JiniFederation fed = (JiniFederation) service.getFederation();
+
+            final ZooKeeper zookeeper = fed.getZookeeper();
+            
+            final List<ACL> acl = fed.getZooConfig().acl;
+
+            // zlock object for the master election.
+            ZLock zlock = ZNodeLockWatcher.getLock(zookeeper,
+                    logicalServiceZPath + "/"
+                            + BigdataZooDefs.PHYSICAL_SERVICE_ELECTION, acl);
+
+            // block until we acquire that lock.
+            zlock.lock();
+            
+            try {
+                
+                runAsMaster(service, zlock);
+                
+            } finally {
+
+                zlock.unlock();
+                
+            }
+
+        }
+
+        /**
+         * Invoked when this service becomes the master. If there is only one
+         * physical service instance running for a given logical service, then
+         * it should gain the {@link ZLock} and run as the master. If there is
+         * more than one physical service instance for a given logical service,
+         * then they will all compete for the same {@link ZLock}. That
+         * competition will place them into an order. The order of the services
+         * for the lock node is their failover order. The master is always the
+         * first service in the queue. If the master dies, then the next
+         * surviving service in queue will gain the lock.
+         * 
+         * @param service
+         * @param zlock
+         * @throws InterruptedException
+         * 
+         * @todo If someone deletes the master's lock then the master will
+         *       notice (if it checks the zlock) and see that it is no longer
+         *       the master.
+         *       <p>
+         *       In order to prevent two services from running as "masters" at
+         *       the same time it is important that the master notice that it
+         *       has lost the lock BEFORE zookeeper clears its ephemeral znode.
+         *       The clue is the disconnect event from the zookeeper client.
+         *       That can set a volatile flag that is used to disable the
+         *       master. A disabled master should immediately cease responding,
+         *       terminating all outstanding requests.
+         * 
+         * @todo the behavior needs to be delegated to the service. there is no
+         *       API for that right now. all of this is just stubbed out for the
+         *       moment.
+         */
+        protected void runAsMaster(AbstractService service, ZLock zlock)
+                throws InterruptedException {
+
+            log.warn("Service is now the master.");
+
+            Thread.sleep(Long.MAX_VALUE);
+            
+        }
+        
+    }
+    
     /**
      * Logs a message. If the service is no longer registered with any
      * {@link ServiceRegistrar}s then logs an error message.
@@ -1367,6 +1495,9 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             
         }
         
+        log.fatal("Service is down: class=" + getClass() + ", name="
+                + serviceName);
+        
     }
 
     private Object keepAlive = new Object();
@@ -1440,6 +1571,13 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
             log.warn("Could not delete file: " + serviceIdFile);
 
+        }
+        
+        // wake up so that run() will exit. 
+        synchronized(keepAlive) {
+            
+            keepAlive.notify();
+            
         }
         
     }
