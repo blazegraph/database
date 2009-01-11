@@ -54,8 +54,6 @@ import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.StaleLocatorReason;
-import com.bigdata.service.AbstractEmbeddedResourceLockManager;
-import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
@@ -157,17 +155,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             
         }
 
-        resourceLockManager = new AbstractEmbeddedResourceLockManager(UUID
-                .randomUUID(), properties) {
-
-            public AbstractFederation getFederation() {
-
-                throw new UnsupportedOperationException();
-
-            }
-
-        }.start();
-
+        resourceLockManager = new ResourceLockService();
+        
         final JournalTransactionService abstractTransactionService = new JournalTransactionService(
                 properties, this).start();
 
@@ -830,14 +819,6 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
          */
         concurrencyManager.shutdown();
         
-        if (resourceLockManager != null) {
-
-            resourceLockManager.shutdown();
-
-            resourceLockManager = null;
-
-        }
-        
         super.shutdown();
         
     }
@@ -855,8 +836,6 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         concurrencyManager.shutdownNow();
         
         localTransactionManager.shutdownNow();
-
-        resourceLockManager.shutdownNow();
 
         super.shutdownNow();
         

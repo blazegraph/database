@@ -680,58 +680,63 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
      * 
      * @return the lock.
      * 
-     * @throws RuntimeException if anything goes wrong.
+     * @throws RuntimeException
+     *             if anything goes wrong.
      * 
      * @see IResourceLockService
+     * 
+     * FIXME The caller MUST be using a full tx for create/destroy of a resource
+     * to be atomic. See {@link IResourceLockService}.
      */
     protected IResourceLock acquireExclusiveLock() {
 
-        final int maxtries = 3;
-        
-        int ntries = 0;
-        
-        final long millis = 10;
-        
-        IResourceLockService lockService;
-        
-        while ((lockService = indexManager.getResourceLockService()) == null
-                && ntries < maxtries) {
-            
-            if(INFO) {
-                
-                log.info("Will retry");
-                
-            }
-            
-            ntries++;
-            
-            try {
-                
-                Thread.sleep(millis);
-                
-            } catch (InterruptedException ex) {
-             
-                throw new RuntimeException(ex);
-                
-            }
-            
-        }
-        
-        if (lockService == null) {
-            
-            throw new RuntimeException("Could not locate lock service");
-            
-        }
-        
-        try {
+        return indexManager.getResourceLockService().acquireLock(getNamespace());
 
-            return lockService.acquireExclusiveLock(getNamespace());
-
-        } catch (IOException ex) {
-
-            throw new RuntimeException(ex);
-
-        }
+//        final int maxtries = 3;
+//        
+//        int ntries = 0;
+//        
+//        final long millis = 10;
+//        
+//        IResourceLockService lockService;
+//        
+//        while ((lockService = indexManager.getResourceLockService()) == null
+//                && ntries < maxtries) {
+//            
+//            if(INFO) {
+//                
+//                log.info("Will retry");
+//                
+//            }
+//            
+//            ntries++;
+//            
+//            try {
+//                
+//                Thread.sleep(millis);
+//                
+//            } catch (InterruptedException ex) {
+//             
+//                throw new RuntimeException(ex);
+//                
+//            }
+//            
+//        }
+//        
+//        if (lockService == null) {
+//            
+//            throw new RuntimeException("Could not locate lock service");
+//            
+//        }
+//        
+//        try {
+//
+//
+//        } catch (IOException ex) {
+//
+//            throw new RuntimeException(ex);
+//
+//        }
 
     }
 
