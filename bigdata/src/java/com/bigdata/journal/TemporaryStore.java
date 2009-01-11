@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.util.Properties;
-import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -39,8 +38,6 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.relation.locator.DefaultResourceLocator;
-import com.bigdata.service.AbstractEmbeddedResourceLockManager;
-import com.bigdata.service.AbstractFederation;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -376,42 +373,17 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
     }
     private final ExecutorService executorService;
     
-    synchronized public IResourceLockService getResourceLockService() {
-        
-        assertOpen();
-        
-        if (resourceLockManager == null) {
+    final public IResourceLockService getResourceLockService() {
 
-            resourceLockManager = new AbstractEmbeddedResourceLockManager(UUID
-                    .randomUUID(), new Properties()) {
-                
-                public AbstractFederation getFederation() {
-                    
-                    throw new UnsupportedOperationException();
-                    
-                }
-                
-            }.start();
-            
-        }
-        
         return resourceLockManager;
         
     }
-    private ResourceLockService resourceLockManager;
+    private ResourceLockService resourceLockManager = new ResourceLockService();
 
     public void close() {
 
         // immediate shutdown.
         executorService.shutdownNow();
-        
-        if (resourceLockManager != null) {
-
-            resourceLockManager.shutdownNow();
-
-            resourceLockManager = null;
-
-        }
         
         super.close();
         

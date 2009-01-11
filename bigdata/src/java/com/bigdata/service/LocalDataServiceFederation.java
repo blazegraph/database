@@ -57,7 +57,7 @@ import com.bigdata.util.InnerCause;
 public class LocalDataServiceFederation extends AbstractFederation {
 
     private AbstractTransactionService abstractTransactionService;
-    private ResourceLockService resourceLockManager;
+    final private ResourceLockService resourceLockManager = new ResourceLockService();
     private LoadBalancerService loadBalancerService;
     private LocalDataServiceImpl dataService;
     
@@ -83,22 +83,12 @@ public class LocalDataServiceFederation extends AbstractFederation {
                 
             }
             
-            public void setEarliestTxStartTime(final long releaseTime) {
-                
-                dataService.setReleaseTime(releaseTime);
-                
-            }
-            
-        }.start();
-        
-        resourceLockManager = new AbstractEmbeddedResourceLockManager(UUID.randomUUID(),
-                properties)  {
-            
-            public LocalDataServiceFederation getFederation() {
-                
-                return LocalDataServiceFederation.this;
-                
-            }
+//            @Override
+//            protected void setReleaseTime(final long releaseTime) {
+//                
+//                dataService.setReleaseTime(releaseTime);
+//                
+//            }
             
         }.start();
         
@@ -443,14 +433,6 @@ public class LocalDataServiceFederation extends AbstractFederation {
             abstractTransactionService = null;
 
         }
-
-        if (resourceLockManager != null) {
-
-            resourceLockManager.shutdown();
-
-            resourceLockManager = null;
-
-        }
         
     }
     
@@ -484,14 +466,6 @@ public class LocalDataServiceFederation extends AbstractFederation {
             abstractTransactionService.shutdownNow();
 
             abstractTransactionService = null;
-
-        }
-
-        if (resourceLockManager != null) {
-
-            resourceLockManager.shutdownNow();
-
-            resourceLockManager = null;
 
         }
         

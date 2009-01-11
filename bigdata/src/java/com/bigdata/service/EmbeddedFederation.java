@@ -36,7 +36,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 
-import com.bigdata.concurrent.LockManager;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IResourceLockService;
@@ -80,7 +79,7 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
      */
     private AbstractTransactionService abstractTransactionService;
     
-    /** The (in process) {@link LockManager} */
+    /** The (in process) {@link IResourceLockService} */
     private ResourceLockService resourceLockManager;
     
     /**
@@ -360,8 +359,7 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
         /*
          * Start the lock manager.
          */
-        resourceLockManager = new EmbeddedResourceLockServiceImpl(UUID.randomUUID(),
-                properties).start();
+        resourceLockManager = new ResourceLockService();
         
         /*
          * Start the load balancer.
@@ -544,9 +542,6 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
             loadBalancerService.join(loadBalancerService.getServiceUUID(),
                     loadBalancerService.getServiceIface(), hostname);
 
-            loadBalancerService.join(resourceLockManager.getServiceUUID(),
-                    resourceLockManager.getServiceIface(), hostname);
-
             loadBalancerService.join(metadataService.getServiceUUID(),
                     metadataService.getServiceIface(), hostname);
 
@@ -715,25 +710,6 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
 
     }
     
-    protected class EmbeddedResourceLockServiceImpl extends AbstractEmbeddedResourceLockManager {
-
-        /**
-         * @param serviceUUID
-         * @param properties
-         */
-        public EmbeddedResourceLockServiceImpl(UUID serviceUUID, Properties properties) {
-            super(serviceUUID, properties);
-        }
-
-        @Override
-        public AbstractFederation getFederation() {
-
-            return EmbeddedFederation.this;
-            
-        }
-        
-    }
-
     protected class EmbeddedTransactionServiceImpl extends AbstractEmbeddedTransactionService {
 
         /**
@@ -753,53 +729,18 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
 
         }
         
-        public void setEarliestTxStartTime(final long releaseTime) {
-            
-            for (DataService ds : dataService) {
-
-                ds.setReleaseTime(releaseTime);
-                
-            }
-            
-        }
-
-    }
-    
-//    public IMetadataIndex getMetadataIndex(String name, long timestamp) {
-//
-//        assertOpen();
-//
-//        // The name of the metadata index.
-//        final String metadataName = MetadataService.getMetadataIndexName(name);
-//
-//        // The metadata service.
-//        final MetadataService metadataService = (MetadataService) getMetadataService();
-//
-//        /*
-//         * The sources for the view as of that timestamp.
-//         * 
-//         * Note: We force READ-COMMITTED semantics if the request was
-//         * UNISOLATED.
-//         */
-//        final AbstractBTree[] sources = metadataService
-//                .getResourceManager()
-//                .getIndexSources(
-//                        metadataName,
-//                        TimestampUtility.isUnisolated(timestamp) ? ITx.READ_COMMITTED
-//                                : timestamp);
-//        
-//        if (sources.length != 1) {
+//        @Override
+//        protected void setReleaseTime(final long releaseTime) {
 //            
-//            throw new UnsupportedOperationException(
-//                    "Metadata index must not be a view: name=" + name
-//                            + ", #sources=" + sources);
+//            for (DataService ds : dataService) {
+//
+//                ds.setReleaseTime(releaseTime);
+//                
+//            }
 //            
 //        }
-//
-//        // Read only view.
-//        return new ReadOnlyMetadataIndexView( sources[0] );
-//
-//    }
+
+    }
     
     /**
      * Normal shutdown of the services in the federation.
@@ -833,14 +774,6 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
 
             loadBalancerService = null;
             
-        }
-        
-        if (resourceLockManager != null) {
-
-            resourceLockManager.shutdown();
-
-            resourceLockManager = null;
-
         }
         
         // Note: don't clear ref until all down since nextTimestamp() still active.
@@ -885,14 +818,6 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
             
         }
         
-        if (resourceLockManager != null) {
-
-            resourceLockManager.shutdownNow();
-
-            resourceLockManager = null;
-
-        }
-
         // Note: don't clear ref until all down since nextTimestamp() still active.
         abstractTransactionService = null;
 

@@ -36,6 +36,7 @@ import com.bigdata.counters.ICounterSet.IInstrumentFactory;
 import com.bigdata.journal.ConcurrencyManager.IConcurrencyManagerCounters;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.resources.ResourceManager.IResourceManagerCounters;
+import com.bigdata.resources.StoreManager.IStoreManagerCounters;
 import com.bigdata.service.DataService.IDataServiceCounters;
 import com.bigdata.service.mapred.IMapService;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -1342,17 +1343,15 @@ abstract public class LoadBalancerService extends AbstractService
                     100d/* default (ms) */, historyMinutes);
 
             final double dataDirBytesAvailable = getAverageValueForMinutes(
-                    serviceCounterSet, IDataServiceCounters.concurrencyManager
-                            + ps + IConcurrencyManagerCounters.writeService
-                            + ps
-                            + IResourceManagerCounters.DataDirBytesAvailable,
+                    serviceCounterSet, IDataServiceCounters.resourceManager
+                            + ps + IResourceManagerCounters.StoreManager
+                            + ps + IStoreManagerCounters.DataDirBytesAvailable,
                     Bytes.gigabyte * 20/* default */, historyMinutes);
-
+            
             final double tmpDirBytesAvailable = getAverageValueForMinutes(
-                    serviceCounterSet, IDataServiceCounters.concurrencyManager
-                            + ps + IConcurrencyManagerCounters.writeService
-                            + ps
-                            + IResourceManagerCounters.TmpDirBytesAvailable,
+                    serviceCounterSet, IDataServiceCounters.resourceManager
+                            + ps + IResourceManagerCounters.StoreManager
+                            + ps + IStoreManagerCounters.TmpDirBytesAvailable,
                     Bytes.gigabyte * 2/* default */, historyMinutes);
 
             final double rawScore = (averageQueueLength + 1) * (hostScore.score + 1);

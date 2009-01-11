@@ -123,11 +123,8 @@ public interface IIndexStore {
     public ExecutorService getExecutorService();
 
     /**
-     * The service that may be used to acquire exclusive or shared locks for a
-     * resource hierarchy. This is used primarily when creating or destroying
-     * {@link IRelation}s in order to make those operations atomic, but the
-     * service may be used for any resource whether or not they correspond to
-     * the global index namespace.
+     * The service that may be used to acquire synchronous distributed locks
+     * <strong>without deadlock detection</strong>.
      */
     public IResourceLockService getResourceLockService();
 
