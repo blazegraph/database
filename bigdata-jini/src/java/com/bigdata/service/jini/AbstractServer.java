@@ -967,13 +967,13 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
              * can be re-created on restart of the service.
              */
             physicalServiceZPath = logicalServiceZPath + "/"
-                    + BigdataZooDefs.PHYSICAL_SERVICES + "/" + serviceUUID;
+                    + BigdataZooDefs.PHYSICAL_SERVICES_CONTAINER + "/" + serviceUUID;
 
             try {
             
                 // make sure the parent node exists.
                 zookeeper.create(logicalServiceZPath + "/"
-                        + BigdataZooDefs.PHYSICAL_SERVICES, new byte[0], acl,
+                        + BigdataZooDefs.PHYSICAL_SERVICES_CONTAINER, new byte[0], acl,
                         CreateMode.PERSISTENT);
 
             } catch (NodeExistsException ex) {
@@ -1035,7 +1035,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         }
 
         /**
-         * Competes for the {@link BigdataZooDefs#PHYSICAL_SERVICE_ELECTION}
+         * Competes for the {@link BigdataZooDefs#MASTER_ELECTION}
          * {@link ZLock}. If it gains the lock, then invoked
          * {@link #runAsMaster()}.
          * 
@@ -1054,7 +1054,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             // zlock object for the master election.
             ZLock zlock = ZNodeLockWatcher.getLock(zookeeper,
                     logicalServiceZPath + "/"
-                            + BigdataZooDefs.PHYSICAL_SERVICE_ELECTION, acl);
+                            + BigdataZooDefs.MASTER_ELECTION, acl);
 
             // block until we acquire that lock.
             zlock.lock();

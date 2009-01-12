@@ -835,7 +835,7 @@ abstract public class JiniServiceConfiguration extends
             
             // this is the zpath that the service will create.
             final String physicalServiceZPath = logicalServiceZPath + "/"
-                    + BigdataZooDefs.PHYSICAL_SERVICES + "/" + serviceUUID;
+                    + BigdataZooDefs.PHYSICAL_SERVICES_CONTAINER + "/" + serviceUUID;
 
             if (!ZNodeCreatedWatcher.awaitCreate(zookeeper,
                     physicalServiceZPath, timeout, unit)) {

@@ -30,13 +30,15 @@ package com.bigdata.journal;
 import java.io.IOException;
 import java.rmi.Remote;
 
+import com.bigdata.service.IService;
+
 /**
  * A service for unique timestamps.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ITimestampService extends Remote {
+public interface ITimestampService extends IService {
 
     /**
      * Return the next unique timestamp. Timestamps must be strictly increasing.

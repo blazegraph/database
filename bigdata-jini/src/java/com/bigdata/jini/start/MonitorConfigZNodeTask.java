@@ -1,7 +1,6 @@
 package com.bigdata.jini.start;
 
 import java.util.concurrent.Callable;
-import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.KeeperException;
@@ -9,6 +8,7 @@ import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.Stat;
 
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.jini.start.config.ManagedServiceConfiguration;
 import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.util.InnerCause;
@@ -129,8 +129,9 @@ public class MonitorConfigZNodeTask implements Callable {
         if (INFO)
             log.info("new config: zpath=" + serviceConfigZPath);
         
-        final ServiceConfiguration config = (ServiceConfiguration) SerializerUtil
-                .deserialize(zookeeper.getData(serviceConfigZPath, false, new Stat()));
+        final ManagedServiceConfiguration config = (ManagedServiceConfiguration) SerializerUtil
+                .deserialize(zookeeper.getData(serviceConfigZPath, false,
+                        new Stat()));
         
         if (INFO)
             log.info("config state: " + config);

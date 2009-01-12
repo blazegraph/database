@@ -157,14 +157,15 @@ public interface BigdataZooDefs {
     String LOCKS = "locks";
     
     /**
-     * Relative path to a child of the zroot that is watched by the
-     * {@link ServicesManagerService}s. Any time a new lock is created under
-     * this znode, running {@link ServicesManagerServer} will contend for that
-     * lock if they can satisify the {@link IServiceConstraint}s for the new
-     * service. The lock node data itself contains the zpath to the
-     * logicalService for which a new physicalService must be created. The
-     * {@link ServiceConfiguration} is fetched from that zpath and gives the
-     * {@link IServiceConstraint}s that must be satisified.
+     * Relative path to a child of the zroot that is a container for lock nodes.
+     * The container is watched by the {@link ServicesManagerService}s. Any
+     * time a new lock node is created under this znode, the
+     * {@link MonitorCreatePhysicalServiceLocksTask} will contend for that lock
+     * if it can satisify the {@link IServiceConstraint}s for the new service.
+     * The lock node data is the zpath to the logicalService for which a new
+     * physicalService must be created. The {@link ServiceConfiguration} is
+     * fetched from that zpath and gives the {@link IServiceConstraint}s that
+     * must be satisified.
      */
     String LOCKS_CREATE_PHYSICAL_SERVICE = LOCKS + ZSLASH
             + "createPhysicalService";
@@ -191,9 +192,9 @@ public interface BigdataZooDefs {
      * The prefix for the name of a znode that represents a logical service.
      * This znode is a {@link CreateMode#PERSISTENT_SEQUENTIAL} child of the
      * {@link #CONFIG} znode. This znode should have two children:
-     * {@link #PHYSICAL_SERVICES} and {@link #PHYSICAL_SERVICE_ELECTION}.
+     * {@link #PHYSICAL_SERVICES_CONTAINER} and {@link #MASTER_ELECTION}.
      */
-    String LOGICAL_SERVICE = "logicalService";
+    String LOGICAL_SERVICE_PREFIX = "logicalService";
 
     /**
      * The name of the znodes whose children represent the physical service
@@ -214,14 +215,15 @@ public interface BigdataZooDefs {
      *       instance. For example, this could be used to change the groups[] or
      *       locators[]. (There are jini APIs for that as well.)
      */
-    String PHYSICAL_SERVICES = "physicalServices";
-    
+    String PHYSICAL_SERVICES_CONTAINER = "physicalServices";
+
     /**
-     * The name of the znode that is a child of {@link #LOGICAL_SERVICE} serving
-     * as a lock node for the election of the master physical service for that
-     * logical service.
+     * The name of the znode that is a child of {@link #LOGICAL_SERVICE_PREFIX}
+     * serving as a lock node for the election of the master physical service
+     * for that logical service.
      * 
      * @see ZLock
      */
-    String PHYSICAL_SERVICE_ELECTION = "masterElection";
+    String MASTER_ELECTION = "masterElection";
+
 }

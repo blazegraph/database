@@ -32,11 +32,11 @@ public class UnknownChildrenWatcher implements Watcher {
     /**
      * Set of children that we have already seen.
      * 
-     * FIXME There should be a way to clear {@link #knownLocks} over time as it
+     * FIXME There should be a way to clear {@link #known} over time as it
      * will grow without bound. An LRU would be one approximation. Or a weak
      * value hash map and clearing the entries references after a timeout.
      */
-    private final LinkedHashSet<String> knownLocks = new LinkedHashSet<String>();
+    private final LinkedHashSet<String> known = new LinkedHashSet<String>();
     
     /**
      * Queue to be drained. It is populated by the {@link Watcher} in the
@@ -128,14 +128,14 @@ public class UnknownChildrenWatcher implements Watcher {
         
         for( String child : children) {
             
-            if(!knownLocks.contains(child)) {
+            if(!known.contains(child)) {
 
                 /*
-                 * Add locks not previously known to the set of known locks
-                 * and to the queue.
+                 * Add children not previously known to the set of known
+                 * children and to the queue.
                  */
                 
-                knownLocks.add(child);
+                known.add(child);
                 
                 queue.add(child);
                 
@@ -146,7 +146,7 @@ public class UnknownChildrenWatcher implements Watcher {
         }
         
         if (INFO)
-            log.info("added " + nadded + " : known=" + knownLocks.size());
+            log.info("added " + nadded + " : known=" + known.size());
 
     }
     
@@ -171,7 +171,7 @@ public class UnknownChildrenWatcher implements Watcher {
         final int knownSize;
         synchronized (this) {
 
-            knownSize = knownLocks.size();
+            knownSize = known.size();
 
         }
 

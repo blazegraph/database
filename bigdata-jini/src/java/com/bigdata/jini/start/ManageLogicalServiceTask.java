@@ -53,12 +53,6 @@ import com.sun.jini.tool.ClassServer;
  * @todo If the task hangs then the {@link ZLock} must be broken so that another
  *       service can give it a go.
  * 
- * @todo for create, all watches on the {@link ServiceConfiguration} znode must
- *       now set a watcher to maintain the logical service replication count by
- *       starting and stopping physical services as necessary.
- *       <p>
- * @todo lots for destroy, but also release any watches.
- * 
  * @todo No mechanism is currently defined to reduce the #of logical services
  *       and there are a variety of issues to be considered.
  *       <p>
@@ -81,7 +75,8 @@ import com.sun.jini.tool.ClassServer;
  * @todo Make sure the {@link MetadataService}, the LBS, and the transaction
  *       server DO NOT allow more than one logical instance in a federation.
  *       they can (eventually) have failover instances, but not peers. The
- *       {@link DataService} may be the only one that already supports "peers".
+ *       {@link DataService} may be the only one that already supports "peers"
+ *       (but not failover).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -157,11 +152,11 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
     }
 
     /**
-     * Create zpath for the new logical service, the "/election" znode under the
-     * logical service (basically a lock node used for primary elections where
-     * the winner is the master and the queue order is the failover chain), and
-     * the {@link BigdataZooDefs#LOCKS_CREATE_PHYSICAL_SERVICE} znode, whose
-     * data contains the zpath of the new logical service.
+     * Create zpath for the new logical service, create its direct children (the
+     * {@link BigdataZooDefs#PHYSICAL_SERVICES_CONTAINER} and
+     * {@link BigdataZooDefs#MASTER_ELECTION}), and create the
+     * {@link BigdataZooDefs#LOCKS_CREATE_PHYSICAL_SERVICE} znode, whose data
+     * contains the zpath of the new logical service.
      * <p>
      * The creation of the {@link BigdataZooDefs#LOCKS_CREATE_PHYSICAL_SERVICE}
      * child trigger watchers looking for to contend for the right to create a
@@ -178,7 +173,7 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
      * <p>
      * Note: The {@link ServicesManagerServer} is responsible for watching the
      * {@link BigdataZooDefs#LOCKS_CREATE_PHYSICAL_SERVICE} znode. It does that
-     * using a {@link MonitorCreatePhysicalServiceLocks} task.
+     * using a {@link MonitorCreatePhysicalServiceLocksTask} task.
      * 
      * @throws InterruptedException
      * @throws KeeperException
@@ -204,7 +199,7 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
          * Create zpath for the new logical service.
          */
         final String logicalServiceZPath = zookeeper.create(configZPath + "/"
-                + BigdataZooDefs.LOGICAL_SERVICE, new byte[0], acl,
+                + BigdataZooDefs.LOGICAL_SERVICE_PREFIX, new byte[0], acl,
                 CreateMode.PERSISTENT_SEQUENTIAL);
 
         /*
@@ -212,7 +207,7 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
          * instances (direct child of the logicalSevice znode).
          */
         zookeeper.create(logicalServiceZPath + "/"
-                + BigdataZooDefs.PHYSICAL_SERVICES, new byte[0], acl,
+                + BigdataZooDefs.PHYSICAL_SERVICES_CONTAINER, new byte[0], acl,
                 CreateMode.PERSISTENT);
 
         /*
@@ -220,7 +215,7 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
          * this logical service (direct child of the logicalSevice znode).
          */
         zookeeper.create(logicalServiceZPath + "/"
-                + BigdataZooDefs.PHYSICAL_SERVICE_ELECTION, new byte[0], acl,
+                + BigdataZooDefs.MASTER_ELECTION, new byte[0], acl,
                 CreateMode.PERSISTENT);
 
         try {
@@ -235,6 +230,11 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
              * creates the new physical service instance.
              * 
              * Note: The data is the zpath to the logicalService.
+             * 
+             * Note: MonitorCreatePhysicalServiceLocksTasks will notice the
+             * create of this lock node, contend for the zlock, and create a new
+             * service instance if it gains the lock and we are still short at
+             * least one physical service for this logical service.
              */
             zookeeper.create(fed.getZooConfig().zroot + "/"
                     + BigdataZooDefs.LOCKS_CREATE_PHYSICAL_SERVICE + "/"
@@ -251,15 +251,15 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
     }
 
     /**
-     * Destroy a logical service (must destroy the physical services first).
+     * Destroy a logical service (must destroy the physical services first,
+     * which is complex for data services since index partitions must be shed).
      * 
      * FIXME {@link #destroyLogicalService()} not implemented yet.
      */
     protected void destroyLogicalService() {
 
-        throw new UnsupportedOperationException("serviceCount="
-                + config.serviceCount + ", actual=" + children.size()
-                + ", zpath=" + configZPath);
+        log.warn("Operation not supported: serviceCount=" + config.serviceCount
+                + ", actual=" + children.size() + ", zpath=" + configZPath);
 
     }
 

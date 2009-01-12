@@ -112,10 +112,11 @@ abstract public class ManagedServiceConfiguration extends ServiceConfiguration {
      *            of the {@link ManagedServiceConfiguration} znode.
      * @return
      */
-    public ManageLogicalServiceTask newLogicalServiceTask(JiniFederation fed,
-            IServiceListener listener, String configZPath, List<String> children) {
+    public ManageLogicalServiceTask<ManagedServiceConfiguration> newLogicalServiceTask(
+            JiniFederation fed, IServiceListener listener, String configZPath,
+            List<String> children) {
 
-        return new ManageLogicalServiceTask<ServiceConfiguration>(fed,
+        return new ManageLogicalServiceTask<ManagedServiceConfiguration>(fed,
                 listener, configZPath, children, this);
 
     }

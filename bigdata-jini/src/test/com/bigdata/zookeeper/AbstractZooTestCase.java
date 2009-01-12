@@ -40,6 +40,7 @@ import net.jini.config.Configuration;
 import net.jini.config.ConfigurationProvider;
 
 import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
@@ -302,6 +303,33 @@ public abstract class AbstractZooTestCase extends TestCase2 {
             log.warn("Could not remove: " + f);
 
         }
+
+    }
+
+    /**
+     * Recursive delete of znodes.
+     * 
+     * @param zpath
+     * 
+     * @throws KeeperException
+     * @throws InterruptedException
+     */
+    protected void destroyZNodes(final String zpath) throws KeeperException,
+            InterruptedException {
+
+        // System.err.println("enter : " + zpath);
+
+        final List<String> children = zookeeper.getChildren(zpath, false);
+
+        for (String child : children) {
+
+            destroyZNodes(zpath + "/" + child);
+
+        }
+
+        log.info("delete: " + zpath);
+
+        zookeeper.delete(zpath, -1/* version */);
 
     }
 

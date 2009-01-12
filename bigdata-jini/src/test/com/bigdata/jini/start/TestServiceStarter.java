@@ -118,7 +118,7 @@ public class TestServiceStarter extends AbstractFedZooTestCase {
          * assigned a random UUID.
          */
         final String logicalServiceZPath = zookeeper.create(zserviceConfig
-                + BigdataZooDefs.LOGICAL_SERVICE, SerializerUtil.serialize(UUID
+                + BigdataZooDefs.LOGICAL_SERVICE_PREFIX, SerializerUtil.serialize(UUID
                 .randomUUID()), acl, CreateMode.PERSISTENT_SEQUENTIAL);
 
         // will be zero unless we started a zookeeper server above.

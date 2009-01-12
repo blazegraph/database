@@ -27,33 +27,59 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.jini.start;
 
+import java.rmi.RemoteException;
+
+import com.bigdata.service.IService;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.jini.RemoteDestroyAdmin;
+import com.bigdata.service.jini.TransactionServer;
 
 /**
- * Utility will <strong>destroy</strong> the federation to which it connects.
+ * Destroys a specific service - the {@link TransactionServer}. This is for use
+ * in testing the behavior of the {@link ServicesManagerServer} and the behavior
+ * of the other services in the federation when the {@link TransactionServer} is
+ * lost.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DestroyFederation {
+public class DestroyTransactionService {
 
     /**
      * @param args
      *            Configuration file and optional overrides.
      *            
      * @throws InterruptedException 
+     * @throws RemoteException 
      */
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) throws InterruptedException,
+            RemoteException {
 
         JiniFederation fed = JiniClient.newInstance(args).connect();
-        
-        System.out.println("Waiting for service discovery.");
-        
-        Thread.sleep(5000/*ms*/);
-        
-        fed.destroy();
-        
+
+        try {
+
+            IService service = fed.getTransactionService();
+
+            if (service == null) {
+
+                System.err.println("Service not found.");
+
+            } else {
+
+                ((RemoteDestroyAdmin) service).destroy();
+
+                System.err.println("Service destroyed.");
+
+            }
+
+        } finally {
+
+            fed.shutdown();
+
+        }
+
     }
 
 }

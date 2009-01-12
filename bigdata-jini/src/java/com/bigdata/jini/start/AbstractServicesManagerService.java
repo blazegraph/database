@@ -210,7 +210,7 @@ public abstract class AbstractServicesManagerService extends AbstractService
          * Create and start task that will compete for locks to start physical
          * service instances.
          */
-        fed.submitMonitoredTask(new MonitorCreatePhysicalServiceLocks(fed,
+        fed.submitMonitoredTask(new MonitorCreatePhysicalServiceLocksTask(fed,
                         this/* listener */));
 
         /*

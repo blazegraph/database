@@ -1,5 +1,6 @@
 package com.bigdata.jini.start;
 
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
@@ -17,7 +18,7 @@ import com.bigdata.zookeeper.ZLock;
 import com.bigdata.zookeeper.ZNodeLockWatcher;
 
 /**
- * Notices when new a new lock node is created and contends for the lock if the
+ * Notices when a new lock node is created and contends for the lock if the
  * localhost can satisify the {@link IServiceConstraint}s for the new physical
  * service. The {@link ServiceConfiguration} is fetched using the zpath written
  * into the data of the lock node. The {@link IServiceConstraint}s found are in
@@ -26,11 +27,11 @@ import com.bigdata.zookeeper.ZNodeLockWatcher;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class MonitorCreatePhysicalServiceLocks implements
+public class MonitorCreatePhysicalServiceLocksTask implements
         Callable<Void> {
 
     final static protected Logger log = Logger
-            .getLogger(MonitorCreatePhysicalServiceLocks.class);
+            .getLogger(MonitorCreatePhysicalServiceLocksTask.class);
 
     final static protected boolean INFO = log.isInfoEnabled();
 
@@ -42,7 +43,7 @@ public class MonitorCreatePhysicalServiceLocks implements
     
     private final IServiceListener listener;
     
-    public MonitorCreatePhysicalServiceLocks(final JiniFederation fed,
+    public MonitorCreatePhysicalServiceLocksTask(final JiniFederation fed,
             final IServiceListener listener) {
 
         if (fed == null)
@@ -181,8 +182,25 @@ public class MonitorCreatePhysicalServiceLocks implements
 
             }
 
-            // start the service.
-            startService(config, logicalServiceZPath);
+            // get children (the list of physical services).
+            final List<String> children = zookeeper
+                    .getChildren(logicalServiceZPath + "/"
+                            + BigdataZooDefs.PHYSICAL_SERVICES_CONTAINER, false);
+            
+            if (INFO)
+                log.info("serviceConfigZPath=" + serviceConfigZPath
+                        + ", logicalServiceZPath=" + logicalServiceZPath
+                        + ", targetReplicationCount="
+                        + config.replicationCount + ", #children="
+                        + children.size() + ", children=" + children);
+
+            // too few instances? @todo handle too many instance here also?
+            if (config.replicationCount > children.size()) {
+
+                // start the service.
+                startService(config, logicalServiceZPath);
+                
+            }
 
             // iff successful, then destroy the lock.
             zlock.destroyLock();

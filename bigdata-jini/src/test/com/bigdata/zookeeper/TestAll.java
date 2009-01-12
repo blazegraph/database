@@ -56,6 +56,8 @@ public class TestAll extends TestCase {
         
         suite.addTestSuite(TestZNodeDeletedWatcher.class);
 
+        suite.addTestSuite(TestHierarchicalZNodeWatcher.class);
+
         // a barrier pattern.
         suite.addTestSuite(TestZooBarrier.class);
 

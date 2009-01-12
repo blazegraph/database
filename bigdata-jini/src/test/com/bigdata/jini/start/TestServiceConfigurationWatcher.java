@@ -100,7 +100,7 @@ public class TestServiceConfigurationWatcher extends AbstractFedZooTestCase {
                 + TransactionServer.class.getName();
         
         // create monitor task that will compete for locks and start procsses.
-        MonitorCreatePhysicalServiceLocks task1 = new MonitorCreatePhysicalServiceLocks(
+        MonitorCreatePhysicalServiceLocksTask task1 = new MonitorCreatePhysicalServiceLocksTask(
                 fed, listener);
 
         final Future f1 = fed.getExecutorService().submit(task1);

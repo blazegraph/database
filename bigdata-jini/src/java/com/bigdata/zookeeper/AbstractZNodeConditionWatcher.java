@@ -335,39 +335,59 @@ abstract public class AbstractZNodeConditionWatcher implements Watcher {
      * @throws InterruptedException
      */
     public boolean awaitCondition(final long timeout, final TimeUnit unit)
+    throws InterruptedException {
+        
+        return awaitCondition(true/* testConditionOnEntry */, timeout, unit);
+        
+    }
+    
+    /**
+     * 
+     * @param testConditionOnEntry
+     * @param timeout
+     * @param unit
+     * @return
+     * @throws InterruptedException
+     */
+    public boolean awaitCondition(final boolean testConditionOnEntry,
+            final long timeout, final TimeUnit unit)
             throws InterruptedException {
+
+        final long begin = System.currentTimeMillis();
+
+        long millis = unit.toMillis(timeout);
 
         synchronized (this) {
 
-            try {
-                
-                if (isConditionSatisified()) {
+            if (testConditionOnEntry) {
 
-                    // condition was satisified before waiting.
+                try {
 
-                    success("on entry.");
+                    if (isConditionSatisified()) {
 
-                    return true;
+                        // condition was satisified before waiting.
+
+                        success("on entry.");
+
+                        return true;
+
+                    }
+
+                } catch (KeeperException ex) {
+
+                    log.warn("On entry: " + ex, ex);
+
+                    /*
+                     * Fall through.
+                     * 
+                     * Note: by falling through we handle the case where the
+                     * client was not connected to a server when the caller made
+                     * their request or where a node does not yet exist, etc.
+                     */
 
                 }
-                
-            } catch (KeeperException ex) {
-
-                log.warn("On entry: "+ex,ex);
-                
-                /*
-                 * Fall through.
-                 * 
-                 * Note: by falling through we handle the case where the client
-                 * was not connected to a server when the caller made their
-                 * request or where a node does not yet exist, etc.
-                 */
-                
+            
             }
-
-            final long begin = System.currentTimeMillis();
-
-            long millis = unit.toMillis(timeout);
 
             while (millis > 0 && !conditionSatisified && !isCancelled()) {
 

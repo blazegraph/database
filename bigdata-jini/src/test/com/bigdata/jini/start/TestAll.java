@@ -52,6 +52,9 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("bigdata services manager");
 
+        // 
+        suite.addTestSuite(TestServiceConfigurationZNodeEnum.class);
+
         // test suite for parsing zookeeper server entries.
         suite.addTestSuite(TestZookeeperServerEntry.class);
 
