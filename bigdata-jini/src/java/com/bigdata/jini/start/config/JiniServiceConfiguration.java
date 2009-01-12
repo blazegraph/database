@@ -50,6 +50,7 @@ import net.jini.config.ConfigurationFile;
 import net.jini.config.ConfigurationProvider;
 import net.jini.core.discovery.LookupLocator;
 import net.jini.core.entry.Entry;
+import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceItem;
 import net.jini.core.lookup.ServiceTemplate;
 import net.jini.entry.AbstractEntry;
@@ -63,8 +64,6 @@ import net.jini.lookup.entry.Name;
 
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
-
-import sun.security.jca.ServiceId;
 
 import com.bigdata.jini.lookup.entry.Hostname;
 import com.bigdata.jini.lookup.entry.ServiceToken;
@@ -639,7 +638,7 @@ abstract public class JiniServiceConfiguration extends
         
         /**
          * Writes the <code>serviceIdFile</code> entry. The value of that
-         * entry is the {@link File} on which the {@link ServiceId} will be
+         * entry is the {@link File} on which the {@link ServiceID} will be
          * written by the service once it is assigned by jini.
          * <p>
          * Note: the serviceUUID (a conversion of the {@link ServiceId} to a
