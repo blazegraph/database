@@ -160,7 +160,7 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
     protected void acquireLockAndRun() throws Exception {
 
         final ZLock zlock = ZNodeLockWatcher.getLock(zookeeper,
-                lockZPath);
+                lockZPath, fed.getZooConfig().acl);
 
         zlock.lock();
 

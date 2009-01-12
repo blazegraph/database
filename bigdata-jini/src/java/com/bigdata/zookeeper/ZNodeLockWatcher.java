@@ -13,7 +13,6 @@ import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
-import org.apache.zookeeper.ZooDefs.Ids;
 import org.apache.zookeeper.data.ACL;
 
 /**
@@ -246,21 +245,16 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
      * 
      * @param zookeeper
      * @param zpath
+     * @param acl
      * 
      * @return
      * 
      * @throws KeeperException
      * @throws InterruptedException
      */
-    public static ZLock getLock(final ZooKeeper zookeeper, final String zpath)
-    throws KeeperException, InterruptedException {
-
-        return getLock(zookeeper, zpath, Ids.OPEN_ACL_UNSAFE);
-        
-    }
-    
-    public static ZLock getLock(final ZooKeeper zookeeper, final String zpath,
-            final List<ACL> acl) throws KeeperException, InterruptedException {
+    public static ZLockImpl getLock(final ZooKeeper zookeeper,
+            final String zpath, final List<ACL> acl) throws KeeperException,
+            InterruptedException {
 
         try {
 
@@ -276,7 +270,7 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
 
         }
 
-        return new ZLockImpl(zookeeper, zpath);
+        return new ZLockImpl(zookeeper, zpath, acl);
 
     }
 
@@ -299,6 +293,8 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
          * the lock).
          */
         final protected String zpath;
+
+        final protected List<ACL> acl;
         
         /**
          * Used to control access to our internal state (this is NOT the
@@ -348,30 +344,37 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
                 return watcher.zchild;
                 
             } finally {
-                
+
                 lock.unlock();
-                
+
             }
-            
+
         }
-        
+
         /**
          * 
          * @param zookeeper
          * @param zpath
          *            The zpath of the lock node.
+         * @param acl
          */
-        protected ZLockImpl(final ZooKeeper zookeeper, final String zpath) {
-            
+        protected ZLockImpl(final ZooKeeper zookeeper, final String zpath,
+                final List<ACL> acl) {
+
             if (zookeeper == null)
                 throw new IllegalArgumentException();
-            
+
             if (zpath == null)
                 throw new IllegalArgumentException();
-            
+
+            if (acl == null)
+                throw new IllegalArgumentException();
+
             this.zookeeper = zookeeper;
-            
+
             this.zpath = zpath;
+
+            this.acl = acl;
             
         }
         
@@ -446,10 +449,7 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
                  * "read" this child znode. Since you can not delete the parent
                  * until the children have been deleted, the ACL here must not
                  * prevent the deletion of the node by another process.
-                 * 
-                 * @todo what is a suitable ACL?
                  */ 
-                final List<ACL> acl = Ids.OPEN_ACL_UNSAFE;
                 
                 // create a child contending for that lock.
                 final String s = zookeeper.create(zpath + "/lock",

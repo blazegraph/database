@@ -250,6 +250,7 @@ public class TestZNodeLockWatcher extends AbstractZooTestCase {
                     mainThread.interrupt();
                     
                 }
+   
             }
 
         };

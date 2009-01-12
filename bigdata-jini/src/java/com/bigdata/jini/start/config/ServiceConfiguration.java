@@ -368,14 +368,24 @@ abstract public class ServiceConfiguration implements Serializable {
         boolean canStart = true;
         
         for (IServiceConstraint constraint : constraints) {
-            
-            if (!constraint.allow(fed)) {
 
-                if (INFO) 
-                    log.info("Violates: " + constraint);
-                
-                canStart = false;
-                
+            try {
+
+                if (!constraint.allow(fed)) {
+
+                    if (INFO)
+                        log.info("Violates: " + constraint);
+
+                    canStart = false;
+
+                }
+
+            } catch (Exception ex) {
+
+                log.error(this, ex);
+
+                return false;
+
             }
             
         }

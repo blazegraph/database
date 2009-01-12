@@ -155,7 +155,8 @@ public class MonitorCreatePhysicalServiceLocksTask implements
             log.info("logicalServiceZPath=" + logicalServiceZPath);
 
         // enter the competition.
-        final ZLock zlock = ZNodeLockWatcher.getLock(zookeeper, lockNodeZPath);
+        final ZLock zlock = ZNodeLockWatcher.getLock(zookeeper, lockNodeZPath,
+                fed.getZooConfig().acl);
 
         zlock.lock();
         try {

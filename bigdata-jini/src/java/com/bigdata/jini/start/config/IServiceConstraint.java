@@ -26,6 +26,6 @@ public interface IServiceConstraint extends Serializable {
      * @param fed
      *            The federation.
      */
-    public boolean allow(JiniFederation fed);
+    public boolean allow(JiniFederation fed) throws Exception;
 
 }

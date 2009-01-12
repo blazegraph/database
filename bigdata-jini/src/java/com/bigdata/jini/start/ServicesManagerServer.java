@@ -165,6 +165,10 @@ import com.bigdata.service.jini.RemoteDestroyAdmin;
  *       "sequential". Also, I am not clear on its consistency guarentees. It
  *       does support transactions, which could be another way to approach this.
  * 
+ * FIXME remaining big issues are destroying logical and physical services (not
+ * implemented yet) and providing failover for the various bigdata services (not
+ * implemented yet).
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
