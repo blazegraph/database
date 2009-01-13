@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jan 6, 2009
  */
 
-package com.bigdata.jini.start;
+package com.bigdata.jini.start.config;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -76,7 +76,7 @@ public class TestServiceConfiguration extends TestCase2 {
      * A configuration file used by some of the unit tests in this package.
      */
 //    private final String configFile = "file:src/resources/config/bigdata.config";
-    private final String configFile = "file:src/test/com/bigdata/jini/start/testfed.config";
+    private final String configFile = "file:src/test/com/bigdata/jini/start/config/testfed.config";
 
     /**
      * 

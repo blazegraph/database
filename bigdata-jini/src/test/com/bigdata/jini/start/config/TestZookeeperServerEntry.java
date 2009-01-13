@@ -25,11 +25,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jan 2, 2009
  */
 
-package com.bigdata.jini.start;
+package com.bigdata.jini.start.config;
+
+import java.net.UnknownHostException;
 
 import junit.framework.TestCase2;
+import net.jini.config.ConfigurationException;
 
-import com.bigdata.jini.start.config.ZookeeperServerEntry;
+import com.bigdata.net.InetAddressUtil;
 
 /**
  * Unit tests for the {@link ZookeeperServerEntry}.
@@ -63,6 +66,9 @@ public class TestZookeeperServerEntry extends TestCase2 {
 
     }
 
+    /**
+     * Test {@link ZookeeperServerEntry} parsing.
+     */
     public void test001() {
 
         final int expectedId = 0;
@@ -80,6 +86,40 @@ public class TestZookeeperServerEntry extends TestCase2 {
         assertEquals(expectedLeaderPort, entry.leaderPort);
 
         log.info(entry.toString());
+        
+    }
+
+    /**
+     * Unit test for
+     * {@link ZookeeperServerConfiguration#getZookeeperServerEntries(String)}
+     * 
+     * @throws ConfigurationException
+     * @throws UnknownHostException 
+     */
+    public void test002() throws ConfigurationException, UnknownHostException {
+
+        final String[] hosts = new String[] {
+                "127.0.0.1",
+                "localhost"
+        };
+        
+        final String servers = "1=127.0.0.1:2888:3888, 2=localhost:2888:3888";
+
+        final ZookeeperServerEntry[] a = ZookeeperServerConfiguration
+                .getZookeeperServerEntries(servers);
+
+        for (int i = 0; i < a.length; i++) {
+
+            final ZookeeperServerEntry entry = a[i];
+
+            assertEquals(i + 1, entry.id);
+            assertEquals(hosts[i], entry.hostname);
+            assertEquals(2888, entry.peerPort);
+            assertEquals(3888, entry.leaderPort);
+            
+            InetAddressUtil.getByName(entry.hostname);
+            
+        }
         
     }
 

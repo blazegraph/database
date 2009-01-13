@@ -51,9 +51,9 @@ import org.apache.zookeeper.server.quorum.QuorumPeerMain;
 
 import com.bigdata.jini.start.MockListener;
 import com.bigdata.jini.start.config.ServiceConfiguration;
+import com.bigdata.jini.start.config.ZookeeperServerConfiguration;
 import com.bigdata.jini.start.process.ProcessHelper;
 import com.bigdata.jini.start.process.ZookeeperProcessHelper;
-import com.bigdata.jini.start.process.ZookeeperServerConfiguration;
 import com.bigdata.resources.ResourceFileFilter;
 
 /**

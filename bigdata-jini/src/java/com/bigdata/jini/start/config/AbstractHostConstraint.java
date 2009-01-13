@@ -33,6 +33,7 @@ import java.util.Arrays;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.net.InetAddressUtil;
 import com.bigdata.service.jini.JiniFederation;
 
 /**
@@ -80,7 +81,7 @@ abstract public class AbstractHostConstraint implements IServiceConstraint {
             if (a == null)
                 throw new IllegalArgumentException();
 
-            this.addr[i++] = InetAddress.getByName(a);
+            this.addr[i++] = InetAddressUtil.getByName(a);
 
         }
 

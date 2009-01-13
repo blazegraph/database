@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jan 13, 2009
  */
 
-package com.bigdata.jini.start.process;
+package com.bigdata.jini.start.config;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -53,9 +53,7 @@ import org.apache.zookeeper.server.quorum.QuorumPeerMain;
 
 import com.bigdata.io.FileLockUtility;
 import com.bigdata.jini.start.IServiceListener;
-import com.bigdata.jini.start.config.JavaServiceConfiguration;
-import com.bigdata.jini.start.config.ServiceConfiguration;
-import com.bigdata.jini.start.config.ZookeeperServerEntry;
+import com.bigdata.jini.start.process.ZookeeperProcessHelper;
 import com.bigdata.zookeeper.ZooHelper;
 
 /**
@@ -318,7 +316,27 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
      * 
      * @todo check for duplicate server ids.
      */
-    public ZookeeperServerEntry[] getZookeeperServerEntries() throws ConfigurationException {
+    public ZookeeperServerEntry[] getZookeeperServerEntries()
+            throws ConfigurationException {
+
+        return getZookeeperServerEntries(servers);
+
+    }
+
+    /**
+     * Parses out the zookeeper server descriptions.
+     * 
+     * @param The
+     *            servers per {@link Options#SERVERS}
+     * 
+     * @return An array of zero or more descriptions of zookeeper instances.
+     * 
+     * @throws ConfigurationException
+     * 
+     * @todo check for duplicate server ids.
+     */
+    static public ZookeeperServerEntry[] getZookeeperServerEntries(
+            final String servers) throws ConfigurationException {
 
         final List<ZookeeperServerEntry> serverEntries = new LinkedList<ZookeeperServerEntry>();
 
@@ -427,7 +445,7 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected class ZookeeperServiceStarter<V extends ZookeeperProcessHelper>
+    public class ZookeeperServiceStarter<V extends ZookeeperProcessHelper>
             extends JavaServiceStarter<V> {
         
         /**

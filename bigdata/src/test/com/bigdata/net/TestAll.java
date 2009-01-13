@@ -22,50 +22,46 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Jun 26, 2006
+ * Created on Oct 14, 2006
  */
-package com.bigdata.jini.start;
+
+package com.bigdata.net;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
-import com.bigdata.jini.start.config.TestZookeeperServerEntry;
-import com.bigdata.service.jini.AbstractServerTestCase;
-
 /**
- * Aggregates tests in dependency order - see {@link AbstractServerTestCase} for
- * <strong>required</strong> system properties in order to run this test suite.
+ * Aggregates test suites in increasing dependency order.
  * 
- * @version $Id$
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
  */
 public class TestAll extends TestCase {
 
+    /**
+     * 
+     */
     public TestAll() {
     }
 
-    public TestAll(String name) {
-        super(name);
+    /**
+     * @param arg0
+     */
+    public TestAll(String arg0) {
+        super(arg0);
     }
 
-    public static Test suite() {
+    /**
+     * Returns a test that will run each of the implementation specific test
+     * suites in turn.
+     */
+    public static Test suite()
+    {
 
-        final TestSuite suite = new TestSuite("start");
+        TestSuite suite = new TestSuite("net");
 
-        suite.addTest(com.bigdata.jini.start.TestAll.suite());
-        
-        // 
-        suite.addTestSuite(TestServiceConfigurationZNodeEnum.class);
-
-        // test suite for parsing zookeeper server entries.
-        suite.addTestSuite(TestZookeeperServerEntry.class);
-
-        // test suite for starting a bigdata service from a service config.
-        suite.addTestSuite(TestServiceStarter.class);
-        
-        // test suite for managing a logical service using a watcher.
-        suite.addTestSuite(TestServiceConfigurationWatcher.class);
+        suite.addTestSuite(TestInetAddressUtil.class);
         
         return suite;
         

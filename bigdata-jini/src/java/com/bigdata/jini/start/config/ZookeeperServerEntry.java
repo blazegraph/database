@@ -32,6 +32,8 @@ import java.net.UnknownHostException;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.net.InetAddressUtil;
+
 /**
  * A description of a zookeeper <code>server</code> entry as found in a
  * configuration file.
@@ -147,7 +149,7 @@ public class ZookeeperServerEntry {
 
         final InetAddress[] addrs = InetAddress.getAllByName("localhost");
 
-        final InetAddress addr = InetAddress.getByName(hostname);
+        final InetAddress addr = InetAddressUtil.getByName(hostname);
 
         if (INFO)
             log.info("Considering: " + hostname + " : addr=" + addr);

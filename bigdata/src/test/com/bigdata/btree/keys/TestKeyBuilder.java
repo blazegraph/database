@@ -1331,4 +1331,37 @@ public class TestKeyBuilder extends TestCase2 {
         
     }
 
+    /**
+     * Unit test for {@link KeyBuilder#encodeByte(byte)} and
+     * {@link KeyBuilder#decodeByte(byte)}. The former should have the same
+     * behavior as {@link KeyBuilder#append(byte)} while the latter should
+     * reverse the mapping.
+     * 
+     * @todo It fact, it appears that the operation is symmetric. So perhaps get
+     *       rid of one? Or just make a note of this on the KeyBuilder methods?
+     * 
+     * @todo KeyBuilder#encodeByte(byte) is only used by the RDF package to
+     *       generate the prefix for the terms index. if the order is wrong then
+     *       that prefix could be unsigned.
+     */
+    public void test_encodeDecodeByte() {
+        
+        for (int b = Byte.MIN_VALUE; b < Byte.MAX_VALUE; b++) {
+
+            assertTrue(b != KeyBuilder.encodeByte(b));
+
+            assertTrue(b == KeyBuilder.decodeByte(KeyBuilder.encodeByte(b)));
+
+            final byte actual = KeyBuilder.decodeByte(KeyBuilder.encodeByte(b));
+
+            if (b != actual) {
+
+                fail("b=" + b + ", but actual=" + actual);
+
+            }
+            
+        }
+          
+    }
+    
 }

@@ -12,8 +12,9 @@ import org.apache.zookeeper.server.PurgeTxnLog;
 import org.apache.zookeeper.server.quorum.QuorumPeerMain;
 
 import com.bigdata.jini.start.IServiceListener;
+import com.bigdata.jini.start.config.ZookeeperServerConfiguration;
 import com.bigdata.jini.start.config.ZookeeperServerEntry;
-import com.bigdata.jini.start.process.ZookeeperServerConfiguration.ZookeeperRunningException;
+import com.bigdata.jini.start.config.ZookeeperServerConfiguration.ZookeeperRunningException;
 import com.bigdata.zookeeper.ZooHelper;
 
 /**

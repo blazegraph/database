@@ -24,13 +24,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
  * Created on Jun 26, 2006
  */
-package com.bigdata.jini.start;
+package com.bigdata.jini.start.config;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
-import com.bigdata.jini.start.config.TestZookeeperServerEntry;
 import com.bigdata.service.jini.AbstractServerTestCase;
 
 /**
@@ -51,22 +50,13 @@ public class TestAll extends TestCase {
 
     public static Test suite() {
 
-        final TestSuite suite = new TestSuite("start");
-
-        suite.addTest(com.bigdata.jini.start.TestAll.suite());
-        
-        // 
-        suite.addTestSuite(TestServiceConfigurationZNodeEnum.class);
+        final TestSuite suite = new TestSuite("config");
 
         // test suite for parsing zookeeper server entries.
         suite.addTestSuite(TestZookeeperServerEntry.class);
 
-        // test suite for starting a bigdata service from a service config.
-        suite.addTestSuite(TestServiceStarter.class);
-        
-        // test suite for managing a logical service using a watcher.
-        suite.addTestSuite(TestServiceConfigurationWatcher.class);
-        
+        // test suite for parsing service configurations, etc.
+        suite.addTestSuite(TestServiceConfiguration.class);
         return suite;
         
     }

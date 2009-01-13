@@ -38,7 +38,6 @@ import org.apache.zookeeper.server.quorum.QuorumPeerMain;
 import cern.colt.Arrays;
 
 import com.bigdata.jini.start.ServicesManagerServer;
-import com.bigdata.jini.start.process.ZookeeperServerConfiguration;
 import com.bigdata.service.jini.DataServer;
 import com.bigdata.service.jini.LoadBalancerServer;
 import com.bigdata.service.jini.MetadataServer;
