@@ -881,35 +881,35 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
-    /**
-     * Return the value that will impose the lexiographic ordering as an
-     * unsigned byte.
-     * 
-     * @param v
-     *            The signed byte.
-     * 
-     * @return The value that will impose the lexiographic ordering as an
-     *         unsigned byte.
-     */
-    final static /*public*/ byte encode(byte v) {
-
-        int i = v;
-        
-        if (i < 0) {
-
-            i = i - 0x80;
-
-        } else {
-            
-            i = i + 0x80;
-            
-        }
-        
-        byte tmp = (byte)(i & 0xff);
-        
-        return tmp;
-        
-    }
+//    /**
+//     * Return the value that will impose the lexiographic ordering as an
+//     * unsigned byte.
+//     * 
+//     * @param v
+//     *            The signed byte.
+//     * 
+//     * @return The value that will impose the lexiographic ordering as an
+//     *         unsigned byte.
+//     */
+//    final static /*public*/ byte encode(byte v) {
+//
+//        int i = v;
+//        
+//        if (i < 0) {
+//
+//            i = i - 0x80;
+//
+//        } else {
+//            
+//            i = i + 0x80;
+//            
+//        }
+//        
+//        byte tmp = (byte)(i & 0xff);
+//        
+//        return tmp;
+//        
+//    }
     
     final public IKeyBuilder appendNul() {
 
@@ -1060,14 +1060,14 @@ public class KeyBuilder implements IKeyBuilder {
     }
     
     /**
-     * Converts a signed byte into an usigned byte.
+     * Converts a signed byte into an unsigned byte.
      * 
      * @param v
      *            The signed byte.
      *            
      * @return The corresponding unsigned value.
      */
-    static public byte encodeByte( byte v ) {
+    static public byte encodeByte(final int v) {
         
         int i = v;
         
@@ -1093,17 +1093,17 @@ public class KeyBuilder implements IKeyBuilder {
      *            
      * @return The corresponding signed value.
      */
-    static public byte decodeByte(byte v) {
+    static public byte decodeByte(final int v) {
 
         int i = v;
         
         if (i < 0) {
 
-            i = i - 0x80;
+            i = i + 0x80;
 
         } else {
             
-            i = i + 0x80;
+            i = i - 0x80;
             
         }
 
