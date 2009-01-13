@@ -82,7 +82,9 @@ public class ServiceStarter {
      *            <dl>
      *            <dt>-n</dt>
      *            <dd>Write the command that would be executed on stdout, but
-     *            do not execute the command.</dd>
+     *            do not execute the command. This is useful both if you want to
+     *            run the command directly and if you want to validate the
+     *            {@link Configuration}.</dd>
      *            </dl>
      * 
      * @throws Exception
@@ -202,6 +204,8 @@ public class ServiceStarter {
             first = false;
             
         }
+        
+        System.out.println();
         
     }
     
