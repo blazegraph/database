@@ -33,41 +33,44 @@ import net.jini.config.ConfigurationException;
 import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.process.JiniServiceProcessHelper;
 import com.bigdata.service.jini.JiniFederation;
-import com.bigdata.service.jini.LoadBalancerServer;
+import com.bigdata.service.jini.MetadataServer;
 import com.bigdata.util.NV;
 
 /**
- * Configuration for the {@link LoadBalancerServer}.
+ * Configuration for the {@link MetadataServer}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo could extend {@link DataServerConfiguration} since they are nearly the
+ *       same kind of thing.
  */
-public class LoadBalancerServiceConfiguration extends
+public class MetadataServerConfiguration extends
         BigdataServiceConfiguration {
 
     /**
      * 
      */
-    private static final long serialVersionUID = 2815856971374520722L;
+    private static final long serialVersionUID = -3476429607652513836L;
 
     /**
      * @param config
      */
-    public LoadBalancerServiceConfiguration(Configuration config)
+    public MetadataServerConfiguration(Configuration config)
             throws ConfigurationException {
 
-        super(LoadBalancerServer.class, config);
+        super(MetadataServer.class, config);
 
     }
 
-    public LoadBalancerServiceStarter newServiceStarter(JiniFederation fed,
+    public MetadataServiceStarter newServiceStarter(JiniFederation fed,
             IServiceListener listener, String zpath) throws Exception {
 
-        return new LoadBalancerServiceStarter(fed, listener, zpath);
+        return new MetadataServiceStarter(fed, listener, zpath);
 
     }
 
-    public class LoadBalancerServiceStarter<V extends JiniServiceProcessHelper>
+    public class MetadataServiceStarter<V extends JiniServiceProcessHelper>
             extends BigdataServiceStarter<V> {
 
         /**
@@ -75,7 +78,7 @@ public class LoadBalancerServiceConfiguration extends
          * @param listener
          * @param zpath
          */
-        protected LoadBalancerServiceStarter(JiniFederation fed,
+        protected MetadataServiceStarter(JiniFederation fed,
                 IServiceListener listener, String zpath) {
 
             super(fed, listener, zpath);
@@ -85,7 +88,7 @@ public class LoadBalancerServiceConfiguration extends
         @Override
         protected NV getDataDir() {
             
-            return new NV(LoadBalancerServer.Options.LOG_DIR, serviceDir
+            return new NV(MetadataServer.Options.DATA_DIR, serviceDir
                     .toString());
             
         }

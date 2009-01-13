@@ -65,6 +65,8 @@ import net.jini.lookup.entry.Name;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 
+import sun.security.jca.ServiceId;
+
 import com.bigdata.jini.lookup.entry.Hostname;
 import com.bigdata.jini.lookup.entry.ServiceToken;
 import com.bigdata.jini.start.BigdataZooDefs;
@@ -86,7 +88,7 @@ import com.bigdata.zookeeper.ZookeeperClientConfig;
  * @version $Id$
  */
 abstract public class JiniServiceConfiguration extends
-        JavaServiceConfiguration {
+        ManagedServiceConfiguration {
 
     /**
      * Additional {@link Configuration} options understood by
@@ -142,16 +144,16 @@ abstract public class JiniServiceConfiguration extends
     }
     
     /**
-     * @param cls
+     * @param className
      * @param config
      * @throws ConfigurationException
      */
-    public JiniServiceConfiguration(final Class cls, final Configuration config)
+    public JiniServiceConfiguration(final String className, final Configuration config)
             throws ConfigurationException {
  
-        super(cls, config);
+        super(className, config);
         
-        JiniClientConfig tmp = new JiniClientConfig(cls,config);
+        JiniClientConfig tmp = new JiniClientConfig(className,config);
         
         entries = tmp.entries;
 
@@ -161,16 +163,16 @@ abstract public class JiniServiceConfiguration extends
         
         properties = tmp.properties;
         
-        jiniOptions = getJiniOptions(cls.getName(), config);
+        jiniOptions = getJiniOptions(className, config);
         
     }
 
-//    public AbstractServiceStarter newServiceStarter(
-//            ServicesManager servicesManager, String zpath) throws Exception {
-//
-//        return new JiniServiceStarter(servicesManager, zpath);
-//        
-//    }
+    public JiniServiceStarter newServiceStarter(JiniFederation fed,
+            IServiceListener listener, String zpath) throws Exception {
+
+        return new JiniServiceStarter(fed, listener, zpath);
+        
+    }
     
     /**
      * 
@@ -179,7 +181,7 @@ abstract public class JiniServiceConfiguration extends
      * @param <V>
      */
     public class JiniServiceStarter<V extends JiniServiceProcessHelper> extends
-            JavaServiceStarter<V> {
+            ManagedServiceStarter<V> {
         
         /**
          * The basename of the service configuration file.
@@ -684,6 +686,7 @@ abstract public class JiniServiceConfiguration extends
             
         }
         
+        @SuppressWarnings("unchecked")
         @Override
         protected V newProcessHelper(String className,
                 ProcessBuilder processBuilder, IServiceListener listener)

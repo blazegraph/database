@@ -39,7 +39,7 @@ import org.apache.zookeeper.ZooKeeper;
 
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.jini.start.config.ServiceConfiguration;
-import com.bigdata.jini.start.config.TransactionServiceConfiguration;
+import com.bigdata.jini.start.config.TransactionServerConfiguration;
 import com.bigdata.service.jini.TransactionServer;
 
 /**
@@ -123,7 +123,7 @@ public class TestServiceConfigurationWatcher extends AbstractFedZooTestCase {
          */
         log.info("Creating zpath: " + serviceConfigurationZPath);
         zookeeper.create(serviceConfigurationZPath, SerializerUtil
-                .serialize(new TransactionServiceConfiguration(config)), acl,
+                .serialize(new TransactionServerConfiguration(config)), acl,
                 CreateMode.PERSISTENT);
         log.info("Created zpath: " + serviceConfigurationZPath);
 

@@ -32,45 +32,42 @@ import net.jini.config.ConfigurationException;
 
 import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.process.JiniServiceProcessHelper;
+import com.bigdata.service.jini.DataServer;
 import com.bigdata.service.jini.JiniFederation;
-import com.bigdata.service.jini.MetadataServer;
 import com.bigdata.util.NV;
 
 /**
- * Configuration for the {@link MetadataServer}.
+ * Configuration for the {@link DataServer}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo could extend {@link DataServiceConfiguration} since they are nearly the
- *       same kind of thing.
  */
-public class MetadataServiceConfiguration extends
+public class DataServerConfiguration extends
         BigdataServiceConfiguration {
 
     /**
      * 
      */
-    private static final long serialVersionUID = -3476429607652513836L;
+    private static final long serialVersionUID = -4902890360167993576L;
 
     /**
      * @param config
      */
-    public MetadataServiceConfiguration(Configuration config)
+    public DataServerConfiguration(Configuration config)
             throws ConfigurationException {
 
-        super(MetadataServer.class, config);
+        super(DataServer.class, config);
 
     }
 
-    public MetadataServiceStarter newServiceStarter(JiniFederation fed,
+    public DataServiceStarter newServiceStarter(JiniFederation fed,
             IServiceListener listener, String zpath) throws Exception {
 
-        return new MetadataServiceStarter(fed, listener, zpath);
+        return new DataServiceStarter(fed, listener, zpath);
 
     }
 
-    public class MetadataServiceStarter<V extends JiniServiceProcessHelper>
+    public class DataServiceStarter<V extends JiniServiceProcessHelper>
             extends BigdataServiceStarter<V> {
 
         /**
@@ -78,7 +75,7 @@ public class MetadataServiceConfiguration extends
          * @param listener
          * @param zpath
          */
-        protected MetadataServiceStarter(JiniFederation fed,
+        protected DataServiceStarter(JiniFederation fed,
                 IServiceListener listener, String zpath) {
 
             super(fed, listener, zpath);
@@ -88,7 +85,7 @@ public class MetadataServiceConfiguration extends
         @Override
         protected NV getDataDir() {
             
-            return new NV(MetadataServer.Options.DATA_DIR, serviceDir
+            return new NV(DataServer.Options.DATA_DIR, serviceDir
                     .toString());
             
         }

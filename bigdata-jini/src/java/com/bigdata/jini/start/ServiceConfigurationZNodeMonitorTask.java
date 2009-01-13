@@ -3,6 +3,7 @@ package com.bigdata.jini.start;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.CreateMode;
@@ -19,7 +20,6 @@ import com.bigdata.util.InnerCause;
 import com.bigdata.zookeeper.HierarchicalZNodeWatcher;
 import com.bigdata.zookeeper.ZLock;
 import com.bigdata.zookeeper.ZNodeLockWatcher;
-import com.sun.corba.se.impl.orbutil.closure.Future;
 
 /**
  * This is a standing task whose {@link Future} is monitored by the

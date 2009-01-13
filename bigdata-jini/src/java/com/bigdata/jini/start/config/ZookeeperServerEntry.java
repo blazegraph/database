@@ -27,6 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.jini.start.config;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+
+import org.apache.log4j.Logger;
+
 /**
  * A description of a zookeeper <code>server</code> entry as found in a
  * configuration file.
@@ -36,6 +41,12 @@ package com.bigdata.jini.start.config;
  */
 public class ZookeeperServerEntry {
 
+    protected static final Logger log = Logger.getLogger(ZookeeperServerEntry.class);
+    
+    protected static final boolean INFO = log.isInfoEnabled();
+
+    protected static final boolean DEBUG = log.isDebugEnabled();
+    
     /**
      * The zookeeper service instance number (the value written in its
      * <code>myid</code> file).
@@ -126,5 +137,41 @@ public class ZookeeperServerEntry {
         return getName()+ "=" + getValue();
         
     }
-    
+
+    /**
+     * Return <code>true</code> if this is server entry for the local host.
+     * 
+     * @throws UnknownHostException
+     */
+    public boolean isLocalHost() throws UnknownHostException {
+
+        final InetAddress[] addrs = InetAddress.getAllByName("localhost");
+
+        final InetAddress addr = InetAddress.getByName(hostname);
+
+        if (INFO)
+            log.info("Considering: " + hostname + " : addr=" + addr);
+
+        if (addr.isLoopbackAddress()) {
+
+            return true;
+
+        } else {
+
+            for (InetAddress a : addrs) {
+
+                if (addr.equals(a)) {
+
+                    return true;
+
+                }
+
+            }
+
+        }
+
+        return false;
+
+    }
+
 }

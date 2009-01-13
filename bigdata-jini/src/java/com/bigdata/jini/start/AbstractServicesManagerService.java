@@ -1,6 +1,6 @@
 package com.bigdata.jini.start;
 
-import java.util.LinkedList;
+import java.io.IOException;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -15,12 +15,13 @@ import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.data.ACL;
 
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.jini.start.config.DataServiceConfiguration;
-import com.bigdata.jini.start.config.LoadBalancerServiceConfiguration;
-import com.bigdata.jini.start.config.MetadataServiceConfiguration;
+import com.bigdata.jini.start.config.JiniCoreServicesConfiguration;
+import com.bigdata.jini.start.config.ManagedServiceConfiguration;
 import com.bigdata.jini.start.config.ServiceConfiguration;
-import com.bigdata.jini.start.config.TransactionServiceConfiguration;
+import com.bigdata.jini.start.config.ServicesManagerConfiguration;
+import com.bigdata.jini.start.process.JiniCoreServicesProcessHelper;
 import com.bigdata.jini.start.process.ProcessHelper;
+import com.bigdata.jini.start.process.ZookeeperProcessHelper;
 import com.bigdata.service.AbstractService;
 import com.bigdata.service.jini.JiniFederation;
 
@@ -79,13 +80,7 @@ public abstract class AbstractServicesManagerService extends AbstractService
     }
 
     /**
-     * Destroys any managed services (those started by this process and
-     * represented in {@link #runningProcesses}), but leaves the zookeeper and
-     * jini services for last.
-     * 
-     * @todo Do not permit new processes to start during shutdown? I am not sure
-     *       how much this matters. If the child was started, then it will just
-     *       run and succeed or die as it likes.
+     * NOP
      */
     synchronized public void shutdown() {
 
@@ -183,16 +178,7 @@ public abstract class AbstractServicesManagerService extends AbstractService
 
         final JiniFederation fed = getFederation();
 
-        final ZooKeeper zookeeper = fed.getZookeeper();
-
         final Configuration config = getConfiguration();
-
-        // root znode for the federation.
-        final String zroot = fed.getZooConfig().zroot;
-
-        // znode for configuration metadata.
-        final String zconfig = zroot + BigdataZooDefs.ZSLASH
-                + BigdataZooDefs.CONFIG;
 
         /*
          * Create and start task that will monitor the config znode. If any
@@ -204,38 +190,108 @@ public abstract class AbstractServicesManagerService extends AbstractService
          * running, but it is really only used when the config znode children
          * are created.
          */
-        fed.submitMonitoredTask(new MonitorConfigZNodeTask(fed, this/* listener */));
+        fed
+                .submitMonitoredTask(new MonitorConfigZNodeTask(fed, this/* listener */));
 
         /*
          * Create and start task that will compete for locks to start physical
          * service instances.
          */
         fed.submitMonitoredTask(new MonitorCreatePhysicalServiceLocksTask(fed,
-                        this/* listener */));
+                this/* listener */));
 
+        // the service manager's own configuration.
+        final ServicesManagerConfiguration selfConfig = new ServicesManagerConfiguration(config);
+
+        if (!selfConfig.canStartService(fed)) {
+
+            // refuse to start.
+            throw new RuntimeException("Constraints do not permit start: "
+                    + selfConfig);
+            
+        }
+        
         /*
-         * Generate service configurations based on the configuration file.
+         * These are the services that we will start and/or manage.
          * 
-         * Note: This lets us validate things before we try to load them into
-         * zookeeper.
+         * @todo review how we decide whether or not to start zookeeper and jini
          * 
-         * @todo if we declare the set of configurations in the Configuration
-         * file then we can add one more metalevel here.  The jini service
-         * starter basically does that.
+         * @todo we should be able to start the necessary jini services just
+         * from the bundled JARs without actually running the installer, right?
          */
-        final ServiceConfiguration[] serviceConfigurations = getServiceConfigurations(config);
+        final ServiceConfiguration[] serviceConfigurations = selfConfig
+                .getServiceConfigurations(config);
 
-        // ACL for the zroot, etc.
-        final List<ACL> acl = fed.getClient().zooConfig.acl;
+        // start if configured to run on host and not running.
+        startZookeeperService(config);
 
-        // create critical nodes used by the federation.
-        createKeyZNodes(zookeeper, zroot, acl);
+        for (ServiceConfiguration serviceConfig : serviceConfigurations) {
 
-        // push the service configurations into zookeeper (create/update).
-        pushConfiguration(zookeeper, zconfig, acl, serviceConfigurations);
+            if (serviceConfig instanceof JiniCoreServicesConfiguration) {
+
+                /*
+                 * Start jini if configured to run on this host and not running.
+                 */
+
+                startJiniCoreServices(config);
+
+            }
+
+        }
+        
+        /*
+         * Make sure that the key znodes are defined and then push the service
+         * configurations into zookeeper.
+         */
+        {
+
+            final ZooKeeper zookeeper = fed.getZookeeper();
+
+            // root znode for the federation.
+            final String zroot = fed.getZooConfig().zroot;
+
+            // znode for configuration metadata.
+            final String zconfig = zroot + BigdataZooDefs.ZSLASH
+                    + BigdataZooDefs.CONFIG;
+
+            // ACL for the zroot, etc.
+            final List<ACL> acl = fed.getClient().zooConfig.acl;
+
+            // create critical nodes used by the federation.
+            createKeyZNodes(zookeeper, zroot, acl);
+
+            // push the service configurations into zookeeper (create/update).
+            pushConfiguration(zookeeper, zconfig, acl, serviceConfigurations);
+
+        }
         
     }
 
+    /**
+     * If necessary, start a zookeeper service on this host.
+     * 
+     * @throws IOException
+     * @throws ConfigurationException
+     */
+    protected void startZookeeperService(Configuration config)
+            throws ConfigurationException, IOException {
+
+        ZookeeperProcessHelper.startZookeeper(config, this/* listener */);
+
+    }
+
+    /**
+     * If necessary, start the jini core services on this host.
+     * 
+     * @throws Exception
+     */
+    protected void startJiniCoreServices(Configuration config) throws Exception {
+
+        JiniCoreServicesProcessHelper
+                .startCoreServices(config, this/* listener */);
+        
+    }
+    
     /**
      * Create key znodes used by the federation.
      * 
@@ -289,62 +345,6 @@ public abstract class AbstractServicesManagerService extends AbstractService
     }
 
     /**
-     * Generates {@link ServiceConfiguration}s from the {@link Configuration}
-     * file.
-     * 
-     * @param config
-     *            The {@link Configuration} file.
-     * 
-     * @return An array of {@link ServiceConfiguration}s populated from the
-     *         {@link Configuration} file.
-     * 
-     * @throws ConfigurationException
-     * 
-     * @todo start httpd for downloadable code. (contend for lock on node, start
-     *       instance if insufficient instances are running). The codebase URI
-     *       should be the concatenation of the URIs for each httpd instance
-     *       that has been configured. Unlike some other configuration
-     *       properties, I am not sure that the codebase URI can be changed once
-     *       a service has been started. We will have to unpack all of the
-     *       classes into the file system, and then possibly create a single JAR
-     *       from them, and expose that use the ClassServer. This should be done
-     *       BEFORE starting jini since jini can then recognize our services in
-     *       the service browser (the codebase URI needs to be set for that to
-     *       work).
-     * 
-     * @see https://deployutil.dev.java.net/
-     * 
-     * @todo Use class server URL(s) when starting services for their RMI
-     *       codebase.
-     */
-    public ServiceConfiguration[] getServiceConfigurations(Configuration config)
-            throws ConfigurationException {
-
-        final List<ServiceConfiguration> v = new LinkedList<ServiceConfiguration>();
-
-            // // class server(s).
-            // zoo.create(zconfig + ZSLASH
-            // + ClassServer.class.getSimpleName(), SerializerUtil
-            // .serialize(classServerConfig), acl,
-            // CreateMode.PERSISTENT);
-
-            // transaction server
-            v.add(new TransactionServiceConfiguration(config));
-
-            // metadata server
-            v.add(new MetadataServiceConfiguration(config));
-
-            // data server(s) (lots!)
-            v.add(new DataServiceConfiguration(config));
-
-            // load balancer server.
-            v.add(new LoadBalancerServiceConfiguration(config));
-            
-            return v.toArray(new ServiceConfiguration[0]);
-            
-    }
-    
-    /**
      * Pushs the {@link ServiceConfiguration}s for the federation into
      * zookeeper. A new znode is created if none exists. Otherwise this
      * overwrites the existing data for those znodes.
@@ -357,13 +357,20 @@ public abstract class AbstractServicesManagerService extends AbstractService
      *       configuration if it is updated or install a SIGHUP handled and push
      *       the configuration if we receive that signal.
      */
-    protected void pushConfiguration(final ZooKeeper zookeeper,
+    public void pushConfiguration(final ZooKeeper zookeeper,
             final String zconfig, final List<ACL> acl,
             final ServiceConfiguration[] config) throws KeeperException,
             InterruptedException, ConfigurationException {
 
         for (ServiceConfiguration x : config) {
 
+            if(!(x instanceof ManagedServiceConfiguration)) {
+                
+                // Only the managed services are put into zookeeper.
+                continue;
+                
+            }
+            
             final String zpath = zconfig + BigdataZooDefs.ZSLASH + x.className;
 
             final byte[] data = SerializerUtil.serialize(x);

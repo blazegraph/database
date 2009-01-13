@@ -40,13 +40,13 @@ import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.util.NV;
 
 /**
- * Any of the bigdata services. Concrete instances handle required parameters
- * such as the data directory for the service.
+ * A bigdata service. Most services have additional parameters which must be
+ * specified. Those services are handled by subclasses.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class BigdataServiceConfiguration extends
+public class BigdataServiceConfiguration extends
         JiniServiceConfiguration {
 
     /**
@@ -72,7 +72,7 @@ abstract public class BigdataServiceConfiguration extends
     public BigdataServiceConfiguration(Class<? extends AbstractServer> cls,
             Configuration config) throws ConfigurationException {
 
-        super(cls, config);
+        super(cls.getName(), config);
 
         if (log4j == null) {
             
@@ -88,7 +88,7 @@ abstract public class BigdataServiceConfiguration extends
 
     }
 
-    public ManagedServiceStarter newServiceStarter(final JiniFederation fed,
+    public BigdataServiceStarter newServiceStarter(final JiniFederation fed,
             final IServiceListener listener, final String logicalServiceZPath)
             throws Exception {
 

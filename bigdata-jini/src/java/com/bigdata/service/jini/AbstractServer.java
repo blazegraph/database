@@ -121,6 +121,8 @@ import com.sun.jini.start.ServiceStarter;
  * service is also destroyed!
  * </p>
  * 
+ * FIXME javadoc update on how to start services.
+ * 
  * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6380355, which
  *      describes a bug in the service browser that will display a
  *      "NullPointerException" dialog box if you destroy a service which
@@ -311,7 +313,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * <code>java.rmi.server.codebase</code> property specified for the VM
      * running the service.
      */
-    final protected void setSecurityManager() {
+    final static public void setSecurityManager() {
 
         final SecurityManager sm = System.getSecurityManager();
         
@@ -411,7 +413,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
             config = ConfigurationProvider.getInstance(args);
 
-            jiniClientConfig = new JiniClientConfig(getClass(), config);
+            jiniClientConfig = new JiniClientConfig(getClass().getName(), config);
 
             entries = jiniClientConfig.entries;
             

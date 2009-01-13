@@ -31,7 +31,6 @@ import java.io.File;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -40,7 +39,6 @@ import org.apache.zookeeper.data.ACL;
 
 import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.process.ProcessHelper;
-import com.bigdata.service.jini.JiniFederation;
 
 /**
  * A service that is implemented in java and started directly using java. The
@@ -50,8 +48,7 @@ import com.bigdata.service.jini.JiniFederation;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class JavaServiceConfiguration extends
-        ManagedServiceConfiguration {
+public class JavaServiceConfiguration extends ServiceConfiguration {
 
     /**
      * 
@@ -150,31 +147,34 @@ abstract public class JavaServiceConfiguration extends
     }
 
     /**
-     * @param cls
+     *
+     * @param className
+     *            The name of the class to be executed.
      * @param config
+     *            The {@link Configuration}.
      * @throws ConfigurationException
      */
-    public JavaServiceConfiguration(final Class cls, final Configuration config)
-            throws ConfigurationException {
+    public JavaServiceConfiguration(final String className,
+            final Configuration config) throws ConfigurationException {
 
-        super(cls.getName(), config);
+        super(className, config);
 
-        this.java = getJava(cls.getName(), config);
+        this.java = getJava(className, config);
 
-        this.defaultJavaArgs = getDefaultJavaArgs(cls.getName(), config);
+        this.defaultJavaArgs = getDefaultJavaArgs(className, config);
 
-        this.log4j = getLog4j(cls.getName(), config);
+        this.log4j = getLog4j(className, config);
 
-        this.classpath = getClasspath(cls.getName(), config);
+        this.classpath = getClasspath(className, config);
 
     }
 
-    // public AbstractServiceStarter newServiceStarter(
-    // ServicesManager servicesManager, String zpath) throws Exception {
-    //
-    // return new JavaServiceStarter(servicesManager, zpath);
-    //        
-    // }
+     public JavaServiceStarter newServiceStarter(IServiceListener listener)
+            throws Exception {
+
+        return new JavaServiceStarter(listener);
+
+    }
 
     /**
      * 
@@ -183,7 +183,7 @@ abstract public class JavaServiceConfiguration extends
      * @param <V>
      */
     public class JavaServiceStarter<V extends ProcessHelper> extends
-            ManagedServiceStarter<V> {
+            AbstractServiceStarter<V> {
 
         /**
          * The class for the service that we are going to start.
@@ -191,53 +191,11 @@ abstract public class JavaServiceConfiguration extends
         public final Class cls;
 
         /**
-         * The znode for the logical service (the last component of the
-         * {@link AbstractServiceStarter#logicalServiceZPath}.
-         */
-        public final String logicalServiceZNode;
-
-        /**
-         * A unique token assigned to the service. This is used to recognize the
-         * service when it joins with a jini registrar, which is how we know
-         * that the service has started successfully and how we learn the
-         * physicalServiceZPath which is only available once it is created by
-         * the service instance.
-         */
-        public final UUID serviceToken;
-
-        /**
-         * The canonical service name. This is formed in much the same manner as
-         * the {@link #serviceDir} using the service type, the
-         * {@link #logicalServiceZNode}, and the unique {@link #serviceToken}.
-         * While the {@link #serviceToken} alone is unique, the path structure
-         * of the service name make is possible to readily classify a physical
-         * service by its type and logical instance.
-         */
-        public final String serviceName;
-
-        /**
-         * The service instance directory. This is where we put any
-         * configuration files and should be the default location for the
-         * persistent state associated with the service (services may of course
-         * be configured to put aspects of their state in a different location,
-         * such as the zookeeper log files).
-         * <p>
-         * The serviceDir is created using path components from the service
-         * type, the {@link #logicalServiceZNode}, and finally the unique
-         * {@link #serviceToken} assigned to the service.
-         */
-        public final File serviceDir;
-
-        /**
          * @param fed
-         * @param listener
-         * @param logicalServiceZPath
          */
-        protected JavaServiceStarter(final JiniFederation fed,
-                final IServiceListener listener,
-                final String logicalServiceZPath) {
+        protected JavaServiceStarter(final IServiceListener listener) {
 
-            super(fed, listener, logicalServiceZPath);
+            super(listener);
 
             try {
 
@@ -248,23 +206,6 @@ abstract public class JavaServiceConfiguration extends
                 throw new RuntimeException("className=" + className, t);
 
             }
-
-            // just the child name for the logical service.
-            logicalServiceZNode = logicalServiceZPath
-                    .substring(logicalServiceZPath.lastIndexOf('/') + 1);
-
-            // unique token used to recognize the service when it starts.
-            serviceToken = UUID.randomUUID();
-
-            // The canonical service name.
-            serviceName = cls.getSimpleName() + "/" + logicalServiceZNode + "/"
-                    + serviceToken;
-
-            // The actual service directory (choosen at runtime).
-            serviceDir = new File(new File(new File(
-                    JavaServiceConfiguration.this.serviceDir, cls
-                            .getSimpleName()), logicalServiceZNode),
-                    serviceToken.toString());
 
         }
 
@@ -296,14 +237,8 @@ abstract public class JavaServiceConfiguration extends
 
             super.setUp();
             
-            if (!serviceDir.exists()) {
-
-                serviceDir.mkdirs();
-
-            }
-
         }
-
+        
         /**
          * Adds {@link Options#JAVA}.
          */

@@ -79,7 +79,7 @@ public class TestServiceConfigurationZNodeEnum extends TestCase2 {
      * </pre>
      * 
      * In this example, the <code>W</code> appears at the start of each
-     * watched znode for the {@link TransactionServiceConfiguration} znode. The
+     * watched znode for the {@link TransactionServerConfiguration} znode. The
      * master election znode can be seen directly below that.
      */
     public void test01() {

@@ -4,12 +4,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -124,18 +121,18 @@ abstract public class ServiceConfiguration implements Serializable {
          */
         String TIMEOUT = "timeout";
         
-        /**
-         * A immutable set of property names whose values are not directly
-         * copied from a {@link Configuration}.
-         * 
-         * @todo this is pretty kludgy.
-         */
-        Set<String> reserved = Collections
-                .unmodifiableSet(new HashSet<String>(Arrays
-                        .asList(new String[] { ARGS,
-                                JavaServiceConfiguration.Options.CLASSPATH,
-                                JavaServiceConfiguration.Options.LOG4J,
-                                SERVICE_DIR })));
+//        /**
+//         * A immutable set of property names whose values are not directly
+//         * copied from a {@link Configuration}.
+//         * 
+//         * @todo this is pretty kludgy.
+//         */
+//        Set<String> reserved = Collections
+//                .unmodifiableSet(new HashSet<String>(Arrays
+//                        .asList(new String[] { ARGS,
+//                                JavaServiceConfiguration.Options.CLASSPATH,
+//                                JavaServiceConfiguration.Options.LOG4J,
+//                                SERVICE_DIR })));
 
     }
     
@@ -163,7 +160,7 @@ abstract public class ServiceConfiguration implements Serializable {
      * 
      * @see Options#OPTIONS
      */
-    public final String[] options;
+    public String[] options;
 
     /**
      * The directory for the persistent state of the instances of this service
@@ -406,7 +403,7 @@ abstract public class ServiceConfiguration implements Serializable {
      * @throws Exception
      *             if there is a problem creating the service starter.
      */
-    abstract protected AbstractServiceStarter newServiceStarter(
+    abstract public AbstractServiceStarter newServiceStarter(
             IServiceListener listener) throws Exception;
 
     /**
@@ -441,6 +438,9 @@ abstract public class ServiceConfiguration implements Serializable {
          * the parent process. That is where to look for any output that is
          * written onto stdout or stderr. Normally you will want the services to
          * write their logs on a file, syslogd, or an async appender.
+         * 
+         * @throws Exception
+         *             if the service detectably did not start.
          */
         public V call() throws Exception {
 
@@ -450,17 +450,9 @@ abstract public class ServiceConfiguration implements Serializable {
             // hook for setup before the process starts.
             setUp();
 
-            // create the command line.
-            final List<String> cmds = getCommandLine();
-
-            final ProcessBuilder processBuilder = newProcessBuilder(cmds);
-
-            // allow override of the environment for the child.
-            setUpEnvironment(processBuilder.environment());
-
-            // specify the startup directory?
-            // processBuilder.directory(dataDir);
-
+            // setup the process builder.
+            final ProcessBuilder processBuilder = newProcessBuilder();
+            
             // start the process.
             final V processHelper = (V) newProcessHelper(className,
                     processBuilder, listener);
@@ -559,10 +551,27 @@ abstract public class ServiceConfiguration implements Serializable {
          */
         protected void setUp() throws Exception {
 
-            // NOP
+            final File serviceDir = getServiceDir();
+            
+            if (!serviceDir.exists()) {
+
+                serviceDir.mkdirs();
+
+            }
 
         }
 
+        /**
+         * Hook for overriding the service directory.
+         * 
+         * @throws Exception
+         */
+        protected File getServiceDir()  {
+         
+            return serviceDir;
+            
+        }
+        
         /**
          * Return the {@link ProcessHelper} that will be used to manage the
          * process.
@@ -575,6 +584,7 @@ abstract public class ServiceConfiguration implements Serializable {
          * 
          * @throws IOException
          */
+        @SuppressWarnings("unchecked")
         protected V newProcessHelper(String className,
                 ProcessBuilder processBuilder, IServiceListener listener)
                 throws IOException {
@@ -583,6 +593,28 @@ abstract public class ServiceConfiguration implements Serializable {
 
         }
         
+        /**
+         * Return the fully prepared {@link ProcessBuilder} that will be used to
+         * execute the command. You may obtain the environment and command line
+         * to be used from this object.
+         */
+        public ProcessBuilder newProcessBuilder() {
+
+            // create the command line.
+            final List<String> cmds = getCommandLine();
+
+            final ProcessBuilder processBuilder = newProcessBuilder(cmds);
+
+            // allow override of the environment for the child.
+            setUpEnvironment(processBuilder.environment());
+
+            // specify the startup directory?
+            // processBuilder.directory(dataDir);
+
+            return processBuilder;
+
+        }
+
         /**
          * Hook for modification of the child environment.
          * 

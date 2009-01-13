@@ -232,7 +232,7 @@ public class JiniClient extends AbstractScaleOutClient {
     public JiniClient(final Class cls, final Configuration config)
             throws ConfigurationException {
 
-        this(new JiniClientConfig(cls, config), new ZookeeperClientConfig(
+        this(new JiniClientConfig(cls.getName(), config), new ZookeeperClientConfig(
                 config));
 
     }

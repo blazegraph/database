@@ -27,7 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.jini.start.config;
 
+import java.io.File;
 import java.util.List;
+import java.util.UUID;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -49,9 +51,9 @@ import com.bigdata.service.jini.JiniFederation;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class ManagedServiceConfiguration extends ServiceConfiguration {
+abstract public class ManagedServiceConfiguration extends JavaServiceConfiguration {
 
-    public interface Options extends ServiceConfiguration.Options {
+    public interface Options extends JavaServiceConfiguration.Options {
 
     }
 
@@ -75,7 +77,7 @@ abstract public class ManagedServiceConfiguration extends ServiceConfiguration {
      * @throws UnsupportedOperationException
      *             always.
      */
-    protected ManagedServiceStarter newServiceStarter(IServiceListener listener)
+    public ManagedServiceStarter newServiceStarter(IServiceListener listener)
             throws Exception{
         
         throw new UnsupportedOperationException();
@@ -95,9 +97,14 @@ abstract public class ManagedServiceConfiguration extends ServiceConfiguration {
      * @throws Exception
      *             if there is a problem creating the service starter.
      */
-    abstract public ManagedServiceStarter newServiceStarter(JiniFederation fed,
+    public ManagedServiceStarter newServiceStarter(JiniFederation fed,
             IServiceListener listener, String logicalServiceZPath)
-            throws Exception;
+            throws Exception {
+
+        return new ManagedServiceStarter<ProcessHelper>(fed, listener,
+                logicalServiceZPath);
+        
+    }
 
     /**
      * Return a task that will correct any imbalance between the
@@ -127,10 +134,48 @@ abstract public class ManagedServiceConfiguration extends ServiceConfiguration {
      * @version $Id$
      * @param <V>
      */
-    public abstract class ManagedServiceStarter<V extends ProcessHelper>
-            extends AbstractServiceStarter<V> {
+    public class ManagedServiceStarter<V extends ProcessHelper>
+            extends JavaServiceStarter<V> {
 
         protected final JiniFederation fed;
+
+        /**
+         * The znode for the logical service (the last component of the
+         * {@link AbstractServiceStarter#logicalServiceZPath}.
+         */
+        public final String logicalServiceZNode;
+
+        /**
+         * A unique token assigned to the service. This is used to recognize the
+         * service when it joins with a jini registrar, which is how we know
+         * that the service has started successfully and how we learn the
+         * physicalServiceZPath which is only available once it is created by
+         * the service instance.
+         */
+        public final UUID serviceToken;
+
+        /**
+         * The canonical service name. This is formed in much the same manner as
+         * the {@link #serviceDir} using the service type, the
+         * {@link #logicalServiceZNode}, and the unique {@link #serviceToken}.
+         * While the {@link #serviceToken} alone is unique, the path structure
+         * of the service name make is possible to readily classify a physical
+         * service by its type and logical instance.
+         */
+        public final String serviceName;
+
+        /**
+         * The service instance directory. This is where we put any
+         * configuration files and should be the default location for the
+         * persistent state associated with the service (services may of course
+         * be configured to put aspects of their state in a different location,
+         * such as the zookeeper log files).
+         * <p>
+         * The serviceDir is created using path components from the service
+         * type, the {@link #logicalServiceZNode}, and finally the unique
+         * {@link #serviceToken} assigned to the service.
+         */
+        public final File serviceDir;
 
         protected final String logicalServiceZPath;
 
@@ -155,7 +200,13 @@ abstract public class ManagedServiceConfiguration extends ServiceConfiguration {
 
             super(listener);
             
+            if (fed == null)
+                throw new IllegalArgumentException();
+
             if (listener == null)
+                throw new IllegalArgumentException();
+            
+            if (logicalServiceZPath == null)
                 throw new IllegalArgumentException();
             
             this.fed = fed;
@@ -164,8 +215,36 @@ abstract public class ManagedServiceConfiguration extends ServiceConfiguration {
             
             this.zookeeper = fed.getZookeeper();
             
+            // just the child name for the logical service.
+            logicalServiceZNode = logicalServiceZPath
+                    .substring(logicalServiceZPath.lastIndexOf('/') + 1);
+
+            // unique token used to recognize the service when it starts.
+            serviceToken = UUID.randomUUID();
+
+            // The canonical service name.
+            serviceName = cls.getSimpleName() + "/" + logicalServiceZNode + "/"
+                    + serviceToken;
+
+            // The actual service directory (choosen at runtime).
+            serviceDir = new File(new File(new File(
+                    ManagedServiceConfiguration.this.serviceDir, cls
+                            .getSimpleName()), logicalServiceZNode),
+                    serviceToken.toString());
+
         }
 
+        /**
+         * Returns the actual service directory which is choosen at runtime
+         * based on the {@link #logicalServiceZNode} and the
+         * {@link #serviceToken}.
+         */
+        protected File getServiceDir() {
+            
+            return serviceDir;
+            
+        }
+        
         /**
          * Extended to verify that the {@link #logicalServiceZPath} exists.
          */

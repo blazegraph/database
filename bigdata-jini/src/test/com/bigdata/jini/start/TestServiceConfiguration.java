@@ -39,7 +39,7 @@ import net.jini.config.ConfigurationProvider;
 import com.bigdata.jini.start.config.BigdataServiceConfiguration;
 import com.bigdata.jini.start.config.IServiceConstraint;
 import com.bigdata.jini.start.config.ServiceConfiguration;
-import com.bigdata.jini.start.config.TransactionServiceConfiguration;
+import com.bigdata.jini.start.config.TransactionServerConfiguration;
 import com.bigdata.service.jini.TransactionServer;
 
 /**
@@ -94,7 +94,7 @@ public class TestServiceConfiguration extends TestCase2 {
                 ServiceConfiguration.class.getName(), "classpath",
                 String[].class)));
         
-        final BigdataServiceConfiguration serviceConfig = new TransactionServiceConfiguration(
+        final BigdataServiceConfiguration serviceConfig = new TransactionServerConfiguration(
                 config);
 
         assertEquals(TransactionServer.class.getName(), serviceConfig.className);

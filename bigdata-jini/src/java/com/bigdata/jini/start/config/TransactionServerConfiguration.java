@@ -42,7 +42,7 @@ import com.bigdata.util.NV;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TransactionServiceConfiguration extends
+public class TransactionServerConfiguration extends
         BigdataServiceConfiguration {
 
     /**
@@ -53,7 +53,7 @@ public class TransactionServiceConfiguration extends
     /**
      * @param config
      */
-    public TransactionServiceConfiguration(Configuration config)
+    public TransactionServerConfiguration(Configuration config)
             throws ConfigurationException {
 
         super(TransactionServer.class, config);

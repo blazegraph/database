@@ -53,6 +53,7 @@ import com.bigdata.jini.start.MockListener;
 import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.jini.start.process.ProcessHelper;
 import com.bigdata.jini.start.process.ZookeeperProcessHelper;
+import com.bigdata.jini.start.process.ZookeeperServerConfiguration;
 import com.bigdata.resources.ResourceFileFilter;
 
 /**
@@ -143,15 +144,15 @@ public abstract class AbstractZooTestCase extends TestCase2 {
                 configFile,
                 // overrides the clientPort to be unique.
                 QuorumPeerMain.class.getName() + "."
-                        + ZookeeperProcessHelper.Options.CLIENT_PORT + "="
+                        + ZookeeperServerConfiguration.Options.CLIENT_PORT + "="
                         + +clientPort,
                 // overrides servers declaration.
                 QuorumPeerMain.class.getName() + "."
-                        + ZookeeperProcessHelper.Options.SERVERS + "=\""
+                        + ZookeeperServerConfiguration.Options.SERVERS + "=\""
                         + servers + "\"",
                 // overrides the dataDir
                 QuorumPeerMain.class.getName() + "."
-                        + ZookeeperProcessHelper.Options.DATA_DIR
+                        + ZookeeperServerConfiguration.Options.DATA_DIR
                         + "=new java.io.File("
                         + ServiceConfiguration.q(dataDir.toString()) + ")"//
         };

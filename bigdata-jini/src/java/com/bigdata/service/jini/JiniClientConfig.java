@@ -101,8 +101,11 @@ public class JiniClientConfig {
     }
 
     /**
-     * @param cls
-     *            The class of the client or service (optional).
+     * @param className
+     *            The class name of the client or service (optional). When
+     *            specified, properties defined for that class in the
+     *            configuration will be used and will override those specified
+     *            for the {@value Options#NAMESPACE}.
      * @param config
      *            The {@link Configuration}.
      * 
@@ -112,7 +115,7 @@ public class JiniClientConfig {
      * 
      * @see Options
      */
-    public JiniClientConfig(final Class cls, final Configuration config)
+    public JiniClientConfig(final String className, final Configuration config)
         throws ConfigurationException {
         
         /*
@@ -160,9 +163,9 @@ public class JiniClientConfig {
                 Options.PROPERTIES, NV[].class, new NV[] {}/* defaultValue */);
 
         final NV[] b;
-        if (cls != null) {
+        if (className != null) {
 
-            b = (NV[]) config.getEntry(cls.getName(), Options.PROPERTIES,
+            b = (NV[]) config.getEntry(className, Options.PROPERTIES,
                     NV[].class, new NV[] {}/* defaultValue */);
 
         } else

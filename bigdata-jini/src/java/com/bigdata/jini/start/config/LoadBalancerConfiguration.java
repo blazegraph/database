@@ -32,42 +32,42 @@ import net.jini.config.ConfigurationException;
 
 import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.process.JiniServiceProcessHelper;
-import com.bigdata.service.jini.DataServer;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.jini.LoadBalancerServer;
 import com.bigdata.util.NV;
 
 /**
- * Configuration for the {@link DataServer}.
+ * Configuration for the {@link LoadBalancerServer}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DataServiceConfiguration extends
+public class LoadBalancerConfiguration extends
         BigdataServiceConfiguration {
 
     /**
      * 
      */
-    private static final long serialVersionUID = -4902890360167993576L;
+    private static final long serialVersionUID = 2815856971374520722L;
 
     /**
      * @param config
      */
-    public DataServiceConfiguration(Configuration config)
+    public LoadBalancerConfiguration(Configuration config)
             throws ConfigurationException {
 
-        super(DataServer.class, config);
+        super(LoadBalancerServer.class, config);
 
     }
 
-    public DataServiceStarter newServiceStarter(JiniFederation fed,
+    public LoadBalancerServiceStarter newServiceStarter(JiniFederation fed,
             IServiceListener listener, String zpath) throws Exception {
 
-        return new DataServiceStarter(fed, listener, zpath);
+        return new LoadBalancerServiceStarter(fed, listener, zpath);
 
     }
 
-    public class DataServiceStarter<V extends JiniServiceProcessHelper>
+    public class LoadBalancerServiceStarter<V extends JiniServiceProcessHelper>
             extends BigdataServiceStarter<V> {
 
         /**
@@ -75,7 +75,7 @@ public class DataServiceConfiguration extends
          * @param listener
          * @param zpath
          */
-        protected DataServiceStarter(JiniFederation fed,
+        protected LoadBalancerServiceStarter(JiniFederation fed,
                 IServiceListener listener, String zpath) {
 
             super(fed, listener, zpath);
@@ -85,7 +85,7 @@ public class DataServiceConfiguration extends
         @Override
         protected NV getDataDir() {
             
-            return new NV(DataServer.Options.DATA_DIR, serviceDir
+            return new NV(LoadBalancerServer.Options.LOG_DIR, serviceDir
                     .toString());
             
         }

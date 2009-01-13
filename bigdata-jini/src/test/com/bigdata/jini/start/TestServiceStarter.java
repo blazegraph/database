@@ -46,8 +46,8 @@ import org.apache.zookeeper.data.Stat;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.jini.start.config.BigdataServiceConfiguration;
 import com.bigdata.jini.start.config.ServiceConfiguration;
-import com.bigdata.jini.start.config.TransactionServiceConfiguration;
-import com.bigdata.jini.start.config.JavaServiceConfiguration.JavaServiceStarter;
+import com.bigdata.jini.start.config.TransactionServerConfiguration;
+import com.bigdata.jini.start.config.ManagedServiceConfiguration.ManagedServiceStarter;
 import com.bigdata.jini.start.process.ProcessHelper;
 import com.bigdata.service.IService;
 import com.bigdata.service.jini.JiniUtil;
@@ -100,7 +100,7 @@ public class TestServiceStarter extends AbstractFedZooTestCase {
 
         final ZooKeeper zookeeper = fed.getZookeeper();
 
-        final TransactionServiceConfiguration serviceConfig = new TransactionServiceConfiguration(
+        final TransactionServerConfiguration serviceConfig = new TransactionServerConfiguration(
                 config);
 
         // znode for serviceConfiguration
@@ -124,7 +124,7 @@ public class TestServiceStarter extends AbstractFedZooTestCase {
         // will be zero unless we started a zookeeper server above.
         final int processCountBefore = listener.running.size();
         
-        final JavaServiceStarter serviceStarter = (JavaServiceStarter) serviceConfig
+        final ManagedServiceStarter serviceStarter = (ManagedServiceStarter) serviceConfig
                 .newServiceStarter(fed, listener, logicalServiceZPath);
 
         // start the service.

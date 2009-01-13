@@ -261,6 +261,9 @@ public class ProcessHelper {
 
         // save the listener reference.
         this.listener = listener;
+    
+        log.warn("command: "+builder.command());
+//        log.warn("environment: "+builder.environment());
         
         /*
          * Merge stdout and stderr so that we only need one thread to drain the

@@ -27,14 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.jini.start;
 
-import java.io.IOException;
 import java.net.InetAddress;
 import java.rmi.RemoteException;
 import java.rmi.server.ServerNotActiveException;
 import java.util.Properties;
 
 import net.jini.config.Configuration;
-import net.jini.config.ConfigurationException;
 import net.jini.export.ServerContext;
 import net.jini.io.context.ClientHost;
 import net.jini.io.context.ClientSubject;
@@ -45,14 +43,13 @@ import org.apache.log4j.MDC;
 import org.apache.zookeeper.ZooKeeper;
 
 import com.bigdata.jini.start.config.IServiceConstraint;
-import com.bigdata.jini.start.process.JiniCoreServicesProcessHelper;
-import com.bigdata.jini.start.process.ZookeeperProcessHelper;
 import com.bigdata.service.DefaultServiceFederationDelegate;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.AbstractServer;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.RemoteAdministrable;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
+import com.sun.jini.start.SharedActivatableServiceDescriptor;
 
 /**
  * A class for bootstrapping a {@link JiniFederation} across a cluster based on
@@ -99,11 +96,6 @@ import com.bigdata.service.jini.RemoteDestroyAdmin;
  * service instance), then a new instance will simply be created.
  * <p>
  * 
- * FIXME No one is watching the children of the logical service (the physical
- * services). The process that does that needs to trigger a comparison with the
- * service configuration znode for that logical service if one of the physical
- * service instances is killed.
- * 
  * FIXME If zookeeper dies (all instances) and is then brought back up there
  * will be a race condition where the physical services will (or should) try to
  * re-assert their ephemeral znodes and the {@link ServicesManagerServer} will
@@ -144,8 +136,6 @@ import com.bigdata.service.jini.RemoteDestroyAdmin;
  *       logical or physical service to be terminated. Use the
  *       {@link RemoteDestroyAdmin} API to terminate physical services.
  * 
- * @todo The federation can be destroyed using {@link JiniFederation#destroy()}.
- * 
  * @todo document dependencies for performance counter reporting and supported
  *       platforms. perhaps config options for which counters are collected and
  *       which are reported to the LBS.
@@ -158,12 +148,31 @@ import com.bigdata.service.jini.RemoteDestroyAdmin;
  *       record in zookeeper of where services were started. The service
  *       configuration of the physical service has all the necessary
  *       information, but it is stored in an ephemeral znode.
+ *       <p>
+ *       Perhaps we could write an {@link SharedActivatableServiceDescriptor}
+ *       into the serviceDir and use that to actually start the service? It
+ *       could then be restarted automatically, either by local intervention or
+ *       by RMI.
  * 
  * @todo is it possible to create locks and queues using javaspaces in a manner
  *       similar to zookeeper? It does support a concept similar to a watch, but
  *       I am not sure that it has concepts similar to "ephermeral" or
  *       "sequential". Also, I am not clear on its consistency guarentees. It
  *       does support transactions, which could be another way to approach this.
+ * 
+ * FIXME Start httpd for downloadable code. (contend for lock on node, start
+ * instance if insufficient instances are running). The codebase URI should be
+ * the concatenation of the URIs for each httpd instance that has been
+ * configured. Unlike some other configuration properties, I am not sure that
+ * the codebase URI can be changed once a service has been started. We will have
+ * to unpack all of the classes into the file system, and then possibly create a
+ * single JAR from them, and expose that use the ClassServer. This should be
+ * done BEFORE starting jini since jini can then recognize our services in the
+ * service browser (the codebase URI needs to be set for that to work).
+ * <p>
+ * See https://deployutil.dev.java.net/
+ * <p>
+ * Use class server URL(s) when starting services for their RMI codebase.
  * 
  * FIXME remaining big issues are destroying logical and physical services (not
  * implemented yet) and providing failover for the various bigdata services (not
@@ -411,26 +420,10 @@ public class ServicesManagerServer extends AbstractServer {
         }
 
         /**
-         * Extended to start zookeeper and/or the jini core services if they
-         * were specified as running on this host in the {@link Configuration}
-         * and they are not found to be running on the localhost.
+         * 
          */
         @Override
         public AdministrableServicesManagerService start() {
-
-            try {
-
-                // start if configured to run on host and not running.
-                startZookeeperService();
-
-                // start if configured to run on this host and not running.
-                startJiniCoreServices();
-                
-            } catch (Exception ex) {
-
-                throw new RuntimeException(ex);
-                
-            }
             
             super.start();
             
@@ -438,32 +431,6 @@ public class ServicesManagerServer extends AbstractServer {
             
         }
 
-        /**
-         * If necessary, start a zookeeper service on this host.
-         * 
-         * @throws IOException 
-         * @throws ConfigurationException 
-         */
-        protected void startZookeeperService() throws ConfigurationException,
-                IOException {
-
-            ZookeeperProcessHelper
-                    .startZookeeper(server.config, this/* listener */);
-
-        }
-        
-        /**
-         * If necessary, start the jini core services on this host.
-         * 
-         * @throws Exception 
-         */
-        protected void startJiniCoreServices() throws Exception {
-         
-            JiniCoreServicesProcessHelper
-                    .startCoreServices(server.config, this/* listener */);
-            
-        }
-        
     }
 
 }
