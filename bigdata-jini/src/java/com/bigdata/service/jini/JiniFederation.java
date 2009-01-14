@@ -193,10 +193,15 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
                 while ((timeout -= (System.nanoTime() - begin)) > 0) {
 
-                    if (zookeeper.getState().isAlive())
+                    switch (zookeeper.getState()) {
+                    case CONNECTED:
                         break;
-
-                    Thread.sleep(50/* ms */);
+                    case AUTH_FAILED:
+                        throw new RuntimeException("Zookeeper authorization failure.");
+                    default:
+                        // wait a bit.
+                        Thread.sleep(50/* ms */);
+                    }
 
                 }
 
