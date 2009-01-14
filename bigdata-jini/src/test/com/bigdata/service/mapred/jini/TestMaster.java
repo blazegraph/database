@@ -27,13 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.mapred.jini;
 
-import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.AbstractServerTestCase;
-import com.bigdata.service.jini.DataServer;
-import com.bigdata.service.jini.JiniClient;
-import com.bigdata.service.jini.LoadBalancerServer;
-import com.bigdata.service.jini.MetadataServer;
-import com.bigdata.service.jini.TransactionServer;
+import com.bigdata.service.jini.JiniServicesHelper;
 import com.bigdata.service.mapReduce.TestEmbeddedMaster;
 import com.bigdata.service.mapred.AbstractMaster;
 import com.bigdata.service.mapred.MapReduceJob;
@@ -115,38 +110,11 @@ public class TestMaster extends AbstractServerTestCase {
         super(arg0);
     }
 
-    /**
-     * Starts in {@link #setUp()}.
-     */
-    TransactionServer timestampServer0;
-    /**
-     * Starts in {@link #setUp()}.
-     */
-    LoadBalancerServer loadBalancerServer0;
-    /**
-     * Starts in {@link #setUp()}.
-     */
-    MapServer mapServer0;
-    /**
-     * Starts in {@link #setUp()}.
-     */
-    ReduceServer reduceServer0;
-    /**
-     * Starts in {@link #setUp()}.
-     */
-    MetadataServer metadataServer0;
-    /**
-     * Starts in {@link #setUp()}.
-     */
-    DataServer dataServer0;
-    /**
-     * Starts in {@link #setUp()}.
-     */
-    JiniClient client;
-    /**
-     * Starts in {@link #setUp()}.
-     */
-    MapReduceServiceDiscoveryManager serviceDiscoveryManager;
+    private String path = "src/resources/config/standalone/";
+
+    protected MapReduceServiceDiscoveryManager serviceDiscoveryManager;
+    
+    protected JiniServicesHelper helper;
     
     /**
      * Starts up a metadata service, a data service, a map service and a reduce
@@ -155,96 +123,10 @@ public class TestMaster extends AbstractServerTestCase {
     public void setUp() throws Exception {
 
         super.setUp();
+
+        helper = new JiniServicesHelper(path);
         
-        /*
-         * Start the timestamp server.
-         */
-        timestampServer0 = new TransactionServer(
-                new String[] { "src/resources/config/standalone/TimestampServer0.config"
-                        });
-        
-        new Thread() {
-
-            public void run() {
-                
-                timestampServer0.run();
-                
-            }
-            
-        }.start();
-
-        /*
-         * Start the load balancer service.
-         */
-        loadBalancerServer0 = new LoadBalancerServer(
-                new String[] { "src/resources/config/standalone/LoadBalancerServer0.config"
-                        });
-        
-        new Thread() {
-
-            public void run() {
-                
-                loadBalancerServer0.run();
-                
-            }
-            
-        }.start();
-
-        /*
-         * Start the metadata server.
-         */
-        metadataServer0 = new MetadataServer(
-                new String[] { "src/resources/config/standalone/MetadataServer0.config"
-                        });
-        
-        new Thread() {
-
-            public void run() {
-                
-                metadataServer0.run();
-                
-            }
-            
-        }.start();
-
-        dataServer0 = new DataServer(
-                new String[] { "src/resources/config/standalone/DataServer0.config"
-                        });
-
-        new Thread() {
-
-            public void run() {
-                
-                dataServer0.run();
-                
-            }
-            
-        }.start();
-
-        client = JiniClient.newInstance(
-                new String[] { "src/resources/config/standalone/Client.config"
-                        });
-
-        mapServer0 = new MapServer(
-                new String[] { "src/resources/config/standalone/MapServer0.config"
-                      });
-        
-        reduceServer0 = new ReduceServer(
-                new String[] { "src/resources/config/standalone/ReduceServer0.config"
-                      });
-        
-        // Wait until all the services are up.
-        getServiceID(metadataServer0);
-        getServiceID(dataServer0);
-        getServiceID(mapServer0);
-        getServiceID(reduceServer0);
-        
-        IBigdataFederation fed = client.connect();
-        
-        // verify that the client has/can get the metadata service.
-        assertNotNull("metadataService", fed.getMetadataService());
-
-        serviceDiscoveryManager = new MapReduceServiceDiscoveryManager(client);
+        serviceDiscoveryManager = new MapReduceServiceDiscoveryManager(helper.client);
         
     }
     
@@ -253,64 +135,20 @@ public class TestMaster extends AbstractServerTestCase {
      */
     public void tearDown() throws Exception {
 
-        serviceDiscoveryManager.terminate();
-
-        if (mapServer0 != null) {
+        if (serviceDiscoveryManager != null) {
             
-            mapServer0.destroy();
-
-            mapServer0 = null;
+            serviceDiscoveryManager.terminate();
+            
+            serviceDiscoveryManager = null;
             
         }
         
-        if (reduceServer0 != null) {
-            
-            reduceServer0.destroy();
+        if (helper != null) {
 
-            reduceServer0 = null;
+            helper.destroy();
             
         }
-        
-        if(metadataServer0!=null) {
 
-            metadataServer0.destroy();
-        
-            metadataServer0 = null;
-
-        }
-
-        if(dataServer0!=null) {
-
-            dataServer0.destroy();
-        
-            dataServer0 = null;
-
-        }
-
-        if (loadBalancerServer0 != null) {
-            
-            loadBalancerServer0.destroy();
-
-            loadBalancerServer0 = null;
-            
-        }
-        
-        if (timestampServer0 != null) {
-            
-            timestampServer0.destroy();
-
-            timestampServer0 = null;
-            
-        }
-        
-        if(client!=null && client.isConnected()) {
-
-            client.disconnect(true/*immediateShutdown*/);
-
-            client = null;
-            
-        }
-        
         super.tearDown();
         
     }
@@ -339,7 +177,7 @@ public class TestMaster extends AbstractServerTestCase {
          * Run the map/reduce operation.
          */
 
-        AbstractMaster master = new Master(job, client, serviceDiscoveryManager);
+        AbstractMaster master = new Master(job, helper.client, serviceDiscoveryManager);
         
         master.run(.9d, .9d);
         

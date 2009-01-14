@@ -48,6 +48,9 @@ import com.bigdata.service.IDataService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.service.DataService.DataServiceFederationDelegate;
+import com.sun.jini.start.LifeCycle;
+import com.sun.jini.start.ServiceDescriptor;
+import com.sun.jini.start.ServiceStarter;
 
 /**
  * A metadata server.
@@ -81,10 +84,18 @@ public class MetadataServer extends DataServer {
     
     /**
      * @param args
+     *            Either the command line arguments or the arguments from the
+     *            {@link ServiceDescriptor}. Either way they identify the jini
+     *            {@link Configuration} (you may specify either a file or URL)
+     *            and optional overrides for that {@link Configuration}.
+     * @param lifeCycle
+     *            The life cycle object. This is used if the server is started
+     *            by the jini {@link ServiceStarter}. Otherwise specify a
+     *            {@link FakeLifeCycle}.
      */
-    public MetadataServer(String[] args) {
-       
-        super(args);
+    public MetadataServer(final String[] args, final LifeCycle lifeCycle) {
+
+        super(args, lifeCycle);
              
     }
 
@@ -92,22 +103,22 @@ public class MetadataServer extends DataServer {
      * Starts a new {@link MetadataServer}.  This can be done programmatically
      * by executing
      * <pre>
-     *    new MetadataServer(args).run();
+     *    new MetadataServer(args,new FakeLifeCycle()).run();
      * </pre>
      * within a {@link Thread}.
      * 
      * @param args
      *            The name of the {@link Configuration} file for the service.
      */
-    public static void main(String[] args) {
-        
-        new MetadataServer(args).run();
+    public static void main(final String[] args) {
 
-//      System.exit(0);
+        new MetadataServer(args, new FakeLifeCycle()).run();
+
+        // System.exit(0);
         Runtime.getRuntime().halt(0);
 
     }
-    
+
     protected MetadataService newService(Properties properties) {
 
         final MetadataService service = new AdministrableMetadataService(

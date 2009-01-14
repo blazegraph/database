@@ -46,6 +46,9 @@ import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.DataService;
 import com.bigdata.service.DefaultServiceFederationDelegate;
 import com.bigdata.service.DistributedTransactionService;
+import com.sun.jini.start.LifeCycle;
+import com.sun.jini.start.ServiceDescriptor;
+import com.sun.jini.start.ServiceStarter;
 
 /**
  * Server exposing a discoverable {@link ITransactionService}.
@@ -71,10 +74,18 @@ public class TransactionServer extends AbstractServer {
     
     /**
      * @param args
+     *            Either the command line arguments or the arguments from the
+     *            {@link ServiceDescriptor}. Either way they identify the jini
+     *            {@link Configuration} (you may specify either a file or URL)
+     *            and optional overrides for that {@link Configuration}.
+     * @param lifeCycle
+     *            The life cycle object. This is used if the server is started
+     *            by the jini {@link ServiceStarter}. Otherwise specify a
+     *            {@link FakeLifeCycle}.
      */
-    public TransactionServer(String[] args) {
+    public TransactionServer(final String[] args, final LifeCycle lifeCycle) {
 
-        super(args);
+        super(args, lifeCycle);
         
     }
 
@@ -82,16 +93,16 @@ public class TransactionServer extends AbstractServer {
      * Starts a new {@link TransactionServer}.  This can be done programmatically
      * by executing
      * <pre>
-     *    new TimestampServer(args).run();
+     *    new TimestampServer(args, new FakeLifeCycle()).run();
      * </pre>
      * within a {@link Thread}.
      * 
      * @param args
      *            The name of the {@link Configuration} file for the service.
      */
-    public static void main(String[] args) {
+    public static void main(final String[] args) {
         
-        new TransactionServer(args).run();
+        new TransactionServer(args, new FakeLifeCycle()).run();
 
 //        System.exit(0);
         Runtime.getRuntime().halt(0);

@@ -22,6 +22,9 @@ import com.bigdata.service.DefaultServiceFederationDelegate;
 import com.bigdata.service.IFederationDelegate;
 import com.bigdata.service.IService;
 import com.bigdata.service.LoadBalancerService;
+import com.sun.jini.start.LifeCycle;
+import com.sun.jini.start.ServiceDescriptor;
+import com.sun.jini.start.ServiceStarter;
 
 /**
  * The load balancer server.
@@ -50,14 +53,20 @@ public class LoadBalancerServer extends AbstractServer {
     }
     
     /**
-     * Creates a new {@link DataServer}.
      * 
      * @param args
-     *            The name of the {@link Configuration} file for the service.
+     *            Either the command line arguments or the arguments from the
+     *            {@link ServiceDescriptor}. Either way they identify the jini
+     *            {@link Configuration} (you may specify either a file or URL)
+     *            and optional overrides for that {@link Configuration}.
+     * @param lifeCycle
+     *            The life cycle object. This is used if the server is started
+     *            by the jini {@link ServiceStarter}. Otherwise specify a
+     *            {@link FakeLifeCycle}.
      */
-    public LoadBalancerServer(String[] args) {
+    public LoadBalancerServer(final String[] args, final LifeCycle lifeCycle) {
 
-        super(args);
+        super(args, lifeCycle);
         
     }
 
@@ -66,7 +75,7 @@ public class LoadBalancerServer extends AbstractServer {
      * programmatically by executing
      * 
      * <pre>
-     * new LoadBalancerServer(args).run();
+     * new LoadBalancerServer(args, new FakeLifeCycle()).run();
      * </pre>
      * 
      * within a {@link Thread}.
@@ -76,7 +85,7 @@ public class LoadBalancerServer extends AbstractServer {
      */
     public static void main(String[] args) {
         
-        new LoadBalancerServer(args).run();
+        new LoadBalancerServer(args, new FakeLifeCycle()).run();
 
 //      System.exit(0);
         Runtime.getRuntime().halt(0);

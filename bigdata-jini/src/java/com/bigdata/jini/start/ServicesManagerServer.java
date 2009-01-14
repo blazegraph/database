@@ -33,6 +33,8 @@ import java.rmi.server.ServerNotActiveException;
 import java.util.Properties;
 
 import net.jini.config.Configuration;
+import net.jini.config.ConfigurationFile;
+import net.jini.config.ConfigurationProvider;
 import net.jini.export.ServerContext;
 import net.jini.io.context.ClientHost;
 import net.jini.io.context.ClientSubject;
@@ -42,13 +44,22 @@ import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 import org.apache.zookeeper.ZooKeeper;
 
+import sun.misc.Signal;
+import sun.misc.SignalHandler;
+
 import com.bigdata.jini.start.config.IServiceConstraint;
+import com.bigdata.jini.start.config.ServiceConfiguration;
+import com.bigdata.jini.start.config.ServicesManagerConfiguration;
 import com.bigdata.service.DefaultServiceFederationDelegate;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.AbstractServer;
+import com.bigdata.service.jini.FakeLifeCycle;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.RemoteAdministrable;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
+import com.sun.jini.start.LifeCycle;
+import com.sun.jini.start.ServiceDescriptor;
+import com.sun.jini.start.ServiceStarter;
 import com.sun.jini.start.SharedActivatableServiceDescriptor;
 
 /**
@@ -95,6 +106,11 @@ import com.sun.jini.start.SharedActivatableServiceDescriptor;
  * now undercapacity for that service type (or under the replication count for a
  * service instance), then a new instance will simply be created.
  * <p>
+ * SIGHUP may be used to modified {@link ServiceConfiguration}s to zookeeper.
+ * The {@link Configuration} will be re-read using the command line arguments,
+ * the {@link ServiceConfiguration}s will be re-extracted, and the
+ * corresponding znodes in zookeeper will be updated. Live service instances
+ * should be administered either using the jini browser or programtically.
  * 
  * FIXME If zookeeper dies (all instances) and is then brought back up there
  * will be a race condition where the physical services will (or should) try to
@@ -144,15 +160,16 @@ import com.sun.jini.start.SharedActivatableServiceDescriptor;
  *       process that reports host specific statistics to the LBS.
  * 
  * @todo There is no straightfoward way to re-start a service that has been
- *       shutdown. You can of course do this by hand, but there is no persistent
- *       record in zookeeper of where services were started. The service
- *       configuration of the physical service has all the necessary
- *       information, but it is stored in an ephemeral znode.
+ *       shutdown or to differentiate a failed start from a service which could
+ *       be started.
+ *       <p>
+ *       The {@link ServiceConfiguration} of the physical service has all the
+ *       necessary information on how to start the service.
  *       <p>
  *       Perhaps we could write an {@link SharedActivatableServiceDescriptor}
  *       into the serviceDir and use that to actually start the service? It
- *       could then be restarted automatically, either by local intervention or
- *       by RMI.
+ *       could then be restarted automatically (if we knew where to look for
+ *       instances of the service, and we do).
  * 
  * @todo is it possible to create locks and queues using javaspaces in a manner
  *       similar to zookeeper? It does support a concept similar to a watch, but
@@ -174,9 +191,9 @@ import com.sun.jini.start.SharedActivatableServiceDescriptor;
  * <p>
  * Use class server URL(s) when starting services for their RMI codebase.
  * 
- * FIXME remaining big issues are destroying logical and physical services (not
- * implemented yet) and providing failover for the various bigdata services (not
- * implemented yet).
+ * FIXME remaining big issues are restart of physical services; destroying
+ * logical and physical services (not implemented yet) and providing failover
+ * for the various bigdata services (not implemented yet).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -206,30 +223,159 @@ public class ServicesManagerServer extends AbstractServer {
         
     }
 
+//    /**
+//     * Creates a new {@link ServicesManagerServer}.
+//     * 
+//     */
+//    public ServicesManagerServer(final String[] args) {
+//
+//        this(args, new FakeLifeCycle());
+//
+//    }
+
     /**
-     * Creates a new {@link ServicesManagerServer}.
+     * Ctor for jini service activation.
      * 
      * @param args
-     *            The name of the {@link Configuration} file for the service.
+     *            Either the command line arguments or the arguments from the
+     *            {@link ServiceDescriptor}. Either way they identify the jini
+     *            {@link Configuration} (you may specify either a file or URL)
+     *            and optional overrides for that {@link Configuration}.
+     * @param lifeCycle
+     *            The life cycle object. This is used if the server is started
+     *            by the jini {@link ServiceStarter}. Otherwise specify a
+     *            {@link FakeLifeCycle}.
      */
-    public ServicesManagerServer(String[] args) {
+    public ServicesManagerServer(final String[] args, final LifeCycle lifeCycle) {
 
-        super(args);
-
-        checkDependencies();
+        super(args, lifeCycle);
+        
+        installSighupHandler(args);
         
     }
-    
+
     /**
-     * @todo verify jar(s)?
+     * Install SIGHUP (Hang up) handler - the {@link Configuration} will be
+     * re-read and pushed to zookeeper.
      * 
-     * @todo verify jini installer?
+     * @param args
+     *            The command line arguments (the identify the configuration and
+     *            any overrides).
      * 
-     * @todo verify platform specific dependencies (vmstat, typeperf, sysstat,
-     *       etc).
+     * @see http://www-128.ibm.com/developerworks/java/library/i-signalhandling/
+     * 
+     * @see http://forum.java.sun.com/thread.jspa?threadID=514860&messageID=2451429
+     *      for the use of {@link Runtime#addShutdownHook(Thread)}.
      */
-    protected void checkDependencies() {
+    protected void installSighupHandler(final String[] args) {
+
+        try {
+
+            new PushConfigurationSignalHandler("SIGHUP",args);
+            
+        } catch (IllegalArgumentException ex) {
+            
+            log.warn("Signal handler not installed: " + ex);
+            
+        }
+
+    }
+
+    /**
+     * Signal handler shuts down the server politely.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private class PushConfigurationSignalHandler implements SignalHandler {
+
+        private final SignalHandler oldHandler;
         
+        private final String[] args;
+
+        /**
+         * 
+         * @param signalName
+         *            The signal name.
+         * @param args
+         *            The command line arguments (the identify the configuration
+         *            and any overrides).
+         */
+        protected PushConfigurationSignalHandler(final String signalName,
+                final String[] args) {
+
+            final Signal signal = new Signal(signalName);
+
+            this.oldHandler = Signal.handle(signal, this);
+
+            this.args = args;
+            
+            if (INFO)
+                log.info("Installed handler: " + signal + ", oldHandler="
+                        + this.oldHandler);
+
+        }
+
+        /**
+         * Re-reads the {@link Configuration} and pushes it to zookeeper.
+         * <p>
+         * Note: This does not change the {@link Configuration} on the service
+         * or the {@link JiniFederation}. It is only designed to allow the push
+         * of new {@link ServiceConfiguration}s to zookeeper.
+         */
+        public void handle(final Signal sig) {
+
+            log.warn("Processing signal: " + sig);
+
+            try {
+                
+                final AbstractServicesManagerService service = (AbstractServicesManagerService) impl;
+
+                if (service != null) {
+
+                    // Obtain the configuration object (re-read it).
+                    final ConfigurationFile config = (ConfigurationFile) ConfigurationProvider
+                            .getInstance(args);
+                    
+                    // get the service manager's own configuration.
+                    final ServicesManagerConfiguration selfConfig = new ServicesManagerConfiguration(
+                            config);
+
+                    /*
+                     * These are the services that we will start and/or manage.
+                     */
+                    final ServiceConfiguration[] serviceConfigurations = selfConfig
+                            .getServiceConfigurations(config);
+
+                    final ZooKeeper zookeeper = service.getFederation()
+                            .getZookeeper();
+
+                    final String zconfig = service.getFederation()
+                            .getZooConfig().zroot
+                            + "/" + BigdataZooDefs.CONFIG;
+
+                    // push the configuration to zookeeper.
+                    service.pushConfiguration(zookeeper, zconfig, service
+                            .getFederation().getZooConfig().acl,
+                            serviceConfigurations);
+
+                }
+
+                // Chain back to previous handler, if one exists
+                if (oldHandler != SIG_DFL && oldHandler != SIG_IGN) {
+
+                    oldHandler.handle(sig);
+
+                }
+
+            } catch (Throwable t) {
+
+                log.error("Signal handler failed : " + t, t);
+
+            }
+
+        }
+
     }
 
     /**
@@ -245,7 +391,7 @@ public class ServicesManagerServer extends AbstractServer {
      */
     public static void main(final String[] args) {
 
-        new ServicesManagerServer(args).run();
+        new ServicesManagerServer(args, new FakeLifeCycle()).run();
         
 //      System.exit(0);
         Runtime.getRuntime().halt(0);

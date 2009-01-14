@@ -339,6 +339,11 @@ public class ProcessHelper {
     /**
      * Consumes the output of the process, writing each line onto a
      * {@link Logger}.
+     * <p>
+     * Note: Normally you will see the child process output by configuring
+     * logging for the child process. However, if you want to see the output of
+     * the child process within the logging of <i>this</i> process, then you
+     * have to raise the log level to INFO for this class.
      */
     protected void consumeOutput() {
 
@@ -355,7 +360,7 @@ public class ProcessHelper {
              */
             while ((s = is.readLine()) != null) {
 
-                log.warn(s);
+                log.info(s);
 
             }
 

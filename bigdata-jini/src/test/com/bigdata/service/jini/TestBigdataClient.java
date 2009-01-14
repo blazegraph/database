@@ -118,10 +118,9 @@ public class TestBigdataClient extends AbstractServerTestCase {
         /*
          * Start up a timestamp server.
          */
-        timestampServer0 = new TransactionServer(new String[] {
-                "src/resources/config/standalone/TimestampServer0.config"
-//                , AbstractServer.ADVERT_LABEL+groups 
-                });
+        timestampServer0 = new TransactionServer(
+                new String[] { "src/resources/config/standalone/TimestampServer0.config" },
+                new FakeLifeCycle());
 
         new Thread() {
 
@@ -137,10 +136,9 @@ public class TestBigdataClient extends AbstractServerTestCase {
          * Start up a data server before the metadata server so that we can make
          * sure that it is detected by the metadata server once it starts up.
          */
-        dataServer1 = new DataServer(new String[] {
-                "src/resources/config/standalone/DataServer1.config"
-//                , AbstractServer.ADVERT_LABEL+groups 
-                });
+        dataServer1 = new DataServer(
+                new String[] { "src/resources/config/standalone/DataServer1.config" },
+                new FakeLifeCycle());
 
         new Thread() {
 
@@ -156,9 +154,8 @@ public class TestBigdataClient extends AbstractServerTestCase {
          * Start the metadata server.
          */
         metadataServer0 = new MetadataServer(
-                new String[] { "src/resources/config/standalone/MetadataServer0.config"
-//                        , AbstractServer.ADVERT_LABEL+groups
-                        });
+                new String[] { "src/resources/config/standalone/MetadataServer0.config" },
+                new FakeLifeCycle());
         
         new Thread() {
 
@@ -175,9 +172,8 @@ public class TestBigdataClient extends AbstractServerTestCase {
          * sure that it is detected by the metadata server once it starts up.
          */
         dataServer0 = new DataServer(
-                new String[] { "src/resources/config/standalone/DataServer0.config"
-//                        , AbstractServer.ADVERT_LABEL+groups
-                        });
+                new String[] { "src/resources/config/standalone/DataServer0.config" },
+                new FakeLifeCycle());
 
         new Thread() {
 
@@ -193,9 +189,8 @@ public class TestBigdataClient extends AbstractServerTestCase {
          * Start up a load balancer server.
          */
         loadBalancerServer0 = new LoadBalancerServer(
-                new String[] { "src/resources/config/standalone/LoadBalancerServer0.config"
-//                        , AbstractServer.ADVERT_LABEL+groups
-                        });
+                new String[] { "src/resources/config/standalone/LoadBalancerServer0.config" },
+                new FakeLifeCycle());
 
         new Thread() {
 

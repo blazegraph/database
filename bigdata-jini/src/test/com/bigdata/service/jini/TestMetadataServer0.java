@@ -84,7 +84,8 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
          * sure that it is detected by the metadata server once it starts up.
          */
         dataServer1 = new DataServer(
-                new String[] { "src/resources/config/standalone/DataServer1.config" });
+                new String[] { "src/resources/config/standalone/DataServer1.config" },
+                new FakeLifeCycle());
 
         new Thread() {
 
@@ -100,7 +101,8 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
          * Start the metadata server.
          */
         metadataServer0 = new MetadataServer(
-                new String[] { "src/resources/config/standalone/MetadataServer0.config" });
+                new String[] { "src/resources/config/standalone/MetadataServer0.config" },
+                new FakeLifeCycle());
         
         new Thread() {
 
@@ -139,9 +141,10 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
     protected void startDataServer0() {
 
         assert dataServer0 == null;
-        
+
         dataServer0 = new DataServer(
-                new String[] { "src/resources/config/standalone/DataServer0.config" });
+                new String[] { "src/resources/config/standalone/DataServer0.config" },
+                new FakeLifeCycle());
 
         new Thread() {
 

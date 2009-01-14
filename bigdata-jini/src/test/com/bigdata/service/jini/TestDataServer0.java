@@ -64,9 +64,9 @@ public class TestDataServer0 extends AbstractServerTestCase {
         
         super.setUp();
         
-        dataServer0 = new DataServer(new String[]{
-                "src/resources/config/standalone/DataServer0.config"
-        });
+        dataServer0 = new DataServer(
+                new String[] { "src/resources/config/standalone/DataServer0.config" },
+                new FakeLifeCycle());
         
         new Thread() {
 

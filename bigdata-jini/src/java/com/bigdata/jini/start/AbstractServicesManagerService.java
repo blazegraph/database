@@ -175,7 +175,7 @@ public abstract class AbstractServicesManagerService extends AbstractService
      * configuration if the [zroot] does not exist.
      */
     protected void setup() throws Exception {
-
+        
         final JiniFederation fed = getFederation();
 
         final Configuration config = getConfiguration();
@@ -360,17 +360,14 @@ public abstract class AbstractServicesManagerService extends AbstractService
      * @throws ConfigurationException
      * @throws InterruptedException
      * @throws KeeperException
-     * 
-     * @todo We should either watch the configuration file and push the
-     *       configuration if it is updated or install a SIGHUP handled and push
-     *       the configuration if we receive that signal.
      */
     public void pushConfiguration(final ZooKeeper zookeeper,
             final String zconfig, final List<ACL> acl,
-            final ServiceConfiguration[] config) throws KeeperException,
-            InterruptedException, ConfigurationException {
+            final ServiceConfiguration[] serviceConfigurations)
+            throws KeeperException, InterruptedException,
+            ConfigurationException {
 
-        for (ServiceConfiguration x : config) {
+        for (ServiceConfiguration x : serviceConfigurations) {
 
             if(!(x instanceof ManagedServiceConfiguration)) {
                 

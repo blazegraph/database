@@ -82,46 +82,32 @@ import com.sun.jini.start.ServiceStarter;
 
 /**
  * <p>
- * Abstract base class for configurable services discoverable using JINI.
- * </p>
- * The recommended way to start a server is using the {@link ServiceStarter}.
+ * Abstract base class for configurable services discoverable using JINI. The
+ * recommended way to start a server is using the {@link ServiceStarter}.
+ * However, they may also be started from the command line using main(String[]).
+ * You must specify a policy file granting sufficient permissions for the server
+ * to start.
  * 
  * <pre>
- *          java -Djava.security.policy=policy.all -cp lib\jini-ext.jar;lib\start.jar com.sun.jini.start.ServiceStarter src/test/com/bigdata/service/TestServerStarter.config
+ * java -Djava.security.policy=policy.all ....
  * </pre>
  * 
  * Other command line options MAY be recommended depending on the JVM and the
  * service that you are starting, e.g., <code>-server</code>.
  * <p>
- * The server MAY be started using a <code>main</code> routine:
- * </p>
- * 
- * <pre>
- * public static void main(String[] args) {
- * 
- *     new MyServer(args).run();
- * 
- * }
- * </pre>
- * 
- * <p>
  * The service may be <em>terminated</em> by terminating the server process.
  * Termination implies that the server stops execution but that it MAY be
- * restarted. A {@link Runtime#addShutdownHook(Thread)} is installed by the
- * server so that you can also stop the server using ^C (Windows) and possibly
- * <code>kill</code> <i>pid</i> (Un*x). You can record the PID of the process
- * running the server when you start it under Un*x using a shell script. Note
- * that if you are starting multiple services at once with the
+ * restarted. A {@link Runtime#addShutdownHook(Thread) shutdown hook} is
+ * installed by the server so that you can also stop the server using ^C
+ * (Windows) and <code>kill</code> <i>pid</i> (Un*x). You can record the PID
+ * of the process running the server when you start it under Un*x using a shell
+ * script. Note that if you are starting multiple services at once with the
  * {@link ServiceStarter} then these methods (^C or kill <i>pid</i>) will take
  * down all servers running in the same VM.
- * </p>
  * <p>
- * Services are <em>destroyed</em> using {@link DestroyAdmin}, e.g., through
- * the Jini service browser. Note that all persistent data associated with that
- * service is also destroyed!
- * </p>
- * 
- * FIXME javadoc update on how to start services.
+ * Services may be <em>destroyed</em> using {@link DestroyAdmin}, e.g.,
+ * through the Jini service browser. Note that all persistent data associated
+ * with that service is also destroyed!
  * 
  * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6380355, which
  *      describes a bug in the service browser that will display a
@@ -161,14 +147,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * True iff the {@link #log} level is DEBUG or less.
      */
     final static protected boolean DEBUG = log.isDebugEnabled();
-
-//    /**
-//     * The label in the {@link Configuration} file for the service description
-//     * (also used by {@link JiniClient}).
-//     * 
-//     * @todo use the className for the component?
-//     */
-//    public final static transient String SERVICE_DESCRIPTION = "ServiceDescription";
 
     /**
      * The {@link ServiceID} for this server is either read from a local file or
@@ -363,33 +341,39 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         throw new RuntimeException( msg, t );
         
     }
-    
-    /**
-     * Server startup reads {@link Configuration} data from the file(s) named by
-     * <i>args</i>, starts the service, and advertises the service for
-     * discovery. Aside from the server class to start, the behavior is more or
-     * less entirely parameterized by the {@link Configuration}.
-     * 
-     * @param args
-     *            The command line arguments.
-     */
-    protected AbstractServer(final String[] args) {
 
-        this( args, new FakeLifeCycle() );
+    /**
+     * Note: AbstractServer(String[]) is private to ensure that the ctor
+     * hierarchy always passes down the variant which accepts the {@link LifeCycle}
+     * as well.  This simplies additional initialization in subclasses. 
+     */
+    @SuppressWarnings("unused")
+    private AbstractServer(String[] args) {
+        
+        throw new UnsupportedOperationException();
         
     }
-
+    
     /**
-     * Server startup invoked by the ServerStarter
+     * Server startup reads {@link Configuration} data from the file or URL
+     * named by <i>args</i> and applies any optional overrides, starts the
+     * service, and advertises the service for discovery. Aside from the server
+     * class to start, the behavior is more or less entirely parameterized by
+     * the {@link Configuration}.
      * 
      * @param args
-     *            Arguments from the {@link ServiceDescriptor}.
+     *            Either the command line arguments or the arguments from the
+     *            {@link ServiceDescriptor}. Either way they identify the jini
+     *            {@link Configuration} (you may specify either a file or URL)
+     *            and optional overrides for that {@link Configuration}.
      * @param lifeCycle
-     *            The life cycle object.
+     *            The life cycle object. This is used if the server is started
+     *            by the jini {@link ServiceStarter}. Otherwise specify a
+     *            {@link FakeLifeCycle}.
      * 
      * @see NonActivatableServiceDescriptor
      */
-    private AbstractServer(final String[] args, final LifeCycle lifeCycle) {
+    protected AbstractServer(final String[] args, final LifeCycle lifeCycle) {
         
         // Show the copyright banner during statup.
         Banner.banner();
@@ -787,11 +771,19 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * @param serviceID
      *            The assigned {@link ServiceID}.
      */
-    public void serviceIDNotify(final ServiceID serviceID) {
+    synchronized public void serviceIDNotify(final ServiceID serviceID) {
 
         if (INFO)
             log.info("serviceID=" + serviceID);
 
+        if (this.serviceID.equals(serviceID)) {
+
+            throw new IllegalStateException(
+                    "ServiceID may not be changed: ServiceID=" + this.serviceID
+                            + ", proposed=" + serviceID);
+            
+        }
+        
         this.serviceID = serviceID;
         
         if (serviceIdFile != null) {
@@ -1640,18 +1632,5 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      *            command line arguments.
      */
     abstract protected Remote newService(Properties properties);
-
-    private static class FakeLifeCycle implements LifeCycle {
-
-        public boolean unregister(Object arg0) {
-            
-            if (INFO)
-                log.info("");
-            
-            return true;
-            
-        }
-        
-    }
     
 }

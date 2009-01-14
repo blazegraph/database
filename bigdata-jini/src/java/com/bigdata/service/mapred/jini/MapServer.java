@@ -33,16 +33,19 @@ import java.util.Properties;
 import java.util.UUID;
 
 import net.jini.config.Configuration;
-import net.jini.discovery.DiscoveryManagement;
 
 import org.apache.log4j.MDC;
 
 import com.bigdata.service.jini.AbstractServer;
+import com.bigdata.service.jini.FakeLifeCycle;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniUtil;
 import com.bigdata.service.jini.RemoteAdministrable;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
 import com.bigdata.service.mapred.MapService;
+import com.sun.jini.start.LifeCycle;
+import com.sun.jini.start.ServiceDescriptor;
+import com.sun.jini.start.ServiceStarter;
 
 /**
  * Used to start and manage a {@link MapService}.
@@ -56,30 +59,39 @@ public class MapServer extends AbstractServer {
      * Creates a new {@link MapServer}.
      * 
      * @param args
-     *            The name of the {@link Configuration} file for the service.
+     *            Either the command line arguments or the arguments from the
+     *            {@link ServiceDescriptor}. Either way they identify the jini
+     *            {@link Configuration} (you may specify either a file or URL)
+     *            and optional overrides for that {@link Configuration}.
+     * @param lifeCycle
+     *            The life cycle object. This is used if the server is started
+     *            by the jini {@link ServiceStarter}. Otherwise specify a
+     *            {@link FakeLifeCycle}.
      */
-    public MapServer(String[] args) {
+    public MapServer(final String[] args, final LifeCycle lifeCycle) {
 
-        super(args);
+        super(args, lifeCycle);
         
     }
 
     /**
-     * Starts a new {@link MapServer}.  This can be done programmatically
-     * by executing
+     * Starts a new {@link MapServer}. This can be done programmatically by
+     * executing
+     * 
      * <pre>
-     *    new MapServer(args).run();
+     * new MapServer(args, new FakeLifeCycle()).run();
      * </pre>
+     * 
      * within a {@link Thread}.
      * 
      * @param args
      *            The name of the {@link Configuration} file for the service.
      */
     public static void main(final String[] args) {
-        
-        new MapServer(args).run();
-        
-//      System.exit(0);
+
+        new MapServer(args, new FakeLifeCycle()).run();
+
+        // System.exit(0);
         Runtime.getRuntime().halt(0);
 
     }

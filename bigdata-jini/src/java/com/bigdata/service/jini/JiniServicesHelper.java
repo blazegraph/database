@@ -108,14 +108,16 @@ public class JiniServicesHelper extends JiniCoreServicesHelper {
          * Start up a timestamp server.
          */
         threadPool.execute(transactionServer0 = new TransactionServer(concat(
-                new String[] { path + "TransactionServer0.config" }, options)));
+                new String[] { path + "TransactionServer0.config" }, options),
+                new FakeLifeCycle()));
 
         /*
          * Start up a data server before the metadata server so that we can make
          * sure that it is detected by the metadata server once it starts up.
          */
         threadPool.execute(dataServer1 = new DataServer(concat(
-                new String[] { path + "DataServer1.config" }, options)));
+                new String[] { path + "DataServer1.config" }, options),
+                new FakeLifeCycle()));
 
         /*
          * Start up a load balancer server.
@@ -123,20 +125,23 @@ public class JiniServicesHelper extends JiniCoreServicesHelper {
         threadPool
                 .execute(loadBalancerServer0 = new LoadBalancerServer(concat(
                         new String[] { path + "LoadBalancerServer0.config" },
-                        options)));
+                        options),
+                        new FakeLifeCycle()));
 
         /*
          * Start the metadata server.
          */
         threadPool.execute(metadataServer0 = new MetadataServer(concat(
-                new String[] { path + "MetadataServer0.config" }, options)));
+                new String[] { path + "MetadataServer0.config" }, options),
+                new FakeLifeCycle()));
 
         /*
          * Start up a data server after the metadata server so that we can make
          * sure that it is detected by the metadata server once it starts up.
          */
         threadPool.execute(dataServer0 = new DataServer(concat(
-                new String[] { path + "DataServer0.config" }, options)));
+                new String[] { path + "DataServer0.config" }, options),
+                new FakeLifeCycle()));
 
         client = JiniClient.newInstance(concat(new String[] { path
                 + "Client.config" }, options));
