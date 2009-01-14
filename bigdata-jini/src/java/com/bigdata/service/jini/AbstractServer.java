@@ -1497,7 +1497,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             
         }
         
-        log.fatal("Service is down: class=" + getClass() + ", name="
+        log.fatal("Service is down: class=" + getClass().getName() + ", name="
                 + serviceName);
         
     }

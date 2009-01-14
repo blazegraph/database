@@ -539,7 +539,7 @@ abstract public class JiniServiceConfiguration extends
             for (LookupLocator e : locators) {
 
                 out.write("new " + LookupLocator.class.getName() + "(\""
-                        + e.getHost() + "\"," + e.getPort() + "\n");
+                        + e.getHost() + "\"," + e.getPort() + "),\n");
 
             }
 
