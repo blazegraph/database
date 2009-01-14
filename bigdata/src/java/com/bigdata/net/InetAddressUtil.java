@@ -38,6 +38,8 @@ import java.util.regex.Pattern;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated this was a red herring.
  */
 public class InetAddressUtil {
     
