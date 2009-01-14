@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.Future;
 
 import net.jini.admin.JoinAdmin;
 import net.jini.config.Configuration;
@@ -62,6 +63,8 @@ import net.jini.lookup.entry.StatusType;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.WatchedEvent;
+import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.data.ACL;
@@ -542,6 +545,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         /*
          * Create the service object.
          */
+        JiniFederation fed = null;
         try {
             
             /*
@@ -572,7 +576,45 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                 log.info("Service impl is " + impl);
 
             // Connect to the federation (starts service discovery for client).
-            client.connect();
+            final JiniFederation f = fed = client.connect();
+            
+            /*
+             * Add a watcher that will create the ephemeral znode for the
+             * federation on zookeeper (re-)connect.
+             * 
+             * Note: We don't have to do this once we have been connected, but
+             * if the service starts without a zookeeper connection and then
+             * later connects then it will otherwise fail to create its znode.
+             */
+            fed.addWatcher(new Watcher() {
+
+                public void process(WatchedEvent event) {
+
+                    switch (event.getState()) {
+                    case Disconnected:
+                        if (masterElectionFuture != null) {
+                            masterElectionFuture
+                                    .cancel(true/* mayInterruptIfRunning */);
+                            masterElectionFuture = null;
+                        }
+                        log.warn("Lost zookeeper connection: cancelled master election task.");
+                        break;
+                    case NoSyncConnected:
+                    case SyncConnected:
+                        if (serviceID != null) {
+
+                            try {
+                                notifyZookeeper(f, JiniUtil
+                                        .serviceID2UUID(serviceID));
+                            } catch (Throwable t) {
+                                log.error(t);
+                            }
+
+                        }
+                    }
+                    
+                }
+            });
             
             // start the service.
             if(impl instanceof AbstractService) {
@@ -622,7 +664,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                 joinManager = new JoinManager(proxy, // service proxy
                         entries, // attr sets
                         serviceID, // ServiceID
-                        client.getFederation().discoveryManager, // DiscoveryManager
+                        fed.discoveryManager, // DiscoveryManager
                         new LeaseRenewalManager());
                 
             } else {
@@ -634,7 +676,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                 joinManager = new JoinManager(proxy, // service proxy
                         entries, // attr sets
                         this, // ServiceIDListener
-                        client.getFederation().discoveryManager, // DiscoveryManager
+                        fed.discoveryManager, // DiscoveryManager
                         new LeaseRenewalManager());
             
             }
@@ -773,10 +815,13 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      */
     synchronized public void serviceIDNotify(final ServiceID serviceID) {
 
+        if (serviceID == null)
+            throw new IllegalArgumentException();
+        
         if (INFO)
             log.info("serviceID=" + serviceID);
 
-        if (this.serviceID.equals(serviceID)) {
+        if (this.serviceID != null && !this.serviceID.equals(serviceID)) {
 
             throw new IllegalStateException(
                     "ServiceID may not be changed: ServiceID=" + this.serviceID
@@ -860,6 +905,11 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * appending the assigned <i>serviceUUID</i>. That name is <strong>stable</strong>.
      * If the service is shutdown and then restarted it will re-create the SAME
      * znode.
+     * <p>
+     * Note: we need to monitor (Watcher) the zookeeper connection state. If the
+     * client is not connected when this method is invoked when we need to
+     * create the ephemeral znode for the physical service when the client
+     * becomes connected to zookeeper. This is done as part of ctor.
      * 
      * @param zookeeper
      * @param serviceUUID
@@ -889,7 +939,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      *       will require hashing the physical services by their logical service
      *       UUID in the client, which is not hard.
      */
-    protected void notifyZookeeper(final JiniFederation fed,
+    private void notifyZookeeper(final JiniFederation fed,
             final UUID serviceUUID) throws KeeperException,
             InterruptedException {
 
@@ -974,15 +1024,28 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                 // ignore.
             }
 
-            // create the ephemeral znode for this service.
-            zookeeper.create(physicalServiceZPath, new byte[0], acl,
-                    CreateMode.EPHEMERAL);
+            try {
+
+                // create the ephemeral znode for this service.
+                zookeeper.create(physicalServiceZPath, new byte[0], acl,
+                        CreateMode.EPHEMERAL);
+                
+            } catch (NodeExistsException ex) {
+                
+                /*
+                 * ignore.
+                 * 
+                 * Note: We ignore this because this code gets executed on each
+                 * zookeeper (re-)connect.
+                 */
+                
+            }
 
             /*
              * Enter into the master / failover competition for the logical
              * service.
              */
-            fed.submitMonitoredTask(new MasterElectionTask());
+            masterElectionFuture = fed.submitMonitoredTask(new MasterElectionTask());
 
             if (INFO)
                 log.info("registered with zookeeper: zpath="
@@ -992,6 +1055,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
     }
 
+    private Future masterElectionFuture = null;
+    
     /**
      * Task runs forever competing to become the master.
      * 
