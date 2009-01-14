@@ -676,15 +676,23 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
              * Verify that an instance is up and running by connecting to the
              * client port on the local host.
              * 
+             * Note: The socket timeout can't be very long. If no process
+             * answers on that socket within a short timeout then zookeeper is
+             * not running.
+             * 
+             * 
              * @todo This does not tell us that the instance that we started is
              * running, just that there is a server responding at that
              * clientPort. That could have already been true.
              */
 
-            ZooHelper.ruok(InetAddress.getLocalHost(), clientPort, (int) unit
-                    .toMillis(timeout));
+            ZooHelper.ruok(InetAddress.getLocalHost(), clientPort, 250/* ms */);
 
-            log.warn("Started zookeeper");
+            // adjust for time remaining.
+            nanos -= (begin - System.nanoTime());
+
+            log.warn("Started zookeeper: elapsed="
+                    + TimeUnit.NANOSECONDS.toMillis(nanos));
             
         }
 

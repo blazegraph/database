@@ -491,4 +491,35 @@ public class ProcessHelper {
 
     }
 
+    /**
+     * Return the command line that would be executed.
+     * 
+     * @param processBuilder
+     * 
+     * @return
+     */
+    static public String getCommandString(ProcessBuilder processBuilder) {
+        
+        final StringBuilder sb = new StringBuilder();
+        
+        boolean first = true;
+        
+        for(String s : processBuilder.command()) {
+            
+            if(!first) {
+    
+                sb.append(' ');
+                
+            }
+            
+            sb.append(s);
+            
+            first = false;
+            
+        }
+    
+        return sb.toString();
+        
+    }
+
 }

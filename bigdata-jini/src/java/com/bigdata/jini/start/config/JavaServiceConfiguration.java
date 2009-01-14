@@ -307,7 +307,7 @@ public class JavaServiceConfiguration extends ServiceConfiguration {
 
             if (log4j != null) {
 
-                cmds.add("-Dlog4j.configuration=\"" + log4j + "\"");
+                cmds.add("-Dlog4j.configuration=" + log4j);
 
             }
 

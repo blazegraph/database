@@ -177,7 +177,8 @@ public class ServiceStarter {
                 .newServiceStarter(new ServiceListener());
         
         // always echo the command that we will execute.
-        writeCommand(serviceStarter.newProcessBuilder());
+        System.out
+                .println(ProcessHelper.getCommandString(serviceStarter.newProcessBuilder()));
         
         if(!noExecute) {
             
@@ -190,28 +191,6 @@ public class ServiceStarter {
         }
         
         System.exit(0);
-        
-    }
-    
-    static private void writeCommand(ProcessBuilder processBuilder) {
-        
-        boolean first = true;
-        
-        for(String s : processBuilder.command()) {
-            
-            if(!first) {
-
-                System.out.print(' ');
-                
-            }
-            
-            System.out.print(s);
-            
-            first = false;
-            
-        }
-        
-        System.out.println();
         
     }
     
