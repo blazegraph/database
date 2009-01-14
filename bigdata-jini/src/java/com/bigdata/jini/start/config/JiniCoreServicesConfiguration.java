@@ -112,10 +112,10 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
     }
 
     /**
-     * Jini core services should start very quickly, so this sets the default
-     * timeout to 2000 ms.
+     * Jini core services should start very quickly (2000 ms)
      */
-    static protected long getDefaultTimeout() {
+    @Override
+    protected long getDefaultTimeout() {
 
         return 2000;// ms.
         
@@ -158,12 +158,14 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
             
         }
 
+        @SuppressWarnings("unchecked")
         @Override
         protected V newProcessHelper(String className,
                 ProcessBuilder processBuilder, IServiceListener listener)
                 throws IOException {
 
-            return (V) new JiniCoreServicesProcessHelper(className, processBuilder, listener);
+            return (V) new JiniCoreServicesProcessHelper(className,
+                    processBuilder, listener);
 
         }
         

@@ -238,20 +238,20 @@ public class ProcessHelper {
      * 
      * @param name
      *            A useful name for the process.
-     * @param builder
+     * @param processBuilder
      *            The object used to start the {@link Process}.
      * @param running
      *            A {@link Queue} of the running {@link Process}es.
      * 
      * @throws IOException
      */
-    public ProcessHelper(final String name, final ProcessBuilder builder,
+    public ProcessHelper(final String name, final ProcessBuilder processBuilder,
             final IServiceListener listener) throws IOException {
 
         if (name == null)
             throw new IllegalArgumentException();
 
-        if (builder == null)
+        if (processBuilder == null)
             throw new IllegalArgumentException();
 
         if (listener == null)
@@ -262,17 +262,17 @@ public class ProcessHelper {
         // save the listener reference.
         this.listener = listener;
     
-        log.warn("command: "+builder.command());
+        log.warn("command: "+processBuilder.command());
 //        log.warn("environment: "+builder.environment());
         
         /*
          * Merge stdout and stderr so that we only need one thread to drain the
          * output of the process.
          */
-        builder.redirectErrorStream(true);
+        processBuilder.redirectErrorStream(true);
 
         // start the process (it may take a bit to be really running).
-        this.process = builder.start();
+        this.process = processBuilder.start();
 
         // add to queue of running (or at any rate, started) processes.
         listener.add(ProcessHelper.this);
@@ -326,9 +326,13 @@ public class ProcessHelper {
 
         thread.start();
 
+        log.warn("Process starting: name=" + name);
+
         if (INFO)
-            log.info("Process starting: name=" + name + ", cmd="
-                    + builder.command() + ", env=" + builder.environment());
+            log.info("cmd=" + getCommandString(processBuilder));
+
+        if (DEBUG)
+            log.debug("env=" + processBuilder.environment());
 
     }
 

@@ -265,6 +265,9 @@ abstract public class ServiceConfiguration implements Serializable {
             throw new IllegalArgumentException();
         
         this.className = className;
+        
+        if(INFO)
+            log.info("className="+className);
 
         args = getArgs(className, config);
 
@@ -278,6 +281,9 @@ abstract public class ServiceConfiguration implements Serializable {
 
         }
 
+        if (INFO)
+            log.info(Options.ARGS + "=" + Arrays.toString(args));
+        
         options = getOptions(className, config);
 
         if (options == null)
@@ -290,17 +296,29 @@ abstract public class ServiceConfiguration implements Serializable {
 
         }
 
+        if (INFO)
+            log.info(Options.OPTIONS + "=" + Arrays.toString(options));
+        
         serviceDir = getServiceDir(className, config);
 
         if (serviceDir == null)
             throw new IllegalArgumentException();
 
-        timeout = getTimeout(className, config);
-        
+        if (INFO)
+            log.info(Options.SERVICE_DIR + "=" + serviceDir);
+
+        timeout = getTimeout(className, config, getDefaultTimeout());
+
+        if (INFO)
+            log.info(Options.TIMEOUT + "=" + timeout);
+
         serviceCount = getServiceCount(className, config);
 
         if (serviceCount < 0) // @todo LTE ZERO?
             throw new IllegalArgumentException();
+
+        if (INFO)
+            log.info(Options.SERVICE_COUNT + "=" + serviceCount);
 
         replicationCount = getReplicationCount(className, config);
         
@@ -326,25 +344,34 @@ abstract public class ServiceConfiguration implements Serializable {
 
         }
        
+        if (INFO)
+            log.info(Options.REPLICATION_COUNT + "=" + replicationCount);
+
         constraints = getConstraints(className, config);
+
+        if (INFO)
+            log.info(Options.CONSTRAINTS + "=" + Arrays.toString(constraints));
 
     }
 
     /**
-     * The default used for {@link Options#TIMEOUT}.
+     * The default used for {@link Options#TIMEOUT} (20000 ms).
+     * 
+     * @return The default timeout in milliseconds.
      */
-    protected static long getDefaultTimeout() {
+    protected long getDefaultTimeout() {
         
-        return TimeUnit.SECONDS.toMillis(20);
+        return 20000;// ms
 
     }
 
     protected static long getTimeout(final String className,
-            final Configuration config) throws ConfigurationException {
+            final Configuration config, final long defaultValue)
+            throws ConfigurationException {
 
         return (Long) config.getEntry(className, Options.TIMEOUT, Long.TYPE, config
                 .getEntry(Options.NAMESPACE, Options.TIMEOUT, Long.TYPE,
-                        getDefaultTimeout()));
+                        defaultValue));
         
     }
 

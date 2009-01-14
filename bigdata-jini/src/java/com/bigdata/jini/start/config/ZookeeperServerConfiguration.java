@@ -240,11 +240,12 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
     }
     
     /**
-     * The default used for {@link Options#TIMEOUT}.
+     * The default used for {@link Options#TIMEOUT} (4000 milliseconds).
      */
-    protected static long getDefaultTimeout() {
+    @Override
+    protected long getDefaultTimeout() {
         
-        return TimeUnit.SECONDS.toMillis(4);
+        return 4000;
 
     }
 
@@ -597,7 +598,7 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
                     /*
                      * Write the zookeeper server configuration file.
                      */
-                    writeConfigFile();
+                    writeZookeeperConfigFile();
 
                     /*
                      * Start the server.
@@ -665,6 +666,7 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
             
         }
 
+        @Override
         @SuppressWarnings("unchecked")
         protected V newProcessHelper(String className,
                 ProcessBuilder processBuilder, IServiceListener listener)
@@ -675,6 +677,7 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
 
         }
         
+        @Override
         protected void awaitServiceStart(final V processHelper,
                 final long timeout, final TimeUnit unit) throws Exception {
 
@@ -705,7 +708,7 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
             }
 
             // adjust for time remaining.
-            nanos -= (begin - System.nanoTime());
+            nanos = (System.nanoTime() - begin);
 
             /*
              * Verify that an instance is up and running by connecting to the
@@ -724,7 +727,7 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
             ZooHelper.ruok(InetAddress.getLocalHost(), clientPort, 250/* ms */);
 
             // adjust for time remaining.
-            nanos -= (begin - System.nanoTime());
+            nanos = (System.nanoTime() - begin);
 
             log.warn("Started zookeeper: elapsed="
                     + TimeUnit.NANOSECONDS.toMillis(nanos));
@@ -737,7 +740,7 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
          * @throws ConfigurationException
          * @throws IOException 
          */
-        protected void writeConfigFile()
+        final protected void writeZookeeperConfigFile()
                 throws ConfigurationException, IOException {
             
             final Properties properties = new Properties();
