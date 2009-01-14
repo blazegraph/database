@@ -303,7 +303,7 @@ public class ServicesManagerServer extends AbstractServer {
          *            The command line arguments (the identify the configuration
          *            and any overrides).
          */
-        @SuppressWarnings("restriction") // Signal is in the sun namespace
+        @SuppressWarnings("all") // Signal is in the sun namespace
         protected PushConfigurationSignalHandler(final String signalName,
                 final String[] args) {
 
@@ -326,7 +326,7 @@ public class ServicesManagerServer extends AbstractServer {
          * or the {@link JiniFederation}. It is only designed to allow the push
          * of new {@link ServiceConfiguration}s to zookeeper.
          */
-        @SuppressWarnings("restriction") // Signal is in the sun namespace
+        @SuppressWarnings("all") // Signal is in the sun namespace
         public void handle(final Signal sig) {
 
             log.warn("Processing signal: " + sig);

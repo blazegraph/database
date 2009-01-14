@@ -186,7 +186,8 @@ public class JiniFederation extends AbstractDistributedFederation implements
              */ 
             {
                 
-                long timeout = TimeUnit.MILLISECONDS.toNanos(2000);
+                long timeout = TimeUnit.MILLISECONDS
+                        .toNanos(zooConfig.sessionTimeout);
 
                 final long begin = System.nanoTime();
 
