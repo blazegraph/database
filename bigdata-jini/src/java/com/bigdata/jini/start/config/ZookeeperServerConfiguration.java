@@ -521,7 +521,41 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
 
         }
 
+        /**
+         * @throws ZookeeperRunningException
+         *             if zookeeper answers at the client port or otherwise
+         *             appears to be running.
+         */
         public V call() throws Exception {
+
+            try {
+
+                /*
+                 * Query for an instance already running on local host at that
+                 * port.
+                 * 
+                 * Note: Since we can't tell which instance is running on the
+                 * localhost, this effectively will refuse to start a second
+                 * instance on the localhost.
+                 */
+
+                ZooHelper.ruok(InetAddress.getLocalHost(), clientPort,
+                        250/* timeout(ms) */);
+
+                throw new ZookeeperRunningException(
+                        "Zookeeper already running on localhost: clientport="
+                                + clientPort);
+
+            } catch (IOException ex) {
+
+                /*
+                 * Fall through.
+                 * 
+                 * Note: We are expecting an exception if zookeeper is
+                 * not running on that port.
+                 */
+                
+            }
 
             if (!dataDir.exists()) {
 
@@ -582,6 +616,8 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
                         /*
                          * Query for an instance already running on local host
                          * at that port.
+                         * 
+                         * Note: We don't test this until we have the file lock.
                          */
 
                         ZooHelper.ruok(InetAddress.getLocalHost(), clientPort,
@@ -594,13 +630,12 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
                     } catch (IOException ex) {
 
                         /*
+                         * Restart the server.
+                         * 
                          * Note: We are expecting an exception if zookeeper is
                          * not running on that port.
-                         */ 
-
-                        /*
-                         * Restart the server.
                          */
+
                         return super.call();
                         
                     }
