@@ -596,8 +596,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                             masterElectionFuture
                                     .cancel(true/* mayInterruptIfRunning */);
                             masterElectionFuture = null;
+                            log.warn("Lost zookeeper connection: cancelled master election task.");
                         }
-                        log.warn("Lost zookeeper connection: cancelled master election task.");
                         break;
                     case NoSyncConnected:
                     case SyncConnected:
