@@ -486,7 +486,7 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
         addScheduledTask(//
                 new StartDeferredTasksTask(),// task to run.
                 150, // initialDelay (ms)
-                150, // delay
+                1000, // delay
                 TimeUnit.MILLISECONDS // unit
                 );
 
