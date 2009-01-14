@@ -65,8 +65,6 @@ import net.jini.lookup.entry.Name;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 
-import sun.security.jca.ServiceId;
-
 import com.bigdata.jini.lookup.entry.Hostname;
 import com.bigdata.jini.lookup.entry.ServiceToken;
 import com.bigdata.jini.start.BigdataZooDefs;
@@ -642,7 +640,7 @@ abstract public class JiniServiceConfiguration extends
          * entry is the {@link File} on which the {@link ServiceID} will be
          * written by the service once it is assigned by jini.
          * <p>
-         * Note: the serviceUUID (a conversion of the {@link ServiceId} to a
+         * Note: the serviceUUID (a conversion of the {@link ServiceID} to a
          * normal {@link UUID}) is also put into the znode data for the service
          * once it has been assigned by jini. That action is performed by the
          * service itself.
@@ -736,7 +734,7 @@ abstract public class JiniServiceConfiguration extends
          * {@link ServiceToken} can not be discovered by jini after a timeout,
          * then we presume that the service could not start and throw an
          * exception. The {@link ServiceToken} provides an attribute which is
-         * assigned by the service starter while the {@link ServiceId} is
+         * assigned by the service starter while the {@link ServiceID} is
          * assigned by jini only after the service has joined with a jini
          * registrar.
          * 
