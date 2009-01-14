@@ -119,6 +119,8 @@ public class ServiceStarter {
                 System.err.println("Unknown option: "+arg);
                 
             } else {
+            
+                i--;
                 
                 break;
                 
@@ -126,9 +128,13 @@ public class ServiceStarter {
             
         }
 
-        if (args.length - i < 2) {
+        if ((args.length - i) < 2) {
 
-            // must specify the className and the Configuration.
+            /*
+             * Not enough arguments remaining?
+             * 
+             * Note: You must specify the className and the Configuration.
+             */
             
             usage();
 

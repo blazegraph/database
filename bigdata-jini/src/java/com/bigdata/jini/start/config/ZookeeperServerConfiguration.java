@@ -57,6 +57,8 @@ import com.bigdata.jini.start.process.ZookeeperProcessHelper;
 import com.bigdata.zookeeper.ZooHelper;
 
 /**
+ * zookeeper server configuration.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -124,8 +126,9 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
         String TICK_TIME = "tickTime";
 
         /**
-         * Option specifies the data directory (defaults to whatever was
-         * specified for {@link ServiceConfiguration.Options#SERVICE_DIR}).
+         * Option specifies the data directory (defaults to a directory named
+         * "zookeeper" that is a child of the value specified for
+         * {@link ServiceConfiguration.Options#SERVICE_DIR}).
          * <p>
          * Note: This name (dataDir) is being used here because that is the name
          * that zookeeper uses in its own configuration file. The value given
@@ -142,7 +145,7 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
         /**
          * Option specifies the directory for the data recovery logs (optional,
          * but it is highly advised to place this on a fast local and dedicated
-         * device).
+         * device; defaults to value resolved for the data directory).
          */
         String DATA_LOG_DIR = "dataLogDir";
 
@@ -237,6 +240,15 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
     }
     
     /**
+     * The default used for {@link Options#TIMEOUT}.
+     */
+    protected static long getDefaultTimeout() {
+        
+        return TimeUnit.SECONDS.toMillis(4);
+
+    }
+
+    /**
      * @param className
      * @param config
      * @throws ConfigurationException
@@ -261,15 +273,15 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
         if (INFO)
             log.info(Options.CLIENT_PORT + "=" + clientPort);
    
-        dataDir = (File) config.getEntry(Options.NAMESPACE, Options.DATA_DIR,
-                File.class, serviceDir);
+        this.dataDir = (File) config
+                .getEntry(Options.NAMESPACE, Options.DATA_DIR, File.class,
+                        new File(serviceDir, "zookeeper"));
 
         if (INFO)
             log.info(Options.DATA_DIR + "=" + dataDir);
 
         dataLogDir = (File) config.getEntry(Options.NAMESPACE,
-                Options.DATA_LOG_DIR, File.class, (File) config.getEntry(
-                        Options.NAMESPACE, Options.DATA_DIR, File.class));
+                Options.DATA_LOG_DIR, File.class, dataDir);
 
         if (INFO)
             log.info(Options.DATA_LOG_DIR + "=" + dataLogDir);
@@ -633,35 +645,18 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
 
             final long begin = System.nanoTime();
             
-            /*
-             * Verify that an instance is up and running by connecting to
-             * the client port on the local host.
-             * 
-             * @todo This does not tell us that the instance that we started
-             * is running, just that there is a server responding at that
-             * clientPort. That could have already been true.
-             */
-
-            ZooHelper.ruok(InetAddress.getLocalHost(), clientPort, (int) unit
-                    .toMillis(timeout));
-
-            // adjust for time remaining.
-            long nanos = begin - System.nanoTime();
-
+            long nanos = unit.toNanos(timeout);
+            
             try {
 
                 /*
-                 * Note: Since we do not have positive confirmation from [ruok]
-                 * this also waits just a few seconds to see if we can get a
-                 * process exitValue from the zookeeper instance that we
-                 * started. If we do, then that is positive proof that it died.
+                 * Wait up to the timeout for a process exitValue from the
+                 * zookeeper instance that we started. If we get an exitValue,
+                 * then that is positive proof that it died.
                  */
                 
-                // maximum time to wait for the process to die.
-                final long maxHangTime = TimeUnit.MILLISECONDS.toNanos(2000);
-
-                final int exitValue = processHelper.exitValue(Math.min(nanos,
-                        maxHangTime), TimeUnit.NANOSECONDS);
+                final int exitValue = processHelper.exitValue(nanos,
+                        TimeUnit.NANOSECONDS);
 
                 throw new IOException("exitValue=" + exitValue);
 
@@ -671,13 +666,26 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
                  * Since there was no timeout on the exitValue we can conclude
                  * that zookeeper started successfully.
                  */
- 
-                log.warn("Started zookeeper");
-
-                return;
                 
             }
 
+            // adjust for time remaining.
+            nanos -= (begin - System.nanoTime());
+
+            /*
+             * Verify that an instance is up and running by connecting to the
+             * client port on the local host.
+             * 
+             * @todo This does not tell us that the instance that we started is
+             * running, just that there is a server responding at that
+             * clientPort. That could have already been true.
+             */
+
+            ZooHelper.ruok(InetAddress.getLocalHost(), clientPort, (int) unit
+                    .toMillis(timeout));
+
+            log.warn("Started zookeeper");
+            
         }
 
         /**
