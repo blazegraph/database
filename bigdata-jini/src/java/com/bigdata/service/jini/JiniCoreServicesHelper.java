@@ -204,7 +204,11 @@ public class JiniCoreServicesHelper {
 
                 synchronized (signal) {
 
-                    signal.wait(TimeUnit.NANOSECONDS.toMillis(timeout));
+                    try {
+                        signal.wait(TimeUnit.NANOSECONDS.toMillis(timeout));
+                    } catch(InterruptedException ex) {
+                        // fall through
+                    }
 
                     if(DEBUG)
                         log.debug("woke up.");
