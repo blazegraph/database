@@ -266,15 +266,17 @@ public class ServicesManagerServer extends AbstractServer {
      * 
      * @see http://forum.java.sun.com/thread.jspa?threadID=514860&messageID=2451429
      *      for the use of {@link Runtime#addShutdownHook(Thread)}.
+     * 
+     * @see http://twit88.com/blog/2008/02/06/java-signal-handling/
      */
     protected void installSighupHandler(final String[] args) {
 
         try {
 
-            new PushConfigurationSignalHandler("SIGHUP",args);
-            
+            new PushConfigurationSignalHandler("SIGHUP", args);
+
         } catch (IllegalArgumentException ex) {
-            
+
             log.warn("Signal handler not installed: " + ex);
             
         }
@@ -301,6 +303,7 @@ public class ServicesManagerServer extends AbstractServer {
          *            The command line arguments (the identify the configuration
          *            and any overrides).
          */
+        @SuppressWarnings("restriction") // Signal is in the sun namespace
         protected PushConfigurationSignalHandler(final String signalName,
                 final String[] args) {
 
@@ -323,6 +326,7 @@ public class ServicesManagerServer extends AbstractServer {
          * or the {@link JiniFederation}. It is only designed to allow the push
          * of new {@link ServiceConfiguration}s to zookeeper.
          */
+        @SuppressWarnings("restriction") // Signal is in the sun namespace
         public void handle(final Signal sig) {
 
             log.warn("Processing signal: " + sig);

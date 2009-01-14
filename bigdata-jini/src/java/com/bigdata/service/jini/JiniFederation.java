@@ -181,6 +181,32 @@ public class JiniFederation extends AbstractDistributedFederation implements
             zookeeper = new ZooKeeper(zooConfig.servers,
                     zooConfig.sessionTimeout, this/* watcher */);
             
+            /*
+             * Await the zookeeper connection, but not more than [timeout] ms.
+             */ 
+            {
+                
+                long timeout = TimeUnit.MILLISECONDS.toNanos(2000);
+
+                final long begin = System.nanoTime();
+
+                while ((timeout -= (System.nanoTime() - begin)) > 0) {
+
+                    if (zookeeper.getState().isAlive())
+                        break;
+
+                    Thread.sleep(50/* ms */);
+
+                }
+
+                if (!zookeeper.getState().isAlive()) {
+
+                    log.warn("Zookeeper connection not alive.");
+                    
+                }
+                
+            }
+            
             try {
 
                 zookeeper.getData(zooConfig.zroot, false/* watch */,
