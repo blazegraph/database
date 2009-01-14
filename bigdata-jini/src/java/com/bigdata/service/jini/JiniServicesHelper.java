@@ -9,8 +9,8 @@ import org.apache.log4j.Logger;
 import org.apache.zookeeper.ZooKeeper;
 
 import com.bigdata.jini.start.ServicesManagerServer;
+import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
-import com.bigdata.zookeeper.ZookeeperClientConfig;
 
 /**
  * A helper class that starts all the necessary services for a Jini federation.

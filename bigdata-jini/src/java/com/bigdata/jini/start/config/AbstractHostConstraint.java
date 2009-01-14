@@ -33,13 +33,16 @@ import java.util.Arrays;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.net.InetAddressUtil;
 import com.bigdata.service.jini.JiniFederation;
 
 /**
+ * Core impl.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo do a variant based on {@link InetAddress}. This might allow the direct
+ *       specification of a subnet.
  */
 abstract public class AbstractHostConstraint implements IServiceConstraint {
 
@@ -49,95 +52,131 @@ abstract public class AbstractHostConstraint implements IServiceConstraint {
 
     protected static final boolean DEBUG = log.isDebugEnabled();
 
-    protected final InetAddress[] addr;
+    protected final String[] hosts;
     
     public String toString() {
         
-        return getClass() + "{addr=" + Arrays.toString(addr) + "}";
+        return getClass() + "{hosts=" + Arrays.toString(hosts) + "}";
         
     }
-    
-    public AbstractHostConstraint(final String host) throws UnknownHostException {
 
-        this(new String[]{host});    
-
-    }
-
-    public AbstractHostConstraint(final String[] host)
+    public AbstractHostConstraint(final String host)
             throws UnknownHostException {
 
-        if (host == null)
-            throw new IllegalArgumentException();
-
-        if (host.length == 0)
-            throw new IllegalArgumentException();
-
-        this.addr = new InetAddress[host.length];
-
-        int i = 0;
-
-        for (String a : host) {
-
-            if (a == null)
-                throw new IllegalArgumentException();
-
-            this.addr[i++] = InetAddressUtil.getByName(a);
-
-        }
+        this(new String[] { host });
 
     }
 
-    public AbstractHostConstraint(final InetAddress addr) {
-        
-        this(new InetAddress[]{addr});
-        
-    }
+    public AbstractHostConstraint(final String[] hosts)
+            throws UnknownHostException {
 
-    public AbstractHostConstraint(final InetAddress[] addr) {
-
-        if (addr == null)
+        if (hosts == null)
             throw new IllegalArgumentException();
 
-        if (addr.length == 0)
+        if (hosts.length == 0)
             throw new IllegalArgumentException();
-        
-        for(InetAddress a : addr) {
-            
-            if (a == null)
+
+        for (String host : hosts) {
+
+            if (host == null)
                 throw new IllegalArgumentException();
-            
+
         }
         
-        this.addr = addr;
-        
+        this.hosts = hosts;
+
     }
 
     protected boolean allow(final boolean accept) {
 
-        final InetAddress[] localAddresses;
-        try {
-            localAddresses = InetAddress.getAllByName("localhost");
-        } catch (UnknownHostException e) {
-            // should not be thrown for localhost.
-            throw new AssertionError(e);
+        for (String hostname : hosts) {
+
+            try {
+                
+                if (isLocalHost(hostname)) {
+
+                    return accept;
+
+                }
+                
+            } catch (UnknownHostException ex) {
+
+                log.warn("hostname: " + hostname, ex);
+
+            }
+
         }
 
-        for (InetAddress tmp : addr) {
+        return !accept;
+        
+// final InetAddress[] localAddresses;
+// try {
+// localAddresses = InetAddress.getAllByName("localhost");
+//        } catch (UnknownHostException e) {
+//            // should not be thrown for localhost.
+//            throw new AssertionError(e);
+//        }
+//
+//        for (InetAddress tmp : addr) {
+//
+//            if (DEBUG)
+//                log.debug("Considering: addr=" + tmp);
+//
+//            if (tmp.isLoopbackAddress()) {
+//
+//                return accept;
+//
+//            } else {
+//
+//                for (InetAddress a : localAddresses) {
+//
+//                    if (tmp.equals(a)) {
+//
+//                        return accept;
+//
+//                    }
+//
+//                }
+//
+//            }
+//
+//        }
+//
+//        return false;
 
-            if (DEBUG)
-                log.debug("Considering: addr=" + tmp);
+    }
 
-            if (tmp.isLoopbackAddress()) {
+    /**
+     * Return <code>true</code> if this is server entry for the local host.
+     * 
+     * @throws UnknownHostException
+     */
+    final public boolean isLocalHost(final String hostname)
+            throws UnknownHostException {
 
-                return accept;
+        final InetAddress[] localAddrs = InetAddress.getAllByName(InetAddress
+                .getLocalHost().getCanonicalHostName());
+
+        final InetAddress[] hostAddrs = InetAddress.getAllByName(hostname);
+
+        if (INFO)
+            log.info("Considering: " + hostname + " : localAddrs="
+                    + Arrays.toString(localAddrs) + ", hostAddrs="
+                    + Arrays.toString(hostAddrs));
+
+        for (InetAddress hostAddr : hostAddrs) {
+
+            if (hostAddr.isLoopbackAddress()) {
+
+                return true;
 
             } else {
 
-                for (InetAddress a : localAddresses) {
+                for (InetAddress localAddr : localAddrs) {
 
-                    if (tmp.equals(a)) {
+                    if (hostAddr.equals(localAddr)) {
 
-                        return accept;
+                        return true;
 
                     }
 

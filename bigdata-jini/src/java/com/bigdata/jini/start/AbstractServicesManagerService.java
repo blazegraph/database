@@ -243,10 +243,18 @@ public abstract class AbstractServicesManagerService extends AbstractService
          * Make sure that the key znodes are defined and then push the service
          * configurations into zookeeper.
          */
-        {
+        final ZooKeeper zookeeper = fed.getZookeeper();
+        if (zookeeper != null) {
 
-            final ZooKeeper zookeeper = fed.getZookeeper();
+            if (!zookeeper.getState().isAlive()) {
 
+                log
+                        .error("Zookeeper: No connection.  Will not push configuration.");
+
+                return;
+
+            }
+            
             // root znode for the federation.
             final String zroot = fed.getZooConfig().zroot;
 
@@ -262,7 +270,7 @@ public abstract class AbstractServicesManagerService extends AbstractService
 
             // push the service configurations into zookeeper (create/update).
             pushConfiguration(zookeeper, zconfig, acl, serviceConfigurations);
-
+            
         }
         
     }

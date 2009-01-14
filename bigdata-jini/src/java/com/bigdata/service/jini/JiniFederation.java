@@ -65,6 +65,7 @@ import org.apache.zookeeper.data.Stat;
 
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.io.IStreamSerializer;
+import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -89,7 +90,6 @@ import com.bigdata.service.proxy.RemoteBufferImpl;
 import com.bigdata.service.proxy.RemoteFuture;
 import com.bigdata.service.proxy.RemoteFutureImpl;
 import com.bigdata.zookeeper.ZooResourceLockService;
-import com.bigdata.zookeeper.ZookeeperClientConfig;
 import com.sun.jini.admin.DestroyAdmin;
 
 /**

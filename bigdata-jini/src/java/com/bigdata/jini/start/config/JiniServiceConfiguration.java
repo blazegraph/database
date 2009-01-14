@@ -79,7 +79,6 @@ import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.JiniUtil;
 import com.bigdata.zookeeper.ZNodeCreatedWatcher;
-import com.bigdata.zookeeper.ZookeeperClientConfig;
 
 /**
  * Abstract implementation for jini-based services.

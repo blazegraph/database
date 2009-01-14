@@ -29,10 +29,9 @@ package com.bigdata.jini.start.config;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.Arrays;
 
 import org.apache.log4j.Logger;
-
-import com.bigdata.net.InetAddressUtil;
 
 /**
  * A description of a zookeeper <code>server</code> entry as found in a
@@ -111,16 +110,6 @@ public class ZookeeperServerEntry {
     }
 
     /**
-     * Return a representation of the property name that would be used for
-     * this server.
-     */
-    public String getName() {
-        
-        return "server." + id;
-        
-    }
-    
-    /**
      * Return a representation of the property value that would be used for this
      * server.
      */
@@ -136,7 +125,7 @@ public class ZookeeperServerEntry {
      */
     public String toString() {
         
-        return getName()+ "=" + getValue();
+        return id+ "=" + getValue();
         
     }
 
@@ -147,24 +136,31 @@ public class ZookeeperServerEntry {
      */
     public boolean isLocalHost() throws UnknownHostException {
 
-        final InetAddress[] addrs = InetAddress.getAllByName("localhost");
+        final InetAddress[] localAddrs = InetAddress.getAllByName(InetAddress
+                .getLocalHost().getCanonicalHostName());
 
-        final InetAddress addr = InetAddressUtil.getByName(hostname);
+        final InetAddress[] hostAddrs = InetAddress.getAllByName(hostname);
 
         if (INFO)
-            log.info("Considering: " + hostname + " : addr=" + addr);
+            log.info("Considering: " + hostname + " : localAddrs="
+                    + Arrays.toString(localAddrs) + ", hostAddrs="
+                    + Arrays.toString(hostAddrs));
 
-        if (addr.isLoopbackAddress()) {
+        for (InetAddress hostAddr : hostAddrs) {
 
-            return true;
+            if (hostAddr.isLoopbackAddress()) {
 
-        } else {
+                return true;
 
-            for (InetAddress a : addrs) {
+            } else {
 
-                if (addr.equals(a)) {
+                for (InetAddress localAddr : localAddrs) {
 
-                    return true;
+                    if (hostAddr.equals(localAddr)) {
+
+                        return true;
+
+                    }
 
                 }
 

@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.jini.start.config;
 
-import java.net.InetAddress;
 import java.net.UnknownHostException;
 
 /**
@@ -46,40 +45,24 @@ public class HostAllowConstraint extends AbstractHostConstraint {
     public HostAllowConstraint(String host) throws UnknownHostException {
         
         super(host);
-        
-    }
-    
-    public HostAllowConstraint(String[] host) throws UnknownHostException {
-    
-        super(host);
-        
-    }
-    
-    /**
-     * @param addr
-     */
-    public HostAllowConstraint(InetAddress addr) {
-        
-        super(addr);
-        
+
     }
 
-    /**
-     * @param addr
-     */
-    public HostAllowConstraint(InetAddress[] addr) {
-        super(addr);
+    public HostAllowConstraint(String[] host) throws UnknownHostException {
+
+        super(host);
+
     }
-    
+
     public boolean allow() {
-        
+
         final boolean allow = allow(true/*accept*/);
 
         if (INFO)
-            log.info("allow="+allow+" : "+this);
+            log.info("allow=" + allow + " : " + this);
 
         return allow;
-        
+
     }
-    
+
 }

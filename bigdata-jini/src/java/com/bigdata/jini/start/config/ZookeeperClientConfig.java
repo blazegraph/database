@@ -1,4 +1,4 @@
-package com.bigdata.zookeeper;
+package com.bigdata.jini.start.config;
 
 import java.io.IOException;
 import java.io.Writer;
@@ -14,7 +14,6 @@ import org.apache.zookeeper.ZooDefs.Ids;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Id;
 
-import com.bigdata.jini.start.config.ServiceConfiguration;
 
 /**
  * Helper class for the {@link ZooKeeper} client configuration.
@@ -129,6 +128,13 @@ public class ZookeeperClientConfig {
         // comma separated list of zookeeper services.
         servers = (String) config.getEntry(Options.NAMESPACE, Options.SERVERS,
                 String.class);
+        
+        if (servers.matches("\\s")) {
+
+            throw new ConfigurationException("Whitespace not allowed in "
+                    + Options.SERVERS + " : " + servers);
+
+        }
         
         // ACLs used to create various znodes.
         acl = Arrays.asList((ACL[]) config.getEntry(Options.NAMESPACE,

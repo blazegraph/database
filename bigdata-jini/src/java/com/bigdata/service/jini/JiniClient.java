@@ -41,8 +41,8 @@ import net.jini.config.ConfigurationProvider;
 
 import org.apache.zookeeper.ZooKeeper;
 
+import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.service.AbstractScaleOutClient;
-import com.bigdata.zookeeper.ZookeeperClientConfig;
 
 /**
  * A client capable of connecting to a distributed bigdata federation using
