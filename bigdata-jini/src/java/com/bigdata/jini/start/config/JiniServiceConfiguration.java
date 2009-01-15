@@ -521,7 +521,7 @@ abstract public class JiniServiceConfiguration extends
                 
                 for (String e : groups) {
 
-                    out.write(e + "\n");
+                    out.write(q(e) + "\n");
 
                 }
                 
