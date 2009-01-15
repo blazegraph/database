@@ -27,19 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.jini.start.config;
 
-import java.util.List;
-import java.util.Map;
-import java.util.WeakHashMap;
-
 import org.apache.log4j.Logger;
-import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.ZooKeeper;
-import org.apache.zookeeper.data.ACL;
 
-import com.bigdata.jini.start.BigdataZooDefs;
 import com.bigdata.jini.start.ServicesManagerServer;
-import com.bigdata.service.jini.JiniClient;
-import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.zookeeper.ZLock;
 
 /**
