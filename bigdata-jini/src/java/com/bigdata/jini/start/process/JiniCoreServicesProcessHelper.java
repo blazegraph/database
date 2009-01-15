@@ -176,7 +176,10 @@ public class JiniCoreServicesProcessHelper extends ProcessHelper {
      */
     public int kill() {
        
-        throw new UnsupportedOperationException();
+        log.error("Can not kill jini");
+        
+        return 1;
+        //throw new UnsupportedOperationException();
         
     }
     
