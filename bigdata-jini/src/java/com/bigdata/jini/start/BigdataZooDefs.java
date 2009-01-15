@@ -158,14 +158,32 @@ public interface BigdataZooDefs {
     
     /**
      * Relative path to a child of the zroot that is a container for lock nodes.
-     * The container is watched by the {@link ServicesManagerService}s. Any
-     * time a new lock node is created under this znode, the
-     * {@link MonitorCreatePhysicalServiceLocksTask} will contend for that lock
-     * if it can satisify the {@link IServiceConstraint}s for the new service.
-     * The lock node data is the zpath to the logicalService for which a new
-     * physicalService must be created. The {@link ServiceConfiguration} is
-     * fetched from that zpath and gives the {@link IServiceConstraint}s that
-     * must be satisified.
+     * There is at most one such lock node for each logical service instance of
+     * each service type. The lock nodes are named using the
+     * {@link ServiceConfiguration#className} followed by an underscore ("_")
+     * followed by the znode of the logical service instance. For example,
+     * 
+     * <pre>
+     * com.bigdata.service.jini.DataServer_logicalService0000000000
+     * </pre>
+     * 
+     * Each such znode is a lock node. Its children represent processes
+     * contending for that lock. The lock node data is the zpath to the
+     * logicalService for which a new physicalService must be created. The
+     * {@link ServiceConfiguration} is fetched from that zpath and gives the
+     * {@link IServiceConstraint}s that must be satisified.
+     * <p>
+     * The {@link LOCKS_CREATE_PHYSICAL_SERVICE} container is watched by the
+     * {@link ServicesManagerService} using a
+     * {@link MonitorCreatePhysicalServiceLocksTask}. Any time a new lock node
+     * is created in the container, the
+     * {@link MonitorCreatePhysicalServiceLocksTask} will contend for that lock.
+     * If it obtains the lock and can satisfy the {@link IServiceConstraint}s
+     * for the new service, then it will attempt to create an instance of that
+     * service. If successful, it {@link ZLock#destroyLock()}s the lock node.
+     * Otherwise it releases the {@link ZLock} and sleeps a bit. Either it or
+     * another {@link ServicesManagerServer} will try again once they gain the
+     * {@link ZLock}.
      */
     String LOCKS_CREATE_PHYSICAL_SERVICE = LOCKS + ZSLASH
             + "createPhysicalService";

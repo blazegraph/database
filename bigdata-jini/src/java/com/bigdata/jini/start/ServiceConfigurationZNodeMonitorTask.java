@@ -10,6 +10,7 @@ import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.data.Stat;
 
 import com.bigdata.io.SerializerUtil;
@@ -322,9 +323,13 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
             
             case PhysicalServicesContainer:
 
-                // the parent is the logicalServive.
+                // the parent is the logicalService.
                 final String logicalServiceZPath = s.substring(0, s
                         .lastIndexOf('/'));
+                
+                // the znode of the logical service (last path component).
+                final String logicalServiceZNode = s.substring(s
+                        .lastIndexOf('/') + 1);
                 
                 // get children (the list of physical services).
                 final List<String> children = zookeeper.getChildren(
@@ -341,25 +346,35 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
 
                 // too few instances? : @todo handle too many instances also.
                 if (config.replicationCount > children.size()) {
-                
-                    /*
-                     * Note: MonitorCreatePhysicalServiceLocksTasks will notice
-                     * the create of this lock node, contend for the zlock, and
-                     * create a new service instance if it gains the lock and we
-                     * are still short at least one physical service for this
-                     * logical service.
-                     */
-                    
-                    final String locknode = zookeeper.create(zroot + "/"
-                            + BigdataZooDefs.LOCKS_CREATE_PHYSICAL_SERVICE
-                            + "/" + "locknode", SerializerUtil
-                            .serialize(logicalServiceZPath),
-                            fed.getZooConfig().acl,
-                            CreateMode.PERSISTENT_SEQUENTIAL);
-                    
-                    if (INFO)
-                        log.info("Created lock node: " + locknode);
-                                        
+
+                    try {
+
+                        /*
+                         * Note: MonitorCreatePhysicalServiceLocksTasks will
+                         * notice the create of this lock node, contend for the
+                         * zlock, and create a new service instance if it gains
+                         * the lock and we are still short at least one physical
+                         * service for this logical service.
+                         */
+
+                        final String lockNodeZPath = zroot + "/"
+                                + BigdataZooDefs.LOCKS_CREATE_PHYSICAL_SERVICE
+                                + "/" + config.className + "_"
+                                + logicalServiceZNode;
+
+                        zookeeper.create(lockNodeZPath, SerializerUtil
+                                .serialize(logicalServiceZPath), fed
+                                .getZooConfig().acl, CreateMode.PERSISTENT);
+
+                        if (INFO)
+                            log.info("Created lock node: " + lockNodeZPath);
+
+                    } catch (NodeExistsException ex) {
+
+                        // ignore.
+
+                    }
+
                 }
             
             default:

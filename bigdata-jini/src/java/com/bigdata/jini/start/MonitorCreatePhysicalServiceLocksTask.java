@@ -65,7 +65,9 @@ public class MonitorCreatePhysicalServiceLocksTask implements
      */
     public Void call() throws Exception {
 
-        // all the locks of interest are children of this znode.
+        /*
+         * All the locks of interest are direct children of this znode.
+         */
         final String locksZPath = fed.getZooConfig().zroot + "/"
                 + BigdataZooDefs.LOCKS_CREATE_PHYSICAL_SERVICE;
 

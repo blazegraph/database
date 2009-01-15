@@ -40,6 +40,7 @@ import org.apache.zookeeper.data.ACL;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.service.DataService;
+import com.bigdata.service.IDataService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
@@ -160,16 +161,19 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
      * <p>
      * The creation of the {@link BigdataZooDefs#LOCKS_CREATE_PHYSICAL_SERVICE}
      * child trigger watchers looking for to contend for the right to create a
-     * physical service which is an instance of that logical service. If the
-     * watcher can create an instance of that service type (including
-     * considering its recent service load, RAM, disk, etc), then it contends
-     * for the lock. The winner creates the physical service, deletes the
-     * remaining children in the queue, and deletes the lock node. That is the
-     * end of the competition.
+     * physical service which is an instance of that logical service. All
+     * service managers contend for that lock. If the winner can satisify the
+     * constraints for that service type (including considering its recent
+     * service load, RAM, disk, etc), and is able to successfully create the
+     * service, then it destroys the lock node. Otherwise it releases the lock
+     * and sleeps a bit. Either it or the other service managers will give it a
+     * try. This will continue until the requirements change or the service is
+     * successfully created somewhere.
      * <p>
      * Note that this does not find the "best" host for the new service since
-     * there is no global consideration of host scores. However, only hosts that
-     * are "good enough" can compete.
+     * there is no global consideration of host scores. However, the load
+     * balancer will adjust the load on the {@link IDataService}s which are the
+     * most heavily loaded part of the system.
      * <p>
      * Note: The {@link ServicesManagerServer} is responsible for watching the
      * {@link BigdataZooDefs#LOCKS_CREATE_PHYSICAL_SERVICE} znode. It does that
@@ -203,6 +207,12 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
                 CreateMode.PERSISTENT_SEQUENTIAL);
 
         /*
+         * The new znode (last path component of the new zpath).
+         */
+        final String logicalServiceZNode = logicalServiceZPath
+                .substring(logicalServiceZPath.lastIndexOf('/') + 1);
+        
+        /*
          * Create the znode that is the parent for the physical service
          * instances (direct child of the logicalSevice znode).
          */
@@ -224,26 +234,33 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
              * Create the znode used to decide the host on which the new
              * physical service will be created.
              * 
-             * Note: The locknode for each such competition is distinct and is
-             * created using the SEQUENTIAL flag. It will eventually be
-             * destroyed by whatever process obtains the lock and successfully
-             * creates the new physical service instance.
-             * 
              * Note: The data is the zpath to the logicalService.
              * 
              * Note: MonitorCreatePhysicalServiceLocksTasks will notice the
              * create of this lock node, contend for the zlock, and create a new
-             * service instance if it gains the lock and we are still short at
-             * least one physical service for this logical service.
+             * service instance if it gains the lock, if it can satisify the
+             * constraints for the new physical service on the local host, and
+             * we are still short at least one physical service for this logical
+             * service when it checks. If successful, it will ZLock#destroy()
+             * the lock node. Otherwise it releases the lock and either it or
+             * another services manager will give it a go when they gain the
+             * lock.
              */
-            zookeeper.create(fed.getZooConfig().zroot + "/"
+
+            final String lockNodeZPath = fed.getZooConfig().zroot + "/"
                     + BigdataZooDefs.LOCKS_CREATE_PHYSICAL_SERVICE + "/"
-                    + "locknode",
-                    SerializerUtil.serialize(logicalServiceZPath), acl,
-                    CreateMode.PERSISTENT_SEQUENTIAL);
-            
+                    + config.className + "_" + logicalServiceZNode;
+
+            zookeeper
+                    .create(lockNodeZPath, SerializerUtil
+                            .serialize(logicalServiceZPath), acl,
+                            CreateMode.PERSISTENT);
+
+            if (INFO)
+                log.info("Created lock node: " + lockNodeZPath);
+
         } catch (NodeExistsException ex) {
-            
+
             // ignore.
             
         }
