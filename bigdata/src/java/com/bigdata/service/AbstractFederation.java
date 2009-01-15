@@ -920,10 +920,10 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
             final QueueStatisticsTask queueStatisticsTask = new QueueStatisticsTask(
                     relpath, threadPool, taskCounters);
 
+            queueStatisticsTask.addCounters(getServiceCounterSet().makePath(relpath));
+
             addScheduledTask(queueStatisticsTask, initialDelay,
                     delay, unit);
-
-            queueStatisticsTask.addCounters(getServiceCounterSet().makePath(relpath));
 
         }
         

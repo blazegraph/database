@@ -658,10 +658,15 @@ public class QueueStatisticsTask implements Runnable {
      * 
      * @param counterSet
      *            The counters will be added to this {@link CounterSet}.
-     *            
+     * 
      * @return The caller's <i>counterSet</i>
      */
-    public CounterSet addCounters(CounterSet counterSet) {
+    public CounterSet addCounters(final CounterSet counterSet) {
+
+        if (counterSet == null)
+            throw new IllegalArgumentException();
+        
+        synchronized(counterSet) {
         
         /*
          * Defined for ThreadPoolExecutor.
@@ -858,6 +863,8 @@ public class QueueStatisticsTask implements Runnable {
         }
 
         return counterSet;
+        
+        }
 
     }
 

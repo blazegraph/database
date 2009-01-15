@@ -720,7 +720,7 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
      *            The object that is used to take the measurements from which
      *            the counter's value will be determined.
      */
-    synchronized public ICounter addCounter(String path, final IInstrument instrument) {
+    synchronized public ICounter addCounter(final String path, final IInstrument instrument) {
 
         if (path == null) {
 
@@ -755,13 +755,39 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
 
         if (instrument == null)
             throw new IllegalArgumentException();
-        
-        if (children.containsKey(name)) {
 
-            throw new IllegalStateException("Exists: path=" + getPath()
-                    + ", name=" + name);
-            
+        {
+
+            final ICounterNode counter = children.get(name);
+
+            if (counter != null) {
+
+                if(counter instanceof ICounter ) {
+                
+                    // counter exists for that path.
+                    log.error("Exists: path=" + getPath() + ", name=" + name);
+                
+                    // return existing counter for path @todo vs replace.
+                    return (ICounter)counter;
+                    
+                } else {
+                    
+                    // a counter set exists for that path(not a counter).
+                    throw new IllegalStateException("Node exists: path="
+                            + getPath() + ", name=" + name);
+                    
+                }
+
+            }
+
         }
+
+//        if (children.containsKey(name)) {
+//
+//            throw new IllegalStateException("Exists: path=" + getPath()
+//                    + ", name=" + name);
+//            
+//        }
         
         final ICounter counter = new Counter(this, name, instrument);
         
