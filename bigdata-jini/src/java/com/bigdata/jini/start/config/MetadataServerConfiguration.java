@@ -41,9 +41,6 @@ import com.bigdata.util.NV;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo could extend {@link DataServerConfiguration} since they are nearly the
- *       same kind of thing.
  */
 public class MetadataServerConfiguration extends
         BigdataServiceConfiguration {

@@ -42,8 +42,7 @@ import com.bigdata.util.NV;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DataServerConfiguration extends
-        BigdataServiceConfiguration {
+public class DataServerConfiguration extends BigdataServiceConfiguration {
 
     /**
      * 
@@ -67,8 +66,8 @@ public class DataServerConfiguration extends
 
     }
 
-    public class DataServiceStarter<V extends JiniServiceProcessHelper>
-            extends BigdataServiceStarter<V> {
+    public class DataServiceStarter<V extends JiniServiceProcessHelper> extends
+            BigdataServiceStarter<V> {
 
         /**
          * @param fed
@@ -84,12 +83,11 @@ public class DataServerConfiguration extends
 
         @Override
         protected NV getDataDir() {
-            
-            return new NV(DataServer.Options.DATA_DIR, serviceDir
-                    .toString());
-            
+
+            return new NV(DataServer.Options.DATA_DIR, serviceDir.toString());
+
         }
-        
+
     }
 
 }

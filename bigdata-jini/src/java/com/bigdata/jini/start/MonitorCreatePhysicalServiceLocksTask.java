@@ -86,7 +86,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
                 
                 try {
                     
-                    handleNewLock(zpath);
+                    contendForCreateServiceZLock(zpath);
                     
                 } catch(InterruptedException ex) {
                     
@@ -119,14 +119,12 @@ public class MonitorCreatePhysicalServiceLocksTask implements
     }
     
     /**
-     * Contends for the {@link ZLock} and starts the service if the the
-     * {@link IServiceConstraint}s are satisified.
-     * <p>
-     * Note: This fetches the {@link ServiceConfiguration} and tests the
-     * {@link IServiceConstraint}s after we hold the {@link ZLock} and then
-     * makes the decision whether or not to start the service. That way it
-     * judges matters as they stand at the time of the decision, rather than
-     * when we joined the queue to contend for the {@link ZLock}.
+     * Contends for the {@link ZLock} and then invokes {@link #runWithLock()}.
+     * If we are unable to create the service while we are holding the lock then
+     * we wait a little bit and try again. This covers the case where there are
+     * preconditions for the service start which have not been met but which
+     * might become satisified at any time. If the lock node is deleted, then we
+     * will exit and return false.
      * 
      * @param lockNodeZPath
      *            The path to the lock node.
@@ -136,83 +134,153 @@ public class MonitorCreatePhysicalServiceLocksTask implements
      * @throws Exception
      *             if we could not start the service.
      */
-    protected boolean handleNewLock(final String lockNodeZPath) throws Exception {
+    protected boolean contendForCreateServiceZLock(final String lockNodeZPath)
+            throws Exception {
+
+        while (true) {
+
+            try {
+
+                if (zookeeper.exists(lockNodeZPath, false) == null) {
+
+                    /*
+                     * End of the competition. Either someone created the
+                     * service or someone destroyed the lock node.
+                     */
+
+                    return false;
+
+                }
+
+                // enter the competition.
+                final ZLock zlock = ZNodeLockWatcher.getLock(zookeeper,
+                        lockNodeZPath, fed.getZooConfig().acl);
+
+                zlock.lock();
+                try {
+
+                    if (INFO)
+                        log.info("have lock: zpath=" + lockNodeZPath);
+
+                    if (runWithLock(lockNodeZPath)) {
+
+                        // iff successful, then destroy the lock.
+                        zlock.destroyLock();
+
+                        // end of the competition.
+                        return true;
+
+                    }
+
+                } finally {
+
+                    zlock.unlock();
+
+                }
+
+            } catch (InterruptedException ex) {
+
+                // interrupted - stop competing.
+                throw ex;
+                
+            } catch (Throwable t) {
+
+                log.warn("lockNode=" + lockNodeZPath, t);
+
+                // fall through.
+                
+            }
+
+            /*
+             * We were not able to create the service while we held the lock.
+             * This can occur if there is a precondition for the service which
+             * is not satisified. Wait a bit a try again.
+             */
+            
+            Thread.sleep(1000/* ms */);
+
+            if(INFO)
+                log.info("Retrying.");
+            
+        } // while true
+        
+    }
+
+    /**
+     * Starts the service if the the {@link IServiceConstraint}s are
+     * satisified.
+     * <p>
+     * Note: This fetches the {@link ServiceConfiguration} and tests the
+     * {@link IServiceConstraint}s after we hold the {@link ZLock} and then
+     * makes the decision whether or not to start the service. That way it
+     * judges matters as they stand at the time of the decision, rather than
+     * when we joined the queue to contend for the {@link ZLock}.
+     * 
+     * @param lockNodeZPath
+     *            The zpath of the lock node. The data in this node is the xpath
+     *            of the logical service whose instance needs to be created.
+     * 
+     * @return <code>true</code> iff the service was started.
+     * 
+     * @throws Exception
+     */
+    private boolean runWithLock(final String lockNodeZPath) throws Exception {
 
         /*
          * Note: The data is the logicalService zpath.
          */
         final String logicalServiceZPath = (String) SerializerUtil
-                .deserialize(zookeeper.getData(lockNodeZPath, false, new Stat()));
+                .deserialize(zookeeper
+                        .getData(lockNodeZPath, false, new Stat()));
 
         /*
-         * If we hack off the last path component, we now have the zpath for
-         * the ServiceConfiguration znode.
+         * If we hack off the last path component, we now have the zpath for the
+         * ServiceConfiguration znode.
          */
         final String serviceConfigZPath = logicalServiceZPath.substring(0,
                 logicalServiceZPath.lastIndexOf('/'));
-        
+
         if (INFO)
             log.info("logicalServiceZPath=" + logicalServiceZPath);
 
-        // enter the competition.
-        final ZLock zlock = ZNodeLockWatcher.getLock(zookeeper, lockNodeZPath,
-                fed.getZooConfig().acl);
+        final ManagedServiceConfiguration config = (ManagedServiceConfiguration) SerializerUtil
+                .deserialize(zookeeper.getData(serviceConfigZPath, false,
+                        new Stat()));
 
-        zlock.lock();
-        try {
+        if (INFO)
+            log.info("Considering: " + config);
 
-            if (INFO)
-                log.info("have lock: zpath=" + lockNodeZPath);
+        if (!config.canStartService(fed)) {
 
-            final ManagedServiceConfiguration config = (ManagedServiceConfiguration) SerializerUtil
-                    .deserialize(zookeeper.getData(serviceConfigZPath, false,
-                            new Stat()));
+            // will not start this service.
 
             if (INFO)
-                log.info("Considering: " + config);
+                log.info("Constraint(s) do not allow service start: " + config);
 
-            if (!config.canStartService(fed)) {
+            return false;
 
-                // will not start this service.
-
-                if (INFO)
-                    log.info("Constraint(s) do not allow service start: "
-                            + config);
-
-                return false;
-
-            }
-
-            // get children (the list of physical services).
-            final List<String> children = zookeeper
-                    .getChildren(logicalServiceZPath + "/"
-                            + BigdataZooDefs.PHYSICAL_SERVICES_CONTAINER, false);
-            
-            if (INFO)
-                log.info("serviceConfigZPath=" + serviceConfigZPath
-                        + ", logicalServiceZPath=" + logicalServiceZPath
-                        + ", targetReplicationCount="
-                        + config.replicationCount + ", #children="
-                        + children.size() + ", children=" + children);
-
-            // too few instances? @todo handle too many instance here also?
-            if (config.replicationCount > children.size()) {
-
-                // start the service.
-                startService(config, logicalServiceZPath);
-                
-            }
-
-            // iff successful, then destroy the lock.
-            zlock.destroyLock();
-            
-            return true;
-            
-        } finally {
-            
-            zlock.unlock();
-            
         }
+
+        // get children (the list of physical services).
+        final List<String> children = zookeeper.getChildren(logicalServiceZPath
+                + "/" + BigdataZooDefs.PHYSICAL_SERVICES_CONTAINER, false);
+
+        if (INFO)
+            log.info("serviceConfigZPath=" + serviceConfigZPath
+                    + ", logicalServiceZPath=" + logicalServiceZPath
+                    + ", targetReplicationCount=" + config.replicationCount
+                    + ", #children=" + children.size() + ", children="
+                    + children);
+
+        // too few instances? @todo handle too many instance here also?
+        if (config.replicationCount > children.size()) {
+
+            // start the service.
+            startService(config, logicalServiceZPath);
+
+        }
+
+        return true;
 
     }
 
