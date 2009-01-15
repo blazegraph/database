@@ -40,6 +40,7 @@ import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.data.Stat;
 
 import com.bigdata.io.SerializerUtil;
@@ -99,7 +100,7 @@ public class DumpZookeeper {
 
         try {
             
-            new DumpZookeeper(z).dump(showData,"", zooClientConfig.zroot, 0);
+            new DumpZookeeper(z).dump(showData, "", zooClientConfig.zroot, 0);
             
         } finally {
 
@@ -121,8 +122,19 @@ public class DumpZookeeper {
         final String zpath = path + "/" + znode;
 
         final Stat stat = new Stat();
-        
-        final byte[] data = z.getData(zpath, false, stat);
+
+        final byte[] data;
+        try {
+
+            data = z.getData(zpath, false, stat);
+            
+        } catch (NoNodeException ex) {
+            
+            System.err.println("Not found: " + path);
+            
+            return;
+            
+        }
 
         System.out.print(i(depth) + znode
                 + (stat.getEphemeralOwner() != 0 ? " (Ephemeral)" : "") + " ");
@@ -155,12 +167,23 @@ public class DumpZookeeper {
             
         System.out.println();
 
-        List<String> children = z.getChildren(zpath, false);
+        final List<String> children;
+        try {
+
+            children = z.getChildren(zpath, false);
+
+        } catch (NoNodeException ex) {
+
+            System.err.println("Not found: " + zpath);
+
+            return;
+
+        }
 
         for (String child : children) {
 
             dump(showData, zpath, child, depth + 1);
-            
+
         }
         
     }
