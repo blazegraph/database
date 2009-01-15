@@ -486,7 +486,7 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
         addScheduledTask(//
                 new StartDeferredTasksTask(),// task to run.
                 150, // initialDelay (ms)
-                1000, // delay
+                2000, // delay
                 TimeUnit.MILLISECONDS // unit
                 );
 
@@ -780,6 +780,10 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
      * <p>
      * Once these task(s) have been started, this task will throw an exception
      * in order to prevent it from being re-executed.
+     * 
+     * FIXME This should explicitly await jini registrar discovery, zookeeper
+     * client connected, and whatever other preconditions must be statisified
+     * before the service can be started.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$

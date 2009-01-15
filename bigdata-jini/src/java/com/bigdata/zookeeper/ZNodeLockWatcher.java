@@ -99,6 +99,13 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
         
     }
     
+    /**
+     * Marker is used to invalidate a lock node before it is destroyed. If you
+     * are monitoring a znode whose children a lock nodes, then a child ending
+     * with this string IS NOT a lock node!
+     */
+    public static final transient String INVALID = "_INVALID";
+    
     protected ZNodeLockWatcher(final ZooKeeper zookeeper, final String zpath,
             final String zchild) {
 
@@ -131,7 +138,6 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
     protected boolean isConditionSatisified(WatchedEvent event)
             throws KeeperException, InterruptedException {
 
-        // @todo probably could be optimized.
         return isConditionSatisified();
 
     }
@@ -152,19 +158,29 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
      * watch will resume with the next {@link WatchedEvent}.
      * 
      * @return Return <code>true</code> iff the process holds the lock
-     * 
-     * @todo Consider this: A new zchild will be generated if this is
-     *       <code>null</code> or if the queue is inspected and is found to
-     *       not contain this znode. This could handle both the initial create
-     *       of the zchild and the re-create if someone stomps on the lock node
-     *       or the zchild). However, it would make it impossible to terminate
-     *       the contention of the process for the lock simply be terminating
-     *       deleting either the zchild or the lock node itself.
      */
     @Override
     protected boolean isConditionSatisified() throws KeeperException,
             InterruptedException {
 
+        if (zookeeper.exists(zpath + INVALID, false) != null) {
+
+            /*
+             * The lock node has been invalidation as part of the protocol to
+             * destroy the lock node together with its queue. Once this is done,
+             * NO ONE will be granted the lock.
+             */
+
+            cancelled = true;
+
+            priorChildZNode = null;
+
+            log.warn("Watch cancelled (lock node was invalidated): " + this);
+
+            return false;
+
+        }
+        
         final List<String> children;
         try {
 
@@ -181,7 +197,8 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
             // wrap as list again.
             children = Arrays.asList(a);
 
-            log.info("queue: "+children); // @todo remove
+//            if(INFO)
+//                log.info("queue: "+children);
             
         } catch (NoNodeException ex) {
             
@@ -209,7 +226,7 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
 
             priorChildZNode = null;
 
-            log.warn("Lock cancelled (child not in queue): " + this);
+            log.warn("Watch cancelled (child not in queue): " + this);
             
             return true;
             
@@ -580,27 +597,13 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
         }
 
         /**
-         * Deletes all children in the queue in reverse lexical order so as to
-         * not trigger cascades of watchers and finally deletes the lock node
-         * itself.
+         * Creates a marker node (a sibling of the lock node) to prevent new
+         * children from being added to the queue and then deletes all children
+         * in the queue in reverse lexical order so as to not trigger cascades
+         * of watchers and finally deletes the lock node itself and then the
+         * marker node.
          * 
          * @todo write unit tests for this.
-         * 
-         * @todo This can fail under heavy writes on the queue for at least two
-         *       reasons:
-         *       <p>
-         *       1) since zookeeper does not have transactions, it is possible
-         *       for other processes to add znodes under the lock faster than we
-         *       can delete them (you have to delete the children before you can
-         *       delete the parent).
-         *       <p>
-         *       2) there is a gap (not covered by a tx) between the moment when
-         *       we delete the last child and the moment when we delete the
-         *       parent. it is possible for a new child to be added, in which
-         *       case we can't delete the parent.
-         *       <p>
-         *       One way to deal with some of this is to add an "invalid"
-         *       semaphore. Once that exists no new locks are permitted.
          * 
          * @todo verify {@link #unlock()} succeeds after {@link #destroyLock()}
          * 
@@ -614,6 +617,27 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
 
                 if (!isLockHeld())
                     throw new IllegalStateException("Lock not held.");
+
+                /*
+                 * Create a marker prevent any new child from entering the queue
+                 * for the lock node. This agreement is necessary in order for
+                 * us to have a guarentee that the queue will be empty when we
+                 * try to delete the lock node. Without this protocol any
+                 * concurrent request for the lock could cause the queue to be
+                 * non-empty when our delete request for the lock node is
+                 * processed by zookeeper.
+                 * 
+                 * Note: The marker CAN NOT be a child since we can't make that
+                 * atomic. We could locate it somewhere completely different in
+                 * the tree, but it is easy enough to make it a sibling
+                 * 
+                 * locknode_INVALID
+                 * 
+                 * The marker is ephemeral in case this process dies while
+                 * trying to destroy the queue.
+                 */
+                zookeeper.create(zpath + INVALID, new byte[0], acl,
+                        CreateMode.EPHEMERAL);
                 
                 List<String> children;
                 
@@ -636,7 +660,11 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
                     
                 }
 
+                // delete the lock node.
                 zookeeper.delete(zpath, -1/* version */);
+
+                // delete the marker node that was used to invalidate the lock node.
+                zookeeper.delete(zpath + "/" + INVALID, -1/* version */);
                 
             } finally {
              

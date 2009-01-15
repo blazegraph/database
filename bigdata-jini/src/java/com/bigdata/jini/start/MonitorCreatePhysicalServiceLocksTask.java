@@ -78,6 +78,18 @@ public class MonitorCreatePhysicalServiceLocksTask implements
 
                 final String znode = watcher.queue.take();
 
+                if(znode.endsWith(ZNodeLockWatcher.INVALID)) {
+                    
+                    /*
+                     * This is not a lock node. It is a marker indicating that
+                     * the corresponding lock node is about to be destroyed. We
+                     * just ignore it here.
+                     */
+
+                    continue;
+                    
+                }
+                
                 // path to the new lock node.
                 final String zpath = locksZPath + "/" + znode;
 
