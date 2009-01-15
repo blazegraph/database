@@ -365,13 +365,20 @@ public class ServicesManagerServer extends AbstractServer {
 
                 }
 
-                // Chain back to previous handler, if one exists
-                if (oldHandler != SIG_DFL && oldHandler != SIG_IGN) {
+                /*
+                 * This appears willing to halt the server so I am not chaining
+                 * back to the previous handler!
+                 */
+                
+//                // Chain back to previous handler, if one exists
+//                if (oldHandler != SIG_DFL && oldHandler != SIG_IGN) {
+//
+//                    oldHandler.handle(sig);
+//
+//                }
 
-                    oldHandler.handle(sig);
-
-                }
-
+                log.warn("Pushed configuration.");
+                
             } catch (Throwable t) {
 
                 log.error("Signal handler failed : " + t, t);
