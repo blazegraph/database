@@ -449,8 +449,15 @@ public class ServicesManagerServer extends AbstractServer {
                 }
 
                 // shutdown the service.
-                shutdownNow();
-                
+                service.shutdownNow();
+
+                // Chain back to previous handler, if one exists
+                if (oldHandler != SIG_DFL && oldHandler != SIG_IGN) {
+
+                    oldHandler.handle(sig);
+
+                }
+              
             } catch (Throwable t) {
 
                 log.error("Signal handler failed : " + t, t);
