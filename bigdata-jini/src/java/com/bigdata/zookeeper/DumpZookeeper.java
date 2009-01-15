@@ -132,7 +132,7 @@ public class DumpZookeeper {
             
         } catch (NoNodeException ex) {
             
-            System.err.println("Not found: " + path);
+            System.err.println("Not found: [" + path + "]");
             
             return;
             
@@ -176,8 +176,8 @@ public class DumpZookeeper {
 
         } catch (NoNodeException ex) {
 
-            System.err.println("Not found: " + zpath);
-
+            System.err.println("Not found: [" + path + "]");
+            
             return;
 
         }
