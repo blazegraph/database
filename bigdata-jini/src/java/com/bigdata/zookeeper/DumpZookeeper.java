@@ -83,6 +83,8 @@ public class DumpZookeeper {
         
         final ZookeeperClientConfig zooClientConfig = new ZookeeperClientConfig(config); 
 
+        System.out.println(zooClientConfig.toString());
+        
 //        System.err.println(ZooHelper.dump(InetAddress.getLocalHost(),
 //                clientPort));
 
