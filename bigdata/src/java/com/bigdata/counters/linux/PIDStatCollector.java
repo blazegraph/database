@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters.linux;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -247,7 +248,7 @@ public class PIDStatCollector extends AbstractProcessCollector implements
         
         List<String> command = new LinkedList<String>();
         
-        command.add("/usr/bin/pidstat");
+        command.add(new File(SysstatUtil.getPath(), "pidstat").getPath());
 
         command.add("-p");
         command.add(""+pid);

@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters.linux;
 
+import java.io.File;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -176,7 +177,7 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
 
         final List<String> command = new LinkedList<String>();
         
-        command.add("/usr/bin/sar");
+        command.add(new File(SysstatUtil.getPath(), "sar").getPath());
 
         // Note: Request the CPU stats.
         command.add("-u");

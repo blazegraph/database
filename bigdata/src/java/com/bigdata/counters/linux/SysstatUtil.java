@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters.linux;
 
+import java.io.File;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
@@ -46,7 +47,6 @@ import com.bigdata.counters.AbstractStatisticsCollector;
  */
 public class SysstatUtil {
 
-
     final protected static Logger log = Logger
             .getLogger(AbstractStatisticsCollector.class);
 
@@ -61,6 +61,20 @@ public class SysstatUtil {
      */
     final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
             .toInt();
+    
+    /**
+     * Returns the path to the sysstat utilities (pidstat, sar, etc). The
+     * default is <code>/usr/bin</code>. This may be overriden using the
+     * <code>com.bigdata.counters.linux.sysstat.path</code> property.
+     * 
+     * @return The path.
+     */
+    static public final File getPath() {
+        
+        return new File(System.getProperty(
+                "com.bigdata.counters.linux.sysstat.path", "/usr/bin/"));
+        
+    }
     
     /**
      * Splits a data line into fields based on whitespace and skipping over
