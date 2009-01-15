@@ -151,7 +151,7 @@ abstract public class AbstractHostConstraint implements IServiceConstraint {
      * 
      * @throws UnknownHostException
      */
-    final public boolean isLocalHost(final String hostname)
+    static final public boolean isLocalHost(final String hostname)
             throws UnknownHostException {
 
         final InetAddress[] localAddrs = InetAddress.getAllByName(InetAddress

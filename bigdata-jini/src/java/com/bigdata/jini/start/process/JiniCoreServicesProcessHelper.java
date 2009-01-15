@@ -85,11 +85,17 @@ public class JiniCoreServicesProcessHelper extends ProcessHelper {
                 null/* class */, config);
 
         final LookupLocator[] locators = clientConfig.locators;
+        
         if (locators.length > 0) {
 
             /*
-             * unicast locators. if this host is any of the named hosts then we
-             * will consider a service start.
+             * Unicast locators were specified.
+             * 
+             * If this host is any of the named hosts then we will consider a
+             * service start.
+             * 
+             * Note: If no locators were specified then we are using multicast
+             * and will always consider a service start.
              */
             
             final String[] allowed = new String[locators.length];
@@ -109,16 +115,15 @@ public class JiniCoreServicesProcessHelper extends ProcessHelper {
                 return false;
                 
             }
-            
+
         }
 
-        if(!serviceConfig.canStartService(null/*fed*/)) {
+        if (!serviceConfig.canStartService(null/* fed */)) {
 
             // will not start this service.
 
             if (INFO)
-                log.info("Constraint(s) do not allow service start: "
-                        + config);
+                log.info("Constraint(s) do not allow service start: " + config);
 
             return false;
             
@@ -140,9 +145,9 @@ public class JiniCoreServicesProcessHelper extends ProcessHelper {
 
             if (INFO)
                 log.info("Enough instances - will not start.");
-            
+
             return false;
-            
+
         }
 
         /*
@@ -152,7 +157,7 @@ public class JiniCoreServicesProcessHelper extends ProcessHelper {
         if (INFO)
             log.info("Will start instance: " + InetAddress.getLocalHost()
                     + ", config=" + config);
-        
+
         final JiniCoreServicesStarter<JiniCoreServicesProcessHelper> serviceStarter = serviceConfig
                 .newServiceStarter(listener);
 
