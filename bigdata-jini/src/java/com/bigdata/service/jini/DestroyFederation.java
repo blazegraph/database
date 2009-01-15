@@ -30,6 +30,8 @@ package com.bigdata.service.jini;
 
 /**
  * Utility will <strong>destroy</strong> the federation to which it connects.
+ * All discoverable services for the federation and all persistent state for
+ * those services will be destroyed.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -44,14 +46,18 @@ public class DestroyFederation {
      */
     public static void main(String[] args) throws InterruptedException {
 
-        JiniFederation fed = JiniClient.newInstance(args).connect();
+        final JiniFederation fed = JiniClient.newInstance(args).connect();
         
         System.out.println("Waiting for service discovery.");
         
         Thread.sleep(5000/*ms*/);
         
         fed.destroy();
+
+        System.out.println("Destroyed.");
         
+        System.exit(0);
+
     }
 
 }

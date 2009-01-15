@@ -1226,7 +1226,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
     /**
      * Shutdown the server, including the service and any jini processing. It
-     * SHOULD always be save to invoke this method. The implementation SHOULD be
+     * SHOULD always be safe to invoke this method. The implementation SHOULD be
      * synchronized and SHOULD conditionally handle each class of asynchronous
      * processing or resource, terminating or releasing it iff it has not
      * already been terminated or released.

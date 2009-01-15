@@ -68,9 +68,6 @@ import com.bigdata.util.InnerCause;
  * @todo dump by data service as well, showing the indices on the ds and the
  *       disk space allocated to the resource manager for the ds (depending on
  *       the release age there may be historical views preserved).
- * 
- * @todo should use a read-historical tx to assert a read-lock on the commitTime
- *       for the dump.
  */
 public class DumpFederation {
 
@@ -78,18 +75,6 @@ public class DumpFederation {
     
     protected static final boolean INFO = log.isInfoEnabled();
 
-    private final JiniFederation fed;
-
-    private final long commitTime;
-    
-    public DumpFederation(JiniFederation fed, final long commitTime) {
-        
-        this.fed = fed;
-        
-        this.commitTime = commitTime;
-        
-    }
-    
     /**
      * Dumps interesting things about the federation.
      * <p>
@@ -109,7 +94,7 @@ public class DumpFederation {
      * @throws TimeoutException
      *             if no {@link DataService} can be discovered.
      */
-    static public void main(String[] args) throws InterruptedException,
+    static public void main(final String[] args) throws InterruptedException,
             ExecutionException, IOException, TimeoutException {
 
         if (args.length == 0) {
@@ -156,29 +141,50 @@ public class DumpFederation {
              */
             fed.awaitServices(1/* minDataServices */, 10000L/* timeout(ms) */);
 
-            final DumpFederation dumper = new DumpFederation(fed, fed
-                    .getLastCommitTime());
+            final long lastCommitTime = fed.getLastCommitTime();
+            
+            if(lastCommitTime == 0L) {
+                
+                System.out.println("No committed data.");
+                
+                System.exit(0);
+                
+            }
+            
+            // a read-only transaction as of the last commit time.
+            final long tx = fed.getTransactionService().newTx(lastCommitTime);
+            
+            try {
 
-            final String[] names = dumper.getIndexNames();
+                final DumpFederation dumper = new DumpFederation(fed, tx);
 
-            System.out.println("Found " + names.length + " indices: "
-                    + Arrays.toString(names));
+                final String[] names = dumper.getIndexNames();
 
-            // @todo command line option.
-            final boolean dumpIndexLocators = true;
+                System.out.println("Found " + names.length + " indices: "
+                        + Arrays.toString(names));
 
-            if (dumpIndexLocators) {
+                // @todo command line option.
+                final boolean dumpIndexLocators = true;
 
-                for (String name : names) {
+                if (dumpIndexLocators) {
 
-                    // strip off the prefix to get the scale-out index name.
-                    final String scaleOutIndexName = name
-                            .substring(MetadataService.METADATA_INDEX_NAMESPACE
-                                    .length());
+                    for (String name : names) {
 
-                    dumper.dumpIndexLocators(scaleOutIndexName);
+                        // strip off the prefix to get the scale-out index name.
+                        final String scaleOutIndexName = name
+                                .substring(MetadataService.METADATA_INDEX_NAMESPACE
+                                        .length());
+
+                        dumper.dumpIndexLocators(scaleOutIndexName);
+
+                    }
 
                 }
+
+            } finally {
+
+                // discard read-only transaction.
+                fed.getTransactionService().abort(tx);
 
             }
 
@@ -200,6 +206,18 @@ public class DumpFederation {
         
     }
 
+    private final JiniFederation fed;
+
+    private final long commitTime;
+    
+    public DumpFederation(final JiniFederation fed, final long commitTime) {
+        
+        this.fed = fed;
+        
+        this.commitTime = commitTime;
+        
+    }
+    
     /**
      * The names of all registered scale-out indices.
      * 
@@ -222,7 +240,7 @@ public class DumpFederation {
      * @param name
      *            The name of a scale-out index.
      */
-    public void dumpIndexLocators(String name) {
+    public void dumpIndexLocators(final String name) {
 
         final long timestamp = TimestampUtility.asHistoricalRead(commitTime);
 

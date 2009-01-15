@@ -250,27 +250,6 @@ public class ServicesManagerServer extends AbstractServer {
 
         super(args, lifeCycle);
         
-        installSighupHandler(args);
-        
-    }
-
-    /**
-     * Install SIGHUP (Hang up) handler - the {@link Configuration} will be
-     * re-read and pushed to zookeeper.
-     * 
-     * @param args
-     *            The command line arguments (the identify the configuration and
-     *            any overrides).
-     * 
-     * @see http://www-128.ibm.com/developerworks/java/library/i-signalhandling/
-     * 
-     * @see http://forum.java.sun.com/thread.jspa?threadID=514860&messageID=2451429
-     *      for the use of {@link Runtime#addShutdownHook(Thread)}.
-     * 
-     * @see http://twit88.com/blog/2008/02/06/java-signal-handling/
-     */
-    protected void installSighupHandler(final String[] args) {
-
         try {
 
             new PushConfigurationSignalHandler("HUP", args);
@@ -281,10 +260,20 @@ public class ServicesManagerServer extends AbstractServer {
             
         }
 
+        try {
+
+            new KillChildrenAndSelfSignalHandler("TERM");
+
+        } catch (IllegalArgumentException ex) {
+
+            log.warn("Signal handler not installed: " + ex);
+            
+        }
+
     }
 
     /**
-     * Signal handler shuts down the server politely.
+     * Handler re-reads and then pushes the {@link Configuration} to zookeeper.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -296,12 +285,21 @@ public class ServicesManagerServer extends AbstractServer {
         private final String[] args;
 
         /**
+         * Install handler that re-reads and then pushes the
+         * {@link Configuration} to zookeeper.
          * 
          * @param signalName
          *            The signal name.
          * @param args
          *            The command line arguments (the identify the configuration
          *            and any overrides).
+         * 
+         * @see http://www-128.ibm.com/developerworks/java/library/i-signalhandling/
+         * 
+         * @see http://forum.java.sun.com/thread.jspa?threadID=514860&messageID=2451429
+         *      for the use of {@link Runtime#addShutdownHook(Thread)}.
+         * 
+         * @see http://twit88.com/blog/2008/02/06/java-signal-handling/
          */
         @SuppressWarnings("all") // Signal is in the sun namespace
         protected PushConfigurationSignalHandler(final String signalName,
@@ -325,6 +323,8 @@ public class ServicesManagerServer extends AbstractServer {
          * Note: This does not change the {@link Configuration} on the service
          * or the {@link JiniFederation}. It is only designed to allow the push
          * of new {@link ServiceConfiguration}s to zookeeper.
+         * 
+         * @todo should this be done in another thread?
          */
         @SuppressWarnings("all") // Signal is in the sun namespace
         public void handle(final Signal sig) {
@@ -378,6 +378,72 @@ public class ServicesManagerServer extends AbstractServer {
 //                }
 
                 log.warn("Pushed configuration.");
+                
+            } catch (Throwable t) {
+
+                log.error("Signal handler failed : " + t, t);
+
+            }
+
+        }
+
+    }
+
+    /**
+     * Handler kills the child processes and then kills the parent.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private class KillChildrenAndSelfSignalHandler implements SignalHandler {
+
+        private final SignalHandler oldHandler;
+
+        /**
+         * Install handler that kills the child processes and then kills the
+         * parent.
+         * 
+         * @param signalName
+         *            The signal name.
+         * 
+         * @see http://www-128.ibm.com/developerworks/java/library/i-signalhandling/
+         * 
+         * @see http://forum.java.sun.com/thread.jspa?threadID=514860&messageID=2451429
+         *      for the use of {@link Runtime#addShutdownHook(Thread)}.
+         * 
+         * @see http://twit88.com/blog/2008/02/06/java-signal-handling/
+         */
+        @SuppressWarnings("all")
+        // Signal is in the sun namespace
+        protected KillChildrenAndSelfSignalHandler(final String signalName) {
+
+            final Signal signal = new Signal(signalName);
+
+            this.oldHandler = Signal.handle(signal, this);
+            
+            if (INFO)
+                log.info("Installed handler: " + signal + ", oldHandler="
+                        + this.oldHandler);
+
+        }
+
+        /**
+         * Kills all child processes and then forces the parent to exit as well.
+         * 
+         * @todo should this be done in another thread?
+         */
+        @SuppressWarnings("all") // Signal is in the sun namespace
+        public void handle(final Signal sig) {
+
+            log.warn("Processing signal: " + sig);
+
+            try {
+                
+                final AbstractServicesManagerService service = (AbstractServicesManagerService) impl;
+
+                service.killChildProcesses();
+
+                shutdownNow();
                 
             } catch (Throwable t) {
 

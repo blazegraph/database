@@ -1,6 +1,7 @@
 package com.bigdata.jini.start;
 
 import java.io.IOException;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -85,57 +86,63 @@ public abstract class AbstractServicesManagerService extends AbstractService
     synchronized public void shutdown() {
 
 //        if(true) return;
-//        
-//        final ConcurrentLinkedQueue<ProcessHelper> problems = new ConcurrentLinkedQueue<ProcessHelper>();
-//        
-//        // destroy any running processes
-//        for (ProcessHelper helper : runningProcesses) {
-//
-//            if (helper instanceof JiniProcessHelper)
-//                continue;
-//            
-//            if (helper instanceof ZookeeperProcessHelper)
-//                continue;
-//
-//            try {
-//                helper.kill();
-//            } catch (Throwable t) {
-//                log.warn("Could not kill process: "+helper);
-//                // add to list of problem processes.
-//                problems.add(helper);
-//                // remove from list of running processes.
-//                runningProcesses.remove(helper);
-//            }
-//
-//        }
-//
-//        // try again for the problem processes, raising the logging level.
-//        for (ProcessHelper helper : problems) {
-//
-//            try {
-//                helper.kill();
-//            } catch (Throwable t) {
-//                log.error("Could not kill process: " + helper);
-//                problems.add(helper);
-//            }
-//
-//        }
-//
-//        /*
-//         * This time we take down zookeeper and jini.
-//         */ 
-//        for (ProcessHelper helper : runningProcesses) {
-//
-//            try {
-//                helper.kill();
-//            } catch (Throwable t) {
-//                log.warn("Could not kill process: " + helper);
-//            }
-//
-//        }
 
     }
 
+    /**
+     * Kills any child processes.  Zookeeper and jini are killed last.
+     */
+    protected void killChildProcesses() {
+
+        final List<ProcessHelper> problems = new LinkedList<ProcessHelper>();
+
+        // destroy any running processes
+        for (ProcessHelper helper : runningProcesses) {
+
+            if (helper instanceof JiniCoreServicesProcessHelper)
+                continue;
+
+            if (helper instanceof ZookeeperProcessHelper)
+                continue;
+
+            try {
+                helper.kill();
+            } catch (Throwable t) {
+                log.warn("Could not kill process: " + helper);
+                // add to list of problem processes.
+                problems.add(helper);
+                // remove from list of running processes.
+                runningProcesses.remove(helper);
+            }
+
+        }
+
+        // try again for the problem processes, raising the logging level.
+        for (ProcessHelper helper : problems) {
+
+            try {
+                helper.kill();
+            } catch (Throwable t) {
+                log.error("Could not kill process: " + helper);
+            }
+
+        }
+
+        /*
+         * This time we take down zookeeper and jini.
+         */
+        for (ProcessHelper helper : runningProcesses) {
+
+            try {
+                helper.kill();
+            } catch (Throwable t) {
+                log.warn("Could not kill process: " + helper);
+            }
+
+        }
+
+    }
+    
     @Override
     public Class getServiceIface() {
 

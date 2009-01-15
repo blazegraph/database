@@ -59,6 +59,7 @@ import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.KeeperException.NoNodeException;
 
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.io.IStreamSerializer;
@@ -798,7 +799,16 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
 //        System.err.println("enter : " + zpath);
 
-        final List<String> children = z.getChildren(zpath, false);
+        final List<String> children;
+        try {
+
+            children = z.getChildren(zpath, false);
+            
+        } catch (NoNodeException ex) {
+            
+            // node is gone.
+            return;
+        }
 
         for (String child : children) {
 
@@ -809,7 +819,14 @@ public class JiniFederation extends AbstractDistributedFederation implements
         if(INFO)
             log.info("delete: " + zpath);
 
-        z.delete(zpath, -1/* version */);
+        try {
+            z.delete(zpath, -1/* version */);
+
+        } catch(NoNodeException ex) {
+        
+            // node is gone.
+            
+        }
         
     }
     
