@@ -1,7 +1,6 @@
 package com.bigdata.jini.start;
 
 import java.io.IOException;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -24,6 +23,7 @@ import com.bigdata.jini.start.process.JiniCoreServicesProcessHelper;
 import com.bigdata.jini.start.process.ProcessHelper;
 import com.bigdata.jini.start.process.ZookeeperProcessHelper;
 import com.bigdata.service.AbstractService;
+import com.bigdata.service.IServiceShutdown;
 import com.bigdata.service.jini.JiniFederation;
 
 /**
@@ -33,7 +33,7 @@ import com.bigdata.service.jini.JiniFederation;
  * @version $Id$
  */
 public abstract class AbstractServicesManagerService extends AbstractService
-        implements IServicesManagerService, IServiceListener {
+        implements IServicesManagerService, IServiceListener, IServiceShutdown {
 
     private final Properties properties;
 
@@ -60,13 +60,41 @@ public abstract class AbstractServicesManagerService extends AbstractService
      */
     final private ConcurrentLinkedQueue<ProcessHelper> runningProcesses = new ConcurrentLinkedQueue<ProcessHelper>();
 
-    public void add(ProcessHelper service) {
+    /*
+     * Note: The means by which we lock out child processes from starting is not
+     * very clean.
+     */
+    public void add(final ProcessHelper service) {
 
+        // add it first.
         runningProcesses.add(service);
+
+        if (!open || !childStartsAllowed) {
+
+            log.warn("New processes may not start: " + service);
+
+            try {
+
+                log.warn("Killing: " + service);
+                
+                /*
+                 * Kill it - this will remove it from the set of running
+                 * processes.
+                 */
+                
+                service.kill();
+                
+            } catch (InterruptedException e) {
+                
+                log.warn(e);
+                
+            }
+
+        }
 
     }
 
-    public void remove(ProcessHelper service) {
+    public void remove(final ProcessHelper service) {
 
         runningProcesses.remove(service);
 
@@ -80,21 +108,43 @@ public abstract class AbstractServicesManagerService extends AbstractService
 
     }
 
-    /**
-     * NOP
-     */
     synchronized public void shutdown() {
 
-//        if(true) return;
+        if(!open) return;
+        
+        open = false;
+
+        childStartsAllowed = false;
 
     }
 
+    synchronized public void shutdownNow() {
+
+        if(!open) return;
+
+        open = false;
+
+        childStartsAllowed = false;
+
+    }
+
+    public boolean isOpen() {
+
+        return open;
+        
+    }
+    private volatile boolean open = true;
+    private volatile boolean childStartsAllowed = true;
+
     /**
-     * Kills any child processes.  Zookeeper and jini are killed last.
+     * Sets a flag to disallow new process starts and kills any running child
+     * processes.
      */
     protected void killChildProcesses() {
 
-        final List<ProcessHelper> problems = new LinkedList<ProcessHelper>();
+       childStartsAllowed = false; 
+        
+//        final List<ProcessHelper> problems = new LinkedList<ProcessHelper>();
 
         // destroy any running processes
         for (ProcessHelper helper : runningProcesses) {
@@ -108,38 +158,38 @@ public abstract class AbstractServicesManagerService extends AbstractService
             try {
                 helper.kill();
             } catch (Throwable t) {
-                log.warn("Could not kill process: " + helper);
-                // add to list of problem processes.
-                problems.add(helper);
+                log.error("Could not kill process: " + helper);
+//                // add to list of problem processes.
+//                problems.add(helper);
                 // remove from list of running processes.
                 runningProcesses.remove(helper);
             }
 
         }
 
-        // try again for the problem processes, raising the logging level.
-        for (ProcessHelper helper : problems) {
-
-            try {
-                helper.kill();
-            } catch (Throwable t) {
-                log.error("Could not kill process: " + helper);
-            }
-
-        }
-
-        /*
-         * This time we take down zookeeper and jini.
-         */
-        for (ProcessHelper helper : runningProcesses) {
-
-            try {
-                helper.kill();
-            } catch (Throwable t) {
-                log.warn("Could not kill process: " + helper);
-            }
-
-        }
+//        // try again for the problem processes, raising the logging level.
+//        for (ProcessHelper helper : problems) {
+//
+//            try {
+//                helper.kill();
+//            } catch (Throwable t) {
+//                log.error("Could not kill process: " + helper);
+//            }
+//
+//        }
+//
+//        /*
+//         * This time we take down zookeeper and jini.
+//         */
+//        for (ProcessHelper helper : runningProcesses) {
+//
+//            try {
+//                helper.kill();
+//            } catch (Throwable t) {
+//                log.warn("Could not kill process: " + helper);
+//            }
+//
+//        }
 
     }
     

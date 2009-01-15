@@ -438,11 +438,17 @@ public class ServicesManagerServer extends AbstractServer {
             log.warn("Processing signal: " + sig);
 
             try {
-                
-                final AbstractServicesManagerService service = (AbstractServicesManagerService) impl;
 
-                service.killChildProcesses();
+                final AdministrableServicesManagerService service = (AdministrableServicesManagerService) impl;
 
+                if (service != null) {
+
+                    // kill child processes (and locks out new children).
+                    service.killChildProcesses();
+
+                }
+
+                // shutdown the service.
                 shutdownNow();
                 
             } catch (Throwable t) {
