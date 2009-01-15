@@ -140,7 +140,7 @@ public class MetadataServer extends DataServer {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected static class AdministrableMetadataService extends MetadataService
+    public static class AdministrableMetadataService extends MetadataService
             implements Remote, RemoteAdministrable, RemoteDestroyAdmin {
         
         protected MetadataServer server;
