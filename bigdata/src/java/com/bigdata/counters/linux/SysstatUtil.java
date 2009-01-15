@@ -70,24 +70,28 @@ public class SysstatUtil {
      * @return The path.
      */
     static public final File getPath() {
-        
-        return new File(System.getProperty(
-                "com.bigdata.counters.linux.sysstat.path", "/usr/bin/"));
+
+        final String PATH = "com.bigdata.counters.linux.sysstat.path";
+
+        final File file = new File(System.getProperty(PATH, "/usr/bin/"));
+
+        log.warn(PATH + "=" + file);
+
+        return file;
         
     }
     
     /**
-     * Splits a data line into fields based on whitespace and skipping over
-     * the date field (index zero (0) is the index of the first non-date
-     * field).
+     * Splits a data line into fields based on whitespace and skipping over the
+     * date field (index zero (0) is the index of the first non-date field).
      * <p>
-     * Note: Some fields can overflow, e.g., RSS. When this happens the
-     * fields in the data lines wind up eating into the whitespace to their
-     * <em>right</em>. This means that it is more robust to split the
-     * lines based on whitespace once we have skipped over the date field.
-     * Since we specify using {@link PIDStatCollector#setEnvironment(Map)}
-     * that we want an ISO date format, we know that the date field is 11
-     * characters. The data lines are broken up by whitespace after that.
+     * Note: Some fields can overflow, e.g., RSS. When this happens the fields
+     * in the data lines wind up eating into the whitespace to their
+     * <em>right</em>. This means that it is more robust to split the lines
+     * based on whitespace once we have skipped over the date field. Since we
+     * specify using {@link PIDStatCollector#setEnvironment(Map)} that we want
+     * an ISO date format, we know that the date field is 11 characters. The
+     * data lines are broken up by whitespace after that.
      * <p>
      * Note: Since we split on whitespace, the resulting strings are already
      * trimmed.
