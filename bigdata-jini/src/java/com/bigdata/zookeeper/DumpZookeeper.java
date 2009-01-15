@@ -28,9 +28,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.zookeeper;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.List;
+
+import net.jini.config.Configuration;
+import net.jini.config.ConfigurationException;
+import net.jini.config.ConfigurationProvider;
 
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.KeeperException;
@@ -40,6 +43,7 @@ import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.Stat;
 
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.jini.start.config.ZookeeperClientConfig;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -61,37 +65,30 @@ public class DumpZookeeper {
     }
 
     /**
+     * Dumps the zookeeper znodes for the bigdata federation.
      * 
      * @param args
+     *            A {@link Configuration} and optional overrides.
+     * 
      * @throws IOException
      * @throws InterruptedException
      * @throws KeeperException
+     * @throws ConfigurationException 
      */
-    public static void main(String[] args) throws IOException,
-            InterruptedException, KeeperException {
+    public static void main(final String[] args) throws IOException,
+            InterruptedException, KeeperException, ConfigurationException {
 
-        int clientPort = 2181;
+        final Configuration config = ConfigurationProvider.getInstance(args); 
+        
+        final ZookeeperClientConfig zooClientConfig = new ZookeeperClientConfig(config); 
 
-        System.err.println(ZooHelper.dump(InetAddress.getLocalHost(),
-                clientPort));
-
-        // if (args.length != 1) {
-        //
-        // System.err.println("hosts");
-        //
-        // System.exit(1);
-        //
-        // }
-        //
-        String hosts = "localhost:" + clientPort;
-
-        // relative znode to start dump.
-        String znode = "test-fed";
+//        System.err.println(ZooHelper.dump(InetAddress.getLocalHost(),
+//                clientPort));
 
         boolean showData = false;
         
-        ZooKeeper z = new ZooKeeper(hosts, 2000/* sessionTimeout */,
-                new Watcher() {
+        final ZooKeeper z = new ZooKeeper(zooClientConfig.servers,
+                2000/* sessionTimeout */, new Watcher() {
 
                     public void process(WatchedEvent event) {
 
@@ -102,7 +99,7 @@ public class DumpZookeeper {
 
         try {
             
-            new DumpZookeeper(z).dump(showData,"", znode, 0);
+            new DumpZookeeper(z).dump(showData,"", zooClientConfig.zroot, 0);
             
         } finally {
 
