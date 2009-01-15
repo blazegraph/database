@@ -154,7 +154,7 @@ public class ServicesManagerConfiguration extends BigdataServiceConfiguration {
 
             } else if (a.equals(DataServer.class.getName())) {
 
-                v.add(new MetadataServerConfiguration(config));
+                v.add(new DataServerConfiguration(config));
 
             } else if (a.equals(LoadBalancerServer.class.getName())) {
 
@@ -174,15 +174,6 @@ public class ServicesManagerConfiguration extends BigdataServiceConfiguration {
         // + ClassServer.class.getSimpleName(), SerializerUtil
         // .serialize(classServerConfig), acl,
         // CreateMode.PERSISTENT);
-
-//        // metadata server
-//        v.add(new MetadataServerConfiguration(config));
-//
-//        // data server(s) (lots!)
-//        v.add(new DataServerConfiguration(config));
-//
-//        // load balancer server.
-//        v.add(new LoadBalancerConfiguration(config));
 
         return v.toArray(new ServiceConfiguration[0]);
             

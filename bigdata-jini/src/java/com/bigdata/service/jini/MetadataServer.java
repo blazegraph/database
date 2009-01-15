@@ -114,8 +114,8 @@ public class MetadataServer extends DataServer {
 
         new MetadataServer(args, new FakeLifeCycle()).run();
 
-        // System.exit(0);
-        Runtime.getRuntime().halt(0);
+        System.exit(0);
+//      Runtime.getRuntime().halt(0);
 
     }
 

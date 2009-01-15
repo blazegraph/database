@@ -87,8 +87,8 @@ public class LoadBalancerServer extends AbstractServer {
         
         new LoadBalancerServer(args, new FakeLifeCycle()).run();
 
-//      System.exit(0);
-        Runtime.getRuntime().halt(0);
+        System.exit(0);
+//      Runtime.getRuntime().halt(0);
 
     }
 

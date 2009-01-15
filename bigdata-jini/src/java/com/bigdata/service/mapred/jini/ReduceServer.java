@@ -91,8 +91,8 @@ public class ReduceServer extends AbstractServer {
 
         new ReduceServer(args, new FakeLifeCycle()).run();
 
-        // System.exit(0);
-        Runtime.getRuntime().halt(0);
+        System.exit(0);
+//      Runtime.getRuntime().halt(0);
 
     }
 
