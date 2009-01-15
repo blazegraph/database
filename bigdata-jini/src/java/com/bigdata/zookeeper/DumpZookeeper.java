@@ -102,7 +102,7 @@ public class DumpZookeeper {
 
         try {
             
-            new DumpZookeeper(z).dump(showData, "", zooClientConfig.zroot, 0);
+            new DumpZookeeper(z).dump(showData, zooClientConfig.zroot, "", 0);
             
         } finally {
 
