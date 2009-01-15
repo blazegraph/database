@@ -159,7 +159,7 @@ public class JiniCoreServicesProcessHelper extends ProcessHelper {
                     + ", config=" + config);
 
         final JiniCoreServicesStarter<JiniCoreServicesProcessHelper> serviceStarter = serviceConfig
-                .newServiceStarter(listener);
+                .newServiceStarter(listener, clientConfig);
 
         // start jini.
         final JiniCoreServicesProcessHelper processHelper = serviceStarter
