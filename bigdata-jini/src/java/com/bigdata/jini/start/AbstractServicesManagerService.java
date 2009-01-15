@@ -287,25 +287,45 @@ public abstract class AbstractServicesManagerService extends AbstractService
     /**
      * If necessary, start a zookeeper service on this host.
      * 
-     * @throws IOException
-     * @throws ConfigurationException
+     * @return <code>true</code> if an instance was started successfully.
      */
-    protected void startZookeeperService(Configuration config)
+    protected boolean startZookeeperService(Configuration config)
             throws ConfigurationException, IOException {
 
-        ZookeeperProcessHelper.startZookeeper(config, this/* listener */);
+        try {
+
+            return ZookeeperProcessHelper
+                    .startZookeeper(config, this/* listener */) > 0;
+
+        } catch (Throwable t) {
+            
+            log.error("Could not start zookeeper service: " + t, t);
+            
+            return false;
+            
+        }
 
     }
 
     /**
      * If necessary, start the jini core services on this host.
      * 
-     * @throws Exception
+     * @return <code>true</code> if an instance was started successfully.
      */
-    protected void startJiniCoreServices(Configuration config) throws Exception {
+    protected boolean startJiniCoreServices(Configuration config) {
 
-        JiniCoreServicesProcessHelper
-                .startCoreServices(config, this/* listener */);
+        try {
+
+            return JiniCoreServicesProcessHelper
+                    .startCoreServices(config, this/* listener */);
+            
+        } catch (Throwable t) {
+            
+            log.error("Could not start jini services: " + t, t);
+            
+            return false;
+            
+        }
         
     }
     
