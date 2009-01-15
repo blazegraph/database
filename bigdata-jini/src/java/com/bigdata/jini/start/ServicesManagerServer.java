@@ -273,7 +273,7 @@ public class ServicesManagerServer extends AbstractServer {
 
         try {
 
-            new PushConfigurationSignalHandler("SIGHUP", args);
+            new PushConfigurationSignalHandler("HUP", args);
 
         } catch (IllegalArgumentException ex) {
 
