@@ -102,7 +102,7 @@ public class DumpZookeeper {
 
         try {
             
-            new DumpZookeeper(z).dump(showData, zooClientConfig.zroot, "", 0);
+            new DumpZookeeper(z).dump(showData, zooClientConfig.zroot, 0);
             
         } finally {
 
@@ -117,11 +117,8 @@ public class DumpZookeeper {
      * @throws KeeperException
      * 
      */
-    private void dump(final boolean showData, final String path,
-            final String znode, final int depth) throws KeeperException,
-            InterruptedException {
-
-        final String zpath = path + "/" + znode;
+    private void dump(final boolean showData, final String zpath,
+            final int depth) throws KeeperException, InterruptedException {
 
         final Stat stat = new Stat();
 
@@ -132,12 +129,15 @@ public class DumpZookeeper {
             
         } catch (NoNodeException ex) {
             
-            System.err.println("Not found: [" + path + "]");
+            System.err.println("Not found: [" + zpath + "]");
             
             return;
             
         }
 
+        // the current znode (last path component).
+        final String znode = zpath.substring(zpath.lastIndexOf('/') + 1);
+        
         System.out.print(i(depth) + znode
                 + (stat.getEphemeralOwner() != 0 ? " (Ephemeral)" : "") + " ");
 
@@ -176,7 +176,7 @@ public class DumpZookeeper {
 
         } catch (NoNodeException ex) {
 
-            System.err.println("Not found: [" + path + "]");
+            System.err.println("Not found: [" + zpath + "]");
             
             return;
 
@@ -184,7 +184,7 @@ public class DumpZookeeper {
 
         for (String child : children) {
 
-            dump(showData, zpath, child, depth + 1);
+            dump(showData, zpath + "/" + child, depth + 1);
 
         }
         
