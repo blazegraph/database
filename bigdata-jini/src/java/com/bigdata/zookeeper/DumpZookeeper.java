@@ -88,7 +88,7 @@ public class DumpZookeeper {
 //        System.err.println(ZooHelper.dump(InetAddress.getLocalHost(),
 //                clientPort));
 
-        boolean showData = false;
+        boolean showData = true;
         
         final ZooKeeper z = new ZooKeeper(zooClientConfig.servers,
                 2000/* sessionTimeout */, new Watcher() {
