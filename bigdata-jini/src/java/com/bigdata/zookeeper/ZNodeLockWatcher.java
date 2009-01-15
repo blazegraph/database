@@ -100,9 +100,14 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
     }
     
     /**
-     * Marker is used to invalidate a lock node before it is destroyed. If you
-     * are monitoring a znode whose children a lock nodes, then a child ending
-     * with this string IS NOT a lock node!
+     * The suffix for a marker that is a <strong>sibling</strong> of the lock
+     * node. The presence of this marker indicates that the queue is being
+     * destroyed. The {@link #isConditionSatisified()} logic will not allow a
+     * lock to be granted if this marker is found. Likewise, new children are
+     * not permitted into the queue when this marker is present.
+     * 
+     * Note: If you are monitoring a znode whose children a lock nodes, then a
+     * child ending with this string IS NOT a lock node!
      */
     public static final transient String INVALID = "_INVALID";
     
@@ -461,6 +466,16 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
                 long nanos = unit.toNanos(timeout);
 
                 /*
+                 * If there is a marker node indicating that the lock has been
+                 * invalidated then we DO NOT enter a child into the queue.
+                 */
+                if (zookeeper.exists(zpath + INVALID, false) != null) {
+
+                    throw new LockNodeInvalidatedException(zpath);
+                    
+                }
+                
+                /*
                  * There is no data in the ephemeral znode representing the
                  * process contending for the lock. Therefore no one needs to
                  * "read" this child znode. Since you can not delete the parent
@@ -472,6 +487,7 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
                 final String s = zookeeper.create(zpath + "/lock",
                         new byte[0], acl, CreateMode.EPHEMERAL_SEQUENTIAL);
 
+                // last path component is the znode of the child.
                 final String zchild = s.substring(s.lastIndexOf('/') + 1);
 
                 if (INFO)
@@ -501,12 +517,12 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
                     try {
 
                         /*
-                         * destroy the child (release lock if leader and
+                         * Destroy the child (release lock if we have it and
                          * drop out of queue contending for that lock).
                          */
 
                         zookeeper
-                                .delete(zpath + "/child", -1/* version */);
+                                .delete(zpath + "/" + zchild, -1/* version */);
 
                     } catch (Throwable t2) {
 
@@ -664,7 +680,7 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
                 zookeeper.delete(zpath, -1/* version */);
 
                 // delete the marker node that was used to invalidate the lock node.
-                zookeeper.delete(zpath + "/" + INVALID, -1/* version */);
+                zookeeper.delete(zpath + INVALID, -1/* version */);
                 
             } finally {
              
@@ -676,4 +692,28 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
 
     }
 
+    /**
+     * This exception is thrown if there is an attempt to acquire a
+     * {@link ZLock} but the lock node has been invalidated pending its
+     * destruction. This is essentially a distributed "interrupt". The lock WILL
+     * NOT be granted and the lock node itself should disappear shortly.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class LockNodeInvalidatedException extends InterruptedException {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 2491240005134272857L;
+        
+        public LockNodeInvalidatedException(String zpath) {
+            
+            super(zpath);
+            
+        }
+        
+    }
+    
 }
