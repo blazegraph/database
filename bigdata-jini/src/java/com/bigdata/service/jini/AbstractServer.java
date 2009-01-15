@@ -1045,7 +1045,12 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
              * Enter into the master / failover competition for the logical
              * service.
              */
-            masterElectionFuture = fed.submitMonitoredTask(new MasterElectionTask());
+            if (masterElectionFuture == null) {
+
+                masterElectionFuture = fed
+                        .submitMonitoredTask(new MasterElectionTask());
+
+            }
 
             if (INFO)
                 log.info("registered with zookeeper: zpath="
