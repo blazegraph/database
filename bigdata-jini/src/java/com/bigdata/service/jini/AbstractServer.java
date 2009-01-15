@@ -592,11 +592,18 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
                     switch (event.getState()) {
                     case Disconnected:
-                        if (masterElectionFuture != null) {
-                            masterElectionFuture
-                                    .cancel(true/* mayInterruptIfRunning */);
-                            masterElectionFuture = null;
-                            log.warn("Lost zookeeper connection: cancelled master election task.");
+                        synchronized (AbstractServer.this) {
+                            /*
+                             * Synchronized so that creating and cancelling the
+                             * master election future are atomic.
+                             */
+                            if (masterElectionFuture != null) {
+                                masterElectionFuture
+                                        .cancel(true/* mayInterruptIfRunning */);
+                                masterElectionFuture = null;
+                                log
+                                        .warn("Lost zookeeper connection: cancelled master election task.");
+                            }
                         }
                         break;
                     case NoSyncConnected:
@@ -1044,14 +1051,20 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             /*
              * Enter into the master / failover competition for the logical
              * service.
+             * 
+             * Note: Synchronized so that creating and cancelling the master
+             * election future are atomic.
              */
-            if (masterElectionFuture == null) {
+            synchronized (this) {
 
-                masterElectionFuture = fed
-                        .submitMonitoredTask(new MasterElectionTask());
+                if (masterElectionFuture == null) {
+
+                    masterElectionFuture = fed
+                            .submitMonitoredTask(new MasterElectionTask());
+
+                }
 
             }
-
             if (INFO)
                 log.info("registered with zookeeper: zpath="
                         + physicalServiceZPath);
