@@ -328,8 +328,8 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
                         .lastIndexOf('/'));
                 
                 // the znode of the logical service (last path component).
-                final String logicalServiceZNode = s.substring(s
-                        .lastIndexOf('/') + 1);
+                final String logicalServiceZNode = logicalServiceZPath
+                        .substring(logicalServiceZPath.lastIndexOf('/') + 1);
                 
                 // get children (the list of physical services).
                 final List<String> children = zookeeper.getChildren(
