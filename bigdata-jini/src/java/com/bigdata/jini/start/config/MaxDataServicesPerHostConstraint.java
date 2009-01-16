@@ -1,8 +1,11 @@
 package com.bigdata.jini.start.config;
 
+import java.net.InetAddress;
+
 import net.jini.core.lookup.ServiceItem;
 import net.jini.lookup.LookupCache;
 
+import com.bigdata.jini.lookup.entry.Hostname;
 import com.bigdata.jini.lookup.entry.HostnameFilter;
 import com.bigdata.jini.lookup.entry.ServiceItemFilterChain;
 import com.bigdata.service.IDataService;
@@ -44,8 +47,16 @@ public class MaxDataServicesPerHostConstraint extends
         // only consider data services.
         filter.add(DataServiceFilter.INSTANCE);
 
+        final String hostname = InetAddress.getLocalHost().getHostName();
+
+        final String canonicalHostname = InetAddress.getLocalHost()
+                .getCanonicalHostName();
+
         // filters for _this_ host.
-        filter.add(new HostnameFilter());
+        filter.add(new HostnameFilter(new Hostname[] {//
+                new Hostname(hostname),//
+                new Hostname(canonicalHostname) //
+                }));
 
         final ServiceItem[] serviceItems = lookupCache.lookup(filter,
                 maxServices);
@@ -54,9 +65,9 @@ public class MaxDataServicesPerHostConstraint extends
 
         // if (INFO)
         // log.info // @todo lower logging level.
-        MaxServicesPerHostConstraint.log.warn("New instance: allowed="
-                + allowed + ", maxServices=" + maxServices + ", #found="
-                + serviceItems.length);
+        log.warn("New instance: allowed=" + allowed + ", maxServices="
+                + maxServices + ", #found=" + serviceItems.length + ", host="
+                + canonicalHostname);
 
         return allowed;
 

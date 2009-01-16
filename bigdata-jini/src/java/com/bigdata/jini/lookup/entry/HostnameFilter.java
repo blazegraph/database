@@ -1,6 +1,5 @@
 package com.bigdata.jini.lookup.entry;
 
-import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 
@@ -16,28 +15,28 @@ import net.jini.lookup.ServiceItemFilter;
  */
 public class HostnameFilter implements ServiceItemFilter {
 
-    final Hostname[] attr;
+    final Hostname[] acceptHostname;
 
     public String toString() {
 
-        return getClass().getName() + "{" + Arrays.toString(attr) + "}";
+        return getClass().getName() + "{" + Arrays.toString(acceptHostname) + "}";
 
     }
 
-    public HostnameFilter() throws UnknownHostException {
+    public HostnameFilter(final Hostname[] attr) throws UnknownHostException {
 
-        final String hostname = InetAddress.getLocalHost().getHostName();
+        if (attr == null)
+            throw new IllegalArgumentException();
+        
+        for (Hostname a : attr) {
 
-        final String canonicalHostname = InetAddress.getLocalHost()
-                .getCanonicalHostName();
-
-        attr = new Hostname[] {
-
-        new Hostname(hostname),//
-                new Hostname(canonicalHostname) //
-
-        };
-
+            if (a == null || a.hostname == null)
+                throw new IllegalArgumentException();
+            
+        }
+        
+        this.acceptHostname = attr;
+        
     }
 
     public boolean check(final ServiceItem serviceItem) {
@@ -50,9 +49,9 @@ public class HostnameFilter implements ServiceItemFilter {
 
             }
 
-            for (Hostname n : attr) {
+            for (Hostname hostname : acceptHostname) {
 
-                if (n.hostname.equals(((Hostname) e).hostname)) {
+                if (hostname.hostname.equals(((Hostname) e).hostname)) {
 
                     return true;
 

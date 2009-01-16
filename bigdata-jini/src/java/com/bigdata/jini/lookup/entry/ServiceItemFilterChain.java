@@ -20,7 +20,7 @@ public class ServiceItemFilterChain implements ServiceItemFilter {
 
     }
 
-    public void add(ServiceItemFilter f) {
+    public void add(final ServiceItemFilter f) {
 
         if (f == null)
             throw new IllegalArgumentException();
