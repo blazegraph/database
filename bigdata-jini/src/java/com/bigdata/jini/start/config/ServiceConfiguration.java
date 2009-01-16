@@ -398,8 +398,8 @@ abstract public class ServiceConfiguration implements Serializable {
                 if (!constraint.allow(fed)) {
 
                     if (INFO)
-                        log.info("Will not start: class=" + className
-                                + ", violates constraint" + constraint);
+                        log.info("Violates constraint: class=" + className
+                                + ", constraint=" + constraint);
 
                     canStart = false;
 
