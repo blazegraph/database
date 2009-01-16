@@ -138,8 +138,11 @@ public class DumpZookeeper {
         // the current znode (last path component).
         final String znode = zpath.substring(zpath.lastIndexOf('/') + 1);
         
-        System.out.print(i(depth) + znode
-                + (stat.getEphemeralOwner() != 0 ? " (Ephemeral)" : "") + " ");
+        System.out.print(i(depth)
+                + znode
+                + (stat.getEphemeralOwner() != 0 ? " (Ephemeral"
+                        + (showData ? "" + stat.getEphemeralOwner() : "") + ")"
+                        : "") + " ");
 
         {
             String obj;

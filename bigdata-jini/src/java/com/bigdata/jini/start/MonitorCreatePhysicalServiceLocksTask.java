@@ -73,7 +73,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
      * Note: This assumes that there is one {@link ServicesManagerServer} per
      * host. We are not enforcing that constraint.
      */
-    final protected Lock lock = new ReentrantLock(true/* fair */);
+    final protected Lock lock = new ReentrantLock();
     
     public MonitorCreatePhysicalServiceLocksTask(final JiniFederation fed,
             final IServiceListener listener) {
@@ -285,11 +285,12 @@ public class MonitorCreatePhysicalServiceLocksTask implements
             if (zookeeper.exists(lockNodeZPath, false) == null) {
 
                 /*
-                 * End of the competition. Either someone created the
-                 * service or someone destroyed the lock node.
+                 * End of the competition. Either someone created the service or
+                 * someone destroyed the lock node.
                  */
 
-                return false;
+                throw new InterruptedException("lock node is gone: zpath="
+                        + lockNodeZPath);
 
             }
 
@@ -297,6 +298,16 @@ public class MonitorCreatePhysicalServiceLocksTask implements
             final ZLock zlock = ZNodeLockWatcher.getLock(zookeeper,
                     lockNodeZPath, fed.getZooConfig().acl);
 
+            /*
+             * Wait for the global lock.
+             * 
+             * Note: It SHOULD be Ok to wait forever here. The process holding
+             * the zlock is represented by an ephemeral znode. If it dies the
+             * lock will be released.
+             * 
+             * Note: Blocking here DOES NOT prevent the services manager from
+             * contending for zlocks for other service types in parallel.
+             */
             zlock.lock();
             try {
 
@@ -330,6 +341,18 @@ public class MonitorCreatePhysicalServiceLocksTask implements
         }
         
         /**
+         * Either barges in or waits at most a short while before yielding to
+         * another process (by returning false).
+         * <p>
+         * Note: We are using nexted locks (a global {@link ZLock} and a local
+         * {@link #lock}). The global {@link ZLock} allows at most one process
+         * to proceed per logical service. The local {@link #lock} allows only
+         * one task to create a service at a time on a given host (well, a given
+         * services manager). This barge-in / timeout pattern prevents other
+         * distributed processes from blocking while this process is seeking to
+         * acquire a local lock. Either it will grab the lock immediately or
+         * wait at most a short interval for the lock.
+         * 
          * @return <code>true</code> iff the service was started.
          * 
          * @throws Exception
@@ -338,17 +361,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
                 throws Exception {
 
             /*
-             * Barge in or wait at most a short while before yielding to another
-             * process (by returning false).
-             * 
-             * Note: We are using nexted locks (a global lock and a local lock).
-             * The global lock allows at most one process to proceed per logical
-             * service. The local lock allows only one task to create a service
-             * at a time on a given host (well, a given services manager). This
-             * barge/timeout pattern prevents other distributed processes from
-             * blocking while this process is seeking to acquire a local lock.
-             * Either it will grab the lock immediately or wait at most a short
-             * interval for the lock.
+             * Either barge-in or wait for up to short interval.
              * 
              * @todo configure this interval?
              */

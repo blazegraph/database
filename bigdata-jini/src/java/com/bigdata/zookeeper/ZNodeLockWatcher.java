@@ -527,20 +527,25 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
 
                 } catch (Throwable t) {
 
-                    try {
+                    /*
+                     * Destroy the child (release lock if we have it and drop
+                     * out of queue contending for that lock).
+                     */
 
-                        /*
-                         * Destroy the child (release lock if we have it and
-                         * drop out of queue contending for that lock).
-                         */
+                    try {
 
                         zookeeper
                                 .delete(zpath + "/" + zchild, -1/* version */);
 
+                    } catch (NoNodeException ex) {
+
+                        // ignore.
+
                     } catch (Throwable t2) {
 
                         // log warning and ignore.
-                        log.warn(t2, t2);
+                        log.warn("Problem deleting our child: zpath=" + zpath
+                                + ", zchild=" + zchild, t2);
 
                     }
 
