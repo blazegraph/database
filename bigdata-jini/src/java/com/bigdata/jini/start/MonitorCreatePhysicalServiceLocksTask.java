@@ -3,6 +3,7 @@ package com.bigdata.jini.start;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -62,7 +63,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
      * Note: This assumes that there is one {@link ServicesManagerServer} per
      * host. We are not enforcing that constraint.
      */
-    final protected Lock lock = new ReentrantLock();
+    final protected Lock lock = new ReentrantLock(true/* fair */);
     
     public MonitorCreatePhysicalServiceLocksTask(final JiniFederation fed,
             final IServiceListener listener) {
@@ -196,7 +197,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
 
         /**
          * Contends for the {@link ZLock} and then invokes
-         * {@link #runWithLock()}, which will verify the constraints and
+         * {@link #runWithZLock()}, which will verify the constraints and
          * attempt to start the service.
          * <p>
          * Note: If we are unable to create the service while we are holding the
@@ -315,7 +316,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
                 if (INFO)
                     log.info("have lock: zpath=" + lockNodeZPath);
 
-                if (runWithLock()) {
+                if (runWithZLock()) {
 
                     // iff successful, then destroy the lock.
                     zlock.destroyLock();
@@ -349,7 +350,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
          * 
          * @throws Exception
          */
-        private boolean runWithLock()
+        private boolean runWithZLock()
                 throws Exception {
 
             /*
@@ -431,7 +432,14 @@ public class MonitorCreatePhysicalServiceLocksTask implements
          * Start the service.
          * 
          * @param config
+         *            The service configuration.
          * @param logicalServiceZPath
+         *            The zpath of the logical service.
+         * 
+         * @throws TimeoutException
+         *             if the service did not start within the configured
+         *             timeout.
+         * 
          * @throws Exception
          */
         @SuppressWarnings("unchecked")
