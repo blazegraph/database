@@ -54,7 +54,17 @@ public class MonitorCreatePhysicalServiceLocksTask implements
     private final IServiceListener listener;
     
     /**
-     * Used to serialize physical service creates on a given host.
+     * Used to serialize physical service creates on a given host. This is
+     * important in order for constaints on the maximum #of service instances on
+     * a single host to be respected (and assumes only a single services manager
+     * per host).
+     * <p>
+     * Consider: A new {@link ServicesManagerServer} starts on a host. It sees a
+     * demand for 10 data services. For each one, it tests a constraint on the
+     * maximum #of data service instances (LTE 2) and finds that it has NO data
+     * services running, so for each one it creates a data service and then it
+     * has 10. By synchronizing here we force this to single thread the service
+     * creates and in order to avoid this problem.
      * <p>
      * Note: this assumes one {@link MonitorCreatePhysicalServiceLocksTask} per
      * {@link ServicesManagerServer}, which should be true. See the startup
@@ -221,45 +231,14 @@ public class MonitorCreatePhysicalServiceLocksTask implements
             // until we create the service or the lock node is destroyed.
             while (true) {
 
-                /*
-                 * This enforces a single lock acquisition attempt at a time.
-                 * This is important in order for constaints on the maximum #of
-                 * service instances on a single host to be respected (and
-                 * assumes only a single services manager per host).
-                 * 
-                 * Consider: A new {@link ServicesManagerServer} starts on a
-                 * host. It sees a demand for 10 data services. For each one, it
-                 * tests a constraint on the maximum #of data service instances
-                 * (LTE 2) and finds that it has NO data services running, so
-                 * for each one it creates a data service and then it has 10. By
-                 * synchronizing here we force this to single thread the service
-                 * creates and in order to avoid this problem.
-                 */
-                lock.lock();
-                
                 try {
-
-                    if (zookeeper.exists(lockNodeZPath, false) == null) {
-
-                        /*
-                         * End of the competition. Either someone created the
-                         * service or someone destroyed the lock node.
-                         */
-
-                        return false;
-
-                    }
-
+                    
                     if (runOnce()) {
-
-                        /*
-                         * Service was created.
-                         */
 
                         return true;
 
                     }
-
+                    
                 } catch (InterruptedException ex) {
 
                     // interrupted - stop competing.
@@ -271,19 +250,16 @@ public class MonitorCreatePhysicalServiceLocksTask implements
 
                     // fall through.
 
-                } finally {
-
-                    lock.unlock();
-
                 }
-
+                
                 /*
-                 * We were not able to create the service while we held the
-                 * lock. This can occur if there is a precondition for the
-                 * service which is not satisified. Wait a bit a try again.
+                 * We did not create the service this time. This can occur if
+                 * there is a precondition for the service which is not
+                 * satisified. Wait a bit a try again.
                  * 
-                 * Note: We have released the [lock] so other service creates
-                 * can proceed while we sleep on this one.
+                 * Note: We have released the both the local [lock] and the
+                 * [zlock] so other service creates can proceed while we sleep
+                 * on this one.
                  * 
                  * @todo configure retry interval.
                  */
@@ -306,6 +282,17 @@ public class MonitorCreatePhysicalServiceLocksTask implements
          */
         private boolean runOnce() throws Exception {
 
+            if (zookeeper.exists(lockNodeZPath, false) == null) {
+
+                /*
+                 * End of the competition. Either someone created the
+                 * service or someone destroyed the lock node.
+                 */
+
+                return false;
+
+            }
+
             // enter the competition.
             final ZLock zlock = ZNodeLockWatcher.getLock(zookeeper,
                     lockNodeZPath, fed.getZooConfig().acl);
@@ -313,9 +300,15 @@ public class MonitorCreatePhysicalServiceLocksTask implements
             zlock.lock();
             try {
 
+                /*
+                 * We are holding a global lock on the right to create a
+                 * physical service instance for the logical service whose zpath
+                 * is given by the data in the lock node.
+                 */
+                
                 if (INFO)
                     log.info("have lock: zpath=" + lockNodeZPath);
-
+                
                 if (runWithZLock()) {
 
                     // iff successful, then destroy the lock.
@@ -337,6 +330,53 @@ public class MonitorCreatePhysicalServiceLocksTask implements
         }
         
         /**
+         * @return <code>true</code> iff the service was started.
+         * 
+         * @throws Exception
+         */
+        private boolean runWithZLock()
+                throws Exception {
+
+            /*
+             * Barge in or wait at most a short while before yielding to another
+             * process (by returning false).
+             * 
+             * Note: We are using nexted locks (a global lock and a local lock).
+             * The global lock allows at most one process to proceed per logical
+             * service. The local lock allows only one task to create a service
+             * at a time on a given host (well, a given services manager). This
+             * barge/timeout pattern prevents other distributed processes from
+             * blocking while this process is seeking to acquire a local lock.
+             * Either it will grab the lock immediately or wait at most a short
+             * interval for the lock.
+             * 
+             * @todo configure this interval?
+             */
+            if (lock.tryLock() || lock.tryLock(2000, TimeUnit.MILLISECONDS)) {
+
+                try {
+
+                    return runWithLocalLock();
+
+                } finally {
+
+                    lock.unlock();
+
+                }
+
+            }
+            
+            return false;
+
+        }
+
+        private boolean runWithLocalLock() throws Exception {
+            
+            return checkConstraintsAndStartService();
+            
+        }
+
+        /**
          * Starts the service if the the {@link IServiceConstraint}s are
          * satisified.
          * <p>
@@ -346,12 +386,9 @@ public class MonitorCreatePhysicalServiceLocksTask implements
          * judges matters as they stand at the time of the decision, rather than
          * when we joined the queue to contend for the {@link ZLock}.
          * 
-         * @return <code>true</code> iff the service was started.
-         * 
          * @throws Exception
          */
-        private boolean runWithZLock()
-                throws Exception {
+        private boolean checkConstraintsAndStartService() throws Exception {
 
             /*
              * Note: The data is the logicalService zpath.
@@ -427,7 +464,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
             }
 
         }
-
+        
         /**
          * Start the service.
          * 

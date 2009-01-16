@@ -273,10 +273,23 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
      * 
      * @throws KeeperException
      * @throws InterruptedException
+     * @throws LockNodeInvalidatedException
+     *             if the lock node has been invalidated but not yet destroyed.
      */
     public static ZLockImpl getLock(final ZooKeeper zookeeper,
             final String zpath, final List<ACL> acl) throws KeeperException,
             InterruptedException {
+
+        if (zookeeper.exists(zpath + INVALID, false) == null) {
+
+            /*
+             * End of the competition. Either someone created the service or
+             * someone destroyed the lock node.
+             */
+
+            throw new LockNodeInvalidatedException(zpath);
+
+        }
 
         try {
 
