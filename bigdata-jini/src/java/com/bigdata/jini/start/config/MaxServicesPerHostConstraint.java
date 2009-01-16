@@ -38,6 +38,7 @@ import net.jini.lookup.ServiceDiscoveryManager;
 import org.apache.log4j.Logger;
 
 import com.bigdata.jini.lookup.entry.Hostname;
+import com.bigdata.jini.start.MonitorCreatePhysicalServiceLocksTask;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.MetadataService;
@@ -63,15 +64,12 @@ import com.bigdata.service.jini.MetadataServer.AdministrableMetadataService;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @see MonitorCreatePhysicalServiceLocksTask
  * 
- * @todo Other kinds of rules could be imposed. Such as no allowing one any
- *       other kind of service on a host running a specified kind of service.
- *       For example, do not run any other service on a host running zookeeper
- *       (listed as a zookeeper server) or running the metadata service. You can
- *       accomplish all of that using static constraints, but the constraints
- *       could also be specified dynamically. However, such dynamic constraints
- *       could not be atomic as concurrent service start decisions could lead to
- *       a post-condition which violates the constraint.
+ * @todo Other kinds of constraints could limit the mixture of services that may
+ *       run on a host. For example, do not run any other service on a host
+ *       running zookeeper (or listed as a zookeeper server) or on a host
+ *       running the {@link MetadataService}.
  */
 public class MaxServicesPerHostConstraint implements IServiceConstraint {
 
@@ -93,6 +91,16 @@ public class MaxServicesPerHostConstraint implements IServiceConstraint {
      */
     protected final long timeout;
 
+    public String toString() {
+
+        return getClass().getName() + //
+                "{ className=" + className + //
+                ", maxServices=" + maxServices + //
+                ", timeout=" + timeout + //
+                "}";
+        
+    }
+    
     /**
      * Creates a constraint with a default service discovery timeout (2000 ms).
      * 
@@ -139,6 +147,8 @@ public class MaxServicesPerHostConstraint implements IServiceConstraint {
     }
 
     public boolean allow(final JiniFederation fed) throws Exception {
+
+        final long begin = System.currentTimeMillis();
         
         final String hostname = InetAddress.getLocalHost().getHostName();
 
@@ -147,12 +157,17 @@ public class MaxServicesPerHostConstraint implements IServiceConstraint {
         
         final Class cls = Class.forName(className);
 
-        final ServiceTemplate tmpl = new ServiceTemplate(null/* serviceID */,
-        // must match the class or interface.
-                new Class[] { cls }, new Entry[] {
-                        // must be on this host (match any of these).
-                        new Hostname(hostname),
-                        new Hostname(canonicalHostname), });
+        final ServiceTemplate tmpl = new ServiceTemplate(
+                // No serviceID constraint.
+                null,
+                // must match the class or interface.
+                new Class[] { cls },
+                // must match at least one Entry.
+                new Entry[] {//
+                    new Hostname(hostname),//
+                    new Hostname(canonicalHostname),//
+                }
+        );
 
         final ServiceDiscoveryManager serviceDiscoveryManager = new ServiceDiscoveryManager(
                 fed.getDiscoveryManagement(), new LeaseRenewalManager());
@@ -165,11 +180,15 @@ public class MaxServicesPerHostConstraint implements IServiceConstraint {
                             timeout/* waitDur */);
 
             final boolean allowed = serviceItems.length < maxServices;
+ 
+            final long elapsed = System.currentTimeMillis() - begin;
             
 //            if (INFO)
-//                log.info // @todo lower logging level.
-                log.warn("New instance: allowed=" + allowed + ", #found="
-                        + serviceItems.length + ", host=" + canonicalHostname);
+            // log.info // @todo lower logging level.
+            log.warn("New instance: allowed=" + allowed + ", className="
+                    + className + ", maxServices=" + maxServices + ", #found="
+                    + serviceItems.length + ", host=" + canonicalHostname
+                    + ", timeout=" + timeout + ", elapsed=" + elapsed);
 
             return allowed;
 

@@ -3,6 +3,8 @@ package com.bigdata.jini.start;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.ZooKeeper;
@@ -18,11 +20,18 @@ import com.bigdata.zookeeper.ZLock;
 import com.bigdata.zookeeper.ZNodeLockWatcher;
 
 /**
- * Notices when a new lock node is created and creates and runs a
+ * This task notices when a new lock node is created and creates and runs a
  * {@link CreatePhysicalServiceTask} to handle that lock node. The lock node
  * represents a specific logical service instance which is short at least one
  * physical service instance. The data of the lock node contains the zpath of
  * the logical service instance.
+ * <p>
+ * Note: A single instance of this task is started by
+ * {@link AbstractServicesManagerService#start()}. Further, this task
+ * serializes service creations events using a {@link #lock}. If only a single
+ * {@link ServicesManagerServer} is run per host, then this allows
+ * {@link IServiceConstraint}s to be specified that restrict the mixture of
+ * services running a host.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -42,6 +51,18 @@ public class MonitorCreatePhysicalServiceLocksTask implements
     private final ZooKeeper zookeeper;
     
     private final IServiceListener listener;
+    
+    /**
+     * Used to serialize physical service creates on a given host.
+     * <p>
+     * Note: this assumes one {@link MonitorCreatePhysicalServiceLocksTask} per
+     * {@link ServicesManagerServer}, which should be true. See the startup
+     * logic in {@link AbstractServicesManagerService}.
+     * <p>
+     * Note: This assumes that there is one {@link ServicesManagerServer} per
+     * host. We are not enforcing that constraint.
+     */
+    final protected Lock lock = new ReentrantLock();
     
     public MonitorCreatePhysicalServiceLocksTask(final JiniFederation fed,
             final IServiceListener listener) {
@@ -102,6 +123,14 @@ public class MonitorCreatePhysicalServiceLocksTask implements
                     if (INFO)
                         log.info("new lock: zpath=" + lockNodeZPath);
 
+                    /*
+                     * Note: This task should run until either it or another
+                     * services manager causes the service to be created, until
+                     * the lock node is destroyed, or until the constraints no
+                     * longer indicate that we need to create a new service
+                     * instance.
+                     */
+
                     fed.submitMonitoredTask(new CreatePhysicalServiceTask(
                             lockNodeZPath));
 
@@ -150,6 +179,10 @@ public class MonitorCreatePhysicalServiceLocksTask implements
      */
     public class CreatePhysicalServiceTask implements Callable<Boolean> {
 
+        /**
+         * The zpath of the lock node. The data in this node is the xpath of the
+         * logical service whose instance needs to be created.
+         */
         protected final String lockNodeZPath;
 
         public CreatePhysicalServiceTask(final String lockNodeZPath) {
@@ -187,6 +220,22 @@ public class MonitorCreatePhysicalServiceLocksTask implements
             // until we create the service or the lock node is destroyed.
             while (true) {
 
+                /*
+                 * This enforces a single lock acquisition attempt at a time.
+                 * This is important in order for constaints on the maximum #of
+                 * service instances on a single host to be respected (and
+                 * assumes only a single services manager per host).
+                 * 
+                 * Consider: A new {@link ServicesManagerServer} starts on a
+                 * host. It sees a demand for 10 data services. For each one, it
+                 * tests a constraint on the maximum #of data service instances
+                 * (LTE 2) and finds that it has NO data services running, so
+                 * for each one it creates a data service and then it has 10. By
+                 * synchronizing here we force this to single thread the service
+                 * creates and in order to avoid this problem.
+                 */
+                lock.lock();
+                
                 try {
 
                     if (zookeeper.exists(lockNodeZPath, false) == null) {
@@ -200,29 +249,13 @@ public class MonitorCreatePhysicalServiceLocksTask implements
 
                     }
 
-                    // enter the competition.
-                    final ZLock zlock = ZNodeLockWatcher.getLock(zookeeper,
-                            lockNodeZPath, fed.getZooConfig().acl);
+                    if (runOnce()) {
 
-                    zlock.lock();
-                    try {
+                        /*
+                         * Service was created.
+                         */
 
-                        if (INFO)
-                            log.info("have lock: zpath=" + lockNodeZPath);
-
-                        if (runWithLock(lockNodeZPath)) {
-
-                            // iff successful, then destroy the lock.
-                            zlock.destroyLock();
-
-                            // end of the competition.
-                            return true;
-
-                        }
-
-                    } finally {
-
-                        zlock.unlock();
+                        return true;
 
                     }
 
@@ -237,12 +270,21 @@ public class MonitorCreatePhysicalServiceLocksTask implements
 
                     // fall through.
 
+                } finally {
+
+                    lock.unlock();
+
                 }
 
                 /*
                  * We were not able to create the service while we held the
                  * lock. This can occur if there is a precondition for the
                  * service which is not satisified. Wait a bit a try again.
+                 * 
+                 * Note: We have released the [lock] so other service creates
+                 * can proceed while we sleep on this one.
+                 * 
+                 * @todo configure retry interval.
                  */
 
                 Thread.sleep(5000/* ms */);
@@ -255,6 +297,45 @@ public class MonitorCreatePhysicalServiceLocksTask implements
         }
 
         /**
+         * Run once, trying to acquire the {@link ZLock}.
+         * 
+         * @return <code>true</code> iff the service was created.
+         * 
+         * @throws Exception
+         */
+        private boolean runOnce() throws Exception {
+
+            // enter the competition.
+            final ZLock zlock = ZNodeLockWatcher.getLock(zookeeper,
+                    lockNodeZPath, fed.getZooConfig().acl);
+
+            zlock.lock();
+            try {
+
+                if (INFO)
+                    log.info("have lock: zpath=" + lockNodeZPath);
+
+                if (runWithLock()) {
+
+                    // iff successful, then destroy the lock.
+                    zlock.destroyLock();
+
+                    // end of the competition.
+                    return true;
+
+                }
+
+                return false;
+                
+            } finally {
+
+                zlock.unlock();
+
+            }
+
+        }
+        
+        /**
          * Starts the service if the the {@link IServiceConstraint}s are
          * satisified.
          * <p>
@@ -264,16 +345,11 @@ public class MonitorCreatePhysicalServiceLocksTask implements
          * judges matters as they stand at the time of the decision, rather than
          * when we joined the queue to contend for the {@link ZLock}.
          * 
-         * @param lockNodeZPath
-         *            The zpath of the lock node. The data in this node is the
-         *            xpath of the logical service whose instance needs to be
-         *            created.
-         * 
          * @return <code>true</code> iff the service was started.
          * 
          * @throws Exception
          */
-        private boolean runWithLock(final String lockNodeZPath)
+        private boolean runWithLock()
                 throws Exception {
 
             /*
@@ -324,15 +400,30 @@ public class MonitorCreatePhysicalServiceLocksTask implements
                         + ", #children=" + children.size() + ", children="
                         + children);
 
-            // too few instances? @todo handle too many instance here also?
-            if (config.replicationCount > children.size()) {
+            final int ninstances = children.size();
+            
+            if (ninstances >= config.replicationCount) {
+
+                /*
+                 * Stops the task from running if the #of physical service
+                 * instances is GTE the target replicationCount.
+                 */
+
+                throw new InterruptedException("No new instances required.");
+
+            } else {
+
+                /*
+                 * There are not enough physical service instances so try to
+                 * start one now.
+                 */
 
                 // start the service.
                 startService(config, logicalServiceZPath);
 
-            }
+                return true;
 
-            return true;
+            }
 
         }
 
