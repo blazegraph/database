@@ -57,8 +57,8 @@ public class MaxDataServicesPerHostConstraint extends
         MaxServicesPerHostConstraint.log.warn("New instance: allowed="
                 + allowed + ", maxServices=" + maxServices + ", #found="
                 + serviceItems.length);
-        //
-        return false;
+
+        return allowed;
 
     }
 
