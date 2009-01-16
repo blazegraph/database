@@ -72,7 +72,7 @@ final public class ZooResourceLockService implements IResourceLockService {
     
         try {
             
-            final String zpath = fed.getZooConfig().zroot
+            final String zpath = fed.getZooConfig().zroot + "/"
                     + BigdataZooDefs.LOCKS_RESOURCES + "/" + namespace;
             
             final ZLock zlock = ZNodeLockWatcher.getLock(fed.getZookeeper(), zpath,
