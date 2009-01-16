@@ -102,6 +102,23 @@ public class DataServicesClient {
     private final boolean cacheMetadataServices;
 
     /**
+     * The lookup cache for both {@link IDataService}s and
+     * {@link IMetadataService}s.
+     * <p>
+     * Note: Since both services implement {@link IDataService}, you MUST use
+     * the {@link DataServiceFilter} in order to obtain only the "data services"
+     * or the {@link MetadataServiceFilter} in order to obtain only the
+     * "metadata services".
+     * 
+     * @return
+     */
+    public LookupCache getLookupCache() {
+        
+        return serviceLookupCache;
+        
+    }
+    
+    /**
      * Begins discovery for {@link DataService}s and {@link MetadataService}s.
      * 
      * @param discoveryManagement

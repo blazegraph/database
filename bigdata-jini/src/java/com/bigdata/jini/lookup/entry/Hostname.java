@@ -1,5 +1,6 @@
 package com.bigdata.jini.lookup.entry;
 
+
 import net.jini.core.entry.Entry;
 import net.jini.entry.AbstractEntry;
 
@@ -32,5 +33,5 @@ public class Hostname extends AbstractEntry {
         this.hostname = hostname;
         
     }
-    
+
 }

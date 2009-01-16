@@ -27,13 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.jini.start.config;
 
-import java.net.InetAddress;
-
-import net.jini.core.entry.Entry;
-import net.jini.core.lookup.ServiceItem;
-import net.jini.core.lookup.ServiceTemplate;
-import net.jini.lease.LeaseRenewalManager;
-import net.jini.lookup.ServiceDiscoveryManager;
 
 import org.apache.log4j.Logger;
 
@@ -42,7 +35,6 @@ import com.bigdata.jini.start.MonitorCreatePhysicalServiceLocksTask;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.MetadataService;
-import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.DataServer.AdministrableDataService;
 import com.bigdata.service.jini.MetadataServer.AdministrableMetadataService;
 
@@ -71,133 +63,48 @@ import com.bigdata.service.jini.MetadataServer.AdministrableMetadataService;
  *       running zookeeper (or listed as a zookeeper server) or on a host
  *       running the {@link MetadataService}.
  */
-public class MaxServicesPerHostConstraint implements IServiceConstraint {
+abstract public class MaxServicesPerHostConstraint implements IServiceConstraint {
 
     protected static final Logger log = Logger.getLogger(MaxServicesPerHostConstraint.class);
     
     protected static final boolean INFO = log.isInfoEnabled();
     
-    /**
-     * 
-     */
-    private static final long serialVersionUID = -4578030743078117032L;
-
-    protected final String className;
+//    protected final String className;
     
     protected final int maxServices;
     
-    /**
-     * The timeout in milliseconds for service discovery.
-     */
-    protected final long timeout;
+//    /**
+//     * The timeout in milliseconds for service discovery.
+//     */
+//    protected final long timeout;
 
     public String toString() {
-
+//        className=" + className + //
+//            ", 
         return getClass().getName() + //
-                "{ className=" + className + //
-                ", maxServices=" + maxServices + //
-                ", timeout=" + timeout + //
+                "{ maxServices=" + maxServices + //
+//                ", timeout=" + timeout + //
                 "}";
         
     }
     
     /**
-     * Creates a constraint with a default service discovery timeout (2000 ms).
      * 
-     * @param className
-     *            The name of a class or interface that identifies the services
-     *            to be discovered.
      * @param maxServices
      *            The maximum #of services which are instances of that class or
      *            interface which may run on any given host.
      */
-    public MaxServicesPerHostConstraint(final String className,
-            final int maxServices) {
+    public MaxServicesPerHostConstraint(final int maxServices) {
 
-        this(className, maxServices, 2000/* ms */);
-
-    }
-
-    /**
-     * 
-     * @param className
-     *            The name of a class or interface that identifies the services
-     *            to be discovered.
-     * @param maxServices
-     *            The maximum #of services which are instances of that class or
-     *            interface which may run on any given host.
-     * @param timeout
-     *            The timeout for service discovery in milliseconds.
-     */
-    public MaxServicesPerHostConstraint(final String className,
-            final int maxServices, final long timeout) {
-
-        if (className == null)
-            throw new IllegalArgumentException();
-        
         if (maxServices <= 0)
             throw new IllegalArgumentException();
         
-        this.className = className;
+//        this.className = className;
         
         this.maxServices = maxServices;
         
-        this.timeout = 2000;// ms.
+//        this.timeout = 2000;// ms.
         
-    }
-
-    public boolean allow(final JiniFederation fed) throws Exception {
-
-        final long begin = System.currentTimeMillis();
-        
-        final String hostname = InetAddress.getLocalHost().getHostName();
-
-        final String canonicalHostname = InetAddress.getLocalHost()
-                .getCanonicalHostName();
-        
-        final Class cls = Class.forName(className);
-
-        final ServiceTemplate tmpl = new ServiceTemplate(
-                // No serviceID constraint.
-                null,
-                // must match the class or interface.
-                new Class[] { cls },
-                // must match at least one Entry.
-                new Entry[] {//
-                    new Hostname(hostname),//
-                    new Hostname(canonicalHostname),//
-                }
-        );
-
-        final ServiceDiscoveryManager serviceDiscoveryManager = new ServiceDiscoveryManager(
-                fed.getDiscoveryManagement(), new LeaseRenewalManager());
-
-        try {
-
-            final ServiceItem[] serviceItems = serviceDiscoveryManager
-                    .lookup(tmpl, maxServices/* minMatches */,
-                            maxServices/* maxMatches */, null/* filter */,
-                            timeout/* waitDur */);
-
-            final boolean allowed = serviceItems.length < maxServices;
- 
-            final long elapsed = System.currentTimeMillis() - begin;
-            
-//            if (INFO)
-            // log.info // @todo lower logging level.
-            log.warn("New instance: allowed=" + allowed + ", className="
-                    + className + ", maxServices=" + maxServices + ", #found="
-                    + serviceItems.length + ", host=" + canonicalHostname
-                    + ", timeout=" + timeout + ", elapsed=" + elapsed);
-
-            return allowed;
-
-        } finally {
-
-            serviceDiscoveryManager.terminate();
-
-        }
-
     }
 
 }

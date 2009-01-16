@@ -140,6 +140,17 @@ public class JiniFederation extends AbstractDistributedFederation implements
     }
     
     /**
+     * Cached lookup for discovered {@link IDataService}s and
+     * {@link IMetadataService}s. Will block on a cache miss and attempt to
+     * discover an appropriate service instance.
+     */
+    public DataServicesClient getDataServicesClient() {
+        
+        return dataServicesClient;
+        
+    }
+    
+    /**
      * Initiaties discovery for one or more service registrars and establishes a
      * lookup caches for various bigdata services.
      * 
