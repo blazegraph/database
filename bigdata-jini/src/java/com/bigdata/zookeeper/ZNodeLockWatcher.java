@@ -280,7 +280,7 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
             final String zpath, final List<ACL> acl) throws KeeperException,
             InterruptedException {
 
-        if (zookeeper.exists(zpath + INVALID, false) == null) {
+        if (zookeeper.exists(zpath + INVALID, false) != null) {
 
             /*
              * End of the competition. Either someone created the service or
