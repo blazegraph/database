@@ -54,9 +54,6 @@ public abstract class AbstractServicesManagerService extends AbstractService
      * terminated). If you {@link Process#destroy()} a {@link Process}
      * registered by the {@link ProcessHelper} in this collection, then it will
      * automatically become unregistered.
-     * 
-     * @todo we don't really need this since we are not destroying the children
-     *       with the parent.
      */
     final private ConcurrentLinkedQueue<ProcessHelper> runningProcesses = new ConcurrentLinkedQueue<ProcessHelper>();
 
@@ -270,11 +267,6 @@ public abstract class AbstractServicesManagerService extends AbstractService
         
         /*
          * These are the services that we will start and/or manage.
-         * 
-         * @todo review how we decide whether or not to start zookeeper and jini
-         * 
-         * @todo we should be able to start the necessary jini services just
-         * from the bundled JARs without actually running the installer, right?
          */
         final ServiceConfiguration[] serviceConfigurations = selfConfig
                 .getServiceConfigurations(config);
@@ -411,9 +403,15 @@ public abstract class AbstractServicesManagerService extends AbstractService
                 // znode dominating most locks.
                 zroot + "/" + BigdataZooDefs.LOCKS,
 
+                // znode dominating lock nodes for creating new physical services.
                 zroot + "/" + BigdataZooDefs.LOCKS_CREATE_PHYSICAL_SERVICE,
 
+                // znode whose children are the per-service type service configurations.
                 zroot + "/" + BigdataZooDefs.LOCKS_SERVICE_CONFIG_MONITOR,
+                
+                // znode for the resource locks (IResourceLockManager)
+                zroot + "/" + BigdataZooDefs.LOCKS_RESOURCES,
+                
 
         };
         
