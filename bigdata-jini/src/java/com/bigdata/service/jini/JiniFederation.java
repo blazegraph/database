@@ -268,7 +268,7 @@ public class JiniFederation extends AbstractDistributedFederation implements
                     lookupLocators, null /* DiscoveryListener */
             );
 
-            final long cacheMissTimeout = Long.valueOf(jiniConfig.properties
+            final long cacheMissTimeout = Long.valueOf(client.getProperties()
                     .getProperty(JiniClient.Options.CACHE_MISS_TIMEOUT,
                             JiniClient.Options.DEFAULT_CACHE_MISS_TIMEOUT));
 

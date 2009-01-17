@@ -87,7 +87,7 @@ public class JiniClientConfig {
 
     final public LookupLocator[] locators;
 
-    final public Properties properties;
+//    final public Properties properties;
     
     public String toString() {
 
@@ -95,7 +95,7 @@ public class JiniClientConfig {
                 + "{ " + Options.GROUPS + "=" + Arrays.toString(groups)//
                 + ", " + Options.LOCATORS + "=" + Arrays.toString(locators)//
                 + ", " + Options.ENTRIES + "=" + Arrays.toString(entries)//
-                + ", " + Options.PROPERTIES + "=" + properties//
+//                + ", " + Options.PROPERTIES + "=" + properties//
                 + "}";
 
     }
@@ -145,19 +145,35 @@ public class JiniClientConfig {
         //                , null/* default */
                 );
 
-        /*
-         * Read properties JiniClient and also for the optional application or
-         * server class identified by [cls].
-         * 
-         * Note: Anything read for the specific class will overwrite any value
-         * for the same properties specified for JiniClient.
-         * 
-         * @todo this could be replaced by explicit use of the java identifier
-         * corresponding to the Option and simply collecting all such properties
-         * into a Properties object using their native type (as reported by the
-         * ConfigurationFile).
-         */
-        properties = new Properties();
+        if (INFO)
+            log.info(toString());
+
+    }
+
+    /**
+     * Read {@link Options#PROPERTIES} for the optional application or server
+     * class identified by [cls].
+     * <p>
+     * Note: Anything read for the specific class will overwrite any value for
+     * the same properties specified for {@link JiniClient}.
+     * 
+     * @param className
+     *            The class name of the client or service (optional). When
+     *            specified, properties defined for that class in the
+     *            configuration will be used and will override those specified
+     *            for the {@value Options#NAMESPACE}.
+     * @param config
+     *            The {@link Configuration}.
+     * 
+     * @todo this could be replaced by explicit use of the java identifier
+     *       corresponding to the Option and simply collecting all such
+     *       properties into a Properties object using their native type (as
+     *       reported by the ConfigurationFile).
+     */
+    static public Properties getProperties(final String className,
+            final Configuration config) throws ConfigurationException {
+
+        final Properties properties = new Properties();
 
         final NV[] a = (NV[]) config.getEntry(JiniClient.class.getName(),
                 Options.PROPERTIES, NV[].class, new NV[] {}/* defaultValue */);
@@ -179,8 +195,7 @@ public class JiniClientConfig {
 
         }
 
-        if (INFO)
-            log.info(toString());
+        return properties;
 
     }
 

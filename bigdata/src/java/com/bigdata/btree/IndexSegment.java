@@ -144,22 +144,9 @@ public class IndexSegment extends AbstractBTree {
      * @param fileStore
      *            The store containing the {@link IndexSegment}.
      * 
-     * @todo explore good defaults for the hard reference queue, which should
-     *       probably be much smaller as the branching factor grows larger.
-     *       <p>
-     *       The index segment is read only so we do not need to do IO on
-     *       eviction. All the listener needs to do is count queue evictions to
-     *       collect statistics on the index performance. The capacity should be
-     *       relatively low and the #of entries to scan should be relatively
-     *       high since each entry is relatively large, e.g., try with 100 and
-     *       20 respectively.
-     *       <p>
-     *       Consider whether we can use only a read-retention queue for an
-     *       index segment.
-     * 
      * @see IndexSegmentStore#loadIndexSegment()
      */
-    public IndexSegment(IndexSegmentStore fileStore) {
+    public IndexSegment(final IndexSegmentStore fileStore) {
 
         super(fileStore,
                 ImmutableNodeFactory.INSTANCE,
@@ -255,6 +242,9 @@ public class IndexSegment extends AbstractBTree {
     @Override
     protected void _reopen() {
 
+        // synchronize to prevent concurrent close.
+        synchronized(fileStore) {
+        
         if (!fileStore.isOpen()) {
 
             // reopen the store.
@@ -337,6 +327,8 @@ public class IndexSegment extends AbstractBTree {
         ResourceManager.openIndexSegment(null/* name */, fileStore.getFile()
                 .toString(), fileStore.size());
 
+        }
+        
     }
     
     @Override

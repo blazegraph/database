@@ -36,13 +36,13 @@ import java.util.Properties;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
-import net.jini.config.ConfigurationFile;
 import net.jini.config.ConfigurationProvider;
 
 import org.apache.zookeeper.ZooKeeper;
 
 import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.service.AbstractScaleOutClient;
+import com.sun.jini.start.ServiceDescriptor;
 
 /**
  * A client capable of connecting to a distributed bigdata federation using
@@ -166,32 +166,45 @@ public class JiniClient extends AbstractScaleOutClient {
     public final ZookeeperClientConfig zooConfig;
 
     /**
-     * 
-     * @param jiniConfig
-     *            Jini client configuration.
-     * @param zooConfig
-     *            ZooKeeper client configuration.
+     * The {@link Configuration} object used to initialize this class.
      */
-    protected JiniClient(final JiniClientConfig jiniConfig,
-            final ZookeeperClientConfig zooConfig) {
-
-        super(jiniConfig.properties);
-
-        this.jiniConfig = jiniConfig;
+    private final Configuration config;
+    
+    /**
+     * The {@link JiniClient} configuration.
+     */
+    public JiniClientConfig getJiniClientConfig() {
         
-        this.zooConfig = zooConfig;
-
+        return jiniConfig;
+        
     }
     
     /**
-     * Conditionally installs a {@link SecurityManager}, reads
-     * {@link Configuration} data from the <i>args</i>, reads the <i>properties</i>
-     * and/or properties file named in the
-     * {@value AbstractServer#SERVICE_DESCRIPTION} section of the
-     * {@link Configuration} file, and returns the configured client.
+     * The {@link ZooKeeper} client configuration.
+     */
+    public final ZookeeperClientConfig getZookeeperClientConfig() {
+
+        return zooConfig;
+        
+    }
+    
+    /**
+     * The {@link Configuration} object used to initialize this class.
+     */
+    public final Configuration getConfiguration() {
+        
+        return config;
+        
+    }
+    
+    /**
+     * Installs a {@link SecurityManager} and returns a new client.
      * 
      * @param args
-     *            The command line arguments.
+     *            Either the command line arguments or the arguments from the
+     *            {@link ServiceDescriptor}. Either way they identify the jini
+     *            {@link Configuration} (you may specify either a file or URL)
+     *            and optional overrides for that {@link Configuration}.
      * 
      * @return The new client.
      * 
@@ -206,35 +219,58 @@ public class JiniClient extends AbstractScaleOutClient {
 
         try {
 
-            // Obtain the configuration object.
-            final ConfigurationFile config = (ConfigurationFile) ConfigurationProvider
-                    .getInstance(args);
+            return new JiniClient(args);
 
-            return new JiniClient(JiniClient.class, config);
+        } catch (ConfigurationException e) {
+
+            throw new RuntimeException(e);
             
-        } catch (Exception ex) {
-
-            throw new RuntimeException(ex);
-
         }
 
     }
 
     /**
+     * Configures a client.
      * 
+     * @param args
+     *            Either the command line arguments or the arguments from the
+     *            {@link ServiceDescriptor}. Either way they identify the jini
+     *            {@link Configuration} (you may specify either a file or URL)
+     *            and optional overrides for that {@link Configuration}.
+     * 
+     * @throws ConfigurationException
+     */
+    public JiniClient(final String[] args) throws ConfigurationException {
+
+        this(JiniClient.class, ConfigurationProvider.getInstance(args));
+
+    }
+
+    /**
+     * Configures a client.
+     * 
+     * @param cls
+     *            The class of the client (optional) determines the component
+     *            whose configuration will be read in addition to that for the
+     *            {@link JiniClient} itself. Component specific values will
+     *            override those specified for the {@link JiniClient} in the
+     *            {@link Configuration}.
      * @param config
      *            The configuration object.
+     * 
      * @throws ConfigurationException
-     *             if the is a problem with the {@link Configuration}
-     * @throws IOException
-     *             if there is a problem reading the optional properties file.
      */
     public JiniClient(final Class cls, final Configuration config)
             throws ConfigurationException {
 
-        this(new JiniClientConfig(cls.getName(), config), new ZookeeperClientConfig(
-                config));
+        super(JiniClientConfig.getProperties(cls.getName(), config));
+        
+        this.jiniConfig = new JiniClientConfig(cls.getName(), config);
 
+        this.zooConfig = new ZookeeperClientConfig(config);
+
+        this.config = config;
+        
     }
 
     /**

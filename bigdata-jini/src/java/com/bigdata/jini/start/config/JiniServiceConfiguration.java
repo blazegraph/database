@@ -158,7 +158,7 @@ abstract public class JiniServiceConfiguration extends
         
         locators = tmp.locators;
         
-        properties = tmp.properties;
+        properties = JiniClientConfig.getProperties(className,config);
         
         jiniOptions = getJiniOptions(className, config);
         
