@@ -240,8 +240,12 @@ abstract public class StoreManager extends ResourceEvents implements
         /** Immortal database (the release time is set to {@link Long#MAX_VALUE}). */
         String MIN_RELEASE_AGE_NEVER = "" + Long.MAX_VALUE;
 
-        /** Default minimum release age is one day. */
-        String DEFAULT_MIN_RELEASE_AGE = MIN_RELEASE_AGE_1D;
+        /**
+         * Default minimum release age is ZERO (0), which means that any data
+         * not required for the earliest read-only transaction or outstanding
+         * historical read operation MAY be released.
+         */
+        String DEFAULT_MIN_RELEASE_AGE = MIN_RELEASE_AGE_NO_HISTORY;//MIN_RELEASE_AGE_1D;
 
         /**
          * The capacity of the LRU cache of open {@link IRawStore}s. The

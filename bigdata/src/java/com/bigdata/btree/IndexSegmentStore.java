@@ -149,6 +149,37 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      */
     private final IndexMetadata indexMetadata;
 
+    private static class IndexSegmentStoreCounters {
+
+        /**
+         * The #of times the store was (re-)opened.
+         */
+        long openCount;
+
+        /**
+         * The #of times the store was closed.
+         */
+        long closeCount;
+
+        /**
+         * A read on a node (whether or not it is buffered).
+         */
+        long nodesRead;
+
+        /**
+         * A read on a node when the nodes are not buffered.
+         */
+        long nodesReadFromDisk;
+
+        /**
+         * A read on a leaf (always reads through to the disk).
+         */
+        long leavesReadFromDisk;
+
+    }
+    
+    private final IndexSegmentStoreCounters counters = new IndexSegmentStoreCounters();
+    
 //    /**
 //     * The optional bloom filter.
 //     */
@@ -428,6 +459,8 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
              * data (the root node/leaf).
              */
             this.open = true;
+            
+            counters.openCount++;
 
         } catch (Throwable t) {
 
@@ -470,7 +503,20 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
 
             final IndexSegment seg = (IndexSegment) ctor
                     .newInstance(new Object[] { this });
+
+            /*
+             * Attach the counters maintained by AbstractBTree to those reported
+             * for the IndexSegmentStore.
+             * 
+             * Note: These counters are only allocated when the IndexSegment
+             * object is created. Since we do not enforce a 1:1 correspondence
+             * on the IndexSegments created from the IndexSegmentStore from
+             * within the latter, this must be either set dynamically by the
+             * IndexSegment when it is created of by loadIndexSegment.
+             */
             
+            getCounters().attach(seg.counters.getCounters());
+
             return seg;
             
         } catch(Exception ex) {
@@ -584,7 +630,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
             } catch(Throwable t) {
                 
                 // log error but continue anyway.
-                log.error(t,t);
+                log.error(this, t);
                 
             } finally {
 
@@ -612,6 +658,8 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
 //        bloomFilter = null;
         
         open = false;
+        
+        counters.closeCount++;
         
         if (INFO)
             log.info("Closed: file=" + getFile());
@@ -664,114 +712,97 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
         
     }
 
-    /**
-     * @todo report the #of (re-)opens.
-     * 
-     * FIXME report {@link Counters} for the {@link IndexSegment} here (#of
-     * nodes read, leaves read, de-serialization times, etc). Some additional
-     * counters probably need to be collected (Bloom filter tests, etc).
-     */
     synchronized public CounterSet getCounters() {
 
-        if(counterSet==null) {
+        if (counterSet == null) {
         
             counterSet = new CounterSet();
             
             counterSet.addCounter("file", new OneShotInstrument<String>(file
                     .toString()));
 
-            // checkpoint
+            // checkpoint (counters are all oneshot).
             {
+                
                 final CounterSet tmp = counterSet.makePath("checkpoint");
                 
-                tmp.addCounter("segment UUID", new Instrument<String>() {
-                    protected void sample() {
-                        final IndexSegmentCheckpoint checkpoint = IndexSegmentStore.this.checkpoint;
-                        if (checkpoint != null) {
-                            setValue(checkpoint.segmentUUID.toString());
-                        }
-                    }
-                });
+                tmp.addCounter("segment UUID", new OneShotInstrument<String>(
+                        checkpoint.segmentUUID.toString()));
 
                 // length in bytes of the file.
-                tmp.addCounter("length", new Instrument<Long>() {
-                    protected void sample() {
-                        final IndexSegmentCheckpoint checkpoint = IndexSegmentStore.this.checkpoint;
-                        if (checkpoint != null) {
-                            setValue(checkpoint.length);
-                        }
-                    }
-                });
+                tmp.addCounter("length", new OneShotInstrument<String>(
+                        Long.toString(checkpoint.length)));
 
-                tmp.addCounter("#nodes", new Instrument<Integer>() {
-                    protected void sample() {
-                        final IndexSegmentCheckpoint checkpoint = IndexSegmentStore.this.checkpoint;
-                        if (checkpoint != null) {
-                            setValue(checkpoint.nnodes);
-                        }
-                    }
-                });
+                tmp.addCounter("#nodes", new OneShotInstrument<String>(
+                        Long.toString(checkpoint.nnodes)));
 
-                tmp.addCounter("#leaves", new Instrument<Integer>() {
-                    protected void sample() {
-                        final IndexSegmentCheckpoint checkpoint = IndexSegmentStore.this.checkpoint;
-                        if (checkpoint != null) {
-                            setValue(checkpoint.nleaves);
-                        }
-                    }
-                });
+                tmp.addCounter("#leaves", new OneShotInstrument<String>(
+                        Long.toString(checkpoint.nleaves)));
 
-                tmp.addCounter("entries", new Instrument<Integer>() {
-                    protected void sample() {
-                        final IndexSegmentCheckpoint checkpoint = IndexSegmentStore.this.checkpoint;
-                        if (checkpoint != null) {
-                            setValue(checkpoint.nentries);
-                        }
-                    }
-                });
+                tmp.addCounter("#entries", new OneShotInstrument<String>(
+                        Long.toString(checkpoint.nentries)));
 
-                tmp.addCounter("height", new Instrument<Integer>() {
-                    protected void sample() {
-                        final IndexSegmentCheckpoint checkpoint = IndexSegmentStore.this.checkpoint;
-                        if (checkpoint != null) {
-                            setValue(checkpoint.height);
-                        }
-                    }
-                });
+                tmp.addCounter("height", new OneShotInstrument<String>(
+                        Long.toString(checkpoint.height)));
 
+            }
+            
+            // metadata (all oneshot).
+            {
+                
+                final CounterSet tmp = counterSet.makePath("metadata");
+                
+                tmp.addCounter("name", new OneShotInstrument<String>(
+                        indexMetadata.getName()));
+
+                tmp.addCounter("index UUID", new OneShotInstrument<String>(
+                        indexMetadata.getIndexUUID().toString()));
+                
+            }
+            
+            // dynamic counters.
+            {
+
+                final CounterSet tmp = counterSet.makePath("store");
+                
                 tmp.addCounter("nodesBuffered", new Instrument<Boolean>() {
                     protected void sample() {
                         setValue(buf_nodes != null);
                     }
                 });
-
-            }
-            
-            // metadata
-            {
                 
-                final CounterSet tmp = counterSet.makePath("metadata");
-                
-                tmp.addCounter("name", new Instrument<String>() {
+                tmp.addCounter("openCount", new Instrument<String>() {
                     protected void sample() {
-                        final IndexMetadata md = indexMetadata;
-                        if (md != null) {
-                            setValue(md.getName());
-                        }
+                        setValue(Long.toString(counters.openCount));
                     }
                 });
 
-                tmp.addCounter("index UUID", new Instrument<String>() {
+                tmp.addCounter("closeCount", new Instrument<String>() {
                     protected void sample() {
-                        final IndexMetadata md = indexMetadata;
-                        if (md != null) {
-                            setValue(md.getIndexUUID().toString());
-                        }
+                        setValue(Long.toString(counters.closeCount));
                     }
                 });
-                
+
+                tmp.addCounter("nodesRead", new Instrument<String>() {
+                    protected void sample() {
+                        setValue(Long.toString(counters.nodesRead));
+                    }
+                });
+
+                tmp.addCounter("nodeReadFromDisk", new Instrument<String>() {
+                    protected void sample() {
+                        setValue(Long.toString(counters.nodesReadFromDisk));
+                    }
+                });
+
+                tmp.addCounter("leavesReadFromDisk", new Instrument<String>() {
+                    protected void sample() {
+                        setValue(Long.toString(counters.leavesReadFromDisk));
+                    }
+                });
+
             }
-            
+
         }
         
         return counterSet;
@@ -812,127 +843,168 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
         // length of the record.
         final int length = addressManager.getByteCount(addr);
 
-        final ByteBuffer dst;
+        if (isNodeAddr) {
 
-        if (isNodeAddr && buf_nodes != null) {
+            // a node.
+            
+            counters.nodesRead++;
+            
+            synchronized (this) {
 
-            /*
-             * The [addr] addresses a node and the data are buffered. Create a
-             * view so that concurrent reads do not modify the buffer state.
-             * 
-             * Note: This is synchronized on [this] for paranoia. As long as the
-             * state of [buf_nodes] (its position and limit) can not be changed
-             * concurrently this operation should not need to be synchronized.
-             */
-            final ByteBuffer tmp;
-            synchronized(this) {
-                
-                tmp = buf_nodes.asReadOnlyBuffer();
-                
-            }
+                if (buf_nodes != null) {
 
-            // correct the offset so that it is relative to the buffer.
-            final long off = offset - checkpoint.offsetNodes;
-
-            // set the limit on the buffer to the end of the record.
-            tmp.limit((int)(off + length));
-
-            // set the position on the buffer to the start of the record.
-            tmp.position((int)off);
-
-            /*
-             * Create a slice of that view showing only the desired record. The
-             * position() of the slice will be zero(0) and the limit() will be
-             * the #of bytes in the record.
-             * 
-             * Note: slice restricts the view available to the caller to the
-             * view that was setup on the buffer at the moment that the slice
-             * was obtained.
-             */
-            dst = tmp.slice();
-
-        } else {
-
-            /*
-             * The data need to be read from the file.
-             */
-
-            // Allocate buffer: limit = capacity; pos = 0.
-            dst = ByteBuffer.allocate(length);
-
-            /*
-             * Read the record from the file.
-             * 
-             * Note: Java will close the backing FileChannel if Thread is
-             * interrupted during an NIO operation. Since the index segment is a
-             * read-only data structure, all of the in-memory state remains
-             * valid and we only need to re-open the FileChannel to the backing
-             * store and retry.
-             */
-
-            while(true) {
-
-                try {
-
-                    // read into [dst] - does not modify the channel's
-                    // position().
-                    FileChannelUtility.readAll(raf.getChannel(), dst, offset);
-
-                    // successful read - exit the loop.
-                    break;
-
-                } catch (ClosedByInterruptException ex) {
-
-                    /*
-                     * This indicates that this thread was interrupted. We
-                     * always abort in this case.
-                     */
-
-                    throw new RuntimeException(ex);
-
-                } catch (AsynchronousCloseException ex) {
-
-                    /*
-                     * The channel was closed asynchronously while blocking
-                     * during the read. If the buffer strategy still thinks that
-                     * it is open then we re-open the channel and re-read.
-                     */
-
-                    if (reopenChannel())
-                        continue;
-
-                    throw new RuntimeException(ex);
-
-                } catch (ClosedChannelException ex) {
-
-                    /*
-                     * The channel is closed. If the buffer strategy still
-                     * thinks that it is open then we re-open the channel and
-                     * re-read.
-                     */
-
-                    if (reopenChannel())
-                        continue;
-
-                    throw new RuntimeException(ex);
-
-                } catch (IOException ex) {
-
-                    throw new RuntimeException(ex);
+                    counters.nodesReadFromDisk++;
+                    
+                    return readFromBuffer(offset, length);
 
                 }
 
-            } // while(true)
+            }
+
+            // The data need to be read from the file.
+            return readFromFile(offset, length);
+
+        } else {
+
+            // A leaf.
             
-            // Flip buffer for reading.
-            dst.flip();
+            counters.leavesReadFromDisk++;
+
+            // The data need to be read from the file.
+            return readFromFile(offset, length);
 
         }
 
-        return dst;
-
     }
 
+    /**
+     * The [addr] addresses a node and the data are buffered. Create and return
+     * a read-only view so that concurrent reads do not modify the buffer state.
+     * <p>
+     * Note: The caller MUST be synchronized on [this] and ensure that the
+     * {@link #buf_nodes} is non-<code>null</code> before calling this
+     * method. This ensures that the buffer is valid across the call.
+     * 
+     * @param offset
+     * @param length
+     * @return
+     */
+    private ByteBuffer readFromBuffer(final long offset, final int length) {
+        
+        /*
+         * Note: As long as the state of [buf_nodes] (its position and limit)
+         * can not be changed concurrently, we should not need to serialize
+         * creations of the view (this is a bit paranoid, but the operation is
+         * very lightweight).
+         */
+        final ByteBuffer tmp;
+        synchronized(this) {
+            
+            tmp = buf_nodes.asReadOnlyBuffer();
+            
+        }
+
+        // correct the offset so that it is relative to the buffer.
+        final long off = offset - checkpoint.offsetNodes;
+
+        // set the limit on the buffer to the end of the record.
+        tmp.limit((int)(off + length));
+
+        // set the position on the buffer to the start of the record.
+        tmp.position((int)off);
+
+        /*
+         * Create a slice of that view showing only the desired record. The
+         * position() of the slice will be zero(0) and the limit() will be
+         * the #of bytes in the record.
+         * 
+         * Note: slice restricts the view available to the caller to the
+         * view that was setup on the buffer at the moment that the slice
+         * was obtained.
+         */
+        return tmp.slice();
+        
+    }
+    
+    /**
+     * Read the record from the file.
+     */
+    private ByteBuffer readFromFile(final long offset, final int length) {
+
+        // Allocate buffer: limit = capacity; pos = 0.
+        final ByteBuffer dst = ByteBuffer.allocate(length);
+
+        /*
+         * Read the record from the file.
+         * 
+         * Note: Java will close the backing FileChannel if Thread is
+         * interrupted during an NIO operation. Since the index segment is a
+         * read-only data structure, all of the in-memory state remains
+         * valid and we only need to re-open the FileChannel to the backing
+         * store and retry.
+         */
+
+        while(true) {
+
+            try {
+
+                // read into [dst] - does not modify the channel's
+                // position().
+                FileChannelUtility.readAll(raf.getChannel(), dst, offset);
+
+                // successful read - exit the loop.
+                break;
+
+            } catch (ClosedByInterruptException ex) {
+
+                /*
+                 * This indicates that this thread was interrupted. We
+                 * always abort in this case.
+                 */
+
+                throw new RuntimeException(ex);
+
+            } catch (AsynchronousCloseException ex) {
+
+                /*
+                 * The channel was closed asynchronously while blocking
+                 * during the read. If the buffer strategy still thinks that
+                 * it is open then we re-open the channel and re-read.
+                 */
+
+                if (reopenChannel())
+                    continue;
+
+                throw new RuntimeException(ex);
+
+            } catch (ClosedChannelException ex) {
+
+                /*
+                 * The channel is closed. If the buffer strategy still
+                 * thinks that it is open then we re-open the channel and
+                 * re-read.
+                 */
+
+                if (reopenChannel())
+                    continue;
+
+                throw new RuntimeException(ex);
+
+            } catch (IOException ex) {
+
+                throw new RuntimeException(ex);
+
+            }
+
+        } // while(true)
+        
+        // Flip buffer for reading.
+        dst.flip();
+
+        return dst;
+        
+    }
+    
     /**
      * This method transparently re-opens the channel for the backing file.
      * <p>
@@ -1085,7 +1157,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
                 } catch (Throwable t) {
                     
                     // log error and continue.
-                    log.error(t, t);
+                    log.error(this, t);
                     
                 } finally {
                     
@@ -1095,9 +1167,9 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
                 }
                 
             }
-            
+
             // log error and continue.
-            log.error(t1,t1);
+            log.error(this, t1);
 
         }
 
