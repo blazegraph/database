@@ -1,31 +1,20 @@
 package com.bigdata.jini.start;
 
-import java.net.UnknownHostException;
-import java.nio.channels.FileLock;
-import java.rmi.RemoteException;
-import java.util.HashSet;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.Callable;
-import java.util.concurrent.locks.Lock;
 
 import net.jini.core.entry.Entry;
 import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceRegistrar;
-import net.jini.core.lookup.ServiceTemplate;
 
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.data.Stat;
 
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.jini.lookup.entry.Hostname;
-import com.bigdata.jini.lookup.entry.ServiceUUID;
-import com.bigdata.jini.start.config.AbstractHostConstraint;
 import com.bigdata.jini.start.config.ManagedServiceConfiguration;
 import com.bigdata.service.jini.JiniFederation;
-import com.bigdata.service.jini.JiniUtil;
-import com.bigdata.zookeeper.ZLock;
 
 /**
  * Task restarts persistent physical services that should be running on this
@@ -115,7 +104,19 @@ public class RestartPersistentServices implements Callable<Void> {
                 + BigdataZooDefs.CONFIG;
 
         // these are the ServiceConfigurations.
-        final List<String> serviceConfigZNodes = zookeeper.getChildren(zconfig, false);
+        final List<String> serviceConfigZNodes;
+        try {
+            
+            serviceConfigZNodes = zookeeper.getChildren(zconfig, false);
+            
+        } catch (NoNodeException ex) {
+
+            log.error(ERR_WILL_NOT_RESTART_SERVICES
+                    + " : configuration znode not found: " + zconfig);
+
+            return null;
+            
+        }
         
         for (String serviceConfigZNode : serviceConfigZNodes) {
 
@@ -127,16 +128,19 @@ public class RestartPersistentServices implements Callable<Void> {
                     .deserialize(zookeeper.getData(zconfig + "/"
                             + serviceConfigZNode, false, new Stat()));
 
+            final String serviceConfigZPath = zconfig + "/"
+                    + serviceConfigZNode;
+
             /*
              * The children are the logical service instances for that service
              * type.
              */
             final List<String> logicalServiceZNodes = zookeeper.getChildren(
-                    zconfig + "/" + serviceConfigZNode, false);
+                    serviceConfigZPath, false);
 
             for (String logicalServiceZNode : logicalServiceZNodes) {
 
-                final String logicalServiceZPath = zconfig + "/"
+                final String logicalServiceZPath = serviceConfigZPath + "/"
                         + logicalServiceZNode;
 
                 /*

@@ -73,7 +73,8 @@ public class ZookeeperProcessHelper extends ProcessHelper {
      * 
      * @throws InterruptedException
      */
-    public int kill() throws InterruptedException {
+    public int kill(final boolean immediateShutdown)
+            throws InterruptedException {
 
         try {
 

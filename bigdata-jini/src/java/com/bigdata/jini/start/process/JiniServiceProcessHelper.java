@@ -105,7 +105,7 @@ public class JiniServiceProcessHelper extends ProcessHelper {
      *             if interrupted - the process may or may not have been killed
      *             and the listener will not have been notified.
      */
-    public int kill() throws InterruptedException {
+    public int kill(final boolean immediateShutdown) throws InterruptedException {
         
         if (serviceItem == null) {
 
@@ -152,9 +152,15 @@ public class JiniServiceProcessHelper extends ProcessHelper {
              * manner MAY be restarted.
              */
             try {
-                // Normal termination (can have latency).
-                log.warn("will shutdown() service: "+this);
-                ((RemoteDestroyAdmin) admin).shutdown();
+                if (immediateShutdown) {
+                    // Fast termination (can have latency).
+                    log.warn("will shutdownNow() service: " + this);
+                    ((RemoteDestroyAdmin) admin).shutdownNow();
+                } else {
+                    // Normal termination (can have latency).
+                    log.warn("will shutdown() service: " + this);
+                    ((RemoteDestroyAdmin) admin).shutdown();
+                }
             } catch (Throwable t) {
                 // delegate to the super class.
                 log.error(this, t);

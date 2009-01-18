@@ -188,7 +188,7 @@ public class JiniCoreServicesProcessHelper extends ProcessHelper {
      * 
      * @see http://www.dancres.org/cottage/doc/api/com/sun/jini/reggie/package-summary.html
      */
-    public int kill() {
+    public int kill(boolean immediateShutdown) {
        
         log.error("Can not kill jini");
         

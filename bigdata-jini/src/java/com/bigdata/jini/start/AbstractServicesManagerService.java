@@ -12,6 +12,7 @@ import com.bigdata.jini.start.process.ZookeeperProcessHelper;
 import com.bigdata.service.AbstractService;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.jini.RemoteDestroyAdmin;
 
 /**
  * Core impl.
@@ -92,24 +93,46 @@ public abstract class AbstractServicesManagerService extends AbstractService
 
     }
 
-    synchronized public void shutdown() {
+    /**
+     * Kill the child processes, using {@link RemoteDestroyAdmin#shutdown()}
+     * where supported.
+     */
+    public void shutdown() {
 
-        if(!open) return;
-        
-        open = false;
+        synchronized (this) {
 
-        childStartsAllowed = false;
+            if (!open)
+                return;
+
+            open = false;
+
+            childStartsAllowed = false;
+
+        }
+
+        killChildProcesses(false/* immediateShutdown */);
 
     }
 
-    synchronized public void shutdownNow() {
+    /**
+     * Kill the child processes, using {@link RemoteDestroyAdmin#shutdownNow()}
+     * where supported.
+     */
+    public void shutdownNow() {
 
-        if(!open) return;
+        synchronized (this) {
 
-        open = false;
+            if (!open)
+                return;
 
-        childStartsAllowed = false;
+            open = false;
 
+            childStartsAllowed = false;
+
+        }
+        
+        killChildProcesses(true/* immediateShutdown */);
+        
     }
 
     public boolean isOpen() {
@@ -123,8 +146,16 @@ public abstract class AbstractServicesManagerService extends AbstractService
     /**
      * Sets a flag to disallow new process starts and kills any running child
      * processes.
+     * 
+     * @param immediateShutdown
+     *            When <code>true</code>
+     *            {@link RemoteDestroyAdmin#shutdownNow()} will be used by
+     *            preference to terminate child processes which support
+     *            {@link RemoteDestroyAdmin}. Otherwise
+     *            {@link RemoteDestroyAdmin#shutdown()} will be used to terminat
+     *            child processes supporting that interface.
      */
-    protected void killChildProcesses() {
+    protected void killChildProcesses(final boolean immediateShutdown) {
 
        childStartsAllowed = false; 
         
@@ -161,19 +192,19 @@ public abstract class AbstractServicesManagerService extends AbstractService
 //            }
 //
 //        }
-//
-//        /*
-//         * This time we take down zookeeper and jini.
-//         */
-//        for (ProcessHelper helper : runningProcesses) {
-//
-//            try {
-//                helper.kill();
-//            } catch (Throwable t) {
-//                log.warn("Could not kill process: " + helper);
-//            }
-//
-//        }
+
+        /*
+         * This time we take down zookeeper and jini.
+         */
+        for (ProcessHelper helper : runningProcesses) {
+
+            try {
+                helper.kill();
+            } catch (Throwable t) {
+                log.warn("Could not kill process: " + helper);
+            }
+
+        }
 
     }
     
