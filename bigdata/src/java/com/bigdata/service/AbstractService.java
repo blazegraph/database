@@ -35,7 +35,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.Banner;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
-import com.bigdata.journal.ITimestampService;
 
 /**
  * Abstract base class defines protocols for setting the service {@link UUID},
@@ -61,11 +60,18 @@ abstract public class AbstractService implements IService {
         // show the copyright banner during statup.
         Banner.banner();
 
-        //@todo reconcile with AbstractServer
-        serviceName = getHostname() + "#" + getServiceIface().getName();
+        /*
+         * Note: This is more or less the same pattern use by AbstractServer (in
+         * the bigdata-jini module) to assign a default service name, but the
+         * latter will report the server's class name. That class also makes
+         * sure to reports the name which it assigns to the service.
+         */
+
+        serviceName = getServiceIface().getName() + "@" + getHostname() + "#"
+                + hashCode();
         
     }
-
+    
     /**
      * This method must be invoked to set the service {@link UUID}.
      * <p>
@@ -85,7 +91,8 @@ abstract public class AbstractService implements IService {
      * @throws IllegalArgumentException
      *             if the parameter is null.
      * @throws IllegalStateException
-     *             if the service {@link UUID} has already been set.
+     *             if the service {@link UUID} has already been set to a
+     *             different value.
      */
     synchronized public void setServiceUUID(final UUID serviceUUID)
             throws IllegalStateException {
@@ -93,8 +100,11 @@ abstract public class AbstractService implements IService {
         if (serviceUUID == null)
             throw new IllegalArgumentException();
 
-        if (this.serviceUUID != null)
+        if (this.serviceUUID != null && !this.serviceUUID.equals(serviceUUID)) {
+
             throw new IllegalStateException();
+
+        }
 
         if (INFO)
             log.info("uuid=" + serviceUUID);
@@ -130,16 +140,6 @@ abstract public class AbstractService implements IService {
     
     /**
      * Return the proxy used to access other services in the federation.
-     * 
-     * @todo access to the {@link ITimestampService}, {@link IMetadataService}
-     *       and the {@link ILoadBalancerService} now goes through this method.
-     *       The code making those requests needs to be modified since it used
-     *       to except a <code>null</code> return for the individual services
-     *       if they were not available and it can not see an exception if the
-     *       federation itself is not available (I believe that this can only
-     *       happen for the JiniFederation since the various embedded
-     *       federations wind up returning a closely held reference whereas the
-     *       JiniFederation is obtained from the JiniClient#getClient().
      */
     abstract public AbstractFederation getFederation();
 
