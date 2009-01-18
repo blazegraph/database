@@ -147,7 +147,10 @@ abstract public class AbstractHostConstraint implements IServiceConstraint {
     }
 
     /**
-     * Return <code>true</code> if this is server entry for the local host.
+     * Return <code>true</code> if <i>hostname</i> is a name for the local
+     * host.
+     * 
+     * @param hostname A host name.
      * 
      * @throws UnknownHostException
      */

@@ -801,8 +801,9 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                 joinManager = new JoinManager(proxy, // service proxy
                         attributes, // attr sets
                         serviceID, // ServiceID
-                        fed.discoveryManager, // DiscoveryManager
-                        new LeaseRenewalManager());
+                        fed.lookupDiscoveryManager, // DiscoveryManager
+                        new LeaseRenewalManager(), //
+                        config);
                 
             } else {
                 
@@ -813,14 +814,15 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                 joinManager = new JoinManager(proxy, // service proxy
                         attributes, // attr sets
                         this, // ServiceIDListener
-                        fed.discoveryManager, // DiscoveryManager
-                        new LeaseRenewalManager());
+                        fed.lookupDiscoveryManager, // DiscoveryManager
+                        new LeaseRenewalManager(), //
+                        config);
             
             }
-            
-        } catch (IOException ex) {
-            
-            fatal("Lookup service discovery error: "+ex, ex);
+
+        } catch (Exception ex) {
+
+            fatal("JoinManager: " + ex, ex);
             
         }
 
@@ -834,6 +836,10 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
                 /*
                  * Notify the service that it's service UUID has been set.
+                 * 
+                 * @todo Several things currently depend on this notification.
+                 * In effect, it is being used as a proxy for the service
+                 * registration event.
                  */
 
                 notifyServiceUUID(serviceID);

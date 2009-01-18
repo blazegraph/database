@@ -251,14 +251,22 @@ public abstract class AbstractServicesManagerService extends AbstractService
          * for the zookeeper client to become connected and the znode to be
          * created.
          */
-        fed.submitMonitoredTask(new MonitorCreatePhysicalServiceLocksTask(fed,
-                this/* listener */));
+        monitorCreatePhysicalServiceLocksTask = new MonitorCreatePhysicalServiceLocksTask(
+                fed, this/* listener */);
+
+        fed.submitMonitoredTask(monitorCreatePhysicalServiceLocksTask);
 
         /*
          * Run startup.
          */
-        new ServicesManagerStartupTask(fed, config, this).call();
+        new ServicesManagerStartupTask(fed, config, this/* listener */,
+                monitorCreatePhysicalServiceLocksTask).call();
         
     }
+    
+    /**
+     * The task used to start and restart services.
+     */
+    protected MonitorCreatePhysicalServiceLocksTask monitorCreatePhysicalServiceLocksTask;
     
 }

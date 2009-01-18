@@ -44,7 +44,6 @@ import java.util.concurrent.TimeUnit;
 import net.jini.config.Configuration;
 import net.jini.core.discovery.LookupLocator;
 import net.jini.core.lookup.ServiceItem;
-import net.jini.discovery.DiscoveryManagement;
 import net.jini.discovery.LookupDiscoveryManager;
 import net.jini.export.Exporter;
 import net.jini.jeri.BasicILFactory;
@@ -109,7 +108,7 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
     protected ServicesManagerClient servicesManagerClient;
 
-    protected DiscoveryManagement discoveryManager;
+    protected LookupDiscoveryManager lookupDiscoveryManager;
 
     protected ZooKeeper zookeeper;
     
@@ -133,9 +132,17 @@ public class JiniFederation extends AbstractDistributedFederation implements
         
     }
     
-    public DiscoveryManagement getDiscoveryManagement() {
+    /**
+     * The object used to manage registrar discovery (basically, the "client"
+     * class used to talk to jini). You won't need this unless you are already
+     * fairly familiar with jini. All the well know service discovery operations
+     * are handled by a variety of caching classes such as
+     * {@link #getDataServicesClient()} and exposed via simple APIs such as
+     * {@link #getDataService(UUID)}.
+     */
+    public LookupDiscoveryManager getDiscoveryManagement() {
         
-        return discoveryManager;
+        return lookupDiscoveryManager;
         
     }
     
@@ -264,7 +271,7 @@ public class JiniFederation extends AbstractDistributedFederation implements
              * an alternative, you can use LookupDiscovery, which always does
              * multicast discovery.
              */
-            discoveryManager = new LookupDiscoveryManager(groups,
+            lookupDiscoveryManager = new LookupDiscoveryManager(groups,
                     lookupLocators, null /* DiscoveryListener */
             );
 
@@ -273,19 +280,19 @@ public class JiniFederation extends AbstractDistributedFederation implements
                             JiniClient.Options.DEFAULT_CACHE_MISS_TIMEOUT));
 
             // Start discovery for data and metadata services.
-            dataServicesClient = new DataServicesClient(discoveryManager, this,
+            dataServicesClient = new DataServicesClient(lookupDiscoveryManager, this,
                     cacheMissTimeout);
 
             // Start discovery for the timestamp service.
             transactionServiceClient = new TransactionServiceClient(
-                    discoveryManager, this, cacheMissTimeout);
+                    lookupDiscoveryManager, this, cacheMissTimeout);
 
             // Start discovery for the load balancer service.
-            loadBalancerClient = new LoadBalancerClient(discoveryManager, this,
+            loadBalancerClient = new LoadBalancerClient(lookupDiscoveryManager, this,
                     cacheMissTimeout);
 
             // Start discovery for the services manager.
-            servicesManagerClient = new ServicesManagerClient(discoveryManager, this,
+            servicesManagerClient = new ServicesManagerClient(lookupDiscoveryManager, this,
                     cacheMissTimeout);
 
         } catch (Exception ex) {
@@ -462,11 +469,11 @@ public class JiniFederation extends AbstractDistributedFederation implements
             
         }
 
-        if (discoveryManager != null) {
+        if (lookupDiscoveryManager != null) {
 
-            discoveryManager.terminate();
+            lookupDiscoveryManager.terminate();
 
-            discoveryManager = null;
+            lookupDiscoveryManager = null;
 
         }
 

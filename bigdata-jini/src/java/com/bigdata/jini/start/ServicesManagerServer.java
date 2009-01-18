@@ -459,7 +459,9 @@ public class ServicesManagerServer extends AbstractServer {
                     final ConfigurationFile config = (ConfigurationFile) ConfigurationProvider
                             .getInstance(args);
 
-                    new ServicesManagerStartupTask(fed,config,service).call();
+                    new ServicesManagerStartupTask(fed, config, service,
+                            service.monitorCreatePhysicalServiceLocksTask)
+                            .call();
                     
 //                    // get the service manager's own configuration.
 //                    final ServicesManagerConfiguration selfConfig = new ServicesManagerConfiguration(

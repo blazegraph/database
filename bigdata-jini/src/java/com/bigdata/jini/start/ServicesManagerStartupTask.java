@@ -44,6 +44,8 @@ public class ServicesManagerStartupTask {
     protected final Configuration config;
 
     protected final IServiceListener listener;
+    
+    protected final MonitorCreatePhysicalServiceLocksTask monitorCreatePhysicalServiceLocksTask; 
 
     /**
      * 
@@ -52,8 +54,11 @@ public class ServicesManagerStartupTask {
      *            The configuration that will be pushed to zookeeper.
      * @param listener
      */
-    public ServicesManagerStartupTask(final JiniFederation fed,
-            final Configuration config, final IServiceListener listener) {
+    public ServicesManagerStartupTask(
+            final JiniFederation fed,
+            final Configuration config,
+            final IServiceListener listener,
+            final MonitorCreatePhysicalServiceLocksTask monitorCreatePhysicalServiceLocksTask) {
 
         if (fed == null)
             throw new IllegalArgumentException();
@@ -64,12 +69,17 @@ public class ServicesManagerStartupTask {
         if (listener == null)
             throw new IllegalArgumentException();
 
+        if (monitorCreatePhysicalServiceLocksTask == null)
+            throw new IllegalArgumentException();
+
         this.fed = fed;
 
         this.config = config;
 
         this.listener = listener;
 
+        this.monitorCreatePhysicalServiceLocksTask = monitorCreatePhysicalServiceLocksTask;
+        
     }
 
     public Void call() throws Exception {
@@ -128,7 +138,8 @@ public class ServicesManagerStartupTask {
         Thread.sleep(5000);
         
         // restart persistent services not already running.
-        fed.submitMonitoredTask(new RestartPersistentServices(fed));
+        fed.submitMonitoredTask(new RestartPersistentServices(fed,
+                monitorCreatePhysicalServiceLocksTask));
 
         return null;
 

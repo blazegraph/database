@@ -1,14 +1,31 @@
 package com.bigdata.jini.start;
 
+import java.net.UnknownHostException;
+import java.nio.channels.FileLock;
+import java.rmi.RemoteException;
+import java.util.HashSet;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.locks.Lock;
 
+import net.jini.core.entry.Entry;
 import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceRegistrar;
+import net.jini.core.lookup.ServiceTemplate;
 
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.data.Stat;
 
+import com.bigdata.io.SerializerUtil;
+import com.bigdata.jini.lookup.entry.Hostname;
+import com.bigdata.jini.lookup.entry.ServiceUUID;
+import com.bigdata.jini.start.config.AbstractHostConstraint;
+import com.bigdata.jini.start.config.ManagedServiceConfiguration;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.jini.JiniUtil;
+import com.bigdata.zookeeper.ZLock;
 
 /**
  * Task restarts persistent physical services that should be running on this
@@ -40,14 +57,23 @@ public class RestartPersistentServices implements Callable<Void> {
     
     protected final ZooKeeper zookeeper;
     
-    public RestartPersistentServices(final JiniFederation fed) {
+    final MonitorCreatePhysicalServiceLocksTask monitorCreatePhysicalServiceLocksTask;
+    
+    public RestartPersistentServices(
+            final JiniFederation fed,
+            final MonitorCreatePhysicalServiceLocksTask monitorCreatePhysicalServiceLocksTask) {
         
         if(fed == null)
+            throw new IllegalArgumentException();
+    
+        if(monitorCreatePhysicalServiceLocksTask == null)
             throw new IllegalArgumentException();
         
         this.fed = fed;
         
         this.zookeeper = fed.getZookeeper();
+        
+        this.monitorCreatePhysicalServiceLocksTask = monitorCreatePhysicalServiceLocksTask;
         
     }
     
@@ -88,16 +114,58 @@ public class RestartPersistentServices implements Callable<Void> {
         final String zconfig = zroot + BigdataZooDefs.ZSLASH
                 + BigdataZooDefs.CONFIG;
 
-        /*
-         * FIXME This must scan physical service instances, compare any which
-         * were started on the local host with the discovered services, and
-         * restart those which are not discoverable using their
-         * {@link ServiceConfiguration} znode.
-         */
-        throw new UnsupportedOperationException();
+        // these are the ServiceConfigurations.
+        final List<String> serviceConfigZNodes = zookeeper.getChildren(zconfig, false);
         
-//        return null;
-        
+        for (String serviceConfigZNode : serviceConfigZNodes) {
+
+            /*
+             * Get the service configuration. We will need it iff we restart an
+             * instance of this service type.
+             */
+            final ManagedServiceConfiguration serviceConfig = (ManagedServiceConfiguration) SerializerUtil
+                    .deserialize(zookeeper.getData(zconfig + "/"
+                            + serviceConfigZNode, false, new Stat()));
+
+            /*
+             * The children are the logical service instances for that service
+             * type.
+             */
+            final List<String> logicalServiceZNodes = zookeeper.getChildren(
+                    zconfig + "/" + serviceConfigZNode, false);
+
+            for (String logicalServiceZNode : logicalServiceZNodes) {
+
+                final String logicalServiceZPath = zconfig + "/"
+                        + logicalServiceZNode;
+
+                /*
+                 * The children are the physical service instances for that
+                 * logical service.
+                 */
+                final List<String> physicalServiceZNodes = zookeeper
+                        .getChildren(logicalServiceZPath, false);
+                
+                for (String physicalServiceZNode : physicalServiceZNodes) {
+
+                    final String physicalServiceZPath = logicalServiceZPath
+                            + "/" + physicalServiceZNode;
+
+                    final Entry[] attributes = (Entry[]) SerializerUtil
+                            .deserialize(zookeeper.getData(
+                                    physicalServiceZPath, false, new Stat()));
+
+                    monitorCreatePhysicalServiceLocksTask.restartIfNotRunning(
+                            serviceConfig, logicalServiceZPath,
+                            physicalServiceZPath, attributes);
+                    
+                }
+
+            }
+
+        }
+
+        return null;
+
     }
-    
 }

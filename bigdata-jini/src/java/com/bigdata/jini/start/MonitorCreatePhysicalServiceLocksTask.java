@@ -1,21 +1,34 @@
 package com.bigdata.jini.start;
 
+import java.net.UnknownHostException;
+import java.nio.channels.FileLock;
+import java.rmi.RemoteException;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+
+import net.jini.core.entry.Entry;
+import net.jini.core.lookup.ServiceID;
+import net.jini.core.lookup.ServiceRegistrar;
+import net.jini.core.lookup.ServiceTemplate;
 
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.Stat;
 
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.jini.lookup.entry.Hostname;
+import com.bigdata.jini.lookup.entry.ServiceUUID;
+import com.bigdata.jini.start.config.AbstractHostConstraint;
 import com.bigdata.jini.start.config.IServiceConstraint;
 import com.bigdata.jini.start.config.ManagedServiceConfiguration;
 import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.jini.JiniUtil;
 import com.bigdata.zookeeper.UnknownChildrenWatcher;
 import com.bigdata.zookeeper.ZLock;
 import com.bigdata.zookeeper.ZNodeLockWatcher;
@@ -72,8 +85,13 @@ public class MonitorCreatePhysicalServiceLocksTask implements
      * <p>
      * Note: This assumes that there is one {@link ServicesManagerServer} per
      * host. We are not enforcing that constraint.
+     * <p>
+     * Note: This is also used to serialize service restarts. This prevents the
+     * possiblity of a service restart for a service which is concurrently
+     * starting. See {@link RestartPersistentServices} and
+     * {@link #restartPhysicalService(ManagedServiceConfiguration, String, String, Entry[])}
      */
-    final protected Lock lock = new ReentrantLock();
+    final protected ReentrantLock lock = new ReentrantLock();
     
     public MonitorCreatePhysicalServiceLocksTask(final JiniFederation fed,
             final IServiceListener listener) {
@@ -526,6 +544,332 @@ public class MonitorCreatePhysicalServiceLocksTask implements
                     TimeUnit.MILLISECONDS);
 
         }
+
+    }
+
+    /**
+     * Restarts the service if it is not running.
+     * <p>
+     * There is a small window within which a new service which is starting
+     * could qualify for restart. The physical service znode is created by the
+     * service itself. We depend on the existence of that znode to identify
+     * services for restart. If the physical service creates the ephemeral znode
+     * in the {@link BigdataZooDefs#MASTER_ELECTION} container after it creates
+     * its physical service znode and before it is registered with a
+     * {@link ServiceRegistrar} that we are also joined with then the service
+     * would qualify for "restart".
+     * <p>
+     * If {@link FileLock} is supported for the OS and the volume on which the
+     * serviceDir lives (NFS does not support FileLock), then the service
+     * obtains a {@link FileLock} and concurrent starts will be disallowed (an
+     * exception will be thrown by the process which does not get the
+     * {@link FileLock}). Where supported, {@link FileLock} will prevent the
+     * service from being started manually if it is already running.
+     * <p>
+     * The window is closed for automatic restarts by internally acquiring the
+     * same {@link #lock} that is used to serialize service starts.
+     * 
+     * @param serviceConfig
+     * @param logicalServiceZPath
+     * @param physicalServiceZPath
+     * @param attributes
+     * 
+     * @return <code>true</code> iff the service is known to have been
+     *         restarted. <code>false</code> will be returned if a timeout
+     *         occurred while attempting to restart the service.
+     * 
+     * @throws InterruptedException
+     *             if interrupted while awaiting the {@link #lock} or while
+     *             re-starting the service.
+     */
+    protected boolean restartIfNotRunning(
+            final ManagedServiceConfiguration serviceConfig,
+            final String logicalServiceZPath,
+            final String physicalServiceZPath, final Entry[] attributes)
+            throws InterruptedException {
+
+        try {
+
+            if (!isLocalService(attributes)) {
+
+                return false;
+
+            }
+
+        } catch (UnknownHostException ex) {
+
+            log.warn("className=" + serviceConfig.className
+                    + ", physicalServiceZPath=" + physicalServiceZPath, ex);
+
+            return false;
+            
+        }
+
+        if (INFO)
+            log.info("Service is local: className=" + serviceConfig
+                        + ", physicalServiceZPath=" + physicalServiceZPath);
+
+        // block until we can evaluate this service for restart.
+        lock.lockInterruptibly();
+        try {
+
+            final boolean shouldRestart;
+
+            try {
+
+                shouldRestart = shouldRestartPhysicalService(serviceConfig,
+                        logicalServiceZPath, physicalServiceZPath, attributes);
+
+            } catch (RemoteException ex) {
+
+                log.error("className=" + serviceConfig
+                        + ", physicalServiceZPath=" + physicalServiceZPath, ex);
+
+                return false;
+
+            }
+
+            if (!shouldRestart) {
+                
+                if (INFO)
+                    log.info("Service is running: className=" + serviceConfig
+                            + ", physicalServiceZPath=" + physicalServiceZPath);
+                
+                return false;
+                
+            }
+
+            if (!serviceConfig.canStartService(fed)) {
+
+                log
+                        .warn("Service not running : start prevented by constraints: className="
+                                + serviceConfig
+                                + ", physicalServiceZPath="
+                                + physicalServiceZPath);
+
+                return false;
+                
+            }
+            
+            // Restart the service.
+            try {
+
+                return restartPhysicalService(serviceConfig, logicalServiceZPath,
+                    physicalServiceZPath, attributes);
+
+            } catch(InterruptedException t) {
+
+                log.error("Service restart interrupted: className="
+                        + serviceConfig + ", physicalServiceZPath="
+                        + physicalServiceZPath);
+
+                // rethrow so that the caller will see the interrupt.
+                throw t;
+                
+            } catch(Throwable t) {
+                
+                // log and ignore.
+                log.error("Service restart error: className=" + serviceConfig
+                        + ", physicalServiceZPath=" + physicalServiceZPath);
+            
+                // service did not start (or at least within the timeout).
+                return false;
+                
+            }
+
+        } finally {
+
+            lock.unlock();
+
+        }
+        
+    }
+
+    /**
+     * Figure out if the service lives on this host.
+     * 
+     * @return <code>true</code> if the service lives on this host.
+     * 
+     * @throws UnknownHostException
+     */
+    protected boolean isLocalService(final Entry[] attributes)
+            throws UnknownHostException {
+
+        boolean isLocalHost = false;
+
+        for (Entry e : attributes) {
+
+            if (e instanceof Hostname) {
+
+                final String hostname = ((Hostname) e).hostname;
+
+                if (AbstractHostConstraint.isLocalHost(hostname)) {
+
+                    isLocalHost = true;
+
+                }
+
+            }
+
+        }
+
+        return isLocalHost;
+
+    }
+    
+    /**
+     * Consider a physical service for restart. The service must be persistent
+     * (its znode is persistent), it must have been started on the local host,
+     * it must be disconnected from zookeeper (we verify that it does not have a
+     * znode in the {@link BigdataZooDefs#MASTER_ELECTION} container), and it
+     * must not be discoverable using jini.
+     * 
+     * @param serviceConfig
+     * @param logicalServiceZPath
+     * @param physicalServiceZPath
+     * @param attributes
+     * 
+     * @throws RemoteException
+     *             if there was an RMI problem with jini.
+     * @throws IllegalMonitorStateException
+     *             if the current thread does not hold the {@link #lock}.
+     */
+    private boolean shouldRestartPhysicalService(
+            final ManagedServiceConfiguration serviceConfig,
+            final String logicalServiceZPath,
+            final String physicalServiceZPath, final Entry[] attributes)
+            throws RemoteException {
+
+        if(!lock.isHeldByCurrentThread())
+            throw new IllegalMonitorStateException();
+
+        if (INFO)
+            log.info("Considering: className=" + serviceConfig.className
+                    + ", physicalServiceZPath=" + physicalServiceZPath);
+        
+        /*
+         * Extract the serviceID and figure out if the service lives on this
+         * host.
+         */
+        final ServiceID serviceID;
+        {
+
+            UUID serviceUUID = null;
+
+            for (Entry e : attributes) {
+
+                if (e instanceof ServiceUUID) {
+
+                    serviceUUID = ((ServiceUUID) e).serviceUUID;
+
+                    break;
+
+                }
+
+            }
+
+            if (serviceUUID == null) {
+
+                log.error("No ServiceUUID? className="
+                        + serviceConfig.className + ", physicalServiceZPath="
+                        + physicalServiceZPath);
+
+                return false;
+
+            }
+
+            serviceID = JiniUtil.uuid2ServiceID(serviceUUID);
+
+        }
+
+        /*
+         * Check to see if the service is discoverable. If it is then we will
+         * not restart it.
+         */
+        
+        final ServiceRegistrar[] serviceRegistrars = fed
+                .getDiscoveryManagement().getRegistrars();
+
+        if (serviceRegistrars == null) {
+
+            // we can't continue without a service registrar.
+            throw new RuntimeException("No service registrars.");
+
+        }
+
+        for (ServiceRegistrar reg : serviceRegistrars) {
+
+            if (reg.lookup(new ServiceTemplate(serviceID, null/* iface[] */,
+                    null/* attributes */)) != null) {
+
+                if (INFO)
+                    log.info("Service discoverable: className="
+                            + serviceConfig.className
+                            + ", physicalServiceZPath=" + physicalServiceZPath);
+
+                return false;
+                
+            }
+
+        }
+
+        /*
+         * Check to see if the service is known to zookeeper.
+         */
+
+        return true;
+        
+    }
+
+    /**
+     * @param serviceConfig
+     * @param logicalServiceZPath
+     * @param physicalServiceZPath
+     * @param attributes
+     * 
+     * @throws Exception
+     *             if the task to start the service could not be created.
+     * @throws TimeoutException
+     *             if the service does not start within the
+     *             {@link ServiceConfiguration#timeout}
+     * @throws ExecutionException
+     *             if the task starting the service fails.
+     * @throws InterruptedException
+     *             if the task starting the service is interrupted.
+     * @throws IllegalMonitorStateException
+     *             if the current thread does not hold the {@link #lock}.
+     */
+    @SuppressWarnings("unchecked")
+    protected boolean restartPhysicalService(
+            final ManagedServiceConfiguration serviceConfig,
+            final String logicalServiceZPath,
+            final String physicalServiceZPath, final Entry[] attributes)
+            throws InterruptedException, ExecutionException, TimeoutException,
+            Exception {
+
+        if(!lock.isHeldByCurrentThread())
+            throw new IllegalMonitorStateException();
+        
+        if (INFO)
+            log.info("config=" + serviceConfig + ", zpath="
+                    + logicalServiceZPath);
+
+        /*
+         * Create task to start the service.
+         * 
+         * Note: We do not specify the service attributes because this is a
+         * service start (vs a service restart).
+         */
+        final Callable task = serviceConfig.newServiceStarter(fed, listener,
+                logicalServiceZPath, null/* attributes */);
+
+        /*
+         * Submit the task and waits for its Future (up to the timeout).
+         */
+        fed.getExecutorService().submit(task).get(serviceConfig.timeout,
+                TimeUnit.MILLISECONDS);
+        
+        return true;
 
     }
 
