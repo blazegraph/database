@@ -65,7 +65,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestServiceStarter.class);
         
         // test suite for managing a logical service using a watcher.
-        suite.addTestSuite(TestServiceConfigurationWatcher.class);
+        suite.addTestSuite(TestServiceConfigurationMonitoring.class);
         
         return suite;
         

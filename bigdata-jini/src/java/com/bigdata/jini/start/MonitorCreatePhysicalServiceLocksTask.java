@@ -93,7 +93,14 @@ public class MonitorCreatePhysicalServiceLocksTask implements
     }
 
     /**
-     * Task runs until cancelled.
+     * Start monitoring the {@link BigdataZooDefs#LOCKS_CREATE_PHYSICAL_SERVICE}
+     * znode.
+     * <p>
+     * Note: If the znode does not exist or {@link ZooKeeper} is not connected,
+     * then the task will keep trying to establish it watch until the znode is
+     * created.
+     * <p>
+     * Note: This task runs until cancelled.
      */
     public Void call() throws Exception {
 
@@ -103,6 +110,10 @@ public class MonitorCreatePhysicalServiceLocksTask implements
         final String locksZPath = fed.getZooConfig().zroot + "/"
                 + BigdataZooDefs.LOCKS_CREATE_PHYSICAL_SERVICE;
 
+        /*
+         * Note: The UnknownChildrenWatcher will keep trying until it is
+         * able to establish the watch. 
+         */
         final UnknownChildrenWatcher watcher = new UnknownChildrenWatcher(
                 zookeeper, locksZPath);
      
@@ -499,9 +510,14 @@ public class MonitorCreatePhysicalServiceLocksTask implements
             if (INFO)
                 log.info("config=" + config + ", zpath=" + logicalServiceZPath);
 
-            // get task to start the service.
+            /*
+             * Create task to start the service.
+             * 
+             * Note: We do not specify the service attributes because this is a
+             * service start (vs a service restart).
+             */
             final Callable task = config.newServiceStarter(fed, listener,
-                    logicalServiceZPath);
+                    logicalServiceZPath, null/* attributes */);
 
             /*
              * Submit the task and waits for its Future (up to the timeout).

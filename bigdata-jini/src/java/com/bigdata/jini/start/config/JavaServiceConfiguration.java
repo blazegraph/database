@@ -177,6 +177,7 @@ public class JavaServiceConfiguration extends ServiceConfiguration {
     }
 
     /**
+     * Starts a java service.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$

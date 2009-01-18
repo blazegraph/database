@@ -43,24 +43,24 @@ import com.bigdata.jini.start.config.TransactionServerConfiguration;
 import com.bigdata.service.jini.TransactionServer;
 
 /**
- * Test suite for managing state changes for a {@link ServiceConfiguration}
- * using a {@link ServiceConfigurationWatcher}.
+ * Test suite for monitoring state changes for a {@link ServiceConfiguration}
+ * and creating a new physical service instance.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestServiceConfigurationWatcher extends AbstractFedZooTestCase {
+public class TestServiceConfigurationMonitoring extends AbstractFedZooTestCase {
 
     /**
      * 
      */
-    public TestServiceConfigurationWatcher() {
+    public TestServiceConfigurationMonitoring() {
     }
 
     /**
      * @param arg0
      */
-    public TestServiceConfigurationWatcher(String arg0) {
+    public TestServiceConfigurationMonitoring(String arg0) {
         super(arg0);
     }
 

@@ -33,10 +33,14 @@ import java.util.UUID;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
+import net.jini.core.entry.Entry;
+import net.jini.core.lookup.ServiceID;
+import net.jini.lookup.entry.Name;
 
-import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.ZooKeeper;
 
+import com.bigdata.jini.lookup.entry.ServiceUUID;
+import com.bigdata.jini.start.BigdataZooDefs;
 import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.ManageLogicalServiceTask;
 import com.bigdata.jini.start.process.ProcessHelper;
@@ -85,24 +89,29 @@ abstract public class ManagedServiceConfiguration extends JavaServiceConfigurati
     }
 
     /**
-     * Factory method returns an object that may be used to start an new
-     * instance of the service for the specified path.
+     * Factory method returns an object that may be used to (re-)start a
+     * service.
      * 
      * @param fed
      * @param listener
      * @param logicalServiceZPath
      *            The path to the logical service whose instance will be
      *            started.
+     * @param attributes
+     *            This provides the information required to restart a persistent
+     *            service. When not given a new service instance will be
+     *            started. When given, the same services instance will be
+     *            restarted.
      * 
      * @throws Exception
      *             if there is a problem creating the service starter.
      */
-    public ManagedServiceStarter newServiceStarter(JiniFederation fed,
-            IServiceListener listener, String logicalServiceZPath)
-            throws Exception {
+    public ManagedServiceStarter newServiceStarter(final JiniFederation fed,
+            final IServiceListener listener, final String logicalServiceZPath,
+            final Entry[] attributes) throws Exception {
 
         return new ManagedServiceStarter<ProcessHelper>(fed, listener,
-                logicalServiceZPath);
+                logicalServiceZPath, attributes);
         
     }
 
@@ -129,6 +138,11 @@ abstract public class ManagedServiceConfiguration extends JavaServiceConfigurati
     }
 
     /**
+     * This class and subclasses support re-start of persistent services.
+     * Restart is only possible for persistent services. Persistent services
+     * must satisify several criteria in order for restart to succeed, including
+     * the stable assignment of the physical service znode name and the stable
+     * assignment of the service directory.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -139,6 +153,10 @@ abstract public class ManagedServiceConfiguration extends JavaServiceConfigurati
 
         protected final JiniFederation fed;
 
+        protected final String logicalServiceZPath;
+
+        protected final ZooKeeper zookeeper;
+
         /**
          * The znode for the logical service (the last component of the
          * {@link AbstractServiceStarter#logicalServiceZPath}.
@@ -146,14 +164,21 @@ abstract public class ManagedServiceConfiguration extends JavaServiceConfigurati
         public final String logicalServiceZNode;
 
         /**
-         * A unique token assigned to the service. This is used to recognize the
-         * service when it joins with a jini registrar, which is how we know
-         * that the service has started successfully and how we learn the
-         * physicalServiceZPath which is only available once it is created by
-         * the service instance.
+         * <code>true</code> iff this is a service restart and
+         * <code>false</code> if this is a new service start.
          */
-        public final UUID serviceToken;
-
+        public final boolean restart;
+        
+        /**
+         * The representation of the assigned {@link ServiceID} as a
+         * {@link UUID}. This is pre-assigned so that we can recognize the
+         * service when it joins with a jini registrar, which is how we know
+         * that the service has started successfully. It is also used to watch
+         * for the create of the znode representing the physical service
+         * instance.
+         */
+        public final UUID serviceUUID;
+        
         /**
          * The canonical service name. This is formed in much the same manner as
          * the {@link #serviceDir} using the service type, the
@@ -177,26 +202,22 @@ abstract public class ManagedServiceConfiguration extends JavaServiceConfigurati
          */
         public final File serviceDir;
 
-        protected final String logicalServiceZPath;
-
-        protected final ZooKeeper zookeeper;
-
         /**
          * 
          * @param fed
          * @param listener
          * @param logicalServiceZPath
-         *            The zpath to the logical service whose instance will be
-         *            started. Note that the zpath to the
-         *            {@link CreateMode#EPHEMERAL_SEQUENTIAL} node for the
-         *            physical service instance MUST be created by that process
-         *            so that the life cycle of the ephemeral node is tied to
-         *            the life cycle of the process (or at least to its
-         *            {@link ZooKeeper} client).
+         *            The zpath to the logical service.
+         * @param attributes
+         *            This provides the information required to restart a
+         *            persistent service. When not given a new service instance
+         *            will be started. When given, the same service instance
+         *            will be restarted.
          */
         protected ManagedServiceStarter(final JiniFederation fed,
                 final IServiceListener listener,
-                final String logicalServiceZPath) {
+                final String logicalServiceZPath,
+                final Entry[] attributes) {
 
             super(listener);
             
@@ -219,18 +240,56 @@ abstract public class ManagedServiceConfiguration extends JavaServiceConfigurati
             logicalServiceZNode = logicalServiceZPath
                     .substring(logicalServiceZPath.lastIndexOf('/') + 1);
 
-            // unique token used to recognize the service when it starts.
-            serviceToken = UUID.randomUUID();
+            this.restart = attributes != null;
 
-            // The canonical service name.
-            serviceName = cls.getSimpleName() + "/" + logicalServiceZNode + "/"
-                    + serviceToken;
+            if (restart) {
 
+                String serviceName = null;
+                UUID serviceUUID = null;
+
+                for(Entry e : attributes) {
+                    
+                    if(serviceName != null && e instanceof Name) {
+                        
+                        serviceName = ((Name)e).name;
+                        
+                    } else if (serviceUUID != null
+                            && e instanceof ServiceUUID) {
+
+                        serviceUUID = ((ServiceUUID) e).serviceUUID;
+                        
+                    }
+                    
+                }
+                
+                if (serviceName == null)
+                    throw new RuntimeException(
+                            "Service Name not found in attributes");
+
+                if (serviceUUID == null)
+                    throw new RuntimeException(
+                            "Service UUID not found in attributes");
+                
+                this.serviceName = serviceName;
+                
+                this.serviceUUID = serviceUUID;
+
+            } else {
+
+                // Generate a random UUID.
+                this.serviceUUID = UUID.randomUUID();
+                
+                // The canonical service name.
+                this.serviceName = cls.getSimpleName() + "/"
+                        + logicalServiceZNode + "/" + serviceUUID;
+
+            }
+            
             // The actual service directory (choosen at runtime).
             serviceDir = new File(new File(new File(
                     ManagedServiceConfiguration.this.serviceDir, cls
                             .getSimpleName()), logicalServiceZNode),
-                    serviceToken.toString());
+                    serviceUUID.toString());
 
         }
 
@@ -246,15 +305,34 @@ abstract public class ManagedServiceConfiguration extends JavaServiceConfigurati
         }
         
         /**
-         * Extended to verify that the {@link #logicalServiceZPath} exists.
+         * Extended to verify that the {@link #logicalServiceZPath}, the
+         * {@link BigdataZooDefs#PHYSICAL_SERVICES_CONTAINER}, and the
+         * {@link BigdataZooDefs#MASTER_ELECTION} znodes exist.
          */
         protected void setUp() throws Exception {
 
-            if (zookeeper.exists(logicalServiceZPath, false/* watch */) == null) {
+            String zpath = logicalServiceZPath;
 
-                throw new IllegalStateException(
-                        "Logical service zpath not found: "
-                                + logicalServiceZPath);
+            if (zookeeper.exists(zpath, false/* watch */) == null) {
+
+                throw new IllegalStateException("Not found: " + zpath);
+
+            }
+
+            zpath = logicalServiceZPath + "/"
+                    + BigdataZooDefs.PHYSICAL_SERVICES_CONTAINER;
+
+            if (zookeeper.exists(zpath, false/* watch */) == null) {
+
+                throw new IllegalStateException("Not found: " + zpath);
+
+            }
+
+            zpath = logicalServiceZPath + "/" + BigdataZooDefs.MASTER_ELECTION;
+
+            if (zookeeper.exists(zpath, false/* watch */) == null) {
+
+                throw new IllegalStateException("Not found: " + zpath);
 
             }
 

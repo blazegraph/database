@@ -66,7 +66,8 @@ import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 
 import com.bigdata.jini.lookup.entry.Hostname;
-import com.bigdata.jini.lookup.entry.ServiceToken;
+import com.bigdata.jini.lookup.entry.ServiceDir;
+import com.bigdata.jini.lookup.entry.ServiceUUID;
 import com.bigdata.jini.start.BigdataZooDefs;
 import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.process.JiniServiceProcessHelper;
@@ -164,11 +165,23 @@ abstract public class JiniServiceConfiguration extends
         
     }
 
+    /**
+     * @param fed
+     * @param listener
+     * @param logicalServiceZPath
+     *            This zpath of the logicalService instance.
+     * @param attributes
+     *            This provides the information required to restart a
+     *            persistent service. When not given a new service instance
+     *            will be started. When given, the same service instance
+     *            will be restarted.
+     */
     public JiniServiceStarter newServiceStarter(JiniFederation fed,
-            IServiceListener listener, String zpath) throws Exception {
+            IServiceListener listener, String zpath, Entry[] attributes)
+            throws Exception {
 
-        return new JiniServiceStarter(fed, listener, zpath);
-        
+        return new JiniServiceStarter(fed, listener, zpath, attributes);
+
     }
     
     /**
@@ -194,24 +207,27 @@ abstract public class JiniServiceConfiguration extends
          * @param fed
          * @param listener
          * @param logicalServiceZPath
-         *            This is an example of that zpath.
-         * <pre>
-         * /test/fed0000000014/config/TransactionServer/logicalService0000000000/physicalService0000000000
-         * </pre>
-         * where <code>/test/fed0000000014/</code> is the zroot for the
-         * federation.
+         *            This zpath of the logicalService instance.
+         * @param attributes
+         *            This provides the information required to restart a
+         *            persistent service. When not given a new service instance
+         *            will be started. When given, the same service instance
+         *            will be restarted.
          */
         protected JiniServiceStarter(final JiniFederation fed,
                 final IServiceListener listener,
-                final String logicalServiceZPath) {
+                final String logicalServiceZPath, final Entry[] attributes) {
 
-            super(fed, listener, logicalServiceZPath);
+            super(fed, listener, logicalServiceZPath, attributes);
 
         }
 
         /**
          * Imports that will be written into the generated
          * {@link ConfigurationFile}.
+         * 
+         * @todo The generated {@link Configuration} uses fully qualified
+         *       imports so it may be that we don't need any of these.
          */
         public String[] getImports() {
 
@@ -267,14 +283,24 @@ abstract public class JiniServiceConfiguration extends
         }
 
         /**
-         * Extended to write the configuration file in the service directory.
+         * Extended to write the {@link Configuration} file in the service
+         * directory.
+         * <p>
+         * Note: If this is a service restart then {@link Configuration} is NOT
+         * overwritten. If you want to change the {@link Configuration} of a
+         * service which has already been started you need to either administer
+         * it through jini or shut it down and edit its configuration file.
          */
         @Override
         protected void setUp() throws Exception {
             
             super.setUp();
-            
-            writeConfigFile();
+
+            if (!restart) {
+
+                writeConfigFile();
+
+            }
             
         }
         
@@ -284,7 +310,7 @@ abstract public class JiniServiceConfiguration extends
          */
         protected void writeConfigFile() throws IOException {
 
-                // generate the file contents.
+            // generate the file contents.
             final String contents;
             {
                 
@@ -390,7 +416,7 @@ abstract public class JiniServiceConfiguration extends
             out.write("}\n");
 
             // configuration for the zookeeper client.
-            writeZookeeperClientConfig(out);
+            writeZookeeperClientConfigEntries(out);
             
         }
         
@@ -407,27 +433,39 @@ abstract public class JiniServiceConfiguration extends
 
         /**
          * Returns the {@link Entry}[] used to describe the service (allows the
-         * override or addition of entries at service creation time).
-         * <p>
-         * Note: A canonical {@link Name} entry is added. It is formed from the
-         * service type and the logical service znode.
-         * <p>
-         * Note: The {@link Hostname} on which the service is running is added.
-         * <p>
-         * Note: The {@link ServiceToken} attribute is added.
+         * override or addition of entries at service creation time). The
+         * following attributes are added:
+         * <dl>
+         * 
+         * <dt>{@link Name}</dt>
+         * <dd>A canonical {@link Name} entry. It is formed from the service
+         * type and the logical service znode.</dd>
+         * 
+         * <dt>{@link Hostname}</dt>
+         * <dd>The canonical name of the host on which the service is running.</dd>
+         * 
+         * <dt>{@link ServiceDir}</dt>
+         * <dd>The directory in which the service stores its persistent state.</dd>
+         * 
+         * <dt>{@link ServiceUUID}</dt>
+         * <dd>The {@link ServiceID} assigned to the service represented as a
+         * {@link UUID}.</dd>
+         * 
+         * </dl>
          */
-        protected Entry[] getEntries(Entry[] entries) throws IOException {
+        protected Entry[] getEntries(final Entry[] entries) throws IOException {
 
             final Name serviceName = new Name(this.serviceName);
+
+            final ServiceDir serviceDir = new ServiceDir(this.serviceDir);
 
             final Hostname hostName = new Hostname(InetAddress.getLocalHost()
                     .getCanonicalHostName().toString());
 
-            final ServiceToken serviceToken = new ServiceToken(
-                    this.serviceToken);
-            
-            return concat(new Entry[] { serviceName, hostName, serviceToken },
-                    entries);
+            final ServiceUUID serviceUUID = new ServiceUUID(this.serviceUUID);
+
+            return concat(new Entry[] { serviceName, hostName, serviceDir,
+                    serviceUUID }, entries);
 
         }
 
@@ -439,7 +477,7 @@ abstract public class JiniServiceConfiguration extends
 
             final Entry[] entries = getEntries(JiniServiceConfiguration.this.entries);
 
-            out.write("\nentries=new Entry[]{\n");
+            out.write("\nentries = new Entry[]{\n");
 
             for (Entry e : entries) {
 
@@ -492,10 +530,15 @@ abstract public class JiniServiceConfiguration extends
 
                 out.write(q(((Hostname) e).hostname));
 
-            } else if (ServiceToken.class.equals(cls)) {
+            } else if (ServiceDir.class.equals(cls)) {
+
+                out.write("new java.io.File("
+                        + q(((ServiceDir) e).serviceDir.toString()) + ")");
+                
+            } else if (ServiceUUID.class.equals(cls)) {
                 
                 out.write("java.util.UUID.fromString("
-                        + q(((ServiceToken) e).serviceToken.toString()) + ")");
+                        + q(((ServiceUUID) e).serviceUUID.toString()) + ")");
 
             } else {
              
@@ -554,11 +597,11 @@ abstract public class JiniServiceConfiguration extends
          */
         protected void writeServiceDescription(Writer out) throws IOException {
 
-            writeExporter(out);
+            writeExporterEntry(out);
 
-            writeServiceIdFile(out);
+            writeServiceIdFileEntry(out);
             
-            writeLogicalServiceZPath(out);
+            writeLogicalServiceZPathEntry(out);
 
             writeProperties(out);
             
@@ -626,7 +669,7 @@ abstract public class JiniServiceConfiguration extends
          * exported is a chunk of code, so it would have to be quoted to get
          * passed along, which is why I am doing it this way.
          */
-        protected void writeExporter(Writer out) throws IOException {
+        protected void writeExporterEntry(Writer out) throws IOException {
             
             out.write("\nexporter = new " + BasicJeriExporter.class.getName()
                     + "(" + TcpServerEndpoint.class.getName()
@@ -645,7 +688,7 @@ abstract public class JiniServiceConfiguration extends
          * once it has been assigned by jini. That action is performed by the
          * service itself.
          */
-        protected void writeServiceIdFile(Writer out) throws IOException {
+        protected void writeServiceIdFileEntry(Writer out) throws IOException {
 
             final File serviceIdFile = new File(serviceDir, "service.id");
 
@@ -661,7 +704,8 @@ abstract public class JiniServiceConfiguration extends
          * 
          * @throws IOException
          */
-        protected void writeLogicalServiceZPath(Writer out) throws IOException {
+        protected void writeLogicalServiceZPathEntry(Writer out)
+                throws IOException {
 
             out
                     .write("\nlogicalServiceZPath=" + q(logicalServiceZPath)
@@ -674,7 +718,7 @@ abstract public class JiniServiceConfiguration extends
          * 
          * @throws IOException
          */
-        protected void writeZookeeperClientConfig(Writer out)
+        protected void writeZookeeperClientConfigEntries(Writer out)
                 throws IOException {
 
             out.write("\n");
@@ -760,17 +804,19 @@ abstract public class JiniServiceConfiguration extends
                 serviceDiscoveryManager = new ServiceDiscoveryManager(fed
                         .getDiscoveryManagement(), new LeaseRenewalManager());
 
-                if(INFO)
+                if (INFO)
                     log.info("Awaiting service discovery: "
                             + processHelper.name);
-                
-                final ServiceItem[] items = serviceDiscoveryManager
-                        .lookup(
-                                new ServiceTemplate(null/* serviceID */,
-                                        null/* iface[] */,
-                                        new Entry[] { new ServiceToken(
-                                                serviceToken)
-                        }), // template
+
+                final ServiceID serviceID = JiniUtil
+                        .uuid2ServiceID(serviceUUID);
+
+                final ServiceItem[] items = serviceDiscoveryManager.lookup(
+                        new ServiceTemplate(//
+                                serviceID, //
+                                null, // iface[]
+                                null // Entry[]
+                        ), // template
                         1, // minMatches
                         1, // maxMatches
                         null, // filter
@@ -829,12 +875,13 @@ abstract public class JiniServiceConfiguration extends
                 final TimeUnit unit) throws KeeperException,
                 InterruptedException, TimeoutException {
 
-            // convert to a standard UUID.
-            final UUID serviceUUID = JiniUtil.serviceID2UUID(serviceItem.serviceID);
+//            // convert to a standard UUID.
+//            final UUID serviceUUID = JiniUtil.serviceID2UUID(serviceItem.serviceID);
             
             // this is the zpath that the service will create.
             final String physicalServiceZPath = logicalServiceZPath + "/"
-                    + BigdataZooDefs.PHYSICAL_SERVICES_CONTAINER + "/" + serviceUUID;
+                    + BigdataZooDefs.PHYSICAL_SERVICES_CONTAINER + "/"
+                    + serviceUUID;
 
             if (!ZNodeCreatedWatcher.awaitCreate(zookeeper,
                     physicalServiceZPath, timeout, unit)) {

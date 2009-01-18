@@ -1,23 +1,10 @@
 package com.bigdata.jini.start;
 
-import java.io.IOException;
-import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import net.jini.config.Configuration;
-import net.jini.config.ConfigurationException;
 
-import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.ZooKeeper;
-import org.apache.zookeeper.KeeperException.NodeExistsException;
-import org.apache.zookeeper.data.ACL;
-
-import com.bigdata.io.SerializerUtil;
-import com.bigdata.jini.start.config.JiniCoreServicesConfiguration;
-import com.bigdata.jini.start.config.ManagedServiceConfiguration;
-import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.jini.start.config.ServicesManagerConfiguration;
 import com.bigdata.jini.start.process.JiniCoreServicesProcessHelper;
 import com.bigdata.jini.start.process.ProcessHelper;
@@ -198,11 +185,6 @@ public abstract class AbstractServicesManagerService extends AbstractService
     }
 
     /**
-     * Return the parsed {@link Configuration} used to start the service. 
-     */
-    abstract protected Configuration getConfiguration();
-
-    /**
      * Strengthen the return type.
      */
     abstract public JiniFederation getFederation();
@@ -232,28 +214,8 @@ public abstract class AbstractServicesManagerService extends AbstractService
         
         final JiniFederation fed = getFederation();
 
-        final Configuration config = getConfiguration();
-
-        /*
-         * Create and start task that will monitor the config znode. If any
-         * children are added then this task will set up a watcher on the
-         * service configuration node. From there everything will happen
-         * automatically.
-         * 
-         * We monitor future on this task and make sure that it is still
-         * running, but it is really only used when the config znode children
-         * are created.
-         */
-        fed
-                .submitMonitoredTask(new MonitorConfigZNodeTask(fed, this/* listener */));
-
-        /*
-         * Create and start task that will compete for locks to start physical
-         * service instances.
-         */
-        fed.submitMonitoredTask(new MonitorCreatePhysicalServiceLocksTask(fed,
-                this/* listener */));
-
+        final Configuration config = fed.getClient().getConfiguration();
+        
         // the service manager's own configuration.
         final ServicesManagerConfiguration selfConfig = new ServicesManagerConfiguration(config);
 
@@ -264,231 +226,39 @@ public abstract class AbstractServicesManagerService extends AbstractService
                     + selfConfig);
             
         }
-        
+
         /*
-         * These are the services that we will start and/or manage.
+         * Create and start task that will monitor the config znode. If any
+         * children are added then this task will set up a watcher on the
+         * service configuration node. From there everything will happen
+         * automatically.
+         * 
+         * We monitor future on this task and make sure that it is still
+         * running, but it is really only used when the config znode children
+         * are created.
+         * 
+         * Note: This task will run until cancelled. If necessary it will wait
+         * for the zookeeper client to become connected and the znode to be
+         * created.
          */
-        final ServiceConfiguration[] serviceConfigurations = selfConfig
-                .getServiceConfigurations(config);
+        fed.submitMonitoredTask(new MonitorConfigZNodeTask(fed, this/* listener */));
 
-        // start if configured to run on host and not running.
-        startZookeeperService(config);
-
-        for (ServiceConfiguration serviceConfig : serviceConfigurations) {
-
-            if (serviceConfig instanceof JiniCoreServicesConfiguration) {
-
-                /*
-                 * Start jini if configured to run on this host and not running.
-                 */
-
-                startJiniCoreServices(config);
-
-            }
-
-        }
-        
         /*
-         * Make sure that the key znodes are defined and then push the service
-         * configurations into zookeeper.
+         * Create and start task that will compete for locks to start physical
+         * service instances.
+         * 
+         * Note: This task will run until cancelled. If necessary it will wait
+         * for the zookeeper client to become connected and the znode to be
+         * created.
          */
-        
-        final ZooKeeper zookeeper = fed.getZookeeper();
-        
-        if (zookeeper != null) {
+        fed.submitMonitoredTask(new MonitorCreatePhysicalServiceLocksTask(fed,
+                this/* listener */));
 
-            final ZooKeeper.States state = zookeeper.getState();
-            
-            switch (state) {
-
-            default:
-            
-                log.error("Zookeeper: "+state+" : Will not push configuration.");
-
-                return;
-
-            case CONNECTED:
-
-                break;
-                
-            }
-            
-            // root znode for the federation.
-            final String zroot = fed.getZooConfig().zroot;
-
-            // znode for configuration metadata.
-            final String zconfig = zroot + BigdataZooDefs.ZSLASH
-                    + BigdataZooDefs.CONFIG;
-
-            // ACL for the zroot, etc.
-            final List<ACL> acl = fed.getClient().zooConfig.acl;
-
-            // create critical nodes used by the federation.
-            createKeyZNodes(zookeeper, zroot, acl);
-
-            // push the service configurations into zookeeper (create/update).
-            pushConfiguration(zookeeper, zconfig, acl, serviceConfigurations);
-            
-        }
-        
-    }
-
-    /**
-     * If necessary, start a zookeeper service on this host.
-     * 
-     * @return <code>true</code> if an instance was started successfully.
-     */
-    protected boolean startZookeeperService(Configuration config)
-            throws ConfigurationException, IOException {
-
-        try {
-
-            return ZookeeperProcessHelper
-                    .startZookeeper(config, this/* listener */) > 0;
-
-        } catch (Throwable t) {
-            
-            log.error("Could not start zookeeper service: " + t, t);
-            
-            return false;
-            
-        }
-
-    }
-
-    /**
-     * If necessary, start the jini core services on this host.
-     * 
-     * @return <code>true</code> if an instance was started successfully.
-     */
-    protected boolean startJiniCoreServices(Configuration config) {
-
-        try {
-
-            return JiniCoreServicesProcessHelper
-                    .startCoreServices(config, this/* listener */);
-            
-        } catch (Throwable t) {
-            
-            log.error("Could not start jini services: " + t, t);
-            
-            return false;
-            
-        }
+        /*
+         * Run startup.
+         */
+        new ServicesManagerStartupTask(fed, config, this).call();
         
     }
     
-    /**
-     * Create key znodes used by the federation.
-     * 
-     * @param zookeeper
-     * @param zroot
-     * @param acl
-     * 
-     * @throws KeeperException
-     * @throws InterruptedException
-     */
-    protected void createKeyZNodes(final ZooKeeper zookeeper,
-            final String zroot, final List<ACL> acl) throws KeeperException,
-            InterruptedException {
-
-        final String[] a = new String[] {
-          
-                // znode for the federation root.
-                zroot,
-                
-                // znode for configuration metadata.
-                zroot + "/" + BigdataZooDefs.CONFIG,
-
-                // znode dominating most locks.
-                zroot + "/" + BigdataZooDefs.LOCKS,
-
-                // znode dominating lock nodes for creating new physical services.
-                zroot + "/" + BigdataZooDefs.LOCKS_CREATE_PHYSICAL_SERVICE,
-
-                // znode whose children are the per-service type service configurations.
-                zroot + "/" + BigdataZooDefs.LOCKS_SERVICE_CONFIG_MONITOR,
-                
-                // znode for the resource locks (IResourceLockManager)
-                zroot + "/" + BigdataZooDefs.LOCKS_RESOURCES,
-                
-
-        };
-        
-        for (String zpath : a) {
-
-            try {
-
-                zookeeper.create(zpath, new byte[] {}/* data */, acl,
-                        CreateMode.PERSISTENT);
-
-            } catch (NodeExistsException ex) {
-
-                // that's fine - the configuration already exists.
-                if (INFO)
-                    log.info("exists: " + zpath);
-
-                return;
-
-            }
-
-        }
-
-    }
-
-    /**
-     * Pushs the {@link ServiceConfiguration}s for the federation into
-     * zookeeper. A new znode is created if none exists. Otherwise this
-     * overwrites the existing data for those znodes.
-     * 
-     * @throws ConfigurationException
-     * @throws InterruptedException
-     * @throws KeeperException
-     */
-    public void pushConfiguration(final ZooKeeper zookeeper,
-            final String zconfig, final List<ACL> acl,
-            final ServiceConfiguration[] serviceConfigurations)
-            throws KeeperException, InterruptedException,
-            ConfigurationException {
-
-        for (ServiceConfiguration x : serviceConfigurations) {
-
-            if(!(x instanceof ManagedServiceConfiguration)) {
-                
-                // Only the managed services are put into zookeeper.
-                continue;
-                
-            }
-            
-            final String zpath = zconfig + BigdataZooDefs.ZSLASH + x.className;
-
-            final byte[] data = SerializerUtil.serialize(x);
-
-            try {
-
-                zookeeper.create(zpath, data, acl, CreateMode.PERSISTENT);
-
-                if (INFO)
-                    log.info("Created: " + zpath + " : " + x);
-
-            } catch (NodeExistsException ex) {
-
-                try {
-                    zookeeper.setData(zpath, data, -1/* version */);
-
-                    if (INFO)
-                        log.info("Updated: " + zpath + " : " + x);
-
-                } catch (KeeperException ex2) {
-
-                    log.error("Could not update: zpath=" + zpath);
-
-                }
-                
-            }
-
-        }
-
-    }
-
 }

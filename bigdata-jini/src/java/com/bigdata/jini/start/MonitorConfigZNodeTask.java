@@ -54,12 +54,24 @@ public class MonitorConfigZNodeTask implements Callable {
 
     }
 
+    /**
+     * Start monitoring the {@link BigdataZooDefs#CONFIG} znode.
+     * <p>
+     * Note: If the znode does not exist or {@link ZooKeeper} is not connected,
+     * then the task will keep trying to establish it watch until the znode is
+     * created.
+     * <p>
+     * Note: This task runs until cancelled.
+     */
     public Object call() throws Exception {
     
         /*
          * This is what we want to keep our eye on. Any new children are new
-         * service configurations and we need to start tasks which will
-         * monitor those service configurations.
+         * service configurations and we need to start tasks which will monitor
+         * those service configurations.
+         * 
+         * Note: The UnknownChildWatcher will keep trying until it is able to
+         * establish the watch.
          */
 
         final String configZPath = fed.getZooConfig().zroot + "/"

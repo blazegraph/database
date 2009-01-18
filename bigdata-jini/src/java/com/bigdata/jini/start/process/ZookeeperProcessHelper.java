@@ -141,6 +141,15 @@ public class ZookeeperProcessHelper extends ProcessHelper {
 
         final ZookeeperServerConfiguration serverConfig = new ZookeeperServerConfiguration(
                 config);
+
+        // Note: will throw NPE or IAE if constraint relies on fed!
+        if (!serverConfig.canStartService(null/* fed */)) {
+
+            // refuse to start.
+            throw new RuntimeException("Constraints do not permit start: "
+                    + serverConfig);
+
+        }
         
         final ZookeeperServerEntry[] entries = serverConfig
                 .getZookeeperServerEntries();

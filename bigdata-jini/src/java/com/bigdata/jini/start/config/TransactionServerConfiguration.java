@@ -29,6 +29,7 @@ package com.bigdata.jini.start.config;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
+import net.jini.core.entry.Entry;
 
 import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.process.JiniServiceProcessHelper;
@@ -61,9 +62,10 @@ public class TransactionServerConfiguration extends
     }
 
     public TransactionServiceStarter newServiceStarter(JiniFederation fed,
-            IServiceListener listener, String zpath) throws Exception {
+            IServiceListener listener, String zpath, Entry[] attributes)
+            throws Exception {
 
-        return new TransactionServiceStarter(fed, listener, zpath);
+        return new TransactionServiceStarter(fed, listener, zpath, attributes);
 
     }
 
@@ -76,9 +78,9 @@ public class TransactionServerConfiguration extends
          * @param zpath
          */
         protected TransactionServiceStarter(JiniFederation fed,
-                IServiceListener listener, String zpath) {
+                IServiceListener listener, String zpath, Entry[] attributes) {
 
-            super(fed, listener, zpath);
+            super(fed, listener, zpath, attributes);
 
         }
 

@@ -31,6 +31,7 @@ import java.util.Properties;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
+import net.jini.core.entry.Entry;
 
 import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.process.JiniServiceProcessHelper;
@@ -89,10 +90,11 @@ public class BigdataServiceConfiguration extends
     }
 
     public BigdataServiceStarter newServiceStarter(final JiniFederation fed,
-            final IServiceListener listener, final String logicalServiceZPath)
-            throws Exception {
+            final IServiceListener listener, final String logicalServiceZPath,
+            final Entry[] attributes) throws Exception {
 
-        return new BigdataServiceStarter(fed, listener, logicalServiceZPath);
+        return new BigdataServiceStarter(fed, listener, logicalServiceZPath,
+                attributes);
 
     }
     
@@ -111,9 +113,10 @@ public class BigdataServiceConfiguration extends
          * @param logicalServiceZPath
          */
         protected BigdataServiceStarter(JiniFederation fed,
-                IServiceListener listener, String logicalServiceZPath) {
+                IServiceListener listener, String logicalServiceZPath,
+                Entry[] attributes) {
 
-            super(fed, listener, logicalServiceZPath);
+            super(fed, listener, logicalServiceZPath, attributes);
             
         }
 
@@ -148,7 +151,7 @@ public class BigdataServiceConfiguration extends
             if (dataDir != null) {
 
                 // the data directory for this service type.
-                properties.setProperty(dataDir.getName(),dataDir.getValue());
+                properties.setProperty(dataDir.getName(), dataDir.getValue());
 
             }
 

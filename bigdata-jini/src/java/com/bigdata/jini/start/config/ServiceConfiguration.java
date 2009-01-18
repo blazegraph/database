@@ -435,8 +435,8 @@ abstract public class ServiceConfiguration implements Serializable {
             IServiceListener listener) throws Exception;
 
     /**
-     * A runnable object that will start an instance of a service described by
-     * its {@link ServiceConfiguration}.
+     * A task that will (re-)start an instance of a service described by its
+     * {@link ServiceConfiguration}. 
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$

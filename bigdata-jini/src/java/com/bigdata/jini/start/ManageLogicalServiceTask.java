@@ -39,9 +39,7 @@ import org.apache.zookeeper.data.ACL;
 
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.jini.start.config.ServiceConfiguration;
-import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.MetadataService;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
 import com.bigdata.zookeeper.ZLock;
@@ -72,12 +70,6 @@ import com.sun.jini.tool.ClassServer;
  *       {@link RemoteDestroyAdmin} and any other APIs required to insure that
  *       the total system state is preserved). Then delete the logical service
  *       node.
- * 
- * @todo Make sure the {@link MetadataService}, the LBS, and the transaction
- *       server DO NOT allow more than one logical instance in a federation.
- *       they can (eventually) have failover instances, but not peers. The
- *       {@link DataService} may be the only one that already supports "peers"
- *       (but not failover).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -182,13 +174,10 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
      * @throws InterruptedException
      * @throws KeeperException
      * 
-     * @todo One problem is that a lot of services could be created in
-     *       succession on a new host. That kind of flooding might overwhelm a
-     *       newly joined host. This could be dealt with introducing a delay
-     *       before the host will contend for another lock. Also, a host that is
-     *       getting a lot of action could just release the lock when it finds
-     *       itself the winner. Failover to the remaining hosts will occur
-     *       naturally.
+     * @todo To be robust and handle client disconnects within this method we
+     *       should inspect the hierarchy on a client reconnect for partially
+     *       created logical services, and create all the znodes each time
+     *       through ignoring errors if they already exit.
      */
     protected void newLogicalService() throws KeeperException, InterruptedException {
 

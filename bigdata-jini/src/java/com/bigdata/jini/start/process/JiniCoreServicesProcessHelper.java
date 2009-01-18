@@ -81,6 +81,15 @@ public class JiniCoreServicesProcessHelper extends ProcessHelper {
         final JiniCoreServicesConfiguration serviceConfig = new JiniCoreServicesConfiguration(
                 config);
 
+        // Note: will throw NPE or IAE if constraint relies on fed!
+        if (!serviceConfig.canStartService(null/* fed */)) {
+
+            // refuse to start.
+            throw new RuntimeException("Constraints do not permit start: "
+                    + serviceConfig);
+
+        }
+
         final JiniClientConfig clientConfig = new JiniClientConfig(
                 null/* class */, config);
 

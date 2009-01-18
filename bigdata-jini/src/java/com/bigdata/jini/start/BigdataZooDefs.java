@@ -12,7 +12,6 @@ import org.apache.zookeeper.ZooKeeper;
 import com.bigdata.jini.start.config.IServiceConstraint;
 import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.journal.IResourceLockService;
-import com.bigdata.service.AbstractService;
 import com.bigdata.service.jini.JiniUtil;
 import com.bigdata.service.jini.TransactionServer;
 import com.bigdata.zookeeper.DumpZookeeper;
@@ -28,8 +27,6 @@ import com.bigdata.zookeeper.ZLock;
  *   locks 
  *     serviceConfigMonitor 
  *       com.bigdata.service.jini.DataServer 
- *         lock0000000000 (Ephemeral) 
- *       com.bigdata.service.jini.ResourceLockServer 
  *         lock0000000000 (Ephemeral) 
  *       com.bigdata.service.jini.LoadBalancerServer 
  *         lock0000000000 (Ephemeral) 
@@ -58,6 +55,15 @@ import com.bigdata.zookeeper.ZLock;
  *       logicalService0000000000 
  *         election 
  *         physicalService87522080-2da6-42be-84a8-4a863b420042 (Ephemeral) {UUID}
+ *   services
+ *       com.bigdata.service.jini.TransactionServer 
+ *          instances (persistent znodes)
+ *       com.bigdata.service.jini.LoadBalancerServer
+ *           instances (persistent znodes)
+ *       com.bigdata.service.jini.MetadataServer
+ *          instances (persistent znodes) 
+ *       com.bigdata.service.jini.DataServerServer
+ *          instances (persistent znodes) 
  * </pre>
  * 
  * Each {@link ServiceConfiguration} znode defines the service type, the target
@@ -81,18 +87,18 @@ import com.bigdata.zookeeper.ZLock;
  * services in the lock queue is the failover order for the secondaries.
  * <p>
  * A {@link ServiceConfigurationZNodeMonitorTask} is run for the each discovered
- * {@link ServiceConfiguration} znode and sets a
- * {@link ServiceConfigurationWatcher} on that znode. This allows it to observe
- * changes in the target serviceCount for a given service type and the target
- * replicationCount for a logical service of that type. If the #of logical
- * services is under the target count, then we need to create a new logical
- * service instance (just a znode) and set a watch on it (@todo anyone can
- * create the new logical service since it only involves assigning a UUID, but
- * we need an election or a lock to decide who actually does it so that we don't
- * get a flood of logical services created. All watchers need to set a watch on
- * the new logical service once it is created.) [note: we need the logical /
- * physical distinction for services such as jini which are peers even before we
- * introduce replication for bigdata services.]
+ * {@link ServiceConfiguration} znode and maintains watches on the dominated
+ * logical services znodes and physical service znodes. This allows it to
+ * observe changes in the target serviceCount for a given service type and the
+ * target replicationCount for a logical service of that type. If the #of
+ * logical services is under the target count, then we need to create a new
+ * logical service instance (just a znode) and set a watch on it (@todo anyone
+ * can create the new logical service since it only involves assigning a UUID,
+ * but we need an election or a lock to decide who actually does it so that we
+ * don't get a flood of logical services created. All watchers need to set a
+ * watch on the new logical service once it is created.) [note: we need the
+ * logical / physical distinction for services such as jini which are peers even
+ * before we introduce replication for bigdata services.]
  * 
  * The {@link ServicesManagerServer} also sets a {@link Watcher} for each
  * logical service of any service type. This allows it to observe the join and
@@ -218,20 +224,30 @@ public interface BigdataZooDefs {
      * The name of the znodes whose children represent the physical service
      * instances.
      * <p>
-     * The znode of a physical service is named by its service {@link UUID}.
-     * Jini will assign a {@link ServiceID} when the service is first registered
-     * and is available from {@link ServiceItem#serviceID}. The
-     * {@link ServiceID} is converted to a normal {@link UUID} using
-     * {@link JiniUtil#serviceID2UUID(ServiceID)}. You can also request the
-     * service {@link UUID} using the service proxy.
-     * 
-     * @see AbstractService#getServiceUUID()
-     * 
-     * @todo Write {@link ServiceConfiguration} into the node and then include
-     *       any additional properties there. On a push, those properties which
-     *       can be changed should be updated dynamically on the running service
-     *       instance. For example, this could be used to change the groups[] or
-     *       locators[]. (There are jini APIs for that as well.)
+     * Most bigdata services are persistent. Each service has a persistent
+     * identifier and persistent state. The persistent identifier is its
+     * {@link ServiceID}, which is assigned by jini. The persistent state of a
+     * bigdata service is stored in its service specific data directory. In
+     * order to support restart, persistent services are represented by
+     * PERSISTENT znodes. The data in the znode is the
+     * {@link ServiceConfiguration} used to (re-)start the service. When the
+     * service is shutdown, its ephemeral znodes (used for master election,
+     * etc.) will be destroyed, but its persistent znode and the
+     * {@link ServiceConfiguration} required for restart will remain.
+     * <p>
+     * Non-persistent services MUST use an EPHEMERAL znode which will be
+     * automatically deleted once zookeeper notices a timeout for that service.
+     * <p>
+     * For both persistent and non-persistent services, the znode of a physical
+     * service is named by its service {@link UUID}. Jini assigns a
+     * {@link ServiceID} when the service is first registered. Persistent
+     * services store their {@link ServiceID} in their data directory. The
+     * {@link ServiceID} for any jini service is available from
+     * {@link ServiceItem#serviceID}.
+     * <p>
+     * The bigdata APIs use a service {@link UUID} in order to decouple the core
+     * modules from jini. The {@link ServiceID} may be converted to a service
+     * {@link UUID} using {@link JiniUtil#serviceID2UUID(ServiceID)}.
      */
     String PHYSICAL_SERVICES_CONTAINER = "physicalServices";
 

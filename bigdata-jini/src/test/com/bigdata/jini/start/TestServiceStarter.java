@@ -125,7 +125,7 @@ public class TestServiceStarter extends AbstractFedZooTestCase {
         final int processCountBefore = listener.running.size();
         
         final ManagedServiceStarter serviceStarter = (ManagedServiceStarter) serviceConfig
-                .newServiceStarter(fed, listener, logicalServiceZPath);
+                .newServiceStarter(fed, listener, logicalServiceZPath, null/* attributes */);
 
         // start the service.
         final ProcessHelper processHelper = serviceStarter.call();

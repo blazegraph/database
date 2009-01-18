@@ -27,16 +27,20 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.jini;
 
-import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
+import java.io.RandomAccessFile;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.rmi.Remote;
 import java.rmi.server.ExportException;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
@@ -71,10 +75,17 @@ import org.apache.zookeeper.data.ACL;
 
 import com.bigdata.Banner;
 import com.bigdata.counters.AbstractStatisticsCollector;
+import com.bigdata.io.FileLockUtility;
+import com.bigdata.io.SerializerUtil;
+import com.bigdata.jini.lookup.entry.Hostname;
+import com.bigdata.jini.lookup.entry.ServiceUUID;
 import com.bigdata.jini.start.BigdataZooDefs;
 import com.bigdata.service.AbstractService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IServiceShutdown;
+import com.bigdata.service.jini.DataServer.AdministrableDataService;
+import com.bigdata.service.mapred.jini.MapServer;
+import com.bigdata.service.mapred.jini.ReduceServer;
 import com.bigdata.zookeeper.ZLock;
 import com.bigdata.zookeeper.ZNodeLockWatcher;
 import com.sun.jini.admin.DestroyAdmin;
@@ -120,11 +131,6 @@ import com.sun.jini.start.ServiceStarter;
  * @see http://java.sun.com/products/jini/2.0/doc/api/com/sun/jini/start/ServiceStarter.html
  *      for documentation on how to use the ServiceStarter.
  * 
- * @todo put a lock on the serviceIdFile while the server is running.
- * 
- * @todo make the serviceId ASCII hex digits (that is not the jini standard
- *       practice)?
- * 
  * @todo document exit status codes and unify their use in this and derived
  *       classes.
  * 
@@ -152,17 +158,33 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     final static protected boolean DEBUG = log.isDebugEnabled();
 
     /**
-     * The {@link ServiceID} for this server is either read from a local file or
-     * assigned by the registrar (iff this is a new service instance). When
-     * assigned, it is assigned the asynchronously.
+     * The {@link ServiceID} for this server is either read from a local file,
+     * assigned by the registrar (if this is a new service instance), or given
+     * in a {@link ServiceUUID} entry in the {@link Configuration} (for either a
+     * new service or the restart of a persistent service). If the
+     * {@link ServiceID} is assigned by jini, then it is assigned the
+     * asynchronously after the service has discovered a
+     * {@link ServiceRegistrar}.
      */
     private ServiceID serviceID;
 
     /**
-     * The file where the {@link ServiceID} will be written/read.
+     * The file where the {@link ServiceID} will be written / read.
      */
-    protected File serviceIdFile;
+    private File serviceIdFile;
 
+    /**
+     * An attempt is made to obtain an exclusive lock on a file in the same
+     * directory as the {@link #serviceIdFile}. If the {@link FileLock} can be
+     * obtained it is set on this field. If the lock is already held by another
+     * process then the server will refuse to start. Since some platforms (NFS
+     * volumes, etc.) do not support {@link FileLock} and the server WILL start
+     * anyway in those cases. The {@link FileLock} is automatically released if
+     * the JVM dies and is released by {@link #run()} before the server exits or
+     * if the ctor fails.
+     */
+    private FileLock fileLock = null;
+    
     /**
      * The zpath (zookeeper path) to the znode for the logical service of which
      * this service is an instance. This is read from the {@link Configuration}.
@@ -196,19 +218,20 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     protected Configuration config;
 
     /**
-     * A configured name for the service -or- <code>null</code> if no
-     * {@link Name} was found in the {@link Configuration}.
-     * 
-     * @todo javadoc and reconcile with behavior of {@link AbstractService},
-     *       which assigns a different default service name.
+     * A configured name for the service -or- a default value if no {@link Name}
+     * was found in the {@link Configuration}.
      */
     private String serviceName;
 
     /**
-     * A configured name for the service -or- <code>null</code> if no
+     * The configured name for the service a generated service name if no
      * {@link Name} was found in the {@link Configuration}.
+     * <p>
+     * Note: Concrete implementations MUST prefer to report this name in the
+     * {@link AbstractService#getServiceName()} of their service implementation
+     * class. E.g., {@link AdministrableDataService#getServiceName()}.
      */
-    public String getServiceName() {
+    final public String getServiceName() {
         
         return serviceName;
         
@@ -234,14 +257,14 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     protected Remote proxy;
 
     /**
-     * The name of the host on which the server is running (best effort during
-     * startup and unchanging thereafter).
+     * The name of the host on which the server is running.
      */
     protected String getHostName() {
         
-        return AbstractStatisticsCollector.fullyQualifiedHostName;
+        return hostname;
         
     }
+    private String hostname;
     
     /**
      * The object used to inform the hosting environment that the server is
@@ -261,13 +284,27 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     }
     
     /**
-     * Return the assigned {@link ServiceID}. If this is a new service, then
+     * Return the assigned {@link ServiceID}. If this is a new service and the
+     * {@link ServiceUUID} was not specified in the {@link Configuration} then
      * the {@link ServiceID} will be <code>null</code> until it has been
-     * assigned by a service registrar.
+     * assigned by a {@link ServiceRegistrar}.
      */
     public ServiceID getServiceID() {
         
         return serviceID;
+        
+    }
+    
+    /**
+     * <code>true</code> iff this is a persistent service (one that you can
+     * shutdown and restart).
+     * 
+     * @todo should be false for things like the {@link MapServer} and the
+     *       {@link ReduceServer} if we keep those classes.
+     */
+    protected boolean isPersistent() {
+        
+        return true;
         
     }
     
@@ -327,7 +364,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * context. However in no case should execution be allowed to return to the
      * caller.
      */
-    protected void fatal(String msg, Throwable t) {
+    protected void fatal(final String msg, final Throwable t) {
        
         log.fatal(msg, t);
         
@@ -392,8 +429,9 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
          * Read jini configuration & service properties 
          */
 
-        Entry[] entries = null;
-        boolean readServiceIDFromFile = false;
+        List<Entry> entries = null;
+        boolean serviceIDAssignedByConfiguration = false;
+        boolean serviceIDReadFromFile = false;
         
         final JiniClientConfig jiniClientConfig;
         try {
@@ -401,53 +439,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             config = ConfigurationProvider.getInstance(args);
 
             jiniClientConfig = new JiniClientConfig(getClass().getName(), config);
-
-            entries = jiniClientConfig.entries;
-            
-            /*
-             * Extract a name associated with the service.
-             */
-            {
-                
-                for (Entry e : entries) {
-
-                    if (e instanceof Name) {
-
-                        // found a name.
-                        serviceName = ((Name) e).name;
-
-                        break;
-
-                    }
-
-                }
-
-                if (serviceName == null) {
-
-                    // assign a default service name.
-                    
-                    final String defaultName = getClass().getName()
-                            + "@"
-                            + AbstractStatisticsCollector.fullyQualifiedHostName
-                            + "#" + hashCode();
-
-                    serviceName = defaultName;
-
-                }
-            
-            }
-            
-            /*
-             * Extract how the service will provision itself from the
-             * Configuration.
-             */
-
-            // The exporter used to expose the service proxy.
-            exporter = (Exporter) config.getEntry(//
-                    getClass().getName(), // component
-                    "exporter", // name
-                    Exporter.class // type (of the return object)
-                    );
 
             /*
              * The zpath of the logical service.
@@ -462,15 +453,175 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             
             // The file on which the ServiceID will be written. 
             serviceIdFile = (File) config.getEntry(getClass().getName(),
-                    "serviceIdFile", File.class); // default
+                    "serviceIdFile", File.class);
+
+            /*
+             * Make sure that the parent directory exists.
+             * 
+             * Note: the parentDir will be null if the serviceIdFile is in the
+             * root directory or if it is specified as a filename without any
+             * parents in the path expression. Note that the file names a file
+             * in the current working directory in the latter case and the root
+             * always exists in the former - and in both of those cases we do
+             * not have to create the parent directory.
+             */
+            final File parentDir = serviceIdFile.getAbsoluteFile()
+                    .getParentFile();
+
+            if (parentDir != null && !parentDir.exists()) {
+
+                log.warn("Creating: " + parentDir);
+
+                parentDir.mkdirs();
+
+            }
+
+            /*
+             * Attempt to acquire an exclusive lock on a file in the same
+             * directory as the serviceIdFile.
+             */
+            acquireFileLock();
+            
+            // convert Entry[] to a mutable list.
+            entries = new LinkedList<Entry>(Arrays
+                    .asList(jiniClientConfig.entries));
+
+            /*
+             * Make sure that there is a Name and Hostname associated with the
+             * service.
+             */
+            {
+                
+                String serviceName = null;
+                
+                String hostname = null;
+                
+                UUID serviceUUID = null;
+                
+                for (Entry e : entries) {
+
+                    if (e instanceof Name && serviceName == null) {
+
+                        // found a name.
+                        serviceName = ((Name) e).name;
+
+                    }
+
+                    if (e instanceof Hostname && hostname == null) {
+
+                        hostname = ((Hostname) e).hostname;
+
+                    }
+
+                    if (e instanceof ServiceUUID && serviceUUID == null) {
+
+                        serviceUUID = ((ServiceUUID) e).serviceUUID;
+
+                    }
+
+                }
+
+                // if serviceName not given then set it now.
+                if (serviceName == null) {
+
+                    // assign a default service name.
+
+                    final String defaultName = getClass().getName()
+                            + "@"
+                            + AbstractStatisticsCollector.fullyQualifiedHostName
+                            + "#" + hashCode();
+
+                    serviceName = defaultName;
+
+                    // add to the Entry[].
+                    entries.add(new Name(serviceName));
+
+                }
+
+                // set the field on the class.
+                this.serviceName = serviceName;
+
+                // if hostname not given then set it now.
+                if (hostname == null) {
+
+                    /*
+                     * @todo This is a best effort during startup and unchanging
+                     * thereafter. We should probably report all names for the
+                     * host and report the current names for the host. However
+                     * there are a number of issues where similar data are not
+                     * being updated which could lead to problems if host name
+                     * assignments were changed.
+                     */
+                    
+                    hostname = AbstractStatisticsCollector.fullyQualifiedHostName;
+
+                    // add to the Entry[].
+                    entries.add(new Hostname(hostname));
+
+                }
+            
+                // set the field on the class.
+                this.hostname = hostname;
+
+                // if serviceUUID assigned then set ServiceID from it now.
+                if (serviceUUID != null) {
+                    
+                    serviceIDAssignedByConfiguration = true;
+
+                    // set serviceID.
+                    this.serviceID = JiniUtil.uuid2ServiceID(serviceUUID);
+                    
+                    if (!serviceIdFile.exists()) {
+
+                        // write the file iff it does not exist.
+                        writeServiceIDOnFile(this.serviceID);
+
+                    }
+                    
+                }
+                
+            }
+            
+            /*
+             * Extract how the service will provision itself from the
+             * Configuration.
+             */
+
+            // The exporter used to expose the service proxy.
+            exporter = (Exporter) config.getEntry(//
+                    getClass().getName(), // component
+                    "exporter", // name
+                    Exporter.class // type (of the return object)
+                    );
 
             if(serviceIdFile.exists()) {
 
                 try {
 
-                    serviceID = readServiceId(serviceIdFile);
+                    final ServiceID serviceIDFromFile = readServiceId(serviceIdFile);
                     
-                    readServiceIDFromFile = true;
+                    if (this.serviceID == null) {
+                        
+                        // set field on class.
+                        this.serviceID = serviceIDFromFile;
+                        
+                        serviceIDReadFromFile = true;
+                        
+                    } else if (!this.serviceID.equals(serviceIDFromFile)) {
+
+                        /*
+                         * This is a paranoia check on the Configuration and the
+                         * serviceIdFile. The ServiceID should never change so
+                         * these values should remain in agreement.
+                         */
+                        
+                        throw new ConfigurationException(
+                                "ServiceID in Configuration does not agree with the value in "
+                                        + serviceIdFile + " : Configuration="
+                                        + this.serviceID + ", serviceIdFile="
+                                        + serviceIDFromFile);
+                        
+                    }
                     
                 } catch(IOException ex) {
 
@@ -482,30 +633,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             } else {
                 
                 if (INFO)
-                    log.info("New service instance - ServiceID will be assigned");
-                
-                /*
-                 * Make sure that the parent directory exists.
-                 * 
-                 * Note: the parentDir will be null if the serviceIdFile is in
-                 * the root directory or if it is specified as a filename
-                 * without any parents in the path expression. Note that the
-                 * file names a file in the current working directory in the
-                 * latter case and the root always exists in the former - and in
-                 * both of those cases we do not have to create the parent
-                 * directory.
-                 */
-                final File parentDir = serviceIdFile.getAbsoluteFile()
-                        .getParentFile();
+                    log.info("New service instance.");
 
-                if (parentDir != null && !parentDir.exists()) {
-
-                    log.warn("Creating: " + parentDir);
-
-                    parentDir.mkdirs();
-                    
-                }
-                
             }
 
         } catch(ConfigurationException ex) {
@@ -609,19 +738,17 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                     case NoSyncConnected:
                     case SyncConnected:
                         if (serviceID != null) {
-
                             try {
                                 notifyZookeeper(f, JiniUtil
                                         .serviceID2UUID(serviceID));
                             } catch (Throwable t) {
                                 log.error(t);
                             }
-
                         }
-                    }
+                    } // switch
                     
-                }
-            });
+                } // process(event)
+            }); // Watcher
             
             // start the service.
             if(impl instanceof AbstractService) {
@@ -660,16 +787,19 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
          */
         try {
 
-            assert proxy != null;
+            assert proxy != null : "No proxy?";
             
-            if (serviceID != null) {
+            final Entry[] attributes = entries.toArray(new Entry[0]);
+            
+            if (this.serviceID != null) {
 
                 /*
-                 * We read the serviceID from local storage.
+                 * We read the serviceID from local storage (either the
+                 * serviceIDFile and/or the Configuration).
                  */
                 
                 joinManager = new JoinManager(proxy, // service proxy
-                        entries, // attr sets
+                        attributes, // attr sets
                         serviceID, // ServiceID
                         fed.discoveryManager, // DiscoveryManager
                         new LeaseRenewalManager());
@@ -681,7 +811,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                  */
                 
                 joinManager = new JoinManager(proxy, // service proxy
-                        entries, // attr sets
+                        attributes, // attr sets
                         this, // ServiceIDListener
                         fed.discoveryManager, // DiscoveryManager
                         new LeaseRenewalManager());
@@ -693,45 +823,91 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             fatal("Lookup service discovery error: "+ex, ex);
             
         }
-        
-        if (readServiceIDFromFile) {
-            
-            /*
-             * Notify the service that it's service UUID has been set.
-             */
-            notifyServiceUUID(serviceID);
+
+        /*
+         * Note: This is synchronized in case set via listener by the
+         * JoinManager, which would be rather fast action on its part.
+         */
+        synchronized (this) {
+
+            if (this.serviceID != null) {
+
+                /*
+                 * Notify the service that it's service UUID has been set.
+                 */
+
+                notifyServiceUUID(serviceID);
+
+            }
 
         }
-        
+
     }
 
     /**
-     * Read and return the content of the properties file.
+     * Attempt to acquire an exclusive lock on a file in the same directory as
+     * the {@link #serviceIdFile} (non-blocking). This is designed to prevent
+     * concurrent service starts and service restarts while the service is
+     * already running.
+     * <p>
+     * Note: The {@link FileLock} (if acquired) will be automatically released
+     * if the process dies. It is also explicitly closed by
+     * {@link #shutdownNow()}. The {@link FileLockUtility} is NOT used since
+     * advisory locks are not automatically removed if the service dies.
      * 
-     * @param propertyFile
-     *            The properties file.
-     * 
-     * @throws IOException
+     * @throws RuntimeException
+     *             if the file is already locked by another process.
      */
-    protected static Properties getProperties(File propertyFile)
-            throws IOException {
+    private void acquireFileLock() {
 
-        final Properties properties = new Properties();
+        final File lockFile = new File(serviceIdFile.getParent(),
+                "service.lock");
 
-        InputStream is = null;
+        final RandomAccessFile raf;
 
         try {
 
-            is = new BufferedInputStream(new FileInputStream(propertyFile));
+            raf = new RandomAccessFile(lockFile, "rw");
 
-            properties.load(is);
+        } catch (IOException ex) {
 
-            return properties;
+            /*
+             * E.g., due to permissions, etc.
+             */
 
-        } finally {
+            throw new RuntimeException("Could not open lock file: lockFile="
+                    + lockFile, ex);
 
-            if (is != null)
-                is.close();
+        }
+
+        try {
+
+            if ((this.fileLock = raf.getChannel().tryLock()) == null) {
+
+                /*
+                 * Note: A null return indicates that someone else holds the
+                 * lock.
+                 */
+
+                try {
+                    raf.close();
+                } catch (Throwable t) {
+                    // ignore.
+                }
+
+                throw new RuntimeException(
+                        "File is locked: service already running? lockFile="
+                                + lockFile);
+
+            }
+
+        } catch (IOException ex) {
+
+            /*
+             * Note: This is true of NFS volumes.
+             */
+
+            log.warn("FileLock not supported: lockFile=" + lockFile, ex);
 
         }
 
@@ -791,7 +967,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * @exception IOException
      *                if the {@link ServiceID} could not be read from the file.
      */
-    public ServiceID readServiceId(final File file) throws IOException {
+    static public ServiceID readServiceId(final File file) throws IOException {
 
         final FileInputStream is = new FileInputStream(file);
 
@@ -837,49 +1013,90 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         }
         
         this.serviceID = serviceID;
-        
-        if (serviceIdFile != null) {
-            
-            try {
-            
-                final DataOutputStream dout = new DataOutputStream(
-                        new FileOutputStream(serviceIdFile));
-            
-                try {
-                
-                    serviceID.writeBytes(dout);
 
-                    dout.flush();
-                    
-                    if (INFO)
-                        log.info("ServiceID saved: file=" + serviceIdFile
-                                + ", serviceID=" + serviceID);
+        assert serviceIdFile != null : "serviceIdFile not defined?";
 
-                } finally {
-                    
-                    dout.close();
-                    
-                }
-                
-            } catch (Exception ex) {
-
-                log.error("Could not save ServiceID", ex);
-                
-            }
-            
-        }
+        writeServiceIDOnFile(serviceID);
 
         notifyServiceUUID(serviceID);
         
+        /*
+         * Update the Entry[] for the service registrars to reflect the assigned
+         * ServiceID.
+         */
+        {
+
+            final List<Entry> attributes = new LinkedList<Entry>(Arrays
+                    .asList(joinManager.getAttributes()));
+
+            final Iterator<Entry> itr = attributes.iterator();
+
+            while (itr.hasNext()) {
+
+                final Entry e = itr.next();
+
+                if (e instanceof ServiceUUID) {
+
+                    itr.remove();
+
+                }
+
+            }
+
+            attributes.add(new ServiceUUID(JiniUtil.serviceID2UUID(serviceID)));
+
+            joinManager.setAttributes(attributes.toArray(new Entry[0]));
+
+        }
+
+    }
+    
+    synchronized private void writeServiceIDOnFile(final ServiceID serviceID) {
+
+        try {
+
+            final DataOutputStream dout = new DataOutputStream(
+                    new FileOutputStream(serviceIdFile));
+
+            try {
+
+                serviceID.writeBytes(dout);
+
+                dout.flush();
+
+                if (INFO)
+                    log.info("ServiceID saved: file=" + serviceIdFile
+                            + ", serviceID=" + serviceID);
+
+            } finally {
+
+                dout.close();
+
+            }
+
+        } catch (Exception ex) {
+
+            log.error("Could not save ServiceID", ex);
+
+        }
+
     }
     
     /**
      * Notify the {@link AbstractService} that it's service UUID has been set.
      */
-    protected void notifyServiceUUID(final ServiceID serviceId) {
+    synchronized protected void notifyServiceUUID(final ServiceID serviceID) {
 
-        if (serviceId == null)
+        if (serviceID == null)
             throw new IllegalArgumentException();
+        
+        if (this.serviceID != null && !this.serviceID.equals(serviceID)) {
+
+            throw new IllegalStateException(
+                    "ServiceID may not be changed: ServiceID=" + this.serviceID
+                            + ", proposed=" + serviceID);
+            
+        }
         
         if(impl != null && impl instanceof AbstractService) {
 
@@ -907,11 +1124,11 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     }
     
     /**
-     * Create a {@link CreateMode#EPHEMERAL} node in zookeeper that is a child
-     * of the {@link #logicalServiceZPath}. The znode name is generated by
-     * appending the assigned <i>serviceUUID</i>. That name is <strong>stable</strong>.
-     * If the service is shutdown and then restarted it will re-create the SAME
-     * znode.
+     * Creates a znode to represent this physical service within the
+     * {@link BigdataZooDefs#PHYSICAL_SERVICES_CONTAINER}. The znode will be
+     * persistent iff this service {@link #isPersistent()}. The znode name is
+     * the <i>serviceUUID</i>. That name is <strong>stable</strong>, which is
+     * a requirement for persistent services.
      * <p>
      * Note: we need to monitor (Watcher) the zookeeper connection state. If the
      * client is not connected when this method is invoked when we need to
@@ -923,11 +1140,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * 
      * @throws KeeperException
      * @throws InterruptedException
-     * 
-     * @todo Since the order of the physical service znodes for a given logical
-     *       service is essentially random, a separate election must be
-     *       maintained for the logical service in order to choose the failover
-     *       chain (which service is the primary, the secondary, etc.)
      * 
      * @todo Any failover protocol in which the service can restart MUST provide
      *       for re-synchronization of the service when it restarts with the
@@ -941,10 +1153,11 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      *       and create it if it is not present and re-negotiate the service
      *       failover chain.
      * 
-     * @todo The logical UUID is for compatibility with the bigdata APIs, which
-     *       expect to refer to a service by a UUID. Lookup by UUID against jini
-     *       will require hashing the physical services by their logical service
-     *       UUID in the client, which is not hard.
+     * @todo When supporting failover, a logicalService {@link UUID} will be
+     *       required for compatibility with the bigdata APIs, which expect to
+     *       refer to a service by a UUID. Lookup by UUID against jini will
+     *       require hashing the physical services by their logical service UUID
+     *       in the client, which is not hard.
      */
     private void notifyZookeeper(final JiniFederation fed,
             final UUID serviceUUID) throws KeeperException,
@@ -1000,76 +1213,85 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             
         }
 
-        // Note: makes if(physicalServiceZPath!=null) atomic.
-        synchronized (logicalServiceZPath) {
+        // Note: The services manager is responsible for doing this.
+//        try {
+//
+//            // make sure the parent node exists.
+//            zookeeper.create(logicalServiceZPath + "/"
+//                    + BigdataZooDefs.PHYSICAL_SERVICES_CONTAINER, new byte[0],
+//                    acl, CreateMode.PERSISTENT);
+//
+//        } catch (NodeExistsException ex) {
+//
+//            // ignore.
+//
+//        }
 
-            if (physicalServiceZPath != null) {
+        /*
+         * Note: The znode is created using the assigned service UUID. This
+         * means that the total zpath for the physical service is stable and can
+         * be re-created on restart of the service.
+         */
 
-                throw new IllegalStateException(
-                        "Physical service zpath already assigned.");
+        physicalServiceZPath = logicalServiceZPath + "/"
+                + BigdataZooDefs.PHYSICAL_SERVICES_CONTAINER + "/"
+                + serviceUUID;
 
-            }
+        /*
+         * Note: The znode data contains the attributes currently associated
+         * with the service. We ensure during startup (and it won't change
+         * unless someone messes with it) that this includes Hostname()
+         * attributes which let us know what host the service is running on. The
+         * ServicesManagerServer needs that information in order to decide if it
+         * has responsibility for restarting the service.
+         */
+        
+        final byte[] data = SerializerUtil.serialize(joinManager
+                .getAttributes());
+
+        try {
+
+            /*
+             * Create the znode for this service.
+             */
 
             final List<ACL> acl = fed.getZooConfig().acl;
-            
-            /*
-             * Note: The znode is created using the assigned service UUID. This
-             * means that the total zpath for the physical service is stable and
-             * can be re-created on restart of the service.
-             */
-            physicalServiceZPath = logicalServiceZPath + "/"
-                    + BigdataZooDefs.PHYSICAL_SERVICES_CONTAINER + "/" + serviceUUID;
 
-            try {
-            
-                // make sure the parent node exists.
-                zookeeper.create(logicalServiceZPath + "/"
-                        + BigdataZooDefs.PHYSICAL_SERVICES_CONTAINER, new byte[0], acl,
-                        CreateMode.PERSISTENT);
+            zookeeper.create(physicalServiceZPath, data, acl,
+                    isPersistent() ? CreateMode.PERSISTENT
+                            : CreateMode.EPHEMERAL);
 
-            } catch (NodeExistsException ex) {
-                // ignore.
-            }
-
-            try {
-
-                // create the ephemeral znode for this service.
-                zookeeper.create(physicalServiceZPath, new byte[0], acl,
-                        CreateMode.EPHEMERAL);
-                
-            } catch (NodeExistsException ex) {
-                
-                /*
-                 * ignore.
-                 * 
-                 * Note: We ignore this because this code gets executed on each
-                 * zookeeper (re-)connect.
-                 */
-                
-            }
+        } catch (NodeExistsException ex) {
 
             /*
-             * Enter into the master / failover competition for the logical
-             * service.
-             * 
-             * Note: Synchronized so that creating and cancelling the master
-             * election future are atomic.
+             * Note: This code gets executed on each zookeeper (re-)connect. We
+             * just update the Entry[] on the znode if it already exists.
              */
-            synchronized (this) {
 
-                if (masterElectionFuture == null) {
+            zookeeper.setData(physicalServiceZPath, data, -1/* version */);
 
-                    masterElectionFuture = fed
-                            .submitMonitoredTask(new MasterElectionTask());
-
-                }
-
-            }
-            if (INFO)
-                log.info("registered with zookeeper: zpath="
-                        + physicalServiceZPath);
-            
         }
+
+        /*
+         * Enter into the master / failover competition for the logical service.
+         * 
+         * Note: Synchronized so that creating and cancelling the master
+         * election future are atomic.
+         */
+        synchronized (this) {
+
+            if (masterElectionFuture == null) {
+
+                masterElectionFuture = fed
+                        .submitMonitoredTask(new MasterElectionTask());
+
+            }
+
+        }
+
+        if (INFO)
+            log.info("(Re)-registered with zookeeper: zpath="
+                    + physicalServiceZPath);
 
     }
 
@@ -1163,7 +1385,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
          * @param zlock
          * @throws InterruptedException
          * 
-         * @todo If someone deletes the master's lock then the master will
+         * @todo If someone deletes the master's zlock then the master will
          *       notice (if it checks the zlock) and see that it is no longer
          *       the master.
          *       <p>
@@ -1420,7 +1642,44 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
         }
         
-        // wake up so that run() will exit. 
+        if (fileLock != null) {
+            
+            /*
+             * If there is a file lock then release the file lock and close the
+             * backing channel.
+             */
+            
+            final FileChannel channel = fileLock.channel();
+
+            try {
+            
+                fileLock.release();
+            
+            } catch (IOException ex) {
+
+                // log and ignore.
+                log.warn(this, ex);
+
+            }
+            
+            if(channel != null) {
+
+                try {
+                
+                    channel.close();
+                    
+                } catch(IOException ex) {
+                    
+                    // log and ignore.
+                    log.warn(this, ex);
+
+                }
+                
+            }
+
+        }
+        
+        // wake up so that run() will exit.
         synchronized(keepAlive) {
             
             keepAlive.notify();

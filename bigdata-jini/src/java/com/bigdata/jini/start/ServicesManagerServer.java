@@ -35,6 +35,7 @@ import java.util.Properties;
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationFile;
 import net.jini.config.ConfigurationProvider;
+import net.jini.core.discovery.LookupLocator;
 import net.jini.export.ServerContext;
 import net.jini.io.context.ClientHost;
 import net.jini.io.context.ClientSubject;
@@ -42,16 +43,23 @@ import net.jini.lookup.entry.Name;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
-import org.apache.zookeeper.ZooKeeper;
 
 import sun.misc.Signal;
 import sun.misc.SignalHandler;
 
+import com.bigdata.btree.IndexSegment;
 import com.bigdata.jini.start.config.IServiceConstraint;
+import com.bigdata.jini.start.config.JiniCoreServicesConfiguration;
 import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.jini.start.config.ServicesManagerConfiguration;
+import com.bigdata.jini.start.config.ZookeeperServerConfiguration;
+import com.bigdata.journal.ITransactionService;
+import com.bigdata.service.DataService;
 import com.bigdata.service.DefaultServiceFederationDelegate;
-import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IDataService;
+import com.bigdata.service.ILoadBalancerService;
+import com.bigdata.service.IMetadataService;
+import com.bigdata.service.MetadataService;
 import com.bigdata.service.jini.AbstractServer;
 import com.bigdata.service.jini.FakeLifeCycle;
 import com.bigdata.service.jini.JiniFederation;
@@ -60,122 +68,235 @@ import com.bigdata.service.jini.RemoteDestroyAdmin;
 import com.sun.jini.start.LifeCycle;
 import com.sun.jini.start.ServiceDescriptor;
 import com.sun.jini.start.ServiceStarter;
-import com.sun.jini.start.SharedActivatableServiceDescriptor;
 
 /**
  * A class for bootstrapping a {@link JiniFederation} across a cluster based on
  * a {@link Configuration} file describing some basic configuration parameters
- * and dynamically managing service discovery using <code>jini</code> and
- * master election and other distributed decision making using
- * <code>zookeeper</code>.
+ * and dynamically managing service configurations. The service configurations
+ * are stored in zookeeper and each activated service registers both a
+ * persistent znode (for restart) and a variety of transient znodes (to register
+ * its claim as an instance of a logical service, for master elections, etc).
  * <p>
- * Each host runs <em>ONE (1)</em> of this server. The server will start other
- * processes on the local host, including: jini, zookeeper, an httpd service for
- * the RMI CODEBASE, and instances of the various services required by an
- * {@link IBigdataFederation}. Those decisions are based on configuration
- * requirements stored in zookeeper, including the target #of logical services
- * of some service type, the replication count for a logical service, and
- * {@link IServiceConstraint} that are used to decide which host will start the
- * new service. Zookeeper service instances are handled somewhat specially.
- * During startup, this server will start a zookeeper instance if one was
- * configured to run on this host and none is found to be running at that time.
+ * Each host in a cluster runs <em>ONE (1)</em> of this server. The server
+ * will start other services on the local host. Those decisions are based on
+ * configuration requirements stored in zookeeper, including the target #of
+ * logical services of some service type, the replication count for a logical
+ * service, and {@link IServiceConstraint} that are used to decide which host
+ * will start the new service.
  * <p>
- * The initial configuration for the federation is specified in a
- * {@link Configuration} file. That file is best located on a shared volume or
- * volume image replicated on the hosts in the cluster, along with the various
- * dependencies required to start and run the federation (java, jini, bigdata,
- * log4j configuration, related JARs, etc). The {@link Configuration} is used to
- * discover and/or start jini and zookeeper instance(s). Once zookeeper can be
- * discovered (using its own protocol, not jini), {@link ServicesManagerServer}
- * instances will contend for a lock on a node corresponding to the
- * {@link IBigdataFederation} described in the {@link Configuration}. If the
- * node is empty, then it will be populated with the initial configuration by
- * whichever process holds the lock, which is why it is important that all hosts
- * running this class are use an identical {@link Configuration}. Thereafter,
- * zookeeper will be used to manage the services in the federation.
+ * Services are broken down by service type (aka class), by logical service
+ * instance, and by physical instances of a logical service. Physical service
+ * instances may be transient or persistent. The configuration state required to
+ * re-start a persistent physical service is stored in a persistent znode
+ * representing that service. For transient services, that znode is ephemeral.
  * <p>
- * Once running, the {@link ServicesManagerServer} will watch the zookeeper
- * nodes for the various kinds of services and will start or stop services as
- * the state of those nodes changes.
+ * The initial configuration for the federation given in a {@link Configuration}
+ * file. That file is best located on a shared volume or volume image replicated
+ * on the hosts in the cluster, along with the various dependencies required to
+ * start and run the federation (java, jini, bigdata, log4j configuration,
+ * related JARs, etc). The information in the {@link Configuration} is used to
+ * discover and/or start jini and zookeeper instance(s). The
+ * {@link ServicesManagerServer} maintains a watch on the
+ * {@link ServiceConfiguration} znodes for the various kinds of services and
+ * will start or stop services as the state of those nodes changes.
+ * 
+ * <h2>Service Monitoring</h2>
+ * 
+ * The {@link ServicesManagerServer} maintains watches on znodes representing
+ * {@link ServiceConfiguration}s, logical services, physical service instances,
+ * etc. If the number of logical services instances for some service type falls
+ * below the {@link ServiceConfiguration#serviceCount} then a new logical
+ * service will be created. Likewise, if the number of physical service
+ * instances for some logical service falls below the
+ * {@link ServiceConfiguration#replicationCount} then a new physical service
+ * instance will be started.
  * <p>
+ * Physical services which are persistent are represented by persistent znodes
+ * within the {@link BigdataZooDefs#PHYSICAL_SERVICES_CONTAINER} for a logical
+ * service. This means that the #of physical service instances is NOT decreased
+ * when persistent physical service dies or is shutdown normally but ONLY when
+ * the physical service instance is destroyed (along with its persistent state).
+ * If a persistent physical service instance has died and can not be restarted,
+ * then you MUST delete its znode in the
+ * {@link BigdataZooDefs#PHYSICAL_SERVICES_CONTAINER} before a new physical
+ * service will be created for the corresponding logical service.
+ * <p>
+ * Physical services which are transient are represented by ephemeral znodes. As
+ * soon as one dies and zookeeper notices that its client has timed out the
+ * ephemeral znode will be deleted and a watch triggered which will result in a
+ * new instance being created on some machine running a
+ * {@link ServicesManagerServer} joined with the federation.
+ * <p>
+ * Most bigdata services have persistent state and may be safely shutdown and
+ * restarted. To shutdown a bigdata service instance use
+ * {@link RemoteDestroyAdmin#shutdown()} or zap it from the command line (not
+ * the preferred approach, but that will only take the service down, but not
+ * destroy its data).
+ * 
+ * <h2>Startup</h2>
+ * 
+ * Zookeeper service and jini instances are handled somewhat specially. Each is
+ * a self-contained system and provides its own means for peers to discover each
+ * other and for clients to discover the peers. The remainder of the services
+ * use jini to perform service discovery and zookeeper to register ephemeral
+ * znodes which represent their existence as part of a logical service and allow
+ * them to contend in the master election for a logical service. Only those
+ * services listed in the {@link ServicesManagerConfiguration} will be
+ * considered for start.
+ * 
+ * <h3>Zookeeper startup</h3>
+ * 
+ * A zookeeper service instance will be started if one was identified in the
+ * {@link Configuration} as running on this host in the
+ * {@link ZookeeperServerConfiguration} and none is found to be running at that
+ * time.
+ * 
+ * <h3>Jini startup</h3>
+ * 
+ * A jini server instance will be considered for start if one is specified for
+ * this host in the {@link JiniCoreServicesConfiguration} using a
+ * {@link LookupLocator} or if you are using multicast. In addition, the
+ * {@link IServiceConstraint}s for the jini server in the {@link Configuration}
+ * must be satisified by this host.
+ * 
+ * <h3>Configuration push</h3>
+ * 
+ * During startup, the {@link ServiceConfiguration}s will be pushed to
+ * zookeeper. This will trigger a variety of watches on the znodes for the
+ * service configurations both in this instance and in other
+ * {@link ServicesManagerServer}s running on other hosts which are part of the
+ * same federation.
+ * <p>
+ * Since the {@link ServiceConfiguration}s are pushed each time a
+ * {@link ServicesManagerServer} is started it is CRITICAL that all
+ * {@link ServicesManagerServer}s use the same configuration. The
+ * {@link Configuration} may either be a file on a shared volume or a URL.
+ * 
+ * <h3>Persistent service restart</h3>
+ * 
+ * Once we are connected to both jini and zookeeper a scan will be performed of
+ * the persistent physical services registered in zookeeper. For each such
+ * service, if the service was started on this host and can not be discovered
+ * using jini, then an attempt will be made to restart the service. We don't
+ * want to do this on an ongoing basis because it would cause any service that
+ * was deliberately shutdown to be restarted as soon as we discover that it is
+ * no longer discoverable.
+ * 
+ * <h2>Service replication and failover</h2>
+ * 
+ * Jini and zookeeper each have their own failover models.
+ * 
+ * <h3>Jini</h3>
+ * 
+ * You can run a number of jini peers and any client can connect to any
+ * registrar. This is all transparent. You can even start a new jini instance
+ * after all have died. Services which have already been discovered will remain
+ * reachable (assuming that a network path exists) for some time after the last
+ * jini registrar has died.
+ * 
+ * <h3>Zookeeper</h3>
+ * 
+ * Zookeeper uses a quorum model. You always want to provision an odd number of
+ * zookeeper instances. ONE (1) instance gives you no failover (but the instance
+ * may be restarted if it dies). THREE (3) instances give you ONE (1) failure.
+ * 
+ * <h3>Persistent bigdata services</h3>
+ * 
+ * <strong>Replication and service failover have NOT been implemented for
+ * bigdata</strong>
+ * <p>
+ * When the physical service supports failover, the shutdown of a physical
+ * service instance does not take the logical service offline if there are
+ * remaining physical services instances for that logical service. However, the
+ * loss of all physical instances of a logical service will result in the loss
+ * of the persistent state for the logical service as a whole.
+ * <p>
+ * The two main services which require failover are the
+ * {@link ITransactionService} and the {@link IDataService} (which includes the
+ * {@link IMetadataService} as a special case). The loss of the
+ * {@link ILoadBalancerService} is normally not critical as only history about
+ * the system load over time is lost.
+ * 
+ * <h4>Transaction service</h4>
+ * 
+ * tdb
+ * 
+ * <h4>(Meta)data services</h4>
+ * 
+ * The basic design is for {@link IDataService} is to pipeline state changes
+ * from a master through a failover chain of secondaries. Write can proceed
+ * asynchronously on the pipeline until the next commit, at which point the
+ * secondaries must be synched with the master. Since all instances have the
+ * same state for any commit point, you can read from any instance but you
+ * always write on the master.
+ * <p>
+ * Asynchronous overflow operations are carried out by the master (could be a
+ * secondary, but that raises the complexity of the operation) and the generated
+ * {@link IndexSegment}s are replicated to the secondaries before atomic
+ * updates which redefined index views.
+ * 
+ * <h2>Destroying services</h2>
+ * 
  * <strong>Destroying an arbitrary service instance is dangerous - if it is not
- * replicated then you can loose all your data!</strong>. In order to shutdown
- * a bigdata service instance use {@link RemoteDestroyAdmin#shutdown()} or zap
- * it from the command line (not the preferred approach, but that will only take
- * the service down, but not destroy its data). However, if the federation is
- * now undercapacity for that service type (or under the replication count for a
- * service instance), then a new instance will simply be created.
+ * replicated then you can loose all your data!</strong>.
  * <p>
- * SIGHUP may be used to modified {@link ServiceConfiguration}s to zookeeper.
- * The {@link Configuration} will be re-read using the command line arguments,
- * the {@link ServiceConfiguration}s will be re-extracted, and the
- * corresponding znodes in zookeeper will be updated. Live service instances
- * should be administered either using the jini browser or programtically.
+ * To <strong>destroy</strong> a bigdata service usie
+ * {@link RemoteDestroyAdmin#destroy()}.
  * 
- * FIXME If zookeeper dies (all instances) and is then brought back up there
- * will be a race condition where the physical services will (or should) try to
- * re-assert their ephemeral znodes and the {@link ServicesManagerServer} will
- * (or should) notice that there are no physical services for its logical
- * services.
- * <p>
- * Probably we need to notice the zookeeper reconnect and then have the
- * {@link ServicesManagerServer} wait a bit before taking any decisions,
- * effectively yeilding to the physical services so that they can re-establish
- * their ephemeral znodes.
- * <p>
- * This needs to be evaluated in practice. For example, is the natural behavior
- * of the {@link ZooKeeper} client to re-create any ephemeral znodes owned by it
- * which were in existence at the time of the disconnect?
+ * <h2>Federation shutdown sequence</h2>
  * 
- * FIXME I am not convinced that we want to take down the child processes when
- * this service exits. It might be much nicer to leave them online (that is the
- * current behavior).
- * <p>
- * IF we do take them down, then when this service starts up we need to restart
- * any services which are declared in zookeeper but joined in jini. We should do
- * direct service discovery and then re-start any services that we can not find
- * running. [We don't want to do this on an ongoing basis because it would cause
- * any service that was deliberately shutdown to be restarted as soon as we
- * discover that it is no longer discoverable.]
- * <p>
- * IF we don't take them down, then I am not sure if the parent process will
- * exit under various operating systems. We might need to start the processes
- * slightly differently for that to work.
+ * See {@link JiniFederation#distributedFederationShutdown(boolean)}
  * 
- * @todo management semantics for deleting znodes are not yet defined. Probably
- *       a physical service should watch its logicalService's znode and compete
- *       to re-create that znode if it is deleted. Likewise, the physical
- *       service should ensure that its own znode is not removed (that can be
- *       done via ACLs as well).
- *       <p>
- *       In particular, deleting a znode SHOULD NOT cause the corresponding
- *       logical or physical service to be terminated. Use the
- *       {@link RemoteDestroyAdmin} API to terminate physical services.
+ * <h2>Signal handling</h2>
+ * 
+ * <dl>
+ * 
+ * <dt>HUP</dt>
+ * 
+ * <dd>This executes the same logic that is describe above for startup.
+ * However, it will re-read the {@link Configuration} from whatever source was
+ * specified when the server was started. This signal may be used to update the
+ * zookeeper configuration, to restart any stopped persistent services, etc.
+ * <p>
+ * See {@link ServicesManagerStartupTask}.</dd>
+ * 
+ * <dt>TERM</dt>
+ * 
+ * <dd>All child processes are terminated, using normal shutdown whenever
+ * possible. Once the child processes are dead, the server will terminate as
+ * well.</dd>
+ * 
+ * <dt>KILL</dt>
+ * 
+ * <dd>This signal is NOT trapped. The server will terminate immediately. Any
+ * child processes will continue to execute (this is the behavior on at least
+ * Windows and linux platforms).</dd>
+ * 
+ * </dl>
+ * 
+ * Please note that Java has limited support for signal handlers, so these
+ * behaviors might not be available on your deployment platform. When in doubt,
+ * TEST FIRST!
  * 
  * @todo document dependencies for performance counter reporting and supported
  *       platforms. perhaps config options for which counters are collected and
  *       which are reported to the LBS.
  * 
- * @todo if we constrain ourselves to one instance per host then this can be the
- *       process that reports host specific statistics to the LBS.
+ * @todo It is possible to create locks and queues using javaspaces in a manner
+ *       similar to zookeeper. Java spaces supports a concept similar to a watch
+ *       and supports transactions over operations on the space. Gigaspaces has
+ *       defined a variety of extensions that provide FIFO queues.
  * 
- * @todo There is no straightfoward way to re-start a service that has been
- *       shutdown or to differentiate a failed start from a service which could
- *       be started.
- *       <p>
- *       The {@link ServiceConfiguration} of the physical service has all the
- *       necessary information on how to start the service.
- *       <p>
- *       Perhaps we could write an {@link SharedActivatableServiceDescriptor}
- *       into the serviceDir and use that to actually start the service? It
- *       could then be restarted automatically (if we knew where to look for
- *       instances of the service, and we do).
+ * @todo The {@link MetadataService}, the {@link ILoadBalancerService}, and
+ *       the {@link ITransactionService} MUST NOT have more than one logical
+ *       instance in a federation. They can (eventually) have failover
+ *       instances, but not peers. The {@link DataService} is the only one that
+ *       already supports multiple logical service instances (lots!) (but not
+ *       failover).
  * 
- * @todo is it possible to create locks and queues using javaspaces in a manner
- *       similar to zookeeper? It does support a concept similar to a watch, but
- *       I am not sure that it has concepts similar to "ephermeral" or
- *       "sequential". Also, I am not clear on its consistency guarentees. It
- *       does support transactions, which could be another way to approach this.
+ * FIXME remaining big issues are destroying logical and physical services (not
+ * implemented yet) and providing failover for the various bigdata services (not
+ * implemented yet).
  * 
  * FIXME Start httpd for downloadable code. (contend for lock on node, start
  * instance if insufficient instances are running). The codebase URI should be
@@ -190,10 +311,6 @@ import com.sun.jini.start.SharedActivatableServiceDescriptor;
  * See https://deployutil.dev.java.net/
  * <p>
  * Use class server URL(s) when starting services for their RMI codebase.
- * 
- * FIXME remaining big issues are restart of physical services; destroying
- * logical and physical services (not implemented yet) and providing failover
- * for the various bigdata services (not implemented yet).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -252,7 +369,7 @@ public class ServicesManagerServer extends AbstractServer {
         
         try {
 
-            new PushConfigurationSignalHandler("HUP", args);
+            new SigHUPHandler("HUP", args);
 
         } catch (IllegalArgumentException ex) {
 
@@ -273,26 +390,25 @@ public class ServicesManagerServer extends AbstractServer {
     }
 
     /**
-     * Handler re-reads and then pushes the {@link Configuration} to zookeeper.
+     * SIGHUP Handler.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private class PushConfigurationSignalHandler implements SignalHandler {
+    private class SigHUPHandler implements SignalHandler {
 
         private final SignalHandler oldHandler;
         
         private final String[] args;
 
         /**
-         * Install handler that re-reads and then pushes the
-         * {@link Configuration} to zookeeper.
+         * Install handler.
          * 
          * @param signalName
          *            The signal name.
          * @param args
-         *            The command line arguments (the identify the configuration
-         *            and any overrides).
+         *            The command line arguments (these identify the
+         *            configuration and any overrides).
          * 
          * @see http://www-128.ibm.com/developerworks/java/library/i-signalhandling/
          * 
@@ -302,7 +418,7 @@ public class ServicesManagerServer extends AbstractServer {
          * @see http://twit88.com/blog/2008/02/06/java-signal-handling/
          */
         @SuppressWarnings("all") // Signal is in the sun namespace
-        protected PushConfigurationSignalHandler(final String signalName,
+        protected SigHUPHandler(final String signalName,
                 final String[] args) {
 
             final Signal signal = new Signal(signalName);
@@ -337,32 +453,42 @@ public class ServicesManagerServer extends AbstractServer {
 
                 if (service != null) {
 
+                    final JiniFederation fed = service.getFederation();
+                    
                     // Obtain the configuration object (re-read it).
                     final ConfigurationFile config = (ConfigurationFile) ConfigurationProvider
                             .getInstance(args);
+
+                    new ServicesManagerStartupTask(fed,config,service).call();
                     
-                    // get the service manager's own configuration.
-                    final ServicesManagerConfiguration selfConfig = new ServicesManagerConfiguration(
-                            config);
-
-                    /*
-                     * These are the services that we will start and/or manage.
-                     */
-                    final ServiceConfiguration[] serviceConfigurations = selfConfig
-                            .getServiceConfigurations(config);
-
-                    final ZooKeeper zookeeper = service.getFederation()
-                            .getZookeeper();
-
-                    final String zconfig = service.getFederation()
-                            .getZooConfig().zroot
-                            + "/" + BigdataZooDefs.CONFIG;
-
-                    // push the configuration to zookeeper.
-                    service.pushConfiguration(zookeeper, zconfig, service
-                            .getFederation().getZooConfig().acl,
-                            serviceConfigurations);
-
+//                    // get the service manager's own configuration.
+//                    final ServicesManagerConfiguration selfConfig = new ServicesManagerConfiguration(
+//                            config);
+//
+//                    /*
+//                     * These are the services that we will start and/or manage.
+//                     */
+//                    final ServiceConfiguration[] serviceConfigurations = selfConfig
+//                            .getServiceConfigurations(config);
+//
+//                    final ZooKeeper zookeeper = service.getFederation()
+//                            .getZookeeper();
+//
+//                    final String zconfig = service.getFederation()
+//                            .getZooConfig().zroot
+//                            + "/" + BigdataZooDefs.CONFIG;
+//
+//                    // push the configuration to zookeeper.
+//                    service.pushConfiguration(zookeeper, zconfig, service
+//                            .getFederation().getZooConfig().acl,
+//                            serviceConfigurations);
+//
+//                    log.warn("Pushed configuration.");
+//
+//                    log.warn("Will restart any stopped services.");
+//                    
+//                    fed.submitMonitoredTask(new RestartPersistentServices(fed));
+                    
                 }
 
                 /*
@@ -377,8 +503,6 @@ public class ServicesManagerServer extends AbstractServer {
 //
 //                }
 
-                log.warn("Pushed configuration.");
-                
             } catch (Throwable t) {
 
                 log.error("Signal handler failed : " + t, t);
@@ -631,13 +755,6 @@ public class ServicesManagerServer extends AbstractServer {
 
         }
 
-        @Override
-        protected Configuration getConfiguration() {
-            
-            return server.config;
-            
-        }
-        
         /**
          * Extends the base behavior to return a {@link Name} of the service
          * from the {@link Configuration}. If no name was specified in the
