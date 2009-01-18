@@ -154,7 +154,11 @@ public class DumpZookeeper {
                 try {
                     final Object x = SerializerUtil.deserialize(data);
                     if (showData) {
-                        obj = x.toString();
+                        if (x.getClass().getComponentType() != null) {
+                            obj = Arrays.toString((Object[]) x);
+                        } else {
+                            obj = x.toString();
+                        }
                     } else {
                         obj = "{"+x.getClass().getSimpleName()+"}";
                     }
