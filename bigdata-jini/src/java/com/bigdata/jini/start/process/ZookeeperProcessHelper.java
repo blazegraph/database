@@ -147,7 +147,7 @@ public class ZookeeperProcessHelper extends ProcessHelper {
         if (ZooHelper.isRunning(InetAddress.getLocalHost(), serverConfig.clientPort)) {
 
             if (INFO)
-                log.info("Zookeeper running: "
+                log.info("Zookeeper already running: "
                         + InetAddress.getLocalHost().getCanonicalHostName()
                         + ":" + serverConfig.clientPort);
 

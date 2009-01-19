@@ -1316,7 +1316,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         }
         
         /**
-         * calls {@link #runOnce()} until the service is shutdown, logging any
+         * Calls {@link #runOnce()} until the service is shutdown, logging any
          * errors.
          */
         public Object call() throws Exception {
@@ -1326,7 +1326,14 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                 try {
 
                     runOnce();
+                    
+                } catch (InterruptedException t) {
 
+                    // Note: Happens during shutdown.
+
+                    if(INFO)
+                        log.info("Interrupted.");
+                    
                 } catch (Throwable t) {
 
                     log.error(this, t);
@@ -1340,38 +1347,40 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         }
 
         /**
-         * Competes for the {@link BigdataZooDefs#MASTER_ELECTION}
-         * {@link ZLock}. If it gains the lock, then invoked
-         * {@link #runAsMaster()}.
+         * Competes for the {@link BigdataZooDefs#MASTER_ELECTION} {@link ZLock}.
+         * If it gains the lock, then invoked {@link #runAsMaster()}.
          * 
+         * @throws InterruptedException
+         *             if interrupted.
          * @throws Exception
+         *             if anything else goes wrong.
          */
-        protected void runOnce() throws Exception {
+        protected void runOnce() throws Exception, InterruptedException {
 
             final AbstractService service = ((AbstractService) impl);
             
             final JiniFederation fed = (JiniFederation) service.getFederation();
 
             final ZooKeeper zookeeper = fed.getZookeeper();
-            
+
             final List<ACL> acl = fed.getZooConfig().acl;
 
             // zlock object for the master election.
-            ZLock zlock = ZNodeLockWatcher.getLock(zookeeper,
-                    logicalServiceZPath + "/"
-                            + BigdataZooDefs.MASTER_ELECTION, acl);
+            final ZLock zlock = ZNodeLockWatcher.getLock(zookeeper,
+                    logicalServiceZPath + "/" + BigdataZooDefs.MASTER_ELECTION,
+                    acl);
 
             // block until we acquire that lock.
             zlock.lock();
-            
+
             try {
-                
+
                 runAsMaster(service, zlock);
-                
+
             } finally {
 
                 zlock.unlock();
-                
+
             }
 
         }
@@ -1389,7 +1398,11 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
          * 
          * @param service
          * @param zlock
+         * 
          * @throws InterruptedException
+         *             if interrupted.
+         * @throws Exception
+         *             if anything else goes wrong.
          * 
          * @todo If someone deletes the master's zlock then the master will
          *       notice (if it checks the zlock) and see that it is no longer
@@ -1407,8 +1420,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
          *       API for that right now. all of this is just stubbed out for the
          *       moment.
          */
-        protected void runAsMaster(AbstractService service, ZLock zlock)
-                throws InterruptedException {
+        protected void runAsMaster(final AbstractService service,
+                final ZLock zlock) throws InterruptedException, Exception {
 
             log.warn("Service is now the master.");
 

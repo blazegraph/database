@@ -68,6 +68,9 @@ public class RestartPersistentServices implements Callable<Void> {
     
     public Void call() throws Exception {
 
+        if(INFO)
+            log.info("Running.");
+        
         /*
          * Make sure that the zookeeper client is connected (of course it could
          * disconnect at any time).
@@ -164,6 +167,10 @@ public class RestartPersistentServices implements Callable<Void> {
                             .deserialize(zookeeper.getData(
                                     physicalServiceZPath, false, new Stat()));
 
+                    if (INFO)
+                        log.info("Considering: "
+                                + physicalServicesContainerZPath);
+                    
                     monitorCreatePhysicalServiceLocksTask.restartIfNotRunning(
                             serviceConfig, logicalServiceZPath,
                             physicalServiceZPath, attributes);
@@ -177,4 +184,5 @@ public class RestartPersistentServices implements Callable<Void> {
         return null;
 
     }
+    
 }

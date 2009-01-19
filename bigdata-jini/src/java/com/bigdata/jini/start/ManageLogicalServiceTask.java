@@ -110,21 +110,18 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
         
     }
 
+    /**
+     * Compare serviceCount to #of logical services. if too few, then create one
+     * (already holding a lock).
+     */
     public Object call() throws Exception {
 
-        /*
-         * compare serviceCount to #of logical services. if too few, then create
-         * one (already holding a lock).
-         * 
-         * for each logical service, verify that the replicationCount is correct
-         * (but only once we support failover chains and we might put the
-         * replicationCount into the logicalService data so that it is ready to
-         * hand). for now, the winner of the election for creating a logical
-         * service should also create the physical service.
-         */
-        
         final int n = children.size();
         
+        if (INFO)
+            log.info("serviceCount=" + config.serviceCount + ", actual="
+                    + children.size() + ", configZPath=" + configZPath);
+
         if (config.serviceCount > n) {
 
             newLogicalService();
@@ -181,14 +178,13 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
      */
     protected void newLogicalService() throws KeeperException, InterruptedException {
 
+        if (INFO)
+            log.info("className=" + config.className);
+
         final ZooKeeper zookeeper = fed.getZookeeper();
 
         final List<ACL> acl = fed.getZooConfig().acl;
         
-        if (INFO)
-            log.info("serviceCount=" + config.serviceCount + ", actual="
-                    + children.size() + ", configZPath=" + configZPath);
-
         /*
          * Create zpath for the new logical service.
          */
@@ -265,9 +261,8 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
      */
     protected void destroyLogicalService() {
 
-        log.warn("Operation not supported: serviceCount=" + config.serviceCount
-                + ", actual=" + children.size() + ", zpath=" + configZPath);
-
+        log.warn("className=" + config.className);
+        
     }
 
 }

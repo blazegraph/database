@@ -353,8 +353,8 @@ public class ServicesManagerStartupTask implements Callable<Void> {
             } catch (NodeExistsException ex) {
 
                 // that's fine - the configuration already exists.
-                if (INFO)
-                    log.info("exists: " + zpath);
+                if (DEBUG)
+                    log.debug("exists: " + zpath);
 
                 return;
 
@@ -396,23 +396,24 @@ public class ServicesManagerStartupTask implements Callable<Void> {
 
                 zookeeper.create(zpath, data, acl, CreateMode.PERSISTENT);
 
-                if (INFO)
-                    log.info("Created: " + zpath
-                            + " : " + x);
+                if (DEBUG)
+                    log.debug("Created: " + zpath + " : " + x);
+                else if (INFO)
+                    log.info("Created: " + zpath);
 
             } catch (NodeExistsException ex) {
 
                 try {
                     zookeeper.setData(zpath, data, -1/* version */);
 
-                    if (INFO)
-                        log.info("Updated: "
-                                + zpath + " : " + x);
+                    if (DEBUG)
+                        log.debug("Updated: " + zpath + " : " + x);
+                    else if (INFO)
+                        log.info("Updated: " + zpath);
 
                 } catch (KeeperException ex2) {
 
-                    log
-                            .error("Could not update: zpath=" + zpath);
+                    log.error("Could not update: zpath=" + zpath);
 
                 }
 
