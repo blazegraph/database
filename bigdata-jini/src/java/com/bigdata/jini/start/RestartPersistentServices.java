@@ -143,16 +143,21 @@ public class RestartPersistentServices implements Callable<Void> {
                 final String logicalServiceZPath = serviceConfigZPath + "/"
                         + logicalServiceZNode;
 
+                final String physicalServicesContainerZPath = logicalServiceZPath
+                        + "/" + BigdataZooDefs.PHYSICAL_SERVICES_CONTAINER;
+                
                 /*
                  * The children are the physical service instances for that
                  * logical service.
                  */
+                
                 final List<String> physicalServiceZNodes = zookeeper
-                        .getChildren(logicalServiceZPath, false);
+                        .getChildren(physicalServicesContainerZPath,
+                                false);
                 
                 for (String physicalServiceZNode : physicalServiceZNodes) {
 
-                    final String physicalServiceZPath = logicalServiceZPath
+                    final String physicalServiceZPath = physicalServicesContainerZPath
                             + "/" + physicalServiceZNode;
 
                     final Entry[] attributes = (Entry[]) SerializerUtil
