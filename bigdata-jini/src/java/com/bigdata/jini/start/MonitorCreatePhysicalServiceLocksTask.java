@@ -307,10 +307,14 @@ public class MonitorCreatePhysicalServiceLocksTask implements
                  * @todo configure retry interval.
                  */
 
-                Thread.sleep(5000/* ms */);
+                // random delay in .5 to 5 seconds.
+                final int sleep = (int) Math.rint(Math.random() * 10) * 500;
 
-                if (INFO)
-                    log.info("Retrying: " + lockNodeZPath);
+                Thread.sleep(sleep/* ms */);
+
+//                if (INFO) // @todo reduce log level.
+                    log.warn("Retrying: delay=" + sleep + "ms : "
+                            + lockNodeZPath);
 
             } // while true
 
