@@ -529,7 +529,7 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
          */
         public V call() throws Exception {
 
-            try {
+            if (ZooHelper.isRunning(InetAddress.getLocalHost(), clientPort)) {
 
                 /*
                  * Query for an instance already running on local host at that
@@ -540,22 +540,11 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
                  * instance on the localhost.
                  */
 
-                ZooHelper.ruok(InetAddress.getLocalHost(), clientPort,
-                        250/* timeout(ms) */);
+                ZooHelper.ruok(InetAddress.getLocalHost(), clientPort);
 
                 throw new ZookeeperRunningException(
                         "Zookeeper already running on localhost: clientport="
                                 + clientPort);
-
-            } catch (IOException ex) {
-
-                /*
-                 * Fall through.
-                 * 
-                 * Note: We are expecting an exception if zookeeper is
-                 * not running on that port.
-                 */
-                
             }
 
             if (!dataDir.exists()) {
@@ -621,8 +610,7 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
                          * Note: We don't test this until we have the file lock.
                          */
 
-                        ZooHelper.ruok(InetAddress.getLocalHost(), clientPort,
-                                250/* timeout(ms) */);
+                        ZooHelper.ruok(InetAddress.getLocalHost(), clientPort);
 
                         throw new ZookeeperRunningException(
                                 "Zookeeper already running on localhost: clientport="
@@ -724,7 +712,7 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
              * clientPort. That could have already been true.
              */
 
-            ZooHelper.ruok(InetAddress.getLocalHost(), clientPort, 250/* ms */);
+            ZooHelper.ruok(InetAddress.getLocalHost(), clientPort);
 
             // adjust for time remaining.
             nanos = (System.nanoTime() - begin);

@@ -40,10 +40,15 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 import net.jini.config.Configuration;
 import net.jini.core.discovery.LookupLocator;
 import net.jini.core.lookup.ServiceItem;
+import net.jini.core.lookup.ServiceRegistrar;
+import net.jini.discovery.DiscoveryEvent;
+import net.jini.discovery.DiscoveryListener;
 import net.jini.discovery.LookupDiscoveryManager;
 import net.jini.export.Exporter;
 import net.jini.jeri.BasicILFactory;
@@ -96,7 +101,7 @@ import com.sun.jini.admin.DestroyAdmin;
  * @version $Id$
  */
 public class JiniFederation extends AbstractDistributedFederation implements
-        ServiceDiscoveryListener, Watcher {
+        DiscoveryListener, ServiceDiscoveryListener, Watcher {
 
     protected DataServicesClient dataServicesClient;
 
@@ -198,73 +203,6 @@ public class JiniFederation extends AbstractDistributedFederation implements
                     zooConfig.sessionTimeout, this/* watcher */);
             
             /*
-             * Await the zookeeper connection, but not more than [timeout] ms.
-             */ 
-            {
-                
-                long timeout = TimeUnit.MILLISECONDS
-                        .toNanos(zooConfig.sessionTimeout);
-
-                final long begin = System.nanoTime();
-
-                while ((timeout -= (System.nanoTime() - begin)) > 0) {
-
-                    switch (zookeeper.getState()) {
-                    case CONNECTED:
-                        break;
-                    case AUTH_FAILED:
-                        throw new RuntimeException("Zookeeper authorization failure.");
-                    default:
-                        // wait a bit.
-                        Thread.sleep(50/* ms */);
-                    }
-
-                }
-
-                if (zookeeper.getState().isAlive()) {
-
-                    log.warn("Zookeeper connection not alive.");
-                    
-                }
-                
-//                try {
-//
-//                    zookeeper.getData(zooConfig.zroot, false/* watch */,
-//                            new Stat());
-//                    
-//                } catch (NoNodeException ex) {
-//
-//                    /*
-//                     * Note: We don't just create the zroot here since there needs
-//                     * to be an appropriate ACL.
-//                     */
-//
-//                    log.warn("federation zroot does not exist: " + zooConfig.zroot);
-//
-//                } catch (ConnectionLossException ex) {
-//
-//                    /*
-//                     * Zookeeper might not be up. That is ok. We will start anyway
-//                     * and it might come online later. The ZooKeeper client will
-//                     * keep looking for a connection and will connection if a server
-//                     * instance is started.
-//                     */
-//                    
-//                    log.warn(this, ex);
-//                    
-//                } catch(KeeperException ex) {
-//                    
-//                    /*
-//                     * Some other ZooKeeper problem.  We will forge ahead.
-//                     */
-//                    
-//                    log.warn(this, ex);
-//                    
-//                }
-                
-            }
-            
-            /*
              * Note: This class will perform multicast discovery if ALL_GROUPS
              * is specified and otherwise requires you to specify one or more
              * unicast locators (URIs of hosts running discovery services). As
@@ -272,7 +210,8 @@ public class JiniFederation extends AbstractDistributedFederation implements
              * multicast discovery.
              */
             lookupDiscoveryManager = new LookupDiscoveryManager(groups,
-                    lookupLocators, null /* DiscoveryListener */
+                    lookupLocators, this /* DiscoveryListener */, client
+                            .getConfiguration()
             );
 
             final long cacheMissTimeout = Long.valueOf(client.getProperties()
@@ -316,9 +255,171 @@ public class JiniFederation extends AbstractDistributedFederation implements
         
     }
 
-    public JiniClient getClient() {
+//    /**
+//     * Wait for zookeeper and jini to become connected.
+//     * <p>
+//     * Note: This is event driven so it will not wait any longer than necessary.
+//     * 
+//     * @param timeout
+//     * @param unit
+//     * 
+//     * @return <code>true</code> if the preconditions are satisified.
+//     * 
+//     * @throws InterruptedException
+//     */
+//    protected boolean awaitPreconditions(final long timeout, final TimeUnit unit)
+//            throws InterruptedException {
+//
+//        final long begin = System.nanoTime();
+//
+//        long nanos = TimeUnit.MILLISECONDS.toNanos(timeout);
+//
+//        // await jini registrar(s)
+//        if (!awaitJiniRegistrars(nanos, TimeUnit.NANOSECONDS)) {
+//
+//            log.error("No jini registrars.");
+//
+//            return false;
+//
+//        }
+//
+//        nanos -= (System.nanoTime() - begin);
+//
+//        // await zookeeper connection.
+//        if (!awaitZookeeperConnected(nanos, TimeUnit.NANOSECONDS)) {
+//
+//            log
+//                    .error("Zookeeper not connected : state="
+//                            + zookeeper.getState());
+//
+//            return false;
+//
+//        }
+//
+//        return true;
+//        
+//    }
+    
+    /**
+     * Await at least one jini {@link ServiceRegistrar} to be discovered.
+     * 
+     * @param timeout
+     * @param unit
+     * 
+     * @return <code>true</code> at least one registrar was available before
+     *         the timeout.
+     * 
+     * @throws InterruptedException
+     *             if interrupted awaiting a jini {@link ServiceRegistrar} to be
+     *             discovered.
+     */
+    public boolean awaitJiniRegistrars(final long timeout, final TimeUnit unit)
+            throws InterruptedException {
         
-        return (JiniClient)super.getClient();
+        final long begin = System.nanoTime();
+        
+        // nanoseconds remaining.
+        long nanos = unit.toNanos(timeout);
+
+        ServiceRegistrar[] registrars = null;
+
+        while (((registrars = lookupDiscoveryManager.getRegistrars()).length == 0)
+                && (nanos -= (System.nanoTime() - begin)) > 0) {
+
+            // wait a bit, but not more than the time remaining.
+            discoveryEventLock.lockInterruptibly();
+            try {
+                
+                discoveryEvent.awaitNanos(nanos);
+
+            } finally {
+            
+                discoveryEventLock.unlock();
+                
+            }
+
+        }
+
+        if (registrars.length == 0) {
+
+            final long elapsed = System.nanoTime() - begin;
+
+            log.warn("jini: no registrars: elapsed="
+                    + TimeUnit.NANOSECONDS.toMillis(elapsed));
+
+            return false;
+
+        }
+        
+        // at least one registrar.
+        return true;
+
+    }
+    
+    /**
+     * Await {@link ZooKeeper} to be {@link ZooKeeper.States#CONNECTED}, but
+     * not more than the specified timeout.
+     * 
+     * @param timeout
+     * @param unit
+     * 
+     * @return <code>true</code> iff we noticed {@link ZooKeeper} entering the
+     *         connected state before the timeout.
+     * 
+     * @throws InterruptedException
+     *             if interrupted awaiting the {@link ZooKeeper} client to be
+     *             connected.
+     * @throws IllegalStateException
+     *             if the {@link ZooKeeper} client does not exist.
+     */
+    public boolean awaitZookeeperConnected(final long timeout, final TimeUnit unit)
+            throws InterruptedException {
+
+        if (zookeeper == null) {
+
+            throw new IllegalStateException("No zookeeper client?");
+
+        }
+
+        final long begin = System.nanoTime();
+        
+        // nanoseconds remaining.
+        long nanos = unit.toNanos(timeout);
+
+        ZooKeeper.States state = null;
+
+        while ((nanos -= (System.nanoTime() - begin)) > 0) {
+
+            switch (state = zookeeper.getState()) {
+            case CONNECTED:
+                return true;
+            case AUTH_FAILED:
+                log.error("Zookeeper authorization failure.");
+                break;
+            default:
+                // wait a bit, but not more than the time remaining.
+                zookeeperEventLock.lockInterruptibly();
+                try {
+                    zookeeperEvent.awaitNanos(nanos);
+                } finally {
+                    zookeeperEventLock.unlock();
+                }
+            }
+
+        }
+
+        final long elapsed = System.nanoTime() - begin;
+
+        log.warn("Zookeeper: not connected: state=" + state + ", elapsed="
+                + TimeUnit.NANOSECONDS.toMillis(elapsed));
+
+        return false;
+
+    }
+
+    public JiniClient getClient() {
+
+        return (JiniClient) super.getClient();
         
     }
     
@@ -1161,15 +1262,116 @@ public class JiniFederation extends AbstractDistributedFederation implements
         
     }
 
-    public void process(WatchedEvent event) {
+    /**
+     * Lock controlling access to the {@link #discoveryEvent} {@link Condition}.
+     */
+    protected final ReentrantLock discoveryEventLock = new ReentrantLock();
+
+    /**
+     * Condition signaled any time there is a {@link DiscoveryEvent} delivered to
+     * our {@link DiscoveryListener}.
+     */
+    protected final Condition discoveryEvent = discoveryEventLock
+            .newCondition();
+
+    /**
+     * Signals anyone waiting on {@link #discoveryEvent}.
+     */
+    public void discarded(final DiscoveryEvent e) {
+
+        try {
+            
+            discoveryEventLock.lockInterruptibly();
+            
+            try {
+                
+                discoveryEvent.signalAll();
+            
+            } finally {
+                
+                discoveryEventLock.unlock();
+                
+            }
+            
+        } catch (InterruptedException ex) {
+            
+            return;
+            
+        }
         
-        if(INFO)
+    }
+
+    /**
+     * Signals anyone waiting on {@link #discoveryEvent}.
+     */
+    public void discovered(final DiscoveryEvent e) {
+
+        try {
+
+            discoveryEventLock.lockInterruptibly();
+
+            try {
+
+                discoveryEvent.signalAll();
+
+            } finally {
+
+                discoveryEventLock.unlock();
+
+            }
+
+        } catch (InterruptedException ex) {
+
+            return;
+
+        }
+        
+    }
+
+    /**
+     * Lock controlling access to the {@link #zookeeperEvent} {@link Condition}.
+     */
+    protected final ReentrantLock zookeeperEventLock = new ReentrantLock();
+
+    /**
+     * Condition signaled any time there is a {@link WatchedEvent} delivered to
+     * our {@link #process(WatchedEvent)}.
+     */
+    protected final Condition zookeeperEvent = zookeeperEventLock
+            .newCondition();
+
+    /**
+     * Signals anyone awaiting {@link #zookeeperEvent}.   
+     */
+    public void process(final WatchedEvent event) {
+
+        if (INFO)
             log.info(event.toString());
+
+        try {
+            
+            zookeeperEventLock.lockInterruptibly();
+            
+            try {
+                
+                zookeeperEvent.signalAll();
+            
+            } finally {
+                
+                zookeeperEventLock.unlock();
+                
+            }
+            
+        } catch (InterruptedException ex) {
+            
+            return;
+            
+        }
         
-        for(Watcher w : watchers) {
-            
+        for (Watcher w : watchers) {
+
             w.process(event);
-            
+
         }
         
     }
@@ -1334,5 +1536,5 @@ public class JiniFederation extends AbstractDistributedFederation implements
         }
         
     }
-    
+
 }

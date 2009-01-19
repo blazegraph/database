@@ -1,6 +1,7 @@
 package com.bigdata.jini.start.process;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -143,6 +144,18 @@ public class ZookeeperProcessHelper extends ProcessHelper {
         final ZookeeperServerConfiguration serverConfig = new ZookeeperServerConfiguration(
                 config);
 
+        if (ZooHelper.isRunning(InetAddress.getLocalHost(), serverConfig.clientPort)) {
+
+            if (INFO)
+                log.info("Zookeeper running: "
+                        + InetAddress.getLocalHost().getCanonicalHostName()
+                        + ":" + serverConfig.clientPort);
+
+            // will not consider start.
+            return 0;
+            
+        }
+        
         // Note: will throw NPE or IAE if constraint relies on fed!
         if (!serverConfig.canStartService(null/* fed */)) {
 
@@ -151,6 +164,10 @@ public class ZookeeperProcessHelper extends ProcessHelper {
                     + serverConfig);
 
         }
+
+        /*
+         * Consider whether there is a possible start for this host.
+         */
         
         final ZookeeperServerEntry[] entries = serverConfig
                 .getZookeeperServerEntries();

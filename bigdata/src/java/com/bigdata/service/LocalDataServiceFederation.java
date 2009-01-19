@@ -31,6 +31,7 @@ package com.bigdata.service;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.counters.AbstractStatisticsCollector;
@@ -60,11 +61,19 @@ public class LocalDataServiceFederation extends AbstractFederation {
     final private ResourceLockService resourceLockManager = new ResourceLockService();
     private LoadBalancerService loadBalancerService;
     private LocalDataServiceImpl dataService;
-    
-    /**
-     * 
-     */
-    public LocalDataServiceFederation(LocalDataServiceClient client) {
+
+//    /**
+//     * There are no preconditions for a service start.
+//     */
+//    @Override
+//    protected boolean awaitPreconditions(long timeout, TimeUnit unit)
+//            throws InterruptedException {
+//
+//        return true;
+//
+//    }
+
+    public LocalDataServiceFederation(final LocalDataServiceClient client) {
         
         super(client);
 
@@ -123,6 +132,7 @@ public class LocalDataServiceFederation extends AbstractFederation {
         
         // notify service joins.
         {
+
             final String hostname = AbstractStatisticsCollector.fullyQualifiedHostName;
 
             loadBalancerService.join(dataService.getServiceUUID(), dataService

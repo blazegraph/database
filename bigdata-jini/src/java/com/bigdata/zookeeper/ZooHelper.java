@@ -33,8 +33,10 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
+import org.apache.zookeeper.ZooKeeper;
 
 /**
  * Utility class for issuing the four letter commands to a zookeeper service.
@@ -58,24 +60,23 @@ public class ZooHelper {
      *            The address of the zookeeper instance.
      * @param clientPort
      *            The client port.
-     * @param timeout
-     *            The socket read timeout in milliseconds.
-     * 
-     * @throws UnknownHostException
-     *             if the hostname can not be resolved.
+     *            
      * @throws IOException
      *             if there is any problem communicating with the service,
      *             including a timeout (the service is not responsive).
      */
-    static public void ruok(final InetAddress addr, final int clientPort,
-            final int timeout) throws UnknownHostException, IOException {
-    
+    static public void ruok(final InetAddress addr, final int clientPort)
+            throws IOException {
+
         if (INFO)
             log.info("Querying service: hostname=" + addr + ", port="
                     + clientPort);
-    
+
         final Socket socket = new Socket(addr, clientPort);
-    
+
+        // The socket read timeout in milliseconds.
+        final int timeout = 250;
+        
         try {
     
             socket.setSoTimeout(timeout);
@@ -282,15 +283,68 @@ public class ZooHelper {
                 return sb.toString();
     
             }
-    
+
         } finally {
-    
+
             socket.shutdownOutput();
-    
+
             socket.shutdownInput();
-    
+
         }
+
+    }
+
+    /**
+     * Return <code>true</code> if zookeeper is running on the specified host
+     * at the client port.
+     * 
+     * @return <code>true</code> if zookeeper responds to an [ruok] request on
+     *         that host and client port.
+     */
+    public static boolean isRunning(final InetAddress addr, final int clientPort) {
+
+        try {
+
+            ZooHelper.ruok(addr, clientPort);
+
+            if (INFO)
+                log.info("Zookeeper running: " + addr.getCanonicalHostName()
+                        + ":" + clientPort);
+
+            return true;
+
+        } catch (IOException ex) {
+
+            // ignore.
+            if (INFO)
+                log.info("Zookeeper not found: " + addr.getCanonicalHostName()
+                        + ":" + clientPort);
+
+            return false;
+
+        }
+
+    }
     
+    /**
+     * Send four letter commands to zookeeper.
+     * 
+     * @param args
+     *            host:clientPort command
+     */
+    public static void main(String[] args) {
+
+        if (args.length != 2) {
+
+            System.err.println("usage: host:clientPort [ruok|dump|stat|kill]");
+
+            System.err
+                    .println("       kill may only be used on the local host.");
+
+            System.exit(1);
+
+        }
+
     }
 
 }

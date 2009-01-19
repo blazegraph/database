@@ -290,10 +290,17 @@ public abstract class AbstractServicesManagerService extends AbstractService
         /*
          * Run startup.
          */
-        new ServicesManagerStartupTask(fed, config, this/* listener */,
-                monitorCreatePhysicalServiceLocksTask).call();
+        new ServicesManagerStartupTask(fed, config, this/* listener */).call();
         
     }
+    
+    /**
+     * <code>true</code> iff a {@link ServicesManagerStartupTask} is currently
+     * running. An instance of that task is started during normal startup, but
+     * instances of that task can be started by the SIGHUP handler as well. This
+     * flag is used to prevent concurrent instances of that task from running.
+     */
+    protected volatile boolean startupRunning = false;
     
     /**
      * The task used to start and restart services.

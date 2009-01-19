@@ -2,6 +2,7 @@ package com.bigdata.jini.start;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -43,7 +44,7 @@ public class ServicesManagerStartupTask {
 
     protected final Configuration config;
 
-    protected final IServiceListener listener;
+    protected final AbstractServicesManagerService service;
     
     protected final MonitorCreatePhysicalServiceLocksTask monitorCreatePhysicalServiceLocksTask; 
 
@@ -52,13 +53,12 @@ public class ServicesManagerStartupTask {
      * @param fed
      * @param config
      *            The configuration that will be pushed to zookeeper.
-     * @param listener
+     * @param service
      */
     public ServicesManagerStartupTask(
             final JiniFederation fed,
             final Configuration config,
-            final IServiceListener listener,
-            final MonitorCreatePhysicalServiceLocksTask monitorCreatePhysicalServiceLocksTask) {
+            final AbstractServicesManagerService service) {
 
         if (fed == null)
             throw new IllegalArgumentException();
@@ -66,23 +66,57 @@ public class ServicesManagerStartupTask {
         if (config == null)
             throw new IllegalArgumentException();
 
-        if (listener == null)
-            throw new IllegalArgumentException();
-
-        if (monitorCreatePhysicalServiceLocksTask == null)
+        if (service == null)
             throw new IllegalArgumentException();
 
         this.fed = fed;
 
         this.config = config;
 
-        this.listener = listener;
+        this.service = service;
 
-        this.monitorCreatePhysicalServiceLocksTask = monitorCreatePhysicalServiceLocksTask;
-        
+        this.monitorCreatePhysicalServiceLocksTask = service.monitorCreatePhysicalServiceLocksTask;
+
     }
 
     public Void call() throws Exception {
+
+        try {
+
+            synchronized (service) {
+
+                if (service.startupRunning) {
+
+                    log.warn("Startup already running.");
+
+                    return null;
+
+                }
+
+                service.startupRunning = true;
+
+            }
+
+            doStartup();
+
+            return null;
+
+        } finally {
+
+            synchronized (service) {
+
+                service.startupRunning = false;
+
+            }
+
+        }
+
+    }
+
+    protected void doStartup() throws Exception {
+        
+        if (INFO)
+            log.info("Running.");
 
         // the service manager's own configuration.
         final ServicesManagerConfiguration selfConfig = new ServicesManagerConfiguration(
@@ -121,30 +155,59 @@ public class ServicesManagerStartupTask {
         }
 
         /*
-         * Make sure that the key znodes are defined and then push the service
-         * configurations into zookeeper.
+         * Wait for zookeeper and jini to become connected.
+         * 
+         * Note: This is event driven so it will not wait any longer than
+         * necessary.
+         */
+        {
+
+            // @todo configure timeout
+            final long timeout = 10000;
+
+            final long begin = System.nanoTime();
+
+            long nanos = TimeUnit.MILLISECONDS.toNanos(timeout);
+
+            // await zookeeper connection.
+            if (!fed.awaitZookeeperConnected(nanos, TimeUnit.NANOSECONDS)) {
+
+                throw new Exception(
+                        "Zookeeper not connected: startup sequence aborted.");
+
+            }
+
+            nanos -= (System.nanoTime() - begin);
+
+            // await jini registrar(s)
+            if (!fed.awaitJiniRegistrars(nanos, TimeUnit.NANOSECONDS)) {
+
+                throw new Exception(
+                        "No jini registrars: startup sequence aborted.");
+
+            }
+
+        }
+
+        /*
+         * Make sure that the key znodes are defined and then push the
+         * service configurations into zookeeper.
          */
         pushConfiguration(serviceConfigurations);
 
         /*
          * Restart any persistent services that can not be discovered.
          * 
-         * Note: This must wait until we have started zookeeper and/or jini in
-         * case they are supposed to run on this host and are not running
+         * Note: This must wait until we have started zookeeper and/or jini
+         * in case they are supposed to run on this host and are not running
          * elsewhere at this time.
          */
 
-        // wait a bit to make sure that everthing has a chance to be connected.
-        Thread.sleep(5000);
-        
-        // restart persistent services not already running.
         fed.submitMonitoredTask(new RestartPersistentServices(fed,
                 monitorCreatePhysicalServiceLocksTask));
 
-        return null;
-
     }
-
+    
     /**
      * If necessary, start a zookeeper service on this host.
      * 
@@ -155,7 +218,7 @@ public class ServicesManagerStartupTask {
 
         try {
 
-            return ZookeeperProcessHelper.startZookeeper(config, listener) > 0;
+            return ZookeeperProcessHelper.startZookeeper(config, service) > 0;
 
         } catch (Throwable t) {
 
@@ -178,7 +241,7 @@ public class ServicesManagerStartupTask {
         try {
 
             return JiniCoreServicesProcessHelper.startCoreServices(config,
-                    listener);
+                    service);
 
         } catch (Throwable t) {
 

@@ -444,15 +444,6 @@ public class ServicesManagerServer extends AbstractServer {
 
         }
 
-        /**
-         * Re-reads the {@link Configuration} and pushes it to zookeeper.
-         * <p>
-         * Note: This does not change the {@link Configuration} on the service
-         * or the {@link JiniFederation}. It is only designed to allow the push
-         * of new {@link ServiceConfiguration}s to zookeeper.
-         * 
-         * @todo should this be done in another thread?
-         */
         @SuppressWarnings("all") // Signal is in the sun namespace
         public void handle(final Signal sig) {
 
@@ -470,38 +461,9 @@ public class ServicesManagerServer extends AbstractServer {
                     final ConfigurationFile config = (ConfigurationFile) ConfigurationProvider
                             .getInstance(args);
 
-                    new ServicesManagerStartupTask(fed, config, service,
-                            service.monitorCreatePhysicalServiceLocksTask)
+                    new ServicesManagerStartupTask(fed, config, service)
                             .call();
-                    
-//                    // get the service manager's own configuration.
-//                    final ServicesManagerConfiguration selfConfig = new ServicesManagerConfiguration(
-//                            config);
-//
-//                    /*
-//                     * These are the services that we will start and/or manage.
-//                     */
-//                    final ServiceConfiguration[] serviceConfigurations = selfConfig
-//                            .getServiceConfigurations(config);
-//
-//                    final ZooKeeper zookeeper = service.getFederation()
-//                            .getZookeeper();
-//
-//                    final String zconfig = service.getFederation()
-//                            .getZooConfig().zroot
-//                            + "/" + BigdataZooDefs.CONFIG;
-//
-//                    // push the configuration to zookeeper.
-//                    service.pushConfiguration(zookeeper, zconfig, service
-//                            .getFederation().getZooConfig().acl,
-//                            serviceConfigurations);
-//
-//                    log.warn("Pushed configuration.");
-//
-//                    log.warn("Will restart any stopped services.");
-//                    
-//                    fed.submitMonitoredTask(new RestartPersistentServices(fed));
-                    
+
                 }
 
                 /*
