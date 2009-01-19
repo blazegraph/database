@@ -272,6 +272,14 @@ public class MonitorCreatePhysicalServiceLocksTask implements
 
                     /*
                      * Interrupted - stop competing.
+                     * 
+                     * The create physical service task will be interrupted if
+                     * someone else has created the service themselves and then
+                     * destroyed the lock node since the service no longer needs
+                     * to be created.
+                     * 
+                     * The task can also be interrupted during shutdownNow()
+                     * since all running tasks will be cancelled.
                      */
 
                     if (INFO)
