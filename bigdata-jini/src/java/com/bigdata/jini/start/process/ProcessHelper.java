@@ -45,6 +45,10 @@ public class ProcessHelper {
     
     private final ReentrantLock lock = new ReentrantLock();
     
+    /**
+     * Signalled if we notice that the process has died by the thread which is
+     * monitoring its output.
+     */
     private final Condition dead = lock.newCondition();
     
     private final AtomicInteger exitValue = new AtomicInteger(-1);
@@ -314,6 +318,7 @@ public class ProcessHelper {
 
                 try {
 
+                    // consume all output from the process.
                     consumeOutput();
 
                 } finally {
@@ -325,8 +330,11 @@ public class ProcessHelper {
                         // ensure process is destroyed.
                         process.destroy();
 
-                        // wait for the exit value from the process.
-                        exitValue.set(process.exitValue());
+                        /* Wait for the exit value from the process.
+                         * 
+                         * Note: throws InterruptedException.
+                         */
+                        exitValue.set(process.waitFor());
 
                         // signal so that anyone waiting will awaken.
                         dead.signalAll();
@@ -337,6 +345,10 @@ public class ProcessHelper {
                         // log event.
                         log.warn("Process destroyed: " + name);
 
+                    } catch(InterruptedException ex) {
+                        
+                        log.warn("Interrupted awaiting process death: " + this);
+                        
                     } finally {
 
                         lock.unlock();
@@ -444,8 +456,9 @@ public class ProcessHelper {
 
                     if (dead.await(nanos, TimeUnit.NANOSECONDS)) {
 
-                        // force a wait until the exitValue has been set.
-                        final int exitValue = exitValue();
+                        // @todo if anything, use process.waitFor()
+//                        // force a wait until the exitValue has been set.
+//                        final int exitValue = exitValue();
                         
                         if (INFO)
                             log.info("Process is dead: name=" + name
