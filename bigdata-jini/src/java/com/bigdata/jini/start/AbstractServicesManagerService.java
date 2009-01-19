@@ -3,8 +3,6 @@ package com.bigdata.jini.start;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import org.apache.zookeeper.ZooKeeper;
-
 import net.jini.config.Configuration;
 
 import com.bigdata.jini.start.config.ServicesManagerConfiguration;
@@ -15,7 +13,6 @@ import com.bigdata.service.AbstractService;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
-import com.bigdata.zookeeper.UnknownChildrenWatcher;
 
 /**
  * Core impl.
@@ -99,6 +96,13 @@ public abstract class AbstractServicesManagerService extends AbstractService
     /**
      * Kill the child processes, using {@link RemoteDestroyAdmin#shutdown()}
      * where supported.
+     * 
+     * @todo This should bring down any processes that are being managed on this
+     *       host regardless of whether or not they are child processes. For
+     *       example, you KILL -9 the ServicesManager [leaves children running],
+     *       start it, and then kill -s TERM it [should have discovered
+     *       processes on this host for which it has responsibility and sent
+     *       them shutdown() requests].
      */
     public void shutdown() {
 

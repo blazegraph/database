@@ -11,6 +11,7 @@ import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.KeeperException.ConnectionLossException;
+import org.apache.zookeeper.KeeperException.SessionExpiredException;
 
 /**
  * Notices when unknown children appear for the watched node. The children
@@ -185,8 +186,17 @@ public class UnknownChildrenWatcher implements Watcher {
             
             zookeeper.getChildren(zpath, false);
             
-        } catch(ConnectionLossException ex) {
+        } catch(SessionExpiredException ex) {
             
+            // can be ignored since [cancelled] was set.
+            
+            if (INFO)
+                log.info(toString() + ":" + ex);
+            
+        } catch(ConnectionLossException ex) {
+
+            // can be ignored since [cancelled] was set.
+
             if (INFO)
                 log.info(toString() + ":" + ex);
             

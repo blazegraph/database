@@ -14,6 +14,7 @@ import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.KeeperException.ConnectionLossException;
 import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
+import org.apache.zookeeper.KeeperException.SessionExpiredException;
 import org.apache.zookeeper.data.ACL;
 
 /**
@@ -661,10 +662,19 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
                                 .delete(zpath + "/" + zchild, -1/* version */);
                         
                         if (INFO)
-                            log.info("released lock: "+watcher);
+                            log.info("released lock: " + watcher);
+
+                    } catch (SessionExpiredException ex) {
+
+                        /*
+                         * See notes on ConnectionLossException below.
+                         */
+
+                        log.warn("Not connected: zpath=" + zpath + ", child="
+                                + zchild + " : " + ex);
 
                     } catch (ConnectionLossException ex) {
-                        
+
                         /*
                          * Note: We MUST NOT ignore a ConnectionLossException if
                          * unless this process is being killed. If the process
@@ -677,9 +687,9 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
                          * and by explicitly deleting the child znode if the
                          * lock has been cancelled in the Watcher.
                          */
-                        
+
                         log.warn("Not connected: zpath=" + zpath + ", child="
-                                + zchild);
+                                + zchild + " : " + ex);
                         
                     } catch (NoNodeException ex) {
                         

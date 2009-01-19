@@ -41,6 +41,7 @@ import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.KeeperException.ConnectionLossException;
 import org.apache.zookeeper.KeeperException.NoNodeException;
+import org.apache.zookeeper.KeeperException.SessionExpiredException;
 import org.apache.zookeeper.Watcher.Event.EventType;
 import org.apache.zookeeper.Watcher.Event.KeeperState;
 import org.apache.zookeeper.data.Stat;
@@ -701,6 +702,18 @@ abstract public class HierarchicalZNodeWatcher implements Watcher,
                 clearWatch(path, flags);
 
             } catch (ConnectionLossException e) {
+            
+                /*
+                 * We can ignore these errors due to the cancelled flag above.
+                 * The errors are logged at a low level because a modestly large
+                 * number of such exceptions will occur if the application
+                 * cancels this watcher it is NOT connected to zookeeper and
+                 */
+                
+                if (INFO)
+                    log.info("path=" + path + " : " + e);
+
+            } catch (SessionExpiredException e) {
 
                 /*
                  * We can ignore these errors due to the cancelled flag above.
