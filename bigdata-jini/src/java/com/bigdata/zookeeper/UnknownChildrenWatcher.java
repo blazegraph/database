@@ -10,6 +10,7 @@ import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.KeeperException.ConnectionLossException;
 
 /**
  * Notices when unknown children appear for the watched node. The children
@@ -26,8 +27,9 @@ public class UnknownChildrenWatcher implements Watcher {
 
     final static protected boolean DEBUG = log.isDebugEnabled();
 
-    final ZooKeeper zookeeper;
-    final String zpath;
+    final private ZooKeeper zookeeper;
+    final private String zpath;
+    private boolean cancelled = false;
 
     /**
      * Set of children that we have already seen.
@@ -76,6 +78,8 @@ public class UnknownChildrenWatcher implements Watcher {
                 break;
                 
             } catch (InterruptedException t) {
+
+                cancelled = true;
                 
                 // task was cancelled.
                 throw t;
@@ -96,6 +100,13 @@ public class UnknownChildrenWatcher implements Watcher {
 
     synchronized public void process(WatchedEvent event) {
 
+        if(cancelled) {
+            
+            // ignore events after the watcher was cancelled.
+            return;
+            
+        }
+        
         if(INFO)
             log.info(event.toString());
 
@@ -158,10 +169,31 @@ public class UnknownChildrenWatcher implements Watcher {
      */
     synchronized public void cancel() {
 
+        /*
+         * Set a flag so that we will ignore any future events even if we are
+         * temporarily disconnected from zookeeper and therefore unable to clear
+         * out watcher.
+         * 
+         * @todo we can probably forgo actually clearing the watcher since
+         * requesting the children now does as much work as being information
+         * about them later and ignoring the event.
+         */
+        
+        cancelled = true;
+
         try {
+            
             zookeeper.getChildren(zpath, false);
+            
+        } catch(ConnectionLossException ex) {
+            
+            if (INFO)
+                log.info(toString() + ":" + ex);
+            
         } catch (Exception e) {
+            
             log.error(this, e);
+            
         }
         
     }

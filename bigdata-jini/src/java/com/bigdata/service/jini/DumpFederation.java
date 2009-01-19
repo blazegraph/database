@@ -514,7 +514,7 @@ public class DumpFederation {
              */
             
             // lookup the service in the client's cache.
-            final ServiceItem serviceItem = fed.dataServicesClient
+            final ServiceItem serviceItem = fed.getDataServicesClient()
                     .getServiceItem(uuid);
 
             if (serviceItem != null) {

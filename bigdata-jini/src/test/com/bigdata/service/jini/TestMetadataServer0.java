@@ -223,7 +223,7 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
             Thread.sleep(500);
 
             final DataServicesClient dataServicesClient = metadataServer0.getClient()
-                    .getFederation().dataServicesClient;
+                    .getFederation().getDataServicesClient();
             
             assertNotNull(dataServicesClient.serviceMap
                     .getServiceItemByID(dataService0ID));
@@ -252,7 +252,7 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
                 Thread.sleep(500);
 
                 final DataServicesClient dataServicesClient = metadataServer0
-                        .getClient().getFederation().dataServicesClient;
+                        .getClient().getFederation().getDataServicesClient();
 
                 assertEquals("#dataServices", 2, dataServicesClient.serviceMap
                         .getServiceCount());

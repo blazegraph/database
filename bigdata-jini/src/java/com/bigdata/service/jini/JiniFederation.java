@@ -103,19 +103,19 @@ import com.sun.jini.admin.DestroyAdmin;
 public class JiniFederation extends AbstractDistributedFederation implements
         DiscoveryListener, ServiceDiscoveryListener, Watcher {
 
-    protected DataServicesClient dataServicesClient;
+    private DataServicesClient dataServicesClient;
 
-    protected LoadBalancerClient loadBalancerClient;
+    private LoadBalancerClient loadBalancerClient;
 
-    protected ZooResourceLockService resourceLockService = new ZooResourceLockService(this);
+    private final ZooResourceLockService resourceLockService = new ZooResourceLockService(this);
 
-    protected TransactionServiceClient transactionServiceClient;
+    private TransactionServiceClient transactionServiceClient;
 
-    protected ServicesManagerClient servicesManagerClient;
+    private ServicesManagerClient servicesManagerClient;
 
-    protected LookupDiscoveryManager lookupDiscoveryManager;
+    private LookupDiscoveryManager lookupDiscoveryManager;
 
-    protected ZooKeeper zookeeper;
+    private ZooKeeper zookeeper;
     
     private final ZookeeperClientConfig zooConfig;
     
@@ -1439,6 +1439,29 @@ public class JiniFederation extends AbstractDistributedFederation implements
         return f;
         
     }
+ 
+//    /**
+//     * Cancel any monitored tasks which are still running.
+//     * 
+//     * @param mayInterruptIfRunning
+//     * 
+//     * @todo This method might not be a good idea since you may have
+//     *       insufficient oversight for the tasks that have been run with
+//     *       {@link #submitMonitoredTask(Callable)}.
+//     */
+//    public void cancelMonitoredTasks(final boolean mayInterruptIfRunning) {
+//        
+//        for(TaskFuture tmp : futures) {
+//            
+//            if(!tmp.future.isDone()) {
+//                
+//                tmp.future.cancel(mayInterruptIfRunning);
+//                
+//            }
+//            
+//        }
+//        
+//    }
     
     /**
      * Glue object.
@@ -1518,7 +1541,7 @@ public class JiniFederation extends AbstractDistributedFederation implements
                          */
                         
                         if (INFO)
-                            log.info(f.task.toString(), e);
+                            log.info("Interrupted: "+f.task, e);
                         else
                             log.warn("Interrupted: task="
                                     + f.task.getClass().getName());

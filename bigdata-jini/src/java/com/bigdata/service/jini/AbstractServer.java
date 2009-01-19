@@ -801,7 +801,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                 joinManager = new JoinManager(proxy, // service proxy
                         attributes, // attr sets
                         serviceID, // ServiceID
-                        fed.lookupDiscoveryManager, // DiscoveryManager
+                        fed.getDiscoveryManagement(), // DiscoveryManager
                         new LeaseRenewalManager(), //
                         config);
                 
@@ -814,7 +814,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                 joinManager = new JoinManager(proxy, // service proxy
                         attributes, // attr sets
                         this, // ServiceIDListener
-                        fed.lookupDiscoveryManager, // DiscoveryManager
+                        fed.getDiscoveryManagement(), // DiscoveryManager
                         new LeaseRenewalManager(), //
                         config);
             
@@ -1141,7 +1141,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * create the ephemeral znode for the physical service when the client
      * becomes connected to zookeeper. This is done as part of ctor.
      * 
-     * @param zookeeper
+     * @param fed
      * @param serviceUUID
      * 
      * @throws KeeperException

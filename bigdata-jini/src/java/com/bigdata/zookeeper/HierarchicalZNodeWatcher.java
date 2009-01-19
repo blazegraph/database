@@ -39,6 +39,7 @@ import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.KeeperException.ConnectionLossException;
 import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.Watcher.Event.EventType;
 import org.apache.zookeeper.Watcher.Event.KeeperState;
@@ -671,10 +672,18 @@ abstract public class HierarchicalZNodeWatcher implements Watcher,
     synchronized 
     public void cancel() throws InterruptedException {
 
+        /*
+         * Note: Once we set this flag we will not propagate any more events to
+         * the application. If we are unable to clear some watches then those
+         * events will just be discarded if they arrive.
+         * 
+         * Note: This allows us to safely ignore various errors from zookeeper
+         * below.
+         */
+        cancelled = true;
+        
         if(INFO)
             log.info("Cancelling watches: #watched="+watched.size());
-        
-        cancelled = true;
         
         final Iterator<Map.Entry<String, Integer>> itr = watched.entrySet()
                 .iterator();
@@ -691,9 +700,21 @@ abstract public class HierarchicalZNodeWatcher implements Watcher,
 
                 clearWatch(path, flags);
 
+            } catch (ConnectionLossException e) {
+
+                /*
+                 * We can ignore these errors due to the cancelled flag above.
+                 * The errors are logged at a low level because a modestly large
+                 * number of such exceptions will occur if the application
+                 * cancels this watcher it is NOT connected to zookeeper and
+                 */
+                
+                if (INFO)
+                    log.info("path=" + path + " : " + e);
+
             } catch (KeeperException e) {
 
-                log.error("path=" + path, e);
+                log.error("path=" + path + " : " + e);
 
             }
 

@@ -3,6 +3,8 @@ package com.bigdata.jini.start;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import org.apache.zookeeper.ZooKeeper;
+
 import net.jini.config.Configuration;
 
 import com.bigdata.jini.start.config.ServicesManagerConfiguration;
@@ -13,6 +15,7 @@ import com.bigdata.service.AbstractService;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
+import com.bigdata.zookeeper.UnknownChildrenWatcher;
 
 /**
  * Core impl.
@@ -130,7 +133,7 @@ public abstract class AbstractServicesManagerService extends AbstractService
             childStartsAllowed = false;
 
         }
-        
+
         killChildProcesses(true/* immediateShutdown */);
         
     }
@@ -158,8 +161,6 @@ public abstract class AbstractServicesManagerService extends AbstractService
     protected void killChildProcesses(final boolean immediateShutdown) {
 
        childStartsAllowed = false; 
-        
-//        final List<ProcessHelper> problems = new LinkedList<ProcessHelper>();
 
         // destroy any running processes
         for (ProcessHelper helper : runningProcesses) {
@@ -171,37 +172,33 @@ public abstract class AbstractServicesManagerService extends AbstractService
                 continue;
 
             try {
+
                 helper.kill();
+                
             } catch (Throwable t) {
+                
                 log.error("Could not kill process: " + helper);
-//                // add to list of problem processes.
-//                problems.add(helper);
+
                 // remove from list of running processes.
                 runningProcesses.remove(helper);
+                
             }
 
         }
-
-//        // try again for the problem processes, raising the logging level.
-//        for (ProcessHelper helper : problems) {
-//
-//            try {
-//                helper.kill();
-//            } catch (Throwable t) {
-//                log.error("Could not kill process: " + helper);
-//            }
-//
-//        }
-
+        
         /*
          * This time we take down zookeeper and jini.
          */
         for (ProcessHelper helper : runningProcesses) {
 
             try {
+                
                 helper.kill();
+                
             } catch (Throwable t) {
+                
                 log.warn("Could not kill process: " + helper);
+                
             }
 
         }

@@ -11,6 +11,7 @@ import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.KeeperException.ConnectionLossException;
 import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.data.ACL;
@@ -140,9 +141,41 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
     }
 
     @Override
-    protected boolean isConditionSatisified(WatchedEvent event)
+    protected boolean isConditionSatisified(final WatchedEvent event)
             throws KeeperException, InterruptedException {
 
+        if(cancelled) {
+            
+            /*
+             * If an event arrives after the lock was cancelled then we make
+             * sure that the znode representing this process is deleted. This
+             * handles the case of a transient disconnect where the process is
+             * reconnected to zookeeper before it times out. This is necessary
+             * in order to release the lock which otherwise would be held
+             * forever by this process.
+             */
+            
+            switch(event.getState()) {
+            case NoSyncConnected: 
+            case SyncConnected:
+                
+                try {
+
+                    zookeeper.delete(zpath + "/" + zchild, -1);
+                    
+                    if (INFO)
+                        log.info("released lock: " + this);
+
+                } catch (NoNodeException ex) {
+                    
+                    // ignore.
+                    
+                }
+                
+            }
+            
+        }
+        
         return isConditionSatisified();
 
     }
@@ -168,6 +201,14 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
     protected boolean isConditionSatisified() throws KeeperException,
             InterruptedException {
 
+        if(cancelled) {
+            
+            // ignore any events once the lock was cancelled.
+            
+            return true;
+            
+        }
+        
         if (zookeeper.exists(zpath + INVALID, false) != null) {
 
             /*
@@ -596,6 +637,13 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
                 
                 synchronized(watcher) {
                     
+                    /*
+                     * We set this flag first so that we will be able to discard
+                     * the lock if there is a transient disconnect.
+                     */
+                    
+                    watcher.cancelled = true;
+                    
 //                    // clear watch.
 //                    watcher.clearWatch();
 
@@ -615,6 +663,24 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
                         if (INFO)
                             log.info("released lock: "+watcher);
 
+                    } catch (ConnectionLossException ex) {
+                        
+                        /*
+                         * Note: We MUST NOT ignore a ConnectionLossException if
+                         * unless this process is being killed. If the process
+                         * remains alive but it was unable to delete its child
+                         * because of a temporary disconnect AND it reconnects
+                         * before zookeeper times out the client then THE LOCK
+                         * WILL NOT BE RELEASED.
+                         * 
+                         * This is handled by setting [cancelled := true] above
+                         * and by explicitly deleting the child znode if the
+                         * lock has been cancelled in the Watcher.
+                         */
+                        
+                        log.warn("Not connected: zpath=" + zpath + ", child="
+                                + zchild);
+                        
                     } catch (NoNodeException ex) {
                         
                         /*
@@ -622,7 +688,7 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
                          * not hold the lock anymore.
                          */
                         
-                        log.warn("child already deleted: zpath=" + zpath
+                        log.warn("Child already deleted: zpath=" + zpath
                                 + ", child=" + zchild);
                         
                     }
@@ -651,6 +717,8 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
          * @todo verify {@link #unlock()} succeeds after {@link #destroyLock()}
          * 
          * @todo consider allowing even if you do not hold the lock.
+         * 
+         * @todo consider what happens if there is a transient disconnect.
          */
         public void destroyLock() throws KeeperException, InterruptedException {
 
