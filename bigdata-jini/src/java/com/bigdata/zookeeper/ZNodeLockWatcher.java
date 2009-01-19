@@ -264,9 +264,18 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
     /**
      * Return an object that may be used to acquire a distributed synchronous
      * lock.
+     * <p>
+     * This method will create a new lock node if the znode identified by the
+     * zpath does not exist. However, it will reject the request if the lock
+     * node has been invalidated pending the destruction of the lock node and
+     * its queue. In design patterns where the lock node may be destroyed, this
+     * places the responsibility on the caller to verify that the lock node is
+     * pre-existing if they wish to avoid re-creating a lock node which has been
+     * destroyed.
      * 
      * @param zookeeper
      * @param zpath
+     *            The path identifying the lock node.
      * @param acl
      * 
      * @return

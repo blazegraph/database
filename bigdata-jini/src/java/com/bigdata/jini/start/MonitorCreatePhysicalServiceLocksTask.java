@@ -270,8 +270,14 @@ public class MonitorCreatePhysicalServiceLocksTask implements
                     
                 } catch (InterruptedException ex) {
 
-                    // interrupted - stop competing.
-                    throw ex;
+                    /*
+                     * Interrupted - stop competing.
+                     */
+
+                    if (INFO)
+                        log.info("Interrupted - will not start service.");
+
+                    return false;
 
                 } catch (Throwable t) {
 
