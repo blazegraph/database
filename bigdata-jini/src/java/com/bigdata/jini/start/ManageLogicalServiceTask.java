@@ -185,8 +185,9 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
 
         final List<ACL> acl = fed.getZooConfig().acl;
         
-        log.warn("serviceCount=" + config.serviceCount + ", actual="
-                + children.size() + ", configZPath=" + configZPath);
+        if (INFO)
+            log.info("serviceCount=" + config.serviceCount + ", actual="
+                    + children.size() + ", configZPath=" + configZPath);
 
         /*
          * Create zpath for the new logical service.
