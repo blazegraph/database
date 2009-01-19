@@ -46,6 +46,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.jini.lookup.entry.Hostname;
 import com.bigdata.journal.DumpJournal;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.IMetadataIndex;
@@ -68,6 +69,9 @@ import com.bigdata.util.InnerCause;
  * @todo dump by data service as well, showing the indices on the ds and the
  *       disk space allocated to the resource manager for the ds (depending on
  *       the release age there may be historical views preserved).
+ * 
+ * @todo modify to use the {@link Hostname} attribute in the {@link Entry}[]
+ *       from the {@link ServiceItem}.
  */
 public class DumpFederation {
 

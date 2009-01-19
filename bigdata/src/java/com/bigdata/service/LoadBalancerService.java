@@ -1120,16 +1120,8 @@ abstract public class LoadBalancerService extends AbstractService
             /*
              * Is the host out of disk?
              * 
-             * FIXME Really needs to check on each partition on which we have a
-             * data service (dataDir). This is available to us now, as is the
-             * free disk space for the tmpDir for each data service. [The global
-             * counter is not being reported under linux right now.] [We really
-             * want to know both the swap space remaining and the data (or at
-             * least local disk) space remaining, and it is a bit tricky to know
-             * which device corresponds to swap and to the data for any given
-             * host.] We could also get a measure of NAS remaining, but that is
-             * likely to be shared over a cluster so not that relevant to the
-             * LBS.
+             * FIXME Need the swap space remaining. Low swap presages heavy
+             * swapping.
              * 
              * @todo this will issue a warning for a windows host on which a
              * service is just starting up. For some reason, it takes a few
@@ -1368,7 +1360,7 @@ abstract public class LoadBalancerService extends AbstractService
                 adjustedRawScore *= 10d;
 
                 log.warn("service=" + serviceName
-                        + " : very short on disk: dataDirBytesAvail="
+                        + " : very short on disk: "+IStoreManagerCounters.TmpDirBytesAvailable+"="
                         + bytesFormat.format(dataDirBytesAvailable));
 
             } else if (dataDirBytesAvailable < Bytes.gigabyte * 10) {
@@ -1377,7 +1369,7 @@ abstract public class LoadBalancerService extends AbstractService
                 adjustedRawScore *= 2d;
 
                 log.warn("service=" + serviceName
-                        + " : is short on disk: dataDirBytesAvail="
+                        + " : is short on disk: "+IStoreManagerCounters.DataDirBytesAvailable+"="
                         + bytesFormat.format(dataDirBytesAvailable));
 
             }
@@ -1392,7 +1384,7 @@ abstract public class LoadBalancerService extends AbstractService
                 adjustedRawScore *= 10d;
 
                 log.warn("service=" + serviceName
-                        + " : very short on disk: tmpDirBytesAvail="
+                        + " : very short on disk: "+IStoreManagerCounters.TmpDirBytesAvailable+"="
                         + bytesFormat.format(tmpDirBytesAvailable));
 
             } else if (tmpDirBytesAvailable < Bytes.gigabyte * 10) {
@@ -1401,7 +1393,7 @@ abstract public class LoadBalancerService extends AbstractService
                 adjustedRawScore *= 2d;
 
                 log.warn("service=" + serviceName
-                        + " : is short on disk: tmpDirBytesAvail="
+                        + " : is short on disk: "+IStoreManagerCounters.TmpDirBytesAvailable+"="
                         + bytesFormat.format(tmpDirBytesAvailable));
 
             }
@@ -1490,7 +1482,7 @@ abstract public class LoadBalancerService extends AbstractService
             } catch (Exception ex) {
 
                 log.warn("Could not read double value: counterSet="
-                        + counterSet.getPath() + ", counter=" + path);
+                        + counterSet.getPath() + ", counter=" + path, ex);
 
                 return defaultValue;
 

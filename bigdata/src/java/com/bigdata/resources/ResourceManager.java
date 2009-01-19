@@ -267,7 +267,8 @@ abstract public class ResourceManager extends OverflowManager implements IResour
             // IndexManager
             {
                 
-                final CounterSet tmp = root.makePath(IResourceManagerCounters.IndexManager);
+                final CounterSet tmp = root
+                        .makePath(IResourceManagerCounters.IndexManager);
 
                 // save a reference.
                 indexManagerRoot = tmp;
