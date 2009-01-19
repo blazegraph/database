@@ -79,7 +79,8 @@ import com.bigdata.util.httpd.AbstractHTTPD;
  *       that the IServiceShutdown.Options interface is flattened into
  *       IServiceShutdown and it shadows the Options that are being used.
  */
-abstract public class AbstractFederation implements IBigdataFederation, IFederationDelegate {
+abstract public class AbstractFederation implements IBigdataFederation,
+        IFederationDelegate {
 
     protected static final Logger log = Logger.getLogger(IBigdataFederation.class);
 
@@ -767,6 +768,24 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
 
     }
     
+//    /**
+//     * Return <code>true</code> if the service startup preconditions are
+//     * noticably satisified before the timeout elapsed.
+//     * 
+//     * @param timeout
+//     * @param unit
+//     * 
+//     * @return <code>true</code> if the preconditions are satisified.
+//     * 
+//     * @throws InterruptedException
+//     */
+//    protected boolean awaitPreconditions(final long timeout,
+//            final TimeUnit unit) throws InterruptedException {
+//        
+//        return client.getDelegate().isServiceReady();
+//        
+//    }
+    
     /**
      * This task runs periodically. Once {@link #getServiceUUID()} reports a
      * non-<code>null</code> value, it will start an (optional)
@@ -814,6 +833,21 @@ abstract public class AbstractFederation implements IBigdataFederation, IFederat
             
             try {
                 
+//                /*
+//                 * @todo Work on event driven startup and event drive service
+//                 * up/down more.
+//                 * 
+//                 * @todo Specify the timeout via IBigdataClient.Options.
+//                 */
+//                if (!awaitPreconditions(1000, TimeUnit.MILLISECONDS)) {
+//                    
+//                    if(INFO)
+//                        log.info("Preconditions not yet satisified.");
+//                    
+//                    return;
+//                    
+//                }
+                    
                 started = startDeferredTasks();
                 
             } catch (Throwable t) {

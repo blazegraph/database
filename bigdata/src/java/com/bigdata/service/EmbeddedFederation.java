@@ -35,6 +35,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.journal.BufferMode;
@@ -230,6 +231,17 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
         
     }
 
+//    /**
+//     * There are no preconditions for a service start.
+//     */
+//    @Override
+//    protected boolean awaitPreconditions(long timeout, TimeUnit unit)
+//            throws InterruptedException {
+//
+//        return true;
+//
+//    }
+    
     /**
      * Start or restart an embedded bigdata federation.
      * 
