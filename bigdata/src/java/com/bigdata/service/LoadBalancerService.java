@@ -1473,16 +1473,18 @@ abstract public class LoadBalancerService extends AbstractService
 
             try {
 
-                HistoryInstrument inst = (HistoryInstrument)c.getInstrument();
-                
-                double val = (Double) inst.minutes.getAverage(minutes);
+                final HistoryInstrument inst = (HistoryInstrument) c
+                        .getInstrument();
+
+                final double val = ((Number) inst.minutes.getAverage(minutes))
+                        .doubleValue();
 
                 return val;
 
             } catch (Exception ex) {
 
-                log.warn("Could not read double value: counterSet="
-                        + counterSet.getPath() + ", counter=" + path, ex);
+                log.warn("Could not read: counterSet=" + counterSet.getPath()
+                        + ", counter=" + path, ex);
 
                 return defaultValue;
 
