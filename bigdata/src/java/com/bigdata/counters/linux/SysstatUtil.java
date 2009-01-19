@@ -75,7 +75,8 @@ public class SysstatUtil {
 
         final File file = new File(System.getProperty(PATH, "/usr/bin/"));
 
-        log.warn(PATH + "=" + file);
+        if (INFO)
+            log.info(PATH + "=" + file);
 
         return file;
         
