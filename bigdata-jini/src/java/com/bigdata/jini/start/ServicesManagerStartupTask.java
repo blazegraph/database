@@ -2,6 +2,7 @@ package com.bigdata.jini.start;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
 import net.jini.config.Configuration;
@@ -32,7 +33,7 @@ import com.bigdata.service.jini.JiniFederation;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ServicesManagerStartupTask {
+public class ServicesManagerStartupTask implements Callable<Void> {
 
     protected static final Logger log = Logger.getLogger(ServicesManagerStartupTask.class);
     

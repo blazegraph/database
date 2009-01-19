@@ -461,8 +461,7 @@ public class ServicesManagerServer extends AbstractServer {
                     final ConfigurationFile config = (ConfigurationFile) ConfigurationProvider
                             .getInstance(args);
 
-                    new ServicesManagerStartupTask(fed, config, service)
-                            .call();
+                    fed.submitMonitoredTask(new ServicesManagerStartupTask(fed, config, service));
 
                 }
 
