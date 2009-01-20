@@ -1233,6 +1233,7 @@ abstract public class LoadBalancerService extends AbstractService
             scoreFormat.setMaximumFractionDigits(2);
             scoreFormat.setMinimumIntegerDigits(1);
         }
+        
         /**
          * Format for percentages such as <code>IO Wait</code> where the
          * values are in [0.00:1.00].
@@ -1344,7 +1345,7 @@ abstract public class LoadBalancerService extends AbstractService
                     serviceCounterSet, IDataServiceCounters.resourceManager
                             + ps + IResourceManagerCounters.StoreManager
                             + ps + IStoreManagerCounters.TmpDirBytesAvailable,
-                    Bytes.gigabyte * 2/* default */, historyMinutes);
+                    Bytes.gigabyte * 10/* default */, historyMinutes);
 
             final double rawScore = (averageQueueLength + 1) * (hostScore.score + 1);
 
@@ -1352,6 +1353,11 @@ abstract public class LoadBalancerService extends AbstractService
             
             /*
              * dataDir
+             * 
+             * Note: If you set these threasholds to GT the default value
+             * reported when the counters are not yet available then you will
+             * see false 'short on disk' claims. They will go away once the
+             * performance counters arrive with real disk space measurements.
              */
             
             if (dataDirBytesAvailable < Bytes.gigabyte * 1) {
@@ -1376,6 +1382,14 @@ abstract public class LoadBalancerService extends AbstractService
 
             /*
              * tmpDir
+             * 
+             * Note: If you set these threasholds to GT the default value
+             * reported when the counters are not yet available then you will
+             * see false 'short on disk' claims. They will go away once the
+             * performance counters arrive with real disk space measurements.
+             * 
+             * These thresholds are currently set to trigger at any value LT the
+             * default, which masks the issue.
              */
 
             if (tmpDirBytesAvailable < Bytes.gigabyte * 1) {
