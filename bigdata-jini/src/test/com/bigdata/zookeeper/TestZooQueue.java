@@ -70,7 +70,7 @@ public class TestZooQueue extends AbstractZooTestCase {
         final String zroot = "/test/" + getName() + UUID.randomUUID();
         
         final ZooQueue<String> queue = new ZooQueue<String>(zookeeper, zroot,
-                Ids.OPEN_ACL_UNSAFE);
+                Ids.OPEN_ACL_UNSAFE, Integer.MAX_VALUE/*capacity*/);
 
         final ReentrantLock lock = new ReentrantLock();
 

@@ -163,6 +163,12 @@ public interface BigdataZooDefs {
     String LOCKS = "locks";
     
     /**
+     * The zname of the child of the zroot where we put all the state for
+     * distributed jobs.
+     */
+    String JOBS = "jobs";
+    
+    /**
      * Relative path to a child of the zroot that is a container for lock nodes.
      * There is at most one such lock node for each logical service instance of
      * each service type. The lock nodes are named using the

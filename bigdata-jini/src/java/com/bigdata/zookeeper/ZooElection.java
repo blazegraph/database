@@ -54,7 +54,7 @@ public class ZooElection<E extends Serializable> extends AbstractZooQueue<E> {
     public ZooElection(ZooKeeper zookeeper, String zroot, List<ACL> acl)
             throws KeeperException, InterruptedException {
 
-        super(zookeeper, zroot, acl);
+        super(zookeeper, zroot, acl, Integer.MAX_VALUE);
 
     }
 

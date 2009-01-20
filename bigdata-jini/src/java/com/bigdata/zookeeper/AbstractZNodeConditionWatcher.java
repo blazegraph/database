@@ -90,7 +90,7 @@ abstract public class AbstractZNodeConditionWatcher implements Watcher {
         final StringBuilder sb = new StringBuilder();
 
         sb.append(getClass().getSimpleName());
-        sb.append("{zpath=" + zpath);
+        sb.append("{ zpath=" + zpath);
         sb.append(", conditionSatisified=" + conditionSatisified);
         sb.append(", disconnected=" + disconnected);
         toString(sb); // extension hook

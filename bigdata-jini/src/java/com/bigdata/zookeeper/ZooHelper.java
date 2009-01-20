@@ -33,10 +33,12 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
-import java.util.concurrent.TimeUnit;
+import java.util.List;
 
 import org.apache.log4j.Logger;
+import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.KeeperException.NoNodeException;
 
 /**
  * Utility class for issuing the four letter commands to a zookeeper service.
@@ -325,6 +327,57 @@ public class ZooHelper {
         }
 
     }
+    
+    /**
+     * Destroys all znodes under the specified zpath and then the znode at the
+     * specified zpath.
+     * 
+     * @param zookeeper
+     * @param zpath
+     *            The path to the root of the hierarchy to be destroyed.
+     * @param depth
+     *            The depth (initially zero).
+     * 
+     * @throws KeeperException
+     * @throws InterruptedException
+     */
+    static public void destroyZNodes(final ZooKeeper zookeeper,
+            final String zpath, final int depth) throws KeeperException,
+            InterruptedException {
+
+        //        System.err.println("enter : " + zpath);
+
+        final List<String> children;
+        try {
+
+            children = zookeeper.getChildren(zpath, false);
+            
+        } catch (NoNodeException ex) {
+            
+            // node is gone.
+            return;
+        }
+
+        for (String child : children) {
+
+            destroyZNodes(zookeeper, zpath + "/" + child, depth + 1);
+
+        }
+
+        if(INFO)
+            log.info("delete: " + zpath);
+
+        try {
+            zookeeper.delete(zpath, -1/* version */);
+
+        } catch(NoNodeException ex) {
+        
+            // node is gone.
+            
+        }
+        
+    }
+    
     
     /**
      * Send four letter commands to zookeeper.

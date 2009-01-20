@@ -89,6 +89,7 @@ import com.bigdata.service.proxy.RemoteBuffer;
 import com.bigdata.service.proxy.RemoteBufferImpl;
 import com.bigdata.service.proxy.RemoteFuture;
 import com.bigdata.service.proxy.RemoteFutureImpl;
+import com.bigdata.zookeeper.ZooHelper;
 import com.bigdata.zookeeper.ZooResourceLockService;
 
 /**
@@ -723,7 +724,8 @@ public class JiniFederation extends AbstractDistributedFederation implements
                  */
                 if (zookeeper.exists(zooConfig.zroot, false/* watch */) != null) {
 
-                    destroyZNodes(zookeeper, zooConfig.zroot, 0/* depth */);
+                    ZooHelper
+                            .destroyZNodes(zookeeper, zooConfig.zroot, 0/* depth */);
 
                 }
                 
@@ -737,43 +739,6 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
     }
 
-    private void destroyZNodes(final ZooKeeper z, final String zpath,
-            final int depth) throws KeeperException,
-            InterruptedException {
-
-//        System.err.println("enter : " + zpath);
-
-        final List<String> children;
-        try {
-
-            children = z.getChildren(zpath, false);
-            
-        } catch (NoNodeException ex) {
-            
-            // node is gone.
-            return;
-        }
-
-        for (String child : children) {
-
-            destroyZNodes(z, zpath + "/" + child, depth + 1);
-
-        }
-
-        if(INFO)
-            log.info("delete: " + zpath);
-
-        try {
-            z.delete(zpath, -1/* version */);
-
-        } catch(NoNodeException ex) {
-        
-            // node is gone.
-            
-        }
-        
-    }
-    
     public long getLastCommitTime() {
 
         final ITransactionService transactionService = getTransactionService();

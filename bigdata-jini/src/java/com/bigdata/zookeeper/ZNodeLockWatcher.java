@@ -324,7 +324,7 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
      * 
      * @throws KeeperException
      * @throws InterruptedException
-     * @throws LockNodeInvalidatedException
+     * @throws ZLockNodeInvalidatedException
      *             if the lock node has been invalidated but not yet destroyed.
      */
     public static ZLockImpl getLock(final ZooKeeper zookeeper,
@@ -338,7 +338,7 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
              * someone destroyed the lock node.
              */
 
-            throw new LockNodeInvalidatedException(zpath);
+            throw new ZLockNodeInvalidatedException(zpath);
 
         }
 
@@ -535,7 +535,7 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
                  */
                 if (zookeeper.exists(zpath + INVALID, false) != null) {
 
-                    throw new LockNodeInvalidatedException(zpath);
+                    throw new ZLockNodeInvalidatedException(zpath);
                     
                 }
                 
@@ -806,14 +806,14 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class LockNodeInvalidatedException extends InterruptedException {
+    public static class ZLockNodeInvalidatedException extends InterruptedException {
 
         /**
          * 
          */
         private static final long serialVersionUID = 2491240005134272857L;
         
-        public LockNodeInvalidatedException(String zpath) {
+        public ZLockNodeInvalidatedException(String zpath) {
             
             super(zpath);
             

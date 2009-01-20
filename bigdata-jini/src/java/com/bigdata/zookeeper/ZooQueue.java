@@ -51,10 +51,10 @@ public class ZooQueue<E extends Serializable> extends AbstractZooQueue<E> {
      * @throws KeeperException
      * @throws InterruptedException
      */
-    public ZooQueue(ZooKeeper zookeeper, String zroot, List<ACL> acl)
-            throws KeeperException, InterruptedException {
+    public ZooQueue(ZooKeeper zookeeper, String zroot, List<ACL> acl,
+            int capacity) throws KeeperException, InterruptedException {
 
-        super(zookeeper, zroot, acl);
+        super(zookeeper, zroot, acl, capacity);
 
     }
 

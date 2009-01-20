@@ -30,12 +30,16 @@ package com.bigdata.zookeeper;
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.WatchedEvent;
+import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
-import org.apache.zookeeper.ZooDefs.Ids;
+import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
 
@@ -58,10 +62,9 @@ abstract public class AbstractZooQueue<E extends Serializable> extends
     
     protected final String zroot;
 
-    /**
-     * @todo should there be a more restricted ACL for the children?
-     */
-    private final List<ACL> childACL = Ids.OPEN_ACL_UNSAFE;
+    private final List<ACL> acl;
+    
+    private int capacity;
     
     /**
      * Return the prefix that is used for the children of the {@link #zroot}.
@@ -80,22 +83,42 @@ abstract public class AbstractZooQueue<E extends Serializable> extends
      * @param zookeeper
      * @param zroot
      *            The znode for the queue pattern.
-     * @param rootACL
+     * @param acl
      *            The ACL for the zroot (used when it is created).
+     * @param capacity
+     *            The capacity of the queue. This is stored in the queue znode.
+     *            A watcher is set so that a changed value will be noticed. Use
+     *            {@link Integer#MAX_VALUE} for no limit, in which case the #of
+     *            children in the queue will not be tested by
+     *            {@link #add(Serializable)}.
      * 
      * @throws InterruptedException
      */
     public AbstractZooQueue(final ZooKeeper zookeeper, final String zroot,
-            final List<ACL> rootACL) throws KeeperException,
+            final List<ACL> acl, final int capacity) throws KeeperException,
             InterruptedException {
 
         super(zookeeper);
 
+        if (zroot == null)
+            throw new IllegalArgumentException();
+
+        if (acl == null)
+            throw new IllegalArgumentException();
+        
+        if (capacity < 0)
+            throw new IllegalArgumentException();
+
         this.zroot = zroot;
 
+        this.acl = acl;
+        
+        this.capacity = capacity;
+        
         try {
 
-            zookeeper.create(zroot, new byte[0], rootACL, CreateMode.PERSISTENT);
+            zookeeper.create(zroot, SerializerUtil.serialize(Integer
+                    .valueOf(capacity)), acl, CreateMode.PERSISTENT);
 
             if (INFO)
                 log.info("New queue: " + zroot);
@@ -106,7 +129,23 @@ abstract public class AbstractZooQueue<E extends Serializable> extends
                 log.info("Existing queue: " + zroot);
             
         }
-        
+
+        /*
+         * Set watcher on the capacity so that we will be notified if it is
+         * changed.
+         */
+
+        this.capacity = (Integer) SerializerUtil.deserialize(zookeeper
+                .getData(zroot, new CapacityWatcher(), new Stat()));
+
+    }
+
+    private class CapacityWatcher implements Watcher {
+
+        public void process(WatchedEvent event) {
+            
+        }
+
     }
 
     /**
@@ -114,11 +153,37 @@ abstract public class AbstractZooQueue<E extends Serializable> extends
      */
     public void add(final E e) throws KeeperException, InterruptedException {
 
+        try {
+
+            add(e, Long.MAX_VALUE, TimeUnit.SECONDS);
+            
+        } catch (TimeoutException e1) {
+
+            // should not be thrown.
+            throw new AssertionError(e1);
+            
+        }
+        
+    }
+    
+    public void add(final E e, final long timeout, final TimeUnit unit)
+            throws KeeperException, TimeoutException, InterruptedException {
+
         if (e == null)
             throw new IllegalArgumentException();
 
+        if (capacity != Integer.MAX_VALUE) {
+
+            if (!new BlockedWatcher(zookeeper, zroot).awaitCondition(timeout, unit)) {
+                
+                throw new TimeoutException();
+                
+            }
+            
+        }
+        
         final String znode = zookeeper.create(zroot + "/" + getChildPrefix(),
-                SerializerUtil.serialize(e), childACL, getCreateMode());
+                SerializerUtil.serialize(e), acl, getCreateMode());
 
         if (INFO)
             log.info("zroot=" + zroot + ", e=" + e + ", znode=" + znode);
@@ -126,10 +191,127 @@ abstract public class AbstractZooQueue<E extends Serializable> extends
     }
 
     /**
+     * Watches until the queue is no longer at capacity.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private class BlockedWatcher implements Watcher {
+
+        private volatile boolean cancelled = false;
+        
+        private final ZooKeeper zookeeper;
+        private final String zpath;
+        
+        public BlockedWatcher(final ZooKeeper zookeeper, final String zpath) {
+
+            if (zookeeper == null)
+                throw new IllegalArgumentException();
+
+            if (zpath == null)
+                throw new IllegalArgumentException();
+            
+            this.zookeeper = zookeeper;
+            
+            this.zpath = zpath;
+            
+        }
+        
+        public void process(final WatchedEvent e) {
+
+            if (cancelled)
+                return;
+
+            synchronized(this) {
+                
+                this.notify();
+                
+            }
+
+        }
+
+        public void awaitCondition() throws InterruptedException,
+                KeeperException {
+
+            awaitCondition(Long.MAX_VALUE, TimeUnit.SECONDS);
+
+        }
+
+        /**
+         * @throws KeeperException
+         *             if we are unable to read the children of the znode the on
+         *             entry.
+         * @throws InterruptedException
+         *             if the thread is interrupted while waiting for an event.
+         * @throws InterruptedException
+         *             if the znode we are watching is deleted.
+         *             
+         * @todo this will not notice a change in the queue capacity while
+         *       blocked unless it sets its own watcher on the data for the
+         *       znode.
+         */
+        public boolean awaitCondition(final long timeout, final TimeUnit unit)
+                throws InterruptedException, KeeperException {
+
+            final long begin = System.currentTimeMillis();
+            
+            long remaining = unit.toMillis(timeout);
+
+            try {
+
+                synchronized (this) {
+
+                    /*
+                     * If we can't read the znode the first time through then
+                     * throw an exception. Otherwise we have set a watcher and
+                     * will just hang around until it gets notified or we get
+                     * interrupted.
+                     */
+                    int n = zookeeper.getChildren(zpath, this).size();
+
+                    try {
+
+                        while (n >= capacity) {
+
+                            this.wait(remaining);
+
+                            remaining -= System.currentTimeMillis() - begin;
+
+                            n = zookeeper.getChildren(zpath, this).size();
+
+                        }
+
+                    } catch (NoNodeException e) {
+
+                        // deleting the queue znode qualifies as an interrupt.
+                        throw new InterruptedException();
+
+                    } catch (KeeperException e) {
+
+                        // log error but keep waiting for events.
+                        log.error("zpath=" + zpath, e);
+                        
+                    }
+
+                    return n < capacity;
+
+                }
+
+            } finally {
+
+                cancelled = true;
+
+            }
+
+        }
+        
+    }
+    
+    /**
      * The approximate #of elements in the queue.
      * 
-     * @throws InterruptedException 
-     * @throws KeeperException 
+     * @throws InterruptedException
+     * @throws KeeperException
      */
     public int size() throws KeeperException, InterruptedException {
 
