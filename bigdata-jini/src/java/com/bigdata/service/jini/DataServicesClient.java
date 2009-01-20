@@ -27,349 +27,76 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.jini;
 
-import java.io.IOException;
 import java.rmi.RemoteException;
 import java.util.UUID;
 
 import net.jini.core.entry.Entry;
-import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceItem;
 import net.jini.core.lookup.ServiceTemplate;
-import net.jini.discovery.DiscoveryManagement;
-import net.jini.lease.LeaseRenewalManager;
-import net.jini.lookup.LookupCache;
-import net.jini.lookup.ServiceDiscoveryEvent;
-import net.jini.lookup.ServiceDiscoveryListener;
-import net.jini.lookup.ServiceDiscoveryManager;
 import net.jini.lookup.ServiceItemFilter;
 import net.jini.lookup.entry.Name;
 
-import org.apache.log4j.Logger;
-
-import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IMetadataService;
-import com.bigdata.service.MetadataService;
 
 /**
  * Class handles discovery, caching, and local lookup of {@link IDataService}s
- * and/or {@link IMetadataService}s.
+ * and {@link IMetadataService}s.
+ * <p>
+ * Note: Since {@link IMetadataService} extends {@link IDataService} this class
+ * uses {@link ServiceItemFilter}s as necessary to exclude {@link IDataService}s
+ * or {@link IMetadataService}s from responses.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DataServicesClient {
-
-    protected static final transient Logger log = Logger
-            .getLogger(DataServicesClient.class);
+public class DataServicesClient extends
+        AbstractCachingServiceClient<IDataService> {
 
     /**
-     * True iff the {@link #log} level is INFO or less.
+     * {@inheritDoc}
      */
-    protected static final boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    protected static final boolean DEBUG = log.isDebugEnabled();
-    
-    private ServiceDiscoveryManager serviceDiscoveryManager = null;
-
-    private LookupCache serviceLookupCache = null;
-
-    private ServiceTemplate template;
-
-    /**
-     * Timeout used when there is a cache miss (milliseconds).
-     */
-    protected final long timeout;
-
-    /**
-     * Provides direct cached lookup {@link ServiceItem}s by {@link ServiceID}.
-     */
-    protected final ServiceCache serviceMap;
-
-    /**
-     * When <code>true</code> {@link ServiceItem}s for {@link DataService}s
-     * will be cached.
-     */
-    private final boolean cacheDataServices;
-
-    /**
-     * When <code>true</code> {@link ServiceItem}s for
-     * {@link MetadataDataService}s will be cached.
-     */
-    private final boolean cacheMetadataServices;
-
-    /**
-     * The lookup cache for both {@link IDataService}s and
-     * {@link IMetadataService}s.
-     * <p>
-     * Note: Since both services implement {@link IDataService}, you MUST use
-     * the {@link DataServiceFilter} in order to obtain only the "data services"
-     * or the {@link MetadataServiceFilter} in order to obtain only the
-     * "metadata services".
-     * 
-     * @return
-     */
-    public LookupCache getLookupCache() {
-        
-        return serviceLookupCache;
-        
-    }
-    
-    /**
-     * Begins discovery for {@link DataService}s and {@link MetadataService}s.
-     * 
-     * @param discoveryManagement
-     * @param listener
-     *            An optional listener that will see the
-     *            {@link ServiceDiscoveryEvent}s observed by the internal
-     *            {@link ServiceCache}.
-     * @param timeout
-     *            The timeout in milliseconds that the client will await the
-     *            discovery of a service if there is a cache miss.
-     */
-    public DataServicesClient(DiscoveryManagement discoveryManagement,
-            ServiceDiscoveryListener listener, long timeout) {
-
-        this(discoveryManagement, listener, timeout, true, true);
-        
-    }
-    
-    /**
-     * Begins discovery for {@link DataService}s and/or {@link MetadataService}s
-     * as determined by the specified flags.
-     * <p>
-     * Note: Since {@link IMetadataService} extends {@link IDataService} we use
-     * {@link ServiceItemFilter}s if necessary to exclude {@link DataService}s
-     * or {@link MetadataService}s from the cache. If neither
-     * {@link DataService}s nor {@link MetadataService}s have been excluded,
-     * then the cache will contain both types of services. Regardless of the
-     * cache state, {@link #getDataService()} and {@link #getMetadataService()}
-     * will return only the matching service items and will throw an exception
-     * if there is an attempt to request the {@link ServiceItem} for
-     * {@link DataService} when those {@link ServiceItem}s are not being cached
-     * or the {@link ServiceItem} for {@link MetadataService} when those
-     * {@link ServiceItem}s are not being cached.
-     * 
-     * @param discoveryManagement
-     * @param listener
-     *            An optional listener that will see the
-     *            {@link ServiceDiscoveryEvent}s observed by the internal
-     *            {@link ServiceCache}.
-     * @param timeout
-     *            The timeout in milliseconds that the client will await the
-     *            discovery of a service if there is a cache miss.
-     * @param cacheDataServices
-     *            When <code>true</code> {@link ServiceItem}s for
-     *            {@link DataService}s will be cached.
-     * @param cacheMetadataServices
-     *            When <code>true</code> {@link ServiceItem}s for
-     *            {@link MetadataDataService}s will be cached.
-     * 
-     * @throws IllegalArgumentException
-     *             if <i>discoveryManagment</i> is <code>null</code>.
-     * @throws IllegalArgumentException
-     *             if neither data services nor metadata services are to be
-     *             cached.
-     */
-    public DataServicesClient(//
-            final DiscoveryManagement discoveryManagement,//
-            final ServiceDiscoveryListener listener,//
-            final long timeout,
-            final boolean cacheDataServices, //
-            final boolean cacheMetadataServices //
-            ) {
-
-        if (discoveryManagement == null)
-            throw new IllegalArgumentException();
-
-        if (timeout < 0L)
-            throw new IllegalArgumentException();
-        
-        this.timeout = timeout;
-        
-        this.serviceMap = new ServiceCache(listener);
-        
-        this.cacheDataServices = cacheDataServices;
-
-        this.cacheMetadataServices = cacheMetadataServices;
-
-        if (!cacheDataServices && !cacheMetadataServices) {
-            
-            throw new IllegalArgumentException("Neither data services nor metadata services are being cached?");
-            
-        }
-        
-        /*
-         * Setup a helper class that will be notified as services join or leave
-         * the various registrars to which the data server is listening.
-         */
-        try {
-
-            serviceDiscoveryManager = new ServiceDiscoveryManager(discoveryManagement,
-                    new LeaseRenewalManager());
-            
-        } catch(IOException ex) {
-            
-            throw new RuntimeException(
-                    "Could not initiate service discovery manager", ex);
-            
-        }
+    public DataServicesClient(final JiniFederation fed, final long timeout)
+            throws RemoteException {
 
         /*
-         * Setup a LookupCache that will be populated with all services that
-         * match a filter. This is used to keep track of services registered
-         * with any service registrar to which the data server is listening.
+         * Note: No filter is imposed here. Instead there are type specific
+         * methods if you want an IDataService vs an IMetadataService.
          */
-        try {
-            
-            template = new ServiceTemplate(null,
-                    new Class[] { IDataService.class }, null);
-
-            ServiceItemFilter filter = null;
-            
-            if(!cacheDataServices) {
-                
-                filter = DataServiceFilter.INSTANCE;
-                
-            } else if(!cacheMetadataServices) {
-                
-                filter = MetadataServiceFilter.INSTANCE;
-                
-            }
-            
-            serviceLookupCache = serviceDiscoveryManager.createLookupCache( //
-                    template,  //
-                    filter,    // MAY be null.
-                    serviceMap // ServiceDiscoveryListener
-                    );
-
-        } catch (RemoteException ex) {
-            
-            throw new RuntimeException("Could not setup LookupCache", ex);
-            
-        }
-
-    }
-    
-    protected LookupCache getServiceLookupCache() {
-        
-        return serviceLookupCache;
-        
-    }
-    
-    protected void terminate() {
-        
-        serviceLookupCache.terminate();
-        
-        serviceDiscoveryManager.terminate();
+        super(fed, new ServiceTemplate(null,
+                new Class[] { IDataService.class }, null), null/* filter */,
+                timeout);
 
     }
 
     /**
      * Return an arbitrary {@link IDataService} instance from the cache -or-
      * <code>null</code> if there is none in the cache and a remote lookup
-     * times out.
+     * times out. This method will NOT return an {@link IMetadataService}.
      * 
-     * @throws UnsupportedOperationException
-     *             if {@link DataService} discovery was disallowed by the
-     *             constructor.
+     * @return The service.
      */
-    public IDataService getDataService() {
+    final public IDataService getDataService() {
 
-        return getDataService(DataServiceFilter.INSTANCE);
+        return getService(DataServiceFilter.INSTANCE);
         
     }
 
     /**
-     * Return an arbitrary {@link IDataService} instance from the cache that
-     * satisifies the given filter -or- <code>null</code> if there is none in
-     * the cache and a remote lookup times out.
+     * Return an arbitrary {@link IMetadataService} from the cache -or-
+     * <code>null</code> if there is none in the cache and a remote lookup
+     * times out. This method will NOT return an {@link IDataService} unless it
+     * also implements {@link IMetadataService}.
      * 
-     * @throws UnsupportedOperationException
-     *             if {@link DataService} discovery was disallowed by the
-     *             constructor.
-     */
-    public IDataService getDataService(final DataServiceFilter filter) {
-
-        if (filter == null)
-            throw new IllegalArgumentException();
-        
-        if(!cacheDataServices) {
-            
-            throw new UnsupportedOperationException();
-            
-        }
-
-        ServiceItem item = serviceLookupCache.lookup(filter);
-
-        if (item == null) {
-
-            if(INFO)
-                log.info("Cache miss.");
-
-            item = handleCacheMiss(filter);
-                        
-            if (item == null) {
-
-                log.warn("No matching service.");
-
-                return null;
-
-            }
-            
-        }
-
-        return (IDataService) item.service;
-
-    }
-
-    /**
-     * Return the {@link IMetadataService} from the cache -or- <code>null</code>
-     * if there is none in the cache and a remote lookup times out.
-     * 
-     * @throws UnsupportedOperationException
-     *             if {@link MetadataService} discovery was disallowed by the
-     *             constructor.
-     *             
      * @todo handle more than one metadata service. right now registering more
      *       than one will cause problems since different clients might discover
      *       different metadata services and the metadata services are not
      *       arranging themselves into a failover chain or a hash partitioned
      *       service.
      */
-    public IMetadataService getMetadataService() {
+    final public IMetadataService getMetadataService() {
 
-        if(!cacheMetadataServices) {
-            
-            throw new UnsupportedOperationException();
-            
-        }
-
-        final ServiceItemFilter filter = MetadataServiceFilter.INSTANCE;
-
-        ServiceItem item = serviceLookupCache.lookup( filter );
-
-        if (item == null) {
-
-            if(INFO)
-                log.info("Cache miss.");
-
-            item = handleCacheMiss( filter );
-            
-            if (item == null) {
-
-                log.warn("No matching service.");
-
-                return null;
-
-            }
-
-        }
-        
-        return (IMetadataService) item.service;
+        return (IMetadataService) getService(MetadataServiceFilter.INSTANCE);
 
     }
 
@@ -377,22 +104,19 @@ public class DataServicesClient {
      * Return the proxy for an {@link IDataService} from the local cache.
      * 
      * @param serviceUUID
-     *            The {@link UUID} for the {@link DataService}.
+     *            The {@link UUID} for the {@link IDataService}.
      * 
      * @return The proxy or <code>null</code> if the {@link UUID} does not
-     *         identify a known {@link DataService}.
+     *         identify a known {@link IDataService}.
      * 
      * @throws IllegalArgumentException
      *             if <i>serviceUUID</i> is <code>null</code>.
      * @throws RuntimeException
-     *             if <i>serviceUUID</i> identifies a {@link MetadataService}.
-     * @throws UnsupportedOperationException
-     *             if {@link DataService} discovery was disallowed by the
-     *             constructor.
+     *             if <i>serviceUUID</i> identifies an {@link IMetadataService}.
      */
-    public IDataService getDataService(UUID serviceUUID) {
+    public IDataService getDataService(final UUID serviceUUID) {
 
-        ServiceItem serviceItem = getServiceItem(serviceUUID);
+        final ServiceItem serviceItem = getServiceItem(serviceUUID);
         
         if (serviceItem == null) {
 
@@ -402,10 +126,10 @@ public class DataServicesClient {
 
         }
 
-        if(!DataServiceFilter.INSTANCE.check(serviceItem)) {
-            
-            throw new RuntimeException("Not a data service: "+serviceItem);
-            
+        if (!DataServiceFilter.INSTANCE.check(serviceItem)) {
+
+            throw new RuntimeException("Not a data service: " + serviceItem);
+
         }
         
         // return the data service.
@@ -414,63 +138,23 @@ public class DataServicesClient {
     }
     
     /**
-     * Return the {@link ServiceItem} associated with the {@link UUID}.
-     * 
-     * @param serviceUUID
-     *            The service {@link UUID}.
-     *            
-     * @return The service item iff it is found in the cache and
-     *         <code>null</code> otherwise.
-     */
-    public ServiceItem getServiceItem(UUID serviceUUID) {
-
-        if (serviceUUID == null)
-            throw new IllegalArgumentException();
-
-        if(!cacheDataServices) {
-            
-            throw new UnsupportedOperationException();
-            
-        }
-
-        final ServiceItem serviceItem = serviceMap.getServiceItemByID(JiniUtil
-                .uuid2ServiceID(serviceUUID));
-
-        return serviceItem;
-        
-    }
-
-    /**
      * Return the proxy for an {@link IMetadataService} from the local cache.
      * 
      * @param serviceUUID
-     *            The {@link UUID} for the {@link MetadataService}.
+     *            The {@link UUID} for the {@link IMetadataService}.
      * 
      * @return The proxy or <code>null</code> if the {@link UUID} does not
-     *         identify a known {@link MetadataService}.
+     *         identify a known {@link IMetadataService}.
      * 
      * @throws IllegalArgumentException
      *             if <i>serviceUUID</i> is <code>null</code>.
      * @throws RuntimeException
-     *             if <i>serviceUUID</i> identifies a {@link DataService}.
-     * @throws UnsupportedOperationException
-     *             if {@link DataService} discovery was disallowed by the
-     *             constructor.
+     *             if <i>serviceUUID</i> identifies a {@link IDataService}.
      */
-    public IMetadataService getMetadataService(UUID serviceUUID) {
+    public IMetadataService getMetadataService(final UUID serviceUUID) {
 
-        if (serviceUUID == null)
-            throw new IllegalArgumentException();
-
-        if(!cacheMetadataServices) {
-            
-            throw new UnsupportedOperationException();
-            
-        }
-
-        final ServiceItem serviceItem = serviceMap.getServiceItemByID(JiniUtil
-                .uuid2ServiceID(serviceUUID));
-
+        final ServiceItem serviceItem = getServiceItem(serviceUUID);
+        
         if (serviceItem == null) {
 
             log.warn("No such service: uuid=" + serviceUUID);
@@ -479,62 +163,17 @@ public class DataServicesClient {
 
         }
 
-        if(!MetadataServiceFilter.INSTANCE.check(serviceItem)) {
-            
-            throw new RuntimeException("Not a metadata service: "+serviceItem);
-            
+        if (!MetadataServiceFilter.INSTANCE.check(serviceItem)) {
+
+            throw new RuntimeException("Not a metadata service: " + serviceItem);
+
         }
 
         // return the metadata service.
         return (IMetadataService) serviceItem.service;
-        
+
     }
    
-    /**
-     * Handles a cache miss by a remote query on the managed set of service
-     * registrars. The timeout for that query is determined by the ctor
-     * parameter.
-     */
-    protected ServiceItem handleCacheMiss(final ServiceItemFilter filter) {
-
-        ServiceItem item = null;
-
-        try {
-
-            item = serviceDiscoveryManager.lookup(template, filter, timeout);
-
-        } catch (RemoteException ex) {
-
-            log.error(ex);
-
-            return null;
-
-        } catch (InterruptedException ex) {
-
-            if(INFO)
-                log.info("Interrupted - no match.");
-
-            return null;
-
-        }
-
-        if (item == null) {
-
-            // Could not discover a matching service.
-
-            log.warn("Could not discover matching service");
-
-            return null;
-
-        }
-
-        if (INFO)
-            log.info("Found: " + item);
-
-        return item;
-
-    }
-
     /**
      * Return an array {@link UUID}s for {@link IDataService}s.
      * 
@@ -545,16 +184,16 @@ public class DataServicesClient {
      * 
      * @return An array of {@link UUID}s for data services.
      */
-    public UUID[] getDataServiceUUIDs(int maxCount) {
+    public UUID[] getDataServiceUUIDs(final int maxCount) {
 
-        final ServiceItem[] items = serviceMap.getServiceItems(maxCount,
+        final ServiceItem[] items = serviceCache.getServiceItems(maxCount,
                 DataServiceFilter.INSTANCE);
 
         if (INFO)
             log.info("There are at least " + items.length
                     + " data services : maxCount=" + maxCount);
 
-        UUID[] uuids = new UUID[items.length];
+        final UUID[] uuids = new UUID[items.length];
 
         for (int i = 0; i < items.length; i++) {
 
@@ -572,16 +211,19 @@ public class DataServicesClient {
      * 
      * @param name
      *            The service name.
-     *            
+     * 
      * @return The {@link IDataService} -or- <code>null</code> if there is
      *         none in the cache and a remote lookup times out.
+     * 
+     * @todo refactor into the base class but keep semantics of only matching
+     *       data services (vs metadata services) in this class.
      */
     public IDataService getDataServiceByName(final String name) {
 
         if (name == null)
             throw new IllegalArgumentException();
 
-        return getDataService(new DataServiceFilter() {
+        return getService(new DataServiceFilter() {
 
             public boolean check(final ServiceItem item) {
 

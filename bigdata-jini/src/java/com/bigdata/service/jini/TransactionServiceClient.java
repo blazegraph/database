@@ -27,21 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.jini;
 
-import java.io.IOException;
 import java.rmi.RemoteException;
 
-import net.jini.core.lookup.ServiceID;
-import net.jini.core.lookup.ServiceItem;
 import net.jini.core.lookup.ServiceTemplate;
-import net.jini.discovery.DiscoveryManagement;
-import net.jini.lease.LeaseRenewalManager;
-import net.jini.lookup.LookupCache;
-import net.jini.lookup.ServiceDiscoveryEvent;
-import net.jini.lookup.ServiceDiscoveryListener;
-import net.jini.lookup.ServiceDiscoveryManager;
-import net.jini.lookup.ServiceItemFilter;
-
-import org.apache.log4j.Logger;
 
 import com.bigdata.journal.ITransactionService;
 
@@ -51,98 +39,15 @@ import com.bigdata.journal.ITransactionService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TransactionServiceClient {
+public class TransactionServiceClient extends
+        AbstractCachingServiceClient<ITransactionService> {
 
-    protected static final transient Logger log = Logger
-            .getLogger(TransactionServiceClient.class);
+    public TransactionServiceClient(final JiniFederation fed, final long timeout)
+            throws RemoteException {
 
-    protected static final boolean INFO = log.isInfoEnabled();
-    
-    private ServiceDiscoveryManager serviceDiscoveryManager = null;
-
-    private LookupCache serviceLookupCache = null;
-    
-    private ServiceTemplate template = null;
-
-    /**
-     * Timeout for remote lookup on cache miss (milliseconds).
-     */
-    protected final long timeout;
-    
-    /**
-     * Provides direct cached lookup of services by their {@link ServiceID}.
-     */
-    private final ServiceCache serviceMap;
-
-    /**
-     * Begins discovery for the {@link ITransactionService}.
-     * 
-     * @param discoveryManagement
-     * @param listener
-     *            Optional listener will see {@link ServiceDiscoveryEvent}s.
-     * @param timeout
-     *            The timeout in milliseconds that the client will await the
-     *            discovery of a service if there is a cache miss.
-     */
-    public TransactionServiceClient(DiscoveryManagement discoveryManagement,
-            ServiceDiscoveryListener listener, long timeout) {
-
-        if (timeout < 0)
-            throw new IllegalArgumentException();
-        
-        this.timeout = timeout;
-        
-        serviceMap = new ServiceCache(listener);
-        
-        /*
-         * Setup a helper class that will be notified as services join or leave
-         * the various registrars to which the client is listening.
-         */
-        try {
-
-            serviceDiscoveryManager = new ServiceDiscoveryManager(discoveryManagement,
-                    new LeaseRenewalManager());
-            
-        } catch(IOException ex) {
-            
-            throw new RuntimeException(
-                    "Could not initiate service discovery manager", ex);
-            
-        }
-
-        /*
-         * Setup a LookupCache that will be populated with all services that
-         * match a filter. This is used to keep track of all services registered
-         * with any service registrar to which the client is listening.
-         */
-        try {
-            
-            template = new ServiceTemplate(null,
-                    new Class[] { ITransactionService.class }, null);
-
-            serviceLookupCache = serviceDiscoveryManager.createLookupCache(
-                    template, null /*new TimestampFilter()*/ /* filter */,
-                    serviceMap/* ServiceDiscoveryListener */);
-
-        } catch (RemoteException ex) {
-            
-            throw new RuntimeException("Could not setup LookupCache", ex);
-            
-        }
-
-    }
-    
-    protected LookupCache getServiceLookupCache() {
-        
-        return serviceLookupCache;
-        
-    }
-    
-    protected void terminate() {
-        
-        serviceLookupCache.terminate();
-        
-        serviceDiscoveryManager.terminate();
+        super(fed, new ServiceTemplate(null,
+                new Class[] { ITransactionService.class }, null),
+                null/* filter */, timeout);
 
     }
 
@@ -157,70 +62,7 @@ public class TransactionServiceClient {
      */
     public ITransactionService getTransactionService() {
 
-        ServiceItem item = serviceLookupCache.lookup(null);
-
-        if (item == null) {
-
-            if (INFO)
-                log.info("Cache miss.");
-
-            item = handleCacheMiss(null/*filter*/);
-                        
-            if (item == null) {
-
-                log.warn("No matching service.");
-
-                return null;
-
-            }
-            
-        }
-        
-        return (ITransactionService) item.service;
-
-    }
-
-    /**
-     * Handles a cache miss by a remote query on the managed set of service
-     * registrars.
-     */
-    protected ServiceItem handleCacheMiss(final ServiceItemFilter filter) {
-
-        ServiceItem item = null;
-
-        try {
-
-            item = serviceDiscoveryManager.lookup(template, filter, timeout);
-
-        } catch (RemoteException ex) {
-
-            log.error(ex);
-
-            return null;
-
-        } catch (InterruptedException ex) {
-
-            if (INFO)
-                log.info("Interrupted - no match.");
-
-            return null;
-
-        }
-
-        if (item == null) {
-
-            // Could not discover a matching service.
-
-            log.warn("Could not discover matching service");
-
-            return null;
-
-        }
-
-        if (INFO)
-            log.info("Found: " + item);
-
-        return item;
+        return super.getService();
 
     }
 

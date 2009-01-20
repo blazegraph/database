@@ -20,6 +20,25 @@ public class ServiceItemFilterChain implements ServiceItemFilter {
 
     }
 
+    public ServiceItemFilterChain(ServiceItemFilter filter) {
+
+        add( filter );
+        
+    }
+
+    public ServiceItemFilterChain(final ServiceItemFilter[] filter) {
+
+        if (filter == null)
+            throw new IllegalArgumentException();
+
+        for(ServiceItemFilter f : filter) {
+
+            add( f );
+            
+        }
+        
+    }
+
     public void add(final ServiceItemFilter f) {
 
         if (f == null)

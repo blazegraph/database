@@ -1,5 +1,6 @@
 package com.bigdata.jini.start;
 
+import java.io.IOException;
 import java.net.UnknownHostException;
 import java.nio.channels.FileLock;
 import java.rmi.RemoteException;
@@ -13,10 +14,13 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import net.jini.core.entry.Entry;
 import net.jini.core.lookup.ServiceID;
+import net.jini.core.lookup.ServiceItem;
 import net.jini.core.lookup.ServiceRegistrar;
 import net.jini.core.lookup.ServiceTemplate;
 
 import org.apache.log4j.Logger;
+import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.Stat;
 
@@ -27,6 +31,7 @@ import com.bigdata.jini.start.config.AbstractHostConstraint;
 import com.bigdata.jini.start.config.IServiceConstraint;
 import com.bigdata.jini.start.config.ManagedServiceConfiguration;
 import com.bigdata.jini.start.config.ServiceConfiguration;
+import com.bigdata.service.IService;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.JiniUtil;
 import com.bigdata.zookeeper.UnknownChildrenWatcher;
@@ -672,6 +677,9 @@ public class MonitorCreatePhysicalServiceLocksTask implements
             // Restart the service.
             try {
 
+                log.warn("Will restart: className=" + serviceConfig
+                        + ", physicalServiceZPath=" + physicalServiceZPath);
+
                 return restartPhysicalService(serviceConfig, logicalServiceZPath,
                     physicalServiceZPath, attributes);
 
@@ -738,9 +746,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
     /**
      * Consider a physical service for restart. The service must be persistent
      * (its znode is persistent), it must have been started on the local host,
-     * it must be disconnected from zookeeper (we verify that it does not have a
-     * znode in the {@link BigdataZooDefs#MASTER_ELECTION} container), and it
-     * must not be discoverable using jini.
+     * and it must not be discoverable using jini.
      * 
      * @param serviceConfig
      * @param logicalServiceZPath
@@ -751,12 +757,23 @@ public class MonitorCreatePhysicalServiceLocksTask implements
      *             if there was an RMI problem with jini.
      * @throws IllegalMonitorStateException
      *             if the current thread does not hold the {@link #lock}.
+     * 
+     * @todo There is no way to verify that the service has been disconnected
+     *       from zookeeper since we can not figure out which entry in the
+     *       {@link BigdataZooDefs#MASTER_ELECTION} container corresponds to
+     *       which service (they are {@link CreateMode#EPHEMERAL_SEQUENTIAL}
+     *       znodes and must be in order to contend for a lock).
+     *       <p>
+     *       We could potentially put the serviceUUID into the lock node
+     *       children, but we would have to fetch the data for all of those
+     *       children in order to figure this out.
      */
     private boolean shouldRestartPhysicalService(
             final ManagedServiceConfiguration serviceConfig,
             final String logicalServiceZPath,
-            final String physicalServiceZPath, final Entry[] attributes)
-            throws RemoteException {
+            final String physicalServiceZPath,
+            final Entry[] attributes)
+            throws RemoteException, InterruptedException {
 
         if(!lock.isHeldByCurrentThread())
             throw new IllegalMonitorStateException();
@@ -764,6 +781,51 @@ public class MonitorCreatePhysicalServiceLocksTask implements
         if (INFO)
             log.info("Considering: className=" + serviceConfig.className
                     + ", physicalServiceZPath=" + physicalServiceZPath);
+        
+        // Verify this is a persistent service.
+        {
+            
+            try {
+
+                final Stat stat = zookeeper.exists(physicalServiceZPath, false);
+
+                if (stat == null) {
+
+                    /*
+                     * The znode for the service is gone. Either not persistent
+                     * or else persistent but destroyed.
+                     */
+
+                    return false;
+                    
+                }
+                
+                if (stat.getEphemeralOwner() != 0) {
+
+                    /*
+                     * This is an ephemeral znode so it does not represent a
+                     * persistent service.
+                     */
+                    
+                    return false;
+                    
+                }
+                
+            } catch(InterruptedException ex) {
+                
+                return false;
+                
+            } catch(KeeperException ex) {
+                
+                log.error("No ServiceUUID? className="
+                        + serviceConfig.className + ", physicalServiceZPath="
+                        + physicalServiceZPath);
+            
+                return false;
+                
+            }
+            
+        }
         
         /*
          * Extract the serviceID and figure out if the service lives on this
@@ -800,40 +862,91 @@ public class MonitorCreatePhysicalServiceLocksTask implements
 
         }
 
-        /*
-         * Check to see if the service is discoverable. If it is then we will
-         * not restart it.
-         */
+//        /*
+//         * Check to see if the service is discoverable. If it is then we will
+//         * not restart it.
+//         */
+//        
+//        final ServiceRegistrar[] serviceRegistrars = fed
+//                .getDiscoveryManagement().getRegistrars();
+//
+//        if (serviceRegistrars == null) {
+//
+//            // we can't continue without a service registrar.
+//            throw new RuntimeException("No service registrars.");
+//
+//        }
+//
+//        for (ServiceRegistrar reg : serviceRegistrars) {
+//
+//            /*
+//             * FIXME this is "instant" lookup. we should use a waitDur variant.
+//             * 
+//             * FIXME ServiceDiscoveryManager should be on JiniFederation. It is
+//             * used by all of the DataServicesClient and related classes, by the
+//             * JiniServiceStarter, and MUST be used by the restart logic in
+//             * MonitorCreatePhysicalServiceLocksTask
+//             * 
+//             */
+//            
+//            if (reg.lookup(new ServiceTemplate(serviceID, null/* iface[] */,
+//                    null/* attributes */)) != null) {
+//
+//                if (INFO)
+//                    log.info("Service discoverable: className="
+//                            + serviceConfig.className
+//                            + ", physicalServiceZPath=" + physicalServiceZPath);
+//
+//                return false;
+//                
+//            }
+//
+//        }
         
-        final ServiceRegistrar[] serviceRegistrars = fed
-                .getDiscoveryManagement().getRegistrars();
+        /*
+         * Try to discover the service.
+         * 
+         * @todo configure timeout.
+         */
+        final ServiceItem serviceItem = fed
+                .getServiceDiscoveryManager()
+                .lookup(
+                        new ServiceTemplate(serviceID, null/* iface[] */, null/* attributes */),
+                        null/* filter */, 10000/* waitDur(ms) */);
 
-        if (serviceRegistrars == null) {
+        if (serviceItem != null) {
 
-            // we can't continue without a service registrar.
-            throw new RuntimeException("No service registrars.");
+            // discoverable, but is it alive?
+            
+            if(serviceItem.service instanceof IService) {
+                
+                try {
 
-        }
+                    // Is the service alive?
+                    ((IService) serviceItem.service).getServiceIface();
+                    
+                    // do not restart.
+                    return false;
+                    
+                } catch (IOException ex) {
 
-        for (ServiceRegistrar reg : serviceRegistrars) {
-
-            if (reg.lookup(new ServiceTemplate(serviceID, null/* iface[] */,
-                    null/* attributes */)) != null) {
-
-                if (INFO)
-                    log.info("Service discoverable: className="
+                    log.error("Service not alive: className="
                             + serviceConfig.className
-                            + ", physicalServiceZPath=" + physicalServiceZPath);
-
-                return false;
+                            + ", physicalServiceZPath=" + physicalServiceZPath
+                            + " : " + ex);
+                    
+                }
                 
             }
 
-        }
+        } else {
+            
+            if (INFO)
+                log.info("Service not discoverable: className="
+                        + serviceConfig.className + ", physicalServiceZPath="
+                        + physicalServiceZPath);
 
-        /*
-         * Check to see if the service is known to zookeeper.
-         */
+        }
 
         return true;
         

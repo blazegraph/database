@@ -80,7 +80,7 @@ public class ServiceCache implements ServiceDiscoveryListener {
      *            An optional delegate listener that will also see the
      *            {@link ServiceDiscoveryEvent}s observed by this class.
      */
-    public ServiceCache(ServiceDiscoveryListener listener) {
+    public ServiceCache(final ServiceDiscoveryListener listener) {
         
         // MAY be null;
         this.listener = listener;
@@ -100,7 +100,7 @@ public class ServiceCache implements ServiceDiscoveryListener {
      * this class is listening. The set of distinct joined services is
      * accessible via the {@link LookupCache}.
      */
-    public void serviceAdded(ServiceDiscoveryEvent e) {
+    public void serviceAdded(final ServiceDiscoveryEvent e) {
 
         if (INFO)
             log.info("" + e + ", class="
@@ -120,7 +120,7 @@ public class ServiceCache implements ServiceDiscoveryListener {
     /**
      * NOP.
      */
-    public void serviceChanged(ServiceDiscoveryEvent e) {
+    public void serviceChanged(final ServiceDiscoveryEvent e) {
 
         if (INFO)
             log.info("" + e + ", class="
@@ -140,7 +140,7 @@ public class ServiceCache implements ServiceDiscoveryListener {
     /**
      * NOP.
      */
-    public void serviceRemoved(ServiceDiscoveryEvent e) {
+    public void serviceRemoved(final ServiceDiscoveryEvent e) {
 
         if (INFO)
             log.info("" + e + ", class="
@@ -169,7 +169,7 @@ public class ServiceCache implements ServiceDiscoveryListener {
      * 
      * @return The cache {@link ServiceItem} for that service.
      */
-    public ServiceItem getServiceItemByID(ServiceID serviceID) {
+    public ServiceItem getServiceItemByID(final ServiceID serviceID) {
         
         return serviceIdMap.get(serviceID);
         
@@ -192,41 +192,45 @@ public class ServiceCache implements ServiceDiscoveryListener {
      * @param maxCount
      *            The maximum #of service items to be returned. When zero (0)
      *            all known service items will be returned.
+     * @param filter
+     *            An optional filter.
      * 
      * @return An array of {@link ServiceItem}s.
      */
-    public ServiceItem[] getServiceItems(int maxCount, ServiceItemFilter filter) {
+    public ServiceItem[] getServiceItems(final int maxCount,
+            final ServiceItemFilter filter) {
 
         if (maxCount < 0)
             throw new IllegalArgumentException();
 
         final int n = maxCount == 0 ? getServiceCount() : maxCount;
-        
-        final Vector<ServiceItem> v = new Vector<ServiceItem>( n );
-        
-        final Iterator<Map.Entry<ServiceID, ServiceItem>> itr = serviceIdMap.entrySet().iterator();
-        
-        while(itr.hasNext()) {
-            
+
+        final Vector<ServiceItem> v = new Vector<ServiceItem>(n);
+
+        final Iterator<Map.Entry<ServiceID, ServiceItem>> itr = serviceIdMap
+                .entrySet().iterator();
+
+        while (itr.hasNext()) {
+
             final Map.Entry<ServiceID, ServiceItem> entry = itr.next();
-            
+
             final ServiceItem item = entry.getValue();
-            
+
             if (filter == null || filter.check(item)) {
 
                 v.add(item);
 
             }
-            
+
         }
-        
+
         final int m = v.size();
 
         if (INFO)
             log.info("found " + m + " matching service items");
 
         return v.toArray(new ServiceItem[m]);
-        
+
     }
-    
+
 }

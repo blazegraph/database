@@ -225,16 +225,16 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
             final DataServicesClient dataServicesClient = metadataServer0.getClient()
                     .getFederation().getDataServicesClient();
             
-            assertNotNull(dataServicesClient.serviceMap
+            assertNotNull(dataServicesClient.serviceCache
                     .getServiceItemByID(dataService0ID));
 
-            assertNotNull(dataServicesClient.serviceMap
+            assertNotNull(dataServicesClient.serviceCache
                     .getServiceItemByID(dataService1ID));
 
-            assertNotNull(dataServicesClient.serviceMap
+            assertNotNull(dataServicesClient.serviceCache
                     .getServiceItemByID(metadataServiceID));
 
-            assertEquals("#dataServices", 3, dataServicesClient.serviceMap
+            assertEquals("#dataServices", 3, dataServicesClient.serviceCache
                     .getServiceCount());
 
         } finally {
@@ -254,16 +254,16 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
                 final DataServicesClient dataServicesClient = metadataServer0
                         .getClient().getFederation().getDataServicesClient();
 
-                assertEquals("#dataServices", 2, dataServicesClient.serviceMap
+                assertEquals("#dataServices", 2, dataServicesClient.serviceCache
                         .getServiceCount());
 
-                assertNull(dataServicesClient.serviceMap
+                assertNull(dataServicesClient.serviceCache
                         .getServiceItemByID(dataService0ID));
 
-                assertNotNull(dataServicesClient.serviceMap
+                assertNotNull(dataServicesClient.serviceCache
                         .getServiceItemByID(dataService1ID));
 
-                assertNotNull(dataServicesClient.serviceMap
+                assertNotNull(dataServicesClient.serviceCache
                         .getServiceItemByID(metadataServiceID));
                 
             }

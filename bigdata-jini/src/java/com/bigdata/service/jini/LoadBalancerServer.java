@@ -95,7 +95,7 @@ public class LoadBalancerServer extends AbstractServer {
     @Override
     protected LoadBalancerService newService(final Properties properties) {
         
-        LoadBalancerService service = new AdministrableLoadBalancer(this, properties);
+        final LoadBalancerService service = new AdministrableLoadBalancer(this, properties);
         
         /*
          * Setup a delegate that let's us customize some of the federation

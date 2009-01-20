@@ -456,12 +456,13 @@ public class ServicesManagerServer extends AbstractServer {
                 if (service != null) {
 
                     final JiniFederation fed = service.getFederation();
-                    
+
                     // Obtain the configuration object (re-read it).
                     final ConfigurationFile config = (ConfigurationFile) ConfigurationProvider
                             .getInstance(args);
 
-                    fed.submitMonitoredTask(new ServicesManagerStartupTask(fed, config, service));
+                    fed.submitMonitoredTask(new ServicesManagerStartupTask(fed,
+                            config, service));
 
                 }
 

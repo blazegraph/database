@@ -31,7 +31,6 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.rmi.Remote;
 import java.rmi.server.ExportException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -55,8 +54,10 @@ import net.jini.jeri.BasicILFactory;
 import net.jini.jeri.BasicJeriExporter;
 import net.jini.jeri.InvocationLayerFactory;
 import net.jini.jeri.tcp.TcpServerEndpoint;
+import net.jini.lease.LeaseRenewalManager;
 import net.jini.lookup.ServiceDiscoveryEvent;
 import net.jini.lookup.ServiceDiscoveryListener;
+import net.jini.lookup.ServiceDiscoveryManager;
 
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.KeeperException;
@@ -79,9 +80,6 @@ import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.IService;
-import com.bigdata.service.jini.DataServer.AdministrableDataService;
-import com.bigdata.service.jini.LoadBalancerServer.AdministrableLoadBalancer;
-import com.bigdata.service.jini.MetadataServer.AdministrableMetadataService;
 import com.bigdata.service.proxy.ClientAsynchronousIterator;
 import com.bigdata.service.proxy.ClientBuffer;
 import com.bigdata.service.proxy.ClientFuture;
@@ -92,7 +90,6 @@ import com.bigdata.service.proxy.RemoteBufferImpl;
 import com.bigdata.service.proxy.RemoteFuture;
 import com.bigdata.service.proxy.RemoteFutureImpl;
 import com.bigdata.zookeeper.ZooResourceLockService;
-import com.sun.jini.admin.DestroyAdmin;
 
 /**
  * Concrete implementation for Jini.
@@ -103,17 +100,19 @@ import com.sun.jini.admin.DestroyAdmin;
 public class JiniFederation extends AbstractDistributedFederation implements
         DiscoveryListener, ServiceDiscoveryListener, Watcher {
 
+    private LookupDiscoveryManager lookupDiscoveryManager;
+
+    private ServiceDiscoveryManager serviceDiscoveryManager;
+
     private DataServicesClient dataServicesClient;
 
     private LoadBalancerClient loadBalancerClient;
-
-    private final ZooResourceLockService resourceLockService = new ZooResourceLockService(this);
 
     private TransactionServiceClient transactionServiceClient;
 
     private ServicesManagerClient servicesManagerClient;
 
-    private LookupDiscoveryManager lookupDiscoveryManager;
+    private final ZooResourceLockService resourceLockService = new ZooResourceLockService(this);
 
     private ZooKeeper zookeeper;
     
@@ -138,16 +137,20 @@ public class JiniFederation extends AbstractDistributedFederation implements
     }
     
     /**
-     * The object used to manage registrar discovery (basically, the "client"
-     * class used to talk to jini). You won't need this unless you are already
-     * fairly familiar with jini. All the well know service discovery operations
-     * are handled by a variety of caching classes such as
-     * {@link #getDataServicesClient()} and exposed via simple APIs such as
-     * {@link #getDataService(UUID)}.
+     * An object used to manage jini service registrar discovery.
      */
     public LookupDiscoveryManager getDiscoveryManagement() {
         
         return lookupDiscoveryManager;
+        
+    }
+
+    /**
+     * An object used to lookup services using the discovered service registars.
+     */
+    public ServiceDiscoveryManager getServiceDiscoveryManager() {
+        
+        return serviceDiscoveryManager;
         
     }
     
@@ -214,24 +217,39 @@ public class JiniFederation extends AbstractDistributedFederation implements
                             .getConfiguration()
             );
 
+            /*
+             * Setup a helper class that will be notified as services join or leave
+             * the various registrars to which the data server is listening.
+             */
+            try {
+
+                serviceDiscoveryManager = new ServiceDiscoveryManager(
+                        lookupDiscoveryManager, new LeaseRenewalManager(),
+                        client.getConfiguration());
+                
+            } catch(IOException ex) {
+                
+                throw new RuntimeException(
+                        "Could not initiate service discovery manager", ex);
+                
+            }
+
             final long cacheMissTimeout = Long.valueOf(client.getProperties()
                     .getProperty(JiniClient.Options.CACHE_MISS_TIMEOUT,
                             JiniClient.Options.DEFAULT_CACHE_MISS_TIMEOUT));
 
             // Start discovery for data and metadata services.
-            dataServicesClient = new DataServicesClient(lookupDiscoveryManager, this,
-                    cacheMissTimeout);
+            dataServicesClient = new DataServicesClient(this, cacheMissTimeout);
 
             // Start discovery for the timestamp service.
-            transactionServiceClient = new TransactionServiceClient(
-                    lookupDiscoveryManager, this, cacheMissTimeout);
-
-            // Start discovery for the load balancer service.
-            loadBalancerClient = new LoadBalancerClient(lookupDiscoveryManager, this,
+            transactionServiceClient = new TransactionServiceClient(this,
                     cacheMissTimeout);
 
+            // Start discovery for the load balancer service.
+            loadBalancerClient = new LoadBalancerClient(this, cacheMissTimeout);
+
             // Start discovery for the services manager.
-            servicesManagerClient = new ServicesManagerClient(lookupDiscoveryManager, this,
+            servicesManagerClient = new ServicesManagerClient(this,
                     cacheMissTimeout);
 
         } catch (Exception ex) {
@@ -326,10 +344,11 @@ public class JiniFederation extends AbstractDistributedFederation implements
         while (((registrars = lookupDiscoveryManager.getRegistrars()).length == 0)
                 && (nanos -= (System.nanoTime() - begin)) > 0) {
 
-            // wait a bit, but not more than the time remaining.
             discoveryEventLock.lockInterruptibly();
             try {
                 
+                // await another discovery event, but not more than the time
+                // remaining.
                 discoveryEvent.awaitNanos(nanos);
 
             } finally {
@@ -570,6 +589,14 @@ public class JiniFederation extends AbstractDistributedFederation implements
             
         }
 
+        if (serviceDiscoveryManager != null) {
+
+            serviceDiscoveryManager.terminate();
+
+            serviceDiscoveryManager = null;
+
+        }
+
         if (lookupDiscoveryManager != null) {
 
             lookupDiscoveryManager.terminate();
@@ -617,278 +644,76 @@ public class JiniFederation extends AbstractDistributedFederation implements
      * <li>{@link IDataService}s (blocks until all are shutdown).</li>
      * <li>{@link IMetadataService}</li>
      * <li>{@link ILoadBalancerService}</li>
-     * <li>{@link IResourceLockService}</li>
      * </ol>
      * 
-     * @param immediate
+     * @param immediateShutdown
      *            When <code>true</code> the services will be shutdown without
      *            waiting for existing transactions and other tasks to
      *            terminate.
      *            
      * @throws InterruptedException 
+     * 
+     * @todo javadoc update.
      */
-    public void distributedFederationShutdown(final boolean immediate)
+    public void distributedFederationShutdown(final boolean immediateShutdown)
             throws InterruptedException {
 
         assertOpen();
 
-        // shutdown the data services.
-        {
+        // service managers
+        servicesManagerClient.shutdownDiscoveredServices(getExecutorService(),
+                null/* filter */, immediateShutdown);
+        
+        // data services.
+        dataServicesClient.shutdownDiscoveredServices(getExecutorService(),
+                DataServiceFilter.INSTANCE, immediateShutdown);
 
-            final UUID[] a = dataServicesClient
-                    .getDataServiceUUIDs(0/* maxCount */);
+        // metadata service.
+        dataServicesClient.shutdownDiscoveredServices(getExecutorService(),
+                MetadataServiceFilter.INSTANCE, immediateShutdown);
 
-            final List<Callable<Void>> tasks = new ArrayList<Callable<Void>>(a.length);
-            
-            for (UUID uuid : a) {
-                
-                final UUID tmp = uuid;
-                
-                tasks.add(new Callable<Void>() {
-                
-                    public Void call() throws Exception {
-                        
-                        final AdministrableDataService service = (AdministrableDataService) getDataService(tmp);
+        // load balancer
+        loadBalancerClient.shutdownDiscoveredServices(getExecutorService(),
+                null/* filter */, immediateShutdown);
 
-                        if (service != null) {
-
-                            try {
-
-                                if (immediate)
-                                    service.shutdownNow();
-                                else
-                                    service.shutdown();
-
-                            } catch (Throwable t) {
-
-                                log.error(t.getMessage(), t);
-
-                            }
-
-                        }
-                        
-                        return null;
-                        
-                    }
-                    
-                });
-                
-            }
-            
-            // blocks until all data services are down.
-            getExecutorService().invokeAll(tasks);
-
-        }
-
-        // shutdown the metadata service.
-        {
-
-            final AdministrableMetadataService service = (AdministrableMetadataService) getMetadataService();
-
-            try {
-
-                if (immediate)
-                    service.shutdownNow();
-                else
-                    service.shutdown();
-
-            } catch (Throwable t) {
-
-                log.error(t.getMessage(), t);
-
-            }
-
-        }
-
-        // shutdown the load balancer
-        {
-
-            final AdministrableLoadBalancer service = (AdministrableLoadBalancer) getLoadBalancerService();
-
-            try {
-
-                if (immediate)
-                    service.shutdownNow();
-                else
-                    service.shutdown();
-
-            } catch (Throwable t) {
-
-                log.error(t.getMessage(), t);
-
-            }
-
-        }
-
+        // transaction service
+        transactionServiceClient.shutdownDiscoveredServices(
+                getExecutorService(), null/* filter */, immediateShutdown);
+        
     }
 
     public void destroy() {
 
         assertOpen();
 
-        /*
-         * Destroy services managers.
-         * 
-         * @todo we could handle all of them a bit more like this.
-         * 
-         * @todo it would be easy enough to write a shutdownAll() method as
-         * well.
-         */
-        if (servicesManagerClient != null) {
+        try {
 
-//            Object service;
-//            while ((service = servicesManagerClient.getService()) != null) {
-//
-//                try {
-//
-//                    System.err.println("Will destroy: " + service);
-//
-//                    ((RemoteDestroyAdmin) (service)).destroy();
-//
-//                } catch (IOException e) {
-//
-//                    log.error(ERR_DESTROY_ADMIN + service, e);
-//
-//                }
-//                
-//            }
-            
-            // force a lookup.
-            servicesManagerClient.getService();
-            
-            final ServiceCache cache = servicesManagerClient.getServiceCache();
-            
-            // return everything in the cache.
-            final ServiceItem[] items = cache.getServiceItems(0/* maxCount */,
+            // service managers
+            servicesManagerClient.destroyDiscoveredServices(
+                    getExecutorService(), null/* filter */);
+
+            // data services.
+            dataServicesClient.destroyDiscoveredServices(getExecutorService(),
+                    DataServiceFilter.INSTANCE);
+
+            // metadata service.
+            dataServicesClient.destroyDiscoveredServices(getExecutorService(),
+                    MetadataServiceFilter.INSTANCE);
+
+            // load balancer
+            loadBalancerClient.destroyDiscoveredServices(getExecutorService(),
                     null/* filter */);
 
-            for (ServiceItem item : items) {
+            // transaction service
+            transactionServiceClient.destroyDiscoveredServices(
+                    getExecutorService(), null/* filter */);
 
-                try {
-                    
-                    log.warn("Will destroy: "+item);
+        } catch (InterruptedException ex) {
 
-                    ((RemoteDestroyAdmin) (item.service)).destroy();
-
-                } catch (IOException e) {
-
-                    log.error(ERR_DESTROY_ADMIN + item, e);
-
-                }
-
-            }
+            throw new RuntimeException(ex);
 
         }
-
-        // destroy the transaction service(s).
-        if (transactionServiceClient != null) {
-
-            final ITransactionService service = transactionServiceClient
-                    .getTransactionService();
-
-            if (service != null) {
-
-                try {
-
-                    log.warn("Will destroy: " + service);
-
-                    ((DestroyAdmin) service).destroy();
-
-                } catch (IOException e) {
-
-                    log.error(ERR_DESTROY_ADMIN + service, e);
-
-                }
-
-            }
-            
-        }
-
-        // destroy data services.
-        if (dataServicesClient != null) {
-
-            final UUID[] uuids = dataServicesClient.getDataServiceUUIDs(0);
-
-            for (UUID uuid : uuids) {
-
-                final IDataService service;
-
-                try {
-
-                    service = getDataService(uuid);
-
-                } catch (Exception ex) {
-
-                    log.error(ERR_RESOLVE + uuid);
-
-                    continue;
-
-                }
-
-                try {
-
-                    log.warn("Will destroy: "+service);
-
-                    service.destroy();
-
-                } catch (IOException e) {
-
-                    log.error(ERR_DESTROY_ADMIN + service, e);
-
-                }
-
-            }
-
-        }
-
-        // destroy metadata services.
-        if (dataServicesClient != null) {
-
-            final IMetadataService service = dataServicesClient
-                    .getMetadataService();
-
-            if (service != null) {
-
-                try {
-
-                    log.warn("Will destroy: "+service);
-
-                    service.destroy();
-
-                } catch (IOException e) {
-
-                    log.error(ERR_DESTROY_ADMIN + service, e);
-
-                }
-
-            }
-
-        }
-
-        // destroy load balancer(s)
-        if (loadBalancerClient != null) {
-
-            final ILoadBalancerService service = loadBalancerClient
-                    .getLoadBalancerService();
-
-            if (service != null) {
-
-                try {
-
-                    log.warn("Will destroy: "+service);
-
-                    ((DestroyAdmin) service).destroy();
-
-                } catch (IOException e) {
-
-                    log.error(ERR_DESTROY_ADMIN + service, e);
-
-                }
-
-            }
-
-        }
-
+        
         if (zookeeper != null) {
 
             try {
@@ -1222,7 +1047,7 @@ public class JiniFederation extends AbstractDistributedFederation implements
     /**
      * Invokes {@link #serviceJoin(com.bigdata.service.IService, UUID, String)}
      */
-    public void serviceAdded(ServiceDiscoveryEvent e) {
+    public void serviceAdded(final ServiceDiscoveryEvent e) {
         
         final ServiceItem serviceItem = e.getPostEventServiceItem();
 
@@ -1230,7 +1055,8 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
 //            System.err.println("serviceAdded: "+serviceItem);
             
-            final UUID serviceUUID = JiniUtil.serviceID2UUID(serviceItem.serviceID);
+            final UUID serviceUUID = JiniUtil
+                    .serviceID2UUID(serviceItem.serviceID);
 
             serviceJoin((IService) serviceItem.service, serviceUUID);
 
@@ -1243,14 +1069,14 @@ public class JiniFederation extends AbstractDistributedFederation implements
     }
 
     /** NOP. */
-    public void serviceChanged(ServiceDiscoveryEvent e) {
+    public void serviceChanged(final ServiceDiscoveryEvent e) {
         
     }
 
     /**
      * Invokes {@link #serviceLeave(UUID)}
      */
-    public void serviceRemoved(ServiceDiscoveryEvent e) {
+    public void serviceRemoved(final ServiceDiscoveryEvent e) {
         
         final ServiceItem serviceItem = e.getPreEventServiceItem();
 
