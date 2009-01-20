@@ -678,6 +678,17 @@ public class MonitorCreatePhysicalServiceLocksTask implements
 
             }
 
+            /*
+             * Note: This does not compare the #of running physical services
+             * instances to the target replication count for the logical
+             * service. Therefore if there are 10 stopped instances they will
+             * all be restarted even if you only want to have 5 instances in the
+             * ServiceConfiguration for the logical service.
+             * 
+             * @todo Should we test the replicationCount and the #of instances
+             * which are currently running before deciding whether or not to
+             * restart a service?
+             */
             if (!serviceConfig.canStartService(fed)) {
 
                 log.warn("Restart prevented by constraints: className="

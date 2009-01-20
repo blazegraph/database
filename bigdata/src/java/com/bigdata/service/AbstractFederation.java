@@ -786,6 +786,10 @@ abstract public class AbstractFederation implements IBigdataFederation,
 //        
 //    }
     
+    static private String ERR_NO_SERVICE_UUID = "Service UUID is not assigned yet.";
+
+    static private String ERR_SERVICE_NOT_READY = "Service is not ready yet.";
+    
     /**
      * This task runs periodically. Once {@link #getServiceUUID()} reports a
      * non-<code>null</code> value, it will start an (optional)
@@ -817,6 +821,11 @@ abstract public class AbstractFederation implements IBigdataFederation,
         final protected Logger log = Logger.getLogger(StartDeferredTasksTask.class);
 
         final protected boolean INFO = log.isInfoEnabled();
+        
+        /**
+         * The timestamp when we started running this task.
+         */
+        final long begin = System.currentTimeMillis();
         
         public StartDeferredTasksTask() {
         
@@ -885,9 +894,15 @@ abstract public class AbstractFederation implements IBigdataFederation,
          */
         protected boolean startDeferredTasks() throws IOException {
 
+            // elapsed time since we started running this task.
+            final long elapsed = System.currentTimeMillis() - begin;
+            
             if (getServiceUUID() == null) {
 
-                log.warn("Service UUID is not assigned yet.");
+                if (elapsed > 1000 * 10)
+                    log.warn(ERR_NO_SERVICE_UUID);
+                else if (INFO)
+                    log.info(ERR_NO_SERVICE_UUID);
 
                 return false;
 
@@ -895,7 +910,10 @@ abstract public class AbstractFederation implements IBigdataFederation,
             
             if(!isServiceReady()) {
             
-                log.warn("Service not ready yet.");
+                if (elapsed > 1000 * 10)
+                    log.warn(ERR_SERVICE_NOT_READY);
+                else if (INFO)
+                    log.info(ERR_SERVICE_NOT_READY);
 
                 return false;
                 
