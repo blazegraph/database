@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.UnknownHostException;
 import java.nio.channels.FileLock;
 import java.rmi.RemoteException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -599,7 +600,8 @@ public class MonitorCreatePhysicalServiceLocksTask implements
      * 
      * @return <code>true</code> iff the service is known to have been
      *         restarted. <code>false</code> will be returned if a timeout
-     *         occurred while attempting to restart the service.
+     *         occurred while attempting to restart the service, if the service
+     *         is already running, etc.
      * 
      * @throws InterruptedException
      *             if interrupted while awaiting the {@link #lock} or while
@@ -615,6 +617,11 @@ public class MonitorCreatePhysicalServiceLocksTask implements
 
             if (!isLocalService(attributes)) {
 
+                /*
+                 * The service does not live on this host so we do not have
+                 * responsibility for that service.
+                 */
+                
                 return false;
 
             }
@@ -625,82 +632,91 @@ public class MonitorCreatePhysicalServiceLocksTask implements
                     + ", physicalServiceZPath=" + physicalServiceZPath, ex);
 
             return false;
-            
+
         }
 
         if (INFO)
-            log.info("Service is local: className=" + serviceConfig
-                        + ", physicalServiceZPath=" + physicalServiceZPath);
+            log.info("Service is local: className=" + serviceConfig.className
+                    + ", physicalServiceZPath=" + physicalServiceZPath);
 
         // block until we can evaluate this service for restart.
         lock.lockInterruptibly();
         try {
 
-            final boolean shouldRestart;
-
             try {
 
-                shouldRestart = shouldRestartPhysicalService(serviceConfig,
-                        logicalServiceZPath, physicalServiceZPath, attributes);
+                if(!shouldRestartPhysicalService(serviceConfig,
+                        physicalServiceZPath, attributes)) {
+                    
+                    if (INFO)
+                        log.info("Will not restart: className="
+                                + serviceConfig.className
+                                + ", physicalServiceZPath="
+                                + physicalServiceZPath);
+
+                    // did not restart.
+                    return false;
+                    
+                }
 
             } catch (RemoteException ex) {
 
-                log.error("className=" + serviceConfig
+                log.error("RMI problem: className=" + serviceConfig.className
                         + ", physicalServiceZPath=" + physicalServiceZPath, ex);
 
+                // did not restart.
                 return false;
 
-            }
+            } catch (KeeperException ex) {
 
-            if (!shouldRestart) {
-                
-                if (INFO)
-                    log.info("Service is running: className=" + serviceConfig
-                            + ", physicalServiceZPath=" + physicalServiceZPath);
-                
+                log.error("Zookeeper problem: className="
+                        + serviceConfig.className + ", physicalServiceZPath="
+                        + physicalServiceZPath, ex);
+
+                // did not restart.
                 return false;
-                
+
             }
 
             if (!serviceConfig.canStartService(fed)) {
 
-                log
-                        .warn("Service not running : start prevented by constraints: className="
-                                + serviceConfig
-                                + ", physicalServiceZPath="
-                                + physicalServiceZPath);
+                log.warn("Restart prevented by constraints: className="
+                        + serviceConfig.className + ", physicalServiceZPath="
+                        + physicalServiceZPath);
 
+                // can't start.
                 return false;
-                
+
             }
-            
+
             // Restart the service.
             try {
 
-                log.warn("Will restart: className=" + serviceConfig
+                log.warn("Will restart: className=" + serviceConfig.className
                         + ", physicalServiceZPath=" + physicalServiceZPath);
 
-                return restartPhysicalService(serviceConfig, logicalServiceZPath,
-                    physicalServiceZPath, attributes);
+                return restartPhysicalService(serviceConfig,
+                        logicalServiceZPath, physicalServiceZPath, attributes);
 
-            } catch(InterruptedException t) {
+            } catch (InterruptedException t) {
 
                 log.error("Service restart interrupted: className="
-                        + serviceConfig + ", physicalServiceZPath="
+                        + serviceConfig.className + ", physicalServiceZPath="
                         + physicalServiceZPath);
 
                 // rethrow so that the caller will see the interrupt.
                 throw t;
-                
-            } catch(Throwable t) {
-                
+
+            } catch (Throwable t) {
+
                 // log and ignore.
-                log.error("Service restart error: className=" + serviceConfig
-                        + ", physicalServiceZPath=" + physicalServiceZPath);
-            
+                log.error("Service restart error: className="
+                        + serviceConfig.className + ", physicalServiceZPath="
+                        + physicalServiceZPath);
+
                 // service did not start (or at least within the timeout).
                 return false;
-                
+
             }
 
         } finally {
@@ -712,49 +728,21 @@ public class MonitorCreatePhysicalServiceLocksTask implements
     }
 
     /**
-     * Figure out if the service lives on this host.
-     * 
-     * @return <code>true</code> if the service lives on this host.
-     * 
-     * @throws UnknownHostException
-     */
-    protected boolean isLocalService(final Entry[] attributes)
-            throws UnknownHostException {
-
-        boolean isLocalHost = false;
-
-        for (Entry e : attributes) {
-
-            if (e instanceof Hostname) {
-
-                final String hostname = ((Hostname) e).hostname;
-
-                if (AbstractHostConstraint.isLocalHost(hostname)) {
-
-                    isLocalHost = true;
-
-                }
-
-            }
-
-        }
-
-        return isLocalHost;
-
-    }
-    
-    /**
      * Consider a physical service for restart. The service must be persistent
      * (its znode is persistent), it must have been started on the local host,
      * and it must not be discoverable using jini.
      * 
      * @param serviceConfig
-     * @param logicalServiceZPath
      * @param physicalServiceZPath
      * @param attributes
      * 
+     * @return <code>true</code> iff the service should be restarted.
+     * 
      * @throws RemoteException
      *             if there was an RMI problem with jini.
+     * @throws KeeperException
+     *             if there was a problem with zookeeper.
+     * @throws InterruptedException
      * @throws IllegalMonitorStateException
      *             if the current thread does not hold the {@link #lock}.
      * 
@@ -770,10 +758,9 @@ public class MonitorCreatePhysicalServiceLocksTask implements
      */
     private boolean shouldRestartPhysicalService(
             final ManagedServiceConfiguration serviceConfig,
-            final String logicalServiceZPath,
             final String physicalServiceZPath,
             final Entry[] attributes)
-            throws RemoteException, InterruptedException {
+            throws RemoteException, KeeperException, InterruptedException {
 
         if(!lock.isHeldByCurrentThread())
             throw new IllegalMonitorStateException();
@@ -781,177 +768,261 @@ public class MonitorCreatePhysicalServiceLocksTask implements
         if (INFO)
             log.info("Considering: className=" + serviceConfig.className
                     + ", physicalServiceZPath=" + physicalServiceZPath);
-        
-        // Verify this is a persistent service.
-        {
-            
-            try {
 
-                final Stat stat = zookeeper.exists(physicalServiceZPath, false);
+        if (!isPersistentService(serviceConfig, physicalServiceZPath)) {
 
-                if (stat == null) {
+            /*
+             * Not a persistent service according to the state in zookeeper.
+             */
 
-                    /*
-                     * The znode for the service is gone. Either not persistent
-                     * or else persistent but destroyed.
-                     */
-
-                    return false;
-                    
-                }
-                
-                if (stat.getEphemeralOwner() != 0) {
-
-                    /*
-                     * This is an ephemeral znode so it does not represent a
-                     * persistent service.
-                     */
-                    
-                    return false;
-                    
-                }
-                
-            } catch(InterruptedException ex) {
-                
-                return false;
-                
-            } catch(KeeperException ex) {
-                
-                log.error("No ServiceUUID? className="
+            if (INFO)
+                log.info("Service not persistent: className="
                         + serviceConfig.className + ", physicalServiceZPath="
                         + physicalServiceZPath);
-            
-                return false;
-                
-            }
-            
+
+            // don't restart.
+            return false;
+
         }
-        
+
+        if (isServiceRunning(serviceConfig, physicalServiceZPath, attributes)) {
+
+            /*
+             * Discoverable and responding to its API.
+             */
+
+            if (INFO)
+                log.info("Service running: className=" + serviceConfig.className
+                        + ", physicalServiceZPath=" + physicalServiceZPath);
+
+            // don't restart.
+            return false;
+
+        }
+
         /*
-         * Extract the serviceID and figure out if the service lives on this
-         * host.
+         * Not discoverable and/or discovered but not responding to its API.
          */
-        final ServiceID serviceID;
-        {
 
-            UUID serviceUUID = null;
+        log.warn("Service not discoverable and/or not running: className="
+                + serviceConfig.className + ", physicalServiceZPath="
+                + physicalServiceZPath);
 
-            for (Entry e : attributes) {
+        // restart this service.
+        return true;
 
-                if (e instanceof ServiceUUID) {
+    }
 
-                    serviceUUID = ((ServiceUUID) e).serviceUUID;
-
-                    break;
-
-                }
-
-            }
-
-            if (serviceUUID == null) {
-
-                log.error("No ServiceUUID? className="
-                        + serviceConfig.className + ", physicalServiceZPath="
-                        + physicalServiceZPath);
-
-                return false;
-
-            }
-
-            serviceID = JiniUtil.uuid2ServiceID(serviceUUID);
-
-        }
-
-//        /*
-//         * Check to see if the service is discoverable. If it is then we will
-//         * not restart it.
-//         */
-//        
-//        final ServiceRegistrar[] serviceRegistrars = fed
-//                .getDiscoveryManagement().getRegistrars();
-//
-//        if (serviceRegistrars == null) {
-//
-//            // we can't continue without a service registrar.
-//            throw new RuntimeException("No service registrars.");
-//
-//        }
-//
-//        for (ServiceRegistrar reg : serviceRegistrars) {
-//
-//            /*
-//             * FIXME this is "instant" lookup. we should use a waitDur variant.
-//             * 
-//             * FIXME ServiceDiscoveryManager should be on JiniFederation. It is
-//             * used by all of the DataServicesClient and related classes, by the
-//             * JiniServiceStarter, and MUST be used by the restart logic in
-//             * MonitorCreatePhysicalServiceLocksTask
-//             * 
-//             */
-//            
-//            if (reg.lookup(new ServiceTemplate(serviceID, null/* iface[] */,
-//                    null/* attributes */)) != null) {
-//
-//                if (INFO)
-//                    log.info("Service discoverable: className="
-//                            + serviceConfig.className
-//                            + ", physicalServiceZPath=" + physicalServiceZPath);
-//
-//                return false;
-//                
-//            }
-//
-//        }
+    /**
+     * Return <code>true</code> iff the service is running (discoverable and
+     * responding to its API).
+     * 
+     * @param serviceConfig
+     * @param attributes
+     * 
+     * @return <code>true</code> if the service appears to be running.
+     * 
+     * @throws RemoteException
+     *             if there was an RMI problem with jini.
+     * @throws InterruptedException
+     * @throws RuntimeException
+     *             if the {@link ServiceUUID} was not found in the <i>attributes</i>.
+     */
+    private boolean isServiceRunning(
+            final ManagedServiceConfiguration serviceConfig,
+            final String physicalServiceZPath,
+            final Entry[] attributes) throws RemoteException,
+            InterruptedException {
         
         /*
-         * Try to discover the service.
+         * Try to discover the service (blocking, not cached).
          * 
          * @todo configure timeout.
+         * 
+         * @todo for any of the various bigdata services there are service-type
+         * specific cached lookup methods which we should use by preference.
          */
+        
+        final ServiceID serviceID = getServiceID(attributes);
+        
+        if(serviceID == null) {
+            
+            throw new RuntimeException("No ServiceUUID? className="
+                    + serviceConfig.className + ", physicalServiceZPath="
+                    + physicalServiceZPath + ", attributes="
+                    + Arrays.toString(attributes));
+   
+        }
+        
+        if (INFO)
+            log.info("Attempting service discovery: className="
+                    + serviceConfig.className + ", physicalServiceZPath="
+                    + physicalServiceZPath + ", ServiceID=" + serviceID);
+        
         final ServiceItem serviceItem = fed
                 .getServiceDiscoveryManager()
                 .lookup(
                         new ServiceTemplate(serviceID, null/* iface[] */, null/* attributes */),
                         null/* filter */, 10000/* waitDur(ms) */);
 
-        if (serviceItem != null) {
+        if (serviceItem == null) {
 
-            // discoverable, but is it alive?
+            log
+                    .warn("Service not discoverable, assumed not running: className="
+                            + serviceConfig.className
+                            + ", physicalServiceZPath="
+                            + physicalServiceZPath
+                            + ", ServiceID=" + serviceID);
+
+            // service is not discoverable - assuming it is not running either.
+            return false;
             
-            if(serviceItem.service instanceof IService) {
-                
-                try {
+        }
 
-                    // Is the service alive?
-                    ((IService) serviceItem.service).getServiceIface();
-                    
-                    // do not restart.
-                    return false;
-                    
-                } catch (IOException ex) {
+        /*
+         * The service is discoverable, but is it alive?
+         */
+        
+        if (INFO)
+            log.info("Service discovered: className=" + serviceConfig.className
+                    + ", physicalServiceZPath=" + physicalServiceZPath
+                    + ", ServiceItem=" + serviceItem);
+        
+        if (serviceItem.service instanceof IService) {
 
-                    log.error("Service not alive: className="
+            try {
+
+                // Is the service alive?
+                ((IService) serviceItem.service).getServiceIface();
+
+                if (INFO)
+                    log.info("Service responding: className="
                             + serviceConfig.className
                             + ", physicalServiceZPath=" + physicalServiceZPath
-                            + " : " + ex);
-                    
-                }
+                            + ", ServiceItem=" + serviceItem);
+                
+                // service is discoverable and responding to its API.
+                return true;
+
+            } catch (IOException ex) {
+
+                log.error(
+                        "Service not responding: className="
+                                + serviceConfig.className
+                                + ", physicalServiceZPath="
+                                + physicalServiceZPath + ", serviceItem="
+                                + serviceItem, ex);
+
+                // service is discoverable but not responding to its API.
+                return false;
                 
             }
 
-        } else {
-            
+        }
+        
+        /*
+         * Otherwise assume discoverable service is alive since we don't know
+         * how to test its API.
+         */
+        
+        if (INFO)
+            log.info("Assuming service is alive: className="
+                    + serviceConfig.className + ", physicalServiceZPath="
+                    + physicalServiceZPath + ", ServiceItem=" + serviceItem);
+
+        return true;
+
+    }
+
+    /**
+     * Return the {@link ServiceID} by finding the {@link ServiceUUID}
+     * {@link Entry} in the given attributes and converting it to a
+     * {@link ServiceID}.
+     * 
+     * @return The {@link ServiceID} -or- <code>null</code> if no
+     *         {@link ServiceUUID} {@link Entry} was found.
+     */
+    protected static ServiceID getServiceID(final Entry[] attributes) {
+
+        if (attributes == null)
+            throw new IllegalArgumentException();
+
+        UUID serviceUUID = null;
+
+        for (Entry e : attributes) {
+
+            if (e instanceof ServiceUUID && serviceUUID == null) {
+
+                serviceUUID = ((ServiceUUID) e).serviceUUID;
+
+            }
+
+        }
+
+        if (serviceUUID == null) {
+
+            return null;
+
+        }
+
+        return JiniUtil.uuid2ServiceID(serviceUUID);
+
+    }
+
+    /**
+     * Return <code>true</code> if this is a persistent service based on an
+     * examination of the physical znode.
+     * 
+     * @param serviceConfig
+     * @param physicalServiceZPath
+     * 
+     * @return true if this is a persistent service.
+     * 
+     * @throws KeeperException
+     * @throws InterruptedException
+     */
+    private boolean isPersistentService(
+            final ManagedServiceConfiguration serviceConfig,
+            final String physicalServiceZPath) throws KeeperException,
+            InterruptedException {
+
+        final Stat stat = zookeeper.exists(physicalServiceZPath, false);
+
+        if (stat == null) {
+
+            /*
+             * The znode for the service is gone. Either not persistent or else
+             * persistent but destroyed.
+             */
+
             if (INFO)
-                log.info("Service not discoverable: className="
+                log.info("znode gone: className=" + serviceConfig.className
+                        + ", physicalServiceZPath=" + physicalServiceZPath);
+
+            return false;
+
+        }
+
+        if (stat.getEphemeralOwner() != 0) {
+
+            /*
+             * This is an ephemeral znode so it does not represent a persistent
+             * service.
+             */
+
+            if (INFO)
+                log.info("znode ephemeral: className="
                         + serviceConfig.className + ", physicalServiceZPath="
                         + physicalServiceZPath);
+
+            return false;
 
         }
 
         return true;
         
     }
-
+    
     /**
      * @param serviceConfig
      * @param logicalServiceZPath
@@ -1004,4 +1075,36 @@ public class MonitorCreatePhysicalServiceLocksTask implements
 
     }
 
+    /**
+     * Figure out if the service lives on this host.
+     * 
+     * @return <code>true</code> if the service lives on this host.
+     * 
+     * @throws UnknownHostException
+     */
+    protected boolean isLocalService(final Entry[] attributes)
+            throws UnknownHostException {
+
+        boolean isLocalHost = false;
+
+        for (Entry e : attributes) {
+
+            if (e instanceof Hostname) {
+
+                final String hostname = ((Hostname) e).hostname;
+
+                if (AbstractHostConstraint.isLocalHost(hostname)) {
+
+                    isLocalHost = true;
+
+                }
+
+            }
+
+        }
+
+        return isLocalHost;
+
+    }
+    
 }

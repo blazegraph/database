@@ -41,10 +41,10 @@ import com.sun.jini.admin.DestroyAdmin;
 
 /**
  * Class for managing a service written using the jini framework. This extends
- * the base class to prefer {@link RemoteDestroyAdmin} for {@link #kill()}. It
- * will use {@link RemoteDestroyAdmin#shutdown()} (normal shutdown, allowing a
- * service to be restarted) if defined and otherwise
- * {@link DestroyAdmin#destroy()} (destroys the service along with its
+ * the base class to prefer {@link RemoteDestroyAdmin} for
+ * {@link #kill(boolean)}. It will use {@link RemoteDestroyAdmin#shutdown()}
+ * (normal shutdown, allowing a service to be restarted) if defined and
+ * otherwise {@link DestroyAdmin#destroy()} (destroys the service along with its
  * persistent state).
  * <p>
  * Note: {@link RemoteDestroyAdmin} is defined for the bigdata services.
@@ -109,7 +109,7 @@ public class JiniServiceProcessHelper extends ProcessHelper {
         
         if (serviceItem == null) {
 
-            return super.kill();
+            return super.kill(immediateShutdown);
 
         }
 
@@ -132,7 +132,7 @@ public class JiniServiceProcessHelper extends ProcessHelper {
             } catch (Throwable t) {
                 // can't resolve the method for some reason.
                 log.warn(this, t);
-                return super.kill();
+                return super.kill(immediateShutdown);
             }
 
             try {
@@ -140,7 +140,7 @@ public class JiniServiceProcessHelper extends ProcessHelper {
             } catch (Throwable t) {
                 // can't invoke the method for some reason.
                 log.warn(this, t);
-                return super.kill();
+                return super.kill(immediateShutdown);
             }
             
         }
@@ -164,7 +164,7 @@ public class JiniServiceProcessHelper extends ProcessHelper {
             } catch (Throwable t) {
                 // delegate to the super class.
                 log.error(this, t);
-                return super.kill();
+                return super.kill(immediateShutdown);
             }
         } else if (admin instanceof DestroyAdmin) {
             /*
@@ -183,7 +183,7 @@ public class JiniServiceProcessHelper extends ProcessHelper {
             } catch (Throwable t) {
                 // delegate to the super class.
                 log.error(this, t);
-                return super.kill();
+                return super.kill(immediateShutdown);
             }
         }
 

@@ -90,7 +90,7 @@ public class ZookeeperProcessHelper extends ProcessHelper {
 
             log.error(e.getLocalizedMessage(), e);
             
-            return super.kill();
+            return super.kill(immediateShutdown);
 
         }
 
@@ -120,7 +120,7 @@ public class ZookeeperProcessHelper extends ProcessHelper {
             
             log.error(this, e);
             
-            return super.kill();
+            return super.kill(immediateShutdown);
             
         }
         

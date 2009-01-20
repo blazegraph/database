@@ -431,9 +431,10 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
      *       configured for that client port, but not how many and not which
      *       ones.
      *       <p>
-     *       Also see {@link #kill()}, which has difficulties knowing which
-     *       instance should be killed - it will kill which one is currently
-     *       answering at the clientPost on the localhost!
+     *       Also see {@link ZookeeperProcessHelper#kill(boolean)}, which has
+     *       difficulties knowing which instance should be killed - it will kill
+     *       which one is currently answering at the clientPost on the
+     *       localhost!
      */
     public ZookeeperServiceStarter newServiceStarter(IServiceListener listener,
             ZookeeperServerEntry entry) {

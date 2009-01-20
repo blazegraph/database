@@ -79,7 +79,7 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
      * a filter. This is used to keep track of all services registered with any
      * {@link ServiceRegistrar} to which the client is listening.
      */
-    protected final LookupCache serviceLookupCache;
+    protected final LookupCache lookupCache;
 
     /**
      * The template provided to the ctor.
@@ -116,7 +116,7 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
      */
     final public LookupCache getLookupCache() {
         
-        return serviceLookupCache;
+        return lookupCache;
         
     }
     
@@ -167,7 +167,7 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
 
         serviceCache = new ServiceCache(fed);
 
-        serviceLookupCache = fed.getServiceDiscoveryManager()
+        lookupCache = fed.getServiceDiscoveryManager()
                 .createLookupCache(//
                         template,//
                         filter, //
@@ -181,7 +181,7 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
      */
     final public void terminate() {
 
-        serviceLookupCache.terminate();
+        lookupCache.terminate();
 
     }
 
@@ -244,7 +244,7 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
 
         } // else filter is non-null and we use it.
 
-        ServiceItem item = serviceLookupCache.lookup(filter);
+        ServiceItem item = lookupCache.lookup(filter);
 
         if (item == null) {
 
@@ -302,7 +302,8 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
 
             // Could not discover a matching service.
 
-            log.warn("Could not discover matching service");
+            log.warn("Could not discover matching service: template="
+                    + template + ", filter=" + filter + ", timeout=" + timeout);
 
             return null;
 

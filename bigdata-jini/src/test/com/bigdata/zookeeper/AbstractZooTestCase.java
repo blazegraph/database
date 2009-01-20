@@ -203,7 +203,7 @@ public abstract class AbstractZooTestCase extends TestCase2 {
         for(ProcessHelper h : listener.running) {
             
             // destroy zookeeper service iff we started it.
-            h.kill();
+            h.kill(true/*immediateShutdown*/);
 
         }
 

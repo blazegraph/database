@@ -151,7 +151,7 @@ public class AbstractFedZooTestCase extends TestCase2 {
         // destroy any processes started by this test suite.
         for (ProcessHelper t : listener.running) {
             
-            t.kill();
+            t.kill(true/*immediateShutdown*/);
             
         }
         

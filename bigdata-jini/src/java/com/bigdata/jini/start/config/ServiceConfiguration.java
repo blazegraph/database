@@ -550,7 +550,7 @@ abstract public class ServiceConfiguration implements Serializable {
 
                 } finally {
 
-                    processHelper.kill();
+                    processHelper.kill(true/* immediateShutdown */);
 
                 }
 

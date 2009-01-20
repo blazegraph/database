@@ -184,30 +184,6 @@ public class ProcessHelper {
      * to exit. Therefore it is very important to extend this method and send
      * proper notice to the process requesting that it terminate itself.
      * 
-     * @return The exitValue of the process.
-     * 
-     * @throws InterruptedException
-     *             if interrupted - the process may or may not have been killed
-     *             and the listener will not have been notified.
-     */
-    final public int kill() throws InterruptedException {
-    
-        return kill(true /* immediateShutdown */);
-        
-    }
-
-    /**
-     * Kill the process, blocking until it has terminated. The contract is only
-     * "kill" not "destroy" - the persistent state of the process SHOULD NOT be
-     * destroyed). Subclasses SHOULD override this method to request normal
-     * process termination where possible.
-     * <p>
-     * Note: processes with child processes (including any bigdata services
-     * since they start children to report OS performance counters) MUST exit
-     * normally (at least under windows) or the parent process will not be able
-     * to exit. Therefore it is very important to extend this method and send
-     * proper notice to the process requesting that it terminate itself.
-     * 
      * @param immediateShutdown
      *            processes with APIs that differentiate immediate shutdown and
      *            normal shutdown will use the appropriate behavior as selected

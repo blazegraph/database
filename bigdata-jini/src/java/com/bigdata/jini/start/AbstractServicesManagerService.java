@@ -67,7 +67,7 @@ public abstract class AbstractServicesManagerService extends AbstractService
                  * processes.
                  */
                 
-                service.kill();
+                service.kill(true/* immediateShutdown */);
                 
             } catch (InterruptedException e) {
                 
@@ -177,7 +177,7 @@ public abstract class AbstractServicesManagerService extends AbstractService
 
             try {
 
-                helper.kill();
+                helper.kill(immediateShutdown);
                 
             } catch (Throwable t) {
                 
@@ -197,7 +197,7 @@ public abstract class AbstractServicesManagerService extends AbstractService
 
             try {
                 
-                helper.kill();
+                helper.kill(immediateShutdown);
                 
             } catch (Throwable t) {
                 
