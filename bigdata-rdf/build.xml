@@ -90,7 +90,27 @@
         </javadoc>
     </target>
 
-    <target name="jar" depends="compile">
+	<!-- bundles all jars for easier deployment/performance analysis. -->
+	<target name="bundle">
+		<copy toDir="${build.dir}/lib">
+        <fileset dir="${bigdata.dir}/lib">
+            <include name="**/*.jar"/>
+            <include name="**/*.so"/>
+            <include name="**/*.dll"/>
+        </fileset>
+        <fileset dir="${bigdata.jini.dir}/lib">
+            <include name="**/*.jar"/>
+        </fileset>
+        <fileset dir="${bigdata.rdf.dir}/lib">
+            <include name="**/*.jar"/>
+        </fileset>
+        <fileset dir="${bigdata.sails.dir}/lib">
+            <include name="**/*.jar"/>
+        </fileset>
+		</copy>
+	</target>
+
+    <target name="jar" depends="compile, bundle">
         <jar destfile="${jar.name}">
             <fileset dir="${build.dir}"/>
             <manifest>
