@@ -1337,6 +1337,14 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                 } catch (Throwable t) {
 
                     log.error(this, t);
+                    
+                    /*
+                     * @todo I have observed a tight loop here with a
+                     * SessionExpired exception from zookeeper. Presumably that
+                     * occurred when the ensemble was dead, but maybe not. I
+                     * have added a timeout in order to reduce the problem.
+                     */
+                    Thread.sleep(2000/* ms */);
 
                 }
                 

@@ -570,11 +570,11 @@ public class RDFDataLoadMaster implements Callable<Void> {
         jobState = new JobState(config);
 
         minDataServices = (Integer) config.getEntry(
-                ConfigurationOptions.NAMESPACE,
+                ConfigurationOptions.COMPONENT,
                 ConfigurationOptions.MIN_DATA_SERVICES, Integer.TYPE);
 
         awaitDataServicesTimeout = (Long) config.getEntry(
-                ConfigurationOptions.NAMESPACE,
+                ConfigurationOptions.COMPONENT,
                 ConfigurationOptions.AWAIT_DATA_SERVICES_TIMEOUT, Long.TYPE);
 
         jobZPath = jobState.getJobZPath(fed);
@@ -1041,9 +1041,9 @@ public class RDFDataLoadMaster implements Callable<Void> {
         // System.err.println(BigdataSail.Options.QUERY_TIME_EXPANDER + "="
         // + p.getProperty(BigdataSail.Options.QUERY_TIME_EXPANDER));
 
-        System.err.println("bloomFilterFactory="
-                + tripleStore.getSPORelation().getSPOIndex().getIndexMetadata()
-                        .getBloomFilterFactory());
+//        System.err.println("bloomFilterFactory="
+//                + tripleStore.getSPORelation().getSPOIndex().getIndexMetadata()
+//                        .getBloomFilterFactory());
 
     }
 

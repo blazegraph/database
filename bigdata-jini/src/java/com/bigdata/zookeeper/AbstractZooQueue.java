@@ -67,6 +67,20 @@ abstract public class AbstractZooQueue<E extends Serializable> extends
     private int capacity;
     
     /**
+     * The capacity. If {@link Integer#MAX_VALUE} then there is no limit and the
+     * size of the queue will not be checked by {@link #add(Serializable)}.
+     * This is stored in the queue node as an {@link Integer}. The data for
+     * that node is watched and the value is updated if it changes.
+     * 
+     * @return
+     */
+    public int capacity() {
+        
+        return capacity;
+        
+    }
+    
+    /**
      * Return the prefix that is used for the children of the {@link #zroot}.
      */
     protected abstract String getChildPrefix();
@@ -191,17 +205,19 @@ abstract public class AbstractZooQueue<E extends Serializable> extends
 
         if (capacity != Integer.MAX_VALUE) {
 
-            if (!new BlockedWatcher(zookeeper, zroot) {
+            final BlockedWatcher watcher = new BlockedWatcher(zookeeper, zroot) {
 
                 // done when the queueSize is under the capacity.
                 @Override
-                protected boolean isDone(int queueSize) {
-                
-                    return queueSize <= capacity;
-                    
+                protected boolean isDone(final int queueSize) {
+
+                    return queueSize < capacity;
+
                 }
-                
-            }.awaitCondition(timeout, unit)) {
+
+            };
+
+            if (!watcher.awaitCondition(timeout, unit)) {
 
                 throw new TimeoutException();
 
@@ -235,17 +251,19 @@ abstract public class AbstractZooQueue<E extends Serializable> extends
     public void awaitEmpty(final long timeout, final TimeUnit unit)
             throws KeeperException, TimeoutException, InterruptedException {
 
-        if (!new BlockedWatcher(zookeeper, zroot) {
+        final BlockedWatcher watcher = new BlockedWatcher(zookeeper, zroot) {
 
-            // done when the queueSize is under the capacity.
+            // done when the queue is empty.
             @Override
-            protected boolean isDone(int queueSize) {
+            protected boolean isDone(final int queueSize) {
 
-                return queueSize <= capacity;
+                return queueSize == 0;
 
             }
 
-        }.awaitCondition(timeout, unit)) {
+        };
+        
+        if (!watcher.awaitCondition(timeout, unit)) {
 
             throw new TimeoutException();
 
@@ -269,8 +287,22 @@ abstract public class AbstractZooQueue<E extends Serializable> extends
         private final ZooKeeper zookeeper;
         private final String zpath;
 
+        /**
+         * Return true if the queue size satisifies the constraint.
+         * 
+         * @param queueSize
+         *            The queue size.
+         * 
+         * @return <code>true</code> if the constraint is satisified.
+         */
         abstract protected boolean isDone(int queueSize);
-        
+
+        /**
+         * 
+         * @param zookeeper
+         * @param zpath
+         *            The queue node.
+         */
         public BlockedWatcher(final ZooKeeper zookeeper, final String zpath) {
 
             if (zookeeper == null)
@@ -287,8 +319,14 @@ abstract public class AbstractZooQueue<E extends Serializable> extends
         
         public void process(final WatchedEvent e) {
 
-            if (cancelled)
+            if (cancelled) {
+
+                if(DEBUG)
+                    log.debug("Already cancelled");
+                
                 return;
+                
+            }
 
             synchronized(this) {
                 
@@ -337,6 +375,9 @@ abstract public class AbstractZooQueue<E extends Serializable> extends
                      */
                     int n = zookeeper.getChildren(zpath, this).size();
 
+                    if(INFO)
+                        log.info("Queue size: "+n);
+                    
                     try {
 
                         while (!isDone(n)) {
@@ -348,7 +389,8 @@ abstract public class AbstractZooQueue<E extends Serializable> extends
                             n = zookeeper.getChildren(zpath, this).size();
 
                             if(INFO)
-                                log.info("Queue size: "+n);
+                                log.info("Queue size: " + n + ", remaining="
+                                        + remaining + "ms");
                             
                         }
 
@@ -362,9 +404,13 @@ abstract public class AbstractZooQueue<E extends Serializable> extends
                         // log error but keep waiting for events.
                         log.error("zpath=" + zpath, e);
                         
+                    } finally {
+                        
+                        cancelled = true;
+
                     }
 
-                    return n < capacity;
+                    return isDone(n);
 
                 }
 

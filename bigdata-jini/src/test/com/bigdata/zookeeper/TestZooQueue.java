@@ -33,7 +33,6 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.ZooDefs.Ids;
 
 /**
  * {@link ZooQueue} test suite.
@@ -70,7 +69,7 @@ public class TestZooQueue extends AbstractZooTestCase {
         final String zroot = "/test/" + getName() + UUID.randomUUID();
         
         final ZooQueue<String> queue = new ZooQueue<String>(zookeeper, zroot,
-                Ids.OPEN_ACL_UNSAFE, Integer.MAX_VALUE/*capacity*/);
+                acl, Integer.MAX_VALUE/*capacity*/);
 
         final ReentrantLock lock = new ReentrantLock();
 
@@ -117,6 +116,112 @@ public class TestZooQueue extends AbstractZooTestCase {
         } finally {
             lock.unlock();
         }
+
+        assertEquals(0, queue.size());
+
+    }
+
+    public void test_queueBlocks() throws KeeperException, InterruptedException {
+        
+        final String zroot = "/test/" + getName() + UUID.randomUUID();
+        
+        final int capacity = 2;
+        
+        final ZooQueue<String> queue = new ZooQueue<String>(zookeeper, zroot,
+                acl, capacity);
+
+        final ReentrantLock unusedLock = new ReentrantLock();
+
+        new ClientThread(Thread.currentThread(), unusedLock) {
+
+            public void run2() throws Exception {
+
+                assertEquals(2, queue.capacity());
+
+                assertEquals(0, queue.size());
+                
+                queue.add("A");
+                
+                assertEquals(1, queue.size());
+                
+                queue.add("B");
+                
+                assertEquals(2, queue.size());
+
+                log.info("Should block.");
+
+                queue.add("C"); // should block.
+                
+                log.info("Producer done.");
+                
+            }
+
+        }.start();
+        
+        int size;
+        while ((size = queue.size()) < capacity) {
+
+            log.info("size=" + size);
+            
+            Thread.sleep(10/* ms */);
+            
+        }
+
+        log.info("Queue is at capacity: size=" + queue.size());
+
+        /* Make sure that the producer is blocked.  If it is not blocked
+         * then the producer will add another element and the queue will
+         * be over capacity.
+         */
+        Thread.sleep(500/* ms */);
+
+        // queue is still at capacity.
+        assertEquals(capacity, queue.size());
+        
+        // take an item from the queue.
+        assertEquals("A",queue.remove());
+        
+        // producer should now complete.
+        Thread.sleep(50/* ms */);
+
+        // queue is back at capacity.
+        assertEquals(2, queue.size());
+        
+        /*
+         * Now verify that we can detect when the queue becomes empty.
+         */
+        
+        new ClientThread(Thread.currentThread(), unusedLock) {
+
+            public void run2() throws Exception {
+
+                assertEquals(2, queue.capacity());
+
+                assertEquals(2, queue.size());
+                
+                assertEquals("B", queue.remove());
+                
+                assertEquals(1, queue.size());
+                
+                // Wait to give awaitEmpty() a chance in the main thread.
+                Thread.sleep(500/*ms*/);
+                
+                assertEquals("C", queue.remove());
+                
+                assertEquals(0, queue.size());
+
+                log.info("Consumer done.");
+                
+            }
+
+        }.start();
+       
+        log.info("Will wait for queue to become empty");
+        
+        // not empty yet.
+        assertNotSame(0, queue.size());
+
+        queue.awaitEmpty();
 
         assertEquals(0, queue.size());
 
