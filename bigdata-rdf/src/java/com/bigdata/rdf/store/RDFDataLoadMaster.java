@@ -68,6 +68,7 @@ import net.jini.config.ConfigurationException;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.data.Stat;
 import org.openrdf.rio.RDFFormat;
@@ -435,13 +436,22 @@ public class RDFDataLoadMaster implements Callable<Void> {
         final public UUID[] client2DataService;
 
         /**
+         * Return the zpath of the node for all jobs which are instances of this class.
+         */
+        public String getJobClassZPath(final JiniFederation fed) {
+            
+            return fed.getZooConfig().zroot + "/" + BigdataZooDefs.JOBS + "/"
+                    + RDFDataLoadMaster.class.getName();
+            
+        }
+        
+        /**
          * Return the zpath to the node which corresponds to the
          * {@link JobState}.
          */
         public String getJobZPath(final JiniFederation fed) {
 
-            return fed.getZooConfig().zroot + "/" + BigdataZooDefs.JOBS + "/"
-                    + RDFDataLoadMaster.class.getName() + "/" + jobName;
+            return getJobClassZPath(fed) + "/" + jobName;
 
         }
 
@@ -576,6 +586,22 @@ public class RDFDataLoadMaster implements Callable<Void> {
      * service.
      */
     public Void call() throws Exception {
+
+        try {
+            // ensure znode exists.
+            fed.getZookeeper().create(
+                    fed.getZooConfig().zroot + "/" + BigdataZooDefs.JOBS,
+                    new byte[0], fed.getZooConfig().acl, CreateMode.PERSISTENT);
+        } catch (NoNodeException ex) {
+            // ignore.
+        }
+        try {
+            // ensure znode exists.
+            fed.getZookeeper().create(jobState.getJobClassZPath(fed),
+                    new byte[0], fed.getZooConfig().acl, CreateMode.PERSISTENT);
+        } catch (NoNodeException ex) {
+            // ignore.
+        }
 
         boolean restart = false;
         try {
