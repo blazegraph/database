@@ -328,8 +328,14 @@ public class RDFDataLoadMaster implements Callable<Void> {
         // @todo config (parser verifies source data).
         final public boolean verifyRDFSourceData = false;
 
-        // @todo config (default format assumed when file ext is unknown).
-        final public RDFFormat fallback = RDFFormat.RDFXML;
+        /**
+         * Default format assumed when file ext is unknown.
+         * 
+         * @todo this is not a {@link Serializable} object. Therefore
+         *       configuration will require more trickery for this
+         *       property.
+         */
+        final static transient public RDFFormat fallback = RDFFormat.RDFXML;
 
         public String toString() {
 
