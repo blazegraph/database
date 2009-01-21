@@ -140,10 +140,27 @@ abstract public class AbstractZooQueue<E extends Serializable> extends
 
     }
 
+    /**
+     * Watches the capacity and updates it on the outer class if it changes.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
     private class CapacityWatcher implements Watcher {
 
         public void process(WatchedEvent event) {
             
+            try {
+
+                capacity = (Integer) SerializerUtil.deserialize(zookeeper
+                        .getData(zroot, this, new Stat()));
+                
+            } catch (Throwable t) {
+            
+                log.warn(t);
+                
+            }
+
         }
 
     }
@@ -174,12 +191,22 @@ abstract public class AbstractZooQueue<E extends Serializable> extends
 
         if (capacity != Integer.MAX_VALUE) {
 
-            if (!new BlockedWatcher(zookeeper, zroot).awaitCondition(timeout, unit)) {
+            if (!new BlockedWatcher(zookeeper, zroot) {
+
+                // done when the queueSize is under the capacity.
+                @Override
+                protected boolean isDone(int queueSize) {
                 
+                    return queueSize <= capacity;
+                    
+                }
+                
+            }.awaitCondition(timeout, unit)) {
+
                 throw new TimeoutException();
-                
+
             }
-            
+
         }
         
         final String znode = zookeeper.create(zroot + "/" + getChildPrefix(),
@@ -190,18 +217,59 @@ abstract public class AbstractZooQueue<E extends Serializable> extends
 
     }
 
+    public void awaitEmpty() throws KeeperException, InterruptedException {
+
+        try {
+
+            awaitEmpty(Long.MAX_VALUE, TimeUnit.SECONDS);
+            
+        } catch (TimeoutException e1) {
+
+            // should not be thrown.
+            throw new AssertionError(e1);
+            
+        }
+        
+    }
+
+    public void awaitEmpty(final long timeout, final TimeUnit unit)
+            throws KeeperException, TimeoutException, InterruptedException {
+
+        if (!new BlockedWatcher(zookeeper, zroot) {
+
+            // done when the queueSize is under the capacity.
+            @Override
+            protected boolean isDone(int queueSize) {
+
+                return queueSize <= capacity;
+
+            }
+
+        }.awaitCondition(timeout, unit)) {
+
+            throw new TimeoutException();
+
+        }
+
+        if (INFO)
+            log.info("zroot=" + zroot + " : queue is empty");
+
+    }
+
     /**
-     * Watches until the queue is no longer at capacity.
+     * Watches until the queue size satisifies the criteria.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private class BlockedWatcher implements Watcher {
+    abstract private class BlockedWatcher implements Watcher {
 
         private volatile boolean cancelled = false;
         
         private final ZooKeeper zookeeper;
         private final String zpath;
+
+        abstract protected boolean isDone(int queueSize);
         
         public BlockedWatcher(final ZooKeeper zookeeper, final String zpath) {
 
@@ -271,7 +339,7 @@ abstract public class AbstractZooQueue<E extends Serializable> extends
 
                     try {
 
-                        while (n >= capacity) {
+                        while (!isDone(n)) {
 
                             this.wait(remaining);
 
@@ -279,6 +347,9 @@ abstract public class AbstractZooQueue<E extends Serializable> extends
 
                             n = zookeeper.getChildren(zpath, this).size();
 
+                            if(INFO)
+                                log.info("Queue size: "+n);
+                            
                         }
 
                     } catch (NoNodeException e) {
@@ -306,7 +377,7 @@ abstract public class AbstractZooQueue<E extends Serializable> extends
         }
         
     }
-    
+
     /**
      * The approximate #of elements in the queue.
      * 
