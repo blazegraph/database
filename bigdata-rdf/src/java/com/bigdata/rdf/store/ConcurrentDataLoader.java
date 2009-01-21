@@ -1377,6 +1377,12 @@ public class ConcurrentDataLoader {
          */
         final boolean verifyData;
         
+        /**
+         * Delete files after they have been successfully loaded when
+         * <code>true</code>.
+         */
+        final boolean deleteAfter;
+        
         final IStatementBufferFactory bufferFactory;
         
         final AtomicLong toldTriples;
@@ -1406,12 +1412,13 @@ public class ConcurrentDataLoader {
          * @param baseURL
          * @param rdfFormat
          * @param verifyData
+         * @param deleteAfter 
          * @param bufferFactory
          * @param toldTriples
          */
         public ReaderTask(String resource, String baseURL, RDFFormat rdfFormat,
-                boolean verifyData, IStatementBufferFactory bufferFactory,
-                AtomicLong toldTriples) {
+                final boolean verifyData, final boolean deleteAfter,
+                IStatementBufferFactory bufferFactory, AtomicLong toldTriples) {
 
             if (resource == null)
                 throw new IllegalArgumentException();
@@ -1435,6 +1442,8 @@ public class ConcurrentDataLoader {
             this.rdfFormat = rdfFormat;
 
             this.verifyData = verifyData;
+
+            this.deleteAfter = deleteAfter;
             
             this.bufferFactory = bufferFactory;
             
@@ -1494,6 +1503,8 @@ public class ConcurrentDataLoader {
             final Reader reader = new BufferedReader(new InputStreamReader(
                     rdfStream));
 
+            boolean success = false;
+            
             try {
 
                 final LoadStats stats = new LoadStats();
@@ -1502,6 +1513,8 @@ public class ConcurrentDataLoader {
                 // @todo reuse the same underlying parser instance?
                 loader.loadRdf(reader, baseURL, rdfFormat, verifyData);
 
+                success = true;
+                
                 final long nstmts = loader.getStatementsAdded();
 
                 final long now = System.currentTimeMillis();
@@ -1539,6 +1552,16 @@ public class ConcurrentDataLoader {
 
                 rdfStream.close();
 
+                if (deleteAfter && success) {
+
+                    if (!new File(resource).delete()) {
+
+                        log.warn("Could not delete: " + resource);
+
+                    }
+
+                }
+                
             }
 
         }
@@ -1932,9 +1955,14 @@ public class ConcurrentDataLoader {
         final RDFFormat fallback;
 
         /**
-         * Validation of RDF by the RIO parser is disabled.
+         * Validation of RDF by the RIO parser is disabled unless this is true.
          */
         final boolean verifyData;
+
+        /**
+         * Delete files after successful processing when <code>true</code>.
+         */
+        final boolean deleteAfter;
 
         final IStatementBufferFactory bufferFactory;
 
@@ -1966,13 +1994,15 @@ public class ConcurrentDataLoader {
         }
 
         protected AbstractRDFTaskFactory(AbstractTripleStore db,
-                boolean verifyData, RDFFormat fallback,
-                IStatementBufferFactory bufferFactory) {
+                final boolean verifyData, final boolean deleteAfter,
+                RDFFormat fallback, IStatementBufferFactory bufferFactory) {
 
             this.db = db;
             
             this.verifyData = verifyData;
 
+            this.deleteAfter = deleteAfter;
+            
             this.fallback = fallback;
             
             this.bufferFactory = bufferFactory;
@@ -2006,8 +2036,8 @@ public class ConcurrentDataLoader {
 
             }
             
-            return new ReaderTask(resource, baseURL, rdfFormat,
-                    verifyData, bufferFactory, toldTriples );
+            return new ReaderTask(resource, baseURL, rdfFormat, verifyData,
+                    deleteAfter, bufferFactory, toldTriples);
             
         }
         
@@ -2022,9 +2052,9 @@ public class ConcurrentDataLoader {
     public static class RDFVerifyTaskFactory extends AbstractRDFTaskFactory {
 
         public RDFVerifyTaskFactory(AbstractTripleStore db, int bufferCapacity,
-                boolean verifyData, RDFFormat fallback) {
+                boolean verifyData, boolean deleteAfter, RDFFormat fallback) {
 
-            super(db, verifyData, fallback, new VerifyStatementBufferFactory(
+            super(db, verifyData, deleteAfter, fallback, new VerifyStatementBufferFactory(
                     db, bufferCapacity));
 
         }
@@ -2083,12 +2113,14 @@ public class ConcurrentDataLoader {
      * @version $Id$
      */
     public static class RDFLoadTaskFactory extends AbstractRDFTaskFactory {
-
+        
         /**
          * 
          * @param db
          * @param bufferCapacity
          * @param verifyData
+         * @param deleteAfter
+         *            if the file should be deleted once it has been loaded.
          * @param fallback
          *            An attempt will be made to determine the interchange
          *            syntax using {@link RDFFormat}. If no determination can
@@ -2098,10 +2130,10 @@ public class ConcurrentDataLoader {
          *            errors.
          */
         public RDFLoadTaskFactory(AbstractTripleStore db, int bufferCapacity,
-                boolean verifyData, RDFFormat fallback) {
+                boolean verifyData, boolean deleteafter, RDFFormat fallback) {
 
-            super(db, verifyData, fallback, new LoadStatementBufferFactory(db,
-                    bufferCapacity));
+            super(db, verifyData, deleteafter, fallback,
+                    new LoadStatementBufferFactory(db, bufferCapacity));
 
         }
 
