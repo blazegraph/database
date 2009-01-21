@@ -1343,7 +1343,7 @@ public class ConcurrentDataLoader {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static class ReaderTask implements Runnable {
+    public static class ReaderTask implements Runnable {
 
         protected static final Logger log = Logger.getLogger(ReaderTask.class);
 
