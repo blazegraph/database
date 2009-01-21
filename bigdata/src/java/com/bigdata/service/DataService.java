@@ -1509,6 +1509,13 @@ abstract public class DataService extends AbstractService
      *       with the least load. When the input is a networked file system,
      *       then additional network topology smarts would be required to make
      *       good choices.
+     * 
+     * @todo we should probably put the federation object in a sandbox in order
+     *       to prevent various operations by tasks running in the
+     *       {@link DataService} using the {@link IDataServiceAwareProcedure}
+     *       interface to gain access to the {@link DataService}'s federation.
+     *       for example, if they use {@link AbstractFederation#shutdownNow()}
+     *       then the {@link DataService} itself would be shutdown.
      */
     public Future<? extends Object> submit(Callable<? extends Object> task)
             throws InterruptedException, ExecutionException {
