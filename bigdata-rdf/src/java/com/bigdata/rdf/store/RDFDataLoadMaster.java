@@ -893,7 +893,7 @@ public class RDFDataLoadMaster implements Callable<Void> {
      * {@link EDS}) or connect to an existing federation ({@link JDS} for
      * scale-out configurations).
      */
-    protected AbstractTripleStore openTripleStore() {
+    public AbstractTripleStore openTripleStore() {
 
         /*
          * Create/re-open the triple store.
@@ -992,7 +992,7 @@ public class RDFDataLoadMaster implements Callable<Void> {
     /**
      * Dump some properties of interest.
      */
-    protected void showProperties(final AbstractTripleStore tripleStore) {
+    public void showProperties(final AbstractTripleStore tripleStore) {
 
         final Properties p = tripleStore.getProperties();
 
