@@ -592,14 +592,14 @@ public class RDFDataLoadMaster implements Callable<Void> {
             fed.getZookeeper().create(
                     fed.getZooConfig().zroot + "/" + BigdataZooDefs.JOBS,
                     new byte[0], fed.getZooConfig().acl, CreateMode.PERSISTENT);
-        } catch (NoNodeException ex) {
+        } catch (NodeExistsException ex) {
             // ignore.
         }
         try {
             // ensure znode exists.
             fed.getZookeeper().create(jobState.getJobClassZPath(fed),
                     new byte[0], fed.getZooConfig().acl, CreateMode.PERSISTENT);
-        } catch (NoNodeException ex) {
+        } catch (NodeExistsException ex) {
             // ignore.
         }
 
