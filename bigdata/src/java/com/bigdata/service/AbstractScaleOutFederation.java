@@ -417,6 +417,9 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
      *       notice it ourselves. That would leave this method with the
      *       responsibility for awaiting the join of at least N data services
      *       (and perhaps verifying that the other services are still joined).
+     * 
+     * FIXME This should be rewritten in the JiniFederation subclass to use the
+     * ServiceDiscoveryListener interface implemented by that class.
      */
     public UUID[] awaitServices(final int minDataServices, final long timeout)
             throws InterruptedException, TimeoutException {
@@ -440,44 +443,57 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
         IMetadataService metadataService = null;
         
         // updated each time through the loop.
-        UUID[] dataServiceUUIDs = new UUID[0];
+        UUID[] dataServiceUUIDs = null;
         
-        while ((System.currentTimeMillis() - begin) < timeout) {
+        while (true) {
+            
+            // set on entry each time through the loop.
+            metadataService = getMetadataService();
+
+            // set on entry each time through the loop.
+            dataServiceUUIDs = getDataServiceUUIDs(0/* all */);
+
+            if ((System.currentTimeMillis() - begin) >= timeout
+                    || (metadataService != null && dataServiceUUIDs.length >= minDataServices)) {
+
+                /*
+                 * Either a timeout or we have the MDS and enough DS.
+                 * 
+                 * Either way, we are done so break out of the loop.
+                 */
+                
+                break;
+                
+            }
             
             ntries++;
 
-            // verify that the client has/can get the metadata service.
-            metadataService = getMetadataService();
-
-            // find all data services.
-            dataServiceUUIDs = getDataServiceUUIDs(0/*all*/);
-//            // find at most that many data services.
-//            UUID[] dataServiceUUIDs = getDataServiceUUIDs(minDataServices);
-        
-            if (metadataService == null
-                    || dataServiceUUIDs.length < minDataServices) {
-                
-                if(INFO)
-                log.info("Waiting : ntries="+ntries+", metadataService="
+            if (INFO)
+                log.info("Waiting : ntries=" + ntries + ", metadataService="
                         + (metadataService == null ? "not " : "")
                         + " found; #dataServices=" + dataServiceUUIDs.length
                         + " out of " + minDataServices + " required : "
                         + Arrays.toString(dataServiceUUIDs));
-                
-                Thread.sleep(interval);
-                
-                continue;
-                
-            }
-            
-            if (INFO)
-                log.info("Have metadata service and " + dataServiceUUIDs.length
-                        + " data services");
-            
-            return dataServiceUUIDs;
-            
+
+            // @todo the way this is written can sleep longer than the remaining time 
+            Thread.sleep(interval);
+
+            continue;
+
         }
-        
+
+        if (INFO)
+            log.info("MDS=" + (metadataService != null) + ", #dataServices="
+                    + dataServiceUUIDs.length);
+
+        if (metadataService != null
+                && dataServiceUUIDs.length >= minDataServices) {
+
+            // success.
+            return dataServiceUUIDs;
+
+        }
+
         throw new TimeoutException("elapsed="
                 + (System.currentTimeMillis() - begin) + "ms: metadataService="
                 + (metadataService != null) + ", dataServices="
