@@ -851,8 +851,11 @@ public class MonitorCreatePhysicalServiceLocksTask implements
          * @todo configure timeout.
          * 
          * @todo for any of the various bigdata services there are service-type
-         * specific cached lookup methods which we should use by preference.
+         * specific cached lookup methods which we should use by preference and
+         * they will automatically convert to blocking requests with a timeout
+         * on a cache miss.  that would give us just one timeout to configure.
          */
+        final long timeout = 2000; // ms
         
         final ServiceID serviceID = getServiceID(attributes);
         
@@ -874,7 +877,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
                 .getServiceDiscoveryManager()
                 .lookup(
                         new ServiceTemplate(serviceID, null/* iface[] */, null/* attributes */),
-                        null/* filter */, 10000/* waitDur(ms) */);
+                        null/* filter */, timeout/* waitDur(ms) */);
 
         if (serviceItem == null) {
 
