@@ -74,6 +74,7 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IDataServiceAwareProcedure;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.zookeeper.ZooQueue;
 
 /**
  * Distributed bulk loader for RDF data.
@@ -185,6 +186,7 @@ public class RDFDataLoadMaster implements Callable<Void> {
     }
 
     /**
+     * The job description for an {@link RDFDataLoadMaster}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -200,12 +202,14 @@ public class RDFDataLoadMaster implements Callable<Void> {
          * The namespace of the {@link ITripleStore} into which the data will be
          * loaded (must exist).
          */
-        final String namespace;
+        public final String namespace;
 
         /**
          * The directory from which files will be read.
+         * 
+         * @todo is this needed if we use a {@link ZooQueue} integration?
          */
-        final File dataDir;
+        public final File dataDir;
 
         /**
          * The file or directory from which files will be loaded when the
@@ -213,7 +217,7 @@ public class RDFDataLoadMaster implements Callable<Void> {
          * 
          * @see ConfigurationOptions#ONTOLOGY
          */
-        final File ontology;
+        public final File ontology;
 
         /**
          * The #of clients. Each client will be assigned to run on some
@@ -224,43 +228,50 @@ public class RDFDataLoadMaster implements Callable<Void> {
          * from its local file system. This is not an issue when reading from a
          * shared volume.
          */
-        final int nclients;
+        public final int nclients;
 
         /**
          * The #of concurrent threads to use to load the data. A single thread
          * will be used to scan the file system, but this many threads will be
          * used to read, parse, and write the data onto the {@link ITripleStore}.
          */
-        final int nthreads;
+        public final int nthreads;
 
         /**
          * The capacity of the buffers used to hold the parsed RDF data.
          */
-        final int bufferCapacity;
+        public final int bufferCapacity;
 
         /**
          * When <code>true</code>, the master will create the
          * {@link ITripleStore} identified by {@link #namespace} if it does not
          * exist.
          */
-        final boolean create;
+        public final boolean create;
 
         /**
          * When <code>true</code>, the clients will load data.
          */
-        final boolean loadData;
+        public final boolean loadData;
 
         /**
          * When <code>true</code>, the closure of the data set will be
          * computed once all data have been loaded.
          */
-        final boolean computeClosure;
+        public final boolean computeClosure;
 
         /**
          * When <code>true</code>, the each data file will be deleted once
          * its data has been loaded into the {@link ITripleStore}.
          */
-        final boolean deleteAfter;
+        public final boolean deleteAfter;
+
+        // @todo config (parser verifies source data).
+        final public boolean verifyRDFSourceData = false;
+
+        // @todo conig (default format assumed when file ext is unknown).
+        // @todo serializable?
+        final public RDFFormat fallback = RDFFormat.RDFXML;
 
         public String toString() {
 
@@ -872,13 +883,8 @@ public class RDFDataLoadMaster implements Callable<Void> {
      * 
      * @todo report counters to federation.
      */
-    public static class RDFFileLoadTask implements Callable<Void>,
+    abstract public static class RDFFileLoadTask implements Callable<Void>,
             Serializable, IDataServiceAwareProcedure {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = 310476660061065997L;
 
         /**
          * The {@link DataService} on which the client is executing. This is set
@@ -887,9 +893,9 @@ public class RDFDataLoadMaster implements Callable<Void> {
          */
         private transient DataService dataService;
 
-        private final JobState jobState;
+        protected final JobState jobState;
         
-        private final int clientNum;
+        protected final int clientNum;
 
         public String toString() {
 
@@ -912,6 +918,31 @@ public class RDFDataLoadMaster implements Callable<Void> {
         }
 
         /**
+         * Return the {@link DataService} on which this task is executing.
+         * 
+         * @throws IllegalStateException
+         *             if the task is not executing on a {@link DataService}.
+         */
+        public DataService getDataService() {
+            
+            if (dataService == null)
+                throw new IllegalStateException();
+            
+            return dataService;
+            
+        }
+        
+        /**
+         * The federation object used by the {@link DataService} on which this
+         * task is executing.
+         */
+        public JiniFederation getFederation() {
+
+            return (JiniFederation) getDataService().getFederation();
+
+        }
+        
+        /**
          * {@link ConcurrentDataLoader}
          */
         public Void call() throws Exception {
@@ -926,47 +957,63 @@ public class RDFDataLoadMaster implements Callable<Void> {
                     .getResourceLocator().locate(jobState.namespace,
                             ITx.UNISOLATED);
 
-            final boolean verifyRDFSourceData = false;
-            
-            final RDFFormat fallback = RDFFormat.RDFXML; // @todo config
-            
-            final ConcurrentDataLoader.RDFLoadTaskFactory loadTaskFactory = //
-                new ConcurrentDataLoader.RDFLoadTaskFactory(tripleStore, jobState.bufferCapacity,
-                        verifyRDFSourceData, fallback);
-
-            ConcurrentDataLoader loader = new ConcurrentDataLoader(fed
-                    .getClient(), jobState.nthreads, jobState.nclients,
-                    clientNum);
-
-            try {
-                
-                /*
-                 * FIXME read names of files to be loaded from a zookeeper queue
-                 * and submit tasks to load those data, deleting the source
-                 * files afterwards.
-                 * 
-                 * When reading from the disk, offer mode to run until cancelled
-                 * so that any data dropped into the file system will be bulk
-                 * loaded.
-                 * 
-                 * For LUBM, run until the queue from which we are reading is
-                 * destroyed (need a hook for that).
-                 */
-                 
-//                loader.submitTask(resource, loadTaskFactory);
-                
-            } finally {
-                
-                loader.shutdownNow();
-                
-            }
+            loadData(tripleStore);
             
             return null;
 
         }
 
-    }
+        /**
+         * Hook to load data is invoked once by {@link #call()}. The
+         * implementation must run until no more data (if that condition can be
+         * detected) or until the job is cancelled.
+         * 
+         * @param tripleStore
+         *            Where to put the data.
+         * 
+         * @throws InterruptedException
+         *             if interrupted (job cancelled).
+         * @throws Exception
+         *             if something else goes wrong.
+         * 
+         * FIXME Offer an implementation which reads from a known directory and
+         * runs until cancelled so that any data dropped into the file system
+         * will be bulk loaded.
+         */
+        abstract protected void loadData(AbstractTripleStore tripleStore)
+                throws InterruptedException, Exception;
 
+        /**
+         * Recursively removes any files and subdirectories and then removes the
+         * file (or directory) itself.
+         * 
+         * @param file
+         *            A file or directory.
+         */
+        protected void recursiveDelete(final File file) {
+
+            if (file.isDirectory()) {
+
+                final File[] children = file.listFiles();
+
+                for (int i = 0; i < children.length; i++) {
+
+                    recursiveDelete(children[i]);
+
+                }
+
+            }
+
+            if (INFO)
+                log.info("Removing: " + file);
+
+            if (!file.delete())
+                log.warn("Could not remove: " + file);
+
+        }
+
+    }
+    
 }
 
 /*
