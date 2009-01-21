@@ -115,7 +115,7 @@ public class RDFLoadAndValidateHelper {
     public void load(AbstractTripleStore db) throws InterruptedException {
 
         final ConcurrentDataLoader.RDFLoadTaskFactory loadTaskFactory = new ConcurrentDataLoader.RDFLoadTaskFactory(
-                db, bufferCapacity, verifyData, fallback);
+                db, bufferCapacity, verifyData, false/*deleteAfter*/, fallback);
 
         // Setup counters.
         loadTaskFactory.setupCounters(service.getCounters(client
@@ -140,7 +140,7 @@ public class RDFLoadAndValidateHelper {
     public void validate(AbstractTripleStore db) throws InterruptedException {
 
         final ConcurrentDataLoader.RDFVerifyTaskFactory verifyTaskFactory = new ConcurrentDataLoader.RDFVerifyTaskFactory(
-                db, bufferCapacity, verifyData, fallback);
+                db, bufferCapacity, verifyData, false/*deleteAfter*/, fallback);
 
         // notify will run tasks.
         verifyTaskFactory.notifyStart();

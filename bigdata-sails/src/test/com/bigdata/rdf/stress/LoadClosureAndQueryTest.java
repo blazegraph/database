@@ -1012,7 +1012,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
 
         final ConcurrentDataLoader.RDFLoadTaskFactory loadTaskFactory = //
         new ConcurrentDataLoader.RDFLoadTaskFactory(db, bufferCapacity,
-                verifyRDFSourceData, fallback);
+                verifyRDFSourceData, false/*deleteAfter*/, fallback);
 
         // @todo change param to fed vs client
         final ConcurrentDataLoader service = new ConcurrentDataLoader(fed
