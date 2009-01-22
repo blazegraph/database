@@ -20,7 +20,7 @@ import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.util.InnerCause;
 import com.bigdata.zookeeper.HierarchicalZNodeWatcher;
 import com.bigdata.zookeeper.ZLock;
-import com.bigdata.zookeeper.ZNodeLockWatcher;
+import com.bigdata.zookeeper.ZLockImpl;
 
 /**
  * This is a standing task whose {@link Future} is monitored by the
@@ -146,6 +146,21 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
                 }
                 
                 log.error(this, t);
+
+                /*
+                 * @todo A tight loop can appear here if the znodes for the
+                 * federation are destroyed. This shows up as a NoNodeException
+                 * thrown out of getZLock(), which indicates that zroot/locks
+                 * does not exist so the lock node can not be created.
+                 * 
+                 * A timeout introduces a delay which reduces the problem. This
+                 * can arise if the federation is being destroyed -or- if this
+                 * is a new federation but we are not yet connected to a
+                 * zookeeper ensemble so the znodes for the federation do not
+                 * yet exist.
+                 */
+
+                Thread.sleep(2000/* ms */);
                 
             }
             
@@ -160,7 +175,7 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
      */
     protected void acquireLockAndRun() throws Exception {
 
-        final ZLock zlock = ZNodeLockWatcher.getLock(zookeeper,
+        final ZLock zlock = ZLockImpl.getLock(zookeeper,
                 lockZPath, fed.getZooConfig().acl);
 
         zlock.lock();

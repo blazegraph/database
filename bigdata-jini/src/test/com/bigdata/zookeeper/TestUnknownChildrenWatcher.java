@@ -22,33 +22,38 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Mar 18, 2008
+ * Created on Jan 22, 2009
  */
 
-package com.bigdata.service.jini;
-
-import java.rmi.RemoteException;
-
-import net.jini.core.lookup.ServiceTemplate;
-
-import com.bigdata.jini.start.IServicesManagerService;
+package com.bigdata.zookeeper;
 
 /**
- * Class handles discovery of an {@link IServicesManagerService}.
+ * Test suite for watcher for unknown children (those not previously seen).
+ * 
+ * @todo write tests.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ServicesManagerClient extends
-        AbstractCachingServiceClient<IServicesManagerService> {
+public class TestUnknownChildrenWatcher extends AbstractZooTestCase {
 
-    public ServicesManagerClient(final JiniFederation fed, final long timeout)
-            throws RemoteException {
-
-        super(fed, IServicesManagerService.class, new ServiceTemplate(null,
-                new Class[] { IServicesManagerService.class }, null),
-                null/* filter */, timeout);
-
+    /**
+     * 
+     */
+    public TestUnknownChildrenWatcher() {
     }
 
+    /**
+     * @param name
+     */
+    public TestUnknownChildrenWatcher(String name) {
+        super(name);
+    }
+
+    public void test_nothing() {
+        
+        fail("write tests");
+        
+    }
+    
 }

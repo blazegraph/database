@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.zookeeper;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.jini.start.BigdataZooDefs;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.IResourceLockService;
@@ -42,6 +44,12 @@ import com.bigdata.service.jini.JiniFederation;
  */
 final public class ZooResourceLockService implements IResourceLockService {
 
+    final static protected Logger log = Logger.getLogger(ZooResourceLockService.class);
+
+    final static protected boolean INFO = log.isInfoEnabled();
+
+    final static protected boolean DEBUG = log.isDebugEnabled();
+    
     private final JiniFederation fed;
 
     public ZooResourceLockService(final JiniFederation fed) {
@@ -75,24 +83,38 @@ final public class ZooResourceLockService implements IResourceLockService {
             final String zpath = fed.getZooConfig().zroot + "/"
                     + BigdataZooDefs.LOCKS_RESOURCES + "/" + namespace;
             
-            final ZLock zlock = ZNodeLockWatcher.getLock(fed.getZookeeper(), zpath,
+            final ZLock zlock = ZLockImpl.getLock(fed.getZookeeper(), zpath,
                     fed.getZooConfig().acl);
             
+            if (INFO)
+                log.info("Acquiring zlock: " + zlock);
+            
             zlock.lock();
+            
+            if (INFO)
+                log.info("Granted zlock: " + zlock);
             
             return new IResourceLock() {
 
                 public void unlock() {
                     
                     try {
+                        
                         zlock.unlock();
+                        
                     } catch (Throwable t) {
+                        
                         throw new RuntimeException(t);
+                        
                     }
                     
                 }
                 
             };
+            
+        } catch (InterruptedException t) {
+            
+            throw t;
             
         } catch (Throwable t) {
          

@@ -45,7 +45,7 @@ public class LoadBalancerClient extends
 
     public LoadBalancerClient(final JiniFederation fed, final long timeout) throws RemoteException {
 
-        super(fed, new ServiceTemplate(null,
+        super(fed, ILoadBalancerService.class, new ServiceTemplate(null,
                 new Class[] { ILoadBalancerService.class }, null),
                 null/* filter */, timeout);
         

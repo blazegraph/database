@@ -49,13 +49,19 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("zookeeper client library");
 
-        // @todo basic zookeeper tests.
-        suite.addTestSuite(TestZookeeper.class);
-
+        // a watcher for a znode to be created.
         suite.addTestSuite(TestZNodeCreatedWatcher.class);
         
+        // a watcher for a znode to be deleted.
         suite.addTestSuite(TestZNodeDeletedWatcher.class);
 
+        // a watcher for new children of some znode.
+        suite.addTestSuite(TestUnknownChildrenWatcher.class);
+
+        // a global synchronous lock test suite.
+        suite.addTestSuite(TestZLockImpl.class);
+
+        // a watcher for a dynamic hierarchy of znodes.
         suite.addTestSuite(TestHierarchicalZNodeWatcher.class);
 
         // a barrier pattern.

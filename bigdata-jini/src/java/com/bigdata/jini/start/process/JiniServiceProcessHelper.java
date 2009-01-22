@@ -29,6 +29,7 @@ package com.bigdata.jini.start.process;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.rmi.NoSuchObjectException;
 import java.rmi.Remote;
 
 import net.jini.admin.Administrable;
@@ -161,6 +162,11 @@ public class JiniServiceProcessHelper extends ProcessHelper {
                     log.warn("will shutdown() service: " + this);
                     ((RemoteDestroyAdmin) admin).shutdown();
                 }
+            } catch (NoSuchObjectException ex) {
+                // probably already dead.
+                log.warn("Process already gone? name=" + name + " : " + ex);
+                // but delegate to the super class anyway.
+                return super.kill(immediateShutdown);
             } catch (Throwable t) {
                 // delegate to the super class.
                 log.error(this, t);
@@ -180,6 +186,11 @@ public class JiniServiceProcessHelper extends ProcessHelper {
                 // Destroy the service and its persistent state.
                 log.warn("will destroy() service: "+this);
                 ((DestroyAdmin) admin).destroy();
+            } catch (NoSuchObjectException ex) {
+                // probably already dead.
+                log.warn("Process already gone? name=" + name + " : " + ex);
+                // but delegate to the super class anyway.
+                return super.kill(immediateShutdown);
             } catch (Throwable t) {
                 // delegate to the super class.
                 log.error(this, t);

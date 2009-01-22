@@ -126,6 +126,8 @@ public abstract class AbstractZooTestCase extends TestCase2 {
     
     public void setUp() throws Exception {
 
+        log.info(getName());
+        
         // find ports that are not in use.
         final int clientPort = getPort(2181/* suggestedPort */);
         final int peerPort = getPort(2888/* suggestedPort */);
@@ -194,6 +196,8 @@ public abstract class AbstractZooTestCase extends TestCase2 {
 
     public void tearDown() throws Exception {
 
+        log.info(getName());
+        
         if (zookeeper != null) {
 
             zookeeper.close();

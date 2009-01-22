@@ -37,6 +37,7 @@ import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.JiniUtil;
 import com.bigdata.zookeeper.UnknownChildrenWatcher;
 import com.bigdata.zookeeper.ZLock;
+import com.bigdata.zookeeper.ZLockImpl;
 import com.bigdata.zookeeper.ZNodeLockWatcher;
 
 /**
@@ -151,7 +152,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
                     // child znode.
                     final String znode = watcher.queue.take();
 
-                    if (znode.endsWith(ZNodeLockWatcher.INVALID)) {
+                    if (znode.endsWith(ZLockImpl.INVALID)) {
 
                         /*
                          * This is not a lock node. It is a marker indicating
@@ -348,7 +349,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
             }
 
             // enter the competition.
-            final ZLock zlock = ZNodeLockWatcher.getLock(zookeeper,
+            final ZLock zlock = ZLockImpl.getLock(zookeeper,
                     lockNodeZPath, fed.getZooConfig().acl);
 
             /*

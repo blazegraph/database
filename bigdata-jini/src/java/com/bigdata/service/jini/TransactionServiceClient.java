@@ -45,7 +45,7 @@ public class TransactionServiceClient extends
     public TransactionServiceClient(final JiniFederation fed, final long timeout)
             throws RemoteException {
 
-        super(fed, new ServiceTemplate(null,
+        super(fed, ITransactionService.class, new ServiceTemplate(null,
                 new Class[] { ITransactionService.class }, null),
                 null/* filter */, timeout);
 

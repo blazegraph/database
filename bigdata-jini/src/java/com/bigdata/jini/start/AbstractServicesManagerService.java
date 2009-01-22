@@ -1,5 +1,6 @@
 package com.bigdata.jini.start;
 
+import java.rmi.NoSuchObjectException;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentLinkedQueue;
 

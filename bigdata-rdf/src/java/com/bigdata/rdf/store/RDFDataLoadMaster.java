@@ -68,7 +68,6 @@ import net.jini.config.ConfigurationException;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.ZooKeeper;
-import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.data.Stat;
 import org.openrdf.rio.RDFFormat;
@@ -920,6 +919,8 @@ public class RDFDataLoadMaster implements Callable<Void> {
             // create kb.
             tripleStore = createTripleStore();
 
+            showProperties(tripleStore);
+
             // load any one time files.
             try {
 
@@ -935,8 +936,10 @@ public class RDFDataLoadMaster implements Callable<Void> {
         } else {
 
             if (INFO)
-                log.info("Opened tripleStore: " + jobState.namespace);
+                log.info("Re-opened tripleStore: " + jobState.namespace);
 
+            showProperties(tripleStore);
+            
         }
 
         return tripleStore;
@@ -955,8 +958,8 @@ public class RDFDataLoadMaster implements Callable<Void> {
             log.info("Creating tripleStore: " + jobState.namespace);
 
         AbstractTripleStore tripleStore = new ScaleOutTripleStore(fed,
-                jobState.namespace, ITx.UNISOLATED, fed.getClient()
-                        .getProperties());
+                jobState.namespace, ITx.UNISOLATED,
+                getProperties(jobState.namespace));
 
         // create the triple store.
         tripleStore.create();
@@ -982,7 +985,7 @@ public class RDFDataLoadMaster implements Callable<Void> {
 
         tripleStore.getDataLoader().loadFiles(jobState.ontology/* file */,
                 jobState.ontology.getPath()/* baseURI */,
-                null/* rdfFormat */, null/* filter */);
+                jobState.fallback/* rdfFormat */, null/* filter */);
 
         if (INFO)
             log.info("Loaded ontology: " + jobState.ontology);
@@ -994,54 +997,53 @@ public class RDFDataLoadMaster implements Callable<Void> {
      */
     public void showProperties(final AbstractTripleStore tripleStore) {
 
+        if (!INFO) return;
+
+        log.info("tripleStore: namespace=" + tripleStore.getNamespace());
+        
         final Properties p = tripleStore.getProperties();
 
-        // System.err.println(Options.INCLUDE_INFERRED + "="
+        // log.info(Options.INCLUDE_INFERRED + "="
         // + p.getProperty(Options.INCLUDE_INFERRED));
         //                        
-        // System.err.println(Options.QUERY_TIME_EXPANDER + "="
+        // log.info(Options.QUERY_TIME_EXPANDER + "="
         // + p.getProperty(Options.QUERY_TIME_EXPANDER));
 
-        // iff LTS. Other variants use data.dir.
-        System.err.println(Options.FILE + "=" + p.getProperty(Options.FILE));
-
-        System.err.println(Options.NESTED_SUBQUERY + "="
+        log.info(Options.NESTED_SUBQUERY + "="
                 + p.getProperty(Options.NESTED_SUBQUERY));
 
-        System.err
-                .println(IndexMetadata.Options.BTREE_READ_RETENTION_QUEUE_CAPACITY
+        log.info(IndexMetadata.Options.BTREE_READ_RETENTION_QUEUE_CAPACITY
                         + "="
                         + p
                                 .getProperty(IndexMetadata.Options.DEFAULT_BTREE_READ_RETENTION_QUEUE_CAPACITY));
 
-        System.err.println(Options.CHUNK_CAPACITY + "="
+        log.info(Options.CHUNK_CAPACITY + "="
                 + p.getProperty(Options.CHUNK_CAPACITY));
 
-        System.err.println(Options.CHUNK_TIMEOUT
+        log.info(Options.CHUNK_TIMEOUT
                 + "="
                 + p.getProperty(Options.CHUNK_TIMEOUT,
                         Options.DEFAULT_CHUNK_TIMEOUT));
 
-        System.err
-                .println(IBigdataClient.Options.CLIENT_RANGE_QUERY_CAPACITY
+        log.info(IBigdataClient.Options.CLIENT_RANGE_QUERY_CAPACITY
                         + "="
                         + p
                                 .getProperty(
                                         IBigdataClient.Options.CLIENT_RANGE_QUERY_CAPACITY,
                                         IBigdataClient.Options.DEFAULT_CLIENT_RANGE_QUERY_CAPACITY));
 
-        System.err.println(Options.FULLY_BUFFERED_READ_THRESHOLD
+        log.info(Options.FULLY_BUFFERED_READ_THRESHOLD
                 + "="
                 + p.getProperty(Options.FULLY_BUFFERED_READ_THRESHOLD,
                         Options.DEFAULT_FULLY_BUFFERED_READ_THRESHOLD));
 
-        System.err.println(Options.MAX_PARALLEL_SUBQUERIES + "="
+        log.info(Options.MAX_PARALLEL_SUBQUERIES + "="
                 + p.getProperty(Options.MAX_PARALLEL_SUBQUERIES));
 
-        // System.err.println(BigdataSail.Options.QUERY_TIME_EXPANDER + "="
+        // log.info(BigdataSail.Options.QUERY_TIME_EXPANDER + "="
         // + p.getProperty(BigdataSail.Options.QUERY_TIME_EXPANDER));
 
-//        System.err.println("bloomFilterFactory="
+//        log.info("bloomFilterFactory="
 //                + tripleStore.getSPORelation().getSPOIndex().getIndexMetadata()
 //                        .getBloomFilterFactory());
 

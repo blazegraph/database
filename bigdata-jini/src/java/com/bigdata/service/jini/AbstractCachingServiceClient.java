@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 
 import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceItem;
@@ -70,7 +71,7 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
 
     protected static final boolean INFO = log.isInfoEnabled();
 
-    protected static final boolean DEBUTG = log.isInfoEnabled();
+    protected static final boolean DEBUG = log.isInfoEnabled();
 
     final protected JiniFederation fed;
 
@@ -90,7 +91,7 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
      * The filter provided to the ctor.
      */
     protected final ServiceItemFilter filter;
-    
+
     /**
      * Timeout for remote lookup on cache miss (milliseconds).
      */
@@ -106,20 +107,26 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
      * {@link ServiceID}.
      */
     final public ServiceCache getServiceCache() {
-        
+
         return serviceCache;
-        
+
     }
 
     /**
      * An object that provides cached lookup of discovered services.
      */
     final public LookupCache getLookupCache() {
-        
+
         return lookupCache;
-        
+
     }
-    
+
+    /**
+     * The most interesting interface on the service (this is used for log
+     * messages).
+     */
+    private final Class serviceIface;
+
     /**
      * Sets up service discovery for the designed class of services.
      * 
@@ -130,7 +137,9 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
      *            {@link JiniFederation}. Also, {@link ServiceDiscoveryEvent}s
      *            will be passed by this class to the {@link JiniFederation},
      *            which implements {@link ServiceDiscoveryListener}. Those
-     *            events are used to notice service joins.
+     *            events are used to notice service joins.\
+     *            @param serviceIface The most interesting interface on the service (this is used for log
+     * messages).
      * @param template
      *            A template used to restrict the services which are discovered
      *            and cached by this class (required).
@@ -145,10 +154,14 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
      *             if we could not setup the {@link LookupCache}
      */
     public AbstractCachingServiceClient(final JiniFederation fed,
-            final ServiceTemplate template, final ServiceItemFilter filter,
-            final long timeout) throws RemoteException {
+            final Class serviceIface, final ServiceTemplate template,
+            final ServiceItemFilter filter, final long timeout)
+            throws RemoteException {
 
         if (fed == null)
+            throw new IllegalArgumentException();
+
+        if (serviceIface == null)
             throw new IllegalArgumentException();
 
         if (template == null)
@@ -159,19 +172,20 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
 
         this.fed = fed;
 
+        this.serviceIface = serviceIface;
+
         this.template = template;
-        
+
         this.filter = filter;
-        
+
         this.timeout = timeout;
 
         serviceCache = new ServiceCache(fed);
 
-        lookupCache = fed.getServiceDiscoveryManager()
-                .createLookupCache(//
-                        template,//
-                        filter, //
-                        serviceCache // ServiceDiscoveryListener
+        lookupCache = fed.getServiceDiscoveryManager().createLookupCache(//
+                template,//
+                filter, //
+                serviceCache // ServiceDiscoveryListener
                 );
 
     }
@@ -193,9 +207,9 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
     final public S getService() {
 
         return getService(filter);
-        
+
     }
-    
+
     /**
      * Return the proxy for an arbitrary service from the cache -or-
      * <code>null</code> if there is no such service in the cache and a remote
@@ -216,7 +230,7 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
             return null;
 
     }
-    
+
     /**
      * Return an arbitrary {@link ServiceItem} from the cache -or-
      * <code>null</code> if there is no such service in the cache and a remote
@@ -330,21 +344,12 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
         if (serviceUUID == null)
             throw new IllegalArgumentException();
 
-        final ServiceItem serviceItem = serviceCache.getServiceItemByID(JiniUtil
-                .uuid2ServiceID(serviceUUID));
+        final ServiceItem serviceItem = serviceCache
+                .getServiceItemByID(JiniUtil.uuid2ServiceID(serviceUUID));
 
         return serviceItem;
 
     }
-
-//    /**
-//     * Destroy all services which have been discovered by this client.
-//     */
-//    public void destroyDiscoveredServices(ExecutorService executorService) {
-//
-//        destroyDiscoveredServices(executorService, null/* filter */);
-//        
-//    }
 
     /**
      * Destroy all services in the cache which match the filter. Errors are
@@ -363,10 +368,13 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
 
         if (executorService == null)
             throw new IllegalArgumentException();
-        
+
         // return everything in the cache.
         final ServiceItem[] items = serviceCache.getServiceItems(
                 0/* maxCount */, filter);
+
+        log.warn("Will destroy " + items.length + " " + serviceIface.getName()
+                + " services" + (filter == null ? "" : " matching " + filter));
 
         final List<Callable<Void>> tasks = new ArrayList<Callable<Void>>(
                 items.length);
@@ -379,19 +387,8 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
 
                 public Void call() throws Exception {
 
-                    try {
-
-                        if(destroyService(item)) {
-                            
-                            log.warn("Could not destroy service: " + item);
-
-                        }
-
-                    } catch (Exception e) {
-
-                        log.error("Could not destroy service: " + item, e);
-
-                    }
+                    // send the request.
+                    destroyService(item);
 
                     return null;
 
@@ -401,8 +398,27 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
 
         }
 
-        // blocks until all data services are down.
-        executorService.invokeAll(tasks);
+        /*
+         * This blocks until all services have been sent a destroy request.
+         * However, they may handle the destroy request asynchronously.
+         */
+        final List<Future<Void>> futures = executorService.invokeAll(tasks);
+
+        for (int i = 0; i < items.length; i++) {
+
+            final Future f = futures.get(i);
+
+            try {
+
+                f.get();
+
+            } catch (Throwable t) {
+
+                log.error(items[i], t);
+
+            }
+
+        }
 
     }
 
@@ -422,16 +438,18 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
      */
     protected void shutdownDiscoveredServices(
             final ExecutorService executorService,
-            final ServiceItemFilter filter,
-            final boolean immediateShutdown
-            ) throws InterruptedException {
+            final ServiceItemFilter filter, final boolean immediateShutdown)
+            throws InterruptedException {
 
         if (executorService == null)
             throw new IllegalArgumentException();
-        
+
         // return everything in the cache.
         final ServiceItem[] items = serviceCache.getServiceItems(
                 0/* maxCount */, filter);
+
+        log.warn("Will shutdown " + items.length + " " + serviceIface.getName()
+                + " services");
 
         final List<Callable<Void>> tasks = new ArrayList<Callable<Void>>(
                 items.length);
@@ -444,19 +462,8 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
 
                 public Void call() throws Exception {
 
-                    try {
-
-                        if (shutdownService(item, immediateShutdown)) {
-
-                            log.warn("Could not shutdown service: " + item);
-
-                        }
-
-                    } catch (Exception e) {
-
-                        log.error("Could not shutdown service: " + item, e);
-
-                    }
+                    // send the request.
+                    shutdownService(item, immediateShutdown);
 
                     return null;
 
@@ -466,13 +473,33 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
 
         }
 
-        // blocks until all data services are down.
-        executorService.invokeAll(tasks);
-        
+        /*
+         * This blocks until all services have been sent a shutdown request.
+         * However, they may handle the shutdown request asynchronously.
+         */
+        final List<Future<Void>> futures = executorService.invokeAll(tasks);
+
+        for (int i = 0; i < items.length; i++) {
+
+            final Future f = futures.get(i);
+
+            try {
+
+                f.get();
+
+            } catch (Throwable t) {
+
+                log.error(items[i], t);
+
+            }
+
+        }
+
     }
 
     /**
-     * Sends {@link RemoteDestroyAdmin#destroy()} to the service.
+     * Sends {@link RemoteDestroyAdmin#destroy()} request to the service. Note
+     * that the service may process the request asynchronously.
      * 
      * @param serviceItem
      *            The service item.
@@ -488,7 +515,7 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
 
         if (serviceItem == null)
             throw new IllegalArgumentException();
-        
+
         /*
          * Attempt to obtain the Administrable object from the service. The
          * methods that we want will be on that object if they are offered by
@@ -519,36 +546,41 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
              */
 
             // Destroy the service and its persistent state.
-            log.warn("will destroy() service: " + this);
+            log.warn("will destroy() service: " + serviceItem);
 
             ((DestroyAdmin) admin).destroy();
 
             return true;
-            
+
         }
 
+        log.warn("Service does not implement " + DestroyAdmin.class + " : "
+                + serviceItem);
+
         return false;
-        
+
     }
 
     /**
-     * Applies {@link RemoteDestroyAdmin#shutdown()} or
+     * Sends a shutdown request to the service. This will invoke either
+     * {@link RemoteDestroyAdmin#shutdown()} or
      * {@link RemoteDestroyAdmin#shutdownNow()} as indicated by the parameter.
+     * Note that the service may process the shutdown request asynchronously.
      * 
      * @param serviceItem
      *            The service item.
      * @param immediateShutdown
      *            When <code>true</code> uses shutdownNow().
-     *            
-     * @return <code>true</code> if we were able to send either of these
-     *         requests to the service.
+     * 
+     * @return <code>true</code> if we were able to send the request to the
+     *         service.
      * 
      * @throws Exception
      *             if anything goes wrong.
      */
     protected boolean shutdownService(final ServiceItem serviceItem,
             final boolean immediateShutdown) throws Exception {
-        
+
         /*
          * Attempt to obtain the Administrable object from the service. The
          * methods that we want will be on that object if they are offered by
@@ -576,25 +608,28 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
             if (immediateShutdown) {
 
                 // Fast termination (can have latency).
-                log.warn("will shutdownNow() service: " + this);
-                
+                log.warn("will shutdownNow() service: " + serviceItem);
+
                 ((RemoteDestroyAdmin) admin).shutdownNow();
-                
+
             } else {
-                
+
                 // Normal termination (can have latency).
-                log.warn("will shutdown() service: " + this);
-                
+                log.warn("will shutdown() service: " + serviceItem);
+
                 ((RemoteDestroyAdmin) admin).shutdown();
-                
+
             }
 
             return true;
-            
+
         }
 
+        log.warn("Service does not implement " + RemoteDestroyAdmin.class
+                + " : " + serviceItem);
+
         return false;
-        
+
     }
     
 }

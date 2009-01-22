@@ -31,7 +31,6 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.rmi.Remote;
 import java.rmi.server.ExportException;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -60,11 +59,9 @@ import net.jini.lookup.ServiceDiscoveryListener;
 import net.jini.lookup.ServiceDiscoveryManager;
 
 import org.apache.log4j.Logger;
-import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
-import org.apache.zookeeper.KeeperException.NoNodeException;
 
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.io.IStreamSerializer;
@@ -689,7 +686,12 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
         try {
 
-            // service managers
+            /*
+             * Service managers.
+             * 
+             * Note: This is done 1st since a service manager will otherwise try
+             * to start a new service each time we will one.
+             */
             servicesManagerClient.destroyDiscoveredServices(
                     getExecutorService(), null/* filter */);
 

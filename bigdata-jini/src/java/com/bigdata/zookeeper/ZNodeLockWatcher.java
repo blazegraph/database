@@ -51,8 +51,12 @@ import org.apache.zookeeper.data.ACL;
  * While a queue may seem excessive for one time operations, it provides
  * failover if the process holding the lock dies.
  * 
+ * @see #getLock(ZooKeeper, String, List)
+ * @see ZLockImpl
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @deprecated Replaced by {@link ZLockImpl}
  */
 public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
 
@@ -297,7 +301,9 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
         zookeeper.exists(zpath + "/" + priorChildZNode, this);
 
         if (INFO)
-            log.info("Process in queue: pos=" + pos + ", " + this);
+            log.info("Process in queue: pos=" + pos + " out of "
+                    + children.size() + " children, " + this
+                    + (DEBUG ? " : children=" + children.toString() :""));
 
         return false;
 
@@ -326,6 +332,8 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
      * @throws InterruptedException
      * @throws ZLockNodeInvalidatedException
      *             if the lock node has been invalidated but not yet destroyed.
+     * 
+     * @deprecated Replaced by {@link com.bigdata.zookeeper.ZLockImpl}
      */
     public static ZLockImpl getLock(final ZooKeeper zookeeper,
             final String zpath, final List<ACL> acl) throws KeeperException,
@@ -361,10 +369,17 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
     }
 
     /**
-     * {@link ZLock} implementation class. The lock is not reentract (you can
-     * not re-acquire it by requesting it while already held in the same or a
-     * different thread). Any thread may release the lock, not just the one that
-     * acquired it.
+     * {@link ZLock} implementation class. The lock is realized as an EPHEMERAL
+     * SEQUENTIAL child of the lock node. If the child is in the first position
+     * of the lexically sorted children then it holds the lock.
+     * <p>
+     * Note: Assuming it has the correct ACL, any thread in any process MAY
+     * release the lock, NOT just the one that acquired it. This is done by
+     * deleting the ephemeral znode corresponding to the process holding the
+     * lock.
+     * 
+     * @todo The lock is not reentrant (you can not re-acquire it by requesting
+     *       it while already held in the same or a different thread).
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -396,13 +411,12 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
         private volatile ZNodeLockWatcher watcher = null;
         
         /**
-         * Non-blocking representation of lock state (does not tell you if the
-         * lock is held).
+         * Non-blocking representation of lock state.
          */
         public String toString() {
             
-            return "ZLock{zpath=" + zpath + ", watcher=" + (watcher != null)
-                    + "}";
+            return "ZLock{zpath=" + zpath
+                    + (watcher == null ? "" : watcher.toString()) + "}";
             
         }
         
@@ -418,10 +432,12 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
         /**
          * The znode (not zpath) of the child and <code>null</code> iff the
          * child does not hold the lock.
+         * 
+         * @throws InterruptedException
          */
-        public String getChild() {
+        public String getChild() throws InterruptedException {
 
-            lock.lock();
+            lock.lockInterruptibly();
             try {
                 
                 if (watcher == null)
@@ -486,7 +502,10 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
         public boolean isLockHeld() throws KeeperException,
                 InterruptedException {
 
-            lock.lock();
+            if(DEBUG)
+                log.debug(this.toString());
+            
+            lock.lockInterruptibly();
             try {
 
                 if (watcher == null) {
@@ -522,7 +541,10 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
         public void lock(final long timeout, final TimeUnit unit)
                 throws KeeperException, InterruptedException, TimeoutException {
 
-            lock.lock();
+            if(DEBUG)
+                log.debug(this.toString());
+            
+            lock.lockInterruptibly();
             try {
                 
                 final long begin = System.nanoTime();
@@ -627,8 +649,14 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
          */
         public void unlock() throws KeeperException, InterruptedException {
 
-            lock.lock();
+            if(DEBUG)
+                log.debug(this.toString());
+            
+            lock.lockInterruptibly();
             try {
+
+                if(DEBUG)
+                    log.debug(this.toString());
 
                 if (watcher == null) {
 
@@ -644,6 +672,9 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
                      */
                     
                     watcher.cancelled = true;
+                    
+                    if(DEBUG)
+                        log.debug(this.toString());
                     
 //                    // clear watch.
 //                    watcher.clearWatch();
@@ -713,6 +744,9 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
                 
             }
 
+            if(DEBUG)
+                log.debug(this.toString());
+            
         }
 
         /**
@@ -732,8 +766,7 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
          */
         public void destroyLock() throws KeeperException, InterruptedException {
 
-            lock.lock();
-            
+            lock.lockInterruptibly();
             try {
 
                 if (!isLockHeld())
@@ -795,30 +828,6 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
             
         }
 
-    }
-
-    /**
-     * This exception is thrown if there is an attempt to acquire a
-     * {@link ZLock} but the lock node has been invalidated pending its
-     * destruction. This is essentially a distributed "interrupt". The lock WILL
-     * NOT be granted and the lock node itself should disappear shortly.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class ZLockNodeInvalidatedException extends InterruptedException {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = 2491240005134272857L;
-        
-        public ZLockNodeInvalidatedException(String zpath) {
-            
-            super(zpath);
-            
-        }
-        
     }
     
 }

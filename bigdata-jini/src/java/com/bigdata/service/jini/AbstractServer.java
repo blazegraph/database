@@ -87,7 +87,7 @@ import com.bigdata.service.jini.DataServer.AdministrableDataService;
 import com.bigdata.service.mapred.jini.MapServer;
 import com.bigdata.service.mapred.jini.ReduceServer;
 import com.bigdata.zookeeper.ZLock;
-import com.bigdata.zookeeper.ZNodeLockWatcher;
+import com.bigdata.zookeeper.ZLockImpl;
 import com.sun.jini.admin.DestroyAdmin;
 import com.sun.jini.start.LifeCycle;
 import com.sun.jini.start.NonActivatableServiceDescriptor;
@@ -1374,7 +1374,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             final List<ACL> acl = fed.getZooConfig().acl;
 
             // zlock object for the master election.
-            final ZLock zlock = ZNodeLockWatcher.getLock(zookeeper,
+            final ZLock zlock = ZLockImpl.getLock(zookeeper,
                     logicalServiceZPath + "/" + BigdataZooDefs.MASTER_ELECTION,
                     acl);
 

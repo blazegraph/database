@@ -11,7 +11,7 @@ import org.apache.zookeeper.KeeperException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @see ZNodeLockWatcher#getLock(org.apache.zookeeper.ZooKeeper, String)
+ * @see ZLockImpl#getLock(org.apache.zookeeper.ZooKeeper, String)
  */
 public interface ZLock {
 

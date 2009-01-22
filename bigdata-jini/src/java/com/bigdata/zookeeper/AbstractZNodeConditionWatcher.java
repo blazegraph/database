@@ -37,6 +37,9 @@ import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
 
 /**
+ * An abstract implementation based on synchronized(this) and
+ * {@link Object#notify()}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -81,7 +84,7 @@ abstract public class AbstractZNodeConditionWatcher implements Watcher {
     protected final String zpath;
 
     /**
-     * Return a representation of the watcher state.
+     * Return a representation of the watcher state (non-blocking).
      * <p>
      * Note: The implementation MUST be safe and non-blocking.
      */

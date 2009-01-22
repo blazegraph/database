@@ -179,7 +179,16 @@ public class DumpZookeeper {
         final List<String> children;
         try {
 
-            children = z.getChildren(zpath, false);
+            // Get children as an Array.
+            final String[] a = z
+                    .getChildren(zpath, false/* watch */).toArray(
+                            new String[0]);
+
+            // sort the array.
+            Arrays.sort(a);
+
+            // wrap as list again.
+            children = Arrays.asList(a);
 
         } catch (NoNodeException ex) {
 

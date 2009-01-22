@@ -63,7 +63,7 @@ public class DataServicesClient extends
          * Note: No filter is imposed here. Instead there are type specific
          * methods if you want an IDataService vs an IMetadataService.
          */
-        super(fed, new ServiceTemplate(null,
+        super(fed, IDataService.class, new ServiceTemplate(null,
                 new Class[] { IDataService.class }, null), null/* filter */,
                 timeout);
 
