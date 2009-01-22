@@ -455,11 +455,8 @@ public class DataLoader {
         if (INFO)
             log.info(Options.COMMIT + "=" + commitEnum);
 
-        final boolean rdfOnly = !database.getAxioms().isRdfSchema();
-        
-        closureEnum = rdfOnly ? ClosureEnum.None : ClosureEnum
-                .valueOf(properties.getProperty(Options.CLOSURE,
-                        Options.DEFAULT_CLOSURE));
+        closureEnum = ClosureEnum.valueOf(properties.getProperty(
+                Options.CLOSURE, Options.DEFAULT_CLOSURE));
 
         if (INFO)
             log.info(Options.CLOSURE + "=" + closureEnum);
@@ -469,7 +466,7 @@ public class DataLoader {
 
         this.database = database;
         
-        inferenceEngine = getInferenceEngine();
+        inferenceEngine = database.getInferenceEngine();
         
         if (closureEnum != ClosureEnum.None) {
 
