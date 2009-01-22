@@ -48,6 +48,7 @@
 package com.bigdata.rdf.store;
 
 import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.Iterator;
@@ -83,6 +84,7 @@ import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
+import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
@@ -215,14 +217,20 @@ public class RDFDataLoadMaster implements Callable<Void> {
          */
         String DELETE_AFTER = "deleteAfter";
 
-        // more properly belongs in a federation utility class.
-        // /**
-        // * Option may be used to force overflow of all data services in the
-        // * federation after load/load+closure.
-        // */
-        // String FORCE_OVERFLOW_AFTER_LOAD = "forceOverflowAfterLoad";
-        //        
-        // String DEFAULT_FORCE_OVERFLOW_AFTER_LOAD = "false";
+        /**
+         * When <code>true</code> as an after action on the job, the
+         * {@link DataService}s in the federation will be made to undergo
+         * asynchronous overflow processing and the live journals will be
+         * truncated so that the total size on disk of the federation is at its
+         * minimum footprint for the given history retention policy. The master
+         * will block during this operation so you can readily tell when it is
+         * finished. Note that this option only makes sense in benchmark
+         * environments where you can contol the total system otherwise
+         * asynchronous writes may continue.
+         * 
+         * @see AbstractScaleOutFederation#forceOverflow(boolean)
+         */
+        String FORCE_OVERFLOW = "forceOverflow";
 
         /**
          * The minimum #of {@link IDataService}s to discover before the master
@@ -324,15 +332,26 @@ public class RDFDataLoadMaster implements Callable<Void> {
          */
         public final boolean deleteAfter;
 
+        /**
+         * When <code>true</code> the {@link DataService}s in the federation
+         * will be made to undergo asynchronous overflow processing and the
+         * live journals will be truncated so that the total size on disk of
+         * the federation is at its minimum footprint for the given history
+         * retention policy.
+         * 
+         * @see ConfigurationOptions#FORCE_OVERFLOW
+         */
+        public final boolean forceOverflow;
+                
         // @todo config (parser verifies source data).
         final public boolean verifyRDFSourceData = false;
 
         /**
          * Default format assumed when file ext is unknown.
          * 
-         * @todo this is not a {@link Serializable} object. Therefore
-         *       configuration will require more trickery for this
-         *       property.
+         * @todo configure the filter. Since {@link RDFFormat} is not
+         *       serializable we will have to specify the filter class and
+         *       create an instance on the target machine.
          */
         final static transient public RDFFormat fallback = RDFFormat.RDFXML;
 
@@ -374,7 +393,10 @@ public class RDFDataLoadMaster implements Callable<Void> {
                     + computeClosure
                     + //
                     ", " + ConfigurationOptions.DELETE_AFTER + "="
-                    + deleteAfter + //
+                    + deleteAfter
+                    + //
+                    ", " + ConfigurationOptions.FORCE_OVERFLOW + "="
+                    + forceOverflow + //
                     "}";
 
         }
@@ -426,6 +448,10 @@ public class RDFDataLoadMaster implements Callable<Void> {
             deleteAfter = (Boolean) config.getEntry(
                     ConfigurationOptions.COMPONENT,
                     ConfigurationOptions.DELETE_AFTER, Boolean.TYPE);
+
+            forceOverflow = (Boolean) config.getEntry(
+                    ConfigurationOptions.COMPONENT,
+                    ConfigurationOptions.FORCE_OVERFLOW, Boolean.TYPE);
 
             client2DataService = new UUID[nclients];
 
@@ -985,13 +1011,43 @@ public class RDFDataLoadMaster implements Callable<Void> {
 
         tripleStore.getDataLoader().loadFiles(jobState.ontology/* file */,
                 jobState.ontology.getPath()/* baseURI */,
-                jobState.fallback/* rdfFormat */, null/* filter */);
+                jobState.fallback/* rdfFormat */, new RDFFilenameFilter());
 
         if (INFO)
             log.info("Loaded ontology: " + jobState.ontology);
 
     }
 
+    /**
+     * Filter recognizes anything that is a registered as an {@link RDFFormat}.
+     * If it does not recognize your format, then you can create a subclass
+     * which ensures the static initialization of your format with
+     * {@link RDFFormat}. That needs to be done in static code so that it will
+     * be performed on the machine where this filter is being used.
+     */
+    public static class RDFFilenameFilter implements FilenameFilter, Serializable {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -628798437502907063L;
+
+        public boolean accept(File dir, String name) {
+
+            if (new File(dir, name).isDirectory()) {
+
+                // visit subdirectories.
+                return true;
+
+            }
+
+            // if recognizable as RDF.
+            return RDFFormat.forFileName(name) != null;
+
+        }
+
+    }
+    
     /**
      * Dump some properties of interest.
      */

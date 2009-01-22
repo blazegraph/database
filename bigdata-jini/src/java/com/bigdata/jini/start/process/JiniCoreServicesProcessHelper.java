@@ -153,7 +153,7 @@ public class JiniCoreServicesProcessHelper extends ProcessHelper {
         if (registrars.length >= serviceConfig.serviceCount) {
 
             if (INFO)
-                log.info("Enough instances - will not start.");
+                log.info("Enough instances - will not start another.");
 
             return false;
 
