@@ -497,7 +497,7 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
         throw new TimeoutException("elapsed="
                 + (System.currentTimeMillis() - begin) + "ms: metadataService="
                 + (metadataService != null) + ", dataServices="
-                + dataServiceUUIDs.length);
+                + dataServiceUUIDs.length+" but require "+minDataServices);
         
     }
 
