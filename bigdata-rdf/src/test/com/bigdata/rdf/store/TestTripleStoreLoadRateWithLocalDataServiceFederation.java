@@ -37,6 +37,7 @@ import org.openrdf.rio.RDFFormat;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.load.ConcurrentDataLoader;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
 import com.bigdata.service.LocalDataServiceFederation;
@@ -150,7 +151,7 @@ public class TestTripleStoreLoadRateWithLocalDataServiceFederation extends
         final File file = new File("../rdf-data/lehigh/U1");
 //      final File file = new File("../rdf-data/lehigh/U1/University0_0.owl");
       
-        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client,
+        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client.getFederation(),
                 nthreads, bufferCapacity, file, filter);
 
         helper.load(store);
@@ -166,7 +167,7 @@ public class TestTripleStoreLoadRateWithLocalDataServiceFederation extends
 
         final File file = new File("../rdf-data/lehigh/U10");
 
-        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client,
+        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client.getFederation(),
                 nthreads, bufferCapacity, file, filter);
 
         helper.load(store);
@@ -182,7 +183,7 @@ public class TestTripleStoreLoadRateWithLocalDataServiceFederation extends
 
         final File file = new File("../rdf-data/lehigh/U50");
 
-        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client,
+        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client.getFederation(),
                 nthreads, bufferCapacity, file, filter);
 
         helper.load(store);
@@ -254,7 +255,7 @@ public class TestTripleStoreLoadRateWithLocalDataServiceFederation extends
         test.setUp();
 
         RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(
-                test.client, nthreads, bufferCapacity, file, test.filter);
+                test.client.getFederation(), nthreads, bufferCapacity, file, test.filter);
 
         helper.load(test.store);
 

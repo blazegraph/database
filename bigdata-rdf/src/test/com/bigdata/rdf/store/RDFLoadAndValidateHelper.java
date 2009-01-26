@@ -53,7 +53,11 @@ import java.util.concurrent.TimeUnit;
 
 import org.openrdf.rio.RDFFormat;
 
-import com.bigdata.service.IBigdataClient;
+import com.bigdata.rdf.load.ConcurrentDataLoader;
+import com.bigdata.rdf.load.FileSystemLoader;
+import com.bigdata.rdf.load.RDFLoadTaskFactory;
+import com.bigdata.rdf.load.RDFVerifyTaskFactory;
+import com.bigdata.service.IBigdataFederation;
 
 /**
  * Helper class for concurrent data load and post-load verification.
@@ -63,7 +67,7 @@ import com.bigdata.service.IBigdataClient;
  */
 public class RDFLoadAndValidateHelper {
 
-    final IBigdataClient client;
+    final IBigdataFederation fed;
     
     final int nthreads;
     
@@ -83,24 +87,24 @@ public class RDFLoadAndValidateHelper {
     
     final int clientNum;
     
-    public RDFLoadAndValidateHelper(IBigdataClient client, int nthreads,
+    public RDFLoadAndValidateHelper(IBigdataFederation fed, int nthreads,
             int bufferCapacity, File file, FilenameFilter filter) {
         
-        this(client,nthreads,bufferCapacity,file, filter, 1/*nclients*/,0/*clientNum*/);
+        this(fed,nthreads,bufferCapacity,file, filter, 1/*nclients*/,0/*clientNum*/);
         
     }
     
-    public RDFLoadAndValidateHelper(IBigdataClient client, int nthreads,
-            int bufferCapacity, File file, FilenameFilter filter, int nclients, int clientNum) {
+    public RDFLoadAndValidateHelper(IBigdataFederation fed, int nthreads,
+            int bufferCapacity, File file, FilenameFilter filter, int nclients,
+            int clientNum) {
 
-        this.client = client;
+        this.fed = fed;
         
         this.nthreads = nthreads;
 
         this.bufferCapacity = bufferCapacity;
 
-        service = new ConcurrentDataLoader(client, nthreads, nclients,
-                clientNum);
+        service = new ConcurrentDataLoader(fed, nthreads);
 
         this.file = file;
         
@@ -114,18 +118,20 @@ public class RDFLoadAndValidateHelper {
     
     public void load(AbstractTripleStore db) throws InterruptedException {
 
-        final ConcurrentDataLoader.RDFLoadTaskFactory loadTaskFactory = new ConcurrentDataLoader.RDFLoadTaskFactory(
+        final RDFLoadTaskFactory loadTaskFactory = new RDFLoadTaskFactory(
                 db, bufferCapacity, verifyData, false/*deleteAfter*/, fallback);
 
+        final FileSystemLoader scanner = new FileSystemLoader(service,
+                nclients, clientNum);
+
         // Setup counters.
-        loadTaskFactory.setupCounters(service.getCounters(client
-                .getFederation()));
+        loadTaskFactory.setupCounters(service.getCounters(fed));
 
         // notify will run tasks.
         loadTaskFactory.notifyStart();
 
         // read files and run tasks.
-        service.process(file, filter, loadTaskFactory);
+        scanner.process(file, filter, loadTaskFactory);
 
         // await completion of all tasks.
         service.awaitCompletion(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
@@ -139,14 +145,17 @@ public class RDFLoadAndValidateHelper {
 
     public void validate(AbstractTripleStore db) throws InterruptedException {
 
-        final ConcurrentDataLoader.RDFVerifyTaskFactory verifyTaskFactory = new ConcurrentDataLoader.RDFVerifyTaskFactory(
+        final RDFVerifyTaskFactory verifyTaskFactory = new RDFVerifyTaskFactory(
                 db, bufferCapacity, verifyData, false/*deleteAfter*/, fallback);
+
+        final FileSystemLoader scanner = new FileSystemLoader(service,
+                nclients, clientNum);
 
         // notify will run tasks.
         verifyTaskFactory.notifyStart();
         
         // read files and run tasks.
-        service.process(file, filter, verifyTaskFactory);
+        scanner.process(file, filter, verifyTaskFactory);
 
         // await completion of all tasks.
         service.awaitCompletion(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
