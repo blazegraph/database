@@ -156,8 +156,8 @@ public class TestTripleStoreLoadRateWithEmbeddedFederation extends
         final File file = new File("../rdf-data/lehigh/U1");
 //      final File file = new File("../rdf-data/lehigh/U1/University0_0.owl");
       
-        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client,
-                nthreads, bufferCapacity, file, filter);
+        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client
+                .getFederation(), nthreads, bufferCapacity, file, filter);
 
         helper.load(store);
 
@@ -172,7 +172,7 @@ public class TestTripleStoreLoadRateWithEmbeddedFederation extends
 
         final File file = new File("../rdf-data/lehigh/U10");
 
-        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client,
+        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client.getFederation(),
                 nthreads, bufferCapacity, file, filter);
 
         helper.load(store);
@@ -188,7 +188,7 @@ public class TestTripleStoreLoadRateWithEmbeddedFederation extends
 
         final File file = new File("../rdf-data/lehigh/U50");
 
-        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client,
+        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client.getFederation(),
                 nthreads, bufferCapacity, file, filter);
 
         helper.load(store);
@@ -236,7 +236,8 @@ public class TestTripleStoreLoadRateWithEmbeddedFederation extends
         test.setUp();
 
         RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(
-                test.client, nthreads, bufferCapacity, file, test.filter);
+                test.client.getFederation(), nthreads, bufferCapacity, file,
+                test.filter);
 
         helper.load(test.store);
 

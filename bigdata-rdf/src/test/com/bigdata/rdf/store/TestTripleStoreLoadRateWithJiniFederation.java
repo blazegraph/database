@@ -33,6 +33,8 @@ import java.io.IOException;
 
 import org.openrdf.rio.RDFFormat;
 
+import com.bigdata.rdf.load.ConcurrentDataLoader;
+
 /**
  * Note: The commit flag is ignored for the {@link ScaleOutTripleStore}.
  * <p>
@@ -126,7 +128,7 @@ public class TestTripleStoreLoadRateWithJiniFederation extends AbstractDistribut
         final File file = new File("../rdf-data/lehigh/U1");
 //      final File file = new File("../rdf-data/lehigh/U1/University0_0.owl");
       
-        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client,
+        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client.getFederation(),
                 nthreads, bufferCapacity, file, filter);
 
         helper.load(store);
@@ -142,7 +144,7 @@ public class TestTripleStoreLoadRateWithJiniFederation extends AbstractDistribut
 
         final File file = new File("../rdf-data/lehigh/U10");
 
-        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client,
+        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client.getFederation(),
                 nthreads, bufferCapacity, file, filter);
 
         helper.load(store);
@@ -158,7 +160,7 @@ public class TestTripleStoreLoadRateWithJiniFederation extends AbstractDistribut
 
         final File file = new File("../rdf-data/lehigh/U50");
 
-        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client,
+        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client.getFederation(),
                 nthreads, bufferCapacity, file, filter);
 
         helper.load(store);
@@ -227,7 +229,7 @@ public class TestTripleStoreLoadRateWithJiniFederation extends AbstractDistribut
         test.setUp();
 
         RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(
-                test.client, nthreads, bufferCapacity, file, test.filter);
+                test.client.getFederation(), nthreads, bufferCapacity, file, test.filter);
 
         helper.load(test.store);
 

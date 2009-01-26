@@ -76,6 +76,9 @@ import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.load.ConcurrentDataLoader;
+import com.bigdata.rdf.load.FileSystemLoader;
+import com.bigdata.rdf.load.RDFLoadTaskFactory;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.sail.BigdataSail;
@@ -83,7 +86,6 @@ import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.ConcurrentDataLoader;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
@@ -1010,13 +1012,15 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
 
         final AbstractTripleStore db = sail.getDatabase();
 
-        final ConcurrentDataLoader.RDFLoadTaskFactory loadTaskFactory = //
-        new ConcurrentDataLoader.RDFLoadTaskFactory(db, bufferCapacity,
+        final RDFLoadTaskFactory loadTaskFactory = //
+        new RDFLoadTaskFactory(db, bufferCapacity,
                 verifyRDFSourceData, false/*deleteAfter*/, fallback);
 
-        // @todo change param to fed vs client
-        final ConcurrentDataLoader service = new ConcurrentDataLoader(fed
-                .getClient(), nthreads, nclients, clientNum);
+        final ConcurrentDataLoader service = new ConcurrentDataLoader(fed,
+                nthreads);
+
+        final FileSystemLoader scanner = new FileSystemLoader(service,
+                nclients, clientNum);
 
         try {
 
@@ -1027,7 +1031,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
             loadTaskFactory.notifyStart();
 
             // read files and run tasks : baseURI will be the filename.
-            service.process(dataDir, filter, loadTaskFactory);
+            scanner.process(dataDir, filter, loadTaskFactory);
 
             // await completion of all tasks.
             service.awaitCompletion(Long.MAX_VALUE, TimeUnit.MILLISECONDS);

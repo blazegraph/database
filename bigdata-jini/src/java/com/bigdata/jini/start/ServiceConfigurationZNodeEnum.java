@@ -63,6 +63,12 @@ public enum ServiceConfigurationZNodeEnum {
     public static ServiceConfigurationZNodeEnum getType(final String serviceConfigZPath,
             final String zpath) {
 
+        if (serviceConfigZPath == null)
+            throw new IllegalArgumentException();
+
+        if (zpath == null)
+            throw new IllegalArgumentException();
+        
         final int pos = zpath.lastIndexOf('/');
 
         final String parent = zpath.substring(0,pos);

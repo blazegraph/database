@@ -45,7 +45,7 @@
  * Created on Jan 17, 2009
  */
 
-package com.bigdata.rdf.store;
+package com.bigdata.rdf.load;
 
 import java.io.File;
 import java.io.FilenameFilter;
@@ -61,6 +61,8 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import net.jini.config.Configuration;
@@ -83,6 +85,10 @@ import com.bigdata.rdf.axioms.RdfsAxioms;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.spo.SPORelation;
+import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.DataLoader;
+import com.bigdata.rdf.store.ITripleStore;
+import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.DataService;
@@ -1436,6 +1442,11 @@ public class RDFDataLoadMaster implements Callable<Void> {
             Serializable, IDataServiceAwareProcedure {
 
         /**
+         * 
+         */
+        private static final long serialVersionUID = 6787939197771556658L;
+
+        /**
          * The {@link DataService} on which the client is executing. This is set
          * automatically by the {@link DataService} when it notices that this
          * class implements the {@link IDataServiceAwareProcedure} interface.
@@ -1513,7 +1524,16 @@ public class RDFDataLoadMaster implements Callable<Void> {
 
             }
 
-            loadData(tripleStore);
+            // @todo factory method.
+            final RDFLoadTaskFactory taskFactory = new RDFLoadTaskFactory(
+                    tripleStore, jobState.bufferCapacity,
+                    jobState.verifyRDFSourceData, jobState.deleteAfter,
+                    jobState.fallback);
+
+            final ConcurrentDataLoader loader = new ConcurrentDataLoader(fed,
+                    jobState.nthreads);
+
+            loadData(loader, taskFactory, tripleStore);
 
             return null;
 
@@ -1532,128 +1552,175 @@ public class RDFDataLoadMaster implements Callable<Void> {
          * @throws Exception
          *             if something else goes wrong.
          */
-        protected void loadData(AbstractTripleStore tripleStore)
-                throws InterruptedException, Exception {
+        protected void loadData(//
+                final ConcurrentDataLoader loader,//
+                final AbstractRDFTaskFactory taskFactory,//
+                final AbstractTripleStore tripleStore//
+                ) throws InterruptedException, Exception {
 
-            loadDataFromFiles(tripleStore);
+            loadDataFromFiles(loader, taskFactory, tripleStore);
 
         }
 
         /**
-         * Implementation loads data from the {@link JobState#dataDir} and
-         * optionally deletes files after they have been loaded successfully.
-         * 
-         * @param tripleStore
+         * Starts a {@link RunnableFileSystemLoader} which loads data from the
+         * {@link JobState#dataDir} and optionally deletes files after they have
+         * been loaded successfully. This task is designed to run forever. It
+         * SHOULD be interrupted in order to halt processing. You MUST specify
+         * {@link JobState#deleteAfter} or it will continually re-load the same
+         * data.
          * 
          * @throws InterruptedException
          * @throws Exception
          * 
-         * FIXME In order for the client to run forever it will have to
-         * periodically wake up and recheck the dataDir to see if new files have
-         * arrived.
+         * @todo It would be better to set a flag on the CDL to halt processing
+         *       so that we do not interrupt processing in the middle of a file
+         *       load. That could also be accomplished by draining the CDL's
+         *       input queue. Interrupt of the CDL should be reserved for a very
+         *       long running data load task where you really need to abort the
+         *       data load operation, e.g., when processing some extremely large
+         *       file.
          */
-        protected void loadDataFromFiles(AbstractTripleStore tripleStore)
+        protected void loadDataFromFiles(final ConcurrentDataLoader loader,
+                final AbstractRDFTaskFactory taskFactory,
+                final AbstractTripleStore tripleStore)
                 throws InterruptedException, Exception {
 
-            final ConcurrentDataLoader.RDFLoadTaskFactory loadTaskFactory = new ConcurrentDataLoader.RDFLoadTaskFactory(
-                    tripleStore, jobState.bufferCapacity,
-                    jobState.verifyRDFSourceData, jobState.deleteAfter,
-                    jobState.fallback);
+            // @todo config delay
+            final long initialDelay = 0;
+            final long delay = 5000;
 
-            final ConcurrentDataLoader loader = new ConcurrentDataLoader(
-                    getFederation().getClient(), jobState.nthreads,
-                    jobState.nclients, clientNum);
+            /*
+             * Start a scheduled task. It will run until explicitly cancelled.
+             */
+            final ScheduledFuture f = getFederation().addScheduledTask(
+                    new RunnableFileSystemLoader(loader, taskFactory,
+                            tripleStore, jobState.dataDir), initialDelay,
+                    delay, TimeUnit.MILLISECONDS);
 
-            if (INFO)
-                log.info("Loading: " + jobState.dataDir);
+            /*
+             * The scheduled task should run forever so this blocks until this
+             * thread is interruted.
+             */
+            f.get();
 
-            // loads everything in the file or directory.
-            loader.submitTask(jobState.dataDir.getPath(), loadTaskFactory);
-
-            // wait until the data have been loaded.
-            loader.awaitCompletion(Long.MAX_VALUE, TimeUnit.SECONDS);
-
-            if (INFO)
-                log.info("Loaded: " + jobState.dataDir);
-
-            // if (jobState.deleteAfter && jobState.dataDir.isDirectory()) {
-            //                
-            // /*
-            // * @todo This removes the directory into which the files were
-            // * written. We might want to leave that directory alone. Also,
-            // * we might want to NOT delete anything since files which could
-            // * not be loaded will still exist in the directory.
-            // */
-            // recursiveDelete(jobState.dataDir);
-            //                
-            // }
-
+            // cancel the scheduled task.
+            f.cancel(true/*mayInterruptIfRunning*/);
+            
         }
 
+//        /**
+//         * Recursively removes any files and subdirectories and then removes the
+//         * file (or directory) itself.
+//         * 
+//         * @param file
+//         *            A file or directory.
+//         */
+//        protected void recursiveDelete(final File file) {
+//
+//            if (file.isDirectory()) {
+//
+//                final File[] children = file.listFiles();
+//
+//                for (int i = 0; i < children.length; i++) {
+//
+//                    recursiveDelete(children[i]);
+//
+//                }
+//
+//            }
+//
+//            if (INFO)
+//                log.info("Removing: " + file);
+//
+//            if (!file.delete())
+//                log.warn("Could not remove: " + file);
+//
+//        }
+
         /**
-         * Recursively removes any files and subdirectories and then removes the
-         * file (or directory) itself.
-         * 
-         * @param file
-         *            A file or directory.
+         * {@link Runnable} class applies the factory to each file found in the
+         * specified directory.
          */
-        protected void recursiveDelete(final File file) {
+        static protected class RunnableFileSystemLoader implements Runnable {
 
-            if (file.isDirectory()) {
+            volatile boolean done = false;
 
-                final File[] children = file.listFiles();
+            final ConcurrentDataLoader loader;
 
-                for (int i = 0; i < children.length; i++) {
+            final AbstractRDFTaskFactory taskFactory;
 
-                    recursiveDelete(children[i]);
+            final AbstractTripleStore tripleStore;
+
+            final File file;
+
+            public RunnableFileSystemLoader(final ConcurrentDataLoader loader,
+                    final AbstractRDFTaskFactory taskFactory,
+                    final AbstractTripleStore tripleStore, final File file) {
+
+                if (loader == null)
+                    throw new IllegalArgumentException();
+                if (taskFactory == null)
+                    throw new IllegalArgumentException();
+                if (tripleStore == null)
+                    throw new IllegalArgumentException();
+                if (file == null)
+                    throw new IllegalArgumentException();
+
+                this.loader = loader;
+
+                this.taskFactory = taskFactory;
+
+                this.tripleStore = tripleStore;
+
+                this.file = file;
+
+            }
+
+            /**
+             * Creates a task using the {@link #taskFactory}, submits it to the
+             * {@link #loader} and and waits for the task to complete.
+             * <p>
+             * Errors are logged, but not thrown. This makes the task suitable
+             * for use with a {@link ScheduledExecutorService}.
+             * 
+             * @throws RuntimeException
+             *             if interrupted.
+             */
+            public void run() {
+
+                try {
+
+                    if (INFO)
+                        log.info("start: file=" + file);
+
+                    // loads everything in the file or directory.
+                    loader.submitTask(file.getPath(), taskFactory);
+
+                    // wait until the data have been loaded.
+                    loader.awaitCompletion(Long.MAX_VALUE, TimeUnit.SECONDS);
+
+                    if (INFO)
+                        log.info("done : file=" + file);
+
+                } catch (InterruptedException t) {
+
+                    // Note: This is normal termination.
+                    log.warn("Interrupted");
+
+                    throw new RuntimeException("Interrupted.");
+                    
+                } catch (Throwable t) {
+
+                    // Catch and log all errors.
+                    log.error(file, t);
 
                 }
 
             }
 
-            if (INFO)
-                log.info("Removing: " + file);
-
-            if (!file.delete())
-                log.warn("Could not remove: " + file);
-
         }
-
+        
     }
 
 }
-
-/*
- * @todo There should be someway to unify jini and the namespace hierarchy stuff
- * used for relations and the metadata index.
- */
-
-// /**
-// * Exposes the jini {@link Configuration} interface but is namespace aware
-// * and so benefits from inherited properties.
-// *
-// * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-// Thompson</a>
-// * @version $Id$
-// *
-// * @see com.bigdata.config.Configuration
-// */
-// private class NamespaceAwareConfiguration implements Configuration {
-//
-//    
-// public Object getEntry(String arg0, String arg1, Class arg2)
-// throws ConfigurationException {
-// return null;
-// }
-//
-// public Object getEntry(String arg0, String arg1, Class arg2, Object arg3)
-// throws ConfigurationException {
-// return null;
-// }
-//
-// public Object getEntry(String arg0, String arg1, Class arg2,
-// Object arg3, Object arg4) throws ConfigurationException {
-// return null;
-// }
-//
-// }

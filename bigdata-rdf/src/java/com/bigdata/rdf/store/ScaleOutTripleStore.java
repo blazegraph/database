@@ -30,6 +30,7 @@ package com.bigdata.rdf.store;
 import java.util.Properties;
 
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.rdf.load.ConcurrentDataLoader;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.service.EmbeddedFederation;
 import com.bigdata.service.IBigdataClient;

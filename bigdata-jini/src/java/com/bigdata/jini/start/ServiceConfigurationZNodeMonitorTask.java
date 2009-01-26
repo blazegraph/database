@@ -439,6 +439,12 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
 
         final String zpath = e.getPath();
 
+        if (zpath == null) {
+            
+            throw new AssertionError("No zpath: event=" + e);
+            
+        }
+        
         final String[] watchedSet = watcher.getWatchedNodes();
 
         switch (ServiceConfigurationZNodeEnum

@@ -195,22 +195,22 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
 
         };
         
-        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(
-                client, nthreads, bufferCapacity, file, filter, nclients, clientNum);
+        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(fed,
+                nthreads, bufferCapacity, file, filter, nclients, clientNum);
 
         helper.load(store);
 
-        if(validate)
-        helper.validate(store);
+        if (validate)
+            helper.validate(store);
 
         helper.shutdownNow();
-        
+
         client.disconnect(true/*immediateShutdown*/);
-        
+
         System.out.println("Exiting normally.");
-        
+
         System.exit(0);
-        
+
     }
 
 }
