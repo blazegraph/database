@@ -186,8 +186,8 @@ abstract public class OverflowManager extends IndexManager {
      * This may be used to minimize the footprint of the {@link StoreManager} on
      * the disk for the current view. However, note that you must also arrange
      * to purge any unused resources after the compacting merge overflow in
-     * order to regain storage associated with views older than the
-     * {@link StoreManager.Options#MIN_RELEASE_AGE}.
+     * order to regain storage associated with views older than the current
+     * releaseTime.
      */
     public final AtomicBoolean compactingMerge = new AtomicBoolean(false);
     
@@ -541,7 +541,7 @@ abstract public class OverflowManager extends IndexManager {
     /**
      * @param properties
      */
-    public OverflowManager(Properties properties) {
+    public OverflowManager(final Properties properties) {
 
         super(properties);
         

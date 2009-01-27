@@ -837,8 +837,9 @@ abstract public class DataService extends AbstractService
                         
                         localState.setRunState(RunState.Committed);
 
-                        journal.getLocalTransactionManager().deactivateTx(
-                                localState);
+                        ((DataServiceTransactionManager) journal
+                                .getLocalTransactionManager())
+                                .deactivateTx(localState);
                         
 //                        state.setRunState(RunState.Committed);
                         
@@ -880,7 +881,9 @@ abstract public class DataService extends AbstractService
                 
                     localState.setRunState(RunState.Committed);
 
-                    journal.getLocalTransactionManager().deactivateTx(localState);
+                    ((DataServiceTransactionManager) journal
+                            .getLocalTransactionManager())
+                            .deactivateTx(localState);
                 
 //                    state.setRunState(RunState.Committed);
 
@@ -900,7 +903,9 @@ abstract public class DataService extends AbstractService
 
                     localState.setRunState(RunState.Aborted);
 
-                    journal.getLocalTransactionManager().deactivateTx(localState);
+                    ((DataServiceTransactionManager) journal
+                            .getLocalTransactionManager())
+                            .deactivateTx(localState);
 
 //                    state.setRunState(RunState.Aborted);
 

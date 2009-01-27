@@ -441,7 +441,7 @@ public class JournalTransactionService extends AbstractTransactionService {
      * Ignored since the {@link Journal} records the last commit time
      * in its root blocks.
      */
-    public void notifyCommit(long commitTime) throws IOException {
+    public void notifyCommit(long commitTime) {
     
         // NOP
         

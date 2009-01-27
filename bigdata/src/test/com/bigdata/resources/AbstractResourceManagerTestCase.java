@@ -51,13 +51,10 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ConcurrencyManager;
-import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.IResourceLockService;
-import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.RegisterIndexTask;
 import com.bigdata.journal.TemporaryStore;
-import com.bigdata.journal.ValidationError;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
@@ -66,6 +63,7 @@ import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.resources.ResourceManager.Options;
+import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
@@ -122,6 +120,7 @@ public class AbstractResourceManagerTestCase extends
     protected IMetadataService metadataService;
     protected ResourceManager resourceManager;
     protected ConcurrencyManager concurrencyManager;
+    private AbstractTransactionService txService;
     protected AbstractLocalTransactionManager localTransactionManager;
     private ExecutorService executorService; 
     private IBigdataFederation fed;
@@ -168,12 +167,23 @@ public class AbstractResourceManagerTestCase extends
 
         };
 
-        localTransactionManager = new MockLocalTransactionManager();
+        txService = new MockTransactionService(properties){
+
+            protected void setReleaseTime(long releaseTime) {
+                
+                super.setReleaseTime(releaseTime);
+
+                // propagate the new release time to the resource manager.
+                resourceManager.setReleaseTime(releaseTime);
+                
+            }
+
+        }.start();
+        
+        localTransactionManager = new MockLocalTransactionManager(txService);
         
         concurrencyManager = new ConcurrencyManager(properties,
                 localTransactionManager, resourceManager);
-
-//        localTransactionManager.setConcurrencyManager(concurrencyManager);
 
         resourceManager.setConcurrencyManager(concurrencyManager);
         
@@ -187,55 +197,26 @@ public class AbstractResourceManagerTestCase extends
 
     public void tearDown() throws Exception {
 
-        shutdownNow();
+        if(executorService != null)
+            executorService.shutdownNow();
+
+        if (fed != null)
+            fed.destroy();
         
+        if (metadataService != null)
+            metadataService.destroy();
+
         if (resourceManager != null)
-            resourceManager.deleteResources();
-
-    }
-
-    /**
-     * Polite shutdown does not accept new requests and will shutdown once the
-     * existing requests have been processed.
-     * <p>
-     * Note: The {@link IConcurrencyManager} is shutdown first, then the
-     * {@link ITransactionService} and finally the {@link IResourceManager}.
-     */
-    public void shutdown() {
-
-        concurrencyManager.shutdown();
-
-        localTransactionManager.shutdown();
-
-        resourceManager.shutdown();
-
-//        metadataService.shutdown();
+            resourceManager.shutdownNow();
         
-    }
-
-    /**
-     * Shutdown attempts to abort in-progress requests and shutdown as soon as
-     * possible.
-     * <p>
-     * Note: The {@link IConcurrencyManager} is shutdown first, then the
-     * {@link ITransactionService} and finally the {@link IResourceManager}.
-     */
-    public void shutdownNow() {
-
         if (concurrencyManager != null)
             concurrencyManager.shutdownNow();
 
         if (localTransactionManager != null)
             localTransactionManager.shutdownNow();
 
-        if (resourceManager != null)
-            resourceManager.shutdownNow();
-
-//        if (metadataService!= null)
-//            metadataService.shutdownNow();
-
-        if (executorService != null) {
-            executorService.shutdownNow();
+        if (txService != null) {
+            txService.destroy();
         }
         
     }
@@ -353,8 +334,6 @@ public class AbstractResourceManagerTestCase extends
         }
 
         public void destroy() throws IOException {
-
-            throw new UnsupportedOperationException();
 
         }
 

@@ -55,7 +55,6 @@ import com.bigdata.journal.RunState;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.journal.ValidationError;
 import com.bigdata.resources.ResourceManager;
-import com.bigdata.resources.StoreManager;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.MillisecondTimestampFactory;
 
@@ -96,13 +95,25 @@ abstract public class AbstractTransactionService extends AbstractService
         
         /**
          * How long you want to hold onto the database history (in milliseconds)
-         * or {@link Long#MAX_VALUE} for an (effectively) immortal database.
+         * or {@link Long#MAX_VALUE} for an (effectively) immortal database. The
+         * {@link ITransactionService} tracks the timestamp corresponding to the
+         * earliest running transaction (if any). When such a transaction
+         * exists, the actual release time is:
+         * 
+         * <pre>
+         * releaseTime = min(earliestRunningTx, now - minimumReleaseAge) - 1
+         * </pre>
+         * 
+         * This ensures that history in use by running transactions is not
+         * released even when the minimumReleaseAge is ZERO (0).
          * 
          * @see #DEFAULT_MIN_RELEASE_AGE
          * @see #MIN_RELEASE_AGE_1H
          * @see #MIN_RELEASE_AGE_1D
          * @see #MIN_RELEASE_AGE_1W
          * @see #MIN_RELEASE_AGE_NEVER
+         * 
+         * @see AbstractTransactionService#updateReleaseTime(long)
          */
         String MIN_RELEASE_AGE = AbstractTransactionService.class.getName()
                 + ".minReleaseAge";
@@ -177,6 +188,8 @@ abstract public class AbstractTransactionService extends AbstractService
     
     /**
      * The minimum age in milliseconds before history may be released.
+     * 
+     * @see Options#MIN_RELEASE_AGE
      */
     final private long minReleaseAge;
     
@@ -742,9 +755,12 @@ abstract public class AbstractTransactionService extends AbstractService
     /**
      * Return the timestamp whose historical data MAY be release. This time is
      * derived from the timestamp of the earliest running transaction MINUS the
-     * minimum release age and updated whenever the earliest running transaction
-     * terminates. This value will never be GT the last commit time and will
-     * never be negative. It MAY be ZERO (0L) and will be ZERO (0L) on startup.
+     * minimum release age and is updated whenever the earliest running
+     * transaction terminates. This value will never be GT the last commit time
+     * and will never be negative. It MAY be ZERO (0L) and will be ZERO (0L) on
+     * startup.
+     * 
+     * @see Options#MIN_RELEASE_AGE
      */
     public long getReleaseTime() {
 
@@ -753,13 +769,19 @@ abstract public class AbstractTransactionService extends AbstractService
     }
     private volatile long releaseTime = 0L;
     
+    /**
+     * Sets the new release time.
+     * 
+     * @param newValue
+     *            The new value.
+     */
     protected void setReleaseTime(final long newValue) {
 
         if(!lock.isHeldByCurrentThread())
             throw new IllegalMonitorStateException();
         
         if (INFO)
-            log.info("newValue="+newValue);
+            log.info("newValue=" + newValue);
         
         this.releaseTime = newValue;
         
@@ -894,17 +916,13 @@ abstract public class AbstractTransactionService extends AbstractService
     }
    
     /**
-     * Remove the transaction entry in the ordered set of running transactions.
-     * <p>
-     * Whenever a read historical transaction completes it consults its internal
-     * state and decides if there are existing readers still reading from an
-     * earlier timestamp. If not, then it can choose to advance the release
-     * time. Data services MAY release data for views whose timestamp is less
-     * than or equal to the specified release time IFF that action would be in
-     * keeping with their local history retention policy (minReleaseAge) AND if
-     * the data is not required for the most current committed state (data for
-     * the most current committed state is not releasable regardless of the
-     * release time or the minReleaseAge).
+     * This method is invoked each time a transaction completes with the
+     * absolute value of the transaction identifier that has just been
+     * deactivated. The method will remove the transaction entry in the ordered
+     * set of running transactions ({@link #startTimeIndex}). If the specified
+     * timestamp corresponds to the earliest running transaction, then the
+     * <code>releaseTime</code> will be updated and the new releaseTime will
+     * be set using {@link #setReleaseTime(long)}.
      * <p>
      * Note that the {@link #startTimeIndex} contains the absolute value of the
      * transaction identifers!
@@ -975,6 +993,7 @@ abstract public class AbstractTransactionService extends AbstractService
                  */
                 earliestTxStartTime = startTimeIndex.decodeKey(startTimeIndex
                         .keyAt(0));
+                
             } else {
 
                 /*
@@ -987,6 +1006,12 @@ abstract public class AbstractTransactionService extends AbstractService
 
         } // synchronized(startTimeIndex)
 
+        if (minReleaseAge == Long.MAX_VALUE) {
+
+            return;
+            
+        }
+        
         if (isEarliestTx) {
 
             // last commit time on the database.
@@ -1005,15 +1030,22 @@ abstract public class AbstractTransactionService extends AbstractService
              * c) minReleaseAge milliseconds in the past.
              * 
              * Note: NEVER let go of the last commit time!
+             * 
+             * @todo there is a fence post here for [now-minReleaseAge] when
+             * minReleaseAge is very large, e.g., Long#MAX_VALUE. This is caught
+             * above for that specific value, but other very large values could
+             * also cause problems.
              */
             final long releaseTime = Math.min(lastCommitTime - 1, Math.min(
                     earliestTxStartTime - 1, now - minReleaseAge));
 
             /*
              * We only update the release time if the computed time would
-             * advance the releaseTime (it MUST NOT go backwards since the
-             * database may have already released history for any commit point
-             * whose commitTime is LTE to the existing releaseTime.
+             * advance the releaseTime.
+             * 
+             * Note: The releaseTime MUST NOT go backwards since the database
+             * may have already released history for any commit point whose
+             * commitTime is LTE to the existing releaseTime.
              */
             if (this.releaseTime < releaseTime) {
 
@@ -1025,7 +1057,7 @@ abstract public class AbstractTransactionService extends AbstractService
                             + releaseTime + ")");
 
                 // update.
-                setReleaseTime( releaseTime );
+                setReleaseTime(releaseTime);
 
             }
 
@@ -1034,12 +1066,51 @@ abstract public class AbstractTransactionService extends AbstractService
     }
 
     /**
+     * The basic implementation advances the release time periodically as
+     * commits occur even when there are no transactions in use.  
+     * <p>
+     * Note: This needs to be a fairly low-latency operation since this method
+     * is invoked for all commits on all data services and will otherwise be a
+     * global hotspot.
+     */
+    public void notifyCommit(final long commitTime) {
+
+        lock.lock();
+
+        try {
+
+            synchronized (startTimeIndex) {
+
+                if (this.releaseTime < (commitTime - 1)
+                        && startTimeIndex.getEntryCount() == 0) {
+
+                    /*
+                     * If there are NO active transactions and the current
+                     * releaseTime is LT (commitTime-1) then advance the
+                     * releaseTime to (commitTime-1).
+                     */
+
+                    if (INFO)
+                        log.info("Advancing releaseTime (no active tx).");
+
+                    setReleaseTime(commitTime - 1);
+
+                }
+
+            }
+
+        } finally {
+
+            lock.unlock();
+
+        }
+
+    }
+
+    /**
      * Return the minimum #of milliseconds of history that must be preserved.
      * 
-     * @todo Move the minReleaseAge configuration property here from the
-     *       {@link StoreManager} and have the {@link StoreManager} refuse to
-     *       release history until it has been notified of a releaseTime. This
-     *       will centralize the value for the minimum amount of history that
+     * @todo This centralizes the value for the minimum amount of history that
      *       will be preserved across the federation.
      *       <p>
      *       If minReleaseTime is increased, then the release time can be
@@ -1050,13 +1121,13 @@ abstract public class AbstractTransactionService extends AbstractService
      *       more history (or at least as soon as the task runs to notify the
      *       discovered data services of the new release time).
      */
-   final public long getMinReleaseAge() {
-        
+    final public long getMinReleaseAge() {
+
         return minReleaseAge;
-        
+
     }
 
-   /**
+    /**
      * A transient index holding the <strong>absolute value</strong> of the
      * start times of all active transactions.
      * <p>
@@ -1069,8 +1140,9 @@ abstract public class AbstractTransactionService extends AbstractService
      * will not return a timestamp whose absolute value corresponds to an active
      * transaction.
      */
-    protected final CommitTimeIndex startTimeIndex = CommitTimeIndex.createTransient();
-    
+    protected final CommitTimeIndex startTimeIndex = CommitTimeIndex
+            .createTransient();
+
     /**
      * Assign a transaction identifier for a new transaction.
      * 
@@ -1294,7 +1366,7 @@ abstract public class AbstractTransactionService extends AbstractService
                      * keys in the [startTimeIndex] can be the absolute value of
                      * the assigned timestamp and still be unique.
                      * 
-                     * @todo We could grap the timestamp using an atomic
+                     * @todo We could grab the timestamp using an atomic
                      * putIfAbsent and a special value and the replace the value
                      * with the desired one (or just construct the TxState
                      * object each time and discard it if the map contains that

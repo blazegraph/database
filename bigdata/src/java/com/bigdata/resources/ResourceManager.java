@@ -472,13 +472,13 @@ abstract public class ResourceManager extends OverflowManager implements IResour
                             }
                         });
 
-                tmp.addCounter(IStoreManagerCounters.MinimumReleaseAge,
-                        new OneShotInstrument<Long>(minReleaseAge));
+//                tmp.addCounter(IStoreManagerCounters.MinimumReleaseAge,
+//                        new OneShotInstrument<Long>(minReleaseAge));
 
                 tmp.addCounter(IStoreManagerCounters.ReleaseTime,
                         new Instrument<Long>() {
                             public void sample() {
-                                setValue(releaseTime);
+                                setValue(getReleaseTime());
                             }
                         });
 

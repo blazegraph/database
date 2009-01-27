@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.resources;
 
+import java.util.Properties;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.Future;
@@ -44,6 +45,7 @@ import com.bigdata.journal.RegisterIndexTask;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
+import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.TestOverflow;
 
 /**
@@ -68,6 +70,20 @@ public class TestSplitTask extends AbstractResourceManagerTestCase {
         super(arg0);
     }
 
+    public Properties getProperties() {
+        
+        Properties p = new Properties(super.getProperties());
+        
+        // prevent release of the old journal during the test.
+        p.setProperty(AbstractTransactionService.Options.MIN_RELEASE_AGE,""+Long.MAX_VALUE);
+
+        // disable release during startup (simplies debugging since only calls purge once)
+        p.setProperty(StoreManager.Options.PURGE_OLD_RESOURCES_DURING_STARTUP,"false");
+        
+        return p;
+        
+    }
+    
     /**
      * Test generation of N index splits based on an index partition that has
      * been pre-populated with index entries and a specified target #of index
@@ -124,7 +140,7 @@ public class TestSplitTask extends AbstractResourceManagerTestCase {
             final byte[][] keys = new byte[nentries][];
             final byte[][] vals = new byte[nentries][];
 
-            Random r = new Random();
+            final Random r = new Random();
 
             for (int i = 0; i < nentries; i++) {
 
@@ -138,7 +154,7 @@ public class TestSplitTask extends AbstractResourceManagerTestCase {
                                 
             }
 
-            IIndexProcedure proc = BatchInsertConstructor.RETURN_NO_VALUES
+            final IIndexProcedure proc = BatchInsertConstructor.RETURN_NO_VALUES
                     .newInstance(indexMetadata, 0/* fromIndex */,
                             nentries/*toIndex*/, keys, vals);
 

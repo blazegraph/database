@@ -116,33 +116,7 @@ public class ZLockImpl implements ZLock {
      *             if the lock node has been invalidated but not yet destroyed.
      */
     public static ZLockImpl getLock(final ZooKeeper zookeeper,
-            final String zpath, final List<ACL> acl) throws KeeperException,
-            InterruptedException {
-
-        if (zookeeper.exists(zpath + INVALID, false) != null) {
-
-            /*
-             * End of the competition. Either someone created the service or
-             * someone destroyed the lock node.
-             */
-
-            throw new ZLockNodeInvalidatedException(zpath);
-
-        }
-
-        try {
-
-            /*
-             * Ensure that the lock node exists.
-             */
-
-            zookeeper.create(zpath, new byte[0], acl, CreateMode.PERSISTENT);
-
-        } catch (NodeExistsException ex) {
-
-            // ignore - the lock node exists.
-
-        }
+            final String zpath, final List<ACL> acl) {
 
         return new ZLockImpl(zookeeper, zpath, acl);
 
@@ -220,6 +194,43 @@ public class ZLockImpl implements ZLock {
 
     }
 
+    /**
+     * Validate the lock node. If it has not been invalidated and does not exist
+     * then create it.
+     * 
+     * @throws InterruptedException
+     * @throws KeeperException
+     */
+    private void validateLockNode() throws InterruptedException,
+            KeeperException {
+
+        if (zookeeper.exists(zpath + INVALID, false) != null) {
+
+            /*
+             * End of the competition. Either someone created the service or
+             * someone destroyed the lock node.
+             */
+
+            throw new ZLockNodeInvalidatedException(zpath);
+
+        }
+
+        try {
+
+            /*
+             * Ensure that the lock node exists.
+             */
+
+            zookeeper.create(zpath, new byte[0], acl, CreateMode.PERSISTENT);
+
+        } catch (NodeExistsException ex) {
+
+            // ignore - the lock node exists.
+
+        }
+
+    }
+    
     /**
      * Inner class provides watcher for the lock. The watcher will continue to
      * receive {@link WatchedEvent}s until the lock node is either invalidated
@@ -877,14 +888,12 @@ public class ZLockImpl implements ZLock {
             long nanos = unit.toNanos(timeout);
 
             /*
-             * If there is a marker node indicating that the lock has been
-             * invalidated then we DO NOT enter a child into the queue.
+             * Ensure that the lock node exists.
+             * 
+             * Note: Throws an InterruptedException if the lock node has been
+             * invalidated.
              */
-            if (zookeeper.exists(zpath + INVALID, false) != null) {
-
-                throw new ZLockNodeInvalidatedException(zpath);
-
-            }
+            validateLockNode();
 
             /*
              * There is no data in the ephemeral znode representing the process

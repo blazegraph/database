@@ -553,8 +553,7 @@ public interface IDataService extends ITxCommitProtocol, IService {
      *            to its minimum extent (all writes will be preserved but there
      *            will be no free space left in the journal). This may be used
      *            to force the {@link DataService} to its minimum possible
-     *            footprint given the configured
-     *            {@link StoreManager#getMinReleaseAge()}.
+     *            footprint for the configured history retention policy.
      * 
      * @return <code>true</code> if successful and <code>false</code> if the
      *         write service could not be paused after the specified timeout.

@@ -196,6 +196,16 @@ public class TestTransactionService extends TestCase2 {
                 }
 
             }
+            
+            /*
+             * @todo This is not invoking the behavior in the base class because
+             * that violates the assumptions of some of the unit tests. Those
+             * tests were written before notifyCommit() was tasked with
+             * advancing the releaseTime when there were no active transactions.
+             * The tests could be rewritten under the new assumptions and then
+             * this line could be uncommented.
+             */
+//            super.notifyCommit(commitTime);
 
         }
 

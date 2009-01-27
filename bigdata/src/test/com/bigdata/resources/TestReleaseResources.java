@@ -36,12 +36,10 @@ import java.util.concurrent.ExecutionException;
 
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.resources.StoreManager.Options;
+import com.bigdata.service.AbstractTransactionService;
 
 /**
- * Test release of old resources using {@link Options#MIN_RELEASE_AGE}.
- * 
- * @todo write test where the [releaseAge] is set.
+ * Test release (aka purge) of old resources.
  * 
  * @todo Write a unit test for purge before, during and after the 1st overflow
  *       and after a restart. Before, there should be nothing to release.
@@ -171,7 +169,9 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             Properties properties = new Properties( super.getProperties() );
 
             // Never release old resources.
-            properties.setProperty(Options.MIN_RELEASE_AGE,Options.MIN_RELEASE_AGE_NEVER);
+            properties.setProperty(
+                    AbstractTransactionService.Options.MIN_RELEASE_AGE,
+                    AbstractTransactionService.Options.MIN_RELEASE_AGE_NEVER);
             
             return properties;
             
@@ -320,7 +320,8 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             Properties properties = new Properties( super.getProperties() );
 
             // Never retain history.
-            properties.setProperty(Options.MIN_RELEASE_AGE,"0");
+            properties.setProperty(
+                    AbstractTransactionService.Options.MIN_RELEASE_AGE, "0");
             
             return properties;
             
@@ -389,8 +390,11 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
                 
                 assertSameResources(new IRawStore[] {liveJournal}, actual);
 
+                // only retain the lastCommitTime.
+                resourceManager.setReleaseTime(lastCommitTime - 1);
+                
             }
-            
+
             resourceManager
                     .purgeOldResources(1000/* ms */, false/*truncateJournal*/);
             
@@ -467,22 +471,23 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
         }
         
         /**
-         * The value that will be configured for the {@link Options#MIN_RELEASE_AGE}.
-         * 
-         * @todo restore to 2000 (2 seconds).
-         * 
-         * Note: 20000 is 20 seconds.
-         * 
-         * Note: 200000 is 200 seconds.
+         * This is the minimum release time that will be used for the test.
+         * <P>
+         * Note: 20000 is 20 seconds. This is what you SHOULD use for the test.
+         * <p>
+         * Note: 200000 is 200 seconds. This can be used for debugging, but
+         * always restore the value so that the test will run in a reasonable
+         * timeframe.
          */
         final private long MIN_RELEASE_AGE = 2000; 
         
         public Properties getProperties() {
             
-            Properties properties = new Properties( super.getProperties() );
+            final Properties properties = new Properties( super.getProperties() );
 
-            // 2 seconds (in milliseconds).
-            properties.setProperty(Options.MIN_RELEASE_AGE,""+MIN_RELEASE_AGE);
+            properties.setProperty(
+                    AbstractTransactionService.Options.MIN_RELEASE_AGE, ""
+                            + MIN_RELEASE_AGE);
             
             return properties;
             
@@ -506,9 +511,6 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
         public void test() throws IOException,
                 InterruptedException, ExecutionException {
 
-            // verify configuration.
-            assertEquals(MIN_RELEASE_AGE,resourceManager.getMinReleaseAge());
-            
             // no overflow yet.
             assertEquals(0,resourceManager.getOverflowCount());
 
@@ -562,9 +564,10 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             
                 final long elapsed = System.currentTimeMillis() - begin;
              
-                final long delay = resourceManager.minReleaseAge - elapsed;
+                final long delay = MIN_RELEASE_AGE - elapsed;
                 
-                System.err.println("Waiting "+delay+"ms to force an overflow");
+                System.err.println("Waiting " + delay
+                        + "ms to force an overflow");
                 
                 // wait until the minReleaseAge would be satisified.
                 Thread.sleep( delay );

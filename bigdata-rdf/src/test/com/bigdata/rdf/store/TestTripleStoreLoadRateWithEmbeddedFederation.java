@@ -98,9 +98,6 @@ public class TestTripleStoreLoadRateWithEmbeddedFederation extends
 //      properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*500);
 //        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*500);
         
-        // Do not hold onto old resources.
-        properties.setProperty(StoreManager.Options.MIN_RELEASE_AGE, "0");
-        
         // control the #of data services.
         properties.setProperty(EmbeddedClient.Options.NDATA_SERVICES, "1");
 

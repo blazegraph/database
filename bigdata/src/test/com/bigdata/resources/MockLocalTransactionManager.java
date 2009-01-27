@@ -11,15 +11,18 @@ import com.bigdata.journal.ITransactionService;
  */
 class MockLocalTransactionManager extends AbstractLocalTransactionManager {
 
-    public MockLocalTransactionManager() {
+    private final ITransactionService txService;
+    
+    public MockLocalTransactionManager(ITransactionService txService) {
 
-        super();
+        this.txService = txService;
 
     }
 
     public ITransactionService getTransactionService() {
-        // TODO Auto-generated method stub
-        return null;
+
+        return txService;
+        
     }
 
 }

@@ -380,11 +380,23 @@ public class ServicesManagerServer extends AbstractServer {
         
         try {
 
+            // try one signal name.
             new SigHUPHandler("HUP", args);
 
         } catch (IllegalArgumentException ex) {
 
             log.warn("Signal handler not installed: " + ex);
+
+            try {
+
+                // try another signal name.
+                new SigHUPHandler("SIGHUP", args);
+                
+            } catch (IllegalArgumentException ex1) {
+
+                log.warn("Signal handler not installed: " + ex1);
+                
+            }
             
         }
 

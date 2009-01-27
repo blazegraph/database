@@ -271,8 +271,8 @@ abstract public class IndexManager extends StoreManager {
     final private IndexCache indexCache;
 
     /**
-     * The earliest timestamp that must be retained for the read-historical
-     * indices in the cache and {@link Long#MAX_VALUE} if there a NO
+     * The earliest timestamp that MUST be retained for the read-historical
+     * indices in the cache and {@link Long#MAX_VALUE} if there are NO
      * read-historical indices in the cache.
      * 
      * @see StoreManager#indexCacheLock
@@ -313,7 +313,7 @@ abstract public class IndexManager extends StoreManager {
         private AtomicLong retentionTime = new AtomicLong(-1L);
 
         /**
-         * The earliest timestamp that must be retained for the read-historical
+         * The earliest timestamp that MUST be retained for the read-historical
          * indices in the cache and {@link Long#MAX_VALUE} if there a NO
          * read-historical indices in the cache.
          * <p>
@@ -335,8 +335,8 @@ abstract public class IndexManager extends StoreManager {
 
                 if (retentionTime.get() == -1L) {
 
-                    long tmp = Long.MAX_VALUE; // note: default if nothing is
-                    // found.
+                    // note: default if nothing is found.
+                    long tmp = Long.MAX_VALUE;
 
                     final Iterator<Map.Entry<NT, WeakReference<IIndex>>> itr = entryIterator();
 
@@ -380,7 +380,7 @@ abstract public class IndexManager extends StoreManager {
 
         }
 
-        public IIndex put(NT k, IIndex v) {
+        public IIndex put(final NT k, final IIndex v) {
 
             synchronized (retentionTime) {
 
@@ -397,7 +397,7 @@ abstract public class IndexManager extends StoreManager {
 
         }
 
-        public IIndex putIfAbsent(NT k, IIndex v) {
+        public IIndex putIfAbsent(final NT k, final IIndex v) {
             
             synchronized(retentionTime) {
                 
@@ -414,7 +414,7 @@ abstract public class IndexManager extends StoreManager {
             
         }
         
-        public IIndex remove(NT k) {
+        public IIndex remove(final NT k) {
             
             synchronized(retentionTime) {
                 
@@ -557,7 +557,7 @@ abstract public class IndexManager extends StoreManager {
      * partition split/move/join changes somehow outpace the cache size then
      * the client would see a {@link NoSuchIndexException} instead.
      */
-    public StaleLocatorReason getIndexPartitionGone(String name) {
+    public StaleLocatorReason getIndexPartitionGone(final String name) {
     
         return staleLocatorCache.get(name);
         
@@ -598,7 +598,7 @@ abstract public class IndexManager extends StoreManager {
         
     }
     
-    protected IndexManager(Properties properties) {
+    protected IndexManager(final Properties properties) {
         
         super(properties);
      
@@ -1248,6 +1248,23 @@ abstract public class IndexManager extends StoreManager {
                      * historical read -or- read-committed operation.
                      */
 
+                    if (timestamp == ITx.READ_COMMITTED) {
+                        
+                        /*
+                         * Check to see if an index partition was split, joined
+                         * or moved.
+                         */
+                        final StaleLocatorReason reason = getIndexPartitionGone(name);
+
+                        if (reason != null) {
+
+                            // Notify client of stale locator.
+                            throw new StaleLocatorException(name, reason);
+
+                        }
+
+                    }
+                    
                     final AbstractBTree[] sources = getIndexSources(name,
                             timestamp);
 
