@@ -105,26 +105,4 @@ public class AbstractResourceManagerBootstrapTestCase extends TestCase2 {
         
     }
 
-//    protected static class MyResourceManager extends ResourceManager {
-//
-////        private static final MillisecondTimestampFactory timestampFactory = new MillisecondTimestampFactory();
-//
-//        public MyResourceManager(Properties properties) {
-//
-//            super(properties);
-//            
-////            super(properties, new ITimestampService(){
-////
-////                public long nextTimestamp() {
-////
-////                    return timestampFactory.nextMillis();
-////                    
-////                }}
-////            
-////            );
-//            
-//        }
-//        
-//    }
-    
 }

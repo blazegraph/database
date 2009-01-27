@@ -702,7 +702,7 @@ public class ClientIndexView implements IClientIndex {
         
     }
 
-    public Object submit(byte[] key, ISimpleIndexProcedure proc) {
+    public Object submit(final byte[] key, final ISimpleIndexProcedure proc) {
 
         // Find the index partition spanning that key.
         final PartitionLocator locator = getMetadataIndex().find(key);

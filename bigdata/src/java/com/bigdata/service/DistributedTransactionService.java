@@ -1874,6 +1874,8 @@ public abstract class DistributedTransactionService extends
             
         }
         
+        super.notifyCommit(commitTime);
+        
     }
     
     final public long getLastCommitTime() {
@@ -1883,18 +1885,19 @@ public abstract class DistributedTransactionService extends
     }
     
     /**
-     * Invokes {@link ITxCommitProtocol#setReleaseTime(long)}.
+     * Invokes {@link ITxCommitProtocol#setReleaseTime(long)} for a specific
+     * {@link IDataService}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private static class NotifyTask implements Callable<Void> {
+    private static class SetReleaseTimeTask implements Callable<Void> {
 
         final IDataService dataService;
 
         final long releaseTime;
 
-        public NotifyTask(final IDataService dataService, final long releaseTime) {
+        public SetReleaseTimeTask(final IDataService dataService, final long releaseTime) {
 
             if (dataService == null)
                 throw new IllegalArgumentException();
@@ -1975,10 +1978,13 @@ public abstract class DistributedTransactionService extends
 
                 for (IDataService dataService : services) {
 
-                    tasks.add(new NotifyTask(dataService, releaseTime));
+                    tasks.add(new SetReleaseTimeTask(dataService, releaseTime));
 
                 }
 
+                log.warn("Will set release time on " + a.length
+                        + " data services: releaseTime=" + releaseTime);
+                
                 final List<Future<Void>> futures = getFederation()
                         .getExecutorService().invokeAll(tasks);
 

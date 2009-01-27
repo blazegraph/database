@@ -74,6 +74,7 @@ import com.bigdata.concurrent.NamedLock;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.CommitRecordIndex;
 import com.bigdata.journal.ConcurrencyManager;
@@ -99,11 +100,9 @@ import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.locator.DefaultResourceLocator;
-import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.MetadataService;
-import com.bigdata.service.DataService.DataServiceTransactionManager;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -152,16 +151,11 @@ abstract public class StoreManager extends ResourceEvents implements
 
     /**
      * Options for the {@link StoreManager}.
-     * <p>
-     * Note: See {@link com.bigdata.journal.Options} for options that may be
-     * applied when opening an {@link AbstractJournal}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static interface Options extends com.bigdata.journal.Options
-//            , IndexSegmentStore.Options
-            {
+    public static interface Options extends com.bigdata.journal.Options {
 
         /**
          * The property whose value is the name of the directory in which the
@@ -191,61 +185,6 @@ abstract public class StoreManager extends ResourceEvents implements
          * its own {@link #DATA_DIR}.
          */
         String DATA_DIR = StoreManager.class.getName()+".dataDir";
-
-        /**
-         * How long you want to hold onto the database history (in milliseconds)
-         * or {@link Long#MAX_VALUE} for an (effectively) immortal database.
-         * Note that you can eagerly trigger an overflow event using
-         * {@link IDataService#forceOverflow()}.
-         * <p>
-         * Some convenience values have been declared.
-         * 
-         * @see #DEFAULT_MIN_RELEASE_AGE
-         * @see #MIN_RELEASE_AGE_1H
-         * @see #MIN_RELEASE_AGE_1D
-         * @see #MIN_RELEASE_AGE_1W
-         * @see #MIN_RELEASE_AGE_NEVER
-         * 
-         * @deprecated May be replaced by a property with the same purpose on
-         *             the {@link AbstractTransactionService}.
-         */
-        String MIN_RELEASE_AGE = StoreManager.class.getName()+".minReleaseAge";
-        
-        /**
-         * Minimum release age is zero (0). A value of ZERO (0) implies that any
-         * history not required for the read-committed view is released each
-         * time the {@link ResourceManager} overflows.
-         */
-        String MIN_RELEASE_AGE_NO_HISTORY = "0";
-        
-        /** Minimum release age is one minutes. */
-        String MIN_RELEASE_AGE_1M = "" + 1/* mn */* 60/* sec */* 1000/* ms */;
-
-        /** Minimum release age is five minutes. */
-        String MIN_RELEASE_AGE_5M = "" + 5/* mn */* 60/* sec */* 1000/* ms */;
-
-        /** Minimum release age is one hour. */
-        String MIN_RELEASE_AGE_1H = "" + 1/* hr */* 60/* mn */* 60/* sec */
-                * 1000/* ms */;
-
-        /** Minimum release age is one day. */
-        String MIN_RELEASE_AGE_1D = "" + 24/* hr */* 60/* mn */* 60/* sec */
-                * 1000/* ms */;
-
-        /** Minimum release age is one week. */
-        String MIN_RELEASE_AGE_1W = "" + 7/* d */* 24/* hr */* 60/* mn */
-                * 60/* sec */
-                * 1000/* ms */;
-
-        /** Immortal database (the release time is set to {@link Long#MAX_VALUE}). */
-        String MIN_RELEASE_AGE_NEVER = "" + Long.MAX_VALUE;
-
-        /**
-         * Default minimum release age is ZERO (0), which means that any data
-         * not required for the earliest read-only transaction or outstanding
-         * historical read operation MAY be released.
-         */
-        String DEFAULT_MIN_RELEASE_AGE = MIN_RELEASE_AGE_NO_HISTORY;//MIN_RELEASE_AGE_1D;
 
         /**
          * The capacity of the LRU cache of open {@link IRawStore}s. The
@@ -307,7 +246,16 @@ abstract public class StoreManager extends ResourceEvents implements
         String IGNORE_BAD_FILES = StoreManager.class.getName()+".ignoreBadFiles";
 
         String DEFAULT_IGNORE_BAD_FILES = "false";
+        
+        /**
+         * Option may be used to disable the purge of old resources during
+         * startup.
+         */
+        String PURGE_OLD_RESOURCES_DURING_STARTUP = StoreManager.class.getName()
+                + ".purgeOldResourcesDuringStartup";
 
+        String DEFAULT_PURGE_OLD_RESOURCES_DURING_STARTUP = "true";
+        
     }
 
     /**
@@ -400,12 +348,12 @@ abstract public class StoreManager extends ResourceEvents implements
          */
         String MaximumJournalSizeAtOverflow = "Maximum Journal Size At Overflow";
 
-        /**
-         * The minimum age in milliseconds before a resource may be released.
-         * 
-         * @see StoreManager.Options#MIN_RELEASE_AGE
-         */
-        String MinimumReleaseAge = "Minimum Release Age";
+//        /**
+//         * The minimum age in milliseconds before a resource may be released.
+//         * 
+//         * @see StoreManager.Options#MIN_RELEASE_AGE
+//         */
+//        String MinimumReleaseAge = "Minimum Release Age";
 
         /**
          * The current release time for the {@link StoreManager}.
@@ -566,6 +514,11 @@ abstract public class StoreManager extends ResourceEvents implements
      * @see Options#IGNORE_BAD_FILES
      */
     private final boolean ignoreBadFiles;
+    
+    /**
+     * @see Options#PURGE_OLD_RESOURCES_DURING_STARTUP
+     */
+    private final boolean purgeOldResourcesDuringStartup;
 
     /**
      * Used to run the {@link Startup}.
@@ -677,7 +630,7 @@ abstract public class StoreManager extends ResourceEvents implements
      * 
      * @see #setReleaseTime(long)
      */
-    protected long releaseTime = 0L;
+    private long releaseTime = 0L;
 
     /**
      * The last value computed by {@link #getEffectiveReleaseTime()} and ZERO(0)
@@ -697,18 +650,18 @@ abstract public class StoreManager extends ResourceEvents implements
      */
     protected long maximumJournalSizeAtOverflow = 0L;
     
-    /**
-     * Resources MUST be at least this many milliseconds before they may be
-     * deleted.
-     * <p>
-     * The minReleaseAge is just how long you want to hold onto an immortal
-     * database view. E.g., 3 days of full history. Specify
-     * {@link Long#MAX_VALUE} for an immortal database (resources will never be
-     * deleted).
-     * 
-     * @see Options#MIN_RELEASE_AGE
-     */
-    final long minReleaseAge;
+//    /**
+//     * Resources MUST be at least this many milliseconds before they may be
+//     * deleted.
+//     * <p>
+//     * The minReleaseAge is just how long you want to hold onto an immortal
+//     * database view. E.g., 3 days of full history. Specify
+//     * {@link Long#MAX_VALUE} for an immortal database (resources will never be
+//     * deleted).
+//     * 
+//     * @see Options#MIN_RELEASE_AGE
+//     */
+//    final long minReleaseAge;
 
     /**
      * The #of {@link ManagedJournal}s that have been (re-)opened to date.
@@ -872,6 +825,20 @@ abstract public class StoreManager extends ResourceEvents implements
 
         }
 
+        // purgeOldResourcesDuringStartup
+        {
+
+            purgeOldResourcesDuringStartup = Boolean
+                    .parseBoolean(properties.getProperty(
+                            Options.PURGE_OLD_RESOURCES_DURING_STARTUP,
+                            Options.DEFAULT_PURGE_OLD_RESOURCES_DURING_STARTUP));
+
+            if (INFO)
+                log.info(Options.PURGE_OLD_RESOURCES_DURING_STARTUP + "="
+                        + purgeOldResourcesDuringStartup);
+
+        }
+
         /*
          * storeCacheCapacity
          */
@@ -915,23 +882,23 @@ abstract public class StoreManager extends ResourceEvents implements
 
         }
 
-        // minimum release age
-        {
-
-            minReleaseAge = Long.parseLong(properties.getProperty(
-                    Options.MIN_RELEASE_AGE, Options.DEFAULT_MIN_RELEASE_AGE));
-
-            if (INFO)
-                log.info(Options.MIN_RELEASE_AGE + "=" + minReleaseAge);
-
-            if (minReleaseAge < 0L) {
-
-                throw new RuntimeException(Options.MIN_RELEASE_AGE
-                        + " must be non-negative");
-
-            }
-
-        }
+//        // minimum release age
+//        {
+//
+//            minReleaseAge = Long.parseLong(properties.getProperty(
+//                    Options.MIN_RELEASE_AGE, Options.DEFAULT_MIN_RELEASE_AGE));
+//
+//            if (INFO)
+//                log.info(Options.MIN_RELEASE_AGE + "=" + minReleaseAge);
+//
+//            if (minReleaseAge < 0L) {
+//
+//                throw new RuntimeException(Options.MIN_RELEASE_AGE
+//                        + " must be non-negative");
+//
+//            }
+//
+//        }
 
         /*
          * Allocate an optional write cache that will be passed from live
@@ -1151,7 +1118,8 @@ abstract public class StoreManager extends ResourceEvents implements
                     starting.set(false);
                     
                     // Purge any resources that we no longer require.
-                    purgeOldResources();
+                    if(purgeOldResourcesDuringStartup)
+                        purgeOldResources();
                     
                 } catch (Throwable ex) {
 
@@ -2235,12 +2203,19 @@ abstract public class StoreManager extends ResourceEvents implements
             
         }
 
-        public DataServiceTransactionManager getLocalTransactionManager() {
+        public AbstractLocalTransactionManager getLocalTransactionManager() {
 
-            return (DataServiceTransactionManager) getConcurrencyManager()
+            return (AbstractLocalTransactionManager) getConcurrencyManager()
                     .getTransactionManager();
 
         }
+
+//        public DataServiceTransactionManager getLocalTransactionManager() {
+//
+//            return (DataServiceTransactionManager) getConcurrencyManager()
+//                    .getTransactionManager();
+//
+//        }
 
         public SparseRowStore getGlobalRowStore() {
             
@@ -2708,13 +2683,16 @@ abstract public class StoreManager extends ResourceEvents implements
 
     /**
      * Updates the {@link #releaseTime}.
+     * <p>
+     * Data services MAY release data for views whose timestamp is less than or
+     * equal to the specified release time IFF that action would be in keeping
+     * with their local history retention policy (minReleaseAge) AND if the data
+     * is not required for the most current committed state (data for the most
+     * current committed state is not releasable regardless of the release time
+     * or the minReleaseAge).
      * 
      * @see #purgeOldResources(), which is responsible for actually deleting the
      *      old resources.
-     * 
-     * @todo When the transaction manager will control [releaseTime] does it
-     *       need to set the [releaseTime] on all resource managers in the
-     *       federation before it can assign its first transaction identifier?
      */
     public void setReleaseTime(final long releaseTime) {
 
@@ -2739,19 +2717,19 @@ abstract public class StoreManager extends ResourceEvents implements
 
     }
 
-    /**
-     * Return the minimum age of a resource before it may become a candidate for
-     * release. This is a configuration time constant. The purpose of this value
-     * is to guarentee that resources will remain available for at least this
-     * many milliseconds. This places an upper bound on the release time.
-     * 
-     * @see Options#MIN_RELEASE_AGE
-     */
-    public long getMinReleaseAge() {
-
-        return minReleaseAge;
-
-    }
+//    /**
+//     * Return the minimum age of a resource before it may become a candidate for
+//     * release. This is a configuration time constant. The purpose of this value
+//     * is to guarentee that resources will remain available for at least this
+//     * many milliseconds. This places an upper bound on the release time.
+//     * 
+//     * @see Options#MIN_RELEASE_AGE
+//     */
+//    public long getMinReleaseAge() {
+//
+//        return minReleaseAge;
+//
+//    }
 
     /**
      * @see IndexManager#getIndexRetentionTime()
@@ -2778,11 +2756,11 @@ abstract public class StoreManager extends ResourceEvents implements
      * existence of the journals back until the one covering that historical
      * commit point. This is because the distinct historical commit points for
      * the indices are ONLY defined on the journals. The index segments carry
-     * forward the commit state of a specific index as of the commitTime of the
-     * index from which the segment was built. This means that you can
+     * forward the committed state of a specific index as of the commitTime of
+     * the index from which the segment was built. This means that you can
      * substitute the index segment for the historical index state on older
      * journals, but the index segment carries forward only a single commit
-     * state for the index so it can not be used to read from arbitrary
+     * point for the index so it can not be used to read from arbitrary
      * historical commit points.
      * <p>
      * The caller MUST hold the exclusive lock on the
@@ -2790,22 +2768,43 @@ abstract public class StoreManager extends ResourceEvents implements
      */
     protected void purgeOldResources() {
 
-        if (minReleaseAge == Long.MAX_VALUE) {
+//        if (minReleaseAge == Long.MAX_VALUE) {
+//
+//            /*
+//             * Constant for an immortal database so we do not need to check the
+//             * timestamp service. Return zero(0) indicating that only resources
+//             * whose timestamp is LTE zero may be deleted (e.g., nothing may be
+//             * deleted).
+//             */
+//
+//            if (INFO)
+//                log.info("Immortal database");
+//            
+//            return;
+//
+//        }
+
+        if (this.releaseTime == 0L) {
 
             /*
-             * Constant for an immortal database so we do not need to check the
-             * timestamp service. Return zero(0) indicating that only resources
-             * whose timestamp is LTE zero may be deleted (e.g., nothing may be
-             * deleted).
+             * Note: The [releaseTime] is advanced by the transaction service
+             * when it decides that a commit point will no longer be reachable
+             * by new transactions and no running transactions is reading from
+             * that commit point.
+             * 
+             * Note: We do not release anything until the releaseTime has been
+             * set by the transaction service. This centralizes decisions
+             * concerning how long to preserve history while distributing the
+             * actions taken based on those decisions.
              */
 
             if (INFO)
-                log.info("Immortal database");
+                log.info("releaseTime not set.");
             
             return;
 
         }
-
+        
         /*
          * The last commit time on record in the live journal.
          * 
@@ -2835,70 +2834,53 @@ abstract public class StoreManager extends ResourceEvents implements
             
         }
 
-        // the current time (RMI).
-        final long currentTime = nextTimestamp();
-
-        // the upper bound on the release time.
-        final long maxReleaseTime = currentTime - minReleaseAge;
-
-        if (maxReleaseTime < 0L) {
-
-            /*
-             * Note: Someone specified a very large value for [minReleaseAge]
-             * and the clock has not yet reached that value. (The test above for
-             * Long.MAX_VALUE just avoids the RMI to the timestamp service when
-             * we KNOW that the database is immortal).
-             */
-
-            if (INFO)
-                log.info("Nothing is old enough to release.");
-
-            return;
-
-        }
+//        // the current time (RMI).
+//        final long currentTime = nextTimestamp();
+//
+//        // the upper bound on the release time.
+//        final long maxReleaseTime = currentTime - minReleaseAge;
+//
+//        if (maxReleaseTime < 0L) {
+//
+//            /*
+//             * Note: Someone specified a very large value for [minReleaseAge]
+//             * and the clock has not yet reached that value. (The test above for
+//             * Long.MAX_VALUE just avoids the RMI to the timestamp service when
+//             * we KNOW that the database is immortal).
+//             */
+//
+//            if (INFO)
+//                log.info("Nothing is old enough to release.");
+//
+//            return;
+//
+//        }
 
         indexCacheLock.writeLock().lock();
         
         try {
 
-            final long releaseTime;
+            /*
+             * The earliest timestamp that MUST be retained for the
+             * read-historical indices in the cache.
+             */
             final long indexRetentionTime = getIndexRetentionTime();
-            
-        if (this.releaseTime == 0L) {
 
             /*
-             * Note: The [releaseTime] is normally advanced by the transaction
-             * manager when it decides that a historical time will no longer be
-             * reachable by new transactions and no running transactions is
-             * reading from that historical time. Absent a transaction manager,
-             * the [releaseTime] is assumed to be [minReleaseAge] milliseconds
-             * in the past.
-             * 
-             * Note: If there are active tasks reading from that historical time
-             * then they will fail once the resources have been released.
+             * Choose whichever timestamp would preserve more history (that is,
+             * choose the earlier timestamp).
              */
 
-            releaseTime = maxReleaseTime;
+            final long releaseTime = Math.min(indexRetentionTime,
+                    this.releaseTime);
 
-            if (INFO)
-                log.info("releaseTime is not set: using maxReleaseTime="
-                        + maxReleaseTime);
-
-        } else {
-
-            /*
-             * Choose whichever timestamp would preserve more history.
-             */
-
-            releaseTime = Math.min(indexRetentionTime, Math.min(
-                        maxReleaseTime, this.releaseTime));
+//            final long releaseTime = Math.min(indexRetentionTime, Math.min(
+//                    maxReleaseTime, this.releaseTime));
 
             if (INFO)
                 log.info("Choosen releaseTime=" + releaseTime
-                        + " : min(maxReleaseTime=" + maxReleaseTime
+//                        + " : min(maxReleaseTime=" + maxReleaseTime
                         + ", set releaseTime=" + releaseTime + ")");
-
-        }
 
         /*
          * The earliest commit time on record in any journal available to the
@@ -2923,29 +2905,19 @@ abstract public class StoreManager extends ResourceEvents implements
          * Find the commitTime that we are going to preserve.
          */
         final long commitTimeToPreserve;
-        if( releaseTime < firstCommitTime ) {
+        if (releaseTime < firstCommitTime) {
 
-            /*
-             * If the computed [releaseTime] is before the first commit record
-             * on the earliest available journal then we use the
-             * [firstCommitTime] on that journal instead.
-             * 
-             * @todo Why? It would seem that there was nothing that could be
-             * deleted in this case and that we could just return immediately.
-             */
+                /*
+                 * If the computed [releaseTime] is before the first commit
+                 * record on the earliest available journal then there was
+                 * nothing that could be deleted in this case and that we could
+                 * just return immediately.
+                 */
 
-//            if (INFO)
-//                log
-//                        .info("Choosing commitTimeToPreserve as the firstCommitTime for the earliest journal: "
-//                                + firstCommitTime);
-//            
-//            commitTimeToPreserve = firstCommitTime;
-            
-            // Nothing to do.
-            
-            if (INFO)
-                log.info("Release time is earlier than any commit time.");
-            
+                if (INFO)
+                    log.info("Release time is earlier than any commit time.");
+
+                // Nothing to do.
             return;
 
         } else if (releaseTime > lastCommitTime ) {
@@ -2954,8 +2926,12 @@ abstract public class StoreManager extends ResourceEvents implements
              * If the computed [releaseTime] is after the last commit record
              * then we choose the [lastCommitTime] instead.
              * 
-             * Note: This situation can arise when the [minReleaseAge] is small
-             * or zero.
+             * Note: If there have been no writes on this data service but there
+             * have been writes on other data services then the txService will
+             * eventually advance the releaseTime beyond the lastCommitTime on
+             * this data service. Since we never release the last commit point
+             * we set the commitTimeToPreserve to the lastCommitTime on the
+             * local data service.
              */
 
             if (INFO)
@@ -3903,8 +3879,7 @@ abstract public class StoreManager extends ResourceEvents implements
      *            to its minimum extent (all writes will be preserved but there
      *            will be no free space left in the journal). This may be used
      *            to force the {@link DataService} to its minimum possible
-     *            footprint given the configured
-     *            {@link StoreManager#getMinReleaseAge()}.
+     *            footprint for the configured history retention policy.
      * 
      * @return <code>true</code> if successful and <code>false</code> if the
      *         write service could not be paused after the specified timeout.

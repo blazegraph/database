@@ -513,8 +513,7 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
      *            to its minimum extent (all writes will be preserved but there
      *            will be no free space left in the journal). This may be used
      *            to force the {@link DataService} to its minimum possible
-     *            footprint given the configured
-     *            {@link StoreManager#getMinReleaseAge()}.
+     *            footprint.
      * 
      * @todo when overflow processing is enabled for the {@link MetadataService}
      *       we will have to modify this to also trigger overflow for those

@@ -42,6 +42,15 @@ public class TimestampServiceUtil {
 
     protected static Logger log = Logger.getLogger(TimestampServiceUtil.class);
     
+    /**
+     * Utility method retries several times if there is a problem before
+     * throwing a {@link RuntimeException}.
+     * 
+     * @param service
+     *            The timestamp service.
+     * 
+     * @return The timestamp.
+     */
     static public long nextTimestamp(final ITimestampService service) {
 
         if (service == null)
@@ -61,8 +70,8 @@ public class TimestampServiceUtil {
 
             } catch (IOException e) {
 
-                log.warn("Could not get timestamp: "+e, e);
-                
+                log.warn("Could not get timestamp: " + e, e);
+
                 cause = e;
 
             }
@@ -70,7 +79,7 @@ public class TimestampServiceUtil {
         }
 
         log.error("Could not get timestamp after: " + ntries, cause);
-        
+
         throw new RuntimeException("Could not get timestamp after " + ntries,
                 cause);
 

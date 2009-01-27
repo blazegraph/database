@@ -1613,7 +1613,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
         if (!_bufferStrategy.isOpen()) {
 
-            throw new IllegalStateException();
+            throw new IllegalStateException("file=" + getFile());
 
         }
 

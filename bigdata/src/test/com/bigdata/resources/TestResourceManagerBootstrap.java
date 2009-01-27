@@ -52,6 +52,7 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.resources.ResourceManager.Options;
+import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 
@@ -121,12 +122,6 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
         }
 
     }
-
-//    private long getNextTimestamp() {
-//        
-//        return MillisecondTimestampFactory.nextMillis();
-//        
-//    }
     
     /**
      * Test creation of a new {@link ResourceManager}. This verifies the
@@ -143,40 +138,51 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
         
         final Properties properties = getProperties();
 
-        ResourceManager resourceManager = new MyResourceManager(properties);
+        final ResourceManager resourceManager = new MyResourceManager(
+                properties);
 
-        AbstractLocalTransactionManager localTransactionManager = new MockLocalTransactionManager();
+        final AbstractTransactionService txService = new MockTransactionService(
+                properties).start();
 
-        ConcurrencyManager concurrencyManager = new ConcurrencyManager(
+        final AbstractLocalTransactionManager localTransactionManager = new MockLocalTransactionManager(
+                txService);
+
+        final ConcurrencyManager concurrencyManager = new ConcurrencyManager(
                 properties, localTransactionManager, resourceManager);
 
-//        localTransactionManager.setConcurrencyManager(concurrencyManager);
+        try {
 
-        resourceManager.setConcurrencyManager(concurrencyManager);
-        
-        assertTrue( resourceManager.awaitRunning() );
-        
-        /*
-         * Do tests.
-         */
-        
-        assertTrue(dataDir.exists());
-        assertTrue(dataDir.isDirectory());
-        assertTrue(journalsDir.isDirectory());
-        assertTrue(segmentsDir.isDirectory());
+            resourceManager.setConcurrencyManager(concurrencyManager);
 
-        // fetch the live journal.
-        AbstractJournal journal = resourceManager.getLiveJournal();
-        
-        assertNotNull(journal);
-        
-        // verify journal created in correct subdirectory.
-        assertTrue(new File(journalsDir,journal.getFile().getName()).exists());
+            assertTrue(resourceManager.awaitRunning());
 
-        // shutdown
-        concurrencyManager.shutdownNow();
-        localTransactionManager.shutdownNow();
-        resourceManager.shutdownNow();
+            /*
+             * Do tests.
+             */
+
+            assertTrue(dataDir.exists());
+            assertTrue(dataDir.isDirectory());
+            assertTrue(journalsDir.isDirectory());
+            assertTrue(segmentsDir.isDirectory());
+
+            // fetch the live journal.
+            AbstractJournal journal = resourceManager.getLiveJournal();
+
+            assertNotNull(journal);
+
+            // verify journal created in correct subdirectory.
+            assertTrue(new File(journalsDir, journal.getFile().getName())
+                    .exists());
+        
+        } finally {
+
+            // shutdown
+            resourceManager.shutdownNow();
+            concurrencyManager.shutdownNow();
+            localTransactionManager.shutdownNow();
+            txService.destroy();
+
+        }
         
     }
 
@@ -268,15 +274,22 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
         
         final Properties properties = getProperties();
 
-        ResourceManager resourceManager = new MyResourceManager(properties);
+        // disable so that our resources are not automatically purged.
+        properties.setProperty(StoreManager.Options.PURGE_OLD_RESOURCES_DURING_STARTUP,"false");
+        
+        final ResourceManager resourceManager = new MyResourceManager(properties);
 
-        AbstractLocalTransactionManager localTransactionManager = new MockLocalTransactionManager();
+        final AbstractTransactionService txService = new MockTransactionService(
+                properties).start();
 
-        ConcurrencyManager concurrencyManager = new ConcurrencyManager(
+        final AbstractLocalTransactionManager localTransactionManager = new MockLocalTransactionManager(
+                txService);
+
+        final ConcurrencyManager concurrencyManager = new ConcurrencyManager(
                 properties, localTransactionManager, resourceManager);
 
-//        localTransactionManager.setConcurrencyManager(concurrencyManager);
-
+        try {
+        
         resourceManager.setConcurrencyManager(concurrencyManager);
         
         assertTrue( resourceManager.awaitRunning() );
@@ -306,10 +319,14 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
         // verify correct journal has same reference as the live journal.
         assertTrue(resourceManager.getLiveJournal()==resourceManager.openStore(journalMetadata2.getUUID()));
         
+        } finally {
+        
         // shutdown
         concurrencyManager.shutdownNow();
         localTransactionManager.shutdownNow();
         resourceManager.shutdownNow();
+        txService.destroy();
+        }
         
     }
     
@@ -405,14 +422,19 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
         
         final Properties properties = getProperties();
 
-        ResourceManager resourceManager = new MyResourceManager(properties);
+        // disable so that our resources are not automatically purged.
+        properties.setProperty(StoreManager.Options.PURGE_OLD_RESOURCES_DURING_STARTUP,"false");
 
-        AbstractLocalTransactionManager localTransactionManager = new MockLocalTransactionManager();
+        final ResourceManager resourceManager = new MyResourceManager(properties);
 
-        ConcurrencyManager concurrencyManager = new ConcurrencyManager(
+        final AbstractTransactionService txService = new MockTransactionService(properties).start();
+        
+        final AbstractLocalTransactionManager localTransactionManager = new MockLocalTransactionManager(txService);
+
+        final ConcurrencyManager concurrencyManager = new ConcurrencyManager(
                 properties, localTransactionManager, resourceManager);
-
-//        localTransactionManager.setConcurrencyManager(concurrencyManager);
+        
+        try {
 
         resourceManager.setConcurrencyManager(concurrencyManager);
         
@@ -442,10 +464,15 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
             
         }
         
+        } finally {
+        
         // shutdown
         concurrencyManager.shutdownNow();
         localTransactionManager.shutdownNow();
         resourceManager.shutdownNow();
+        txService.destroy();
+        
+        }
         
     }
     
@@ -616,15 +643,17 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
         
         final Properties properties = getProperties();
 
-        ResourceManager resourceManager = new MyResourceManager(properties);
+        final ResourceManager resourceManager = new MyResourceManager(properties);
         
-        AbstractLocalTransactionManager localTransactionManager = new MockLocalTransactionManager();
+        final AbstractTransactionService txService = new MockTransactionService(properties).start();
         
-        ConcurrencyManager concurrencyManager = new ConcurrencyManager(
+        final AbstractLocalTransactionManager localTransactionManager = new MockLocalTransactionManager(txService);
+        
+        final ConcurrencyManager concurrencyManager = new ConcurrencyManager(
                 properties, localTransactionManager, resourceManager);
 
-//        localTransactionManager.setConcurrencyManager(concurrencyManager);
-
+        try {
+        
         resourceManager.setConcurrencyManager(concurrencyManager);
         
         assertTrue( resourceManager.awaitRunning() );
@@ -681,11 +710,16 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
             assertEquals(nentries, sources[1].getEntryCount());
 
         }
+        
+        } finally {
 
         // shutdown
         concurrencyManager.shutdownNow();
         localTransactionManager.shutdownNow();
         resourceManager.shutdownNow();
+        txService.destroy();
+        
+        }
 
     }
 
@@ -696,24 +730,6 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
             super(properties);
 
         }
-
-//        public ILoadBalancerService getLoadBalancerService() {
-//
-//            throw new UnsupportedOperationException();
-//            
-//        }
-//
-//        public IMetadataService getMetadataService() {
-//
-//            throw new UnsupportedOperationException();
-//
-//        }
-//
-//        public IDataService getDataService(UUID serviceUUID) {
-//
-//            throw new UnsupportedOperationException();
-//
-//        }
 
         public UUID getDataServiceUUID() {
 
