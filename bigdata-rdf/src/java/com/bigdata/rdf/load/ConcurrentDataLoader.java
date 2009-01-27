@@ -346,7 +346,7 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
      * 
      * @return The {@link CounterSet} for the {@link ConcurrentDataLoader}.
      */
-    synchronized public CounterSet getCounters(IBigdataFederation fed) {
+    synchronized public CounterSet getCounters(final IBigdataFederation fed) {
 
         if (ourCounterSet == null) {
 

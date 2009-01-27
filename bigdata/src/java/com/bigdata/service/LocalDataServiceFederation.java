@@ -28,10 +28,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.counters.AbstractStatisticsCollector;
@@ -41,6 +41,7 @@ import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.ResourceLockService;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.resources.ResourceManager.Options;
+import com.bigdata.service.EmbeddedFederation.EmbeddedTransactionServiceImpl;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -82,7 +83,12 @@ public class LocalDataServiceFederation extends AbstractFederation {
         // indexCache
         indexCache = new DataServiceIndexCache(this, client
                 .getIndexCacheCapacity(), client.getIndexCacheTimeout());
-        
+
+        // specify the data directory for the txService.
+        properties.setProperty(EmbeddedTransactionServiceImpl.Options.DATA_DIR,
+                new File(properties.getProperty(Options.DATA_DIR), "txService")
+                        .toString());
+
         abstractTransactionService = new AbstractEmbeddedTransactionService(UUID.randomUUID(),
                 properties) {
             
