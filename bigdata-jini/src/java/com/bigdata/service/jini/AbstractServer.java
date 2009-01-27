@@ -374,7 +374,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             
         } catch (Throwable t2) {
             
-            log.error(t2.getMessage(), t2);
+            log.error(this, t2);
             
         }
         
@@ -623,10 +623,10 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                         
                     }
                     
-                } catch(IOException ex) {
+                } catch (IOException ex) {
 
-                    fatal( "Could not read serviceID from existing file: "
-                            + serviceIdFile, ex );
+                    fatal("Could not read serviceID from existing file: "
+                            + serviceIdFile + ": " + this, ex);
                     
                 }
                 
@@ -639,7 +639,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
         } catch(ConfigurationException ex) {
             
-            fatal("Configuration error: "+ex, ex);
+            fatal("Configuration error: "+this, ex);
             
         }
         
@@ -667,7 +667,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             
         } catch(Throwable t) {
             
-            fatal("Could not create JiniClient: " + t, t);
+            fatal("Could not create JiniClient: " + this, t);
             
         }
         
@@ -730,8 +730,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                                 masterElectionFuture
                                         .cancel(true/* mayInterruptIfRunning */);
                                 masterElectionFuture = null;
-                                log
-                                        .warn("Lost zookeeper connection: cancelled master election task.");
+                                log.warn("Lost zookeeper connection: cancelled master election task: "
+                                                + this);
                             }
                         }
                         break;
@@ -742,7 +742,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                                 notifyZookeeper(f, JiniUtil
                                         .serviceID2UUID(serviceID));
                             } catch (Throwable t) {
-                                log.error(t);
+                                log.error(AbstractServer.this,t);
                             }
                         }
                     } // switch
@@ -759,7 +759,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             
         } catch(Exception ex) {
         
-            fatal("Could not start service: "+ex, ex);
+            fatal("Could not start service: "+this, ex);
             
         }
 
@@ -778,7 +778,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
         } catch (ExportException ex) {
 
-            fatal("Export error: "+ex, ex);
+            fatal("Export error: "+this, ex);
             
         }
         
@@ -822,7 +822,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
         } catch (Exception ex) {
 
-            fatal("JoinManager: " + ex, ex);
+            fatal("JoinManager: " + this, ex);
             
         }
 
@@ -850,6 +850,27 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
     }
 
+    /**
+     * Simple representation of state (non-blocking, safe). Some fields reported
+     * in the representation may be <code>null</code> depending on the server
+     * state.
+     */
+    public String toString() {
+        
+        // note: MAY be null.
+        final ServiceID serviceID = this.serviceID;
+                
+        return getClass().getName()
+                + "{serviceName="
+                + serviceName
+                + ", hostname="
+                + hostname
+                + ", serviceUUID="
+                + (serviceID == null ? "null" : ""
+                        + JiniUtil.serviceID2UUID(serviceID)) + "}";
+        
+    }
+    
     /**
      * Attempt to acquire an exclusive lock on a file in the same directory as
      * the {@link #serviceIdFile} (non-blocking). This is designed to prevent
@@ -946,7 +967,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
                 } else {
 
-                    log.warn("Proxy was not unexported?");
+                    log.warn("Proxy was not unexported? : "+this);
 
                 }
 
@@ -1082,7 +1103,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
         } catch (Exception ex) {
 
-            log.error("Could not save ServiceID", ex);
+            log.error("Could not save ServiceID : "+this, ex);
 
         }
 
@@ -1121,7 +1142,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
             } catch (Throwable t) {
 
-                log.error("Could not register service with zookeeper: " + t, t);
+                log.error("Could not register service with zookeeper: " + this, t);
 
             }
 
@@ -1193,7 +1214,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
              * fed.getZookeeper() will throw that exception).
              */
 
-            log.warn("No zookeeper: will not create service znode.");
+            log.warn("No zookeeper: will not create service znode: "+this);
 
             return;
             
@@ -1431,7 +1452,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         protected void runAsMaster(final AbstractService service,
                 final ZLock zlock) throws InterruptedException, Exception {
 
-            log.warn("Service is now the master.");
+            log.warn("Service is now the master: "+this);
 
             Thread.sleep(Long.MAX_VALUE);
             
@@ -1452,9 +1473,9 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * Note: This is only invoked if the automatic lease renewal by the lease
      * manager is denied by the service registrar.
      */
-    public void notify(LeaseRenewalEvent event) {
+    public void notify(final LeaseRenewalEvent event) {
         
-        log.warn("Lease could not be renewed: " + event);
+        log.warn("Lease could not be renewed: " + this + " : " + event);
 
         /*
          * Note: Written defensively in case this.joinManager is asynchronously
@@ -1485,7 +1506,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
         } catch (Exception ex) {
 
-            log.error("Problem obtaining joinSet? : " + ex, ex);
+            log.error("Problem obtaining joinSet? : " + this, ex);
 
         }
 
@@ -1549,7 +1570,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
         } catch (Throwable ex) {
 
-            log.error("Problem unexporting service: " + ex, ex);
+            log.error("Problem unexporting service: " + this, ex);
 
             /* Ignore */
 
@@ -1583,7 +1604,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 //                
 //            } catch (Throwable t) {
 //
-//                log.error("Problem deleting service znode: " + t, t);
+//                log.error("Problem deleting service znode: " + this, t);
 //
 //                /* Ignore */
 //
@@ -1617,7 +1638,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                 
             } catch(Throwable ex) {
                 
-                log.error("Problem with service shutdown: "+ex, ex);
+                log.error("Problem with service shutdown: " + this, ex);
                 
                 // ignore.
                 
@@ -1640,7 +1661,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         } catch (Throwable ex) {
             
             log.error("Could not terminate async threads (jini, zookeeper): "
-                    + ex, ex);
+                    + this, ex);
             
             // ignore.
 
@@ -1657,7 +1678,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
             } catch (Throwable ex) {
 
-                log.error("Could not unregister lifeCycle: " + ex, ex);
+                log.error("Could not unregister lifeCycle: " + this, ex);
 
                 // ignore.
 
@@ -1737,7 +1758,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
             } catch (Throwable ex) {
 
-                log.error("Could not terminate the join manager: " + ex, ex);
+                log.error("Could not terminate the join manager: " + this, ex);
 
             } finally {
                 
@@ -1906,7 +1927,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                 
             } catch (Exception ex) {
 
-                log.error("While shutting down service: " + ex, ex);
+                log.error("While shutting down service: " + this, ex);
 
             }
 
@@ -1954,24 +1975,14 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
             public void run() {
 
-                // note: MAY be null.
-                final Remote impl = AbstractServer.this.impl;
-                
-                // note: MAY be null.
-                final ServiceID serviceID = AbstractServer.this.serviceID;
-                
                 // format log message.
-                final String msg = "name="
-                        + serviceName
-                        + (impl == null ? "" : ", class="+impl.getClass())
-                        + (serviceID == null ? "" : ", serviceUUID="
-                                + JiniUtil.serviceID2UUID(serviceID));
+                final String msg = AbstractServer.this.toString();
                 
-                log.warn("will destroy service: " + msg);
+                log.warn("Will destroy service: " + msg);
 
                 AbstractServer.this.destroy();
 
-                log.warn("service destroyed: " + msg);
+                log.warn("Service destroyed: " + msg);
 
             }
 
