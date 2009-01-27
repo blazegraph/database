@@ -1357,7 +1357,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                     
                 } catch (Throwable t) {
 
-                    log.error(this, t);
+                    log.error(AbstractServer.this, t);
                     
                     /*
                      * @todo I have observed a tight loop here with a
@@ -1452,7 +1452,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         protected void runAsMaster(final AbstractService service,
                 final ZLock zlock) throws InterruptedException, Exception {
 
-            log.warn("Service is now the master: "+this);
+            log.warn("Service is now the master: " + AbstractServer.this);
 
             Thread.sleep(Long.MAX_VALUE);
             
