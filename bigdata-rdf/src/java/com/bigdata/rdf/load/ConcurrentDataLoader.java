@@ -207,34 +207,6 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
         
     }
     
-//    /**
-//     * The elapsed time during which one or more tasks was running on this
-//     * service.
-//     */
-//    public long getElapsedServiceTime() {
-//        
-//        final long elapsedThisRun;
-//        
-//        final long startTime = this.startTime;
-//
-//        if (startTime == 0L) {
-//        
-//            elapsedThisRun = 0L;
-//            
-//        } else {
-//            
-//            // still running.
-//            elapsedThisRun = System.currentTimeMillis() - startTime;
-//
-//        }
-//
-//        return elapsedPriorRuns + elapsedThisRun;
-//        
-//    }
-//    private long startTime;
-//    private long elapsedPriorRuns;
-
-    
     protected final AbstractFederation fed;
     
     protected final ScheduledFuture loadServiceStatisticsFuture;
@@ -281,7 +253,7 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
 
         final BlockingQueue<Runnable> queue = new LinkedBlockingQueue<Runnable>(
                 Math.max(100, nthreads * 2));
-
+        
         loadService = new ThreadPoolExecutor(nthreads, nthreads,
                 Integer.MAX_VALUE, TimeUnit.NANOSECONDS, queue,
                 new DaemonThreadFactory(getClass().getName() + ".loadService"));
@@ -681,9 +653,8 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
                 
                 }
                 
-                // But retry the task every 1/4 second.
-                
-                Thread.sleep(REJECTED_EXECUTION_DELAY/*ms*/);
+                // resubmit task for execution after a delay
+                Thread.sleep(REJECTED_EXECUTION_DELAY/* ms */);
                 
             }
 

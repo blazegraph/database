@@ -9,19 +9,22 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.util.concurrent.QueueStatisticsTask;
 import com.bigdata.util.concurrent.TaskCounters;
+import com.sun.corba.se.spi.orbutil.threadpool.Work;
 
 /**
- * Counters updated by a {@link WorkflowTask}.
+ * Counters updated by a {@link WorkflowTask}. All instances running on the
+ * same service should use the same {@link WorkflowTaskCounters} instance. The
+ * service should report these counters along with any other counters that it
+ * tracks.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo extract a common interface or impl for the
- *       {@link QueueStatisticsTask} so that we can report the response
- *       times here.
+ * @todo extract a common interface or impl for the {@link QueueStatisticsTask}
+ *       so that we can report the response times here.
  */
 public class WorkflowTaskCounters extends TaskCounters {
-    
+
     /**
      * The #of tasks for which a {@link RejectedExecutionException} was
      * thrown when the task was
@@ -40,7 +43,7 @@ public class WorkflowTaskCounters extends TaskCounters {
      * caused the task to fail.
      */
     final public AtomicInteger taskRetryCount = new AtomicInteger(0);
-    
+
     /**
      * #of tasks that failed due to a {@link CancellationException} - this is
      * the exception thrown when the
@@ -54,13 +57,13 @@ public class WorkflowTaskCounters extends TaskCounters {
      * retry count has been reached.
      */
     final public AtomicInteger taskFatalCount = new AtomicInteger(0);
-    
+
     public String toString() {
-     
-        return super.toString() + ", #reject=" + taskRejectCount
-                + ", #retry=" + taskRetryCount + ", #cancel="
-                + taskCancelCount + ", #fatal=" + taskFatalCount;
-        
+
+        return super.toString() + ", #reject=" + taskRejectCount + ", #retry="
+                + taskRetryCount + ", #cancel=" + taskCancelCount + ", #fatal="
+                + taskFatalCount;
+
     }
-    
+
 }
