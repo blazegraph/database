@@ -74,7 +74,7 @@ public class RDFLoadTaskFactory<T extends Runnable> extends
              * data loader, then the total #of told triples is the aggregation
              * across all of those instances.
              */
-            counterSet.addCounter("toldTriples", new Instrument<Long>() {
+            counterSet.addCounter("toldTriplesLoaded", new Instrument<Long>() {
 
                 @Override
                 protected void sample() {
