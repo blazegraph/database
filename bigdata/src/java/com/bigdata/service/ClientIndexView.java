@@ -1255,10 +1255,12 @@ public class ClientIndexView implements IClientIndex {
      * @param tasks
      *            The tasks.
      */
-    protected void runInCallersThread(ArrayList<Callable<Void>> tasks) {
+    protected void runInCallersThread(final ArrayList<Callable<Void>> tasks) {
         
-        if(WARN)
-            log.warn("Running " + tasks.size()
+        final int ntasks = tasks.size();
+        
+        if (WARN && ntasks > 1)
+            log.warn("Running " + ntasks
                 + " tasks in caller's thread: recursionDepth="
                 + getRecursionDepth().get() + "(#active="
                 + getThreadPool().getActiveCount() + ", queueSize="
