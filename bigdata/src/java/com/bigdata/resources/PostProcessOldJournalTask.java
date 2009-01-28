@@ -2077,7 +2077,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         try {
 
             resourceManager
-                    .purgeOldResources(1000/* timeout */, false/* truncateJournal */);
+                    .purgeOldResources(2000/* timeout */, false/* truncateJournal */);
 
         } catch (InterruptedException ex) {
 

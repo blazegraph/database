@@ -753,13 +753,6 @@ abstract public class AbstractTransactionService extends AbstractService
 //    public abstract long getEarliestTxStartTime();
     
     /**
-     * Return the timestamp whose historical data MAY be release. This time is
-     * derived from the timestamp of the earliest running transaction MINUS the
-     * minimum release age and is updated whenever the earliest running
-     * transaction terminates. This value will never be GT the last commit time
-     * and will never be negative. It MAY be ZERO (0L) and will be ZERO (0L) on
-     * startup.
-     * 
      * @see Options#MIN_RELEASE_AGE
      */
     public long getReleaseTime() {

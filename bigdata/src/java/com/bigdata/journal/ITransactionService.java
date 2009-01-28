@@ -35,6 +35,7 @@ import com.bigdata.isolation.IConflictResolver;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ITxCommitProtocol;
+import com.bigdata.service.AbstractTransactionService.Options;
 
 /**
  * <p>
@@ -242,6 +243,16 @@ public interface ITransactionService extends ITimestampService {
      */
     public long getLastCommitTime() throws IOException;
 
+    /**
+     * Return the timestamp whose historical data MAY be release. This time is
+     * derived from the timestamp of the earliest running transaction MINUS the
+     * minimum release age and is updated whenever the earliest running
+     * transaction terminates. This value is monotonically increasing. It will
+     * never be GT the last commit time. It will never be negative. It MAY be
+     * ZERO (0L) and will be ZERO (0L) on startup.
+     */
+    public long getReleaseTime();
+    
     /**
      * An {@link IDataService} MUST invoke this method before permitting an
      * operation isolated by a read-write transaction to execute with access to
