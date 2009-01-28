@@ -1164,7 +1164,11 @@ public class ZLockImpl implements ZLock {
 
                     final String child = a[i];
 
-                    zookeeper.delete(zpath + "/" + child, -1/* version */);
+                    try {
+                        zookeeper.delete(zpath + "/" + child, -1/* version */);
+                    } catch (NoNodeException ex) {
+                        // ignore - child is already gone.
+                    }
 
                 }
 
