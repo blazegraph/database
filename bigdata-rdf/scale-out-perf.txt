@@ -3013,19 +3013,6 @@ Commit notes:
   
 - Cluster tools and service starter.
 
-  - Need ability to start services on machines automatically and to
-    initiate a distributed operation such as a data load since
-    otherwise we can't readily operate on larger clusters.
-
-  - Need ability to execute a command on all machines in a cluster.
-
-  - Very large data sets will require either the ability to
-    dynamically generate the partition of the data appropriate to each
-    client involved in the data load -or- a LOT of NAS.  It might also
-    be possible to compress the data when they are generated and then
-    decompress them dynamically during load but that will add extra
-    cost to the load (closure and query costs would not be effected).
-
   - Should be able to resume the load from a log indicating which
     files have already been loaded.  This may be important for a long
     running process if we hit very rare bugs that would otherwise
@@ -3059,7 +3046,8 @@ Commit notes:
 
   - Generate and visualize a concise summary of how the disk space in
     the federation is allocated (a) on each data service on each host;
-    and (b) by index.
+    and (b) by index.  Also show the #of sources in each index
+    partition.
 
   - Generate timelines of events correlated to interesting counters,
     such as % IO Wait and % Processor Time.
@@ -3099,12 +3087,6 @@ Commit notes:
     builds, etc.  Maybe a 1.2 multiplier on top of that?
 
   - Main issues:
-
-    - Done. Read-historical tx for closure.  The code will have to be
-      modified to explicitly start and commit a read-only tx for the
-      desired timestamp for each mutation operation in ProgramTask.
-      The releaseTime will be automatically maintained by the tx
-      manager.
 
     - Aynchronous overflow is causing contention across services.
 
@@ -3216,10 +3198,6 @@ Commit notes:
       for the live index, historical index, index view, index segment,
       and locator caches. (I still need to do this for locators, for
       the open journals, etc.)
-
-    - Done. Use a scheduled task to clear stale references for those
-      caches so that we can close out things which are not being
-      accessed.
 
     - Clearing the references for the lastCommitTime of the old
       journal could cause performance problems during asynchronous

@@ -3597,8 +3597,8 @@ abstract public class StoreManager extends ResourceEvents implements
      */
     protected Set<UUID> getResourcesForTimestamp(final long commitTime) {
 
-        log.warn("commitTime=" + commitTime + ", lastCommitTime="
-                + getLiveJournal().getRootBlockView().getLastCommitTime());
+        if (INFO) log.info("commitTime=" + commitTime + ", lastCommitTime="
+                    + getLiveJournal().getRootBlockView().getLastCommitTime());
         
         // must be a commitTime.
         if (commitTime < 0)
