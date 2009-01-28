@@ -3898,14 +3898,29 @@ abstract public class StoreManager extends ResourceEvents implements
     public boolean purgeOldResources(final long timeout,
             final boolean truncateJournal) throws InterruptedException {
 
-        /*
-         * Make sure that we have the current release time. It is periodically
-         * pushed by the transaction manager, but we pull it here since we are
-         * about to make a decision based on the releaseTime concerning which
-         * resources to release.
-         */
+        try {
 
-        this.releaseTime = getFederation().getTransactionService().getReleaseTime();
+            /*
+             * Make sure that we have the current release time. It is periodically
+             * pushed by the transaction manager, but we pull it here since we are
+             * about to make a decision based on the releaseTime concerning which
+             * resources to release.
+             */
+
+            this.releaseTime = getFederation().getTransactionService()
+                    .getReleaseTime();
+            
+        } catch (IOException ex) {
+            
+            /*
+             * Since the releaseTime is monotonically increasing, if there is an
+             * RMI problem then we use the last release time that was pushed to
+             * us by the txService.
+             */
+            
+            log.warn("Proceeding with current release time: " + ex);
+            
+        }
         
         final WriteExecutorService writeService = getConcurrencyManager()
                 .getWriteService();

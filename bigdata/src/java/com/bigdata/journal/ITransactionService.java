@@ -251,7 +251,7 @@ public interface ITransactionService extends ITimestampService {
      * never be GT the last commit time. It will never be negative. It MAY be
      * ZERO (0L) and will be ZERO (0L) on startup.
      */
-    public long getReleaseTime();
+    public long getReleaseTime() throws IOException;
     
     /**
      * An {@link IDataService} MUST invoke this method before permitting an
