@@ -141,7 +141,9 @@ public class BigdataServiceConfiguration extends
          * addition of those properties at service creation time).
          * <p>
          * Note: If {@link #getDataDir()} returns non-<code>null</code> then
-         * that property will be included in the returned array.
+         * that property-value binding will be included in the returned array
+         * unless a binding already exists for that property (this avoids
+         * overwrite of an explicitly configured property value).
          */
         @Override
         protected Properties getProperties(final Properties properties) {
@@ -150,8 +152,18 @@ public class BigdataServiceConfiguration extends
 
             if (dataDir != null) {
 
-                // the data directory for this service type.
-                properties.setProperty(dataDir.getName(), dataDir.getValue());
+                /*
+                 * Note: [dataDir] represents a default. if the configuration
+                 * gave an explicit NV for this property then we DO NOT use the
+                 * [dataDir] since that would overwrite the configured value.
+                 */ 
+                if (properties.getProperty(dataDir.getName()) == null) {
+
+                    // the data directory for this service type.
+                    properties.setProperty(dataDir.getName(), dataDir
+                            .getValue());
+
+                }
 
             }
 
