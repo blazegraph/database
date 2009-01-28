@@ -2749,8 +2749,8 @@ abstract public class StoreManager extends ResourceEvents implements
     protected final ReentrantReadWriteLock indexCacheLock = new ReentrantReadWriteLock();
 
     /**
-     * Delete resources having no data for the
-     * {@link #getEffectiveReleaseTime()}.
+     * Identify and delete resources no longer required by the index views from
+     * the current releaseTime up to the lastCommitTime.
      * <p>
      * Note: The ability to read from a historical commit point requires the
      * existence of the journals back until the one covering that historical
@@ -3898,6 +3898,15 @@ abstract public class StoreManager extends ResourceEvents implements
     public boolean purgeOldResources(final long timeout,
             final boolean truncateJournal) throws InterruptedException {
 
+        /*
+         * Make sure that we have the current release time. It is periodically
+         * pushed by the transaction manager, but we pull it here since we are
+         * about to make a decision based on the releaseTime concerning which
+         * resources to release.
+         */
+
+        this.releaseTime = getFederation().getTransactionService().getReleaseTime();
+        
         final WriteExecutorService writeService = getConcurrencyManager()
                 .getWriteService();
 
