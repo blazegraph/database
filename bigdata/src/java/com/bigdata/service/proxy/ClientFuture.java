@@ -118,6 +118,9 @@ public class ClientFuture<T> implements Future<T>, Serializable {
      * Since the remote future no longer exists we can assume that it is no
      * longer running. Therefore, I have modified this method to log a warning
      * and return <code>false</code> when this exception is thrown.
+     * <p>
+     * Note: I have also seen this problem where the stack trace involves
+     * <code>java.rmi.ConnectException</code>.
      * 
      * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6181943
      * @see http://archives.java.sun.com/cgi-bin/wa?A2=ind0509&L=rmi-users&P=617
@@ -130,6 +133,24 @@ public class ClientFuture<T> implements Future<T>, Serializable {
 
             return proxy.cancel(mayInterruptIfRunning);
             
+        } catch (java.rmi.ConnectException ex) {
+
+            /*
+             * Log a warning.
+             */
+            if (log.isEnabledFor(Level.WARN)) {
+
+                log.warn(ex.getLocalizedMessage());
+
+            }
+            
+            /*
+             * Return false since not provably cancelled in response to this
+             * request.
+             */
+            
+            return false;
+
         } catch (java.rmi.NoSuchObjectException ex) {
             
             /*
