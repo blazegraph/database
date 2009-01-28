@@ -428,7 +428,9 @@ public class XMLUtility {
                      * history support).
                      */
                     
-                    log.warn("Ignoring history: inst="+counter.getInstrument().getClass().getName()+", path"+counter);
+                    log.warn("Ignoring history: inst="
+                            + counter.getInstrument().getClass().getName()
+                            + ", path" + counter);
                     
                     return;
                     
@@ -475,7 +477,8 @@ public class XMLUtility {
                 final String value = attributes.getValue("value");
 
                 if (log.isInfoEnabled())
-                log.info("counter=" + counter + ", time=" + time+", value="+value);
+                    log.info("counter=" + counter + ", time=" + time
+                            + ", value=" + value);
 
                 addValue(history, time, value);
 
@@ -608,6 +611,25 @@ public class XMLUtility {
          */
         static protected void setValue(final ICounter counter, final Class typ,
                 final String text, final long time) {
+            
+            final IInstrument inst = counter.getInstrument();
+            
+            if (inst instanceof OneShotInstrument) {
+
+                /*
+                 * This instrument can not be updated. However, new values for a
+                 * variety of one-shot counters will be reported by each client
+                 * that starts on the same host. E.g., the #of CPUs and that
+                 * sort of thing. We just ignore the redundent updates.
+                 */
+                
+                log.warn(OneShotInstrument.class.getName()
+                        + " : ignoring update: path=" + counter.getPath()
+                        + ", value=" + text);
+                
+                return;
+                
+            }
             
             try {
 

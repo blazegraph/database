@@ -9,7 +9,7 @@ package com.bigdata.counters;
  * @param <T>
  */
 public class OneShotInstrument<T> implements IInstrument<T> {
-
+    
     private final T value;
     private long lastModified = System.currentTimeMillis();
     
