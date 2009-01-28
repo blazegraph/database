@@ -991,6 +991,9 @@ public class RDFDataLoadMaster implements Callable<Void> {
         // create the triple store.
         tripleStore.create();
 
+        // show #of axioms.
+        System.out.println("axiomCount=" + tripleStore.getStatementCount());
+        
         if (INFO)
             log.info("Created tripleStore: " + jobState.namespace);
 
@@ -1014,6 +1017,9 @@ public class RDFDataLoadMaster implements Callable<Void> {
                 jobState.ontology.getPath()/* baseURI */,
                 jobState.fallback/* rdfFormat */, new RDFFilenameFilter());
 
+        System.out.println("axiomAndOntologyCount="
+                + tripleStore.getStatementCount());
+        
         if (INFO)
             log.info("Loaded ontology: " + jobState.ontology);
 

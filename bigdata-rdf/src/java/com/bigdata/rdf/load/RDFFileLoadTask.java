@@ -145,7 +145,13 @@ public class RDFFileLoadTask implements Callable<Void>, Serializable,
 
         // Load data.
         loadData(loader, taskFactory, tripleStore);
+        
+        // Done loading data (stops the clock).
+        taskFactory.notifyEnd();
 
+        // Shutdown the loader.
+        loader.shutdown();
+        
         return null;
 
     }

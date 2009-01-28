@@ -597,7 +597,7 @@ public class ClientIndexView implements IClientIndex {
      * Returns the sum of the range count for each index partition spanned by
      * the key range.
      */
-    public long rangeCount(byte[] fromKey, byte[] toKey) {
+    public long rangeCount(final byte[] fromKey, final byte[] toKey) {
 
         final LongAggregator handler = new LongAggregator();
         
@@ -616,7 +616,7 @@ public class ClientIndexView implements IClientIndex {
      * 
      * @todo watch for overflow of {@link Long#MAX_VALUE}
      */
-    final public long rangeCountExact(byte[] fromKey, byte[] toKey) {
+    final public long rangeCountExact(final byte[] fromKey, final byte[] toKey) {
 
         final LongAggregator handler = new LongAggregator();
         
@@ -640,7 +640,7 @@ public class ClientIndexView implements IClientIndex {
      * {@link ResultSet}s to cover all index partitions spanned by the key
      * range.
      */
-    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey) {
+    public ITupleIterator rangeIterator(final byte[] fromKey, final byte[] toKey) {
         
         return rangeIterator(fromKey, toKey, capacity,
                 IRangeQuery.DEFAULT /* flags */, null/* filter */);
