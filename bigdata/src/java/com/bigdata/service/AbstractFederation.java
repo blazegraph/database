@@ -900,20 +900,22 @@ abstract public class AbstractFederation implements IBigdataFederation,
             if (getServiceUUID() == null) {
 
                 if (elapsed > 1000 * 10)
-                    log.warn(ERR_NO_SERVICE_UUID);
+                    log.warn(ERR_NO_SERVICE_UUID + " : iface="
+                            + getServiceIface() + ", elapsed=" + elapsed);
                 else if (INFO)
                     log.info(ERR_NO_SERVICE_UUID);
 
                 return false;
 
             }
-            
-            if(!isServiceReady()) {
-            
+
+            if (!isServiceReady()) {
+
                 if (elapsed > 1000 * 10)
-                    log.warn(ERR_SERVICE_NOT_READY);
+                    log.warn(ERR_SERVICE_NOT_READY + " : iface="
+                            + getServiceIface() + ", elapsed=" + elapsed);
                 else if (INFO)
-                    log.info(ERR_SERVICE_NOT_READY);
+                    log.info(ERR_SERVICE_NOT_READY + " : " + elapsed);
 
                 return false;
                 
