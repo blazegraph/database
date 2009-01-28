@@ -51,6 +51,7 @@ import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.ILoadBalancerService;
+import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.QueueStatisticsTask;
 
@@ -288,7 +289,7 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
         /*
          * Setup reporting to the load balancer.
          */
-        final CounterSet tmp = getCounters(fed);
+        final CounterSet tmp = getCounters();
 
         final QueueStatisticsTask loadServiceStatisticsTask = new QueueStatisticsTask(
                 "Load Service", loadService, counters);
@@ -335,31 +336,24 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
     }
     
     /**
-     * Setup the {@link CounterSet} to be reported to the
-     * {@link ILoadBalancerService}.
-     * <p>
-     * Note: This add the counters to be reported to the client's counter set.
-     * The added counters will be reported when the client reports its own
-     * counters.
-     * 
-     * @param fed
+     * Return the {@link CounterSet} to be reported to the
+     * {@link ILoadBalancerService}. The caller is responsible for attaching
+     * the counters to those reported by {@link JiniFederation#getCounterSet()}
      * 
      * @return The {@link CounterSet} for the {@link ConcurrentDataLoader}.
      */
-    synchronized public CounterSet getCounters(final IBigdataFederation fed) {
+    synchronized public CounterSet getCounters() {
 
-        if (ourCounterSet == null) {
+        if (counterSet == null) {
 
-            // make path to the counter set for the data loader.
-            ourCounterSet = fed.getServiceCounterSet().makePath(
-                    "Concurrent Data Loader");
-
-            ourCounterSet.addCounter("#threads",
+            counterSet = new CounterSet();
+            
+            counterSet.addCounter("#threads",
                     new OneShotInstrument<Integer>(nthreads));
 
             {
 
-                CounterSet tmp = ourCounterSet.makePath("Load Service");
+                CounterSet tmp = counterSet.makePath("Load Service");
                 
                 tmp.addCounter("#tasked", new Instrument<Long>() {
 
@@ -411,10 +405,10 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
 
         }
         
-        return ourCounterSet;
+        return counterSet;
         
     }
-    private CounterSet ourCounterSet;
+    private CounterSet counterSet;
     
     /**
      * If there is a task on the {@link #errorQueue} then re-submit it.

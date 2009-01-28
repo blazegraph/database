@@ -44,69 +44,77 @@ public class RDFLoadTaskFactory<T extends Runnable> extends
      * {@link ILoadBalancerService}.
      * 
      * @todo in the base class also?
-     * 
-     * @param tmp
      */
-    public void setupCounters(CounterSet tmp) {
-        
-        /*
-         * Elapsed ms since the start of the load up to and until the end of
-         * the load.
-         */
-        tmp.addCounter("elapsed", new Instrument<Long>() {
+    synchronized public CounterSet getCounters() {
 
-            @Override
-            protected void sample() {
+        if (counterSet == null) {
 
-                final long elapsed = elapsed();
+            counterSet = new CounterSet();
 
-                setValue(elapsed);
+            /*
+             * Elapsed ms since the start of the load up to and until the end of
+             * the load.
+             */
+            counterSet.addCounter("elapsed", new Instrument<Long>() {
 
-            }
-        });
+                @Override
+                protected void sample() {
 
-        /*
-         * Note: This is the #of told triples read by _this_ client.
-         * 
-         * When you are loading using multiple instances of the concurrent
-         * data loader, then the total #of told triples is the aggregation
-         * across all of those instances.
-         */
-        tmp.addCounter("toldTriples", new Instrument<Long>() {
+                    final long elapsed = elapsed();
 
-            @Override
-            protected void sample() {
+                    setValue(elapsed);
 
-                setValue(toldTriples.get());
+                }
+            });
 
-            }
-        });
+            /*
+             * Note: This is the #of told triples read by _this_ client.
+             * 
+             * When you are loading using multiple instances of the concurrent
+             * data loader, then the total #of told triples is the aggregation
+             * across all of those instances.
+             */
+            counterSet.addCounter("toldTriples", new Instrument<Long>() {
 
-        /*
-         * Note: This is the told triples per second rate for _this_ client
-         * only since it is based on the triples read by the threads for
-         * this client.
-         * 
-         * When you are loading using multiple instances of the concurrent
-         * data loader, then the total told triples per second rate is the
-         * aggregation across all of those instances.
-         */
-        tmp.addCounter("toldTriplesPerSec", new Instrument<Long>() {
+                @Override
+                protected void sample() {
 
-            @Override
-            protected void sample() {
+                    setValue(toldTriples.get());
 
-                final long elapsed = elapsed();
+                }
+            });
 
-                final double tps = (long) (((double) toldTriples.get())
-                        / ((double) elapsed) * 1000d);
+            /*
+             * Note: This is the told triples per second rate for _this_ client
+             * only since it is based on the triples read by the threads for
+             * this client.
+             * 
+             * When you are loading using multiple instances of the concurrent
+             * data loader, then the total told triples per second rate is the
+             * aggregation across all of those instances.
+             */
+            counterSet.addCounter("toldTriplesPerSec", new Instrument<Long>() {
 
-                setValue((long) tps);
+                @Override
+                protected void sample() {
 
-            }
-        });
+                    final long elapsed = elapsed();
+
+                    final double tps = (long) (((double) toldTriples.get())
+                            / ((double) elapsed) * 1000d);
+
+                    setValue((long) tps);
+
+                }
+            });
+
+        }
+
+        return counterSet;
 
     }
+
+    private CounterSet counterSet = null;
     
     /**
      * Report totals.

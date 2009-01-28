@@ -70,6 +70,7 @@ import com.bigdata.btree.BloomFilter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -1024,8 +1025,31 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
 
         try {
 
-            // Setup counters.
-            loadTaskFactory.setupCounters(service.getCounters(fed));
+            /*
+             * Note: Add the counters to be reported to the client's counter
+             * set. The added counters will be reported when the client reports its
+             * own counters.
+             */
+            final CounterSet serviceRoot = fed.getServiceCounterSet();
+
+            final String relPath = "Concurrent Data Loader";
+
+            synchronized (serviceRoot) {
+
+                if (serviceRoot.getPath(relPath) == null) {
+
+                    // Create path to CDL counter set.
+                    final CounterSet tmp = serviceRoot.makePath(relPath);
+
+                    // Attach CDL counters.
+                    tmp.attach(service.getCounters());
+
+                    // Attach task factory counters.
+                    tmp.attach(loadTaskFactory.getCounters());
+
+                }
+                
+            }
 
             // notify will run tasks.
             loadTaskFactory.notifyStart();

@@ -9,6 +9,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSet;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.load.RDFDataLoadMaster.JobState;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -137,8 +139,32 @@ public class RDFFileLoadTask implements Callable<Void>, Serializable,
         final ConcurrentDataLoader loader = new ConcurrentDataLoader(fed,
                 jobState.nthreads);
 
-        // Setup counters for the task factory on the loader.
-        taskFactory.setupCounters(loader.getCounters(fed));
+        /*
+         * Note: Add the counters to be reported to the client's counter
+         * set. The added counters will be reported when the client reports its
+         * own counters.
+         */
+        final CounterSet serviceRoot = fed.getServiceCounterSet();
+
+        final String relPath = jobState.jobName + ICounterSet.pathSeparator
+                + "Concurrent Data Loader";
+
+        synchronized (serviceRoot) {
+
+            if (serviceRoot.getPath(relPath) == null) {
+
+                // Create path to CDL counter set.
+                final CounterSet tmp = serviceRoot.makePath(relPath);
+
+                // Attach CDL counters.
+                tmp.attach(loader.getCounters());
+
+                // Attach task factory counters.
+                tmp.attach(taskFactory.getCounters());
+
+            }
+            
+        }
 
         // Let the loader know that we will run tasks.
         taskFactory.notifyStart();
