@@ -602,7 +602,7 @@ public class FusedView implements IIndex, ILocalBTreeView, IValueAge {
      * @todo this could be done using concurrent threads.
      * @todo watch for overflow of {@link Long#MAX_VALUE}
      */
-    final public long rangeCount(byte[] fromKey, byte[] toKey) {
+    final public long rangeCount(final byte[] fromKey, final byte[] toKey) {
 
         long count = 0;
         
