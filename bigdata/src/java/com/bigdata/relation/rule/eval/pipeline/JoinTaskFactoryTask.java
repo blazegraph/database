@@ -352,6 +352,18 @@ public class JoinTaskFactoryTask implements Callable<Future>,
 
     }
     
+    /**
+     * 
+     * @param master
+     * @param orderIndex
+     * @param partitionId
+     * @return
+     * 
+     * FIXME The master UUID should be cached locally by the JoinTask so that
+     * this method does not require RMI for a distributed federation. Once it
+     * has been cached, modify the method signature to accept the master UUID
+     * directly.
+     */
     static public String getJoinTaskNamespace(IJoinMaster master,
             int orderIndex, int partitionId) {
 

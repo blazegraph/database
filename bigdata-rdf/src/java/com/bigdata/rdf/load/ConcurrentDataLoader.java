@@ -605,7 +605,7 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
             final ITaskFactory<T> taskFactory) throws InterruptedException,
             Exception {
         
-        if(INFO) log.info("Processing: resource=" + resource);
+        if(DEBUG) log.debug("Processing: resource=" + resource);
         
         final T target = taskFactory.newTask(resource);
         

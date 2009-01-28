@@ -43,7 +43,6 @@ public class RangeCountProcedure extends AbstractKeyRangeIndexProcedure
     
     /**
      * De-serialization ctor.
-     *
      */
     public RangeCountProcedure() {
         
@@ -64,6 +63,8 @@ public class RangeCountProcedure extends AbstractKeyRangeIndexProcedure
     public RangeCountProcedure(boolean exact, byte[] fromKey, byte[] toKey) {
 
         super( fromKey, toKey );
+        
+        this.exact = exact;
         
     }
 
