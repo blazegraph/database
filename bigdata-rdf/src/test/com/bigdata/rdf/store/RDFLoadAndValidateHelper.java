@@ -53,6 +53,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.openrdf.rio.RDFFormat;
 
+import com.bigdata.counters.CounterSet;
 import com.bigdata.rdf.load.ConcurrentDataLoader;
 import com.bigdata.rdf.load.FileSystemLoader;
 import com.bigdata.rdf.load.RDFLoadTaskFactory;
@@ -124,8 +125,31 @@ public class RDFLoadAndValidateHelper {
         final FileSystemLoader scanner = new FileSystemLoader(service,
                 nclients, clientNum);
 
-        // Setup counters.
-        loadTaskFactory.setupCounters(service.getCounters(fed));
+        /*
+         * Note: Add the counters to be reported to the client's counter
+         * set. The added counters will be reported when the client reports its
+         * own counters.
+         */
+        final CounterSet serviceRoot = fed.getServiceCounterSet();
+
+        final String relPath = "Concurrent Data Loader";
+
+        synchronized (serviceRoot) {
+
+            if (serviceRoot.getPath(relPath) == null) {
+
+                // Create path to CDL counter set.
+                final CounterSet tmp = serviceRoot.makePath(relPath);
+
+                // Attach CDL counters.
+                tmp.attach(service.getCounters());
+
+                // Attach task factory counters.
+                tmp.attach(loadTaskFactory.getCounters());
+
+            }
+            
+        }
 
         // notify will run tasks.
         loadTaskFactory.notifyStart();
