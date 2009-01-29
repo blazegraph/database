@@ -359,6 +359,13 @@ public class ClientIndexView implements IClientIndex {
      * require extensions to the {@link PartitionedTupleIterator} and whatever
      * is supporting the {@link #locatorScan(long, byte[], byte[], boolean)} to
      * make sure that we essentially "close" the iterator.
+     * 
+     * @todo since transaction identifiers are never recycled we should flush
+     *       them from the cache more aggressively. Perhaps allocate another bit
+     *       to distinguish a tx from an arbitrary timestamp? That would reduce
+     *       the resolution to every other millisecond and would not protect
+     *       from hacking a timestamp that looks like a transaction identifier
+     *       (but nothing will).
      */
     final private boolean readConsistent = true;
 
