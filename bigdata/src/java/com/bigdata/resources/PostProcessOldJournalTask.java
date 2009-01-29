@@ -1457,13 +1457,16 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         final boolean compactingMerge = resourceManager.compactingMerge
                 .getAndSet(false); 
         
-        if (INFO)
-            log.info("begin: lastCommitTime=" + lastCommitTime
-                    + ", compactingMerge=" + compactingMerge);
-
         // the old journal.
         final AbstractJournal oldJournal = resourceManager
                 .getJournal(lastCommitTime);
+
+        final long oldJournalSize = oldJournal.size();
+        
+        if (INFO)
+            log.info("begin: lastCommitTime=" + lastCommitTime
+                    + ", compactingMerge=" + compactingMerge
+                    + ", oldJournalSize=" + oldJournalSize);
 
         // tasks to be created (capacity of the array is estimated).
         final List<AbstractTask> tasks = new ArrayList<AbstractTask>(
@@ -1521,7 +1524,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 sb.append("\n" + entry.getKey() + "\t = " + entry.getValue());
             }
             log.warn("\nlastCommitTime=" + lastCommitTime
-                    + ", compactingMerge=" + compactingMerge + sb);
+                    + ", compactingMerge=" + compactingMerge
+                    + ", oldJournalSize=" + oldJournalSize + sb);
         }
 
         return tasks;

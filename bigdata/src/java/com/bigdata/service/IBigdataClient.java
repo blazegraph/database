@@ -255,16 +255,22 @@ public interface IBigdataClient {
          * {@value #DEFAULT_CLIENT_MAX_STALE_LOCATOR_RETRIES}).
          * <p>
          * Note: The {@link StaleLocatorException} is thrown when a split, join,
-         * or move results in one or more new index partitions that replace the
-         * index partition addressed by the client. A retry will normally
-         * succeed. A limit is placed on the #of retries in order to force
-         * abnormal sequences to terminate.
+         * or move results in one or more new index partitions which replace the
+         * index partition addressed by the client.
+         * <p>
+         * This value needs to be relatively large if when we are aggressively
+         * driving journal overflows and index partitions splits during the
+         * "young" phase of a data service or scale-out index since a LOT of
+         * index partition splits and moves will result.
+         * <p>
+         * For mature data services and scale-out indices a retry will normally
+         * succeed.
          */
         String CLIENT_MAX_STALE_LOCATOR_RETRIES = IBigdataClient.class
                 .getName()
                 + ".maxStaleLocatorRetries";
 
-        String DEFAULT_CLIENT_MAX_STALE_LOCATOR_RETRIES = "3";
+        String DEFAULT_CLIENT_MAX_STALE_LOCATOR_RETRIES = "100";
 
         /**
          * The maximum #of tasks that will be created and submitted in parallel

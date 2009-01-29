@@ -4089,8 +4089,9 @@ abstract public class StoreManager extends ResourceEvents implements
         p.setProperty(Options.MAXIMUM_EXTENT, Long
                 .toString(adjustedMaximumExtent));
         
-        if(INFO)
-            log.info("discount=" + d + ", bytesUnderManagement="
+//        if(INFO)
+//            log.info // @todo info.
+            log.warn("discount=" + d + ", bytesUnderManagement="
                     + bytesUnderManagement + ", threshold=" + threshold
                     + ", minimimInitialExtent=" + minimumInitialExtent//
                     + ", initialExtent=" + initialExtent //
