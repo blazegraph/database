@@ -162,7 +162,7 @@ public class TestOverflow extends AbstractResourceManagerTestCase {
             
             assertEquals(1, resourceManager.getManagedJournalCount());
 
-            assertEquals(0, resourceManager.getManagedIndexSegmentCount());
+            assertEquals(0, resourceManager.getManagedSegmentCount());
             
             Set<String> copied = new HashSet<String>();
             
@@ -175,7 +175,7 @@ public class TestOverflow extends AbstractResourceManagerTestCase {
             
             assertEquals(2, resourceManager.getManagedJournalCount());
 
-            assertEquals(0, resourceManager.getManagedIndexSegmentCount());
+            assertEquals(0, resourceManager.getManagedSegmentCount());
 
             // verify live journal is a different instance.
             assertTrue(oldJ != resourceManager.getLiveJournal());

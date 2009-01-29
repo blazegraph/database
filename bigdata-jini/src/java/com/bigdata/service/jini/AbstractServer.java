@@ -430,8 +430,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
          */
 
         List<Entry> entries = null;
-        boolean serviceIDAssignedByConfiguration = false;
-        boolean serviceIDReadFromFile = false;
         
         final JiniClientConfig jiniClientConfig;
         try {
@@ -488,7 +486,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
             /*
              * Make sure that there is a Name and Hostname associated with the
-             * service.
+             * service. If a ServiceID was pre-assigned in the Configuration
+             * then we will extract that also.
              */
             {
                 
@@ -565,8 +564,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
                 // if serviceUUID assigned then set ServiceID from it now.
                 if (serviceUUID != null) {
-                    
-                    serviceIDAssignedByConfiguration = true;
 
                     // set serviceID.
                     this.serviceID = JiniUtil.uuid2ServiceID(serviceUUID);
@@ -578,6 +575,20 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
                     }
                     
+                } else if(!serviceIdFile.exists()) {
+                    
+                    /*
+                     * Since nobody assigned us a ServiceID and since there is
+                     * none on record in the [serviceIdFile], we assign one now
+                     * ourselves.
+                     */
+                    
+                    // set serviceID.
+                    this.serviceID = JiniUtil.uuid2ServiceID(UUID.randomUUID());
+                    
+                    // write the file iff it does not exist.
+                    writeServiceIDOnFile(this.serviceID);
+
                 }
                 
             }
@@ -604,8 +615,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                         
                         // set field on class.
                         this.serviceID = serviceIDFromFile;
-                        
-                        serviceIDReadFromFile = true;
                         
                     } else if (!this.serviceID.equals(serviceIDFromFile)) {
 

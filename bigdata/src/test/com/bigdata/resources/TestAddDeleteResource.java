@@ -116,7 +116,7 @@ public class TestAddDeleteResource extends AbstractResourceManagerTestCase {
      */
     public void test_addDeleteSegment() throws Exception {
 
-        assertEquals(0, resourceManager.getManagedIndexSegmentCount());
+        assertEquals(0, resourceManager.getManagedSegmentCount());
 
         final File outFile;
         final BuildResult buildResult;
@@ -150,13 +150,13 @@ public class TestAddDeleteResource extends AbstractResourceManagerTestCase {
         try {
 
             // Note: the build already added the index segment for us.
-            assertEquals(1, resourceManager.getManagedIndexSegmentCount());
+            assertEquals(1, resourceManager.getManagedSegmentCount());
 
             // delete
             resourceManager.deleteResource(buildResult.segmentMetadata
                     .getUUID(), false/* isJournal */);
 
-            assertEquals(0, resourceManager.getManagedIndexSegmentCount());
+            assertEquals(0, resourceManager.getManagedSegmentCount());
 
         } finally {
 

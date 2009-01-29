@@ -401,7 +401,7 @@ abstract public class ResourceManager extends OverflowManager implements IResour
                 tmp.addCounter(IStoreManagerCounters.ManagedSegmentStoreCount,
                         new Instrument<Long>() {
                             public void sample() {
-                                setValue((long) getManagedIndexSegmentCount());
+                                setValue((long) getManagedSegmentCount());
                             }
                         });
 
@@ -442,6 +442,24 @@ abstract public class ResourceManager extends OverflowManager implements IResour
                             }
                         });
 
+                tmp.addCounter(IStoreManagerCounters.JournalBytesUnderManagement,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                if (isRunning()) {
+                                    setValue(getJournalBytesUnderManagement());
+                                }
+                            }
+                        });
+
+                tmp.addCounter(IStoreManagerCounters.SegmentBytesUnderManagement,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                if (isRunning()) {
+                                    setValue(getSegmentBytesUnderManagement());
+                                }
+                            }
+                        });
+
                 tmp.addCounter(IStoreManagerCounters.BytesDeleted,
                         new Instrument<Long>() {
                             public void sample() {
@@ -471,9 +489,6 @@ abstract public class ResourceManager extends OverflowManager implements IResour
                                 setValue(maximumJournalSizeAtOverflow);
                             }
                         });
-
-//                tmp.addCounter(IStoreManagerCounters.MinimumReleaseAge,
-//                        new OneShotInstrument<Long>(minReleaseAge));
 
                 tmp.addCounter(IStoreManagerCounters.ReleaseTime,
                         new Instrument<Long>() {

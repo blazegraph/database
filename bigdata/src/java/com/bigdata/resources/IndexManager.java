@@ -895,7 +895,8 @@ abstract public class IndexManager extends StoreManager {
 
     }
 
-    public AbstractBTree[] getIndexSources(String name, long timestamp) {
+    public AbstractBTree[] getIndexSources(final String name,
+            final long timestamp) {
 
         if (INFO)
             log.info("name=" + name + ", timestamp=" + timestamp);
@@ -949,7 +950,8 @@ abstract public class IndexManager extends StoreManager {
 
     }
 
-    public AbstractBTree[] getIndexSources(String name, long timestamp, BTree btree) {
+    public AbstractBTree[] getIndexSources(final String name,
+            final long timestamp, final BTree btree) {
         
         /*
          * Get the index partition metadata (if any). If defined, then we know

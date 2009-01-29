@@ -236,7 +236,7 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             assertEquals(2,resourceManager.getManagedJournalCount());
 
             // no index segments.
-            assertEquals(0,resourceManager.getManagedIndexSegmentCount());
+            assertEquals(0,resourceManager.getManagedSegmentCount());
             
             /*
              * Verify that we can the first commit record when we provide the
@@ -427,7 +427,7 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             assertEquals(1,resourceManager.getManagedJournalCount());
 
             // no index segments.
-            assertEquals(0,resourceManager.getManagedIndexSegmentCount());
+            assertEquals(0,resourceManager.getManagedSegmentCount());
             
             /*
              * Verify that the resources required for [A] after overflow are
@@ -541,7 +541,7 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             assertEquals(2,resourceManager.getManagedJournalCount());
             
             // no index segments.
-            assertEquals(0,resourceManager.getManagedIndexSegmentCount());
+            assertEquals(0,resourceManager.getManagedSegmentCount());
             
             // should have been closed against further writes but NOT deleted.
             assertTrue(resourceManager.openStore(uuid0).isReadOnly());
@@ -593,7 +593,7 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             assertEquals(2,resourceManager.getManagedJournalCount());
             
             // no index segments.
-            assertEquals(0,resourceManager.getManagedIndexSegmentCount());
+            assertEquals(0,resourceManager.getManagedSegmentCount());
             
             // should have been closed against further writes but NOT deleted.
             assertTrue(resourceManager.openStore(uuid1).isReadOnly());

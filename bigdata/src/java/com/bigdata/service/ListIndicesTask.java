@@ -43,18 +43,18 @@ public class ListIndicesTask implements Callable<String[]>,
 
     transient protected static final boolean INFO = log.isInfoEnabled();
 
-    private final long commitTime;
+    private final long ts;
 
     private transient DataService dataService;
 
     /**
      * 
-     * @param commitTime
-     *            The commit time for which the data will be reported.
+     * @param ts
+     *            The timestamp for which the data will be reported.
      */
-    public ListIndicesTask(long commitTime) {
+    public ListIndicesTask(final long ts) {
 
-        this.commitTime = commitTime;
+        this.ts = ts;
 
     }
 
@@ -64,20 +64,16 @@ public class ListIndicesTask implements Callable<String[]>,
 
     }
 
-    /**
-     * @todo to be robust this should temporarily disable overflow for the
-     *       data service otherwise it is possible that the live journal
-     *       will be concurrently closed out.
-     */
     public String[] call() throws Exception {
 
         if (dataService == null)
             throw new IllegalStateException("DataService not set.");
 
         final AbstractJournal journal = dataService.getResourceManager()
-                .getLiveJournal();
+                .getJournal(ts);
 
-        final IIndex name2Addr = journal.getName2Addr(commitTime);
+        // @todo possible problem if [ts] is a read-write tx.
+        final IIndex name2Addr = journal.getName2Addr(ts);
 
         final int n = (int) name2Addr.rangeCount();
 
