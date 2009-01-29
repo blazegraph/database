@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -166,6 +167,21 @@ public class ClientIndexView implements IClientIndex {
      */
     final protected static boolean DEBUG = log.isDebugEnabled();
 
+    /**
+     * Error message used if we were unable to start a new transaction in order
+     * to provide read-consistent semantics for an {@link ITx#READ_COMMITTED}
+     * view or for a read-only operation on an {@link ITx#UNISOLATED} view.
+     */
+    static protected final transient String ERR_NEW_TX = "Could not start transaction";
+    
+    /**
+     * Error message used if we were unable to abort a transaction that we
+     * started in order to provide read-consistent semantics for an
+     * {@link ITx#READ_COMMITTED} view or for a read-only operation on an
+     * {@link ITx#UNISOLATED} view.
+     */
+    static protected final transient String ERR_ABORT_TX = "Could not abort transaction";
+    
     private final AbstractScaleOutFederation fed;
 
     public AbstractScaleOutFederation getFederation() {
@@ -229,11 +245,6 @@ public class ClientIndexView implements IClientIndex {
         
     }
 
-    /**
-     * true iff this is a historical read.
-     */
-    private final boolean historicalRead;
-    
     /**
      * The {@link IMetadataIndex} for this scale-out index.
      */
@@ -322,6 +333,32 @@ public class ClientIndexView implements IClientIndex {
      * during the operation.
      * 
      * @todo make this a ctor argument or settable property?
+     * 
+     * FIXME (I've done the submit methods.) Read-consistent semantics for a
+     * read-committed or unisolated view demand the transparent use of a
+     * read-historical transaction starting from the lastCommitTime of the
+     * federation.
+     * <p>
+     * However, if we open a transaction then we MUST abort() it or the
+     * read-lock will remain in places for resources as of that timestamp.
+     * <p>
+     * This effects
+     * {@link #submit(byte[], byte[], IKeyRangeIndexProcedure, IResultHandler)} ,
+     * {@link #submit(int, int, byte[][], byte[][], AbstractIndexProcedureConstructor, IResultHandler)},
+     * {@link #locatorScan(long, byte[], byte[], boolean)}, and
+     * {@link #rangeIterator(byte[], byte[], int, int, IFilterConstructor)}
+     * since all of those methods can span more than a single index partition.
+     * <p>
+     * Note: we only flag read-only vs read-write in the tx identifier itself,
+     * not whether it is a tx vs a light-weight historical read!
+     * <p>
+     * Fixing this will require that the methods listed above create a
+     * read-historical transaction (when the necessary semantics are
+     * read-consistent from the global lastCommitTIme) and <code>finally</code>
+     * abort() that transaction. This is easy for the submit methods but it will
+     * require extensions to the {@link PartitionedTupleIterator} and whatever
+     * is supporting the {@link #locatorScan(long, byte[], byte[], boolean)} to
+     * make sure that we essentially "close" the iterator.
      */
     final private boolean readConsistent = true;
 
@@ -389,8 +426,6 @@ public class ClientIndexView implements IClientIndex {
         this.batchOnly = fed.getClient().getBatchApiOnly();
 
         this.taskTimeout = fed.getClient().getTaskTimeout();
-        
-        this.historicalRead = TimestampUtility.isReadOnly(timestamp);
 
     }
 
@@ -746,10 +781,11 @@ public class ClientIndexView implements IClientIndex {
      * Returns an iterator that will visit the {@link PartitionLocator}s for
      * the specified scale-out index key range.
      * 
-     * @see AbstractScaleOutFederation#locatorScan(String, long, byte[], byte[], boolean)
+     * @see AbstractScaleOutFederation#locatorScan(String, long, byte[], byte[],
+     *      boolean)
      * 
      * @param timestamp
-     *            The timestamp of the view.
+     *            The timestamp that will be used to visit the locators.
      * @param fromKey
      *            The scale-out index first key that will be visited
      *            (inclusive). When <code>null</code> there is no lower bound.
@@ -765,8 +801,8 @@ public class ClientIndexView implements IClientIndex {
      *         will be a serialized {@link PartitionLocator} object.
      */
     @SuppressWarnings("unchecked")
-    public Iterator<PartitionLocator> locatorScan(long timestamp,
-            final byte[] fromKey, final byte[] toKey, boolean reverseScan) {
+    public Iterator<PartitionLocator> locatorScan(final long timestamp,
+            final byte[] fromKey, final byte[] toKey, final boolean reverseScan) {
         
         return fed.locatorScan(name, timestamp, fromKey, toKey, reverseScan);
         
@@ -853,19 +889,82 @@ public class ClientIndexView implements IClientIndex {
         if (proc == null)
             throw new IllegalArgumentException();
 
+        if (readConsistent && proc.isReadOnly()
+                && TimestampUtility.isReadCommittedOrUnisolated(getTimestamp())) {
+            /*
+             * Use globally consistent reads for the mapped procedure.
+             */
+
+            final long tx;
+            try {
+
+                tx = fed.getTransactionService().newTx(ITx.READ_COMMITTED);
+
+            } catch (IOException ex) {
+
+                throw new RuntimeException(ERR_NEW_TX, ex);
+
+            }
+
+            try {
+
+                mapProcedure(tx, fromKey, toKey, proc, resultHandler);
+
+            } finally {
+
+                try {
+
+                    fed.getTransactionService().abort(tx);
+
+                } catch (IOException ex) {
+
+                    // log error and ignore since the operation is complete.
+                    log.error("Could not abort tx: tx=" + tx, ex);
+
+                }
+
+            }
+            
+        } else {
+
+            /*
+             * Timestamp is either a tx already or the caller is risking errors
+             * with lightweight historical reads.
+             */
+            
+            mapProcedure(timestamp, fromKey, toKey, proc, resultHandler);
+            
+        }
+
+    }
+
+    /**
+     * Inner method uses the timestamp choosen above.
+     * 
+     * @param tx
+     * @param fromKey
+     * @param toKey
+     * @param proc
+     * @param resultHandler
+     */
+    private void mapProcedure(final long tx, final byte[] fromKey,
+            final byte[] toKey, final IKeyRangeIndexProcedure proc,
+            final IResultHandler resultHandler) {
+
         // true iff the procedure is known to be parallelizable.
         final boolean parallel = proc instanceof IParallelizableIndexProcedure;
-        
-        if(INFO)
-        log.info("Procedure " + proc.getClass().getName()
-                + " will be mapped across index partitions in "
-                + (parallel ? "parallel" : "sequence"));
+
+        if (INFO)
+            log.info("Procedure " + proc.getClass().getName()
+                    + " will be mapped across index partitions in "
+                    + (parallel ? "parallel" : "sequence"));
 
         final int poolSize = ((ThreadPoolExecutor) getThreadPool())
                 .getCorePoolSize();
 
-        final int maxTasksPerRequest = fed.getClient().getMaxParallelTasksPerRequest();
-        
+        final int maxTasksPerRequest = fed.getClient()
+                .getMaxParallelTasksPerRequest();
+
         // max #of tasks to queue at once.
         final int maxTasks = poolSize == 0 ? maxTasksPerRequest : Math.min(
                 poolSize, maxTasksPerRequest);
@@ -873,19 +972,13 @@ public class ClientIndexView implements IClientIndex {
         // verify positive or the loop below will fail to progress.
         assert maxTasks > 0 : "maxTasks=" + maxTasks + ", poolSize=" + poolSize
                 + ", maxTasksPerRequest=" + maxTasksPerRequest;
-        
-        // choose globally consistent reads for the mapped procedure?
-        final long timestamp = readConsistent && proc.isReadOnly()
-                && TimestampUtility.isReadCommittedOrUnisolated(getTimestamp())
-                ? TimestampUtility.asHistoricalRead(fed.getLastCommitTime())
-                : getTimestamp(); 
-        
+
         // scan visits index partition locators in key order.
-        final Iterator<PartitionLocator> itr = locatorScan(timestamp,
-                fromKey, toKey, false/* reverseScan */);
-        
+        final Iterator<PartitionLocator> itr = locatorScan(tx, fromKey, toKey,
+                false/* reverseScan */);
+
         long nparts = 0;
-        
+
         while (itr.hasNext()) {
 
             /*
@@ -901,31 +994,32 @@ public class ClientIndexView implements IClientIndex {
              * sequence.
              */
 
-            final ArrayList<Callable<Void>> tasks = new ArrayList<Callable<Void>>(maxTasks);
-            
-            for(int i=0; i<maxTasks && itr.hasNext(); i++) {
-                
+            final ArrayList<Callable<Void>> tasks = new ArrayList<Callable<Void>>(
+                    maxTasks);
+
+            for (int i = 0; i < maxTasks && itr.hasNext(); i++) {
+
                 final PartitionLocator locator = itr.next();
 
-                final Split split = new Split(locator, 0/* fromIndex */, 0/* toIndex */);                
+                final Split split = new Split(locator, 0/* fromIndex */, 0/* toIndex */);
 
                 tasks.add(new KeyRangeDataServiceProcedureTask(fromKey, toKey,
-                        timestamp, split, proc, resultHandler));
-                
+                        tx, split, proc, resultHandler));
+
                 nparts++;
-                
+
             }
 
-            runTasks(parallel, tasks );
+            runTasks(parallel, tasks);
 
-            // next index partition(s)                     
-        
+            // next index partition(s)
+
         }
 
-        if(INFO)
-        log.info("Procedure " + proc.getClass().getName() + " mapped across "
-                + nparts + " index partitions in "
-                + (parallel ? "parallel" : "sequence"));
+        if (INFO)
+            log.info("Procedure " + proc.getClass().getName()
+                    + " mapped across " + nparts + " index partitions in "
+                    + (parallel ? "parallel" : "sequence"));
 
     }
 
@@ -943,8 +1037,10 @@ public class ClientIndexView implements IClientIndex {
      * @return The aggregated result of applying the procedure to the relevant
      *         index partitions.
      */
-    public void submit(int fromIndex, int toIndex, byte[][] keys, byte[][] vals,
-            AbstractIndexProcedureConstructor ctor, IResultHandler aggregator) {
+    public void submit(final int fromIndex, final int toIndex,
+            final byte[][] keys, final byte[][] vals,
+            final AbstractIndexProcedureConstructor ctor,
+            final IResultHandler aggregator) {
 
         if (ctor == null) {
 
@@ -963,24 +1059,80 @@ public class ClientIndexView implements IClientIndex {
          * applied to a different index partition.
          */
 
-        final List<Split> splits = splitKeys(fromIndex, toIndex, keys);
+        final LinkedList<Split> splits = splitKeys(fromIndex, toIndex, keys);
 
         final int nsplits = splits.size();
 
+        if (nsplits == 0)
+            return;
+
         /*
-         * Create the instances of the procedure for each split.
+         * Examine the first split in order to figure out how we are going to
+         * run this operation.
          */
         
-        final ArrayList<Callable<Void>> tasks = new ArrayList<Callable<Void>>(
-                nsplits);
-        
-        // set iff required.
-        long lastCommitTime = -1L;
-        
-        // assume true until proven otherwise.
-        boolean parallel = true;
+        // iff procedure can be executed in parallel.
+        final boolean parallel;
+        // iff procedure is read-only.
+        final boolean readOnly;
+        // iff we created a read-historical tx in this method.
+        final boolean isTx;
+        // the timestamp that will be used for the operation.
+        final long ts;
         {
-         
+
+            final Split split = splits.getFirst();
+
+            final IKeyArrayIndexProcedure proc = ctor.newInstance(this,
+                    split.fromIndex, split.toIndex, keys, vals);
+
+            parallel = (proc instanceof IParallelizableIndexProcedure);
+
+            readOnly = proc.isReadOnly();
+
+            if (readConsistent
+                    && proc.isReadOnly()
+                    && TimestampUtility
+                            .isReadCommittedOrUnisolated(getTimestamp())) {
+
+                /*
+                 * Create a read-historical transaction from the last commit
+                 * point of the federation in order to provide consistent
+                 * reads for the mapped procedure.
+                 */
+
+                isTx = true;
+                
+                try {
+                
+                    ts = fed.getTransactionService().newTx(ITx.READ_COMMITTED);
+                    
+                } catch (IOException e) {
+                    
+                    throw new RuntimeException(ERR_NEW_TX,e);
+                    
+                }
+
+            } else {
+            
+                // might be a tx, but not one that we created here.
+                isTx = false;
+                
+                ts = getTimestamp();
+            
+            }
+            
+        }
+        
+        try {
+
+            /*
+             * Create the instances of the procedure for each split.
+             */
+
+            final ArrayList<Callable<Void>> tasks = new ArrayList<Callable<Void>>(
+                    nsplits);
+
             final Iterator<Split> itr = splits.iterator();
 
             while (itr.hasNext()) {
@@ -990,39 +1142,40 @@ public class ClientIndexView implements IClientIndex {
                 final IKeyArrayIndexProcedure proc = ctor.newInstance(this,
                         split.fromIndex, split.toIndex, keys, vals);
 
-                if (!(proc instanceof IParallelizableIndexProcedure)) {
+                tasks.add(new KeyArrayDataServiceProcedureTask(keys, vals, ts,
+                        split, proc, aggregator, ctor));
 
-                    parallel = false;
+            }
 
+            if (INFO)
+                log.info("Procedures created by " + ctor.getClass().getName()
+                        + " will run on " + nsplits + " index partitions in "
+                        + (parallel ? "parallel" : "sequence"));
+
+            runTasks(parallel, tasks);
+
+        } finally {
+
+            if (isTx) {
+
+                try {
+
+                    fed.getTransactionService().abort(ts);
+                    
+                } catch (IOException e) {
+                    
+                    /*
+                     * log error but do not rethrow since operation is over
+                     * anyway.
+                     */
+                    
+                    log.error(ERR_ABORT_TX + ": " + ts, e);
+                    
                 }
-
-                // choose globally consistent reads for the mapped procedure?
-                final long timestamp;
-                if (readConsistent
-                        && proc.isReadOnly()
-                        && TimestampUtility
-                                .isReadCommittedOrUnisolated(getTimestamp())) {
-                    if (lastCommitTime == -1L) {
-                        lastCommitTime = TimestampUtility.asHistoricalRead(fed.getLastCommitTime());
-                    }
-                    timestamp = lastCommitTime;
-                } else {
-                    timestamp = getTimestamp();
-                }
-
-                tasks.add(new KeyArrayDataServiceProcedureTask(keys, vals,
-                        timestamp, split, proc, aggregator, ctor));
-                
+        
             }
             
         }
-
-        if (INFO)
-            log.info("Procedures created by " + ctor.getClass().getName()
-                    + " will run on " + nsplits + " index partitions in "
-                    + (parallel ? "parallel" : "sequence"));
-        
-        runTasks(parallel, tasks);
         
     }
 
@@ -1855,7 +2008,7 @@ public class ClientIndexView implements IClientIndex {
      *       {@link IMetadataService} but then we have the problem of figuring
      *       out when to release locators if the client is long-lived.
      */
-    public List<Split> splitKeys(final int fromIndex, final int toIndex,
+    public LinkedList<Split> splitKeys(final int fromIndex, final int toIndex,
             final byte[][] keys) {
 
         assert keys != null;
@@ -1865,7 +2018,7 @@ public class ClientIndexView implements IClientIndex {
 
         assert toIndex <= keys.length;
         
-        final List<Split> splits = new LinkedList<Split>();
+        final LinkedList<Split> splits = new LinkedList<Split>();
         
         // start w/ the first key.
         int currentIndex = fromIndex;

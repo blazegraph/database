@@ -61,20 +61,33 @@ public class SplitIndexPartitionTask extends
         AbstractResourceManagerTask<AbstractResult> {
 
     private final long lastCommitTime;
+
+    /**
+     * The split handler to be applied. Note that this MAY have been overriden
+     * in order to promote a split so you MUST use this instance and NOT the one
+     * in the {@link IndexMetadata} object.
+     */
+    private final ISplitHandler splitHandler;
     
     /**
-     * @param resourceManager 
+     * @param resourceManager
      * @param lastCommitTime
      * @param resource
+     * @param splitHandler
+     *            The split handler to be applied. Note that this MAY have been
+     *            overriden in order to promote a split so you MUST use this
+     *            instance and NOT the one in the {@link IndexMetadata} object.
      */
-    protected SplitIndexPartitionTask(ResourceManager resourceManager,
-            long lastCommitTime,
-            String resource) {
+    protected SplitIndexPartitionTask(final ResourceManager resourceManager,
+            final long lastCommitTime, final String resource,
+            final ISplitHandler splitHandler) {
 
         super(resourceManager, TimestampUtility
                 .asHistoricalRead(lastCommitTime), resource);
 
         this.lastCommitTime = lastCommitTime;
+        
+        this.splitHandler = splitHandler;
 
     }
 
@@ -265,7 +278,7 @@ public class SplitIndexPartitionTask extends
         // The UUID associated with the scale-out index.
         final UUID indexUUID = indexMetadata.getIndexUUID();
         
-        final ISplitHandler splitHandler = indexMetadata.getSplitHandler();
+//        final ISplitHandler splitHandler = indexMetadata.getSplitHandler();
         
         if (splitHandler == null) {
             

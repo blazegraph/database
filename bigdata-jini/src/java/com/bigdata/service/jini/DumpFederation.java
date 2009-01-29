@@ -52,6 +52,7 @@ import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.jini.lookup.entry.Hostname;
 import com.bigdata.journal.DumpJournal;
+import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
@@ -145,19 +146,19 @@ public class DumpFederation {
              * Wait until we have the metadata service.
              */
             fed.awaitServices(1/* minDataServices */, 10000L/* timeout(ms) */);
-
-            final long lastCommitTime = fed.getLastCommitTime();
-            
-            if(lastCommitTime == 0L) {
-                
-                System.out.println("No committed data.");
-                
-                System.exit(0);
-                
-            }
+//
+//            final long lastCommitTime = fed.getLastCommitTime();
+//            
+//            if(lastCommitTime == 0L) {
+//                
+//                System.out.println("No committed data.");
+//                
+//                System.exit(0);
+//                
+//            }
             
             // a read-only transaction as of the last commit time.
-            final long tx = fed.getTransactionService().newTx(lastCommitTime);
+            final long tx = fed.getTransactionService().newTx(ITx.READ_COMMITTED);
             
             try {
 
@@ -251,6 +252,7 @@ public class DumpFederation {
         System.out
                 .println("Timestamp"//
                         + "\tIndexName" //
+                        + "\tIndexPartition"//
                         + "\tPartitionId" //
                         + "\tServiceUUID" //
                         + "\tServiceName" //
@@ -305,10 +307,10 @@ public class DumpFederation {
     public void dumpIndexLocators(final String indexName)
             throws InterruptedException {
 
-        final IMetadataIndex ndx;
+        final IMetadataIndex metadataIndex;
         try {
 
-            ndx = fed.getMetadataIndex(indexName, ts);
+            metadataIndex = fed.getMetadataIndex(indexName, ts);
 
         } catch (Throwable t) {
 
@@ -327,7 +329,7 @@ public class DumpFederation {
 
         }
 
-        dumpIndexLocators(indexName, ndx);
+        dumpIndexLocators(indexName, metadataIndex);
 
     }
     
@@ -394,10 +396,10 @@ public class DumpFederation {
             this.localPartitionMetadata = localPartitionMetadata;
 
             // various byte counts of interest.
-            IndexPartitionDetailRecord byteCountRec = null;
+            IndexPartitionDetailRecord detailRec = null;
             try {
 
-                byteCountRec = (IndexPartitionDetailRecord) dataService
+                detailRec = (IndexPartitionDetailRecord) dataService
                         .submit(ts, DataService.getIndexPartitionName(
                                 indexName, locator.getPartitionId()),
                                 new FetchIndexPartitionByteCountRecordTask()); 
@@ -411,7 +413,7 @@ public class DumpFederation {
                 log.warn("name=" + indexName, t);
 
             }
-            this.detailRec = byteCountRec;
+            this.detailRec = detailRec;
             
         }
 
@@ -624,12 +626,12 @@ public class DumpFederation {
 
             }
 
-            System.err.println("ndx=" + ndx.getClass());
-
             final long rangeCount = ndx.rangeCount();
 
-            final long rangeCountExact = ndx.rangeCountExact(
-                    null/* fromKey */, null/* toKey */);
+            // @todo this appears to be too expensive to do all the time.
+            final long rangeCountExact = -1L;
+//            final long rangeCountExact = ndx.rangeCountExact(
+//                    null/* fromKey */, null/* toKey */);
             
             final LocalPartitionMetadata pmd = ndx.getIndexMetadata()
                     .getPartitionMetadata();
@@ -791,6 +793,7 @@ public class DumpFederation {
             final StringBuilder sb = new StringBuilder();
             sb.append(ts);//new Date(ts));
             sb.append("\t" + indexName);
+            sb.append("\t" + DataService.getIndexPartitionName(indexName,rec.locator.getPartitionId()));
             sb.append("\t" + rec.locator.getPartitionId());
             sb.append("\t" + rec.locator.getDataServiceUUID());
             sb.append("\t" + rec.smd.getName());

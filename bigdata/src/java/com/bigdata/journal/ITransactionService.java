@@ -35,7 +35,6 @@ import com.bigdata.isolation.IConflictResolver;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ITxCommitProtocol;
-import com.bigdata.service.AbstractTransactionService.Options;
 
 /**
  * <p>
@@ -198,7 +197,7 @@ public interface ITransactionService extends ITimestampService {
      * @throws ValidationError
      *             if the transaction could not be validated.
      * @throws IllegalStateException
-     *             if the tx is not a known active transaction.
+     *             if <i>tx</i> is not an active transaction.
      * @throws IOException
      *             RMI errors.
      */
@@ -211,7 +210,7 @@ public interface ITransactionService extends ITimestampService {
      *            The transaction identifier.
      * 
      * @throws IllegalStateException
-     *             if the tx is not a known active transaction.
+     *             if <i>tx</i> is not an active transaction.
      * @throws IOException
      *             RMI errors.
      */
