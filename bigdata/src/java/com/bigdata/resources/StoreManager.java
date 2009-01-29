@@ -325,6 +325,18 @@ abstract public class StoreManager extends ResourceEvents implements
         String BytesUnderManagement = "Bytes Under Management";
 
         /**
+         * The #of bytes in journals currently under management by the
+         * {@link StoreManager}.
+         */
+        String JournalBytesUnderManagement = "Journal Bytes Under Management";
+
+        /**
+         * The #of bytes in index segments currently under management by the
+         * {@link StoreManager}.
+         */
+        String SegmentBytesUnderManagement = "Segment Bytes Under Management";
+
+        /**
          * The #of bytes in resources that have been deleted by the
          * {@link StoreManager} after they became release free.
          */
@@ -690,6 +702,8 @@ abstract public class StoreManager extends ResourceEvents implements
      * time a resource is deleted.
      */
     final protected AtomicLong bytesUnderManagement = new AtomicLong();
+    final protected AtomicLong journalBytesUnderManagement = new AtomicLong();
+    final protected AtomicLong segmentBytesUnderManagement = new AtomicLong();
     
     /**
      * The #of bytes that have been deleted since startup.
@@ -707,7 +721,38 @@ abstract public class StoreManager extends ResourceEvents implements
         
         assertRunning();
         
-        return bytesUnderManagement.get() + getLiveJournal().getBufferStrategy().getExtent();
+        return bytesUnderManagement.get()
+                + getLiveJournal().getBufferStrategy().getExtent();
+        
+    }
+    
+    /**
+     * The #of bytes in {@link ManagedJournal}s, including those written on the
+     * live journal.
+     * 
+     * @throws IllegalStateException
+     *             during startup or if the {@link StoreManager} is closed.
+     */
+    public long getJournalBytesUnderManagement() {
+
+        assertRunning();
+        
+        return journalBytesUnderManagement.get()
+                + getLiveJournal().getBufferStrategy().getExtent();
+        
+    }
+    
+    /**
+     * The #of bytes in managed {@link IndexSegmentStore}s.
+     * 
+     * @throws IllegalStateException
+     *             during startup or if the {@link StoreManager} is closed.
+     */
+    public long getSegmentBytesUnderManagement() {
+        
+        assertRunning();
+        
+        return segmentBytesUnderManagement.get();
         
     }
     
@@ -1448,8 +1493,12 @@ abstract public class StoreManager extends ResourceEvents implements
                 /*
                  * Subtract out the #of bytes in the live journal.
                  */
-                bytesUnderManagement.addAndGet(-tmp.getBufferStrategy()
-                        .getExtent());
+
+                final long extent = -tmp.getBufferStrategy().getExtent();
+                
+                bytesUnderManagement.addAndGet(extent);
+                
+                journalBytesUnderManagement.addAndGet(extent);
 
             }
 
@@ -1974,7 +2023,7 @@ abstract public class StoreManager extends ResourceEvents implements
     /**
      * The #of index segments on hand.
      */
-    synchronized public int getManagedIndexSegmentCount() {
+    synchronized public int getManagedSegmentCount() {
 
         assertOpen();
 
@@ -2097,11 +2146,15 @@ abstract public class StoreManager extends ResourceEvents implements
         if (resourceMetadata.isJournal()) {
 
             journalIndex.add((JournalMetadata)resourceMetadata);
+            
+            journalBytesUnderManagement.addAndGet(extent);
 
         } else {
 
             segmentIndex.add((SegmentMetadata)resourceMetadata);
 
+            segmentBytesUnderManagement.addAndGet(extent);
+            
         }
         
         /*
@@ -2649,6 +2702,8 @@ abstract public class StoreManager extends ResourceEvents implements
         
         // nothing left under management.
         bytesUnderManagement.set(0L);
+        journalBytesUnderManagement.set(0L);
+        segmentBytesUnderManagement.set(0L);
         
     }
 
@@ -2979,7 +3034,7 @@ abstract public class StoreManager extends ResourceEvents implements
         // @todo log @info
         log.warn("Purging old resources: #bytes=" + getBytesUnderManagement()
                 + ", #journals=" + getManagedJournalCount() + ", #segments="
-                + getManagedIndexSegmentCount());
+                + getManagedSegmentCount());
 
         /*
          * Delete anything that is: 
@@ -2995,7 +3050,7 @@ abstract public class StoreManager extends ResourceEvents implements
         // @todo log @info
         log.warn("Purged old resources: #bytes=" + getBytesUnderManagement()
                 + ", #journals=" + getManagedJournalCount() + ", #segments="
-                + getManagedIndexSegmentCount());
+                + getManagedSegmentCount());
     
         } finally {
         
@@ -3381,6 +3436,12 @@ abstract public class StoreManager extends ResourceEvents implements
 
             // track #of bytes still under management.
             bytesUnderManagement.addAndGet(-length);
+            
+            if(isJournal) {
+                journalBytesUnderManagement.addAndGet(-length);
+            } else {
+                segmentBytesUnderManagement.addAndGet(-length);
+            }
 
         }
 

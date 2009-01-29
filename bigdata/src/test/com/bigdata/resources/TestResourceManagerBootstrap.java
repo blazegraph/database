@@ -308,7 +308,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
         assertEquals(2,resourceManager.getManagedJournalCount());
 
         // verify no index segments discovered.
-        assertEquals(0,resourceManager.getManagedIndexSegmentCount());
+        assertEquals(0,resourceManager.getManagedSegmentCount());
         
         // open one journal.
         assertNotNull(resourceManager.openStore(journalMetadata1.getUUID()));
@@ -448,7 +448,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
         assertEquals(1, resourceManager.getManagedJournalCount());
 
         // #of index segments discovered.
-        assertEquals(nsegments, resourceManager.getManagedIndexSegmentCount());
+        assertEquals(nsegments, resourceManager.getManagedSegmentCount());
 
         // verify index segments discovered.
         for(int i=0; i<nsegments; i++) {
@@ -676,7 +676,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
                 0L/* timestamp */, journal));
 
         // an index segment was found.
-        assertEquals(1, resourceManager.getManagedIndexSegmentCount());
+        assertEquals(1, resourceManager.getManagedSegmentCount());
 
         // verify index segment discovered.
         IndexSegmentStore segStore = (IndexSegmentStore) resourceManager

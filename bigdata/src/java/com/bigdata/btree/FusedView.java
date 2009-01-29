@@ -575,21 +575,10 @@ public class FusedView implements IIndex, ILocalBTreeView, IValueAge {
      * maximum #of entries that could lie within that key range. However, the
      * actual number could be less if there are entries for the same key in more
      * than one source index.
-     * 
-     * @todo this could be done using concurrent threads.
-     * @todo watch for overflow of {@link Long#MAX_VALUE}
      */
     final public long rangeCount() {
 
-        long count = 0;
-        
-        for (int i = 0; i < srcs.length; i++) {
-            
-            count += srcs[i].rangeCount();
-            
-        }
-        
-        return count;
+        return rangeCount(null/* fromKey */, null/* toKey */);
         
     }
 
@@ -602,8 +591,36 @@ public class FusedView implements IIndex, ILocalBTreeView, IValueAge {
      * @todo this could be done using concurrent threads.
      * @todo watch for overflow of {@link Long#MAX_VALUE}
      */
-    final public long rangeCount(final byte[] fromKey, final byte[] toKey) {
+    final public long rangeCount(byte[] fromKey, byte[] toKey) {
 
+        if (fromKey == null) {
+
+            /*
+             * Note: When an index partition is split, the new index partitions
+             * will initially use the same source index segments as the original
+             * index partition. Therefore we MUST impose an explicit constraint
+             * on the fromKey/toKey if none is given so that we do not read
+             * tuples lying outside of the index partition boundaries!
+             */
+            fromKey = getIndexMetadata().getPartitionMetadata()
+                    .getLeftSeparatorKey();
+
+        }
+
+        if (toKey == null) {
+
+            /*
+             * Note: When an index partition is split, the new index partitions
+             * will initially use the same source index segments as the original
+             * index partition. Therefore we MUST impose an explicit constraint
+             * on the fromKey/toKey if none is given so that we do not read
+             * tuples lying outside of the index partition boundaries!
+             */
+            toKey = getIndexMetadata().getPartitionMetadata()
+                    .getRightSeparatorKey();
+
+        }
+        
         long count = 0;
         
         for (int i = 0; i < srcs.length; i++) {
@@ -651,7 +668,8 @@ public class FusedView implements IIndex, ILocalBTreeView, IValueAge {
      * appears in more than one index, the entry is choosen based on the order
      * in which the indices were declared to the constructor.
      */
-    final public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey) {
+    final public ITupleIterator rangeIterator(final byte[] fromKey,
+            final byte[] toKey) {
 
         return rangeIterator(fromKey, toKey, 0/* capacity */,
                 DEFAULT/* flags */, null/* filter */);
@@ -686,12 +704,40 @@ public class FusedView implements IIndex, ILocalBTreeView, IValueAge {
      */
     @SuppressWarnings("unchecked")
     public ITupleIterator rangeIterator(//
-            final byte[] fromKey,//
-            final byte[] toKey, //
+            byte[] fromKey,//
+            byte[] toKey, //
             final int capacity, //
             final int flags,//
             final IFilterConstructor filter//
             ) {
+
+        if (fromKey == null) {
+
+            /*
+             * Note: When an index partition is split, the new index partitions
+             * will initially use the same source index segments as the original
+             * index partition. Therefore we MUST impose an explicit constraint
+             * on the fromKey/toKey if none is given so that we do not read
+             * tuples lying outside of the index partition boundaries!
+             */
+            fromKey = getIndexMetadata().getPartitionMetadata()
+                    .getLeftSeparatorKey();
+
+        }
+
+        if (toKey == null) {
+
+            /*
+             * Note: When an index partition is split, the new index partitions
+             * will initially use the same source index segments as the original
+             * index partition. Therefore we MUST impose an explicit constraint
+             * on the fromKey/toKey if none is given so that we do not read
+             * tuples lying outside of the index partition boundaries!
+             */
+            toKey = getIndexMetadata().getPartitionMetadata()
+                    .getRightSeparatorKey();
+
+        }
 
         // reverse scan?
         final boolean reverseScan = (flags & REVERSE) != 0;
@@ -854,16 +900,45 @@ public class FusedView implements IIndex, ILocalBTreeView, IValueAge {
 
     }
     
-    final public Object submit(byte[] key, ISimpleIndexProcedure proc) {
-        
+    final public Object submit(final byte[] key,
+            final ISimpleIndexProcedure proc) {
+
         return proc.apply(this);
-        
+
     }
 
     @SuppressWarnings("unchecked")
     final public void submit(byte[] fromKey, byte[] toKey,
             final IKeyRangeIndexProcedure proc, final IResultHandler handler) {
 
+        if (fromKey == null) {
+
+            /*
+             * Note: When an index partition is split, the new index partitions
+             * will initially use the same source index segments as the original
+             * index partition. Therefore we MUST impose an explicit constraint
+             * on the fromKey/toKey if none is given so that we do not read
+             * tuples lying outside of the index partition boundaries!
+             */
+            fromKey = getIndexMetadata().getPartitionMetadata()
+                    .getLeftSeparatorKey();
+
+        }
+
+        if (toKey == null) {
+
+            /*
+             * Note: When an index partition is split, the new index partitions
+             * will initially use the same source index segments as the original
+             * index partition. Therefore we MUST impose an explicit constraint
+             * on the fromKey/toKey if none is given so that we do not read
+             * tuples lying outside of the index partition boundaries!
+             */
+            toKey = getIndexMetadata().getPartitionMetadata()
+                    .getRightSeparatorKey();
+
+        }
+        
         final Object result = proc.apply(this);
         
         if (handler != null) {

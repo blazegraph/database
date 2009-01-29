@@ -1185,7 +1185,10 @@ abstract public class OverflowManager extends IndexManager {
              */
             bytesUnderManagement.addAndGet(oldJournal.getBufferStrategy().getExtent());
             bytesUnderManagement.addAndGet(-newJournal.getBufferStrategy().getExtent());
-            
+
+            journalBytesUnderManagement.addAndGet(oldJournal.getBufferStrategy().getExtent());
+            journalBytesUnderManagement.addAndGet(-newJournal.getBufferStrategy().getExtent());
+
             // note the lastCommitTime on the old journal.
             lastOverflowTime = lastCommitTime;
             

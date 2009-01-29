@@ -92,6 +92,11 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
      * The entries in the array reflect the creation time of the resources. The
      * earliest resource is listed first. The most recently created resource is
      * listed last.
+     * <p>
+     * When present, the #of sources in the index partition view includes: the
+     * mutable {@link BTree}, any {@link BTree}s on historical journal(s)
+     * still incorporated into the view, and any {@link IndexSegment}s
+     * incorporated into the view.
      */
     private IResourceMetadata[] resources;
 
@@ -362,6 +367,11 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
      * a fused view of the index partition will be read. Reads begin with the
      * most "recent" data for the index partition and stop as soon as there is a
      * "hit" on one of the resources (including a hit on a deleted index entry).
+     * <p>
+     * When present, the #of sources in the index partition view includes: the
+     * mutable {@link BTree}, any {@link BTree}s on historical journal(s)
+     * still incorporated into the view, and any {@link IndexSegment}s
+     * incorporated into the view.
      * <p>
      * Note: the {@link IResourceMetadata}[] is only available when the
      * {@link LocalPartitionMetadata} is attached to the {@link IndexMetadata}
