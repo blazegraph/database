@@ -271,7 +271,8 @@ public class TestEmbeddedClient extends AbstractEmbeddedFederationTestCase {
             new byte[]{9}  // [4]
             };
             
-            List<Split> splits = ndx.splitKeys( 0, keys.length, keys);
+            final List<Split> splits = ndx.splitKeys(ITx.UNISOLATED, 0, keys.length,
+                    keys);
         
             assertNotNull(splits);
             
@@ -301,7 +302,8 @@ public class TestEmbeddedClient extends AbstractEmbeddedFederationTestCase {
             new byte[]{9}  // [4]
             };
             
-            List<Split> splits = ndx.splitKeys( 0, keys.length, keys);
+            final List<Split> splits = ndx.splitKeys(ITx.UNISOLATED, 0,
+                    keys.length, keys);
         
             assertNotNull(splits);
             
@@ -331,7 +333,8 @@ public class TestEmbeddedClient extends AbstractEmbeddedFederationTestCase {
             new byte[]{9}  // [4]
             };
             
-            List<Split> splits = ndx.splitKeys( 0, keys.length, keys);
+            final List<Split> splits = ndx.splitKeys(ITx.UNISOLATED, 0,
+                    keys.length, keys);
         
             assertNotNull(splits);
 

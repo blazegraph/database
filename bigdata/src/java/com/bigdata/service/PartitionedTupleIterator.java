@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.service;
 
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -75,7 +76,15 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
     /**
      * The timestamp from the ctor.
      */
-    private final long timestamp;
+    private final long ts;
+
+    /**
+     * <code>true</code> iff the {@link #ts} is a read-historical
+     * transaction created specifically to give the iterator read-consistent
+     * semantics. when <code>true</code>, this class will ensure that the
+     * transaction is eventually aborted so that its read lock will be released.
+     */
+    private final boolean isReadConsistentTx;
     
     /**
      * The first key to visit -or- <code>null</code> iff no lower bound (from
@@ -188,6 +197,8 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
     /**
      * When true, the entire key range specified by the client has been
      * visited and the iterator is exhausted (i.e., all done).
+     * 
+     * @see #close()
      */
     private boolean exhausted = false;
 
@@ -216,16 +227,25 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
     
     /**
      * <p>
-     * Note: The {@link PartitionedTupleIterator} uses a sequential scan
-     * (rather than mapping across the index partitions in parallel) and always
-     * picks up from the successor of the last key visited. Read-consistent is
-     * achieved by specifying a commitTime for the <i>timestamp</i> rather than
-     * {@link ITx#READ_COMMITTED}.  The latter will use dirty reads (each time
-     * a {@link ResultSet} is fetched it will be fetched from the most recently
+     * Note: The {@link PartitionedTupleIterator} uses a sequential scan (rather
+     * than mapping across the index partitions in parallel) and always picks up
+     * from the successor of the last key visited. Read-consistent is achieved
+     * by specifying a commitTime for the <i>timestamp</i> rather than
+     * {@link ITx#READ_COMMITTED}. The latter will use dirty reads (each time a
+     * {@link ResultSet} is fetched it will be fetched from the most recently
      * committed state of the database).
      * 
      * @param ndx
-     * @param timestamp
+     * @param ts
+     *            The timestamp for the view (may be a transaction).
+     * @param isReadConsistentTx
+     *            <code>true</code> iff the caller specified timestamp is a
+     *            read-historical transaction created specifically to give the
+     *            iterator read-consistent semantics. when <code>true</code>,
+     *            this class will ensure that the transaction is eventually
+     *            aborted so that its read lock will be released. This is done
+     *            eagerly when the iterator is exhausted and with a
+     *            {@link #finalize()} method otherwise.
      * @param fromKey
      * @param toKey
      * @param capacity
@@ -237,8 +257,9 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
      *             {@link ITx#UNISOLATED}.
      */
     public PartitionedTupleIterator(final ClientIndexView ndx,
-            final long timestamp, final byte[] fromKey, final byte[] toKey,
-            final int capacity, final int flags, final IFilterConstructor filter) {
+            final long ts, final boolean isReadConsistentTx, final byte[] fromKey,
+            final byte[] toKey, final int capacity, final int flags,
+            final IFilterConstructor filter) {
 
         if (ndx == null) {
 
@@ -253,7 +274,8 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
         }
         
         this.ndx = ndx;
-        this.timestamp = timestamp;
+        this.ts = ts;
+        this.isReadConsistentTx = isReadConsistentTx;
         this.fromKey = this.currentFromKey = fromKey;
         this.toKey = this.currentToKey = toKey;
         this.capacity = capacity;
@@ -265,11 +287,47 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
         this.reverseScan = (flags & IRangeQuery.REVERSE) != 0;
 
         // start locator scan
-        this.locatorItr = ndx.locatorScan(timestamp, fromKey, toKey,
+        this.locatorItr = ndx.locatorScan(ts, fromKey, toKey,
                 reverseScan);
 
     }
 
+    protected void finalize() {
+        
+        close();
+        
+    }
+
+    /**
+     * Marks the iterator as {@link #exhausted} and aborts the {@link #ts} iff
+     * it was identified to the ctor as being created specifically to provide
+     * read-consistent semantics for this iterator and hence our responsibility
+     * to clean up.
+     */
+    synchronized private void close() {
+
+        if (exhausted)
+            return;
+
+        exhausted = true;
+
+        if (isReadConsistentTx) {
+
+            try {
+
+                ndx.getFederation().getTransactionService().abort(ts);
+
+            } catch (IOException e) {
+
+                // log and ignore since the caller was not directly affected.
+                log.error(ClientIndexView.ERR_ABORT_TX + ts, e);
+
+            }
+
+        }
+
+    }
+    
     public boolean hasNext() {
 
         if (exhausted) {
@@ -349,7 +407,7 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
                 }
                 
                 // notify the client so that it can refresh its cache.
-                ndx.staleLocator(locator,cause);
+                ndx.staleLocator(ts, locator,cause);
                 
                 // save reference
                 lastStaleLocator = locator;
@@ -358,7 +416,7 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
                 locator = null;
                 
                 // Re-start the locator scan.
-                locatorItr = ndx.locatorScan(timestamp, currentFromKey,
+                locatorItr = ndx.locatorScan(ts, currentFromKey,
                         currentToKey, reverseScan);
                 
                 // Recursive query.
@@ -391,7 +449,7 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
          * Exausted.
          */
         
-        exhausted = true;
+        close();
         
         return false;
         
@@ -476,7 +534,7 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
             
             if (INFO)
                 log.info("name=" + ndx.getName() //
-                        + ", tx=" + timestamp //
+                        + ", tx=" + ts //
                         + ", reverseScan=" + reverseScan //
                         + ", partition=" + partitionId //
                         + ", fromKey=" + BytesUtil.toString(_fromKey) //
@@ -499,7 +557,7 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
             
             src = new DataServiceTupleIterator<E>(ndx, dataService, DataService
                     .getIndexPartitionName(ndx.getName(), partitionId),
-                    timestamp, _fromKey, _toKey, capacity, flags, filter) {
+                    ts, _fromKey, _toKey, capacity, flags, filter) {
                 
                 /**
                  * Overriden so that we observe each distinct result set
@@ -623,7 +681,9 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
 
         sb.append("{ flags=" + Tuple.flagString(flags));
 
-        sb.append(", timestamp=" + timestamp);
+        sb.append(", timestamp=" + ts);
+
+        sb.append(", isReadConsistentTx=" + isReadConsistentTx);
 
         sb.append(", capacity=" + capacity);
 
