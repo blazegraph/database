@@ -172,7 +172,8 @@ public class DumpFederation {
 
             }
 
-            System.err.println("Done.");
+            if(INFO)
+                log.info("Done");
 
         } finally {
 
@@ -195,7 +196,7 @@ public class DumpFederation {
     /**
      * The read-historical transaction that will be used to dump the database.
      */
-    private final long tx;
+    private final long ts;
     
     /**
      * 
@@ -213,7 +214,7 @@ public class DumpFederation {
         
         this.fed = fed;
         
-        this.tx = tx;
+        this.ts = tx;
         
     }
     
@@ -229,7 +230,7 @@ public class DumpFederation {
             ExecutionException, IOException {
 
         return (String[]) fed.getMetadataService().submit(
-                new ListIndicesTask(tx)).get();
+                new ListIndicesTask(ts)).get();
 
     }
 
@@ -248,7 +249,8 @@ public class DumpFederation {
 
         // write out table header.
         System.out
-                .println("IndexName" //
+                .println("Timestamp"//
+                        + "\tIndexName" //
                         + "\tPartitionId" //
                         + "\tServiceUUID" //
                         + "\tServiceName" //
@@ -266,15 +268,18 @@ public class DumpFederation {
                         + "\tIndexSegmentBytesUnderManagement"// 
                         + "\tManagedJournalCount"// 
                         + "\tManagedSegmentCount"//
+                        + "\tOverflowCount"//
                         //
                         + "\tLeftSeparator"//
                         + "\tRightSeparator"//
+                        + "\tHistory"//
                         );
 
         final String[] names = getIndexNames();
 
-        System.err.println("Found " + names.length + " indices: "
-                + Arrays.toString(names));
+        if (INFO)
+            log.info("Found " + names.length + " indices: "
+                    + Arrays.toString(names));
 
         for (String name : names) {
 
@@ -303,7 +308,7 @@ public class DumpFederation {
         final IMetadataIndex ndx;
         try {
 
-            ndx = fed.getMetadataIndex(indexName, tx);
+            ndx = fed.getMetadataIndex(indexName, ts);
 
         } catch (Throwable t) {
 
@@ -548,6 +553,11 @@ public class DumpFederation {
          * data service on which the index partition resides.
          */
         public final int managedSegmentCount;
+
+        /**
+         * The #of overflow events.
+         */
+        public final long overflowCount;
         
         public IndexPartitionDetailRecord(//
                 final int sourceCount,//
@@ -579,6 +589,8 @@ public class DumpFederation {
             this.managedJournalCount = resourceManager.getManagedJournalCount();
             
             this.managedSegmentCount = resourceManager.getManagedSegmentCount();
+            
+            this.overflowCount = resourceManager.getOverflowCount();
             
         }
 
@@ -644,10 +656,9 @@ public class DumpFederation {
                      * open since we have an IIndex object and that should be a
                      * FusedView of its components.
                      * 
-                     * @todo if it is really a FusedView then we can just
-                     * enumerate its sources directly - much more
-                     * straightforward and we do not need to implement
-                     * IDataServiceAwareProcedure.
+                     * @todo The IIndex is either a BTree or a FusedView so we
+                     * can just enumerate its sources directly, which is much
+                     * more straightforward.
                      */
                     final IndexSegmentStore segStore = (IndexSegmentStore) resourceManager
                             .openStore(x.getUUID());
@@ -706,7 +717,7 @@ public class DumpFederation {
 
             final PartitionLocator locator = itr.next().getObject();
 
-            final IndexPartitionRecord rec = new IndexPartitionRecord(fed, tx,
+            final IndexPartitionRecord rec = new IndexPartitionRecord(fed, ts,
                     indexName, locator);
 
             /*
@@ -778,12 +789,13 @@ public class DumpFederation {
 
             // format row for table.
             final StringBuilder sb = new StringBuilder();
-            sb.append(indexName);
+            sb.append(ts);//new Date(ts));
+            sb.append("\t" + indexName);
             sb.append("\t" + rec.locator.getPartitionId());
             sb.append("\t" + rec.locator.getDataServiceUUID());
             sb.append("\t" + rec.smd.getName());
             sb.append("\t" + rec.smd.getHostname());
-            sb.append("\t" + rec.smd.getCode());
+            sb.append("\t" + "DS" + rec.smd.getCode());
             if (rec.detailRec != null) {
                 sb.append("\t" + rec.detailRec.sourceCount);
                 sb.append("\t" + rec.detailRec.rangeCount);
@@ -796,6 +808,9 @@ public class DumpFederation {
                 sb.append("\t" + rec.detailRec.segmentBytesUnderManagement);
                 sb.append("\t" + rec.detailRec.managedJournalCount);
                 sb.append("\t" + rec.detailRec.managedSegmentCount);
+                
+                sb.append("\t" + rec.detailRec.overflowCount);
+                
             } else {
                 // error obtaining the data of interest.
                 sb.append("\tN/A");
@@ -809,11 +824,24 @@ public class DumpFederation {
                 sb.append("\tN/A");
                 sb.append("\tN/A");
                 sb.append("\tN/A");
+
+                sb.append("\tN/A");
             }
+            
             sb.append("\t"
                     + BytesUtil.toString(rec.locator.getLeftSeparatorKey()));
             sb.append("\t"
                     + BytesUtil.toString(rec.locator.getRightSeparatorKey()));
+            
+            if(rec.localPartitionMetadata!=null) {
+
+                sb.append("\t\"" + rec.localPartitionMetadata.getHistory()+"\"");
+                
+            } else {
+                
+                sb.append("\tN/A");
+            
+            }
             
             System.out.println(sb.toString());
 
@@ -878,11 +906,11 @@ public class DumpFederation {
 
             for (Entry e : serviceItem.attributeSets) {
 
-                if (e instanceof Hostname && hostname != null) {
+                if (e instanceof Hostname && hostname == null) {
 
                     hostname = ((Hostname) e).hostname;
 
-                } else if (e instanceof Name && name != null) {
+                } else if (e instanceof Name && name == null) {
 
                     name = ((Name) e).name;
 
@@ -892,7 +920,7 @@ public class DumpFederation {
 
             if (hostname == null) {
 
-                log.warn("No hostname? : serviceUUID=" + uuid);
+                log.warn("No hostname? : " + serviceItem);
 
                 hostname = "Unknown(" + uuid + ")";
 
@@ -900,7 +928,7 @@ public class DumpFederation {
 
             if (name == null) {
 
-                log.warn("No name? : serviceUUID=" + uuid);
+                log.warn("No name? : "+serviceItem);
 
                 name = "Unknown(" + uuid + ")";
 

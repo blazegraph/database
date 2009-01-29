@@ -1497,10 +1497,11 @@ abstract public class IndexManager extends StoreManager {
         final IndexMetadata indexMetadata;
         final SegmentMetadata segmentMetadata;
         
+        final IndexSegmentBuilder builder;
         try {
 
             // new builder.
-            final IndexSegmentBuilder builder = IndexSegmentBuilder
+            builder = IndexSegmentBuilder
                     .newInstance(name, src, outFile, tmpDir, compactingMerge,
                             createTime, fromKey, toKey);
 
@@ -1556,7 +1557,7 @@ abstract public class IndexManager extends StoreManager {
             if (INFO)
                 log.info("built index segment: " + name + ", file=" + outFile);
 
-            return new BuildResult(name, indexMetadata, segmentMetadata);
+            return new BuildResult(name, indexMetadata, segmentMetadata, builder);
 
         } catch (Throwable t) {
 

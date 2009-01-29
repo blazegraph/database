@@ -87,18 +87,19 @@ public class CompactingMergeTask extends
         final String name = getOnlyResource();
 
         // The source view.
-        final ILocalBTreeView src = (ILocalBTreeView)getIndex(name);
+        final ILocalBTreeView src = (ILocalBTreeView) getIndex(name);
 
         // The UUID associated with the scale-out index.
         final UUID indexUUID = src.getIndexMetadata().getIndexUUID();
-        
+
         if (INFO) {
 
             // note: the mutable btree - accessed here for debugging only.
             final BTree btree = src.getMutableBTree();
 
-            log.info("src=" + name + ",counter=" + src.getCounter().get()
-                    + ",checkpoint=" + btree.getCheckpoint());
+            if (INFO)
+                log.info("src=" + name + ",counter=" + src.getCounter().get()
+                        + ",checkpoint=" + btree.getCheckpoint());
 
         }
         
@@ -224,15 +225,15 @@ public class CompactingMergeTask extends
             final IResourceMetadata[] actual = pmd.getResources();
             
             if (expected.length != actual.length) {
-                
+
                 throw new RuntimeException("expected=" + expected
                         + ", but actual=" + actual);
-                
+
             }
-            
-            for(int i=0; i<expected.length; i++) {
-                
-                if(!expected[i].equals(actual[i])) {
+
+            for (int i = 0; i < expected.length; i++) {
+
+                if (!expected[i].equals(actual[i])) {
 
                     throw new RuntimeException("Differs at index=" + i
                             + ", expected=" + expected + ", but actual="
@@ -282,7 +283,7 @@ public class CompactingMergeTask extends
         final protected BuildResult buildResult;
         
         /**
-         * @param resourceManager 
+         * @param resourceManager
          * @param concurrencyManager
          * @param resource
          * @param buildResult
@@ -293,12 +294,12 @@ public class CompactingMergeTask extends
 
             super(resourceManager, ITx.UNISOLATED, resource, indexUUID);
 
-            if(buildResult == null)
+            if (buildResult == null)
                 throw new IllegalArgumentException();
 
             this.buildResult = buildResult;
 
-            assert resource.equals( buildResult.name );
+            assert resource.equals(buildResult.name);
             
         }
 
@@ -460,6 +461,8 @@ public class CompactingMergeTask extends
                     currentpmd.getHistory()+
                     "compactingMerge"//
                     +"(lastCommitTime="+ segmentMetadata.getCreateTime()//
+                    +",btreeEntryCount="+btree.getEntryCount()//
+                    +",segmentEntryCount="+buildResult.builder.getCheckpoint().nentries//
                     +",segment="+ segmentMetadata.getUUID()//
                     +",counter="+btree.getCounter().get()//
                     +",oldResources="+Arrays.toString(currentResources)

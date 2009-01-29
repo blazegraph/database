@@ -2,6 +2,7 @@ package com.bigdata.resources;
 
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
+import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.mdi.SegmentMetadata;
 
 /**
@@ -17,21 +18,25 @@ public class BuildResult extends AbstractResult {
      */
     public final SegmentMetadata segmentMetadata;
 
+    public final IndexSegmentBuilder builder;
+    
     /**
      * 
      * @param name
      *            The name under which the processed index partition was
-     *            registered (this is typically different from the name of
-     *            the scale-out index).
+     *            registered (this is typically different from the name of the
+     *            scale-out index).
      * @param indexMetadata
-     *            The index metadata object for the processed index as of
-     *            the timestamp of the view from which the
-     *            {@link IndexSegment} was generated.
+     *            The index metadata object for the processed index as of the
+     *            timestamp of the view from which the {@link IndexSegment} was
+     *            generated.
      * @param segmentMetadata
      *            The metadata describing the generated {@link IndexSegment}.
+     * @param builder
+     *            Contains more interesting information about the build.
      */
     public BuildResult(String name, IndexMetadata indexMetadata,
-            SegmentMetadata segmentMetadata) {
+            SegmentMetadata segmentMetadata, IndexSegmentBuilder builder) {
 
         super(name, indexMetadata);
         
@@ -41,13 +46,22 @@ public class BuildResult extends AbstractResult {
             
         }
 
+        if (builder == null) {
+
+            throw new IllegalArgumentException();
+            
+        }
+
         this.segmentMetadata = segmentMetadata;
+        
+        this.builder = builder;
 
     }
 
     public String toString() {
         
-        return "BuildResult{name="+name+"}";
+        return "BuildResult{name=" + name + ", nentries="
+                + builder.getCheckpoint().nentries + "}";
         
     }
 
