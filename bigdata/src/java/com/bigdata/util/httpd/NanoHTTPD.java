@@ -30,7 +30,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.service.IServiceShutdown;
@@ -93,14 +92,12 @@ public class NanoHTTPD implements IServiceShutdown
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final protected boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final protected boolean DEBUG = log.isDebugEnabled();
 
     /** The server socket. */
     private final ServerSocket ss;
@@ -131,8 +128,8 @@ public class NanoHTTPD implements IServiceShutdown
      */
 	public Response serve( String uri, String method, Properties header, Map<String,Vector<String>> parms )
 	{
-        if(INFO)
-		log.info(method + " '" + uri + "' ");
+        if (INFO)
+            log.info(method + " '" + uri + "' ");
 
         if (DEBUG) {
             {
@@ -280,7 +277,7 @@ public class NanoHTTPD implements IServiceShutdown
             
         }
         
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("Running on port=" + port);
 
         // @todo parameter and configuration of same.
@@ -325,7 +322,8 @@ public class NanoHTTPD implements IServiceShutdown
                     
                     if (!open) {
 
-                        log.info("closed.");
+                        if(INFO)
+                            log.info("closed.");
 
                         return;
 
@@ -369,7 +367,8 @@ public class NanoHTTPD implements IServiceShutdown
             
         }
         
-        log.info("");
+        if (INFO)
+            log.info("");
         
         // time when shutdown begins.
         final long begin = System.currentTimeMillis();
@@ -392,7 +391,8 @@ public class NanoHTTPD implements IServiceShutdown
 
         try {
 
-            log.info("Awaiting accept service termination");
+            if (INFO)
+                log.info("Awaiting accept service termination");
             
             long elapsed = System.currentTimeMillis() - begin;
             
@@ -410,7 +410,8 @@ public class NanoHTTPD implements IServiceShutdown
 
         try {
 
-            log.info("Awaiting request service termination");
+            if (INFO)
+                log.info("Awaiting request service termination");
             
             long elapsed = System.currentTimeMillis() - begin;
             
@@ -449,7 +450,8 @@ public class NanoHTTPD implements IServiceShutdown
             
         }
 
-        log.info("");
+        if (INFO)
+            log.info("");
 
         acceptService.shutdownNow();
 
@@ -532,7 +534,11 @@ public class NanoHTTPD implements IServiceShutdown
 
 		public void run()
 		{
-            log.info("Handling request: localPort="+mySocket.getLocalPort());
+            
+            if (INFO)
+                log.info("Handling request: localPort="
+                        + mySocket.getLocalPort());
+            
             InputStream is = null;
 			try
 			{

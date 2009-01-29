@@ -1857,7 +1857,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             final DefaultSplitHandler s = (DefaultSplitHandler) splitHandler;
 
             // discount: will be 1 when N=100; 10 when N=10, and 100 when N=1.
-            final double d = 100d / npartitions;
+            final double d = npartitions / 100d;
 
             try {
 
