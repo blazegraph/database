@@ -397,6 +397,14 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      * {@link ICommitRecord}. The keys are timestamps (long integers). The
      * values are the address of the {@link ICommitRecord} with that commit
      * timestamp.
+     * <p>
+     * Note: The {@link CommitRecordIndex} object is NOT systematically
+     * protected by <code>synchronized</code> within this class. Therefore it
+     * is NOT safe for use by outside classes and CAN NOT be made safe simply by
+     * synchronizing their access on the {@link CommitRecordIndex} object
+     * itself. This is mainly for historical reasons and it may be possible to
+     * systematically protect access to this index within a synchronized block
+     * and then expose it to other classes.
      */
     private volatile CommitRecordIndex _commitRecordIndex;
 
@@ -1977,7 +1985,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                 .wrap(CommitRecordSerializer.INSTANCE.serialize(commitRecord)));
 
         /*
-         * Add the comment record to an index so that we can recover historical
+         * Add the commit record to an index so that we can recover historical
          * states efficiently.
          */
         _commitRecordIndex.add(commitRecordAddr, commitRecord);
@@ -2269,8 +2277,18 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     /**
      * Return the current state of the index that resolves timestamps to
      * {@link ICommitRecord}s and create it if the index does not exist.
+     * <p>
+     * Note: The returned object is NOT safe for concurrent operations and is
+     * NOT systematically protected by the use of synchronized blocks within
+     * this class.
      * 
      * @return The {@link CommitRecordIndex}.
+     * 
+     * @todo If you need access to this object in an outside class consider
+     *       using {@link #getRootBlockView()},
+     *       {@link IRootBlockView#getCommitRecordIndexAddr()}, and
+     *       {@link #getCommitRecord(long)} to obtain a distinct instance
+     *       suitable for read-only access.
      */
     protected CommitRecordIndex getCommitRecordIndex() {
 
@@ -2313,6 +2331,14 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     /**
      * Create or re-load the index that resolves timestamps to
      * {@link ICommitRecord}s.
+     * <p>
+     * Note: The returned object is NOT cached. When addr is non-{@link #NULL},
+     * each invocation will return a distinct {@link CommitRecordIndex} object.
+     * This behavior is partly for historical reasons but it does serve to
+     * protect the live {@link CommitRecordIndex} from outside access. This is
+     * important since access to the live {@link CommitRecordIndex} is NOT
+     * systematically protected by <code>synchronized</code> within this
+     * class.
      * 
      * @param addr
      *            The root address of the index -or- 0L if the index has not
@@ -2330,7 +2356,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         
         final CommitRecordIndex ndx;
 
-        if (addr == 0L) {
+        if (addr == NULL) {
 
             /*
              * The btree has either never been created or if it had been created

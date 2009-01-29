@@ -132,9 +132,9 @@ public class DefaultSplitHandler implements ISplitHandler {
      *             if any argument, or combination or arguments, is out of
      *             range.
      */
-    public DefaultSplitHandler(int minimumEntryCount, int entryCountPerSplit,
-            double overCapacityMultiplier, double underCapacityMultiplier,
-            int sampleRate) {
+    public DefaultSplitHandler(final int minimumEntryCount,
+            final int entryCountPerSplit, final double overCapacityMultiplier,
+            final double underCapacityMultiplier, final int sampleRate) {
 
         /*
          * Bootstap parameter settings. 
@@ -179,9 +179,9 @@ public class DefaultSplitHandler implements ISplitHandler {
      * build to purge the deleted index entries. This is true even when all
      * index entries in the index partition have been deleted!
      */
-    public boolean shouldJoin(IIndex ndx) {
+    public boolean shouldJoin(final IIndex ndx) {
 
-        final long rangeCount = ndx.rangeCount(null, null);
+        final long rangeCount = ndx.rangeCount();
         
         final boolean shouldJoin = rangeCount <= getMinimumEntryCount();
         
@@ -197,8 +197,8 @@ public class DefaultSplitHandler implements ISplitHandler {
      * 
      * 
      */
-    static void assertSplitJoinStable(int minimumEntryCount,
-            int entryCountPerSplit, double underCapacityMultiplier) {
+    static void assertSplitJoinStable(final int minimumEntryCount,
+            final int entryCountPerSplit, final double underCapacityMultiplier) {
 
         if (minimumEntryCount >= underCapacityMultiplier * entryCountPerSplit) {
             
@@ -221,7 +221,7 @@ public class DefaultSplitHandler implements ISplitHandler {
         
     }
 
-    public void setMinimumEntryCount(int minimumEntryCount) {
+    public void setMinimumEntryCount(final int minimumEntryCount) {
 
         assertSplitJoinStable(minimumEntryCount, getEntryCountPerSplit(),
                 getUnderCapacityMultiplier());
@@ -239,7 +239,7 @@ public class DefaultSplitHandler implements ISplitHandler {
 
     }
 
-    public void setEntryCountPerSplit(int entryCountPerSplit) {
+    public void setEntryCountPerSplit(final int entryCountPerSplit) {
 
         if (entryCountPerSplit <= Options.MIN_BRANCHING_FACTOR) {
 
@@ -286,7 +286,7 @@ public class DefaultSplitHandler implements ISplitHandler {
      * @param overCapacityMultiplier
      *            A value in [1.0:2.0].
      */
-    public void setOverCapacityMultiplier(double overCapacityMultiplier) {
+    public void setOverCapacityMultiplier(final double overCapacityMultiplier) {
 
         final double min = 1.0;
         final double max = 2.0;
@@ -320,7 +320,7 @@ public class DefaultSplitHandler implements ISplitHandler {
      * @param underCapacityMultiplier
      *            A value in [0.5,1.0).
      */
-    public void setUnderCapacityMultiplier(double underCapacityMultiplier) {
+    public void setUnderCapacityMultiplier(final double underCapacityMultiplier) {
 
         final double min = 0.5;
         final double max = 1.0;
@@ -339,7 +339,7 @@ public class DefaultSplitHandler implements ISplitHandler {
 
     }
 
-    public boolean shouldSplit(IIndex view) {
+    public boolean shouldSplit(final IIndex view) {
 
         /*
          * Range count the index. Will overestimate if deleted entries
@@ -418,7 +418,7 @@ public class DefaultSplitHandler implements ISplitHandler {
      * @return An ordered array of {@link Sample}s as an aid to choosen the
      *         split points for the view.
      */
-    public Sample[] sampleIndex(IIndex ndx, AtomicLong nvisited) {
+    public Sample[] sampleIndex(final IIndex ndx, final AtomicLong nvisited) {
 
         final int rangeCount = (int) Math.min(ndx.rangeCount(null, null),
                 Integer.MAX_VALUE);
@@ -517,7 +517,8 @@ public class DefaultSplitHandler implements ISplitHandler {
      * 
      * @see #getSplits(IIndex, int, Sample[])
      */
-    public Split[] getSplits(IResourceManager resourceManager, IIndex ndx) {
+    public Split[] getSplits(final IResourceManager resourceManager,
+            final IIndex ndx) {
 
         final AtomicLong nvisited = new AtomicLong();
 
@@ -604,8 +605,9 @@ public class DefaultSplitHandler implements ISplitHandler {
      * 
      * @todo there are a lot of edge conditions in this -- write tests!
      */
-    protected Split[] getSplits(final IResourceManager resourceManager, final IIndex ndx,
-            final int nsplits, final Sample[] samples, final long nvisited) {
+    protected Split[] getSplits(final IResourceManager resourceManager,
+            final IIndex ndx, final int nsplits, final Sample[] samples,
+            final long nvisited) {
 
         // The source index partition metadata.
         final IndexMetadata indexMetadata = ndx.getIndexMetadata();
