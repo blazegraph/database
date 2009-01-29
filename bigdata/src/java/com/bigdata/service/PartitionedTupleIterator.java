@@ -236,9 +236,9 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
      *             if readConsistent is requested and the index view is
      *             {@link ITx#UNISOLATED}.
      */
-    public PartitionedTupleIterator(ClientIndexView ndx, long timestamp,
-            byte[] fromKey, byte[] toKey, int capacity, int flags,
-            IFilterConstructor filter) {
+    public PartitionedTupleIterator(final ClientIndexView ndx,
+            final long timestamp, final byte[] fromKey, final byte[] toKey,
+            final int capacity, final int flags, final IFilterConstructor filter) {
 
         if (ndx == null) {
 

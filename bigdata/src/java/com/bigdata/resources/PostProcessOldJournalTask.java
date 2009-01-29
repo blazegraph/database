@@ -1171,7 +1171,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             final BTree btree = (BTree) resourceManager.getIndexOnStore(
                     score.name, lastCommitTime, oldJournal);
             
-            if ( btree == null) {
+            if (btree == null) {
 
                 /*
                  * Note: The counters are accumulated over the live of the
@@ -1188,9 +1188,11 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 
             }
 
+            final IndexMetadata indexMetadata = btree.getIndexMetadata();
+            
             {
             
-                final LocalPartitionMetadata pmd = btree.getIndexMetadata()
+                final LocalPartitionMetadata pmd = indexMetadata
                         .getPartitionMetadata();
 
                 if (pmd.getSourcePartitionId() != -1) {
@@ -1209,6 +1211,25 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     
                 }
                 
+            }
+
+            // handler decides when and where to split an index partition.
+            final ISplitHandler splitHandler = getSplitHandler(indexMetadata);
+
+            if (splitHandler.shouldSplit(resourceManager.getIndex(score.name,
+                    lastCommitTime))) {
+
+                /*
+                 * This avoids moving index partitions that are large and really
+                 * should be split before they are moved.
+                 */
+                
+                if (INFO)
+                    log.info("Skipping index: name=" + name
+                            + ", reason=shouldSplit");
+
+                continue;
+
             }
             
             if (INFO)
@@ -1262,7 +1283,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                             + targetDataServiceName);
 
                 // name of the corresponding scale-out index.
-                final String scaleOutIndexName = btree.getIndexMetadata().getName();
+                final String scaleOutIndexName = indexMetadata.getName();
                         
                 final int newPartitionId = nextPartitionId(scaleOutIndexName);
                 
@@ -1429,8 +1450,16 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      */
     protected List<AbstractTask> chooseTasks() throws Exception {
 
+        /*
+         * Note whether or not a compacting merge was requested and clear the
+         * flag.
+         */
+        final boolean compactingMerge = resourceManager.compactingMerge
+                .getAndSet(false); 
+        
         if (INFO)
-            log.info("begin: lastCommitTime=" + lastCommitTime);
+            log.info("begin: lastCommitTime=" + lastCommitTime
+                    + ", compactingMerge=" + compactingMerge);
 
         // the old journal.
         final AbstractJournal oldJournal = resourceManager
@@ -1440,14 +1469,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         final List<AbstractTask> tasks = new ArrayList<AbstractTask>(
                 (int) oldJournal.getName2Addr().rangeCount());
 
-        /*
-         * Note whether or not a compacting merge was requested and clear the
-         * flag.
-         */
-
-        final boolean compactingMerge = resourceManager.compactingMerge
-                .getAndSet(false); 
-        
         if (!compactingMerge) {
 
             /*
@@ -1499,7 +1520,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 final Map.Entry<String, String> entry = itrx.next();
                 sb.append("\n" + entry.getKey() + "\t = " + entry.getValue());
             }
-            log.warn("\nlastCommitTime=" + lastCommitTime + sb);
+            log.warn("\nlastCommitTime=" + lastCommitTime
+                    + ", compactingMerge=" + compactingMerge + sb);
         }
 
         return tasks;
@@ -1653,7 +1675,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 final AbstractTask task = new SplitIndexPartitionTask(
                         resourceManager,//
                         lastCommitTime,//
-                        name//
+                        name,//
+                        splitHandler// Note: MAY have been overriden!
                 );
 
                 // add to set of tasks to be run.
@@ -1870,8 +1893,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                         s.getSampleRate() // unchanged
                 );
 
-                // @todo reduce to info or debug.
-                log.warn("Adjusted splitHandler:  name="
+                if(INFO)
+                    log.info("Adjusted splitHandler:  name="
                         + indexMetadata.getName() + ", npartitions="
                         + npartitions + ", discount=" + d
                         + ", adjustedSplitHandler=" + t);

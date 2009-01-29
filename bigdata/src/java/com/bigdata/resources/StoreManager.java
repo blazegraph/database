@@ -1410,6 +1410,8 @@ abstract public class StoreManager extends ResourceEvents implements
                 p.setProperty(Options.CREATE_TIME, Long
                         .toString(nextTimestamp()));
 
+                overrideJournalExtent(p);
+                
                 newJournal = true;
 
             } else {
@@ -4029,6 +4031,74 @@ abstract public class StoreManager extends ResourceEvents implements
             return false;
 
         }
+
+    }
+
+    /**
+     * When the {@link StoreManager} is relatively new (as measured by the #of
+     * bytes under management) we discount the journal extent in order to
+     * trigger overflow earlier. Together with the discount applied to the split
+     * handler by the {@link PostProcessOldJournalTask}, this helps to break
+     * down new index partitions allocated on the new data service and
+     * re-distribute those index partitions (if there are other data services
+     * which have even less utilization).
+     * 
+     * @param p
+     */
+    protected void overrideJournalExtent(Properties p) {
+
+        // @todo configure threshold.
+        final long threshold = Bytes.gigabyte;
+        
+        final long bytesUnderManagement = this.bytesUnderManagement.get();
+        
+        if (bytesUnderManagement > threshold) {
+
+            /*
+             * Crossed the threshold where we no longer accelerate overflow.
+             */
+            
+            return;
+            
+        }
+
+        final double d = bytesUnderManagement / (double)threshold;
+        
+        final long initialExtent = Long.parseLong(p.getProperty(Options.INITIAL_EXTENT,
+                Options.DEFAULT_INITIAL_EXTENT));
+
+        final long maximumExtent = Long.parseLong(p.getProperty(Options.INITIAL_EXTENT,
+                Options.DEFAULT_MAXIMUM_EXTENT));
+
+        /*
+         * Don't allow a journal w/ less than 10M or the minimum specified by
+         * Options.
+         */
+        final long minimumInitialExtent = Math.max(
+                Options.minimumInitialExtent, Bytes.megabyte * 10);
+
+        final long adjustedInitialExtent = Math.max(minimumInitialExtent,
+                (long) (initialExtent * d));
+
+        final long adjustedMaximumExtent = Math.max(minimumInitialExtent,
+                (long) (maximumExtent * d));
+
+        p.setProperty(Options.INITIAL_EXTENT, Long
+                .toString(adjustedInitialExtent));
+
+        p.setProperty(Options.MAXIMUM_EXTENT, Long
+                .toString(adjustedMaximumExtent));
+        
+        if(INFO)
+            log.info("discount=" + d + ", bytesUnderManagement="
+                    + bytesUnderManagement + ", threshold=" + threshold
+                    + ", minimimInitialExtent=" + minimumInitialExtent//
+                    + ", initialExtent=" + initialExtent //
+                    + ", maximumExtent=" + maximumExtent //
+                    + ", adjustedInitialExtent=" + adjustedInitialExtent //
+                    + ", adjustedMaximumExtent=" + adjustedMaximumExtent);
+
+        return;
 
     }
 
