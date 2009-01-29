@@ -164,15 +164,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      */
     private final Set<String> copied; 
     
-//    /**
-//     * @deprecated This was used for what is in my opinion an unreasonable
-//     *             attempt to have the {@link PostProcessOldJournalTask} scale
-//     *             to very large #ofs of indices on the live journal. Simpler
-//     *             in-memory data structures would work just fine as would a
-//     *             transient {@link BTree}.
-//     */
-//    private IRawStore tmpStore;
-    
 //    /** Aggregated counters for the named indices. */ 
 //    private final Counters totalCounters;
 //    
@@ -567,8 +558,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 final IndexMetadata indexMetadata = view.getIndexMetadata();
 
                 // handler decides when and where to split an index partition.
-                final ISplitHandler splitHandler = indexMetadata
-                        .getSplitHandler();
+                final ISplitHandler splitHandler = getSplitHandler(indexMetadata);
 
                 // index partition metadata
                 final LocalPartitionMetadata pmd = indexMetadata
@@ -1612,7 +1602,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             final IndexMetadata indexMetadata = view.getIndexMetadata();
 
             // handler decides when and where to split an index partition.
-            final ISplitHandler splitHandler = indexMetadata.getSplitHandler();
+            final ISplitHandler splitHandler = getSplitHandler(indexMetadata);
 
             // index partition metadata
             final LocalPartitionMetadata pmd = indexMetadata
@@ -1757,6 +1747,157 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         return tasks;
         
     }
+
+    /**
+     * Return an adjusted split handler. The split handler will be adjusted to
+     * be heavily biased in favor of splitting an index partition when the #of
+     * index partitions for a scale-out index is small. This adjustment is
+     * designed to very rapidly (re-)distribute a new scale-out index until
+     * there are at least 10 index partitions and rapidly (re-)distribute a
+     * scale-out index until they are at least 100 index partitions. Thereafter
+     * the as configured behavior will be observed.
+     * <p>
+     * Note: The potential parallelism of a data service is limited by the #of
+     * index partitions on that data service as well as by the workload of the
+     * application. By partitioning new and young indices aggressively we ensure
+     * that the index is broken into multiple index partitions on the initial
+     * data service. Those index partitions will be re-distributed across the
+     * available data services based on recommendations made by the load
+     * balancer. Both breaking an index into multiple partitions on a single
+     * data service and re-distributing those index partitions among the hosts
+     * of a cluster will increase the resources (CPU, DISK, RAM) which can be
+     * brought to bear on the index. In particular, there is a constraint of a
+     * single core per index partition (for writes). Therefore breaking a new
+     * index into 2 pieces doubles the potential concurrency for a data service
+     * on a host with at least 2 cores. This can be readily extrapolated to a
+     * cluster with 8 cores x 16 machines, etc.
+     * <p>
+     * Note: The adjustment is proportional to the #of existing index partitions
+     * and is adjusted using a floating point discount factor. This should
+     * prevent a split triggering a subsequent join on the next overflow.
+     * 
+     * @param indexMetadata
+     *            The {@link IndexMetadata} for an index partition being
+     *            considered for a split or join.
+     * 
+     * @return The adjusted split handler.
+     * 
+     * @todo only supports the {@link DefaultSplitHandler}.
+     */
+    protected ISplitHandler getSplitHandler(final IndexMetadata indexMetadata) {
+
+        final ISplitHandler splitHandler = indexMetadata.getSplitHandler();
+
+        if (splitHandler == null)
+            return splitHandler;
+        
+        if (splitHandler instanceof DefaultSplitHandler) {
+
+            final long npartitions;
+            try {
+
+                /*
+                 * The #of index partitions for this scale-out index.
+                 * 
+                 * Note: This may require RMI, but the metadata index is also
+                 * heavily cached by the client.
+                 */
+
+                npartitions = resourceManager.getFederation().getMetadataIndex(
+                        indexMetadata.getName(), lastCommitTime).rangeCount();
+                
+            } catch (Throwable t) {
+
+                if(InnerCause.isInnerCause(t, InterruptedException.class)) {
+
+                    // don't trap interrupts.
+                    throw new RuntimeException(t);
+                    
+                }
+                
+                /*
+                 * Traps any RMI failures (or anything else), logs a warning,
+                 * and returns the default splitHandler instead.
+                 */
+                
+                log.warn("name=" + indexMetadata.getName(), t);
+                
+                return splitHandler;
+                
+            }
+
+            if (npartitions == 0) {
+
+                /*
+                 * There must always be at least one index partition for a
+                 * scale-out index so this is an error condition.
+                 */
+                
+                log.error("No partitions? name=" + indexMetadata.getName());
+                
+                return splitHandler;
+
+            }
+            
+            if (npartitions > 100) {
+
+                /*
+                 * There are plenty of index partitions. Use the original split
+                 * handler.
+                 * 
+                 * Note: This also prevents our "discount" from becoming an
+                 * "inflation" factor!
+                 */
+
+                return splitHandler;
+                
+            }
+            
+            // the split handler as configured.
+            final DefaultSplitHandler s = (DefaultSplitHandler) splitHandler;
+
+            // discount: will be 1 when N=100; 10 when N=10, and 100 when N=1.
+            final double d = 100d / npartitions;
+
+            try {
+
+                // adjusted split handler.
+                final DefaultSplitHandler t = new DefaultSplitHandler(//
+                        (int)(s.getMinimumEntryCount() * d),  //
+                        (int)(s.getEntryCountPerSplit() * d), //
+                        s.getOverCapacityMultiplier(),  // unchanged 
+                        s.getUnderCapacityMultiplier(), // unchanged
+                        s.getSampleRate() // unchanged
+                );
+
+                // @todo reduce to info or debug.
+                log.warn("Adjusted splitHandler:  name="
+                        + indexMetadata.getName() + ", npartitions="
+                        + npartitions + ", discount=" + d
+                        + ", adjustedSplitHandler=" + t);
+
+                return t;
+
+            } catch (IllegalArgumentException ex) {
+
+                /*
+                 * The adjustment violated some constraint. Log a warning and
+                 * use the original splitHandler since it was at least valid.
+                 */
+                
+                log.warn("Adjustment failed: name=" + indexMetadata.getName()
+                        + ", npartitions=" + npartitions + ", discount=" + d
+                        + ", splitHandler=" + splitHandler, ex);
+
+                return splitHandler;
+                
+            }
+            
+        }
+        
+        return splitHandler;
+
+    }
     
     /**
      * Note: This task is interrupted by {@link OverflowManager#shutdownNow()}.
@@ -1792,8 +1933,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             if (INFO)
                 log.info("begin");
 
-//            tmpStore = new TemporaryRawStore();
-            
             if(INFO) {
                 
                 // The pre-condition views.
@@ -1866,16 +2005,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             throw new RuntimeException( t );
             
         } finally {
-
-//            if (tmpStore != null) {
-//
-//                try {
-//                    tmpStore.destroy();
-//                } catch (Throwable t) {
-//                    log.warn(t.getMessage(), t);
-//                }
-//
-//            }
 
             // enable overflow again as a post-condition.
             if (!resourceManager.overflowAllowed.compareAndSet(

@@ -79,12 +79,16 @@ public class CounterSetHTTPD extends AbstractHTTPD {
                 + "'", is);
 
         /*
-         * @todo set cache headers -- the data should be good for 60 seconds
-         * unless you change the query parameters.
+         * Sets the cache behavior -- the data should be good for up to 60
+         * seconds unless you change the query parameters. These cache control
+         * parameters SHOULD indicate that the response is valid for 60 seconds,
+         * that the client must revalidate, and that the response is cachable
+         * even if the client was authenticated.
          */
-        
-        r.addHeader("Cache-Control", "no-cache");
-        
+        r.addHeader("Cache-Control", "max-age=60, must-revalidate, public");
+        // to disable caching.
+        // r.addHeader("Cache-Control", "no-cache");
+
         return r;
         
     }

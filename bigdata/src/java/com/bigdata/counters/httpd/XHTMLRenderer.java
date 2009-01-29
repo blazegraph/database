@@ -50,6 +50,10 @@ public class XHTMLRenderer {
     
     final static protected Logger log = Logger.getLogger(XHTMLRenderer.class);
 
+    final static protected boolean INFO = log.isInfoEnabled();
+
+    final static protected boolean DEBUG = log.isDebugEnabled();
+
     public static class Model {
 
         /**
@@ -158,13 +162,17 @@ public class XHTMLRenderer {
             this.params = params;
 
             this.path = getProperty(params, PATH, ps);
-            log.info(PATH+"="+path);
+            
+            if (INFO)
+                log.info(PATH + "=" + path);
 
             // @todo must be non-negative.
             this.depth = Integer.parseInt(getProperty(params, DEPTH, "2"));
-            log.info(DEPTH+"="+depth);
+            
+            if (INFO)
+                log.info(DEPTH + "=" + depth);
 
-            this.filter = (Collection<String>)params.get(FILTER);
+            this.filter = (Collection<String>) params.get(FILTER);
 
             if(filter != null) {
 
@@ -180,7 +188,8 @@ public class XHTMLRenderer {
                 
                 for(String val : filter) {
                 
-                    log.info("filter="+val);
+                    if (INFO)
+                        log.info(FILTER + "=" + val);
                 
                     if(sb.length()>0) {
                         
@@ -194,7 +203,8 @@ public class XHTMLRenderer {
 
                 final String regex = sb.toString();
                 
-                log.info(FILTER+"=" + regex);
+                if (INFO)
+                    log.info(FILTER + "=" + regex);
                 
                 this.pattern = Pattern.compile(regex);
                 
@@ -206,7 +216,9 @@ public class XHTMLRenderer {
 
             this.correlated = Boolean.parseBoolean(getProperty(params,
                     CORRELATED, "false"));
-            log.info(CORRELATED + "=" + correlated);
+            
+            if (INFO)
+                log.info(CORRELATED + "=" + correlated);
             
             /*
              * @todo this should be parameter whose default is set on the server and
@@ -437,15 +449,16 @@ public class XHTMLRenderer {
     /**
      * 
      */
-    public XHTMLRenderer(Model model) {
+    public XHTMLRenderer(final Model model) {
 
-        if(model==null) throw new IllegalArgumentException();
-        
+        if (model == null)
+            throw new IllegalArgumentException();
+
         this.model = model;
-        
+
     }
 
-    public void write(Writer w) throws IOException {
+    public void write(final Writer w) throws IOException {
 
         writeXmlDecl(w);
         
@@ -707,8 +720,9 @@ public class XHTMLRenderer {
         // depth of the hierarchy at the point where we are starting.
         final int ourDepth = counterSet.getDepth();
 
-        if(log.isInfoEnabled())
-        log.info("path="+counterSet.getPath()+", depth="+depth+", ourDepth="+ourDepth);
+        if (INFO)
+            log.info("path=" + counterSet.getPath() + ", depth=" + depth
+                    + ", ourDepth=" + ourDepth);
 
         final String summary = "Showing counters for path="
                 + counterSet.getPath();
@@ -741,8 +755,8 @@ public class XHTMLRenderer {
 
             final ICounterNode node = itr.next();
 
-            if(log.isDebugEnabled())
-            log.debug("considering: "+node.getPath());
+            if (DEBUG)
+                log.debug("considering: " + node.getPath());
             
             if(depth != 0) { 
                 
@@ -753,8 +767,8 @@ public class XHTMLRenderer {
                 if((counterDepth - ourDepth) > depth) {
                 
                     // prune rendering
-                    if(log.isDebugEnabled())
-                    log.debug("skipping: "+node.getPath());
+                    if (DEBUG)
+                        log.debug("skipping: " + node.getPath());
                     
                     continue;
                     
@@ -1346,8 +1360,9 @@ public class XHTMLRenderer {
         // depth of the hierarchy at the point where we are starting.
         final int ourDepth = counterSet.getDepth();
 
-        if(log.isInfoEnabled())
-        log.info("path="+counterSet.getPath()+", depth="+depth+", ourDepth="+ourDepth);
+        if (INFO)
+            log.info("path=" + counterSet.getPath() + ", depth=" + depth
+                    + ", ourDepth=" + ourDepth);
 
         final Iterator<ICounterNode> itr = counterSet.getNodes(model.pattern);
 
@@ -1357,8 +1372,8 @@ public class XHTMLRenderer {
 
             final ICounterNode node = itr.next();
 
-            if(log.isDebugEnabled())
-            log.debug("considering: "+node.getPath());
+            if (DEBUG)
+                log.debug("considering: " + node.getPath());
             
             if(depth != 0) { 
                 
@@ -1367,8 +1382,8 @@ public class XHTMLRenderer {
                 if((counterDepth - ourDepth) > depth) {
                 
                     // prune rendering
-                    if(log.isDebugEnabled())
-                    log.debug("skipping: "+node.getPath());
+                    if (DEBUG)
+                        log.debug("skipping: " + node.getPath());
                     
                     continue;
                     

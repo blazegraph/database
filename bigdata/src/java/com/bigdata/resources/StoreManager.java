@@ -2195,11 +2195,17 @@ abstract public class StoreManager extends ResourceEvents implements
         }
         
         /**
-         * Exposed for {@link StoreManger#getResourcesForTimestamp(long)}.
+         * Exposed for {@link StoreManger#getResourcesForTimestamp(long)} which
+         * requires access to the {@link CommitRecordIndex} for the
+         * lastCommitTime on the historical journals.
+         * <p>
+         * Note: This always returns a distinct index object. The code relies on
+         * this fact to avoid contention with the live {@link CommitRecordIndex}
+         * for the live journal.
          */
-        public CommitRecordIndex getCommitRecordIndex() {
+        public CommitRecordIndex getCommitRecordIndex(final long addr) {
             
-            return super.getCommitRecordIndex();
+            return super.getCommitRecordIndex(addr);
             
         }
 
@@ -3633,7 +3639,7 @@ abstract public class StoreManager extends ResourceEvents implements
                 
                 final UUID uuid = journalMetadata.getUUID();
                 
-                final ManagedJournal journal = (ManagedJournal)openStore(uuid);
+                final ManagedJournal journal = (ManagedJournal) openStore(uuid);
                 
                 // the last commit point on that journal.
                 final long lastCommitTime = journal.getRootBlockView()
@@ -3666,9 +3672,14 @@ abstract public class StoreManager extends ResourceEvents implements
                      * the last commit point on the journal. This is Ok since we
                      * always want to read up to the lastCommitPoint on each
                      * journal, including on the live journal.
+                     * 
+                     * Note: This is NOT the live CommitRecordIndex. The live
+                     * CommitRecordIndex is NOT protected for use by concurrent
+                     * threads.
                      */
                     final CommitRecordIndex commitRecordIndex = journal
-                            .getCommitRecordIndex();
+                            .getCommitRecordIndex(journal.getRootBlockView()
+                                    .getCommitRecordIndexAddr());
 
                     /*
                      * A per-journal hash set of the [checkpointAddr] for the
