@@ -92,7 +92,7 @@ abstract public class HierarchicalZNodeWatcher implements Watcher,
 
     final static protected boolean DEBUG = log.isDebugEnabled();
 
-    final protected ZooKeeper zookeeper;
+    private ZooKeeper zookeeper;
     
     /**
      * The root of the hierarchy of watched znodes.

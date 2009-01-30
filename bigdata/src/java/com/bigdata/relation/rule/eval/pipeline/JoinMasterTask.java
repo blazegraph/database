@@ -293,7 +293,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
     /**
      * The unique identifier for this {@link JoinMasterTask} instance.
      */
-    protected final UUID uuid;
+    protected final UUID masterUUID;
     
     /**
      * 
@@ -321,7 +321,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
 
         this.tailCount = rule.getTailCount();
 
-        this.uuid = UUID.randomUUID();
+        this.masterUUID = UUID.randomUUID();
 
         // computes the eval order.
         this.ruleState = new RuleState(rule, joinNexus);
@@ -351,7 +351,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
     
     final public UUID getUUID() {        
         
-        return uuid;
+        return masterUUID;
         
     }
     

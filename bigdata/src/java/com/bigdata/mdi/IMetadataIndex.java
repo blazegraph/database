@@ -99,20 +99,4 @@ public interface IMetadataIndex extends IRangeQuery { //extends IIndex {
      */
     public void staleLocator(PartitionLocator locator);
     
-    /**
-     * Implementations MUST use <em>read-consistent</em> semantics. Otherwise
-     * it is possible that a split or join could occur during the process of
-     * mapping the an {@link IIndexProcedure} or {@link ITupleIterator} across
-     * the index partitions. If the view is {@link ITx#UNISOLATED} or
-     * {@link ITx#READ_COMMITTED} a split or join could make the set of mapped
-     * index partitions inconsistent in the sense that it might double count
-     * some parts of the key range or that it might skip some parts of the key
-     * range. In order to avoid this problem the locator scan MUST use
-     * <em>read-consistent</em> semantics and issue continuation queries with
-     * respect to the commitTime for which the first locator {@link ResultSet}
-     * was materialized.
-     */
-    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, IFilterConstructor filter);
-    
 }

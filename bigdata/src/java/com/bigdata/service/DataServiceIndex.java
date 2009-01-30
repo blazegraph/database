@@ -64,6 +64,10 @@ import com.bigdata.mdi.LocalPartitionMetadata;
  * <p>
  * Applications writing to this interface are directly portable to scale-out
  * partitioned indices and to embedded indices without concurrency control.
+ * <p>
+ * Note: Since the index is NOT partitioned we do not have to handle stale
+ * locators. That makes this implementation MUCH simpler than the
+ * {@link ClientIndexView}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -450,10 +454,16 @@ public class DataServiceIndex implements IClientIndex {
 
     }
 
-    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, IFilterConstructor filter) {
+    public ITupleIterator rangeIterator(final byte[] fromKey,
+            final byte[] toKey, final int capacity, final int flags,
+            final IFilterConstructor filter) {
 
-        // @todo make this a ctor argument or settable property?
+        /*
+         * @todo make this a ctor argument or settable property?
+         * 
+         * Note: this parameter is NOT sufficient to achieve read-consistent
+         * semantics across a partitioned index!
+         */
         final boolean readConsistent = (timestamp == ITx.UNISOLATED ? false
                 : true);
 

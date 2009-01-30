@@ -119,6 +119,8 @@ public class JoinTaskFactoryTask implements Callable<Future>,
 
     final int partitionId;
 
+    final UUID masterUUID;
+    
     final IJoinMaster masterProxy;
 
     final IAsynchronousIterator<IBindingSet[]> sourceItrProxy;
@@ -159,6 +161,8 @@ public class JoinTaskFactoryTask implements Callable<Future>,
      * @param orderIndex
      * @param partitionId
      * @param masterProxy
+     * @param masterUUID
+     *            (Avoids RMI to obtain this later).
      * @param sourceItrProxy
      * @param nextScaleOutIndexName
      */
@@ -166,6 +170,7 @@ public class JoinTaskFactoryTask implements Callable<Future>,
             final IRule rule, final IJoinNexusFactory joinNexusFactory,
             final int[] order, final int orderIndex, final int partitionId,
             final IJoinMaster masterProxy,
+            final UUID masterUUID,
             final IAsynchronousIterator<IBindingSet[]> sourceItrProxy,
             final IKeyOrder[] keyOrders) {
         
@@ -184,6 +189,10 @@ public class JoinTaskFactoryTask implements Callable<Future>,
             throw new IllegalArgumentException();
         if (partitionId < 0)
             throw new IllegalArgumentException();
+        if (masterProxy == null)
+            throw new IllegalArgumentException();
+        if (masterUUID == null)
+            throw new IllegalArgumentException();
         if (sourceItrProxy == null)
             throw new IllegalArgumentException();
         if (keyOrders == null || keyOrders.length != order.length)
@@ -196,6 +205,7 @@ public class JoinTaskFactoryTask implements Callable<Future>,
         this.orderIndex = orderIndex;
         this.partitionId = partitionId;
         this.masterProxy = masterProxy;
+        this.masterUUID = masterUUID;
         this.sourceItrProxy = sourceItrProxy;
         this.keyOrders = keyOrders;
         
@@ -231,8 +241,8 @@ public class JoinTaskFactoryTask implements Callable<Future>,
                     .getExecutorService());
 
         }
-
-        final String namespace = getJoinTaskNamespace(masterProxy, orderIndex,
+        
+        final String namespace = getJoinTaskNamespace(masterUUID, orderIndex,
                 partitionId);
         
         final Future<Void> joinTaskFuture;
@@ -319,7 +329,7 @@ public class JoinTaskFactoryTask implements Callable<Future>,
 
             task = new DistributedJoinTask(scaleOutIndexName, rule,
                     joinNexusFactory.newInstance(indexManager), order,
-                    orderIndex, partitionId, fed, masterProxy,
+                    orderIndex, partitionId, fed, masterProxy, masterUUID,
                     sourceItrProxy, keyOrders, dataService);
             
         }
@@ -354,28 +364,17 @@ public class JoinTaskFactoryTask implements Callable<Future>,
     
     /**
      * 
-     * @param master
+     * @param masterUUID
+     *            The master UUID should be cached locally by the JoinTask so
+     *            that invoking this method does not require RMI.
      * @param orderIndex
      * @param partitionId
      * @return
-     * 
-     * FIXME The master UUID should be cached locally by the JoinTask so that
-     * this method does not require RMI for a distributed federation. Once it
-     * has been cached, modify the method signature to accept the master UUID
-     * directly.
      */
-    static public String getJoinTaskNamespace(IJoinMaster master,
-            int orderIndex, int partitionId) {
+    static public String getJoinTaskNamespace(final UUID masterUUID,
+            final int orderIndex, final int partitionId) {
 
-        try {
-            
-            return master.getUUID() + "/" + orderIndex + "/" + partitionId;
-            
-        } catch (IOException ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
+        return masterUUID + "/" + orderIndex + "/" + partitionId;
 
     }
 

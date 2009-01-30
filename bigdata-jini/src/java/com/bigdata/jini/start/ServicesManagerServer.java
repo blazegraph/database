@@ -386,29 +386,8 @@ public class ServicesManagerServer extends AbstractServer {
         } catch (IllegalArgumentException ex) {
 
             log.warn("Signal handler not installed: " + ex);
-
-            try {
-
-                // try another signal name.
-                new SigHUPHandler("SIGHUP", args);
-                
-            } catch (IllegalArgumentException ex1) {
-
-                log.warn("Signal handler not installed: " + ex1);
-                
-            }
             
         }
-
-//        try {
-//
-//            new KillChildrenAndSelfSignalHandler("TERM");
-//
-//        } catch (IllegalArgumentException ex) {
-//
-//            log.warn("Signal handler not installed: " + ex);
-//            
-//        }
 
     }
 
@@ -499,85 +478,6 @@ public class ServicesManagerServer extends AbstractServer {
         }
 
     }
-
-//    /**
-//     * Handler kills the child processes and then kills the parent.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    private class KillChildrenAndSelfSignalHandler implements SignalHandler {
-//
-//        private final SignalHandler oldHandler;
-//
-//        /**
-//         * Install handler that kills the child processes and then kills the
-//         * parent.
-//         * 
-//         * @param signalName
-//         *            The signal name.
-//         * 
-//         * @see http://www-128.ibm.com/developerworks/java/library/i-signalhandling/
-//         * 
-//         * @see http://forum.java.sun.com/thread.jspa?threadID=514860&messageID=2451429
-//         *      for the use of {@link Runtime#addShutdownHook(Thread)}.
-//         * 
-//         * @see http://twit88.com/blog/2008/02/06/java-signal-handling/
-//         */
-//        @SuppressWarnings("all")
-//        // Signal is in the sun namespace
-//        protected KillChildrenAndSelfSignalHandler(final String signalName) {
-//
-//            final Signal signal = new Signal(signalName);
-//
-//            this.oldHandler = Signal.handle(signal, this);
-//            
-//            if (INFO)
-//                log.info("Installed handler: " + signal + ", oldHandler="
-//                        + this.oldHandler);
-//
-//        }
-//
-//        /**
-//         * Kills all child processes and then forces the parent to exit as well.
-//         * 
-//         * @todo should this be done in another thread?
-//         */
-//        @SuppressWarnings("all") // Signal is in the sun namespace
-//        public void handle(final Signal sig) {
-//
-//            log.warn("Processing signal: " + sig);
-//
-//            try {
-//
-//                final AdministrableServicesManagerService service = (AdministrableServicesManagerService) impl;
-//
-//                if (service != null) {
-//
-//                    // kill child processes (and locks out new children).
-//                    service.killChildProcesses();
-//
-//                }
-//
-//                // shutdown the service.
-//                service.shutdownNow();
-//
-//                // Chain back to previous handler, if one exists
-//                if (oldHandler != SIG_DFL && oldHandler != SIG_IGN) {
-//
-//                    oldHandler.handle(sig);
-//
-//                }
-//              
-//            } catch (Throwable t) {
-//
-//                log.error("Signal handler failed : " + t, t);
-//
-//            }
-//
-//        }
-//
-//    }
 
     /**
      * Starts and maintains services based on the specified configuration file

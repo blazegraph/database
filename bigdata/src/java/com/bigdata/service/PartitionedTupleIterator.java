@@ -287,8 +287,7 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
         this.reverseScan = (flags & IRangeQuery.REVERSE) != 0;
 
         // start locator scan
-        this.locatorItr = ndx.locatorScan(ts, fromKey, toKey,
-                reverseScan);
+        this.locatorItr = ndx.locatorScan(ts, fromKey, toKey, reverseScan);
 
     }
 

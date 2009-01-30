@@ -47,8 +47,6 @@ import com.bigdata.btree.ILinearList;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.ResultSet;
-import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IMetadataIndex;
@@ -239,29 +237,22 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
      * partitions spanned is very large, then this will allow a chunked
      * approach.
      * <p>
-     * Note: It is possible that a split or join could occur during the process
-     * of mapping the procedure across the index partitions. When the view is
-     * {@link ITx#UNISOLATED} or {@link ITx#READ_COMMITTED} this could make the
-     * set of mapped index partitions inconsistent in the sense that it might
-     * double count some parts of the key range or that it might skip some parts
-     * of the key range. In order to avoid this problem the locator scan MUST
-     * use <em>read-consistent</em> semantics and issue continuation queries
-     * with respect to the commitTime for which the first locator
-     * {@link ResultSet} was materialized. It is the responsibility of the
-     * caller to choose <i>timestamp</i> so as to provide read-consistent
-     * semantics for the locator scan.
+     * Note: It is possible that a split, join or move could occur during the
+     * process of mapping the procedure across the index partitions. When the
+     * view is {@link ITx#UNISOLATED} or {@link ITx#READ_COMMITTED} this could
+     * make the set of mapped index partitions inconsistent in the sense that it
+     * might double count some parts of the key range or that it might skip some
+     * parts of the key range. In order to avoid this problem the caller MUST
+     * use <em>read-consistent</em> semantics. If the {@link ClientIndexView}
+     * is not already isolated by a transaction, then the caller MUST create a
+     * read-only transaction use the global last commit time of the federation.
      * 
      * @param name
      *            The name of the scale-out index.
      * @param timestamp
-     *            The timestamp of the view. The iterator uses a read-consistent
-     *            view of the MDI as of the caller specified timestamp. In
-     *            general, the timestamp is the value returned by
-     *            {@link #getTimestamp()} unless the index is
-     *            {@link ITx#UNISOLATED} or {@link ITx#READ_COMMITTED}, in
-     *            which case you might use
-     *            {@link IIndexStore#getLastCommitTime()} for a globally
-     *            consistent read.
+     *            The timestamp of the view. It is the responsibility of the
+     *            caller to choose <i>timestamp</i> so as to provide
+     *            read-consistent semantics for the locator scan.
      * @param fromKey
      *            The scale-out index first key that will be visited
      *            (inclusive). When <code>null</code> there is no lower bound.
@@ -286,10 +277,6 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
                     + BytesUtil.toString(fromKey) + ", toKey="
                     + BytesUtil.toString(toKey));
         
-        /*
-         * The iterator uses a read-consistent view of the MDI as of the
-         * caller specified timestamp.
-         */
         final IMetadataIndex mdi = getMetadataIndex(name, timestamp);
         
         final ITupleIterator<PartitionLocator> itr;

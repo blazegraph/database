@@ -379,7 +379,7 @@ public class ProcessHelper {
              */
             while ((s = is.readLine()) != null) {
 
-                log.info(s);
+                if(INFO) log.info(s);
 
             }
 

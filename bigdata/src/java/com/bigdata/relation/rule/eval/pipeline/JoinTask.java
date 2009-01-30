@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
@@ -185,6 +186,8 @@ abstract public class JoinTask implements Callable<Void> {
      */
     final protected IJoinMaster masterProxy;
 
+    final protected UUID masterUUID;
+    
     /**
      * The {@link IJoinNexus} for the local {@link IIndexManager}, which
      * will be the live {@link IJournal}. This {@link IJoinNexus} MUST have
@@ -402,14 +405,14 @@ abstract public class JoinTask implements Callable<Void> {
      *            The index partition identifier and <code>-1</code> if
      *            the deployment does not support key-range partitioned
      *            indices.
-     * @param master
+     * @param masterProxy
      * 
      * @see JoinTaskFactoryTask
      */
     public JoinTask(final String indexName, final IRule rule,
             final IJoinNexus joinNexus, final int[] order,
             final int orderIndex, final int partitionId,
-            final IJoinMaster master) {
+            final IJoinMaster masterProxy, final UUID masterUUID) {
 
         if (rule == null)
             throw new IllegalArgumentException();
@@ -422,7 +425,9 @@ abstract public class JoinTask implements Callable<Void> {
             throw new IllegalArgumentException();
         if (orderIndex < 0 || orderIndex >= tailCount)
             throw new IllegalArgumentException();
-        if (master == null)
+        if (masterProxy == null)
+            throw new IllegalArgumentException();
+        if (masterUUID == null)
             throw new IllegalArgumentException();
 
         this.rule = rule;
@@ -435,7 +440,8 @@ abstract public class JoinTask implements Callable<Void> {
         this.lastJoin = ((orderIndex + 1) == tailCount);
         this.predicate = rule.getTail(tailIndex);
         this.stats = new JoinStats(partitionId, orderIndex);
-        this.masterProxy = master;
+        this.masterProxy = masterProxy;
+        this.masterUUID = masterUUID;
 
         if (DEBUG)
             log.debug("orderIndex=" + orderIndex + ", partitionId="

@@ -181,7 +181,13 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
         if (INFO)
             log.info("className=" + config.className);
 
-        final ZooKeeper zookeeper = fed.getZookeeper();
+        /*
+         * Note: If the session is expired then this will just throw out an
+         * exception. By failing to handle the new logical service request the
+         * responsibility will automatically pass from our hands to any other
+         * running services manager.
+         */
+        final ZooKeeper zookeeper = fed.getZookeeperAccessor().getZookeeper();
 
         final List<ACL> acl = fed.getZooConfig().acl;
         

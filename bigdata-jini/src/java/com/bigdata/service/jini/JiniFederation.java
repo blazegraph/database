@@ -34,7 +34,6 @@ import java.rmi.server.ExportException;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -59,9 +58,9 @@ import net.jini.lookup.ServiceDiscoveryListener;
 import net.jini.lookup.ServiceDiscoveryManager;
 
 import org.apache.log4j.Logger;
-import org.apache.zookeeper.WatchedEvent;
-import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.KeeperException.ConnectionLossException;
+import org.apache.zookeeper.KeeperException.SessionExpiredException;
 
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.io.IStreamSerializer;
@@ -87,6 +86,7 @@ import com.bigdata.service.proxy.RemoteBufferImpl;
 import com.bigdata.service.proxy.RemoteFuture;
 import com.bigdata.service.proxy.RemoteFutureImpl;
 import com.bigdata.zookeeper.ZooHelper;
+import com.bigdata.zookeeper.ZooKeeperAccessor;
 import com.bigdata.zookeeper.ZooResourceLockService;
 
 /**
@@ -96,7 +96,7 @@ import com.bigdata.zookeeper.ZooResourceLockService;
  * @version $Id$
  */
 public class JiniFederation extends AbstractDistributedFederation implements
-        DiscoveryListener, ServiceDiscoveryListener, Watcher {
+        DiscoveryListener, ServiceDiscoveryListener {
 
     private LookupDiscoveryManager lookupDiscoveryManager;
 
@@ -112,7 +112,7 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
     private final ZooResourceLockService resourceLockService = new ZooResourceLockService(this);
 
-    private ZooKeeper zookeeper;
+    private final ZooKeeperAccessor zooKeeperAccessor;
     
     private final ZookeeperClientConfig zooConfig;
     
@@ -124,13 +124,37 @@ public class JiniFederation extends AbstractDistributedFederation implements
         return zooConfig;
         
     }
+
+    /**
+     * Return an object that may be used to obtain a {@link ZooKeeper} client
+     * and that may be used to obtain the a new {@link ZooKeeper} client if the
+     * current session has been expired (an absorbing state for the
+     * {@link ZooKeeper} client).
+     */
+    public ZooKeeperAccessor getZookeeperAccessor() {
+
+        return zooKeeperAccessor;
+        
+    }
     
     /**
-     * Return the zookeeper client.
+     * Return a {@link ZooKeeper} client.
+     * 
+     * @deprecated by {@link #getZookeeperAccessor()} which lets you handle a
+     *             {@link SessionExpiredException} or the zookeeper
+     *             {@link ZooKeeper.States#CLOSED} state.
      */
     public ZooKeeper getZookeeper() {
-        
-        return zookeeper;
+
+        try {
+
+            return zooKeeperAccessor.getZookeeper();
+            
+        } catch (InterruptedException ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
         
     }
     
@@ -200,8 +224,8 @@ public class JiniFederation extends AbstractDistributedFederation implements
             
             this.zooConfig = zooConfig;
 
-            zookeeper = new ZooKeeper(zooConfig.servers,
-                    zooConfig.sessionTimeout, this/* watcher */);
+            zooKeeperAccessor = new ZooKeeperAccessor(zooConfig.servers,
+                    zooConfig.sessionTimeout);
             
             /*
              * Note: This class will perform multicast discovery if ALL_GROUPS
@@ -373,66 +397,66 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
     }
     
-    /**
-     * Await {@link ZooKeeper} to be {@link ZooKeeper.States#CONNECTED}, but
-     * not more than the specified timeout.
-     * 
-     * @param timeout
-     * @param unit
-     * 
-     * @return <code>true</code> iff we noticed {@link ZooKeeper} entering the
-     *         connected state before the timeout.
-     * 
-     * @throws InterruptedException
-     *             if interrupted awaiting the {@link ZooKeeper} client to be
-     *             connected.
-     * @throws IllegalStateException
-     *             if the {@link ZooKeeper} client does not exist.
-     */
-    public boolean awaitZookeeperConnected(final long timeout, final TimeUnit unit)
-            throws InterruptedException {
-
-        if (zookeeper == null) {
-
-            throw new IllegalStateException("No zookeeper client?");
-
-        }
-
-        final long begin = System.nanoTime();
-        
-        // nanoseconds remaining.
-        long nanos = unit.toNanos(timeout);
-
-        ZooKeeper.States state = null;
-
-        while ((nanos -= (System.nanoTime() - begin)) > 0) {
-
-            switch (state = zookeeper.getState()) {
-            case CONNECTED:
-                return true;
-            case AUTH_FAILED:
-                log.error("Zookeeper authorization failure.");
-                break;
-            default:
-                // wait a bit, but not more than the time remaining.
-                zookeeperEventLock.lockInterruptibly();
-                try {
-                    zookeeperEvent.awaitNanos(nanos);
-                } finally {
-                    zookeeperEventLock.unlock();
-                }
-            }
-
-        }
-
-        final long elapsed = System.nanoTime() - begin;
-
-        log.warn("Zookeeper: not connected: state=" + state + ", elapsed="
-                + TimeUnit.NANOSECONDS.toMillis(elapsed));
-
-        return false;
-
-    }
+//    /**
+//     * Await {@link ZooKeeper} to be {@link ZooKeeper.States#CONNECTED}, but
+//     * not more than the specified timeout.
+//     * 
+//     * @param timeout
+//     * @param unit
+//     * 
+//     * @return <code>true</code> iff we noticed {@link ZooKeeper} entering the
+//     *         connected state before the timeout.
+//     * 
+//     * @throws InterruptedException
+//     *             if interrupted awaiting the {@link ZooKeeper} client to be
+//     *             connected.
+//     * @throws IllegalStateException
+//     *             if the {@link ZooKeeper} client does not exist.
+//     */
+//    public boolean awaitZookeeperConnected(final long timeout, final TimeUnit unit)
+//            throws InterruptedException {
+//
+//        if (zookeeper == null) {
+//
+//            throw new IllegalStateException("No zookeeper client?");
+//
+//        }
+//
+//        final long begin = System.nanoTime();
+//        
+//        // nanoseconds remaining.
+//        long nanos = unit.toNanos(timeout);
+//
+//        ZooKeeper.States state = null;
+//
+//        while ((nanos -= (System.nanoTime() - begin)) > 0) {
+//
+//            switch (state = zookeeper.getState()) {
+//            case CONNECTED:
+//                return true;
+//            case AUTH_FAILED:
+//                log.error("Zookeeper authorization failure.");
+//                break;
+//            default:
+//                // wait a bit, but not more than the time remaining.
+//                zookeeperEventLock.lockInterruptibly();
+//                try {
+//                    zookeeperEvent.awaitNanos(nanos);
+//                } finally {
+//                    zookeeperEventLock.unlock();
+//                }
+//            }
+//
+//        }
+//
+//        final long elapsed = System.nanoTime() - begin;
+//
+//        log.warn("Zookeeper: not connected: state=" + state + ", elapsed="
+//                + TimeUnit.NANOSECONDS.toMillis(elapsed));
+//
+//        return false;
+//
+//    }
 
     public JiniClient getClient() {
 
@@ -603,25 +627,16 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
         }
 
-        if (zookeeper != null) {
-            
-            try {
+        try {
 
-                // close the zookeeper client.
-                zookeeper.close();
+            // close the zookeeper client.
+            zooKeeperAccessor.close();
 
-            } catch (InterruptedException e) {
+        } catch (InterruptedException e) {
 
-                throw new RuntimeException(e);
-
-            }
-
-            zookeeper = null;
+            throw new RuntimeException(e);
 
         }
-
-        // discard all zookeeper watchers.
-        watchers.clear();
         
     }
 
@@ -717,24 +732,37 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
         }
         
-        if (zookeeper != null) {
+        /*
+         * Clear out everything in zookeeper for this federation.
+         */
+        {
 
             try {
 
-                /*
-                 * Clear out everything in zookeeper for this federation.
-                 */
+                ZooKeeper zookeeper = getZookeeperAccessor().getZookeeper();
+
                 if (zookeeper.exists(zooConfig.zroot, false/* watch */) != null) {
 
                     ZooHelper
                             .destroyZNodes(zookeeper, zooConfig.zroot, 0/* depth */);
-
                 }
-                
+
+            } catch (InterruptedException ex) {
+
+                log.warn(ex);
+
+            } catch (SessionExpiredException ex) {
+
+                log.warn(ex);
+
+            } catch (ConnectionLossException ex) {
+
+                log.warn(ex);
+
             } catch (Exception e) {
-                
+
                 throw new RuntimeException(e);
-                
+
             }
             
         }
@@ -1121,92 +1149,92 @@ public class JiniFederation extends AbstractDistributedFederation implements
         
     }
 
-    /**
-     * Lock controlling access to the {@link #zookeeperEvent} {@link Condition}.
-     */
-    protected final ReentrantLock zookeeperEventLock = new ReentrantLock();
-
-    /**
-     * Condition signaled any time there is a {@link WatchedEvent} delivered to
-     * our {@link #process(WatchedEvent)}.
-     */
-    protected final Condition zookeeperEvent = zookeeperEventLock
-            .newCondition();
-
-    /**
-     * Signals anyone awaiting {@link #zookeeperEvent}.   
-     */
-    public void process(final WatchedEvent event) {
-
-        if (INFO)
-            log.info(event.toString());
-
-        try {
-            
-            zookeeperEventLock.lockInterruptibly();
-            
-            try {
-                
-                zookeeperEvent.signalAll();
-            
-            } finally {
-                
-                zookeeperEventLock.unlock();
-                
-            }
-            
-        } catch (InterruptedException ex) {
-            
-            return;
-            
-        }
-        
-        for (Watcher w : watchers) {
-
-            w.process(event);
-
-        }
-        
-    }
-    
-    /**
-     * Adds a {@link Watcher} which will receive {@link WatchedEvent}s until it
-     * is removed.
-     * 
-     * @param w
-     *            The watcher.
-     */
-    public void addWatcher(final Watcher w) {
-
-        if (w == null)
-            throw new IllegalArgumentException();
-
-        if(INFO)
-            log.info("watcher="+w);
-        
-        watchers.add(w);
-
-    }
-
-    /**
-     * Remove a {@link Watcher}.
-     * 
-     * @param w
-     *            The watcher.
-     */
-    public void removeWatcher(final Watcher w) {
-
-        if (w == null)
-            throw new IllegalArgumentException();
-
-        if(INFO)
-            log.info("watcher="+w);
-
-        watchers.remove(w);
-
-    }
-
-    private final CopyOnWriteArrayList<Watcher> watchers = new CopyOnWriteArrayList<Watcher>();
+//    /**
+//     * Lock controlling access to the {@link #zookeeperEvent} {@link Condition}.
+//     */
+//    protected final ReentrantLock zookeeperEventLock = new ReentrantLock();
+//
+//    /**
+//     * Condition signaled any time there is a {@link WatchedEvent} delivered to
+//     * our {@link #process(WatchedEvent)}.
+//     */
+//    protected final Condition zookeeperEvent = zookeeperEventLock
+//            .newCondition();
+//
+//    /**
+//     * Signals anyone awaiting {@link #zookeeperEvent}.   
+//     */
+//    public void process(final WatchedEvent event) {
+//
+//        if (INFO)
+//            log.info(event.toString());
+//
+//        try {
+//            
+//            zookeeperEventLock.lockInterruptibly();
+//            
+//            try {
+//                
+//                zookeeperEvent.signalAll();
+//            
+//            } finally {
+//                
+//                zookeeperEventLock.unlock();
+//                
+//            }
+//            
+//        } catch (InterruptedException ex) {
+//            
+//            return;
+//            
+//        }
+//        
+//        for (Watcher w : watchers) {
+//
+//            w.process(event);
+//
+//        }
+//        
+//    }
+//    
+//    /**
+//     * Adds a {@link Watcher} which will receive {@link WatchedEvent}s until it
+//     * is removed.
+//     * 
+//     * @param w
+//     *            The watcher.
+//     */
+//    public void addWatcher(final Watcher w) {
+//
+//        if (w == null)
+//            throw new IllegalArgumentException();
+//
+//        if(INFO)
+//            log.info("watcher="+w);
+//        
+//        watchers.add(w);
+//
+//    }
+//
+//    /**
+//     * Remove a {@link Watcher}.
+//     * 
+//     * @param w
+//     *            The watcher.
+//     */
+//    public void removeWatcher(final Watcher w) {
+//
+//        if (w == null)
+//            throw new IllegalArgumentException();
+//
+//        if(INFO)
+//            log.info("watcher="+w);
+//
+//        watchers.remove(w);
+//
+//    }
+//
+//    private final CopyOnWriteArrayList<Watcher> watchers = new CopyOnWriteArrayList<Watcher>();
     
     /**
      * Submits the task for execution and monitors its {@link Future}.

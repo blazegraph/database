@@ -252,7 +252,7 @@ public class DumpFederation {
         System.out
                 .println("Timestamp"//
                         + "\tIndexName" //
-                        + "\tIndexPartition"//
+                        + "\tIndexPartitionName"//
                         + "\tPartitionId" //
                         + "\tServiceUUID" //
                         + "\tServiceName" //

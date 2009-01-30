@@ -1,5 +1,6 @@
 package com.bigdata.relation.rule.eval.pipeline;
 
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -22,7 +23,7 @@ import com.bigdata.service.LocalDataServiceFederation;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-class LocalJoinTask extends JoinTask {
+public class LocalJoinTask extends JoinTask {
     
     /**
      * The asynchronous iterator that is the source for this
@@ -42,7 +43,8 @@ class LocalJoinTask extends JoinTask {
      * @param joinNexusFactory
      * @param order
      * @param orderIndex
-     * @param master
+     * @param masterProxy
+     * @param masterUUID
      * @param source
      * @param solutionBuffer
      */
@@ -50,12 +52,13 @@ class LocalJoinTask extends JoinTask {
             final String indexName, final IRule rule,
             final IJoinNexus joinNexus, final int[] order,
             final int orderIndex, 
-            final IJoinMaster master,
+            final IJoinMaster masterProxy,
+            final UUID masterUUID,
             final IAsynchronousIterator<IBindingSet[]> source,
             final IBuffer<ISolution[]> solutionBuffer) {
 
-        super(indexName, rule, joinNexus, order,
-                orderIndex, -1/* partitionId */, master);
+        super(indexName, rule, joinNexus, order, orderIndex,
+                -1/* partitionId */, masterProxy, masterUUID);
 
         if (source == null)
             throw new IllegalArgumentException();

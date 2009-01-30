@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.Vector;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -134,6 +135,7 @@ public class DistributedJoinTask extends JoinTask {
             final int partitionId,
             final AbstractScaleOutFederation fed,
             final IJoinMaster master,
+            final UUID masterUUID,
             final IAsynchronousIterator<IBindingSet[]> src,
             final IKeyOrder[] keyOrders,
             final DataService dataService
@@ -142,7 +144,7 @@ public class DistributedJoinTask extends JoinTask {
         super(
                 DataService.getIndexPartitionName(scaleOutIndexName,
                         partitionId), rule, joinNexus, order, orderIndex,
-                partitionId, master);
+                partitionId, master, masterUUID);
 
         if (fed == null)
             throw new IllegalArgumentException();
@@ -363,7 +365,7 @@ public class DistributedJoinTask extends JoinTask {
 
             // @todo allocate this in the ctor.
             final String namespace = JoinTaskFactoryTask.getJoinTaskNamespace(
-                    masterProxy, orderIndex, partitionId);
+                    masterUUID, orderIndex, partitionId);
 
             /*
              * Note: If something else has the entry in the session then that is
@@ -1093,10 +1095,10 @@ public class DistributedJoinTask extends JoinTask {
                 try {
 
                     final JoinTaskFactoryTask factoryTask = new JoinTaskFactoryTask(
-                            nextScaleOutIndexName, rule, joinNexus
-                                    .getJoinNexusFactory(), order, nextOrderIndex,
-                            locator.getPartitionId(), masterProxy, sourceItrProxy,
-                            keyOrders);
+                        nextScaleOutIndexName, rule, joinNexus
+                                .getJoinNexusFactory(), order, nextOrderIndex,
+                        locator.getPartitionId(), masterProxy, masterUUID,
+                        sourceItrProxy, keyOrders);
 
                     // submit the factory task, obtain its future.
                     factoryFuture = dataService.submit(factoryTask);

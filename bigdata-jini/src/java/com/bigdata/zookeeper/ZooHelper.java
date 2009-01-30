@@ -40,6 +40,8 @@ import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.KeeperException.NoNodeException;
 
+import com.bigdata.jini.start.config.AbstractHostConstraint;
+
 /**
  * Utility class for issuing the four letter commands to a zookeeper service.
  * 
@@ -112,27 +114,23 @@ public class ZooHelper {
     }
 
     /**
-     * Inquires whether a zookeeper instance is running in a non-error state.
+     * Kills a local zookeeper instance responding at the specified client port.
      * 
-     * @param entry
-     *            The entry describing that instance.
-     * @param timeout
-     *            The socket read timeout in milliseconds.
+     * @param clientPort
+     *            The client port.
      * 
-     * @throws UnknownHostException
-     *             if the hostname can not be resolved.
      * @throws IOException
      *             if there is any problem communicating with the service,
      *             including a timeout (the service is not responsive).
      */
     public static void kill(final int clientPort) throws UnknownHostException,
             IOException {
-    
+
         if (INFO)
             log.info("Killing service: @ port=" + clientPort);
-    
+
         final Socket socket = new Socket(InetAddress.getLocalHost(), clientPort);
-    
+
         try {
     
             socket.setSoTimeout(100/* timeout(ms) */);
@@ -384,20 +382,59 @@ public class ZooHelper {
      * 
      * @param args
      *            host:clientPort command
+     *            
+     * @throws IOException 
      */
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
 
         if (args.length != 2) {
 
-            System.err.println("usage: host:clientPort [ruok|dump|stat|kill]");
-
-            System.err
-                    .println("       kill may only be used on the local host.");
-
-            System.exit(1);
-
+            usage();
+            
+        }
+        
+        final String s = args[0];
+        
+        final int pos = s.indexOf(':');
+        
+        if(pos==-1) usage();
+        
+        final String host = s.substring(0, pos);
+        
+        final int clientPort = Integer.parseInt(s.substring(pos+1));
+        
+        final InetAddress addr = InetAddress.getByName(host);
+        
+        final String cmd = args[1];
+        
+        if (cmd.equals("ruok")) {
+            ruok(addr, clientPort);
+            // note: if not Ok then exception will be thrown.
+            System.out.println("imok");
+        } else if (cmd.equals("dump")) {
+            System.out.println(dump(addr, clientPort));
+        } else if (cmd.equals("stat")) {
+            System.out.println(stat(addr, clientPort));
+        } else if (cmd.equals("kill")) {
+            if(!AbstractHostConstraint.isLocalHost(host)) {
+                usage();
+            }
+            kill(clientPort);
+        } else {
+            usage();
         }
 
     }
 
+    private static void usage() {
+
+        System.err.println("usage: host:clientPort [ruok|dump|stat|kill]");
+
+        System.err
+                .println("       kill may only be used on the local host.");
+
+        System.exit(1);
+
+    }
+    
 }

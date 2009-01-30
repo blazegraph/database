@@ -104,7 +104,8 @@ public class MonitorConfigZNodeTask implements Callable {
                     if (InnerCause.isInnerCause(t,
                             InterruptedException.class)) {
 
-                        log.info("interrupted", t);
+                        if(INFO)
+                            log.info("interrupted", t);
 
                         // exit
                         return null;

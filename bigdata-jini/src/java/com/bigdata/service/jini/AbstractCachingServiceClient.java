@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.jini;
 
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
@@ -51,6 +52,7 @@ import net.jini.lookup.ServiceItemFilter;
 import org.apache.log4j.Logger;
 
 import com.bigdata.jini.lookup.entry.ServiceItemFilterChain;
+import com.bigdata.util.InnerCause;
 import com.sun.jini.admin.DestroyAdmin;
 
 /**
@@ -376,21 +378,42 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
         log.warn("Will destroy " + items.length + " " + serviceIface.getName()
                 + " services" + (filter == null ? "" : " matching " + filter));
 
-        final List<Callable<Void>> tasks = new ArrayList<Callable<Void>>(
+        final List<Callable<Boolean>> tasks = new ArrayList<Callable<Boolean>>(
                 items.length);
 
         for (ServiceItem serviceItem : items) {
 
             final ServiceItem item = serviceItem;
 
-            tasks.add(new Callable<Void>() {
+            tasks.add(new Callable<Boolean>() {
 
-                public Void call() throws Exception {
+                public Boolean call() throws Exception {
 
-                    // send the request.
-                    destroyService(item);
+                    try {
 
-                    return null;
+                        // send the request.
+                        destroyService(item);
+                        
+                        return true;
+                        
+                    } catch (InvocationTargetException ex) {
+                        
+                        final java.rmi.ConnectException t = (java.rmi.ConnectException) InnerCause
+                                .getInnerCause(ex,
+                                        java.rmi.ConnectException.class);
+
+                        if(t != null) {
+                        
+                            // probably already dead.
+                            log.warn(t + ":" + item);
+                            
+                            return false;
+                            
+                        }
+                        
+                        throw ex;
+
+                    }
 
                 }
 
@@ -402,11 +425,11 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
          * This blocks until all services have been sent a destroy request.
          * However, they may handle the destroy request asynchronously.
          */
-        final List<Future<Void>> futures = executorService.invokeAll(tasks);
+        final List<Future<Boolean>> futures = executorService.invokeAll(tasks);
 
         for (int i = 0; i < items.length; i++) {
 
-            final Future f = futures.get(i);
+            final Future<Boolean> f = futures.get(i);
 
             try {
 

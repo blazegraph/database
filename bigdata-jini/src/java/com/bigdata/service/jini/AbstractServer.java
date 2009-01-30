@@ -71,6 +71,7 @@ import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
+import org.apache.zookeeper.KeeperException.SessionExpiredException;
 import org.apache.zookeeper.data.ACL;
 
 import com.bigdata.Banner;
@@ -724,12 +725,15 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
              * if the service starts without a zookeeper connection and then
              * later connects then it will otherwise fail to create its znode.
              */
-            fed.addWatcher(new Watcher() {
+            fed.getZookeeperAccessor().addWatcher(new Watcher() {
 
+                boolean sessionValid = false;
+                
                 public void process(WatchedEvent event) {
 
                     switch (event.getState()) {
-                    case Disconnected:
+                    case Expired:
+                        sessionValid = false;
                         synchronized (AbstractServer.this) {
                             /*
                              * Synchronized so that creating and cancelling the
@@ -739,19 +743,23 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                                 masterElectionFuture
                                         .cancel(true/* mayInterruptIfRunning */);
                                 masterElectionFuture = null;
-                                log.warn("Lost zookeeper connection: cancelled master election task: "
+                                log
+                                        .warn("Zookeeper session expired: cancelled master election task: "
                                                 + this);
                             }
                         }
                         break;
                     case NoSyncConnected:
                     case SyncConnected:
-                        if (serviceID != null) {
-                            try {
-                                notifyZookeeper(f, JiniUtil
-                                        .serviceID2UUID(serviceID));
-                            } catch (Throwable t) {
-                                log.error(AbstractServer.this,t);
+                        if (!sessionValid) {
+                            sessionValid = true;
+                            if (serviceID != null) {
+                                try {
+                                    notifyZookeeper(f, JiniUtil
+                                            .serviceID2UUID(serviceID));
+                                } catch (Throwable t) {
+                                    log.error(AbstractServer.this, t);
+                                }
                             }
                         }
                     } // switch
@@ -1363,23 +1371,37 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
                     if(INFO)
                         log.info("Interrupted.");
-                    
-                } catch (Throwable t) {
 
-                    log.error(AbstractServer.this, t);
+                } catch (SessionExpiredException t) {
                     
                     /*
-                     * @todo I have observed a tight loop here with a
-                     * SessionExpired exception from zookeeper. Presumably that
-                     * occurred when the ensemble was dead, but maybe not. I
-                     * have added a timeout in order to reduce the problem.
+                     * Note: We setup a watcher that runs the master election
+                     * task. It will notice the session expire and cancel this
+                     * task. Once it notices the session connect for a new
+                     * client another instance of this task will be started and
+                     * the service will again contend to be a master.
                      */
-                    Thread.sleep(2000/* ms */);
 
+                    log.error("Zookeeper session expired!");
+                    
+                    return null;
+
+                } catch (Throwable t) {
+
+                    /*
+                     * All other exceptions we log and ignore.
+                     * 
+                     * Note: Expected exceptions include various kinds of
+                     * transient problems with the zookeeper client, e.g.,
+                     * ConnectionLoss.
+                     */
+                    
+                    log.error(AbstractServer.this, t);
+                    
                 }
-                
+
             }
-            
+
             return null;
 
         }
@@ -1399,7 +1421,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             
             final JiniFederation fed = (JiniFederation) service.getFederation();
 
-            final ZooKeeper zookeeper = fed.getZookeeper();
+            final ZooKeeper zookeeper = fed.getZookeeperAccessor().getZookeeper();
 
             final List<ACL> acl = fed.getZooConfig().acl;
 

@@ -29,8 +29,6 @@ package com.bigdata.service;
 
 import java.util.Iterator;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.journal.IIndexStore;
@@ -79,12 +77,12 @@ public class DataServiceTupleIterator<E> extends RawDataServiceTupleIterator<E> 
      * @param flags
      * @param filter
      */
-    public DataServiceTupleIterator(ClientIndexView ndx,
-            IDataService dataService, String name, long timestamp,
-            byte[] fromKey, byte[] toKey, int capacity, int flags,
-            IFilterConstructor filter) {
+    public DataServiceTupleIterator(final ClientIndexView ndx,
+            final IDataService dataService, final String name,
+            final long timestamp, final byte[] fromKey, final byte[] toKey,
+            final int capacity, final int flags, final IFilterConstructor filter) {
 
-        super(dataService, name, timestamp, false/*readConsistent*/, fromKey,
+        super(dataService, name, timestamp, false/* readConsistent */, fromKey,
                 toKey, capacity, flags, filter);
         
         if (ndx == null) {

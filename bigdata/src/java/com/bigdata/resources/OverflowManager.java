@@ -63,6 +63,7 @@ import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.service.DataService;
+import com.bigdata.service.IDataService;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -110,17 +111,27 @@ abstract public class OverflowManager extends IndexManager {
     final protected static boolean INFO = log.isInfoEnabled();
 
     /**
-     * Set based on {@link Options#COPY_INDEX_THRESHOLD}.
+     * @see Options#COPY_INDEX_THRESHOLD
      */
-    final int copyIndexThreshold;
+    final protected int copyIndexThreshold;
     
     /**
-     * Set based on {@link Options#MINIMUM_ACTIVE_INDEX_PARTITIONS}. 
+     * @see Options#ACCELERATE_SPLIT_THRESHOLD
+     */
+    final protected int accelerateSplitThreshold; 
+    
+    /**
+     * @see Options#JOINS_ENABLED
+     */
+    final protected boolean joinsEnabled;
+    
+    /**
+     * @see Options#MINIMUM_ACTIVE_INDEX_PARTITIONS 
      */
     protected final int minimumActiveIndexPartitions;
     
     /**
-     * Set based on {@link Options#MAXIMUM_MOVES_PER_TARGET}.
+     * @see Options#MAXIMUM_MOVES_PER_TARGET
      */
     protected final int maximumMovesPerTarget;
 
@@ -317,10 +328,43 @@ abstract public class OverflowManager extends IndexManager {
          * 
          * @see #DEFAULT_COPY_INDEX_THRESHOLD
          */
-        String COPY_INDEX_THRESHOLD = OverflowManager.class.getName()+".copyIndexThreshold";
+        String COPY_INDEX_THRESHOLD = OverflowManager.class.getName()
+                + ".copyIndexThreshold";
 
         String DEFAULT_COPY_INDEX_THRESHOLD = "1000";
 
+        /**
+         * The #of index partitions below which we will accelerate the decision
+         * to split an index partition. When a new scale-out index is created
+         * there is by default only a single index partition on a single
+         * {@link IDataService}. Since each index (partition) is single
+         * threaded for writes, we can increase the potential concurrency if we
+         * split the initial index partition. We accelerate decisions to split
+         * index partitions by reducing the minimum and target #of tuples per
+         * index partition for an index with fewer than the #of index partitions
+         * specified by this parameter.
+         */
+        String ACCELERATE_SPLIT_THRESHOLD = OverflowManager.class.getName()
+                + ".accelerateSplitThreshold";
+
+        String DEFAULT_ACCELERATE_SPLIT_THRESHOLD = "20";
+
+        /**
+         * Option may be used to disable index partition joins.
+         * 
+         * FIXME Joins are being triggered by the
+         * {@link #ACCELERATE_SPLIT_THRESHOLD} behavior since the target for the
+         * split size increases as a function of the #of index partitions. In
+         * order to fix this we have to somehow discount joins, either by
+         * requiring deletes on the index partition or by waiting some #of
+         * overflows since the split, etc. For the moment they are disabled by
+         * default.
+         */
+        String JOINS_ENABLED = OverflowManager.class.getName()
+                + ".joinsEnabled";
+
+        String DEFAULT_JOINS_ENABLED = "false";
+        
         /**
          * The minimum #of active index partitions on a data service before the
          * resource manager will consider moving an index partition to another
@@ -544,18 +588,18 @@ abstract public class OverflowManager extends IndexManager {
     public OverflowManager(final Properties properties) {
 
         super(properties);
-        
+
         // overflowEnabled
         {
-            
+
             overflowEnabled = Boolean
                     .parseBoolean(properties.getProperty(
                             Options.OVERFLOW_ENABLED,
                             Options.DEFAULT_OVERFLOW_ENABLED));
 
-            if(INFO)
-                log.info(Options.OVERFLOW_ENABLED+"="+overflowEnabled);
-            
+            if (INFO)
+                log.info(Options.OVERFLOW_ENABLED + "=" + overflowEnabled);
+
         }
 
         // overflowTimeout
@@ -591,7 +635,38 @@ abstract public class OverflowManager extends IndexManager {
             }
             
         }
+       
+        // accelerateSplitThreshold
+        {
+
+            accelerateSplitThreshold = Integer.parseInt(properties.getProperty(
+                    Options.ACCELERATE_SPLIT_THRESHOLD,
+                    Options.DEFAULT_ACCELERATE_SPLIT_THRESHOLD));
+
+            if (INFO)
+                log.info(Options.ACCELERATE_SPLIT_THRESHOLD + "="
+                        + accelerateSplitThreshold);
+
+            if (accelerateSplitThreshold < 0) {
+
+                throw new RuntimeException(Options.ACCELERATE_SPLIT_THRESHOLD
+                        + " must be non-negative");
+
+            }
+            
+        }
         
+        // joinsEnabled
+        {
+            
+            joinsEnabled = Boolean.parseBoolean(properties.getProperty(
+                    Options.JOINS_ENABLED, Options.DEFAULT_JOINS_ENABLED));
+
+            if (INFO)
+                log.info(Options.JOINS_ENABLED + "=" + joinsEnabled);
+            
+        }
+
         // minimumActiveIndexPartitions
         {
 

@@ -32,7 +32,9 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
@@ -89,7 +91,7 @@ public class CachingMetadataIndex extends CacheOnceMetadataIndex {
     /**
      * Re-fetches the locator(s).
      */
-    public void staleLocator(PartitionLocator locator) {
+    public void staleLocator(final PartitionLocator locator) {
 
         if (locator == null)
             throw new IllegalArgumentException();
@@ -226,22 +228,23 @@ public class CachingMetadataIndex extends CacheOnceMetadataIndex {
 
     public ITupleIterator rangeIterator() {
 
-        final Lock lock = readWriteLock.readLock();
-        
-        lock.lock();
-        
-        try {
-        
-            return delegate.rangeIterator();
-            
-        } finally {
-            
-            lock.unlock();
-            
-        }
+        return delegate.rangeIterator(null, null);
 
     }
 
+    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey) {
+
+        return rangeIterator(fromKey, toKey, 0/* capacity */,
+                IRangeQuery.DEFAULT, null/*filter*/);
+
+    }
+
+    /**
+     * FIXME this is wrong. The {@link #delegate} must be a
+     * {@link UnisolatedReadWriteIndex} in order to provide correct locking for
+     * the iterator. The class may have to be refactored in order to permit the
+     * behavior to be gated by an {@link UnisolatedReadWriteIndex}.
+     */
     public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
             int capacity, int flags, IFilterConstructor filter) {
 
@@ -252,24 +255,6 @@ public class CachingMetadataIndex extends CacheOnceMetadataIndex {
         try {
         
             return delegate.rangeIterator(fromKey, toKey, capacity, flags, filter);
-            
-        } finally {
-            
-            lock.unlock();
-            
-        }
-
-    }
-
-    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey) {
-
-        final Lock lock = readWriteLock.readLock();
-        
-        lock.lock();
-
-        try {
-        
-            return delegate.rangeIterator(fromKey, toKey);
             
         } finally {
             

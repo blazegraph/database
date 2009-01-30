@@ -345,8 +345,8 @@ public class DistributedJoinMasterTask extends JoinMasterTask implements
 
             final JoinTaskFactoryTask factoryTask = new JoinTaskFactoryTask(
                     scaleOutIndexName, rule, joinNexusFactory, order,
-                    0/* orderIndex */, partitionId, masterProxy, sourceItr,
-                    ruleState.getKeyOrder());
+                    0/* orderIndex */, partitionId, masterProxy, masterUUID,
+                    sourceItr, ruleState.getKeyOrder());
 
             final IDataService dataService = fed.getDataService(locator
                     .getDataServiceUUID());

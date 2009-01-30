@@ -49,6 +49,9 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("zookeeper client library");
 
+        // test ability to handle an expired session.
+        suite.addTestSuite(TestZookeeperAccessor.class);
+
         // a watcher for a znode to be created.
         suite.addTestSuite(TestZNodeCreatedWatcher.class);
         

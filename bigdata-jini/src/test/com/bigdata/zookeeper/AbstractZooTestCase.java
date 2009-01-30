@@ -122,14 +122,15 @@ public abstract class AbstractZooTestCase extends TestCase2 {
 
     private File dataDir = null;
     
-//    int clientPort;
+    // the choosen client port.
+    int clientPort = -1;
     
     public void setUp() throws Exception {
 
         log.info(getName());
         
         // find ports that are not in use.
-        final int clientPort = getPort(2181/* suggestedPort */);
+        clientPort = getPort(2181/* suggestedPort */);
         final int peerPort = getPort(2888/* suggestedPort */);
         final int leaderPort = getPort(3888/* suggestedPort */);
         final String servers = "1=localhost:" + peerPort + ":" + leaderPort;

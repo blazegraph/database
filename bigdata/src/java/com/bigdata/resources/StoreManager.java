@@ -256,6 +256,20 @@ abstract public class StoreManager extends ResourceEvents implements
 
         String DEFAULT_PURGE_OLD_RESOURCES_DURING_STARTUP = "true";
         
+        /**
+         * Option specifies the #of bytes under management below which we will
+         * accelerate the overflow of the live journal by reducing its maximum
+         * extent below the nominal configured maximum extent. The purpose of
+         * this option is to promote rapid overflow of a new data service (where
+         * new is measured by the #of bytes under management). This helps to
+         * increase the rate at which index partitions are split (and moved if
+         * the there is more than one new data service starting).
+         */
+        String ACCELERATE_OVERFLOW_THRESHOLD = StoreManager.class.getName()
+                + ".accelerateOverflowThreshold";
+
+        String DEFAULT_ACCELERATE_OVERFLOW_THRESHOLD = ""+(Bytes.gigabyte);
+        
     }
 
     /**
@@ -359,13 +373,6 @@ abstract public class StoreManager extends ResourceEvents implements
          * time when it was closed out by synchronous overflow processing.
          */
         String MaximumJournalSizeAtOverflow = "Maximum Journal Size At Overflow";
-
-//        /**
-//         * The minimum age in milliseconds before a resource may be released.
-//         * 
-//         * @see StoreManager.Options#MIN_RELEASE_AGE
-//         */
-//        String MinimumReleaseAge = "Minimum Release Age";
 
         /**
          * The current release time for the {@link StoreManager}.
@@ -532,6 +539,11 @@ abstract public class StoreManager extends ResourceEvents implements
      */
     private final boolean purgeOldResourcesDuringStartup;
 
+    /**
+     * @see Options#ACCELERATE_OVERFLOW_THRESHOLD
+     */
+    protected final long accelerateOverflowThreshold;
+    
     /**
      * Used to run the {@link Startup}.
      */
@@ -884,6 +896,28 @@ abstract public class StoreManager extends ResourceEvents implements
 
         }
 
+
+        // accelerateOverflowThreshold
+        {
+
+            accelerateOverflowThreshold = Long.parseLong(properties
+                    .getProperty(Options.ACCELERATE_OVERFLOW_THRESHOLD,
+                            Options.DEFAULT_ACCELERATE_OVERFLOW_THRESHOLD));
+
+            if (INFO)
+                log.info(Options.ACCELERATE_OVERFLOW_THRESHOLD + "="
+                        + accelerateOverflowThreshold);
+
+            if (accelerateOverflowThreshold < 0) {
+
+                throw new RuntimeException(
+                        Options.ACCELERATE_OVERFLOW_THRESHOLD
+                                + " must be non-negative");
+
+            }
+            
+        }
+        
         /*
          * storeCacheCapacity
          */
@@ -926,25 +960,7 @@ abstract public class StoreManager extends ResourceEvents implements
 //                    new LRUCache<UUID, IRawStore>(storeCacheCapacity));
 
         }
-
-//        // minimum release age
-//        {
-//
-//            minReleaseAge = Long.parseLong(properties.getProperty(
-//                    Options.MIN_RELEASE_AGE, Options.DEFAULT_MIN_RELEASE_AGE));
-//
-//            if (INFO)
-//                log.info(Options.MIN_RELEASE_AGE + "=" + minReleaseAge);
-//
-//            if (minReleaseAge < 0L) {
-//
-//                throw new RuntimeException(Options.MIN_RELEASE_AGE
-//                        + " must be non-negative");
-//
-//            }
-//
-//        }
-
+        
         /*
          * Allocate an optional write cache that will be passed from live
          * journal to live journal during overflow.
@@ -4044,60 +4060,60 @@ abstract public class StoreManager extends ResourceEvents implements
      * which have even less utilization).
      * 
      * @param p
+     *            The properties (modified as side-effect).
      */
-    protected void overrideJournalExtent(Properties p) {
+    protected void overrideJournalExtent(final Properties p) {
 
-        // @todo configure threshold.
-        final long threshold = Bytes.gigabyte;
-        
         final long bytesUnderManagement = this.bytesUnderManagement.get();
         
-        if (bytesUnderManagement > threshold) {
+        if (bytesUnderManagement >= accelerateOverflowThreshold) {
 
             /*
              * Crossed the threshold where we no longer accelerate overflow.
              */
-            
+
             return;
-            
+
         }
 
-        final double d = bytesUnderManagement / (double)threshold;
-        
-        final long initialExtent = Long.parseLong(p.getProperty(Options.INITIAL_EXTENT,
-                Options.DEFAULT_INITIAL_EXTENT));
+        final double d = (double) bytesUnderManagement
+                / accelerateOverflowThreshold;
 
-        final long maximumExtent = Long.parseLong(p.getProperty(Options.INITIAL_EXTENT,
-                Options.DEFAULT_MAXIMUM_EXTENT));
+        final long initialExtent = Long.parseLong(p.getProperty(
+                Options.INITIAL_EXTENT, Options.DEFAULT_INITIAL_EXTENT));
+
+        final long maximumExtent = Long.parseLong(p.getProperty(
+                Options.INITIAL_EXTENT, Options.DEFAULT_MAXIMUM_EXTENT));
 
         /*
          * Don't allow a journal w/ less than 10M or the minimum specified by
          * Options.
          */
-        final long minimumInitialExtent = Math.max(
-                Options.minimumInitialExtent, Bytes.megabyte * 10);
+        final long minimumExtent = Math.max(Options.minimumInitialExtent,
+                Bytes.megabyte * 10);
 
-        final long adjustedInitialExtent = Math.max(minimumInitialExtent,
-                (long) (initialExtent * d));
-
-        final long adjustedMaximumExtent = Math.max(minimumInitialExtent,
+        /*
+         * Use the same value for initial and maximum extents since we plan to
+         * overflow rapidly. We choose the value as a discount on the maximum
+         * extent. This prevents numerous extensions until we get near to the
+         * maximum extent.
+         */
+        final long adjustedExtent = Math.max(minimumExtent,
                 (long) (maximumExtent * d));
 
-        p.setProperty(Options.INITIAL_EXTENT, Long
-                .toString(adjustedInitialExtent));
+        p.setProperty(Options.INITIAL_EXTENT, Long.toString(adjustedExtent));
 
-        p.setProperty(Options.MAXIMUM_EXTENT, Long
-                .toString(adjustedMaximumExtent));
-        
-//        if(INFO)
-//            log.info // @todo info.
-            log.warn("discount=" + d + ", bytesUnderManagement="
-                    + bytesUnderManagement + ", threshold=" + threshold
-                    + ", minimimInitialExtent=" + minimumInitialExtent//
-                    + ", initialExtent=" + initialExtent //
-                    + ", maximumExtent=" + maximumExtent //
-                    + ", adjustedInitialExtent=" + adjustedInitialExtent //
-                    + ", adjustedMaximumExtent=" + adjustedMaximumExtent);
+        p.setProperty(Options.MAXIMUM_EXTENT, Long.toString(adjustedExtent));
+
+// if(INFO)
+// log.info // @todo info.
+            log.warn("discount=" + d //
+                + ", bytesUnderManagement="+ bytesUnderManagement //
+                + ", threshold=" + accelerateOverflowThreshold//
+                + ", minimimInitialExtent=" + minimumExtent//
+                + ", initialExtent=" + initialExtent //
+                + ", maximumExtent=" + maximumExtent //
+                + ", adjustedExtent=" + adjustedExtent);
 
         return;
 

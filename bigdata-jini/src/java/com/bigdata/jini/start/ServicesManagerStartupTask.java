@@ -171,7 +171,8 @@ public class ServicesManagerStartupTask implements Callable<Void> {
             long nanos = TimeUnit.MILLISECONDS.toNanos(timeout);
 
             // await zookeeper connection.
-            if (!fed.awaitZookeeperConnected(nanos, TimeUnit.NANOSECONDS)) {
+            if (!fed.getZookeeperAccessor().awaitZookeeperConnected(nanos,
+                    TimeUnit.NANOSECONDS)) {
 
                 throw new Exception(
                         "Zookeeper not connected: startup sequence aborted.");
