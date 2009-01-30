@@ -1936,6 +1936,10 @@ public abstract class DistributedTransactionService extends
      * @todo We could monitor data service joins (for jini) and immediately
      *       notify newly joined data services of the current release time.
      * 
+     * FIXME There is probably no reason to do this now that the resource
+     * manager reaches out for the current release time before deciding which
+     * resources it can release.
+     * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */

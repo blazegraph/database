@@ -617,12 +617,18 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask<MoveResu
             final IDataService sourceDataService = fed.getDataService(sourceDataServiceUUID);
             assert sourceDataService != null;
             
-            // iterator reading from the (remote) source index partition.
+            /*
+             * An iterator reading from the (remote) source index partition.
+             * 
+             * Note: We obtain read-consistent semantics here because the
+             * lastCommitTime of the source is fixed. (The source is a journal
+             * that has been closed for writes.)
+             */
             final ITupleIterator itr = new RawDataServiceTupleIterator(
                     sourceDataService, //
                     sourceIndexName, //
                     TimestampUtility.asHistoricalRead(lastCommitTime),// Note: historical read.
-                    true, // readConsistent,
+                    false, // readConsistent (does not matter since lastCommitTime is fixed),
                     null, // fromKey
                     null, // toKey
                     0,    // capacity

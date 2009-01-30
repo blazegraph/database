@@ -849,7 +849,7 @@ public class ClientIndexView implements IClientIndex {
      * @see AbstractScaleOutFederation#locatorScan(String, long, byte[], byte[],
      *      boolean)
      * 
-     * @param timestamp
+     * @param ts
      *            The timestamp that will be used to visit the locators.
      * @param fromKey
      *            The scale-out index first key that will be visited
@@ -866,10 +866,10 @@ public class ClientIndexView implements IClientIndex {
      *         will be a serialized {@link PartitionLocator} object.
      */
     @SuppressWarnings("unchecked")
-    public Iterator<PartitionLocator> locatorScan(final long timestamp,
+    public Iterator<PartitionLocator> locatorScan(final long ts,
             final byte[] fromKey, final byte[] toKey, final boolean reverseScan) {
-        
-        return fed.locatorScan(name, timestamp, fromKey, toKey, reverseScan);
+
+        return fed.locatorScan(name, ts, fromKey, toKey, reverseScan);
 
     }
     
@@ -1220,14 +1220,15 @@ public class ClientIndexView implements IClientIndex {
     protected void runTasks(final boolean parallel,
             final ArrayList<AbstractDataServiceProcedureTask> tasks) {
 
-        if(tasks.isEmpty()) {
-            
-            log.warn("No tasks to run?",new RuntimeException("No tasks to run?"));
-            
+        if (tasks.isEmpty()) {
+
+            log.warn("No tasks to run?", new RuntimeException(
+                    "No tasks to run?"));
+
             return;
             
         }
-        
+
         if (getRecursionDepth().get() > 0) {
 
             /*
@@ -1236,10 +1237,10 @@ public class ClientIndexView implements IClientIndex {
 
             runInCallersThread(tasks);
 
-        } else if(tasks.size()==1) {
+        } else if (tasks.size() == 1) {
 
             runOne(tasks.get(0));
-            
+
         } else if (parallel) {
 
             /*
@@ -1450,10 +1451,13 @@ public class ClientIndexView implements IClientIndex {
                 
             } catch (Exception e) {
 
-                if(INFO) log.info("Execution failed: task=" + task, e);
+//                if (INFO)
+//                    log.info("Execution failed: task=" + task, e);
 
-                throw new ClientException("Execution failed: " + task, e, task.causes);
-                
+                throw new ClientException("Execution failed: recursionDepth="
+                        + getRecursionDepth() + ", task=" + task, e,
+                        task.causes);
+
             }
             
         }

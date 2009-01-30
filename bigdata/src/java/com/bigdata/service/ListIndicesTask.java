@@ -75,6 +75,13 @@ public class ListIndicesTask implements Callable<String[]>,
         // @todo possible problem if [ts] is a read-write tx.
         final IIndex name2Addr = journal.getName2Addr(ts);
 
+        if (name2Addr == null) {
+
+            // No commit points, no registered indices.
+            return new String[0];
+            
+        }
+        
         final int n = (int) name2Addr.rangeCount();
 
         if (INFO)

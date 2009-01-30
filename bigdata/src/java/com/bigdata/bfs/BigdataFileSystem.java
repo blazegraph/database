@@ -100,7 +100,7 @@ import cutthecrap.utils.striterators.Striterator;
  * least one block. Streaming processing is advised in all cases when handling
  * large files, including when the file is to be delivered via HTTP.
  * <p>
- * The {@link #getMetadataIndex() metadata index} uses a {@link SparseRowStore}
+ * The {@link #getFilleMetadataIndex() metadata index} uses a {@link SparseRowStore}
  * design, similar to Google's bigtable or Hadoop's HBase. All updates to file
  * version metadata are atomic. The primary key in the metadata index for every
  * file is its {@link FileMetadataSchema#ID}. In addition, each version of a file
@@ -312,9 +312,9 @@ public class BigdataFileSystem extends
     
     public static final FileMetadataSchema metadataSchema = new FileMetadataSchema();
     
-    private SparseRowStore metadataIndex;
+    private SparseRowStore fileMetadataIndex;
     
-    private IIndex dataIndex;
+    private IIndex fileDataIndex;
     
     protected static void assertString(Map<String, Object> properties, String name) {
 
@@ -363,30 +363,30 @@ public class BigdataFileSystem extends
     /**
      * The index in which the file metadata is stored (the index must exist).
      */
-    public SparseRowStore getMetadataIndex() {
+    public SparseRowStore getFilleMetadataIndex() {
 
-        if (metadataIndex == null) {
+        if (fileMetadataIndex == null) {
 
             throw new IllegalStateException();
             
         }
 
-        return metadataIndex;
+        return fileMetadataIndex;
         
     }
 
     /**
      * The index in which the file blocks are stored (the index must exist).
      */
-    public IIndex getDataIndex() {
+    public IIndex getFileDataIndex() {
 
-        if (dataIndex == null) {
+        if (fileDataIndex == null) {
 
             throw new IllegalStateException();
 
         }
 
-        return dataIndex;
+        return fileDataIndex;
 
     }
     
@@ -453,7 +453,7 @@ public class BigdataFileSystem extends
 
                 final IIndex ndx = indexManager.getIndex(name, getTimestamp());
 
-                metadataIndex = new SparseRowStore(ndx);
+                fileMetadataIndex = new SparseRowStore(ndx);
 
             }
 
@@ -479,7 +479,7 @@ public class BigdataFileSystem extends
                 // register the index.
                 indexManager.registerIndex(md);
 
-                dataIndex = indexManager.getIndex(name,getTimestamp());
+                fileDataIndex = indexManager.getIndex(name,getTimestamp());
 
             }
 
@@ -538,7 +538,7 @@ public class BigdataFileSystem extends
         metadata.put(FileMetadataSchema.VERSION, AutoIncIntegerCounter.INSTANCE);
         
         // write the metadata (atomic operation).
-        final ITPS tps = getMetadataIndex().write(metadataSchema, metadata,
+        final ITPS tps = getFilleMetadataIndex().write(metadataSchema, metadata,
                 AUTO_TIMESTAMP_UNIQUE, null/* filter */, null/*precondition*/);
 
         final int version = (Integer) tps.get(FileMetadataSchema.VERSION).getValue();
@@ -631,7 +631,7 @@ public class BigdataFileSystem extends
      */
     public ITPS readMetadata(final String id, final long timestamp) {
 
-        return getMetadataIndex()
+        return getFilleMetadataIndex()
                 .read(metadataSchema, id, timestamp/* fromTime */,
                         timestamp + 1/* toTime */, null/* filter */);
 
@@ -662,7 +662,7 @@ public class BigdataFileSystem extends
         // remove the version identifier if any - we do not want this modified!
         metadata.remove(FileMetadataSchema.VERSION);
         
-        return getMetadataIndex().write(metadataSchema, metadata,
+        return getFilleMetadataIndex().write(metadataSchema, metadata,
                 AUTO_TIMESTAMP_UNIQUE, null/* filter */,null/*precondition*/).asMap();
         
     }
@@ -737,7 +737,7 @@ public class BigdataFileSystem extends
             // delete marker.
             metadata.put(FileMetadataSchema.VERSION, null);
 
-            getMetadataIndex().write(metadataSchema, metadata, AUTO_TIMESTAMP_UNIQUE,
+            getFilleMetadataIndex().write(metadataSchema, metadata, AUTO_TIMESTAMP_UNIQUE,
                     null/* filter */, null/*precondition*/);
             
         }
@@ -755,7 +755,7 @@ public class BigdataFileSystem extends
 
         long blockCount = 0;
 
-        final IKeyBuilder keyBuilder = getDataIndex().getIndexMetadata().getKeyBuilder();
+        final IKeyBuilder keyBuilder = getFileDataIndex().getIndexMetadata().getKeyBuilder();
 
         // the key for {file,version}
         final byte[] fromKey = keyBuilder.reset().appendText(id,
@@ -767,7 +767,7 @@ public class BigdataFileSystem extends
                 true/* unicode */, false/* successor */).append(version + 1)
                 .getKey();
 
-        final ITupleIterator itr = getDataIndex().rangeIterator(fromKey, toKey,
+        final ITupleIterator itr = getFileDataIndex().rangeIterator(fromKey, toKey,
                 0/* capacity */, IRangeQuery.REMOVEALL, null/* filter */);
 
         while (itr.hasNext()) {
@@ -890,7 +890,7 @@ public class BigdataFileSystem extends
     public Iterator<? extends DocumentHeader> getDocumentHeaders(String fromId,
             String toId) {
 
-        return new Striterator(getMetadataIndex().rangeIterator(metadataSchema,
+        return new Striterator(getFilleMetadataIndex().rangeIterator(metadataSchema,
                 fromId, toId)).addFilter(new Resolver() {
 
                     private static final long serialVersionUID = 1L;
@@ -921,7 +921,7 @@ public class BigdataFileSystem extends
      */
     public long deleteAll(String fromId, String toId) {
         
-        final IKeyBuilder keyBuilder = getDataIndex().getIndexMetadata().getKeyBuilder();
+        final IKeyBuilder keyBuilder = getFileDataIndex().getIndexMetadata().getKeyBuilder();
 
         // the key for {fromId}
         final byte[] fromKey = keyBuilder.reset().appendText(fromId,
@@ -941,7 +941,7 @@ public class BigdataFileSystem extends
              * range by replacing its VERSION column value with a null value
              * (and updating the timestamp in the key).
              */
-            getMetadataIndex().getIndex().rangeIterator(
+            getFilleMetadataIndex().getIndex().rangeIterator(
                     fromKey,
                     toKey,
                     0/* capacity */,
@@ -955,7 +955,7 @@ public class BigdataFileSystem extends
         // delete file blocks.
         {
 
-            final ITupleIterator itr = getDataIndex()
+            final ITupleIterator itr = getFileDataIndex()
                     .rangeIterator(fromKey, toKey, 0/* capacity */,
                             IRangeQuery.REMOVEALL, null/* filter */);
 
@@ -1040,7 +1040,7 @@ public class BigdataFileSystem extends
      */
     public Iterator<Long> blocks(String id, int version) {
 
-        final IKeyBuilder keyBuilder = getDataIndex().getIndexMetadata()
+        final IKeyBuilder keyBuilder = getFileDataIndex().getIndexMetadata()
                 .getKeyBuilder();
 
         final byte[] fromKey = keyBuilder.reset().appendText(id,
@@ -1055,7 +1055,7 @@ public class BigdataFileSystem extends
         final int flags = IRangeQuery.KEYS;
         
         // visits the keys for the file version in block order.
-        final ITupleIterator itr = getDataIndex().rangeIterator(fromKey, toKey,
+        final ITupleIterator itr = getFileDataIndex().rangeIterator(fromKey, toKey,
                 0/* capacity */, flags, null/* filter */);
 
         // resolve keys to block identifiers.
@@ -1191,14 +1191,14 @@ public class BigdataFileSystem extends
         final ISimpleIndexProcedure proc = new AtomicBlockWriteProc(this, id, version,
                 block, b, off, len);
 
-        final IKeyBuilder keyBuilder = getDataIndex().getIndexMetadata().getKeyBuilder();
+        final IKeyBuilder keyBuilder = getFileDataIndex().getIndexMetadata().getKeyBuilder();
 
         // the key for the {file,version,block}
         final byte[] key = keyBuilder.reset().appendText(id,
                 true/* unicode */, false/* successor */).append(version)
                 .append(block).getKey();
 
-        return (Boolean) getDataIndex().submit(key, proc);
+        return (Boolean) getFileDataIndex().submit(key, proc);
 
     }
 
@@ -1218,7 +1218,7 @@ public class BigdataFileSystem extends
         if (INFO)
             log.info("id=" + id + ", version=" + version);
 
-        final IKeyBuilder keyBuilder = getDataIndex().getIndexMetadata()
+        final IKeyBuilder keyBuilder = getFileDataIndex().getIndexMetadata()
                 .getKeyBuilder();
 
         // the key for {file,version}
@@ -1236,7 +1236,7 @@ public class BigdataFileSystem extends
          * an atomic delete of the first block for this file version.
          */
 
-        final ITupleIterator itr = getDataIndex()
+        final ITupleIterator itr = getFileDataIndex()
                 .rangeIterator(fromKey, toKey,
                 1, // Note: limit is ONE block!
                 IRangeQuery.KEYS|IRangeQuery.REMOVEALL, null/* filter */);
@@ -1293,7 +1293,7 @@ public class BigdataFileSystem extends
             throw new IllegalArgumentException();
         }
 
-        final IKeyBuilder keyBuilder = getDataIndex().getIndexMetadata().getKeyBuilder();
+        final IKeyBuilder keyBuilder = getFileDataIndex().getIndexMetadata().getKeyBuilder();
 
         final byte[] key = keyBuilder.reset().appendText(id,
                 true/* unicode */, false/* successor */).append(version)
@@ -1304,7 +1304,7 @@ public class BigdataFileSystem extends
          * on the journal (8 bytes).
          */
         
-        final boolean deleted = getDataIndex().remove(key) != null;
+        final boolean deleted = getFileDataIndex().remove(key) != null;
         
         return deleted;
         
@@ -1330,7 +1330,7 @@ public class BigdataFileSystem extends
          * data using an atomic read.
          */
 
-        final IKeyBuilder keyBuilder = getDataIndex().getIndexMetadata().getKeyBuilder();
+        final IKeyBuilder keyBuilder = getFileDataIndex().getIndexMetadata().getKeyBuilder();
 
         final byte[] fromKey = keyBuilder.reset().appendText(id,
                 true/* unicode */, false/* successor */).append(version)
@@ -1343,7 +1343,7 @@ public class BigdataFileSystem extends
         /*
          * Resolve the requested block : keys and data.
          */
-        final ITupleIterator itr = getDataIndex()
+        final ITupleIterator itr = getFileDataIndex()
                 .rangeIterator(fromKey, toKey, 1/* capacity */,
                         IRangeQuery.KEYS | IRangeQuery.VALS, null/* filter */);
 
@@ -1388,7 +1388,7 @@ public class BigdataFileSystem extends
          * of the block rather than its data!
          */
 
-        final IKeyBuilder keyBuilder = getDataIndex().getIndexMetadata().getKeyBuilder();
+        final IKeyBuilder keyBuilder = getFileDataIndex().getIndexMetadata().getKeyBuilder();
 
         final byte[] fromKey = keyBuilder.reset().appendText(id,
                 true/* unicode */, false/* successor */).append(version)
@@ -1401,7 +1401,7 @@ public class BigdataFileSystem extends
         /*
          * Resolve the requested block : keys and data.
          */
-        final ITupleIterator itr = getDataIndex()
+        final ITupleIterator itr = getFileDataIndex()
                 .rangeIterator(fromKey, toKey, 1/* capacity */,
                         IRangeQuery.KEYS | IRangeQuery.VALS, null/* filter */);
 
@@ -1550,7 +1550,7 @@ public class BigdataFileSystem extends
         final ISimpleIndexProcedure proc = new AtomicBlockAppendProc(this, id,
                 version, b, off, len);
 
-        final IKeyBuilder keyBuilder = getDataIndex().getIndexMetadata().getKeyBuilder();
+        final IKeyBuilder keyBuilder = getFileDataIndex().getIndexMetadata().getKeyBuilder();
         
         // the last possible key for this file
         final byte[] key = keyBuilder.reset().appendText(id,
@@ -1573,7 +1573,7 @@ public class BigdataFileSystem extends
          * there can be EMPTY index partitions (containing only deleted entries)
          * until the next compacting merge.
          */
-        return (Long) getDataIndex().submit(key, proc);
+        return (Long) getFileDataIndex().submit(key, proc);
         
     }
 
@@ -1599,7 +1599,7 @@ public class BigdataFileSystem extends
      */
     public long getBlockCount(String id, int version) {
      
-        final IKeyBuilder keyBuilder = getDataIndex().getIndexMetadata()
+        final IKeyBuilder keyBuilder = getFileDataIndex().getIndexMetadata()
                 .getKeyBuilder();
 
         final byte[] fromKey = keyBuilder.reset().appendText(id,
@@ -1610,7 +1610,7 @@ public class BigdataFileSystem extends
                 true/* unicode */, false/* successor */).append(version + 1)
                 .getKey();
 
-        final long nblocks = getDataIndex().rangeCount(fromKey, toKey);
+        final long nblocks = getFileDataIndex().rangeCount(fromKey, toKey);
 
         if (INFO)
             log.info("id=" + id + ", version=" + version + ", nblocks=" + nblocks);
@@ -1734,7 +1734,7 @@ public class BigdataFileSystem extends
      * 
      * <li> It is possible to re-create historical states of a file version
      * corresponding to a <em>commit point</em> for the
-     * {@link #getDataIndex() data index} provided that the relevant data has
+     * {@link #getFileDataIndex() data index} provided that the relevant data has
      * not been eradicated by a compacting merge. It is not possible to recover
      * all states - merely committed states - since unisolated writes may be
      * grouped together by group commit and therefore have the same commit
@@ -1797,7 +1797,7 @@ public class BigdataFileSystem extends
          * blocks for that file and version.
          */
 
-        final IKeyBuilder keyBuilder = getDataIndex().getIndexMetadata().getKeyBuilder();
+        final IKeyBuilder keyBuilder = getFileDataIndex().getIndexMetadata().getKeyBuilder();
 
         final byte[] fromKey = keyBuilder.reset().appendText(id,
                 true/* unicode */, false/* successor */).append(version)
@@ -1838,7 +1838,7 @@ public class BigdataFileSystem extends
         
         if (tx == ITx.UNISOLATED) {
 
-            dataIndex = getDataIndex();
+            dataIndex = getFileDataIndex();
 
         } else {
 

@@ -103,9 +103,9 @@ public class LocalJoinMasterTask extends JoinMasterTask {
                     + ", tailCount=" + tailCount + ", rule=" + rule;
             
             // create the local join task.
-            final LocalJoinTask joinTask = new LocalJoinTask(
-                    indexName, rule, joinNexus,
-                    order, orderIndex, this/* master */, src, getSolutionBuffer());
+            final LocalJoinTask joinTask = new LocalJoinTask(indexName, rule,
+                    joinNexus, order, orderIndex, this/* master */,
+                    masterUUID, src, getSolutionBuffer());
 
             if (!lastJoin) {
 

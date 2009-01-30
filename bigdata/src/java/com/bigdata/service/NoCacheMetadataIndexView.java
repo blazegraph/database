@@ -111,7 +111,7 @@ public class NoCacheMetadataIndexView implements IMetadataIndex {
     }
 
     // only used by unit tests.
-    public long rangeCount(byte[] fromKey, byte[] toKey) {
+    public long rangeCount(final byte[] fromKey, final byte[] toKey) {
 
         final IIndexProcedure proc = new RangeCountProcedure(
                 false/* exact */, fromKey, toKey);
@@ -132,7 +132,7 @@ public class NoCacheMetadataIndexView implements IMetadataIndex {
 
     }
 
-    public long rangeCountExact(byte[] fromKey, byte[] toKey) {
+    public long rangeCountExact(final byte[] fromKey, final byte[] toKey) {
 
         final IIndexProcedure proc = new RangeCountProcedure(
                 true/* exact */, fromKey, toKey);
@@ -159,7 +159,7 @@ public class NoCacheMetadataIndexView implements IMetadataIndex {
         
     }
     
-    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey) {
+    public ITupleIterator rangeIterator(final byte[] fromKey, final byte[] toKey) {
 
         return rangeIterator(fromKey, toKey, 0/* capacity */,
                 IRangeQuery.DEFAULT, null/* filter */);

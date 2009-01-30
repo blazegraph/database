@@ -489,6 +489,19 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      */
     protected List<AbstractTask> chooseIndexPartitionJoins() {
 
+        if (!resourceManager.joinsEnabled) {
+
+            /*
+             * Joins are disabled.
+             */
+
+            log.warn(OverflowManager.Options.JOINS_ENABLED + "="
+                    + resourceManager.joinsEnabled);
+
+            return EMPTY_LIST;
+            
+        }
+        
         // list of tasks that we create (if any).
         final List<AbstractTask> tasks = new LinkedList<AbstractTask>();
 
@@ -1866,7 +1879,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
             }
             
-            if (npartitions > 100) {
+            if (npartitions >= resourceManager.accelerateSplitThreshold) {
 
                 /*
                  * There are plenty of index partitions. Use the original split
@@ -1883,8 +1896,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             // the split handler as configured.
             final DefaultSplitHandler s = (DefaultSplitHandler) splitHandler;
 
-            // discount: will be 1 when N=100; 10 when N=10, and 100 when N=1.
-            final double d = npartitions / 100d;
+            // discount: given T=100, will be 1 when N=100; 10 when N=10, and
+            // 100 when N=1.
+            final double d = (double) npartitions
+                    / resourceManager.accelerateSplitThreshold;
 
             try {
 
@@ -1897,11 +1912,13 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                         s.getSampleRate() // unchanged
                 );
 
-                if(INFO)
-                    log.info("Adjusted splitHandler:  name="
+//                if(INFO)
+//                    log.info // @todo info
+                    log.warn("Adjusted splitHandler:  name="
                         + indexMetadata.getName() + ", npartitions="
-                        + npartitions + ", discount=" + d
-                        + ", adjustedSplitHandler=" + t);
+                        + npartitions + ", threshold="
+                        + resourceManager.accelerateSplitThreshold
+                        + ", discount=" + d + ", adjustedSplitHandler=" + t);
 
                 return t;
 
