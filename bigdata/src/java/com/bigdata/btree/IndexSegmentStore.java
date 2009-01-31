@@ -60,6 +60,13 @@ import com.bigdata.resources.StoreManager;
 /**
  * A read-only store backed by a file containing a single {@link IndexSegment}.
  * 
+ * @todo A _shared_ FileLock might be a good idea since it would make it
+ *       impossible to delete an IndexSegmentStore that was in use. Note that
+ *       using an advisory lock could make it impossible to restart a data
+ *       service after an abnormal termination since it will leave lock files in
+ *       place. Perhaps it is better to NOT use advisory locks on platforms and
+ *       volumes which do not support FileLock.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
