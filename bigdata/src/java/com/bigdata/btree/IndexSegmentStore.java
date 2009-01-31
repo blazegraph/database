@@ -29,6 +29,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousCloseException;
@@ -493,39 +494,52 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      * @return The {@link IndexSegment} or derived class loaded from that store.
      */
     synchronized public IndexSegment loadIndexSegment() {
-        
-        try {
-            
-            final Class cl = Class.forName(indexMetadata.getBTreeClassName());
-            
-            final Constructor ctor = cl
-                    .getConstructor(new Class[] { IndexSegmentStore.class });
 
-            final IndexSegment seg = (IndexSegment) ctor
-                    .newInstance(new Object[] { this });
+        IndexSegment seg = ref == null ? null : ref.get();
 
-            /*
-             * Attach the counters maintained by AbstractBTree to those reported
-             * for the IndexSegmentStore.
-             * 
-             * Note: These counters are only allocated when the IndexSegment
-             * object is created. Since we do not enforce a 1:1 correspondence
-             * on the IndexSegments created from the IndexSegmentStore from
-             * within the latter, this must be either set dynamically by the
-             * IndexSegment when it is created of by loadIndexSegment.
-             */
-            
-            getCounters().attach(seg.counters.getCounters());
+        if (seg != null) {
 
-            return seg;
+            // ensure "open".
+            seg.reopen();
             
-        } catch(Exception ex) {
-            
-            throw new RuntimeException(ex);
-            
+        } else {
+
+            try {
+
+                final Class cl = Class.forName(indexMetadata
+                        .getBTreeClassName());
+
+                final Constructor ctor = cl
+                        .getConstructor(new Class[] { IndexSegmentStore.class });
+
+                seg = (IndexSegment) ctor.newInstance(new Object[] { this });
+
+                ref = new WeakReference<IndexSegment>(seg);
+
+                /*
+                 * Attach the counters maintained by AbstractBTree to those
+                 * reported for the IndexSegmentStore.
+                 * 
+                 * Note: These counters are only allocated when the IndexSegment
+                 * object is created and this is where we enforce a 1:1
+                 * correspondence between an IndexSegmentStore and the
+                 * IndexSegment loaded from that store.
+                 */
+
+                getCounters().attach(seg.counters.getCounters());
+
+            } catch (Exception ex) {
+
+                throw new RuntimeException(ex);
+
+            }
+
         }
+
+        return seg;
         
     }
+    private volatile WeakReference<IndexSegment> ref = null;
     
     final public boolean isOpen() {
         
