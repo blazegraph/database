@@ -293,45 +293,22 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
                             .makePath(ICounterHierarchy.Memory_GarbageCollectors));
             
             /*
-             * Add counters reporting on the DirectBufferPool.
+             * Add counters reporting on the various DirectBufferPool.
              */
             {
-                
-                final CounterSet tmp = serviceRoot
-                        .makePath(IProcessCounters.Memory
-                                + ICounterSet.pathSeparator
-                                + "DirectBufferPool");
-                
-                tmp.addCounter("poolCapacity", new OneShotInstrument<Integer>(
-                        DirectBufferPool.INSTANCE.getPoolCapacity()));
 
-                tmp.addCounter("bufferCapacity",
-                        new OneShotInstrument<Integer>(
-                                DirectBufferPool.INSTANCE.getBufferCapacity()));
-
-                tmp.addCounter("poolSize", new Instrument<Integer>() {
-                    public void sample() {
-                        setValue(DirectBufferPool.INSTANCE.getPoolSize());
-                    }
-                });
-                
-                /*
-                 * #of bytes allocated and held by the DirectBufferPool.
-                 */
-                tmp.addCounter("bytesUsed",
-                        new Instrument<Integer>() {
-                    public void sample() {
-                        setValue(DirectBufferPool.INSTANCE.getPoolSize()
-                                * DirectBufferPool.INSTANCE.getBufferCapacity());
-                    }
-                });
+                // general purpose pool.
+                serviceRoot.makePath(
+                        IProcessCounters.Memory + ICounterSet.pathSeparator
+                                + "DirectBufferPool").attach(
+                        DirectBufferPool.INSTANCE.getCounters());
                 
             }
 
         }
                 
     }
-    
+
     /**
      * Lists out all of the properties and then report each property using a
      * {@link OneShotInstrument}.
@@ -342,8 +319,8 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      * @param properties
      *            The properties to be reported out.
      */
-    static public void addServiceProperties(CounterSet serviceInfoSet,
-            Properties properties) {
+    static public void addServiceProperties(final CounterSet serviceInfoSet,
+            final Properties properties) {
 
         final CounterSet ptmp = serviceInfoSet.makePath("Properties");
 
@@ -501,15 +478,19 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      */
     protected void installShutdownHook() {
      
-        Runtime.getRuntime().addShutdownHook(new Thread() {
-        
+        final Thread t = new Thread() {
+            
             public void run() {
                 
                 AbstractStatisticsCollector.this.stop();
                 
             }
             
-        });
+        };
+        
+        t.setDaemon(true);
+        
+        Runtime.getRuntime().addShutdownHook(t);
 
     }
 
@@ -601,18 +582,19 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      * operating system. Before performance counter collection starts the static
      * counters will be written on stdout. The appropriate process(es) are then
      * started to collect the dynamic performance counters. Collection will
-     * occur every {@link Options#PERFORMANCE_COUNTERS_SAMPLE_INTERVAL} seconds. The program will make 10
-     * collections by default and will write the updated counters on stdout
-     * every {@link Options#PERFORMANCE_COUNTERS_SAMPLE_INTERVAL} seconds.
+     * occur every {@link Options#PERFORMANCE_COUNTERS_SAMPLE_INTERVAL} seconds.
+     * The program will make 10 collections by default and will write the
+     * updated counters on stdout every
+     * {@link Options#PERFORMANCE_COUNTERS_SAMPLE_INTERVAL} seconds.
      * <p>
      * Parameters also may be specified using <code>-D</code>. See
      * {@link Options}.
      * 
-     * @param args [
-     *            <i>interval</i> [<i>count</i>]]
+     * @param args <code>[<i>interval</i> [<i>count</i>]]</code>
      *            <p>
      *            <i>interval</i> is the collection interval in seconds and
-     *            defaults to {@link Options#DEFAULT_PERFORMANCE_COUNTERS_SAMPLE_INTERVAL}.
+     *            defaults to
+     *            {@link Options#DEFAULT_PERFORMANCE_COUNTERS_SAMPLE_INTERVAL}.
      *            <p>
      *            <i>count</i> is the #of collections to be made and defaults
      *            to <code>10</code>. Specify zero (0) to run until halted.

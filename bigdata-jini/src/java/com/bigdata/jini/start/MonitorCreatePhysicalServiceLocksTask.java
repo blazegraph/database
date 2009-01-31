@@ -38,7 +38,6 @@ import com.bigdata.service.jini.JiniUtil;
 import com.bigdata.zookeeper.UnknownChildrenWatcher;
 import com.bigdata.zookeeper.ZLock;
 import com.bigdata.zookeeper.ZLockImpl;
-import com.bigdata.zookeeper.ZNodeLockWatcher;
 
 /**
  * This task notices when a new lock node is created and creates and runs a
@@ -724,7 +723,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
                 // log and ignore.
                 log.error("Service restart error: className="
                         + serviceConfig.className + ", physicalServiceZPath="
-                        + physicalServiceZPath);
+                        + physicalServiceZPath, t);
 
                 // service did not start (or at least within the timeout).
                 return false;
@@ -921,12 +920,12 @@ public class MonitorCreatePhysicalServiceLocksTask implements
 
             } catch (IOException ex) {
 
-                log.error(
-                        "Service not responding: className="
+                log
+                        .warn("Service not responding: className="
                                 + serviceConfig.className
                                 + ", physicalServiceZPath="
                                 + physicalServiceZPath + ", serviceItem="
-                                + serviceItem, ex);
+                                + serviceItem);
 
                 // service is discoverable but not responding to its API.
                 return false;
@@ -1074,11 +1073,13 @@ public class MonitorCreatePhysicalServiceLocksTask implements
         /*
          * Create task to start the service.
          * 
-         * Note: We do not specify the service attributes because this is a
-         * service start (vs a service restart).
+         * Note: We specify the service attributes because this is a service
+         * restart (vs a service start). The ServiceUUID is among those
+         * attributes. This is how we know to use the existing service directory
+         * and restart the service found therein.
          */
         final Callable task = serviceConfig.newServiceStarter(fed, listener,
-                logicalServiceZPath, null/* attributes */);
+                logicalServiceZPath, attributes);
 
         /*
          * Submit the task and waits for its Future (up to the timeout).

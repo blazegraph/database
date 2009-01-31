@@ -4,15 +4,13 @@ import java.util.UUID;
 
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.PIDUtil;
 
 /**
  * Collection of host performance data using <code>vmstat</code> and
  * <code>sysstat</code> suite.
  * 
  * @see http://pagesperso-orange.fr/sebastien.godard/
- * 
- * @todo configuration parameters to locate the sysstat utilities (normally
- *       installed into /usr/bin).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

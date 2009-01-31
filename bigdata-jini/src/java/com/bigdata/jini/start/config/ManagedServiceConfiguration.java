@@ -249,26 +249,25 @@ abstract public class ManagedServiceConfiguration extends JavaServiceConfigurati
 
                 for(Entry e : attributes) {
                     
-                    if(serviceName != null && e instanceof Name) {
-                        
-                        serviceName = ((Name)e).name;
-                        
-                    } else if (serviceUUID != null
-                            && e instanceof ServiceUUID) {
+                    if (serviceName == null && e instanceof Name) {
+
+                        serviceName = ((Name) e).name;
+
+                    } else if (serviceUUID == null && e instanceof ServiceUUID) {
 
                         serviceUUID = ((ServiceUUID) e).serviceUUID;
-                        
+
                     }
                     
                 }
                 
                 if (serviceName == null)
-                    throw new RuntimeException(
-                            "Service Name not found in attributes");
+                    throw new RuntimeException("Attribute not found: "
+                            + Name.class.getName());
 
                 if (serviceUUID == null)
-                    throw new RuntimeException(
-                            "Service UUID not found in attributes");
+                    throw new RuntimeException("Attribute not found: "
+                            + ServiceUUID.class.getName());
                 
                 this.serviceName = serviceName;
                 

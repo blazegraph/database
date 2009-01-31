@@ -22,7 +22,7 @@ import com.bigdata.zookeeper.UnknownChildrenWatcher;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class MonitorConfigZNodeTask implements Callable {
+public class MonitorConfigZNodeTask implements Callable<Void> {
 
     final static protected Logger log = Logger
             .getLogger(MonitorConfigZNodeTask.class);
@@ -63,7 +63,7 @@ public class MonitorConfigZNodeTask implements Callable {
      * <p>
      * Note: This task runs until cancelled.
      */
-    public Object call() throws Exception {
+    public Void call() throws Exception {
     
         /*
          * This is what we want to keep our eye on. Any new children are new

@@ -32,7 +32,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
-import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.Vector;
@@ -1117,7 +1117,8 @@ abstract public class AbstractFederation implements IBigdataFederation,
             return new CounterSetHTTPD(httpdPort, counterSet) {
 
                 public Response doGet(String uri, String method,
-                        Properties header, Map<String, Vector<String>> parms)
+                        Properties header,
+                        LinkedHashMap<String, Vector<String>> parms)
                         throws Exception {
 
                     try {

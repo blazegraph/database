@@ -2640,7 +2640,18 @@ abstract public class StoreManager extends ResourceEvents implements
 
                 } else {
 
-                    IndexSegmentStore segStore = new IndexSegmentStore(file);
+                    /*
+                     * FIXME Make sure that the segStore either makes it into
+                     * the cache or is closed even for spurious exceptions.
+                     * E.g.,
+                     * 
+                     * try {segStore=...; store=segStore;} catch()
+                     * {if(store!=null)store.close();}
+                     * 
+                     * But not it if was already open and not after it makes
+                     * it into the cache.
+                     */
+                    final IndexSegmentStore segStore = new IndexSegmentStore(file);
 
                     actualUUID = segStore.getCheckpoint().segmentUUID;
 

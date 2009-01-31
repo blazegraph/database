@@ -1,6 +1,5 @@
 package com.bigdata.jini.start;
 
-import java.rmi.NoSuchObjectException;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -98,12 +97,13 @@ public abstract class AbstractServicesManagerService extends AbstractService
      * Kill the child processes, using {@link RemoteDestroyAdmin#shutdown()}
      * where supported.
      * 
-     * @todo This should bring down any processes that are being managed on this
-     *       host regardless of whether or not they are child processes. For
-     *       example, you KILL -9 the ServicesManager [leaves children running],
-     *       start it, and then kill -s TERM it [should have discovered
-     *       processes on this host for which it has responsibility and sent
-     *       them shutdown() requests].
+     * FIXME This should also bring down any processes that are being managed on
+     * this host regardless of whether or not they are child processes. For
+     * example, you KILL -9 the ServicesManager [leaves children running], start
+     * it, and then kill -s TERM it [should have discovered processes on this
+     * host for which it has responsibility and sent them shutdown() requests].
+     * <p>
+     * Add a private killManagedProcesses() method for this.
      */
     public void shutdown() {
 
@@ -118,6 +118,10 @@ public abstract class AbstractServicesManagerService extends AbstractService
 
         }
 
+        // halt our monitor tasks.
+        getFederation().cancelMonitoredTasks(true/* mayInterruptIfRunning */);
+        
+        // kill our children.
         killChildProcesses(false/* immediateShutdown */);
 
     }
@@ -139,8 +143,12 @@ public abstract class AbstractServicesManagerService extends AbstractService
 
         }
 
+        // halt our monitor tasks.
+        getFederation().cancelMonitoredTasks(true/* mayInterruptIfRunning */);
+
+        // kill our children.
         killChildProcesses(true/* immediateShutdown */);
-        
+
     }
 
     public boolean isOpen() {
@@ -274,7 +282,8 @@ public abstract class AbstractServicesManagerService extends AbstractService
          * for the zookeeper client to become connected and the znode to be
          * created.
          */
-        fed.submitMonitoredTask(new MonitorConfigZNodeTask(fed, this/* listener */));
+        fed
+                .submitMonitoredTask(new MonitorConfigZNodeTask(fed, this/* listener */));
 
         /*
          * Create and start task that will compete for locks to start physical
@@ -292,7 +301,8 @@ public abstract class AbstractServicesManagerService extends AbstractService
         /*
          * Run startup.
          */
-        new ServicesManagerStartupTask(fed, config, this/* listener */).call();
+        new ServicesManagerStartupTask(fed, config, true/* pushConfig */,
+                true/* restartServices */, this/* listener */).call();
         
     }
     

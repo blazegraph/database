@@ -115,7 +115,8 @@ public class ResourceFileFilter implements FileFilter {
 
         }
 
-        log.warn("Unknown file: " + f);
+        if (log.isInfoEnabled())
+            log.info("Unknown file: " + f);
 
         return false;
 

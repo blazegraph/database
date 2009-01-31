@@ -54,11 +54,19 @@ public class ServicesManagerStartupTask implements Callable<Void> {
      * @param fed
      * @param config
      *            The configuration that will be pushed to zookeeper.
+     * @param pushConfig
+     *            If you want to do a service configuration push.
+     * @param restartServices
+     *            If you want the services manager that receives the message to
+     *            restart any services for which it is responsible which are not
+     *            currently running.
      * @param service
      */
     public ServicesManagerStartupTask(
             final JiniFederation fed,
             final Configuration config,
+            final boolean pushConfig,
+            final boolean restartServices,
             final AbstractServicesManagerService service) {
 
         if (fed == null)

@@ -5,7 +5,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
-import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.Properties;
 import java.util.Vector;
 
@@ -36,9 +36,10 @@ public class CounterSetHTTPD extends AbstractHTTPD {
     }
     
     public Response doGet(String uri, String method, Properties header,
-            Map<String, Vector<String>> parms) throws Exception {
+            LinkedHashMap<String, Vector<String>> parms) throws Exception {
         
-        ByteArrayOutputStream baos = new ByteArrayOutputStream(2 * Bytes.kilobyte32);
+        final ByteArrayOutputStream baos = new ByteArrayOutputStream(
+                2 * Bytes.kilobyte32);
 
         final String charset = "UTF-8";
         
@@ -50,10 +51,10 @@ public class CounterSetHTTPD extends AbstractHTTPD {
             
             mimeType = MIME_TEXT_HTML;
             
-            OutputStreamWriter w = new OutputStreamWriter(baos);
+            final OutputStreamWriter w = new OutputStreamWriter(baos);
 
             // build model of the controller state.
-            Model model = new Model(root, uri, parms);
+            final Model model = new Model(root, uri, parms);
             
             // @todo if controller state error then send HTTP_BAD_REQUEST
             
@@ -73,10 +74,10 @@ public class CounterSetHTTPD extends AbstractHTTPD {
 
         }
 
-        InputStream is = new ByteArrayInputStream(baos.toByteArray());
+        final InputStream is = new ByteArrayInputStream(baos.toByteArray());
 
-        Response r = new Response(HTTP_OK, mimeType + "; charset='" + charset
-                + "'", is);
+        final Response r = new Response(HTTP_OK, mimeType + "; charset='"
+                + charset + "'", is);
 
         /*
          * Sets the cache behavior -- the data should be good for up to 60

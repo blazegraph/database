@@ -55,7 +55,7 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("BTree");
+        final TestSuite suite = new TestSuite("BTree");
         
         // test low level variable length byte[] operations.
         suite.addTestSuite( TestBytesUtil.class );
@@ -161,33 +161,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestBloomFilter.class);
         suite.addTestSuite(TestBTreeWithBloomFilter.class);
 
-        /*
-         * test index segment builds.
-         * 
-         * Note: the fast forward and fast reverse leaf scans are
-         * testing at the same time that we test the index segment
-         * builds.
-         * 
-         * See DumpIndexSegment.
-         */
-        // test static methods for the index builder.
-        suite.addTestSuite( TestIndexSegmentPlan.class );
-        // test encoding and decoding of child node/leaf addresses.
-        suite.addTestSuite( TestIndexSegmentAddressManager.class );
-        // test write and read back of the index segment metadata record.
-        suite.addTestSuite( TestIndexSegmentCheckpoint.class );
-        // test with small known examples in detail.
-        suite.addTestSuite( TestIndexSegmentBuilderWithSmallTree.class );
-        // test fence posts for incremental builds with deleted index entries.
-        suite.addTestSuite( TestIndexSegmentBuilderWithIncrementalBuild.class );
-        // test fence posts for compacting merges with deleted index entries.
-        suite.addTestSuite( TestIndexSegmentBuilderWithCompactingMerge.class );
-        // test iterators for the index segment.
-        suite.addTestSuite(TestIndexSegmentCursors.class);
-        // stress test with larger random input trees and a variety of branching factors.
-        suite.addTestSuite( TestIndexSegmentBuilderWithLargeTrees.class );
-        // test of the bloom filter integration.
-        suite.addTestSuite( TestIndexSegmentWithBloomFilter.class );
+        // pick up the index segment test suites.
+        suite.addTest(TestAll_IndexSegment.suite());
 
         /*
          * test fused views, including iterators for the fused view.

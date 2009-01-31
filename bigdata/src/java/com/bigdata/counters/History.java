@@ -710,8 +710,31 @@ public class History<T> {
             
             if ((lastLogicalSlot - logicalSlot) >= capacity) {
 
-                throw new TimestampOrderException("timestamp=" + timestamp
-                        + ", value=" + value);
+                /*
+                 * Note: OneShot counters will trigger this response. The
+                 * problem is that the counter value initially arrives for a
+                 * host when the first service starts on that host. If hours or
+                 * days later you then run a task on that service, perhaps an
+                 * application client such as the distributed data loader, then
+                 * it will try to report the one shot counters again and they
+                 * will still have their original timestamp, which is now hours
+                 * or days before the current time.
+                 * 
+                 * FIXME This should be hacked so that we do not SEND one shot
+                 * counters unless their timestamp is very recent. That requires
+                 * a filter on the client when the counters are serialized to
+                 * notify the load balancer. Currently that filter can only be a
+                 * Regex, which is not sufficient for this purpose. Once hacked,
+                 * the exception can be re-enabled.
+                 */
+                
+                if (INFO)
+                    log.info("Timestamp out of order?",
+                            new TimestampOrderException("timestamp="
+                                    + timestamp + ", value=" + value));
+                
+//                throw new TimestampOrderException("timestamp=" + timestamp
+//                        + ", value=" + value);
                 
             }
             

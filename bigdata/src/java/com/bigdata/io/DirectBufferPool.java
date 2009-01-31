@@ -11,6 +11,9 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.Instrument;
+import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.journal.TransientBufferStrategy;
@@ -240,20 +243,20 @@ public class DirectBufferPool {
     /**
      * Create a direct {@link ByteBuffer} pool.
      * <p>
-     * Note: When the <i>poolSize</i> is bounded then {@link #acquire()}
-     * MAY block. This can introduce deadlocks into the application. You can
-     * use a timeout to limit the sensitivity to deadlocks or you can use an
-     * unbounded pool and accept that {@link OutOfMemoryError}s will arise
-     * if there is too much concurrent demand for the buffers supplied by
-     * this pool.
+     * Note: When the <i>poolSize</i> is bounded then {@link #acquire()} MAY
+     * block. This can introduce deadlocks into the application. You can use a
+     * timeout to limit the sensitivity to deadlocks or you can use an unbounded
+     * pool and accept that {@link OutOfMemoryError}s will arise if there is
+     * too much concurrent demand for the buffers supplied by this pool.
      * 
      * @param poolCapacity
      *            The maximum capacity of the pool. Use
      *            {@link Integer#MAX_VALUE} to have a pool with an unbounded
      *            number of buffers.
      * @param bufferCapacity
-     *            The capacity of the {@link ByteBuffer}s managed by this
-     *            pool.
+     *            The capacity of the {@link ByteBuffer}s managed by this pool.
+     * 
+     * @see #INSTANCE
      */
     protected DirectBufferPool(final int poolCapacity, final int bufferCapacity) {
 
@@ -520,4 +523,38 @@ public class DirectBufferPool {
 
     }
 
+    /**
+     * Return the {@link CounterSet} for the {@link DirectBufferPool}.
+     * 
+     * @return The counters.
+     */
+    public synchronized CounterSet getCounters() {
+
+        final CounterSet tmp = new CounterSet();
+
+        tmp.addCounter("poolCapacity", new OneShotInstrument<Integer>(
+                getPoolCapacity()));
+
+        tmp.addCounter("bufferCapacity", new OneShotInstrument<Integer>(
+                getBufferCapacity()));
+
+        tmp.addCounter("poolSize", new Instrument<Integer>() {
+            public void sample() {
+                setValue(getPoolSize());
+            }
+        });
+
+        /*
+         * #of bytes allocated and held by the DirectBufferPool.
+         */
+        tmp.addCounter("bytesUsed", new Instrument<Integer>() {
+            public void sample() {
+                setValue(getPoolSize() * getBufferCapacity());
+            }
+        });
+
+        return tmp;
+
+    }
+    
 }

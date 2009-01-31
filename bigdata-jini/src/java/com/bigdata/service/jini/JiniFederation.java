@@ -187,6 +187,12 @@ public class JiniFederation extends AbstractDistributedFederation implements
         
     }
     
+    public ServicesManagerClient getServicesManagerClient() {
+        
+        return servicesManagerClient;
+        
+    }
+    
     /**
      * Initiaties discovery for one or more service registrars and establishes a
      * lookup caches for various bigdata services.
@@ -1246,57 +1252,54 @@ public class JiniFederation extends AbstractDistributedFederation implements
      * 
      * @todo move this up to {@link AbstractFederation}?
      */
-    public Future submitMonitoredTask(Callable task) {
-        
+    public <T> Future<T> submitMonitoredTask(final Callable<T> task) {
+
         if (task == null)
             throw new IllegalArgumentException();
-        
+
         assertOpen();
-        
-        final Future f = getExecutorService().submit(task);
-        
-        futures.add(new TaskFuture(task,f));
-        
+
+        final Future<T> f = getExecutorService().submit(task);
+
+        futures.add(new TaskFuture<T>(task, f));
+
         return f;
-        
+
     }
- 
-//    /**
-//     * Cancel any monitored tasks which are still running.
-//     * 
-//     * @param mayInterruptIfRunning
-//     * 
-//     * @todo This method might not be a good idea since you may have
-//     *       insufficient oversight for the tasks that have been run with
-//     *       {@link #submitMonitoredTask(Callable)}.
-//     */
-//    public void cancelMonitoredTasks(final boolean mayInterruptIfRunning) {
-//        
-//        for(TaskFuture tmp : futures) {
-//            
-//            if(!tmp.future.isDone()) {
-//                
-//                tmp.future.cancel(mayInterruptIfRunning);
-//                
-//            }
-//            
-//        }
-//        
-//    }
-    
+
+    /**
+     * Cancel any monitored tasks which are still running.
+     * 
+     * @param mayInterruptIfRunning
+     */
+    synchronized public void cancelMonitoredTasks(
+            final boolean mayInterruptIfRunning) {
+
+        for (TaskFuture tmp : futures) {
+
+            if (!tmp.future.isDone()) {
+
+                tmp.future.cancel(mayInterruptIfRunning);
+
+            }
+
+        }
+
+    }
+
     /**
      * Glue object.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static private class TaskFuture {
+    static private class TaskFuture<T> {
 
-        final Callable task;
+        final Callable<T> task;
 
-        final Future future;
+        final Future<T> future;
 
-        public TaskFuture(final Callable task, final Future future) {
+        public TaskFuture(final Callable<T> task, final Future<T> future) {
 
             this.task = task;
             this.future = future;

@@ -33,6 +33,7 @@ import java.rmi.server.ServerNotActiveException;
 import java.util.Properties;
 
 import net.jini.config.Configuration;
+import net.jini.config.ConfigurationException;
 import net.jini.config.ConfigurationFile;
 import net.jini.config.ConfigurationProvider;
 import net.jini.core.discovery.LookupLocator;
@@ -351,16 +352,11 @@ public class ServicesManagerServer extends AbstractServer {
         
     }
 
-//    /**
-//     * Creates a new {@link ServicesManagerServer}.
-//     * 
-//     */
-//    public ServicesManagerServer(final String[] args) {
-//
-//        this(args, new FakeLifeCycle());
-//
-//    }
-
+    /**
+     * The command line arguments from the ctor.
+     */
+    private final String[] args;
+    
     /**
      * Ctor for jini service activation.
      * 
@@ -377,11 +373,16 @@ public class ServicesManagerServer extends AbstractServer {
     public ServicesManagerServer(final String[] args, final LifeCycle lifeCycle) {
 
         super(args, lifeCycle);
+    
+        this.args = args;
         
         try {
 
-            // try one signal name.
-            new SigHUPHandler("HUP", args);
+            /*
+             * Note: This signal is not supported under Windows. You can use the
+             * sighup() method to accomplish the same ends via RMI.
+             */
+            new SigHUPHandler("HUP");
 
         } catch (IllegalArgumentException ex) {
 
@@ -400,8 +401,6 @@ public class ServicesManagerServer extends AbstractServer {
     private class SigHUPHandler implements SignalHandler {
 
         private final SignalHandler oldHandler;
-        
-        private final String[] args;
 
         /**
          * Install handler.
@@ -420,14 +419,11 @@ public class ServicesManagerServer extends AbstractServer {
          * @see http://twit88.com/blog/2008/02/06/java-signal-handling/
          */
         @SuppressWarnings("all") // Signal is in the sun namespace
-        protected SigHUPHandler(final String signalName,
-                final String[] args) {
+        protected SigHUPHandler(final String signalName) {
 
             final Signal signal = new Signal(signalName);
 
             this.oldHandler = Signal.handle(signal, this);
-
-            this.args = args;
             
             if (INFO)
                 log.info("Installed handler: " + signal + ", oldHandler="
@@ -446,15 +442,9 @@ public class ServicesManagerServer extends AbstractServer {
 
                 if (service != null) {
 
-                    final JiniFederation fed = service.getFederation();
-
-                    // Obtain the configuration object (re-read it).
-                    final ConfigurationFile config = (ConfigurationFile) ConfigurationProvider
-                            .getInstance(args);
-
-                    fed.submitMonitoredTask(new ServicesManagerStartupTask(fed,
-                            config, service));
-
+                    service
+                            .sighup(true/* pushConfig */, true/*restartServices*/);
+                    
                 }
 
                 /*
@@ -669,6 +659,33 @@ public class ServicesManagerServer extends AbstractServer {
             
             return this;
             
+        }
+
+        public void sighup(final boolean pushConfig,
+                final boolean restartServices) throws ConfigurationException {
+
+            setupLoggingContext();
+
+            try {
+
+                log.warn("pushConfig=" + pushConfig + ", restartServices="
+                        + restartServices);
+
+                final JiniFederation fed = getFederation();
+
+                // Obtain the configuration object (re-read it).
+                final ConfigurationFile config = (ConfigurationFile) ConfigurationProvider
+                        .getInstance(server.args);
+
+                fed.submitMonitoredTask(new ServicesManagerStartupTask(fed,
+                        config, pushConfig, restartServices, this));
+
+            } finally {
+
+                clearLoggingContext();
+
+            }
+
         }
 
     }

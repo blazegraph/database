@@ -33,6 +33,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
@@ -76,6 +77,7 @@ import org.apache.zookeeper.data.ACL;
 
 import com.bigdata.Banner;
 import com.bigdata.counters.AbstractStatisticsCollector;
+import com.bigdata.counters.PIDUtil;
 import com.bigdata.io.FileLockUtility;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.jini.lookup.entry.Hostname;
@@ -177,14 +179,16 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     /**
      * An attempt is made to obtain an exclusive lock on a file in the same
      * directory as the {@link #serviceIdFile}. If the {@link FileLock} can be
-     * obtained it is set on this field. If the lock is already held by another
-     * process then the server will refuse to start. Since some platforms (NFS
-     * volumes, etc.) do not support {@link FileLock} and the server WILL start
-     * anyway in those cases. The {@link FileLock} is automatically released if
-     * the JVM dies and is released by {@link #run()} before the server exits or
-     * if the ctor fails.
+     * obtained then the reference for that {@link RandomAccessFile} is set on
+     * this field. If the lock is already held by another process then the
+     * server will refuse to start. Since some platforms (NFS volumes, etc.) do
+     * not support {@link FileLock} and the server WILL start anyway in those
+     * cases. The {@link FileLock} is automatically released if the JVM dies or
+     * if the {@link FileChannel} is closed. It is automatically released by
+     * {@link #run()} before the server exits or if the ctor fails.
      */
-    private FileLock fileLock = null;
+    private RandomAccessFile lockFileRAF = null;
+    private FileLock fileLock;
     
     /**
      * The zpath (zookeeper path) to the znode for the logical service of which
@@ -892,7 +896,10 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * Attempt to acquire an exclusive lock on a file in the same directory as
      * the {@link #serviceIdFile} (non-blocking). This is designed to prevent
      * concurrent service starts and service restarts while the service is
-     * already running.
+     * already running. THis also writes the pid of the JVM (best guess) on the
+     * file. If the server is run from the command line, then the pid will be
+     * the pid of the server. If you are running multiple servers inside of the
+     * same JVM, then the pid will be the same for each of those servers.
      * <p>
      * Note: The {@link FileLock} (if acquired) will be automatically released
      * if the process dies. It is also explicitly closed by
@@ -904,14 +911,13 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      */
     private void acquireFileLock() {
 
-        final File lockFile = new File(serviceIdFile.getParent(),
-                "service.lock");
+        final File file = new File(serviceIdFile.getParent(), "pid.lock");
 
-        final RandomAccessFile raf;
+//        final RandomAccessFile raf;
 
         try {
 
-            raf = new RandomAccessFile(lockFile, "rw");
+            lockFileRAF = new RandomAccessFile(file, "rw");
 
         } catch (IOException ex) {
 
@@ -919,14 +925,15 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
              * E.g., due to permissions, etc.
              */
 
-            throw new RuntimeException("Could not open lock file: lockFile="
-                    + lockFile, ex);
+            throw new RuntimeException("Could not open: file=" + file, ex);
 
         }
 
         try {
 
-            if ((this.fileLock = raf.getChannel().tryLock()) == null) {
+            fileLock = lockFileRAF.getChannel().tryLock();
+            
+            if (fileLock == null) {
 
                 /*
                  * Note: A null return indicates that someone else holds the
@@ -934,14 +941,15 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                  */
 
                 try {
-                    raf.close();
+                    lockFileRAF.close();
                 } catch (Throwable t) {
                     // ignore.
+                } finally {
+                    lockFileRAF = null;
                 }
 
-                throw new RuntimeException(
-                        "File is locked: service already running? lockFile="
-                                + lockFile);
+                throw new RuntimeException("Service already running: file="
+                        + file);
 
             }
 
@@ -951,12 +959,44 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
              * Note: This is true of NFS volumes.
              */
 
-            log.warn("FileLock not supported: lockFile=" + lockFile, ex);
+            log.warn("FileLock not supported: file=" + file, ex);
+
+        }
+
+        /*
+         * Write the pid on the file (best attempt).
+         */
+        try {
+
+            final String pid = Integer.toString(PIDUtil.getPID());
+
+            final OutputStream os = new FileOutputStream(lockFileRAF.getFD());
+
+//            try {
+
+                os.write(pid.getBytes("ASCII"));
+
+                os.flush();
+
+                /*
+                 * Note: DO NOT close the OutputStream!!!!! That will close the
+                 * backing FileChannel and release our lock!
+                 */
+                
+//            } finally {
+//
+//                os.close();
+//
+//            }
+
+        } catch (IOException ex) {
+
+            log.warn("Could not write pid: file=" + file, ex);
 
         }
 
     }
-    
+
     /**
      * Unexports the {@link #proxy} - this is a NOP if the proxy is
      * <code>null</code>.
@@ -1721,19 +1761,16 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
         }
         
-        if (fileLock != null) {
-            
+        if (lockFileRAF != null) {
+
             /*
-             * If there is a file lock then release the file lock and close the
-             * backing channel.
+             * If there is a file lock then close the backing channel.
              */
-            
-            final FileChannel channel = fileLock.channel();
 
             try {
-            
-                fileLock.release();
-            
+
+                lockFileRAF.close();
+
             } catch (IOException ex) {
 
                 // log and ignore.
@@ -1741,21 +1778,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
             }
             
-            if(channel != null) {
-
-                try {
-                
-                    channel.close();
-                    
-                } catch(IOException ex) {
-                    
-                    // log and ignore.
-                    log.warn(this, ex);
-
-                }
-                
-            }
-
         }
         
         // wake up so that run() will exit.

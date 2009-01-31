@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.jini;
 
-
 /**
  * Utility will <strong>destroy</strong> the federation to which it connects.
  * All discoverable services for the federation and all persistent state for
@@ -44,7 +43,7 @@ public class DestroyFederation {
      *            
      * @throws InterruptedException 
      */
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(final String[] args) throws InterruptedException {
 
         final JiniFederation fed = JiniClient.newInstance(args).connect();
         

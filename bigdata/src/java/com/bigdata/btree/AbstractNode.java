@@ -632,9 +632,6 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      * @param flags
      *            indicating whether the keys and/or values will be
      *            materialized.
-     * @param filter
-     *            An optional filter that will be applied to the values before
-     *            they are visited by the returned iterator.
      */
     public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
             int flags) {
