@@ -36,7 +36,9 @@ import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -60,13 +62,6 @@ import com.bigdata.resources.StoreManager;
 /**
  * A read-only store backed by a file containing a single {@link IndexSegment}.
  * 
- * @todo A _shared_ FileLock might be a good idea since it would make it
- *       impossible to delete an IndexSegmentStore that was in use. Note that
- *       using an advisory lock could make it impossible to restart a data
- *       service after an abnormal termination since it will leave lock files in
- *       place. Perhaps it is better to NOT use advisory locks on platforms and
- *       volumes which do not support FileLock.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -86,20 +81,6 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
 
     protected static final boolean DEBUG = log.isDebugEnabled();
 
-//    /**
-//     * A clone of the properties specified to the ctor.
-//     */
-//    private final Properties properties;
-//    
-//    /**
-//     * An object wrapping the properties specified to the ctor.
-//     */
-//    public Properties getProperties() {
-//        
-//        return new Properties( properties );
-//        
-//    }
-
     /**
      * The file containing the index segment.
      */
@@ -116,18 +97,11 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      * {@link IndexSegmentRegion}. Those addresses are then transparently
      * decoded by this class. The {@link IndexSegment} itself knows nothing
      * about this entire slight of hand.
+     * <p>
+     * Note: Don't deallocate. It is small and holds useful metadata such as the
+     * #of index entries that we would always like to have on hand.
      */
     private final IndexSegmentAddressManager addressManager;
-    
-//    /**
-//     * See {@link IndexMetadata.Options#INDEX_SEGMENT_BUFFER_NODES}.
-//     */
-//    private boolean bufferNodes;
-//    
-//    /**
-//     * See {@link IndexMetadata.Options#INDEX_SEGMENT_LEAF_CACHE_SIZE}
-//     */
-//    protected int leafCacheSize;
     
     /**
      * An optional <strong>direct</strong> {@link ByteBuffer} containing a disk
@@ -140,23 +114,63 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      * the use of this buffer means that reading a node that has fallen off of
      * the queue does not require any IO.
      */
-    private ByteBuffer buf_nodes;
+    private volatile ByteBuffer buf_nodes;
     
     /**
-     * The random access file used to read the index segment.
+     * The random access file used to read the index segment. This is
+     * transparently re-opened if closed by an interrupt during an NIO
+     * operation.
+     * <p>
+     * A shared {@link FileLock} is requested. If the platform and the volume
+     * either DO NOT support {@link FileLock} or support <em>shared</em>
+     * {@link FileLock}s then you will be able to open the same
+     * {@link IndexSegmentStore} in multiple applications. However, if the
+     * platform does not support shared locks then the lock request is converted
+     * (by Java) into an exclusive {@link FileLock} and you will not be able to
+     * open the {@link IndexSegmentStore} in more than one application at a
+     * time.
+     * <p>
+     * Note: A shared {@link FileLock} makes it impossible to delete an
+     * {@link IndexSegmentStore} that is in use. {@link FileLock}s are
+     * automatically released when the {@link FileChannel} is closed or the
+     * application dies. Using an advisory lock is NOT a good idea as it can
+     * leave lock files in place which make it impossible to restart a data
+     * service after an abnormal termination. For that reason it is better to
+     * NOT use advisory locks on platforms and volumes which do not support
+     * {@link FileLock}.
+     * 
+     * @see #reopenChannel()
      */
-    private RandomAccessFile raf;
+    private volatile RandomAccessFile raf;
 
     /**
+     * 
+     * @see #raf
+     */
+    
+    /**
      * A read-only view of the checkpoint record for the index segment.
+     * <p>
+     * Note: Don't deallocate. It is small and holds useful metadata such as the
+     * #of index entries that we would always like to have on hand.
      */
     private final IndexSegmentCheckpoint checkpoint;
 
     /**
      * The metadata record for the index segment.
+     * <p>
+     * Note: Don't deallocate. Relatively small and it holds some important
+     * metadata. By reading this during the ctor we do not have to force the
+     * entire index segment to be loaded just to access the index metadata.
      */
     private final IndexMetadata indexMetadata;
 
+    /**
+     * Counters specific to the {@link IndexSegmentStore}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
     private static class IndexSegmentStoreCounters {
 
         /**
@@ -185,13 +199,11 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
         long leavesReadFromDisk;
 
     }
-    
+
+    /**
+     * Counters specific to the {@link IndexSegmentStore}.
+     */
     private final IndexSegmentStoreCounters counters = new IndexSegmentStoreCounters();
-    
-//    /**
-//     * The optional bloom filter.
-//     */
-//    private BloomFilter bloomFilter;
     
     protected void assertOpen() {
 
@@ -212,8 +224,6 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      */
     protected final IndexSegmentAddressManager getAddressManager() {
         
-        assertOpen();
-        
         return addressManager;
         
     }
@@ -222,12 +232,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      * A read-only view of the checkpoint record for the index segment.
      */
     public final IndexSegmentCheckpoint getCheckpoint() {
-
-        if (checkpoint == null)
-            throw new IllegalStateException();
         
-//        assertOpen();
-
         return checkpoint;
         
     }
@@ -249,34 +254,10 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
         
     }
 
-//    /**
-//     * Return the optional bloom filter.
-//     * 
-//     * @return The bloom filter -or- <code>null</code> iff the bloom filter
-//     *         was not requested when the {@link IndexSegment} was built.
-//     */
-//    public final BloomFilter getBloomFilter() {
-//        
-//        assertOpen();
-//        
-//        return bloomFilter;
-//        
-//    }
-    
     /**
      * True iff the store is open.
      */
-    private boolean open = false;
-
-//    /**
-//     * Options understood by the {@link IndexSegmentStore}.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    public interface Options {
-//        
-//    }
+    private volatile boolean open = false;
     
     /**
      * Open a read-only store containing an {@link IndexSegment}, but does not
@@ -303,59 +284,39 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
         if (file == null)
             throw new IllegalArgumentException();
 
-        // segmentFile
-        {
+        this.file = file;
 
-            this.file = file;
-            
-            try {
-                
-                // open the file.
-                this.raf = new RandomAccessFile(file, mode);
-
-                // read the checkpoint record from the file.
-                this.checkpoint = new IndexSegmentCheckpoint(raf);
-                
-                // handles transparent decoding of offsets within regions.
-                this.addressManager = new IndexSegmentAddressManager(checkpoint);
-                
-                // Read the metadata record.
-                this.indexMetadata = readMetadata();
-                
-            } catch (IOException ex) {
-
-                if (raf != null) {
-
-                    try {
-
-                        // close the backing file on error during open.
-                        raf.close();
-                    
-                    } catch (Throwable t) {
-                    
-                        log.warn("Ignored: " + t);
-
-                        // fall through.
-                        
-                    }
-
-                }
-
-                throw new RuntimeException(ex);
-                
-            }
-
-            if (INFO)
-                log.info(checkpoint.toString());
-
-        }
-        
         /*
-         * Mark as open so that we can use read(long addr) to read other
-         * data (the root node/leaf).
+         * Mark as open so that we can use reopenChannel() and read(long addr)
+         * to read other data (the root node/leaf).
          */
         this.open = true;
 
+        try {
+
+            // open the file.
+            reopenChannel();
+
+            // read the checkpoint record from the file.
+            this.checkpoint = new IndexSegmentCheckpoint(raf);
+
+            // handles transparent decoding of offsets within regions.
+            this.addressManager = new IndexSegmentAddressManager(checkpoint);
+
+            // Read the metadata record.
+            this.indexMetadata = readMetadata();
+
+        } catch (IOException ex) {
+
+            _close();
+
+            throw new RuntimeException(ex);
+
+        }
+
+        if (INFO)
+            log.info(checkpoint.toString());
+        
     }
 
     /**
@@ -368,6 +329,8 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
     protected void finalize() throws Exception {
         
         if(open) {
+
+            log.warn("Closing IndexSegmentStore: " + getFile());
 
             _close();
             
@@ -411,77 +374,51 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      * 
      * @see #close()
      */
-    synchronized public void reopen() {
+    public void reopen() {
 
-        if (open)
-            throw new IllegalStateException("Already open.");
-        
-//        if (!file.exists()) {
-//
-//            throw new RuntimeException("File does not exist: "
-//                    + file.getAbsoluteFile());
-//
-//        }
-        
-//        /*
-//         * This should already be null (see close()), but make sure reference is
-//         * cleared first.
-//         */
-//        raf = null;
-
+        lock.lock();
         try {
 
-            // open the file.
-            if (this.raf == null) {
+            if (open)
+                throw new IllegalStateException("Already open.");
 
-                // Note: Throws FileNotFoundException
-                this.raf = new RandomAccessFile(file, mode);
+            try {
+
+                // open the file.
+                if (this.raf == null) {
+
+                    // Note: Throws FileNotFoundException
+                    this.raf = new RandomAccessFile(file, mode);
+
+                }
+
+                /*
+                 * Mark as open so that we can use read(long addr) to read other
+                 * data (the root node/leaf).
+                 */
+                this.open = true;
+
+                counters.openCount++;
+
+            } catch (Throwable t) {
+
+                // clean up.
+                _close();
+
+                // re-throw the exception.
+                throw new RuntimeException(
+                        "Could not (re-) open: file=" + file, t);
 
             }
 
-//            final boolean bufferNodes = metadata.getIndexSegmentBufferNodes();
-//
-//            /*
-//             * Read the index nodes from the file into a buffer. If there are no
-//             * index nodes (that is if everything fits in the root leaf of the
-//             * index) then we skip this step.
-//             * 
-//             * Note: We always read in the root in IndexSegment#_open() and hold
-//             * a hard reference to the root while the IndexSegment is open.
-//             */
-//            if (checkpoint.nnodes > 0 && bufferNodes) {
-//
-//                bufferIndexNodes();
-//
-//            }
-//
-//            if (checkpoint.addrBloom != 0L) {
-//
-//                // Read in the optional bloom filter from its addr.
-//                this.bloomFilter = readBloomFilter();
-//
-//            }
+        } finally {
 
-            /*
-             * Mark as open so that we can use read(long addr) to read other
-             * data (the root node/leaf).
-             */
-            this.open = true;
-            
-            counters.openCount++;
-
-        } catch (Throwable t) {
-
-            // clean up.
-            _close();
-
-            // re-throw the exception.
-            throw new RuntimeException("Could not (re-) open: file=" + file, t);
+            lock.unlock();
 
         }
 
     }
-    
+
     /**
      * Load the {@link IndexSegment}. The {@link IndexSegment} (or derived
      * class) MUST provide a public constructor with the following signature:
@@ -500,53 +437,90 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      * 
      * @return The {@link IndexSegment} or derived class loaded from that store.
      */
-    synchronized public IndexSegment loadIndexSegment() {
+    public IndexSegment loadIndexSegment() {
 
+        /*
+         * This is grabbed before we request the lock in an attempt to close a
+         * possible concurrency window where the finalizer on the index segment
+         * might run while we are acquiring the lock. By grabbing a hard
+         * reference here we ensure that the finalizer will not run while we are
+         * acquiring the lock.  Who knows if this will ever make a difference.
+         */
         IndexSegment seg = ref == null ? null : ref.get();
 
-        if (seg != null) {
+        lock.lock();
+        try {
 
-            // ensure "open".
-            seg.reopen();
-            
-        } else {
+            /*
+             * If we did not get the hard reference above then we need to try
+             * again now that we have the lock.
+             */
+            seg = seg != null ? seg : ref == null ? null : ref.get();
 
-            try {
+            if (seg != null) {
 
-                final Class cl = Class.forName(indexMetadata
-                        .getBTreeClassName());
+                // ensure "open".
+                seg.reopen();
 
-                final Constructor ctor = cl
-                        .getConstructor(new Class[] { IndexSegmentStore.class });
+                // return seg.
+                return seg;
+                
+            } else {
 
-                seg = (IndexSegment) ctor.newInstance(new Object[] { this });
+                try {
 
-                ref = new WeakReference<IndexSegment>(seg);
+                    final Class cl = Class.forName(indexMetadata
+                            .getBTreeClassName());
 
-                /*
-                 * Attach the counters maintained by AbstractBTree to those
-                 * reported for the IndexSegmentStore.
-                 * 
-                 * Note: These counters are only allocated when the IndexSegment
-                 * object is created and this is where we enforce a 1:1
-                 * correspondence between an IndexSegmentStore and the
-                 * IndexSegment loaded from that store.
-                 */
+                    final Constructor ctor = cl
+                            .getConstructor(new Class[] { IndexSegmentStore.class });
 
-                getCounters().attach(seg.counters.getCounters());
+                    seg = (IndexSegment) ctor
+                            .newInstance(new Object[] { this });
 
-            } catch (Exception ex) {
+                    /*
+                     * Attach the counters maintained by AbstractBTree to those
+                     * reported for the IndexSegmentStore.
+                     * 
+                     * Note: These counters are only allocated when the
+                     * IndexSegment object is created and this is where we
+                     * enforce a 1:1 correspondence between an IndexSegmentStore
+                     * and the IndexSegment loaded from that store.
+                     */
 
-                throw new RuntimeException(ex);
+                    getCounters().attach(seg.counters.getCounters());
+
+                    // set the canonicalizing weak reference to the open seg.
+                    ref = new WeakReference<IndexSegment>(seg);
+
+                    // return seg.
+                    return seg;
+                    
+                } catch (Exception ex) {
+
+                    throw new RuntimeException(ex);
+
+                }
 
             }
 
+        } finally {
+
+            lock.unlock();
+
         }
 
-        return seg;
-        
     }
+    /**
+     * A canonicalizing weak reference for the {@link IndexSegment} that can be
+     * loaded from this store.
+     */
     private volatile WeakReference<IndexSegment> ref = null;
+
+    /**
+     * A lock used to make open and close operations atomic.
+     */
+    protected final ReentrantLock lock = new ReentrantLock();
     
     final public boolean isOpen() {
         
@@ -555,8 +529,6 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
     }
    
     final public boolean isReadOnly() {
-
-        assertOpen();
 
         return true;
         
@@ -585,9 +557,15 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      */
     public boolean isNodesFullyBuffered() {
         
-        synchronized(this) {
+        lock.lock();
+        
+        try {
 
             return isOpen() && buf_nodes != null;
+
+        } finally {
+            
+            lock.unlock();
             
         }
         
@@ -604,14 +582,24 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      * This operation may be reversed by {@link #reopen()} as long as the
      * backing file remains available.
      */
-    synchronized public void close() {
+    public void close() {
 
-        if(INFO)
-            log.info(file.toString());
+        lock.lock();
+
+        try {
         
-        assertOpen();
-     
-        _close();
+            if (INFO)
+                log.info(file.toString());
+
+            assertOpen();
+
+            _close();
+            
+        } finally {
+            
+            lock.unlock();
+            
+        }
         
     }
         
@@ -622,94 +610,107 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      * message is written, and the exception is NOT re-thrown.
      */
     synchronized private void _close() {
-        
-        if (raf != null) {
 
-            try {
+        lock.lock();
 
-                raf.close();
-                
-            } catch (IOException ex) {
-                
-                log.error("Problem closing file: " + file, ex);
-                
-                // ignore exception.
-                
-            }
+        try {
 
-            raf = null;
+            if (raf != null) {
 
-        }
+                try {
 
-        if (buf_nodes != null) {
+                    raf.close();
 
-            try {
+                } catch (IOException ex) {
 
-                // release the buffer back to the pool.
-                DirectBufferPool.INSTANCE.release(buf_nodes);
+                    log.error("Problem closing file: " + file, ex);
 
-            } catch(Throwable t) {
-                
-                // log error but continue anyway.
-                log.error(this, t);
-                
-            } finally {
+                    // ignore exception.
 
-                // clear reference since buffer was released.
-                buf_nodes = null;
+                }
+
+                raf = null;
                 
             }
-            
+
+            if (buf_nodes != null) {
+
+                try {
+
+                    // release the buffer back to the pool.
+                    DirectBufferPool.INSTANCE.release(buf_nodes);
+
+                } catch (Throwable t) {
+
+                    // log error but continue anyway.
+                    log.error(this, t);
+
+                } finally {
+
+                    // clear reference since buffer was released.
+                    buf_nodes = null;
+
+                }
+
+            }
+
+            open = false;
+
+            counters.closeCount++;
+
+            if (INFO)
+                log.info("Closed: file=" + getFile());
+
+        } finally {
+
+            lock.unlock();
+
         }
-
-        /*
-         * Note: Don't deallocate. It is small and holds useful metadata such as
-         * the #of index entries that we would always like to have on hand.
-         */
-//        checkpoint = null;
-
-        /*
-         * Note: Don't deallocate. Relatively small and it holds some important
-         * metadata. By reading this during the ctor we do not have to force the
-         * entire index segment to be loaded just to access the index metadata.
-         */
-//        metadata = null;
-
-        // Note: field was moved to IndexSegment.
-//        bloomFilter = null;
-        
-        open = false;
-        
-        counters.closeCount++;
-        
-        if (INFO)
-            log.info("Closed: file=" + getFile());
         
     }
     
-    synchronized public void deleteResources() {
+    public void deleteResources() {
         
-        if (open)
-            throw new IllegalStateException();
-        
-        if(!file.delete()) {
+        lock.lock();
+        try {
+
+            if (open)
+                throw new IllegalStateException();
+
+            if (!file.delete()) {
+
+                throw new RuntimeException("Could not delete: "
+                        + file.getAbsolutePath());
+
+            }
             
-            throw new RuntimeException("Could not delete: "
-                    + file.getAbsolutePath());
-            
+        } finally {
+
+            lock.unlock();
+
         }
 
     }
-    
+
     synchronized public void destroy() {
-        
-        if(isOpen()) {
 
-            close();
+        lock.lock();
+
+        try {
+
+            if (isOpen()) {
+
+                close();
+
+            }
+
+            deleteResources();
+
+        } finally {
+
+            lock.unlock();
             
         }
-
-        deleteResources();
         
     }
 
@@ -727,8 +728,6 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
     
     final public long size() {
 
-//        assertOpen();
-        
         return checkpoint.length;
         
     }
@@ -910,7 +909,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      * @param length
      * @return
      */
-    private ByteBuffer readFromBuffer(final long offset, final int length) {
+    final private ByteBuffer readFromBuffer(final long offset, final int length) {
         
         /*
          * Note: As long as the state of [buf_nodes] (its position and limit)
@@ -950,7 +949,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
     /**
      * Read the record from the file.
      */
-    private ByteBuffer readFromFile(final long offset, final int length) {
+    final private ByteBuffer readFromFile(final long offset, final int length) {
 
         // Allocate buffer: limit = capacity; pos = 0.
         final ByteBuffer dst = ByteBuffer.allocate(length);
@@ -1040,13 +1039,22 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      * the root node, {@link IndexMetadata}, {@link BloomFilter}, etc. All we
      * have to do is re-open the {@link FileChannel}.
      * 
-     * @return true iff the channel was re-opened.
+     * @return <code>true</code> iff the channel was re-opened.
+     *         <code>false</code> if the {@link IndexSegmentStore} is closed.
      * 
      * @throws RuntimeException
      *             if the backing file can not be opened (can not be found or
      *             can not acquire a lock).
      */
-    synchronized private boolean reopenChannel() {
+    final synchronized private boolean reopenChannel() {
+        
+        if(!isOpen()) {
+
+            // the IndexSegmentStore has been closed.
+            
+            return false;
+            
+        }
         
         if (raf != null && raf.getChannel().isOpen()) {
             
@@ -1059,14 +1067,6 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
              */
             
             return true;
-            
-        }
-        
-        if(!isOpen()) {
-
-            // the IndexSegmentStore has been closed.
-            
-            return false;
             
         }
         
@@ -1084,6 +1084,43 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
             
         }
 
+        try {
+
+            /*
+             * Request a shared file lock.
+             */
+            if (raf.getChannel().tryLock(0, Long.MAX_VALUE, true/* shared */) == null) {
+
+                /*
+                 * Note: A null return indicates that someone else holds the
+                 * lock. This can happen if the platform does not support shared
+                 * locks or if someone requested an exclusive file lock.
+                 */
+
+                try {
+                    raf.close();
+                } catch (Throwable t) {
+                    // ignore.
+                }
+
+                throw new RuntimeException(
+                        "File is locked: service already running? file="
+                                + getFile());
+
+            }
+
+        } catch (IOException ex) {
+
+            /*
+             * Note: This is true of NFS volumes. This is Ok and should be
+             * ignored. However the backing file is not protected against
+             * accidental deletes or overwrites.
+             */
+
+            log.warn("FileLock not supported: file=" + getFile(), ex);
+
+        }
+
         return true;
         
     }
@@ -1095,10 +1132,17 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      * will read through to the backing file.
      */
     protected void bufferIndexNodes() throws IOException {
+        
+        if(!lock.isHeldByCurrentThread()) {
 
+            throw new IllegalMonitorStateException();
+            
+        }
+        
         if (buf_nodes != null) {
 
-            throw new IllegalStateException();
+            // already buffered.
+            return;
             
         }
         
@@ -1140,6 +1184,16 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
 
             /*
              * Attempt to allocate a buffer to hold the disk image of the nodes.
+             * 
+             * FIXME There should be a direct buffer pool instance specifically
+             * configured to buffer the index segment nodes. This will make it
+             * possible to buffer the nodes even when the buffer size required
+             * is not a good match for the buffer size used as the write cache
+             * for the journal. We need to report counters for all buffer pools
+             * in order to accurately track the memory overhead for each
+             * purpose. [make sure to replace all references to the default
+             * INSTANCE with the specialized pool and make sure that we have the
+             * chance to configure the pool before it is placed into service.]
              */
             
             buf_nodes = DirectBufferPool.INSTANCE.acquire(100/* ms */,
@@ -1254,9 +1308,10 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
     }
 
     /**
-     * Reads the {@link IndexMetadata} record directly from the file.
+     * Reads the {@link IndexMetadata} record directly from the file (this is
+     * invoked by the ctor).
      */
-    private IndexMetadata readMetadata() throws IOException {
+    final private IndexMetadata readMetadata() throws IOException {
 
         final long addr = checkpoint.addrMetadata;
         

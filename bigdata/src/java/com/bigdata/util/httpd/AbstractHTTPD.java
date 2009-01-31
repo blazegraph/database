@@ -29,7 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.util.httpd;
 
 import java.io.IOException;
-import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.Properties;
 import java.util.Vector;
 
@@ -44,14 +44,15 @@ import java.util.Vector;
  */
 public abstract class AbstractHTTPD extends NanoHTTPD {
     
-    public AbstractHTTPD(int port) throws IOException {
+    public AbstractHTTPD(final int port) throws IOException {
         
         super(port);
 
     }
 
-    public Response serve(String uri, String method, Properties header,
-            Map<String, Vector<String>> parms) {
+    public Response serve(final String uri, final String method,
+            final Properties header,
+            final LinkedHashMap<String, Vector<String>> parms) {
 
         try {
 
@@ -90,7 +91,7 @@ public abstract class AbstractHTTPD extends NanoHTTPD {
     }
 
     public Response doGet(String uri, String method, Properties header,
-            Map<String, Vector<String>> parms) throws Exception {
+            LinkedHashMap<String, Vector<String>> parms) throws Exception {
 
         return new Response(HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN, ""
                 + method);
@@ -98,7 +99,7 @@ public abstract class AbstractHTTPD extends NanoHTTPD {
     }
 
     public Response doPost(String uri, String method, Properties header,
-            Map<String, Vector<String>> parms) throws Exception {
+            LinkedHashMap<String, Vector<String>> parms) throws Exception {
 
         return new Response(HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN, ""
                 + method);
@@ -106,7 +107,7 @@ public abstract class AbstractHTTPD extends NanoHTTPD {
     }
 
     public Response doPut(String uri, String method, Properties header,
-            Map<String, Vector<String>> parms) throws Exception {
+            LinkedHashMap<String, Vector<String>> parms) throws Exception {
 
         return new Response(HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN, ""
                 + method);
@@ -114,7 +115,7 @@ public abstract class AbstractHTTPD extends NanoHTTPD {
     }
 
     public Response doDelete(String uri, String method, Properties header,
-            Map<String, Vector<String>> parms) throws Exception {
+            LinkedHashMap<String, Vector<String>> parms) throws Exception {
 
         return new Response(HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN, ""
                 + method);

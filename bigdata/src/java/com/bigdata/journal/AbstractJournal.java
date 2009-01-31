@@ -1141,7 +1141,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         
         if(_bufferStrategy.isOpen()) {
             
-            log.warn("Closing journal: "+getFile());
+            log.warn("Closing journal: " + getFile());
             
             shutdownNow();
             

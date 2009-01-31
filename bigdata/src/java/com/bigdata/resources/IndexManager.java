@@ -845,7 +845,7 @@ abstract public class IndexManager extends StoreManager {
                  * atomic get/put against the WeakValueCache.
                  * 
                  * Note: The load of the index segment from the store can have
-                 * significiant latency. The use of a per-UUID lock allows us to
+                 * significant latency. The use of a per-UUID lock allows us to
                  * load index segments for different index views concurrently.
                  * 
                  * Note: We DO NOT use a name+timestamp lock here because many

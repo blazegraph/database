@@ -172,63 +172,29 @@ public class IndexSegment extends AbstractBTree {
 
         }
 
-        // close the backing file (can be re-opened).
-        fileStore.close();
+        fileStore.lock.lock();
+        try {
 
-//        // release the optional bloom filter (done by the base class).
-//        bloomFilter = null;
-        
-        // release the leaf cache.
-        leafCache.clear();
-        leafCache = null;
+            // release the leaf cache.
+            leafCache.clear();
+            leafCache = null;
 
-        // release buffers and hard reference to the root node.
-        super.close();
+            // release buffers and hard reference to the root node.
+            super.close();
 
-        // report event.
-        ResourceManager.closeIndexSegment(fileStore.getFile().toString());
+            // close the backing file (can be re-opened).
+            fileStore.close();
+
+            // report event.
+            ResourceManager.closeIndexSegment(fileStore.getFile().toString());
+
+        } finally {
+
+            fileStore.lock.unlock();
+            
+        }
 
     }
-
-//    /**
-//     * Re-opens the backing file.
-//     */
-//    protected void reopen() {
-//
-//        if (root == null) {
-//
-//            /*
-//             * reload the root node.
-//             * 
-//             * Note: This is synchronized to avoid race conditions when
-//             * re-opening the index from the backing store.
-//             * 
-//             * Note: [root] MUST be marked as [volatile] to guarentee correct
-//             * semantics.
-//             * 
-//             * See http://en.wikipedia.org/wiki/Double-checked_locking
-//             */
-//            
-//            synchronized (this) {
-//
-//                if (root == null) {
-//
-//                    if (!fileStore.isOpen()) {
-//
-//                        // reopen the store.
-//                        fileStore.reopen();
-//                        
-//                    }
-//
-//                    _open();
-//
-//                }
-//
-//            }
-//
-//        }
-//
-//    }
 
     /**
      * Overriden to a more constrained type.
@@ -238,94 +204,123 @@ public class IndexSegment extends AbstractBTree {
         return fileStore;
         
     }
+
+    /**
+     * Extended to explictly close the {@link IndexSegment} and the backing
+     * {@link IndexSegmentStore}. A finalizer is necessary for this class
+     * because we maintain {@link IndexSegment}s in a weak value cache and do
+     * not explicitly close then before their reference is cleared. This leads
+     * to the {@link IndexSegmentStore} being left open. The finalizer fixes
+     * that.
+     */
+    protected void finalize() throws Throwable {
+
+        if (isOpen()) {
+
+            log.warn("Closing IndexSegment: " + fileStore.getFile());
+            
+            close();
+
+        }
+
+        super.finalize();
+
+    }
     
     @Override
     protected void _reopen() {
-
-        // synchronize to prevent concurrent close.
-        synchronized(fileStore) {
         
-        if (!fileStore.isOpen()) {
+        // prevent concurrent close.
+        fileStore.lock.lock();
+        try {
 
-            // reopen the store.
-            fileStore.reopen();
-            
-        }
+            if (!fileStore.isOpen()) {
 
-        this.leafCache = new WeakValueCache<Long, ImmutableLeaf>(
-                new LRUCache<Long, ImmutableLeaf>(
-                        fileStore.getIndexMetadata().getIndexSegmentLeafCacheCapacity()));
-
-        // the checkpoint record (read when the backing store is opened).
-        final IndexSegmentCheckpoint checkpoint = fileStore.getCheckpoint();
-
-        // true iff we should fully buffer the nodes region of the index
-        // segment.
-        final boolean bufferNodes = metadata.getIndexSegmentBufferNodes();
-
-        if (checkpoint.nnodes > 0 && bufferNodes) {
-
-            try {
-
-                /*
-                 * Read the index nodes from the file into a buffer. If there
-                 * are no index nodes (that is if everything fits in the root
-                 * leaf of the index) then we skip this step.
-                 * 
-                 * Note: We always read in the root in IndexSegment#_open() and
-                 * hold a hard reference to the root while the IndexSegment is
-                 * open.
-                 */
-                
-                fileStore.bufferIndexNodes();
-                
-            } catch (IOException ex) {
-
-                throw new RuntimeException(ex);
+                // reopen the store.
+                fileStore.reopen();
 
             }
 
-        }
+            this.leafCache = new WeakValueCache<Long, ImmutableLeaf>(
+                    new LRUCache<Long, ImmutableLeaf>(fileStore
+                            .getIndexMetadata()
+                            .getIndexSegmentLeafCacheCapacity()));
 
-        /*
-         * Read the root node.
-         * 
-         * Note: if this is an empty index segment then we actually create a new
-         * empty root leaf since there is nothing to be read from the file.
-         */
-        final long addrRoot = checkpoint.addrRoot;
-        if (addrRoot == 0L) {
+            // the checkpoint record (read when the backing store is opened).
+            final IndexSegmentCheckpoint checkpoint = fileStore.getCheckpoint();
 
-            // empty index segment; create an empty root leaf.
-            this.root = new ImmutableLeaf(this);
-            
-        } else {
-            
-            // read the root node/leaf from the file.
-            this.root = readNodeOrLeaf(addrRoot);
-            
-        }
+            // true iff we should fully buffer the nodes region of the index
+            // segment.
+            final boolean bufferNodes = metadata.getIndexSegmentBufferNodes();
 
-        if (checkpoint.addrBloom != 0L) {
+            if (checkpoint.nnodes > 0 && bufferNodes) {
 
-            try {
+                try {
 
-                /*
-                 * Read the optional bloom filter from the backing store.
-                 */
-                bloomFilter = fileStore.readBloomFilter();
+                    /*
+                     * Read the index nodes from the file into a buffer. If
+                     * there are no index nodes (that is if everything fits in
+                     * the root leaf of the index) then we skip this step.
+                     * 
+                     * Note: We always read in the root in IndexSegment#_open()
+                     * and hold a hard reference to the root while the
+                     * IndexSegment is open.
+                     */
 
-            } catch (IOException ex) {
+                    fileStore.bufferIndexNodes();
 
-                throw new RuntimeException(ex);
+                } catch (IOException ex) {
+
+                    throw new RuntimeException(ex);
+
+                }
 
             }
 
-        }
-        
-        // report on the event.
-        ResourceManager.openIndexSegment(null/* name */, fileStore.getFile()
-                .toString(), fileStore.size());
+            /*
+             * Read the root node.
+             * 
+             * Note: if this is an empty index segment then we actually create a
+             * new empty root leaf since there is nothing to be read from the
+             * file.
+             */
+            final long addrRoot = checkpoint.addrRoot;
+            if (addrRoot == 0L) {
+
+                // empty index segment; create an empty root leaf.
+                this.root = new ImmutableLeaf(this);
+
+            } else {
+
+                // read the root node/leaf from the file.
+                this.root = readNodeOrLeaf(addrRoot);
+
+            }
+
+            if (checkpoint.addrBloom != 0L) {
+
+                try {
+
+                    /*
+                     * Read the optional bloom filter from the backing store.
+                     */
+                    bloomFilter = fileStore.readBloomFilter();
+
+                } catch (IOException ex) {
+
+                    throw new RuntimeException(ex);
+
+                }
+
+            }
+
+            // report on the event.
+            ResourceManager.openIndexSegment(null/* name */, fileStore
+                    .getFile().toString(), fileStore.size());
+
+        } finally {
+
+            fileStore.lock.unlock();
 
         }
         
@@ -399,7 +394,7 @@ public class IndexSegment extends AbstractBTree {
      * 
      * @return That leaf.
      */
-    public ImmutableLeaf readLeaf(long addr) {
+    public ImmutableLeaf readLeaf(final long addr) {
 
         return (ImmutableLeaf) readNodeOrLeaf(addr);
         
@@ -412,7 +407,7 @@ public class IndexSegment extends AbstractBTree {
      * reads by the {@link LeafIterator} which are made without using the node
      * hierarchy.
      */
-    protected AbstractNode readNodeOrLeaf(long addr) {
+    protected AbstractNode readNodeOrLeaf(final long addr) {
 
         final Long tmp = Long.valueOf(addr);
 
@@ -626,7 +621,8 @@ public class IndexSegment extends AbstractBTree {
 
             }
 
-            public Tuple insert(byte[] key, byte[] val, boolean deleted, long timestamp, Tuple tuple) {
+            public Tuple insert(byte[] key, byte[] val, boolean deleted,
+                    long timestamp, Tuple tuple) {
 
                 throw new UnsupportedOperationException(ERROR_READ_ONLY);
 
@@ -708,7 +704,8 @@ public class IndexSegment extends AbstractBTree {
 
             }
 
-            public Tuple insert(byte[] key, byte[] val, boolean deleted, long timestamp, Tuple tuple) {
+            public Tuple insert(byte[] key, byte[] val, boolean deleted,
+                    long timestamp, Tuple tuple) {
 
                 throw new UnsupportedOperationException(ERROR_READ_ONLY);
 
@@ -719,10 +716,10 @@ public class IndexSegment extends AbstractBTree {
                 throw new UnsupportedOperationException(ERROR_READ_ONLY);
 
             }
-    
+
             public ImmutableLeaf nextLeaf() {
-                
-                if(nextAddr == 0L) {
+
+                if (nextAddr == 0L) {
 
                     // no more leaves.
 

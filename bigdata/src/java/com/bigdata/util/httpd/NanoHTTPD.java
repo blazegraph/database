@@ -16,9 +16,9 @@ import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.Date;
 import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
@@ -121,13 +121,15 @@ public class NanoHTTPD implements IServiceShutdown
      * @parm parms Parsed, percent decoded parameters from URI and, in case of
      *       POST, data. The keys are the parameter names. Each value is a
      *       {@link Colelction} of {@link String}s containing the bindings for
-     *       the named parameter.
+     *       the named parameter. The order of the URL parameters is preserved.
      * @parm header Header entries, percent decoded
      * 
      * @return HTTP response, see class Response for details
      */
-	public Response serve( String uri, String method, Properties header, Map<String,Vector<String>> parms )
-	{
+	public Response serve(final String uri, final String method,
+            final Properties header,
+            final LinkedHashMap<String, Vector<String>> parms) {
+        
         if (INFO)
             log.info(method + " '" + uri + "' ");
 
@@ -559,8 +561,8 @@ public class NanoHTTPD implements IServiceShutdown
 //                final String uri = decodePercent( st.nextToken());
                 String uri = st.nextToken();
 
-				// Decode parameters from the URI
-                final HashMap<String,Vector<String>> parms = new HashMap<String,Vector<String>>();
+				// Decode parameters from the URI (LinkedHashMap preserves their ordering).
+                final LinkedHashMap<String, Vector<String>> parms = new LinkedHashMap<String, Vector<String>>();
 				final int qmi = uri.indexOf( '?' );
 				if ( qmi != -1 )
 				{

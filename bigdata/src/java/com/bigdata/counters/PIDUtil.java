@@ -26,15 +26,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Mar 26, 2008
  */
 
-package com.bigdata.counters.linux;
+package com.bigdata.counters;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.lang.management.ManagementFactory;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
+import org.apache.system.SystemUtil;
 
 /**
  * Utility to return the PID of the JVM.
@@ -116,35 +120,79 @@ public class PIDUtil {
 
     }
 
-//  /**
-//  * Return the JVM PID.
-//  * 
-//  * @throws UnsupportedOperationException
-//  *             if the pid can not be extracted.
-//  * 
-//  * @see RuntimeMXBean#getName(), A web search will show that this is
-//  *      generally of the form "pid@host".  However this is definately
-//  *      NOT guarenteed by the javadoc.
-//  */
-// public int getPID() {
-//     
-//     String name = ManagementFactory.getRuntimeMXBean().getName();
-//     
-//     Matcher matcher = pidPattern.matcher(name);
-//     
-//     if(!matcher.matches()) {
-//         
-//         throw new UnsupportedOperationException("Could not extract pid from ["+name+"]");
-//         
-//     }
-//     
-//     final int pid = Integer.parseInt(matcher.group(1));
-//     
-//     log.info("pid="+pid);
-//     
-//     return pid;
-//     
-// }
-// private final Pattern pidPattern = Pattern.compile("^([0-9]+)@");
+    /**
+     * Return the JVM PID.
+     * 
+     * @throws UnsupportedOperationException
+     *             if the pid can not be extracted.
+     * 
+     * @see RuntimeMXBean#getName(), A web search will show that this is
+     *      generally of the form "pid@host". However this is definately NOT
+     *      guarenteed by the javadoc.
+     */
+    static public int getPIDWithRuntimeMXBean() {
+
+        final String name = ManagementFactory.getRuntimeMXBean().getName();
+
+        final Matcher matcher = pidPattern.matcher(name);
+
+        if (!matcher.find()) {
+
+            throw new UnsupportedOperationException(
+                    "Could not extract pid from [" + name + "]");
+
+        }
+
+        final int pid = Integer.parseInt(matcher.group(1));
+
+        if(INFO)
+            log.info("pid=" + pid);
+
+        return pid;
+
+    }
+
+    static private final Pattern pidPattern = Pattern.compile("^([0-9]+)@");
+
+    /**
+     * Tries each of the methods in this class and returns the PID as reported
+     * by the first method that succeeds. The order in which the methods are
+     * tried SHOULD reflect the likelyhood that the method will get it right.
+     * 
+     * @return The PID of this JVM (best guess).
+     */
+    public static int getPID() {
+
+            try {
+
+            if (!SystemUtil.operatingSystem().toLowerCase().startsWith("win")) {
+
+                return getLinuxPIDWithBash();
+            }
+
+        } catch (Throwable t) {
+
+            log.warn(t);
+
+        }
+        
+        return getPIDWithRuntimeMXBean();
+        
+    }
+    
+    /**
+     * Utility for checking which method works on your platform.
+     * 
+     * @param args
+     * @throws InterruptedException
+     */
+    public static void main(String[] args) throws InterruptedException {
+
+        System.out.println("pid=" + getPID());
+
+        // gives you a chance to look at top, etc.
+        Thread.sleep(5000);
+
+    }
 
 }

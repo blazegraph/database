@@ -10,8 +10,8 @@ import java.text.Format;
 import java.text.NumberFormat;
 import java.util.Collection;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Vector;
 import java.util.regex.Pattern;
@@ -34,7 +34,7 @@ import com.bigdata.util.HTMLUtility;
 /**
  * (X)HTML rendering of a {@link CounterSet}.
  * 
- * @todo UI widgets for regex filters and depth
+ * @todo UI widgets for regex filters, depth, correlated.
  * 
  * @todo parameterize for expand/collapse of paths, perhaps in session (need
  *       more support on the server to do that) or else just in the URL query
@@ -75,11 +75,17 @@ public class XHTMLRenderer {
         static final String CORRELATED = "correlated";
         
         /**
-         * Name of the URL query parameter specifying a regular expression for the
-         * filter to be applied to the counter paths.
+         * Name of the URL query parameter specifying one or more strings for
+         * the filter to be applied to the counter paths.
          */
         static final String FILTER = "filter";
-        
+
+        /**
+         * Name of the URL query parameter specifying one or more regular
+         * expression for the filter to be applied to the counter paths.
+         */
+        static final String REGEX = "regex";
+
         final private String ps = ICounterSet.pathSeparator;
 
         /**
@@ -96,7 +102,7 @@ public class XHTMLRenderer {
          * The parameters from the request (eg, as parsed from URL query
          * parameters).
          */
-        final public Map<String,Vector<String>> params;
+        final public LinkedHashMap<String,Vector<String>> params;
         
         /**
          * The value of the {@link #PATH} query parameter. 
@@ -107,11 +113,6 @@ public class XHTMLRenderer {
          * The value of the {@link #DEPTH} query parameter.
          */
         final public int depth;
-        
-        /**
-         * The value(s) of the {@link #FILTER} query parameter.
-         */
-        final public Collection<String> filter;
         
         /**
          * When <code>true</code> a correlated view will be generated for the
@@ -153,7 +154,8 @@ public class XHTMLRenderer {
         /**
          * 
          */
-        public Model(CounterSet root, String uri, Map<String,Vector<String>> params) {
+        public Model(final CounterSet root, final String uri,
+                final LinkedHashMap<String, Vector<String>> params) {
 
             this.root = root;
 
@@ -172,48 +174,82 @@ public class XHTMLRenderer {
             if (INFO)
                 log.info(DEPTH + "=" + depth);
 
-            this.filter = (Collection<String>) params.get(FILTER);
-
-            if(filter != null) {
-
-                /*
-                 * Joins multiple values for ?filter together in OR of quoted
-                 * patterns.
-                 * 
-                 * @todo make this more flexible in terms of allowing actual
-                 * regex from the user agent?
-                 */
-
+            {
+            
+                // the regex that we build up (if any).
                 final StringBuilder sb = new StringBuilder();
-                
-                for(String val : filter) {
-                
-                    if (INFO)
-                        log.info(FILTER + "=" + val);
-                
-                    if(sb.length()>0) {
-                        
-                        sb.append("|");
-                        
+
+                if ((Collection<String>) params.get(FILTER) != null) {
+
+                    /*
+                     * Joins multiple values for ?filter together in OR of
+                     * quoted patterns.
+                     */
+                    final Collection<String> filter = (Collection<String>) params
+                            .get(FILTER);
+
+                    for (String val : filter) {
+
+                        if (INFO)
+                            log.info(FILTER + "=" + val);
+
+                        if (sb.length() > 0) {
+
+                            // OR of previous pattern and this pattern.
+                            sb.append("|");
+
+                        }
+
+                        sb.append("(.*" + Pattern.quote(val) + ".*)");
+
                     }
-                    
-                    sb.append("(.*"+Pattern.quote(val)+".*)");
-                    
+
                 }
 
-                final String regex = sb.toString();
-                
-                if (INFO)
-                    log.info(FILTER + "=" + regex);
-                
-                this.pattern = Pattern.compile(regex);
-                
-            } else {
-                
-                this.pattern = null;
-                
-            }
+                if ((Collection<String>) params.get(REGEX) != null) {
 
+                    /*
+                     * Joins multiple values for ?regex together in OR of
+                     * patterns.
+                     */
+                    final Collection<String> filter = (Collection<String>) params
+                            .get(REGEX);
+
+                    for (String val : filter) {
+
+                        if (INFO)
+                            log.info(REGEX + "=" + val);
+
+                        if (sb.length() > 0) {
+
+                            // OR of previous pattern and this pattern.
+                            sb.append("|");
+
+                        }
+
+                        sb.append("(" + val + ")");
+
+                    }
+
+                }
+
+                if (sb.length() > 0) {
+
+                    final String regex = sb.toString();
+
+                    if (INFO)
+                        log.info("effective regex filter=" + regex);
+
+                    this.pattern = Pattern.compile(regex);
+
+                } else {
+
+                    this.pattern = null;
+
+                }
+
+            }
+            
             this.correlated = Boolean.parseBoolean(getProperty(params,
                     CORRELATED, "false"));
             
@@ -267,7 +303,8 @@ public class XHTMLRenderer {
          * 
          * @todo move to a request object?
          */
-        public String getProperty(Map<String,Vector<String>> params, String property, String defaultValue) {
+        public String getProperty(final Map<String, Vector<String>> params,
+                final String property, final String defaultValue) {
             
             if (params == null)
                 throw new IllegalArgumentException();
@@ -303,9 +340,10 @@ public class XHTMLRenderer {
          *            
          * @todo move to request object?
          */
-        public String getRequestURL(NV[] override) {
+        public String getRequestURL(final NV[] override) {
         
-            final Map<String,Vector<String>> p;
+            // Note: Used throughput to preserve the parameter order.
+            final LinkedHashMap<String,Vector<String>> p;
             
             if(override == null) {
                 
@@ -313,7 +351,7 @@ public class XHTMLRenderer {
                 
             } else {
                 
-                p = new HashMap<String,Vector<String>>(params);
+                p = new LinkedHashMap<String,Vector<String>>(params);
                 
                 for(NV x : override) {
                                             
@@ -323,33 +361,34 @@ public class XHTMLRenderer {
                 
             }
             
-            StringBuilder sb = new StringBuilder();
+            final StringBuilder sb = new StringBuilder();
             
             sb.append(uri);
             
             sb.append("?path=" + encodeURL(getProperty(p,PATH, ps)));
             
-            Iterator itr = p.entrySet().iterator();
+            final Iterator<Map.Entry<String, Vector<String>>> itr = p
+                    .entrySet().iterator();
             
             while(itr.hasNext()) {
                 
-                final Map.Entry entry = (Map.Entry)itr.next();
-                
-                String name = (String)entry.getKey();
+                final Map.Entry<String, Vector<String>> entry = itr.next();
 
-                if(name.equals(PATH)) {
-                    
+                final String name = entry.getKey();
+
+                if (name.equals(PATH)) {
+
                     // already handled.
                     continue;
-                    
-                }
-                
-                Collection<String> vals = (Collection<String>)entry.getValue();
-                
-                for(String s : vals ) {
 
-                    sb.append("&"+encodeURL(name)+"="+encodeURL(s));
-                    
+                }
+
+                final Collection<String> vals = entry.getValue();
+
+                for (String s : vals) {
+
+                    sb.append("&" + encodeURL(name) + "=" + encodeURL(s));
+
                 }
                 
             }
@@ -358,14 +397,20 @@ public class XHTMLRenderer {
             
         }
         
-        static public String encodeURL(String url) {
+        static public String encodeURL(final String url) {
             
             final String charset = "UTF-8";
+
             try {
+                
                 return URLEncoder.encode(url, charset);
+                
             } catch (UnsupportedEncodingException e) {
+                
                 log.error("Could not encode: charset="+charset+", url="+url);
+                
                 return url;
+                
             }
             
         }
