@@ -9,7 +9,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.util.concurrent.QueueStatisticsTask;
 import com.bigdata.util.concurrent.TaskCounters;
-import com.sun.corba.se.spi.orbutil.threadpool.Work;
 
 /**
  * Counters updated by a {@link WorkflowTask}. All instances running on the

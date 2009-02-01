@@ -3428,9 +3428,8 @@ abstract public class StoreManager extends ResourceEvents implements
 
             final File file = resourceFiles.remove(uuid);
 
-//            if (INFO)
-//                log.info
-                log.warn("DELETE: file=" + file + ", uuid=" + uuid + ", isJournal="
+            if (INFO)
+                log.info("DELETE: file=" + file + ", uuid=" + uuid + ", isJournal="
                     + isJournal);
             
             if (file == null) {
@@ -3886,9 +3885,9 @@ abstract public class StoreManager extends ResourceEvents implements
 
         final long elapsed = System.currentTimeMillis() - begin;
         
-//        if (INFO)
-//            log.info
-            log.warn("commitTime="+commitTime+", #used="+uuids.size()+", elapsed="+elapsed);
+        if (INFO)
+            log.info("commitTime=" + commitTime + ", #used=" + uuids.size()
+                    + ", elapsed=" + elapsed);
 
         return uuids;
 
@@ -4116,15 +4115,14 @@ abstract public class StoreManager extends ResourceEvents implements
 
         p.setProperty(Options.MAXIMUM_EXTENT, Long.toString(adjustedExtent));
 
-// if(INFO)
-// log.info // @todo info.
-            log.warn("discount=" + d //
-                + ", bytesUnderManagement="+ bytesUnderManagement //
-                + ", threshold=" + accelerateOverflowThreshold//
-                + ", minimimInitialExtent=" + minimumExtent//
-                + ", initialExtent=" + initialExtent //
-                + ", maximumExtent=" + maximumExtent //
-                + ", adjustedExtent=" + adjustedExtent);
+        if (INFO)
+            log.info("discount=" + d //
+                    + ", bytesUnderManagement=" + bytesUnderManagement //
+                    + ", threshold=" + accelerateOverflowThreshold//
+                    + ", minimimInitialExtent=" + minimumExtent//
+                    + ", initialExtent=" + initialExtent //
+                    + ", maximumExtent=" + maximumExtent //
+                    + ", adjustedExtent=" + adjustedExtent);
 
         return;
 

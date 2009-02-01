@@ -495,8 +495,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * Joins are disabled.
              */
 
-            log.warn(OverflowManager.Options.JOINS_ENABLED + "="
-                    + resourceManager.joinsEnabled);
+            if(INFO)
+                log.info(OverflowManager.Options.JOINS_ENABLED + "="
+                        + resourceManager.joinsEnabled);
 
             return EMPTY_LIST;
             
@@ -1912,13 +1913,15 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                         s.getSampleRate() // unchanged
                 );
 
-//                if(INFO)
-//                    log.info // @todo info
-                    log.warn("Adjusted splitHandler:  name="
-                        + indexMetadata.getName() + ", npartitions="
-                        + npartitions + ", threshold="
-                        + resourceManager.accelerateSplitThreshold
-                        + ", discount=" + d + ", adjustedSplitHandler=" + t);
+                if (INFO)
+                    log
+                            .info("Adjusted splitHandler:  name="
+                                    + indexMetadata.getName()
+                                    + ", npartitions=" + npartitions
+                                    + ", threshold="
+                                    + resourceManager.accelerateSplitThreshold
+                                    + ", discount=" + d
+                                    + ", adjustedSplitHandler=" + t);
 
                 return t;
 

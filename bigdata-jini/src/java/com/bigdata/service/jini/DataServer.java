@@ -45,7 +45,6 @@ import org.apache.log4j.MDC;
 
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.service.DataService;
-import com.bigdata.service.IDataServiceAwareProcedure;
 import com.bigdata.service.DataService.DataServiceFederationDelegate;
 import com.sun.jini.start.LifeCycle;
 import com.sun.jini.start.ServiceDescriptor;
