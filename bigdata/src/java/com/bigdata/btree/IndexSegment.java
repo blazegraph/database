@@ -217,7 +217,8 @@ public class IndexSegment extends AbstractBTree {
 
         if (isOpen()) {
 
-            log.warn("Closing IndexSegment: " + fileStore.getFile());
+            if (INFO)
+                log.info("Closing IndexSegment: " + fileStore.getFile());
             
             close();
 
