@@ -3010,11 +3010,11 @@ abstract public class StoreManager extends ResourceEvents implements
                 // Nothing to do.
             return;
 
-        } else if (releaseTime > lastCommitTime ) {
+        } else if (releaseTime >= lastCommitTime ) {
 
             /*
-             * If the computed [releaseTime] is after the last commit record
-             * then we choose the [lastCommitTime] instead.
+             * If the computed [releaseTime] GTE the last commit point then we
+             * choose the [lastCommitTime] instead.
              * 
              * Note: If there have been no writes on this data service but there
              * have been writes on other data services then the txService will
