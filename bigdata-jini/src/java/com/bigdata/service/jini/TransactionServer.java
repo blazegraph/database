@@ -183,17 +183,19 @@ public class TransactionServer extends AbstractServer {
     @Override
     protected AbstractTransactionService newService(Properties properties) {
 
-        final AbstractTransactionService service = new AdministrableTransactionService(
+        final DistributedTransactionService service = new AdministrableTransactionService(
                 this, properties);
 
         /*
          * Setup a delegate that let's us customize some of the federation
          * behaviors on the behalf of the service.
+         * 
+         * Note: We can't do this with the local or embedded federations since
+         * they have only one client per federation and an attempt to set the
+         * delegate more than once will cause an exception to be thrown!
          */
-        getClient()
-                .setDelegate(
-                        new DefaultServiceFederationDelegate<AbstractTransactionService>(
-                                service));
+        getClient().setDelegate(
+                new TransactionServiceFederationDelegate(service));
 
         return service;
         
