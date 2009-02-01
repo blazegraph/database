@@ -330,7 +330,8 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
         
         if(open) {
 
-            log.warn("Closing IndexSegmentStore: " + getFile());
+            if(INFO)
+                log.info("Closing IndexSegmentStore: " + getFile());
 
             _close();
             
@@ -1075,8 +1076,8 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
             // open the file.
             this.raf = new RandomAccessFile(file, "r");
 
-            if (WARN)
-                log.warn("Re-opened file: "+file);
+            if (INFO)
+                log.info("(Re-)opened file: "+file);
             
         } catch(IOException ex) {
             
@@ -1117,7 +1118,8 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
              * accidental deletes or overwrites.
              */
 
-            log.warn("FileLock not supported: file=" + getFile(), ex);
+            if (INFO)
+                log.warn("FileLock not supported: file=" + getFile(), ex);
 
         }
 
