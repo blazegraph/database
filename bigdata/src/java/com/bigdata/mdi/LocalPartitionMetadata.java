@@ -69,7 +69,7 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
      * written and is read each time it is read so this can be the main driver
      * of the size of the {@link IndexMetadata} record.
      */
-    protected final static int MAX_HISTORY_LENGTH = 4 * Bytes.kilobyte32;
+    protected final static transient int MAX_HISTORY_LENGTH = 4 * Bytes.kilobyte32;
     
     /**
      * The unique partition identifier.
