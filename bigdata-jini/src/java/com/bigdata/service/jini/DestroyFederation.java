@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.jini;
 
+import net.jini.config.ConfigurationException;
+
 /**
  * Utility will <strong>destroy</strong> the federation to which it connects.
  * All discoverable services for the federation and all persistent state for
@@ -37,24 +39,34 @@ package com.bigdata.service.jini;
  */
 public class DestroyFederation {
 
+    protected static final String COMPONENT = DestroyFederation.class.getName(); 
+
     /**
      * @param args
      *            Configuration file and optional overrides.
-     *            
-     * @throws InterruptedException 
+     * 
+     * @throws InterruptedException
+     * @throws ConfigurationException
      */
-    public static void main(final String[] args) throws InterruptedException {
+    public static void main(final String[] args) throws InterruptedException,
+            ConfigurationException {
 
         final JiniFederation fed = JiniClient.newInstance(args).connect();
-        
-        System.out.println("Waiting for service discovery.");
-        
-        Thread.sleep(5000/*ms*/);
-        
+
+        final long discoveryDelay = (Long) fed
+                .getClient()
+                .getConfiguration()
+                .getEntry(COMPONENT, "discoveryDelay", Long.TYPE, 5000L/* default */);
+
+        System.out.println("Waiting " + discoveryDelay
+                + "ms for service discovery.");
+
+        Thread.sleep(discoveryDelay/* ms */);
+
         fed.destroy();
 
         System.out.println("Destroyed.");
-        
+
         System.exit(0);
 
     }

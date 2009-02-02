@@ -144,23 +144,14 @@ public class DumpFederation {
         try {
 
             /*
-             * Wait until we have the metadata service.
+             * Wait until we have the metadata service : @todo config
              */
             fed.awaitServices(1/* minDataServices */, 10000L/* timeout(ms) */);
-//
-//            final long lastCommitTime = fed.getLastCommitTime();
-//            
-//            if(lastCommitTime == 0L) {
-//                
-//                System.out.println("No committed data.");
-//                
-//                System.exit(0);
-//                
-//            }
-            
+          
             // a read-only transaction as of the last commit time.
-            final long tx = fed.getTransactionService().newTx(ITx.READ_COMMITTED);
-            
+            final long tx = fed.getTransactionService().newTx(
+                    ITx.READ_COMMITTED);
+
             try {
 
                 final DumpFederation dumper = new DumpFederation(fed, tx);
@@ -266,7 +257,7 @@ public class DumpFederation {
                         + "\tSourceJournalCount"
                         + "\tSourceSegmentCount"
                         + "\tRangeCount" //
-                        + "\tRangeCountExact" //
+//                        + "\tRangeCountExact" //
                         + "\tSegmentBytes"// 
                         /*
                          * Note: These values are aggregates for the data
@@ -284,7 +275,7 @@ public class DumpFederation {
                          */
                         + "\tLeftSeparator"//
                         + "\tRightSeparator"//
-                        + "\nView"
+                        + "\tView"
                         + "\tHistory"//
                         );
 
@@ -387,25 +378,6 @@ public class DumpFederation {
 
             }
 
-            // fetch the LocalPartitionMetadata.
-            LocalPartitionMetadata localPartitionMetadata = null;
-            try {
-                
-                localPartitionMetadata = (LocalPartitionMetadata) dataService.submit(ts, DataService
-                        .getIndexPartitionName(indexName, locator.getPartitionId()),
-                        new FetchLocalPartitionMetadataTask());
-                
-            } catch (InterruptedException t) {
-                
-                throw t;
-                
-            } catch (Exception t) {
-                
-                log.warn("name=" + indexName + ", locator=" + locator, t);
-                
-            }
-            this.localPartitionMetadata = localPartitionMetadata;
-
             // various byte counts of interest.
             IndexPartitionDetailRecord detailRec = null;
             try {
@@ -444,11 +416,29 @@ public class DumpFederation {
          */
         public final ServiceMetadata smd;
 
-        /**
-         * The {@link LocalPartitionMetadata} for the index partition. This has
-         * lots of interesting information.
-         */
-        public final LocalPartitionMetadata localPartitionMetadata;
+//        /**
+//         * The {@link LocalPartitionMetadata} for the index partition. This has
+//         * lots of interesting information.
+//         */
+//        public final LocalPartitionMetadata localPartitionMetadata;
+//        // fetch the LocalPartitionMetadata.
+//        LocalPartitionMetadata localPartitionMetadata = null;
+//        try {
+//            
+//            localPartitionMetadata = (LocalPartitionMetadata) dataService.submit(ts, DataService
+//                    .getIndexPartitionName(indexName, locator.getPartitionId()),
+//                    new FetchLocalPartitionMetadataTask());
+//            
+//        } catch (InterruptedException t) {
+//            
+//            throw t;
+//            
+//        } catch (Exception t) {
+//            
+//            log.warn("name=" + indexName + ", locator=" + locator, t);
+//            
+//        }
+//        this.localPartitionMetadata = localPartitionMetadata;
         
         /**
          * The #of bytes across all {@link IndexSegment}s in the view.
@@ -512,6 +502,11 @@ public class DumpFederation {
         private static final long serialVersionUID = 6275468354120307662L;
 
         /**
+         * The detailed description of the index view.
+         */
+        public final LocalPartitionMetadata pmd;
+        
+        /**
          * The #of resources in the view for the index partition.
          */
         public final int sourceCount;
@@ -533,10 +528,10 @@ public class DumpFederation {
          */
         public final long rangeCount;
         
-        /**
-         * The exact range count for the index partition (w/o deleted tuples).
-         */
-        public final long rangeCountExact;
+//        /**
+//         * The exact range count for the index partition (w/o deleted tuples).
+//         */
+//        public final long rangeCountExact;
         
         /**
          * The #of bytes across all {@link IndexSegment}s in the view.
@@ -584,20 +579,17 @@ public class DumpFederation {
          */
         public final long overflowCount;
         
-        public IndexPartitionDetailRecord(//
-                final IIndex ndx,
-                final ResourceManager resourceManager//
-        ) {
+        public IndexPartitionDetailRecord(final IIndex ndx,
+                final ResourceManager resourceManager) {
 
             final long rangeCount = ndx.rangeCount();
 
             // @todo this appears to be too expensive to do all the time.
-            final long rangeCountExact = -1L;
+//            final long rangeCountExact = -1L;
 //            final long rangeCountExact = ndx.rangeCountExact(
 //                    null/* fromKey */, null/* toKey */);
             
-            final LocalPartitionMetadata pmd = ndx.getIndexMetadata()
-                    .getPartitionMetadata();
+            pmd = ndx.getIndexMetadata().getPartitionMetadata();
 
             long segmentByteCount = 0;
 
@@ -619,11 +611,9 @@ public class DumpFederation {
 
                         continue;
                     
-                    } else {
-
-                        segmentSourceCount++;
-
                     }
+
+                    segmentSourceCount++;
 
                     /*
                      * Note: This will force the (re-)open of the
@@ -653,7 +643,7 @@ public class DumpFederation {
             
             this.rangeCount = rangeCount;
             
-            this.rangeCountExact = rangeCountExact;
+//            this.rangeCountExact = rangeCountExact;
             
             this.sourceCount = sourceCount;
 
@@ -843,7 +833,7 @@ public class DumpFederation {
                 sb.append("\t" + rec.detailRec.journalSourceCount);
                 sb.append("\t" + rec.detailRec.segmentSourceCount);
                 sb.append("\t" + rec.detailRec.rangeCount);
-                sb.append("\t" + rec.detailRec.rangeCountExact);
+//                sb.append("\t" + rec.detailRec.rangeCountExact);
                 sb.append("\t" + rec.detailRec.segmentByteCount);
 
                 // stats for the entire data service
@@ -862,6 +852,8 @@ public class DumpFederation {
                 sb.append("\tN/A");
                 sb.append("\tN/A");
                 sb.append("\tN/A");
+//                sb.append("\tN/A");
+                sb.append("\tN/A");
 
                 sb.append("\tN/A");
                 sb.append("\tN/A");
@@ -878,20 +870,20 @@ public class DumpFederation {
                     + BytesUtil.toString(rec.locator.getLeftSeparatorKey()));
             sb.append("\t"
                     + BytesUtil.toString(rec.locator.getRightSeparatorKey()));
-            
-            if (rec.localPartitionMetadata != null) {
+
+            if (rec.detailRec != null && rec.detailRec.pmd != null) {
 
                 // current view definition.
-                sb.append("\""
-                        + Arrays.toString(rec.localPartitionMetadata
-                                .getResources()) + "\"");
-                
-                // history
-                sb.append("\t\"" + rec.localPartitionMetadata.getHistory()
+                sb.append("\t\""
+                        + Arrays.toString(rec.detailRec.pmd.getResources())
                         + "\"");
+
+                // history
+                sb.append("\t\"" + rec.detailRec.pmd.getHistory() + "\"");
 
             } else {
 
+                sb.append("\tN/A");
                 sb.append("\tN/A");
 
             }

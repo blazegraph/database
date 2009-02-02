@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.jini;
 
+import net.jini.config.ConfigurationException;
+
 /**
  * Utility will <strong>shutdown</strong> all services in the federation to
  * which it connects. The services may be restarted at a later time.
@@ -36,24 +38,38 @@ package com.bigdata.service.jini;
  */
 public class ShutdownFederation {
 
+    protected static final String COMPONENT = ShutdownFederation.class.getName(); 
+    
     /**
      * @param args
      *            Configuration file and optional overrides.
      * 
      * @throws InterruptedException
+     * @throws ConfigurationException
      */
-    public static void main(final String[] args) throws InterruptedException {
+    public static void main(final String[] args) throws InterruptedException,
+            ConfigurationException {
 
         final JiniFederation fed = JiniClient.newInstance(args).connect();
 
-        System.out.println("Waiting for service discovery.");
+        final long discoveryDelay = (Long) fed
+                .getClient()
+                .getConfiguration()
+                .getEntry(COMPONENT, "discoveryDelay", Long.TYPE, 5000L/* default */);
 
-        Thread.sleep(5000/* ms */);
+        final boolean immediateShutdown = (Boolean) fed.getClient()
+                .getConfiguration().getEntry(COMPONENT, "immediateShutdown",
+                        Boolean.TYPE, true/* default */);
 
-        fed.distributedFederationShutdown(true/* immediateShutdown */);
+        System.out.println("Waiting " + discoveryDelay
+                + "ms for service discovery.");
+
+        Thread.sleep(discoveryDelay/* ms */);
+
+        fed.distributedFederationShutdown(immediateShutdown);
 
         System.out.println("Shutdown.");
-        
+
         System.exit(0);
 
     }
