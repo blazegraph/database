@@ -63,9 +63,13 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
     private static final long serialVersionUID = -1511361004851335936L;
     
     /**
-     * The maximum length of the history string (1024 bytes).
+     * The maximum length of the history string (4kb).
+     * <p>
+     * Note: The history is written each time the {@link IndexMetadata} is
+     * written and is read each time it is read so this can be the main driver
+     * of the size of the {@link IndexMetadata} record.
      */
-    final int maxHistoryLength = Bytes.kilobyte32;
+    protected final static int MAX_HISTORY_LENGTH = 4 * Bytes.kilobyte32;
     
     /**
      * The unique partition identifier.
@@ -109,8 +113,8 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
     private String history;
     
     /**
-     * If the history string exceeds {@link #maxHistoryLength} characters then
-     * truncates it to the last {@link #maxHistoryLength}-3 characters,
+     * If the history string exceeds {@link #MAX_HISTORY_LENGTH} characters then
+     * truncates it to the last {@link #MAX_HISTORY_LENGTH}-3 characters,
      * prepends "...", and returns the result. Otherwise returns the entire
      * history string.
      */
@@ -118,7 +122,7 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
         
         String history = this.history;
         
-        if(history.length() > maxHistoryLength) {
+        if(history.length() > MAX_HISTORY_LENGTH) {
 
             /*
              * Truncate the history.
@@ -126,10 +130,10 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
 
             final int len = history.length();
             
-            final int fromIndex = len - (maxHistoryLength - 3);
+            final int fromIndex = len - (MAX_HISTORY_LENGTH - 3);
 
             assert fromIndex > 0 : "len=" + len + ", fromIndex=" + fromIndex
-                    + ", maxHistoryLength=" + maxHistoryLength;
+                    + ", maxHistoryLength=" + MAX_HISTORY_LENGTH;
             
             history = "..." + history.substring(fromIndex, len);
             
