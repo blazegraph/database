@@ -3644,7 +3644,7 @@ abstract public class StoreManager extends ResourceEvents implements
              * time of this journal.
              */
 
-            log.warn("Exmaining prior journal (fence post): closeTime="
+            log.warn("Examining prior journal (fence post): closeTime="
                     + closeTime + ", releaseTime=" + releaseTime);
 
             return getCommitTimeStrictlyGreaterThan(closeTime);

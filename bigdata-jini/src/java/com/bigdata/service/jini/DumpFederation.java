@@ -59,6 +59,7 @@ import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StoreManager;
+import com.bigdata.resources.StoreManager.ManagedJournal;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IDataServiceAwareProcedure;
@@ -258,22 +259,32 @@ public class DumpFederation {
                         + "\tServiceName" //
                         + "\tHostname" //
                         + "\tServiceCode"//
-                        //
+                        /*
+                         * Basic metadata about the index partition.
+                         */
                         + "\tSourceCount"//
+                        + "\tSourceJournalCount"
+                        + "\tSourceSegmentCount"
                         + "\tRangeCount" //
                         + "\tRangeCountExact" //
                         + "\tSegmentBytes"// 
+                        /*
+                         * Note: These values are aggregates for the data
+                         * service on which the index partition resides.
+                         */
                         + "\tDataDirFreeSpace"// 
-                        //
                         + "\tBytesUnderManagement"// 
                         + "\tJournalBytesUnderManagement"// 
                         + "\tIndexSegmentBytesUnderManagement"// 
                         + "\tManagedJournalCount"// 
                         + "\tManagedSegmentCount"//
                         + "\tOverflowCount"//
-                        //
+                        /*
+                         * Extended metadata about the index partition.
+                         */
                         + "\tLeftSeparator"//
                         + "\tRightSeparator"//
+                        + "\nView"
                         + "\tHistory"//
                         );
 
@@ -450,7 +461,7 @@ public class DumpFederation {
          * {@link StoreManager}.
          */
         public final IndexPartitionDetailRecord detailRec;
-
+        
     }
 
     /**
@@ -504,6 +515,18 @@ public class DumpFederation {
          * The #of resources in the view for the index partition.
          */
         public final int sourceCount;
+        
+        /**
+         * The #of resources in the view for the index partition which are
+         * {@link ManagedJournal}s.
+         */
+        public final int journalSourceCount;
+        
+        /**
+         * The #of resources in the view for the index partition which are
+         * {@link IndexSegment}s.
+         */
+        public final int segmentSourceCount;
         
         /**
          * The fast range count for the index partition.
@@ -562,18 +585,81 @@ public class DumpFederation {
         public final long overflowCount;
         
         public IndexPartitionDetailRecord(//
-                final int sourceCount,//
-                final long rangeCount,//
-                final long rangeCountExact,//
-                final long segmentByteCount,//
+                final IIndex ndx,
                 final ResourceManager resourceManager//
         ) {
 
+            final long rangeCount = ndx.rangeCount();
+
+            // @todo this appears to be too expensive to do all the time.
+            final long rangeCountExact = -1L;
+//            final long rangeCountExact = ndx.rangeCountExact(
+//                    null/* fromKey */, null/* toKey */);
+            
+            final LocalPartitionMetadata pmd = ndx.getIndexMetadata()
+                    .getPartitionMetadata();
+
+            long segmentByteCount = 0;
+
+            int sourceCount = 0;
+            
+            int journalSourceCount = 0;
+            
+            int segmentSourceCount = 0;
+            
+            if (pmd != null) {
+                
+                for (IResourceMetadata x : pmd.getResources()) {
+
+                    sourceCount++;
+
+                    if (x.isJournal()) {
+
+                        journalSourceCount++;
+
+                        continue;
+                    
+                    } else {
+
+                        segmentSourceCount++;
+
+                    }
+
+                    /*
+                     * Note: This will force the (re-)open of the
+                     * IndexSegmentStore. However, the store should already be
+                     * open since we have an IIndex object and that should be a
+                     * FusedView of its components.
+                     * 
+                     * @todo The IIndex is either a BTree or a FusedView so we
+                     * can just enumerate its sources directly, which is much
+                     * more straightforward.
+                     */
+                    final IndexSegmentStore segStore = (IndexSegmentStore) resourceManager
+                            .openStore(x.getUUID());
+
+                    /*
+                     * Note: The size() of an IndexSegmentStore is always the
+                     * length of the file. However, the #of bytes allocated by
+                     * the OS to a file may differ depending on the block size
+                     * for files on the volume.
+                     */
+
+                    segmentByteCount += segStore.size();
+
+                }
+
+            }
+            
             this.rangeCount = rangeCount;
             
             this.rangeCountExact = rangeCountExact;
             
             this.sourceCount = sourceCount;
+
+            this.journalSourceCount = journalSourceCount;
+            
+            this.segmentSourceCount = segmentSourceCount;
             
             this.segmentByteCount = segmentByteCount;
             
@@ -626,60 +712,10 @@ public class DumpFederation {
 
             }
 
-            final long rangeCount = ndx.rangeCount();
-
-            // @todo this appears to be too expensive to do all the time.
-            final long rangeCountExact = -1L;
-//            final long rangeCountExact = ndx.rangeCountExact(
-//                    null/* fromKey */, null/* toKey */);
-            
-            final LocalPartitionMetadata pmd = ndx.getIndexMetadata()
-                    .getPartitionMetadata();
-
             final ResourceManager resourceManager = dataService
                     .getResourceManager();
 
-            long segmentByteCount = 0;
-
-            int sourceCount = 0;
-            
-            if (pmd != null) {
-                
-                for (IResourceMetadata x : pmd.getResources()) {
-
-                    sourceCount++;
-                    
-                    if (x.isJournal())
-                        continue;
-
-                    /*
-                     * Note: This will force the (re-)open of the
-                     * IndexSegmentStore. However, the store should already be
-                     * open since we have an IIndex object and that should be a
-                     * FusedView of its components.
-                     * 
-                     * @todo The IIndex is either a BTree or a FusedView so we
-                     * can just enumerate its sources directly, which is much
-                     * more straightforward.
-                     */
-                    final IndexSegmentStore segStore = (IndexSegmentStore) resourceManager
-                            .openStore(x.getUUID());
-
-                    /*
-                     * Note: The size() of an IndexSegmentStore is always the
-                     * length of the file. However, the #of bytes allocated by
-                     * the OS to a file may differ depending on the block size
-                     * for files on the volume.
-                     */
-
-                    segmentByteCount += segStore.size();
-
-                }
-
-            }
-            
-            return new IndexPartitionDetailRecord(sourceCount, rangeCount,
-                    rangeCountExact, segmentByteCount, resourceManager);
+            return new IndexPartitionDetailRecord(ndx, resourceManager);
 
         }
 
@@ -799,51 +835,65 @@ public class DumpFederation {
             sb.append("\t" + rec.smd.getName());
             sb.append("\t" + rec.smd.getHostname());
             sb.append("\t" + "DS" + rec.smd.getCode());
+            
             if (rec.detailRec != null) {
+                
+                // core view stats.
                 sb.append("\t" + rec.detailRec.sourceCount);
+                sb.append("\t" + rec.detailRec.journalSourceCount);
+                sb.append("\t" + rec.detailRec.segmentSourceCount);
                 sb.append("\t" + rec.detailRec.rangeCount);
                 sb.append("\t" + rec.detailRec.rangeCountExact);
                 sb.append("\t" + rec.detailRec.segmentByteCount);
+
+                // stats for the entire data service
                 sb.append("\t" + rec.detailRec.dataDirFreeSpace);
-                
                 sb.append("\t" + rec.detailRec.bytesUnderManagement);
                 sb.append("\t" + rec.detailRec.journalBytesUnderManagement);
                 sb.append("\t" + rec.detailRec.segmentBytesUnderManagement);
                 sb.append("\t" + rec.detailRec.managedJournalCount);
                 sb.append("\t" + rec.detailRec.managedSegmentCount);
-                
                 sb.append("\t" + rec.detailRec.overflowCount);
                 
             } else {
+                
                 // error obtaining the data of interest.
                 sb.append("\tN/A");
                 sb.append("\tN/A");
                 sb.append("\tN/A");
                 sb.append("\tN/A");
-                sb.append("\tN/A");
 
                 sb.append("\tN/A");
                 sb.append("\tN/A");
                 sb.append("\tN/A");
                 sb.append("\tN/A");
                 sb.append("\tN/A");
-
                 sb.append("\tN/A");
+                sb.append("\tN/A");
+                
             }
-            
+
+            // extended view stats.
             sb.append("\t"
                     + BytesUtil.toString(rec.locator.getLeftSeparatorKey()));
             sb.append("\t"
                     + BytesUtil.toString(rec.locator.getRightSeparatorKey()));
             
-            if(rec.localPartitionMetadata!=null) {
+            if (rec.localPartitionMetadata != null) {
 
-                sb.append("\t\"" + rec.localPartitionMetadata.getHistory()+"\"");
+                // current view definition.
+                sb.append("\""
+                        + Arrays.toString(rec.localPartitionMetadata
+                                .getResources()) + "\"");
                 
+                // history
+                sb.append("\t\"" + rec.localPartitionMetadata.getHistory()
+                        + "\"");
+
             } else {
-                
+
                 sb.append("\tN/A");
-            
+
             }
             
             System.out.println(sb.toString());
