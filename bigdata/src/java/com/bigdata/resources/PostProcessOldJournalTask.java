@@ -353,13 +353,15 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * operations.
              */
 
-            log.debug("Index is cold: "+name);
+            if(DEBUG) 
+                log.debug("Index is cold: "+name);
             
             return null;
             
         }
         
-        log.debug("Index score: "+score);
+        if (DEBUG)
+            log.debug("Index score: "+score);
         
         return score;
         
@@ -380,9 +382,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      *            The per-index {@link Counters} for the unisolated and
      *            read-committed index views on the old journal.
      */
-    public PostProcessOldJournalTask(ResourceManager resourceManager,
-            long lastCommitTime, Set<String> copied, Counters totalCounters,
-            Map<String/* name */, Counters> indexCounters) {
+    public PostProcessOldJournalTask(final ResourceManager resourceManager,
+            final long lastCommitTime, final Set<String> copied,
+            final Counters totalCounters,
+            final Map<String/* name */, Counters> indexCounters) {
 
         if (resourceManager == null)
             throw new IllegalArgumentException();
@@ -2077,9 +2080,15 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         if (INFO)
             log.info("begin : will run " + tasks.size() + " update tasks");
 
-//        runTasksConcurrent(tasks);
-        
-        runTasksInSingleThread(tasks);
+        if (resourceManager.overflowTasksConcurrent) {
+
+            runTasksConcurrent(tasks);
+
+        } else {
+
+            runTasksInSingleThread(tasks);
+
+        }
         
         if (INFO)
             log.info("end");
@@ -2103,7 +2112,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             final long begin = System.nanoTime();
             
             // remaining nanoseconds in which to execute overflow tasks.
-            long nanos = TimeUnit.MILLISECONDS.toNanos(resourceManager.overflowTimeout);
+            long nanos = TimeUnit.MILLISECONDS
+                    .toNanos(resourceManager.overflowTimeout);
             
             final Iterator<AbstractTask> titr = tasks.iterator();
 
@@ -2117,8 +2127,20 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 
                 if (shouldOverflow) {
 
-                    // end async overflow.
-                    break;
+                    if (resourceManager.overflowCancelledWhenJournalFull) {
+                        
+                        // end async overflow.
+                        break;
+                    
+                    } else {
+
+                        // issue warning since journal is already full again.
+                        final long elapsed = (System.nanoTime() - begin);
+
+                        log.warn("Overflow still running: elapsed="
+                                + TimeUnit.NANOSECONDS.toMillis(elapsed));
+
+                    }
                     
                 }
 
@@ -2207,7 +2229,13 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
         } catch (Throwable t) {
 
-            // elapsed execution time for the task.
+            /*
+             * Elapsed execution time for the task.
+             * 
+             * Note: finishedWork may be zero if a task was cancelled and we
+             * look at its future before the task notices the interrupt. in such
+             * cases the elapsed time reported here will be negative.
+             */ 
             final long elapsed = TimeUnit.NANOSECONDS
                     .toMillis(task.nanoTime_finishedWork
                             - task.nanoTime_beginWork);
@@ -2271,16 +2299,17 @@ public class PostProcessOldJournalTask implements Callable<Object> {
     /**
      * These are all good indicators that the data service was shutdown.
      */
-    protected boolean isNormalShutdown(Throwable t) {
+    protected boolean isNormalShutdown(final Throwable t) {
 
-        return isNormalShutdown(resourceManager,t);
+        return isNormalShutdown(resourceManager, t);
         
     }
     
     /**
      * These are all good indicators that the data service was shutdown.
      */
-    static protected boolean isNormalShutdown(ResourceManager resourceManager, Throwable t) {
+    static protected boolean isNormalShutdown(
+            final ResourceManager resourceManager, final Throwable t) {
 
         if(Thread.currentThread().isInterrupted()) return true;
         
@@ -2308,6 +2337,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
     }
     
     @SuppressWarnings("unchecked")
-    private final List<AbstractTask> EMPTY_LIST = Collections.EMPTY_LIST; 
+    static private final List<AbstractTask> EMPTY_LIST = Collections.EMPTY_LIST; 
     
 }

@@ -53,6 +53,7 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.BufferedDiskStrategy;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITx;
@@ -262,6 +263,16 @@ abstract public class OverflowManager extends IndexManager {
     protected final long overflowTimeout;
     
     /**
+     * @see Options#OVERFLOW_TASKS_CONCURRENT
+     */
+    protected final boolean overflowTasksConcurrent;
+    
+    /**
+     * @see Options#OVERFLOW_CANCELLED_WHEN_JOURNAL_FULL
+     */
+    protected final boolean overflowCancelledWhenJournalFull;
+    
+    /**
      * #of overflows that have taken place. This counter is incremented each
      * time the entire overflow operation is complete, including any
      * post-processing of the old journal.
@@ -301,7 +312,7 @@ abstract public class OverflowManager extends IndexManager {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public interface Options extends IndexManager.Options, IServiceShutdown.Options {
+    public static interface Options extends IndexManager.Options, IServiceShutdown.Options {
        
         /**
          * Boolean property determines whether or not
@@ -477,12 +488,19 @@ abstract public class OverflowManager extends IndexManager {
          * complete (default {@link #DEFAULT_OVERFLOW_TIMEOUT}). Any overflow
          * task that does not complete within this timeout will be cancelled.
          * <p>
-         * Note: Asynchronous overflow processing is responsible for splitting,
+         * Asynchronous overflow processing is responsible for splitting,
          * moving, and joining index partitions. The asynchronous overflow tasks
          * are written to fail "safe". Also, each task may succeed or fail on
          * its own. Iff the task succeeds, then its effect is made restart safe.
          * Otherwise clients continue to use the old view of the index
          * partition.
+         * <p>
+         * If asynchronous overflow processing DOES NOT complete each time then
+         * we run several very serious and non-sustainable risks, including: (a)
+         * the #of sources in a view can increase without limit; (b) the #of
+         * journal that must be retained can increase without limit; and (c)
+         * when using the {@link BufferedDiskStrategy}, the direct buffers for
+         * those journals can increase without limit.
          */
         String OVERFLOW_TIMEOUT = OverflowManager.class.getName() + ".timeout";
 
@@ -491,6 +509,32 @@ abstract public class OverflowManager extends IndexManager {
          * processing (equivalent to 10 minutes).
          */
         String DEFAULT_OVERFLOW_TIMEOUT = "" + (10 * 1000 * 60L); // 10 minutes.
+
+        /**
+         * When <code>true</code> the asynchronous overflow processing tasks
+         * will run concurrently (default
+         * {@value #DEFAULT_OVERFLOW_TASKS_CONCURRENT}). When
+         * <code>false</code> they will run sequentially.
+         */
+        String OVERFLOW_TASKS_CONCURRENT = OverflowManager.class.getName()
+                + ".overflowTasksConcurrent";
+
+        String DEFAULT_OVERFLOW_TASKS_CONCURRENT = "false";
+
+        /**
+         * Cancel an existing asychronous overflow process (interrupting any
+         * running tasks) if the live journal is again approaching its maximum
+         * extent (default
+         * {@value #DEFAULT_OVERFLOW_CANCELLED_WHEN_JOURNAL_FULL}).
+         * 
+         * @todo this option is ignored if {@link #OVERFLOW_TASKS_CONCURRENT} is
+         *       <code>true</code>.
+         */
+        String OVERFLOW_CANCELLED_WHEN_JOURNAL_FULL = OverflowManager.class
+                .getName()
+                + ".overflowCancelledWhenJournalFull";
+
+        String DEFAULT_OVERFLOW_CANCELLED_WHEN_JOURNAL_FULL = "true";
 
     }
 
@@ -613,6 +657,34 @@ abstract public class OverflowManager extends IndexManager {
             if(INFO)
                 log.info(Options.OVERFLOW_TIMEOUT + "=" + overflowTimeout);
             
+        }
+
+        // overflowTasksConcurrent
+        {
+
+            overflowTasksConcurrent = Boolean.parseBoolean(properties
+                    .getProperty(Options.OVERFLOW_TASKS_CONCURRENT,
+                            Options.DEFAULT_OVERFLOW_TASKS_CONCURRENT));
+
+            if (INFO)
+                log.info(Options.OVERFLOW_TASKS_CONCURRENT + "="
+                        + overflowTasksConcurrent);
+
+        }
+        
+        // overflowCancelledWhenJournalFull
+        {
+
+            overflowCancelledWhenJournalFull = Boolean
+                    .parseBoolean(properties
+                            .getProperty(
+                                    Options.OVERFLOW_CANCELLED_WHEN_JOURNAL_FULL,
+                                    Options.DEFAULT_OVERFLOW_CANCELLED_WHEN_JOURNAL_FULL));
+
+            if (INFO)
+                log.info(Options.OVERFLOW_CANCELLED_WHEN_JOURNAL_FULL + "="
+                        + overflowCancelledWhenJournalFull);
+
         }
 
         // copyIndexThreshold
@@ -1022,7 +1094,8 @@ abstract public class OverflowManager extends IndexManager {
          * We have an exclusive lock and the overflow conditions are satisifed.
          */
         final long lastCommitTime;
-        final Set<String> copied = new HashSet<String>();
+        // names of all indices copied over to the new journal.
+        final Set<String> copied = new HashSet<String>(); //@todo capacity
         final AtomicBoolean postProcess = new AtomicBoolean(false);
 
         // Do overflow processing.
@@ -1277,7 +1350,7 @@ abstract public class OverflowManager extends IndexManager {
          * 
          * FIXME This whole operation should be validated as a pre-condition to
          * attempting overflow and if an error arises during overflow then a
-         * compenating action should restore the old journal and delete the new
+         * compensating action should restore the old journal and delete the new
          * one so that we continue to run against a known good state. For
          * example, if an unpartitioned index is encountered then a thrown
          * exception results in the application running against the new live
@@ -1292,8 +1365,16 @@ abstract public class OverflowManager extends IndexManager {
         int numIndicesViewRefined = 0;
         // #of indices with at least one index entry that were copied.
         int numIndicesNonZeroCopy = 0;
-        // Maximum #of non-zero indices that we will copy over.
-        final int maxNonZeroCopy = 100; // @todo config
+        /*
+         * Maximum #of non-zero indices that we will copy over.
+         * 
+         * @todo config. maxNonZeroCopy might not be a good idea in some cases.
+         * if there is a large #of small indices on the journal then some should
+         * really be moved somewhere else and this limit can promote that.
+         * however, if the entire federation is filled with such small indices
+         * then we hardly needs to be doing index builds for all of them.
+         */
+        final int maxNonZeroCopy = 100;
         final long firstCommitTime;
         {
 
