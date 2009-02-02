@@ -56,6 +56,26 @@ public class XHTMLRenderer {
 
     public static class Model {
 
+//        static enum SourceEnum {
+//            
+//            /**
+//             * Shows the performance counter data.
+//             */
+//            Counters,
+//            
+//            /**
+//             * Shows the index partition data.
+//             */
+//            IndexPartitions;
+//            
+//        }
+//        
+//        /**
+//         * A choice of various kinds of data. The default source is the
+//         * performance counters.
+//         */
+//        static final String SOURCE = "source";
+        
         /**
          * Name of the URL query parameter specifying the starting path for the page
          * view.

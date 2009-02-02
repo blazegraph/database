@@ -209,9 +209,6 @@ abstract public class StoreManager extends ResourceEvents implements
          * if it is still open.
          * 
          * @see #DEFAULT_STORE_CACHE_CAPACITY
-         * 
-         * @todo define maximum age on the LRU and the delay between sweeps of
-         *       the LRU
          */
         String STORE_CACHE_CAPACITY = StoreManager.class.getName()
                 + ".storeCacheCapacity";

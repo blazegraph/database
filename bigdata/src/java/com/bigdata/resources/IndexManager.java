@@ -111,7 +111,7 @@ abstract public class IndexManager extends StoreManager {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public interface Options extends StoreManager.Options {
+    public static interface Options extends StoreManager.Options {
      
         /**
          * The capacity of the LRU cache of open {@link IIndex}s. The capacity
