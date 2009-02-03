@@ -42,6 +42,14 @@ import java.util.concurrent.TimeoutException;
 public interface ILoadBalancerService extends IService {
    
     /**
+     * Sent an event.
+     * 
+     * @param e
+     *            The event.
+     */
+    public void notifyEvent(Event e) throws IOException;
+    
+    /**
      * Send performance counters. Clients SHOULD invoke this method no less than
      * once every 60 seconds.
      * 
