@@ -33,11 +33,14 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.Vector;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -67,6 +70,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.QueueStatisticsTask;
 import com.bigdata.util.concurrent.TaskCounters;
 import com.bigdata.util.httpd.AbstractHTTPD;
+import com.sun.org.apache.bcel.internal.generic.ILOAD;
 
 /**
  * Abstract base class for {@link IBigdataFederation} implementations.
@@ -155,6 +159,9 @@ abstract public class AbstractFederation implements IBigdataFederation,
         // terminate sampling and reporting tasks.
         sampleService.shutdown();
 
+        // discard any events still in the queue.
+        events.clear();
+        
         // optional httpd service for the local counters. 
         if( httpd != null) {
             
@@ -212,6 +219,9 @@ abstract public class AbstractFederation implements IBigdataFederation,
 
         // terminate sampling and reporting tasks immediately.
         sampleService.shutdownNow();
+
+        // discard any events still in the queue.
+        events.clear();
 
         // terminate the optional httpd service for the client's live counters.
         if( httpd != null) {
@@ -483,14 +493,21 @@ abstract public class AbstractFederation implements IBigdataFederation,
         
         tempStoreFactory = new TemporaryStoreFactory(this.client
                 .getTempStoreMaxExtent());
-        
+
+        addScheduledTask(
+                new SendEventsTask(),// task to run.
+                100, // initialDelay (ms)
+                2000, // delay
+                TimeUnit.MILLISECONDS // unit
+                );                
+
         addScheduledTask(//
                 new StartDeferredTasksTask(),// task to run.
                 150, // initialDelay (ms)
                 2000, // delay
                 TimeUnit.MILLISECONDS // unit
                 );
-
+        
         // Setup locator.
         resourceLocator = new DefaultResourceLocator(this,
                 null, // delegate
@@ -1334,7 +1351,61 @@ abstract public class AbstractFederation implements IBigdataFederation,
      * 
      * @param e
      */
-    protected void sendEvent(Event e) {
+    protected void sendEvent(final Event e) {
+        
+        assertOpen();
+        
+        events.add(e);
+        
+    }
+    
+    final private BlockingQueue<Event> events = new LinkedBlockingQueue<Event>();
+    
+    /**
+     * Sends events to the {@link ILoadBalancerService}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private class SendEventsTask implements Runnable {
+
+        public SendEventsTask() {
+            
+        }
+        
+        /**
+         * Note: Don't throw anything - it will cancel the scheduled task.
+         */
+        public void run() {
+
+            try {
+            
+            final ILoadBalancerService lbs = getLoadBalancerService();
+
+            if (lbs == null) {
+
+                // Can't drain events : @todo might discard if queue is too full.
+                return;
+                
+            }
+            
+            final LinkedList<Event> c = new LinkedList<Event>();
+            
+            events.drainTo( c );
+            
+            for(Event e : events) {
+                
+                lbs.notifyEvent( e );
+                
+            }
+
+            } catch(Throwable t) {
+                
+                log.warn(getServiceName(), t);
+                
+            }
+            
+        }
         
     }
     

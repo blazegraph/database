@@ -1863,6 +1863,14 @@ abstract public class LoadBalancerService extends AbstractService
 
     }
 
+    public void notifyEvent(final Event e) {
+        
+        /*
+         * @todo handle events.
+         */
+        
+    }
+    
     public void notify(final UUID serviceUUID, final byte[] data) {
 
         setupLoggingContext();
