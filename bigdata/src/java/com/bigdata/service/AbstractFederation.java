@@ -901,7 +901,8 @@ abstract public class AbstractFederation implements IBigdataFederation,
 
                 if (elapsed > 1000 * 10)
                     log.warn(ERR_NO_SERVICE_UUID + " : iface="
-                            + getServiceIface() + ", elapsed=" + elapsed);
+                            + getServiceIface() + ", name=" + getServiceName()
+                            + ", elapsed=" + elapsed);
                 else if (INFO)
                     log.info(ERR_NO_SERVICE_UUID);
 
@@ -913,7 +914,8 @@ abstract public class AbstractFederation implements IBigdataFederation,
 
                 if (elapsed > 1000 * 10)
                     log.warn(ERR_SERVICE_NOT_READY + " : iface="
-                            + getServiceIface() + ", elapsed=" + elapsed);
+                            + getServiceIface() + ", name=" + getServiceName()
+                            + ", elapsed=" + elapsed);
                 else if (INFO)
                     log.info(ERR_SERVICE_NOT_READY + " : " + elapsed);
 
@@ -1325,4 +1327,15 @@ abstract public class AbstractFederation implements IBigdataFederation,
 
     }
 
+    /**
+     * Queues up an event to be sent to the {@link ILoadBalancerService}.
+     * Events are maintained on a non-blocking queue and sent by a scheduled
+     * task.
+     * 
+     * @param e
+     */
+    protected void sendEvent(Event e) {
+        
+    }
+    
 }
