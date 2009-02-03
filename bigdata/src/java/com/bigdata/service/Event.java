@@ -33,6 +33,7 @@ import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.journal.ITransactionService;
 
 /**
@@ -66,6 +67,27 @@ public class Event implements Serializable {
      */
     public final UUID uuid;
 
+    /**
+     * The host on which the event was generated.
+     */
+    public final String hostname;
+    
+    /**
+     * The most interesting class or interface for the service which generated
+     * that event.
+     */
+    public final Class serviceIface;
+    
+    /**
+     * The name of the service which generated the event.
+     */
+    public final String serviceName;
+    
+    /**
+     * The {@link UUID} for the service which generated that event.
+     */
+    public final UUID serviceUUID;
+    
     /**
      * Event type (classification or category).
      */
@@ -116,8 +138,19 @@ public class Event implements Serializable {
             throw new IllegalArgumentException();
 
         this.fed = fed;
+        
         this.uuid = UUID.randomUUID();
+        
+        this.hostname = AbstractStatisticsCollector.fullyQualifiedHostName;
+
+        this.serviceIface = fed.getServiceIface();
+
+        this.serviceName = fed.getServiceName();
+
+        this.serviceUUID = fed.getServiceUUID();
+
         this.type = type;
+
         this.details = details;
 
         /*
