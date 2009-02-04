@@ -39,13 +39,21 @@ import com.bigdata.journal.ITransactionService;
 /**
  * An event. Events are queued by the {@link IBigdataClient} and self-reported
  * periodically to the {@link ILoadBalancerService}. The event is assigned a
- * {@link UUID} when it is created and the {@link ILoadBalancerService }
- * assigned start and end event times based on its local clock as the events are
- * received (this helps to reduce the demand on the {@link ITransactionService}
- * for global timestamp).
+ * {@link UUID} when it is created and the {@link ILoadBalancerService} assigned
+ * start and end event times based on its local clock as the events are received
+ * (this helps to reduce the demand on the {@link ITransactionService} for
+ * global timestamp).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo compact event serialization when reporting to the
+ *       {@link ILoadBalancerService}, including factoring out of the common
+ *       metadata (some stuff will always be the same for a given reported and
+ *       does not need to be reported with each event).
+ * 
+ * @todo Add a level property to events? (but events are not meant to replace
+ *       logging)
  */
 public class Event implements Serializable {
 
@@ -60,7 +68,7 @@ public class Event implements Serializable {
      */
     private static final long serialVersionUID = 2651293369056916231L;
 
-    private transient AbstractFederation fed;
+    private transient IBigdataFederation fed;
 
     /**
      * Unique event identifier.
@@ -91,28 +99,54 @@ public class Event implements Serializable {
     /**
      * Event type (classification or category).
      */
-    public final String type;
+    public final EventType eventType;
 
     /**
      * Event details.
      */
-    public final String details;
+    protected String details;
+    
+    /**
+     * Event details.
+     */
+    public String getDetails() {
+        
+        return details;
+        
+    }
 
     /**
-     * The event start time (auto-assigned by the recipient if 0L).
+     * The event start time. Assigned locally. The ecipient may use [endTime -
+     * startTime] to adjust the event to its local clock.
      */
-    private long startTime;
+    protected long startTime;
 
     /**
-     * The event end time (auto-assigned by the recipient if 0L).
+     * The event end time. Assigned locally. The recipient may use [endTime -
+     * startTime] to adjust the event to its local clock.
      */
-    private long endTime;
+    protected long endTime;
 
+    /**
+     * The time when the event was received. The recipient may use [endTime -
+     * startTime] to adjust the event to its local clock.
+     */
+    transient protected long receiptTime;
+    
     /**
      * <code>true</code> iff the event event has been generated.
      */
     private boolean complete = false;
 
+    /**
+     * <code>true</code> iff the event event has been generated.
+     */
+    public boolean isComplete() {
+        
+        return complete;
+        
+    }
+    
     public long getStartTime() {
 
         return startTime;
@@ -125,31 +159,31 @@ public class Event implements Serializable {
 
     }
 
-    public Event(final AbstractFederation fed, final String type,
+    public Event(final IBigdataFederation fed, final EventType eventType,
             final String details) {
 
         if (fed == null)
             throw new IllegalArgumentException();
 
-        if (type == null)
+        if (eventType == null)
             throw new IllegalArgumentException();
 
         if (details == null)
             throw new IllegalArgumentException();
 
         this.fed = fed;
-        
+
         this.uuid = UUID.randomUUID();
-        
+
         this.hostname = AbstractStatisticsCollector.fullyQualifiedHostName;
 
-        this.serviceIface = fed.getServiceIface();
+        this.serviceIface = this.fed.getServiceIface();
 
-        this.serviceName = fed.getServiceName();
+        this.serviceName = this.fed.getServiceName();
 
-        this.serviceUUID = fed.getServiceUUID();
+        this.serviceUUID = this.fed.getServiceUUID();
 
-        this.type = type;
+        this.eventType = eventType;
 
         this.details = details;
 
@@ -164,36 +198,144 @@ public class Event implements Serializable {
          * if local-assign, then use System.currentTimeMillis().
          */
 
-        start();
-
     }
 
     /**
      * Send the start event.
+     * <p>
+     * Note: If you want to report an event with a duration then you MUST use
+     * {@link #start()} when the event starts and {@link #end()} when the event
+     * ends. If you want to report an "instantenous" event then you can just use
+     * {@link #end()}.
      */
-    protected void start() {
+    synchronized public Event start() {
 
-        fed.sendEvent(this);
+        if (startTime != 0) {
+            
+            // start already reported.
+            throw new IllegalStateException();
+            
+        }
+        
+        // assign start time.
+        startTime = System.currentTimeMillis();
+        
+        if(fed instanceof AbstractFederation) {
+
+            ((AbstractFederation)fed).sendEvent(this);
+            
+        } else {
+            
+            if (INFO)
+                log.info(this);
+            
+        }
+        
+        return this;
 
     }
 
     /**
-     * Sends the end event.
+     * Variant of {@link #end()} which may be used to append more details to the
+     * event.
+     * 
+     * @param moreDetails
+     *            Additional details (optional).
+     * 
+     * @return The event.
      */
-    public void end() {
+    synchronized public Event end(String moreDetails) {
+        
+        if (moreDetails != null) {
 
+            details = details + "::" + moreDetails;
+            
+        }
+
+        return end();
+        
+    }
+    
+    /**
+     * Sends the end event.
+     * <p>
+     * Note: You can use this method for "instantenous" events.
+     */
+    synchronized public Event end() {
+        
         if (complete) {
 
-            log.error("Event already complete: " + this);
-
-            return;
-
+            throw new IllegalStateException();
+            
         }
 
         complete = true;
 
-        fed.sendEvent(this);
+        endTime = System.currentTimeMillis();
+
+        if (startTime == 0L) {
+
+            // an "instantenous" event.
+            startTime = endTime;
+            
+        }
+        
+        if(fed instanceof AbstractFederation) {
+
+            ((AbstractFederation) fed).sendEvent(this);
+
+        } else {
+
+            if (INFO)
+                log.info(this);
+
+        }
+        
+        return this;
 
     }
 
+    /**
+     * A header that can be used to interpret the output of {@link #toString()}
+     * (with newline).
+     */
+    static public String getHeader() {
+
+        return  "uuid"
+            + "\teventType"
+            + "\tstartTime"
+            + "\tendTime"
+            + "\tcomplete"
+            + "\thostname"
+            + "\tserviceIface"
+            + "\tserviceName"
+            + "\tserviceUUID"
+            + "\tdetails"
+            + "\n"
+            ;
+        
+    }
+    
+    /**
+     * Tab-delimited format (with newline).
+     */
+    public String toString() {
+        
+        StringBuilder sb = new StringBuilder();
+        
+        sb.append(uuid); sb.append('\t'); 
+        sb.append(eventType); sb.append('\t'); 
+        sb.append(startTime); sb.append('\t'); 
+        sb.append(endTime); sb.append('\t'); 
+        sb.append(complete); sb.append('\t'); 
+        sb.append(hostname); sb.append('\t'); 
+        sb.append(serviceIface); sb.append('\t'); 
+        sb.append(serviceName); sb.append('\t'); 
+        sb.append(serviceUUID); sb.append('\t'); 
+        sb.append(details); sb.append('\n');
+        
+        return sb.toString();
+        
+    }
+    
 }

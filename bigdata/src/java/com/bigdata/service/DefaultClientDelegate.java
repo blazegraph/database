@@ -1,8 +1,15 @@
 package com.bigdata.service;
 
+import java.io.IOException;
+import java.util.LinkedHashMap;
+import java.util.Properties;
 import java.util.UUID;
+import java.util.Vector;
 
 import com.bigdata.counters.AbstractStatisticsCollector;
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.httpd.CounterSetHTTPD;
+import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
  * Default {@link IFederationDelegate} implementation used by a standard client.
@@ -18,7 +25,7 @@ public class DefaultClientDelegate implements IFederationDelegate {
 
     private final AbstractFederation fed;
 
-    public DefaultClientDelegate(AbstractFederation fed) {
+    public DefaultClientDelegate(final AbstractFederation fed) {
 
         if (fed == null)
             throw new IllegalArgumentException();
@@ -76,6 +83,38 @@ public class DefaultClientDelegate implements IFederationDelegate {
 
     /** NOP */
     public void serviceLeave(UUID serviceUUID) {
+
+    }
+
+    public AbstractHTTPD newHttpd(final int httpdPort,
+            final CounterSet counterSet) throws IOException {
+        
+        return new CounterSetHTTPD(httpdPort, counterSet) {
+
+            public Response doGet(String uri, String method, Properties header,
+                    LinkedHashMap<String, Vector<String>> parms)
+                    throws Exception {
+
+                try {
+
+                    reattachDynamicCounters();
+
+                } catch (Exception ex) {
+
+                    /*
+                     * Typically this is because the live journal has been
+                     * concurrently closed during the request.
+                     */
+
+                    log.warn("Could not re-attach dynamic counters: " + ex, ex);
+
+                }
+
+                return super.doGet(uri, method, header, parms);
+
+            }
+
+        };
 
     }
 

@@ -9,6 +9,7 @@ import java.io.OutputStream;
 import java.text.NumberFormat;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.Vector;
@@ -146,6 +147,27 @@ abstract public class LoadBalancerService extends AbstractService
      * True iff the {@link #log} level is DEBUG or less.
      */
     static final protected boolean DEBUG = log.isDebugEnabled();
+
+    /**
+     * Inner class provides a named logger for {@link Event}s.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class EventLog {
+
+        final static protected Logger eventLog = Logger.getLogger(EventLog.class);
+        
+        final static protected boolean INFO = eventLog.isInfoEnabled();
+        
+        static {
+            
+            if(INFO)
+                EventLog.eventLog.info(Event.getHeader());
+            
+        }
+        
+    }
 
     final protected String ps = ICounterSet.pathSeparator;
     
@@ -296,6 +318,27 @@ abstract public class LoadBalancerService extends AbstractService
     protected final int historyMinutes;
     
     /**
+     * The #of milliseconds that completed events will be retained.
+     * 
+     * @see Options#EVENT_HISTORY_MILLIS
+     */
+    protected final long eventHistoryMillis;
+    
+    /**
+     * Basically a ring buffer of events without a capacity limit and with
+     * random access by the event {@link UUID}. New events are added to the
+     * collection by {@link #notifyEvent(Event)}. That method also scans the
+     * head of the collection, purging any events that are older than the
+     * desired #of minutes of event history to retain.
+     * <p>
+     * Since this is a "linked" collection, the order of the events in the
+     * collection will always reflect their arrival time. This lets us scan the
+     * events in temporal order, filtering for desired criteria and makes it
+     * possible to prune the events in the buffer as new events arrive.
+     */
+    protected LinkedHashMap<UUID,Event> events = new LinkedHashMap<UUID,Event>(10000/* initialCapacity */);
+    
+    /**
      * Options understood by the {@link LoadBalancerService}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -394,7 +437,18 @@ abstract public class LoadBalancerService extends AbstractService
                 + ".serviceJoinTimeout";
 
         String DEFAULT_SERVICE_JOIN_TIMEOUT = "" + (3 * 1000);
-        
+
+        /**
+         * The #of milliseconds that completed events will be retained.
+         */
+        String EVENT_HISTORY_MILLIS = LoadBalancerService.class.getName()
+                + ".eventHistoryMillis";
+
+        /**
+         * Default is one hour of completed events.
+         */
+        String DEFAULT_EVENT_HISTORY_MILLIS = "" + (60 * 60 * 1000);
+
     }
 
     /**
@@ -528,7 +582,20 @@ abstract public class LoadBalancerService extends AbstractService
                     delay, unit);
 
         }
-        
+
+        // eventHistoryMillis
+        {
+
+            eventHistoryMillis = Long.parseLong(properties.getProperty(
+                    Options.EVENT_HISTORY_MILLIS,
+                    Options.DEFAULT_EVENT_HISTORY_MILLIS));
+
+            if (INFO)
+                log.info(Options.EVENT_HISTORY_MILLIS + "="
+                        + eventHistoryMillis);
+
+        }
+
     }
     
     @Override
@@ -1863,11 +1930,138 @@ abstract public class LoadBalancerService extends AbstractService
 
     }
 
-    public void notifyEvent(final Event e) {
-        
+    /**
+     * Accepts the event, either updates the existing event with the same
+     * {@link UUID} or adds the event to the set of recent events, and then
+     * prunes the set of recent events so that all completed events older than
+     * {@link #eventHistoryMillis} are discarded.
+     */
+    public void notifyEvent(Event e) {
+
+        // timestamp for start/end time of the event.
+        final long now = System.currentTimeMillis();
+
         /*
-         * @todo handle events.
+         * Any completed events which are older than the cutoff point are
+         * discarded.
          */
+        final long cutoff = now - eventHistoryMillis;
+
+        if(EventLog.INFO) {
+            
+            EventLog.eventLog.info(e.toString());
+            
+        }
+          
+        synchronized (events) {
+
+            /*
+             * Record the event, either setting its start time or its end time
+             * as appropriate.
+             */
+            {
+
+                {
+                    
+                    // is this a known event?
+                    final Event t = events.get(e.uuid);
+
+                    if (t == null) {
+
+                        /*
+                         * This is a new event so add to the collection of
+                         * recent events.
+                         * 
+                         * Note: If a start event is received, then there is a
+                         * service restart, and then we see the end event the
+                         * receipt time assigned to the event will be after the
+                         * actual event start time. Outside of making events
+                         * restart safe there is not much that we can do about
+                         * this.
+                         */
+                    
+                        events.put(e.uuid, e);
+                        
+                        // timestamp when we got this event.
+                        e.receiptTime = now;
+
+                    } else {
+                        
+                        /*
+                         * There is an existing event. We replace the details
+                         * with the details of the new event.
+                         * 
+                         * Note: We do not update events which are already
+                         * flagged as complete. At stake is the fact that the
+                         * client might send us two "end()" events if the end()
+                         * event is generated before the start() event gets sent
+                         * along. The logic in the client does not exclude this
+                         * possibility.
+                         */
+
+                        if (!t.isComplete()) {
+
+                            // copy potentially updated details.
+                            t.details = e.details;
+
+                            // use the pre-existing event reference.
+                            e = t;
+
+                        }
+                        
+                    }
+                    
+                }
+
+            }
+
+            /*
+             * Prune the events, discarding any whose end time is LTE to the
+             * cutoff.
+             */
+            final Iterator<Event> itr = events.values().iterator();
+
+            int npruned = 0;
+            
+            while (itr.hasNext()) {
+
+                final Event t = itr.next();
+
+                if (t.isComplete()) {
+
+                    /*
+                     * The age of the event.
+                     * 
+                     * Note: This is measured by timestamps assigned by the
+                     * service which generated the event.
+                     */
+                    final long age = e.endTime - e.startTime;
+                    
+                    // age of the 'end' timestamp for this event.
+                    if (age >= eventHistoryMillis) {
+                        
+                        // discard completed event.
+                        itr.remove();
+//                        log.warn("Discarded event: "+e);
+                        
+                        npruned++;
+                        
+                    } else {
+                        
+                        // done pruning events.
+                        break;
+                        
+                    }
+                    
+                }
+                
+            }
+            
+            if (INFO)
+                log.info("There are " + events.size() + " events : cutoff="
+                        + cutoff + ", #pruned " + npruned);
+            
+        }
         
     }
     

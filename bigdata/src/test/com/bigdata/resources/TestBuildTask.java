@@ -30,12 +30,9 @@ package com.bigdata.resources;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.Random;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.BTree;
@@ -177,14 +174,13 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
         final UUID uuid0 = resourceManager.getLiveJournal().getRootBlockView()
                 .getUUID();
 
-        final Set<String> copied = new HashSet<String>();
-        
         // force overflow onto a new journal.
-        final AtomicBoolean postProcess = new AtomicBoolean(false);
-        resourceManager.doSynchronousOverflow( copied, postProcess );
+        final OverflowMetadata overflowMetadata = resourceManager
+                .doSynchronousOverflow();
         
         // nothing should have been copied to the new journal.
-        assertEquals(0,copied.size());
+        assertEquals(0, overflowMetadata
+                .getActionCount(OverflowActionEnum.Copy));
 
         // lookup the old journal again using its createTime.
         final AbstractJournal oldJournal = resourceManager
@@ -211,9 +207,14 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
             final File outFile = resourceManager
                     .getIndexSegmentFile(indexMetadata);
 
+            final OverflowMetadata omd = new OverflowMetadata(resourceManager);
+            
+            final ViewMetadata vmd = omd.getViewMetadata(name);
+            
             // task to run.
             final AbstractTask task = new CompactingMergeTask(
-                    resourceManager, lastCommitTime, name, outFile);
+                    resourceManager, lastCommitTime, name, vmd,
+                    outFile);
 
             try {
 

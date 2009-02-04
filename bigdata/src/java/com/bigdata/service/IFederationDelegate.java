@@ -28,7 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
+import java.io.IOException;
 import java.util.UUID;
+
+import com.bigdata.counters.CounterSet;
+import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
  * Interface allowing services to take over handling of events normally handled
@@ -106,5 +110,20 @@ public interface IFederationDelegate {
      *            The service {@link UUID}.
      */
     public void serviceLeave(UUID serviceUUID);
-    
+
+    /**
+     * Create a new {@link AbstractHTTPD} instance.
+     * 
+     * @param port
+     *            The port, or zero for a random port.
+     * @param counterSet
+     *            The root {@link CounterSet} that will be served up.
+     * 
+     * @return The httpd daemon.
+     * 
+     * @throws IOException
+     */
+    public AbstractHTTPD newHttpd(final int httpdPort,
+            final CounterSet counterSet) throws IOException;
+
 }

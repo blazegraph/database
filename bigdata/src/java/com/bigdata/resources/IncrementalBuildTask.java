@@ -17,6 +17,8 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.SegmentMetadata;
+import com.bigdata.service.Event;
+import com.bigdata.service.EventType;
 
 /**
  * Task builds an {@link IndexSegment} from the mutable {@link BTree} for an
@@ -34,38 +36,85 @@ import com.bigdata.mdi.SegmentMetadata;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class IncrementalBuildTask extends
-        AbstractResourceManagerTask<BuildResult> {
+public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
 
     final protected long lastCommitTime;
 
+    final protected ViewMetadata vmd;
+    
     final protected File outFile;
+
+    /**
+     * The source view.
+     */
+    BTree src;
+//    final SoftReference<BTree> ref;
 
     /**
      * 
      * @param resourceManager
      * @param lastCommitTime
-     *            The lastCommitTime of the journal whose view of the index
-     *            you wish to capture in the generated {@link IndexSegment}.
+     *            The lastCommitTime of the journal whose view of the index you
+     *            wish to capture in the generated {@link IndexSegment}.
      * @param name
      *            The name of the index.
      * @param outFile
-     *            The file on which the {@link IndexSegment} will be
-     *            written.
+     *            The file on which the {@link IndexSegment} will be written.
      */
     public IncrementalBuildTask(final ResourceManager resourceManager,
-            final long lastCommitTime, final String name, final File outFile) {
+            final long lastCommitTime, final String name,
+            final ViewMetadata vmd, final File outFile) {
 
         super(resourceManager, TimestampUtility
-                .asHistoricalRead(lastCommitTime), name);
+                .asHistoricalRead(lastCommitTime), name,
+                OverflowActionEnum.Build);
 
-        this.lastCommitTime = lastCommitTime;
+        if (vmd == null)
+            throw new IllegalArgumentException();
+
+        if (!vmd.name.equals(name))
+            throw new IllegalArgumentException();
 
         if (outFile == null)
             throw new IllegalArgumentException();
 
+        this.lastCommitTime = lastCommitTime;
+
+        this.vmd = vmd;
+        
         this.outFile = outFile;
 
+//        // cache a soft reference to JUST the btree on the old journal.
+//        this.ref = new SoftReference<BTree>(vmd.getBTree());
+
+        /*
+         * Put a hard reference hold on the btree.
+         * 
+         * Note: This could be too aggressive if the data service is memory
+         * starved, but it will help us to finish the index segment builds as
+         * quickly as possible.
+         */
+        this.src = vmd.getBTree();
+        
+        /*
+         * Release soft references to the full view and the mutable btree on the
+         * ViewMetadata object (we are relying on the reference that we made
+         * above).
+         */  
+        vmd.clearRef();
+        
+    }
+
+    @Override
+    protected void clearRefs() {
+
+        // release soft references.
+//        ref.clear();
+        vmd.clearRef();
+
+        // release hard reference.
+        src = null;
+        
     }
 
     /**
@@ -74,62 +123,100 @@ public class IncrementalBuildTask extends
      * 
      * @return The {@link BuildResult}.
      */
-    public BuildResult doTask() throws Exception {
+    protected BuildResult doTask() throws Exception {
 
-        if (resourceManager.isOverflowAllowed())
-            throw new IllegalStateException();
-        
-        // the name under which the index partition is registered.
-        final String name = getOnlyResource();
+        e.start();
 
-        // The source view.
-        final BTree src = ((ILocalBTreeView)getIndex(name)).getMutableBTree();
-
-        // The UUID for the scale-out index.
-        final UUID indexUUID = src.getIndexMetadata().getIndexUUID();
-        
-        if (INFO) {
-
-            log.info("src=" + name + ", counter=" + src.getCounter().get()
-                    + ", checkpoint=" + src.getCheckpoint());
-
-        }
-        
-        // Build the index segment.
-        final BuildResult result = resourceManager.buildIndexSegment(name, src,
-                outFile, false/* compactingMerge */, lastCommitTime,
-                null/* fromKey */, null/* toKey */);
-
-        /*
-         * @todo error handling should be inside of the atomic update task since
-         * it has more visibility into the state changes and when we can no
-         * longer delete the new index segment.
-         */
         try {
-            
-            // task will update the index partition view definition.
-            final AbstractTask<Void> task = new AtomicUpdateIncrementalBuildTask(
-                    resourceManager, concurrencyManager, name, indexUUID,
-                    result);
 
-            if (INFO)
-                log.info("src=" + name + ", will run atomic update task");
+            final BuildResult result;
+            try {
 
-            // submit task and wait for it to complete @todo config timeout?
-            concurrencyManager.submit(task).get();
+                if (resourceManager.isOverflowAllowed())
+                    throw new IllegalStateException();
 
-        } catch (Throwable t) {
+                // index partition name.
+                final String name = vmd.name;
 
-            // delete the generated index segment.
-            resourceManager.deleteResource(result.segmentMetadata.getUUID(),
-                    false/* isJournal */);
+                /*
+                 * The source view.
+                 */
+                // final BTree src = ((ILocalBTreeView) getIndex(name))
+                // .getMutableBTree();
+                if (INFO) {
 
-            // re-throw the exception
-            throw new Exception(t);
+                    log.info("src=" + name + ", counter="
+                            + src.getCounter().get() + ", checkpoint="
+                            + src.getCheckpoint());
+
+                }
+
+                // Build the index segment.
+                result = resourceManager.buildIndexSegment(name, src, outFile,
+                        false/* compactingMerge */, lastCommitTime,
+                        null/* fromKey */, null/* toKey */);
+
+            } finally {
+
+                /*
+                 * Release our hold on the source index partition view. We only
+                 * needed it during the the index partition build.
+                 */
+
+                clearRefs();
+
+            }
+
+            /*
+             * @todo error handling should be inside of the atomic update task
+             * since it has more visibility into the state changes and when we
+             * can no longer delete the new index segment.
+             */
+            try {
+
+                // task will update the index partition view definition.
+                final AbstractTask<Void> task = new AtomicUpdateIncrementalBuildTask(
+                        resourceManager, concurrencyManager, vmd.name,
+                        vmd.indexMetadata.getIndexUUID(), result);
+
+                if (INFO)
+                    log.info("src=" + vmd.name
+                            + ", will run atomic update task");
+
+
+                final Event updateEvent = new Event(resourceManager
+                        .getFederation(), EventType.AtomicViewUpdate, "src="
+                        + vmd).start();
+                
+                try {
+
+                    // submit task and wait for it to complete
+                    concurrencyManager.submit(task).get();
+
+                } finally {
+
+                    updateEvent.end();
+                    
+                }
+
+            } catch (Throwable t) {
+
+                // delete the generated index segment.
+                resourceManager
+                        .deleteResource(result.segmentMetadata.getUUID(), false/* isJournal */);
+
+                // re-throw the exception
+                throw new Exception(t);
+
+            }
+
+            return result;
+
+        } finally {
+
+            e.end();
 
         }
-
-        return result;
 
     }
 
@@ -357,7 +444,7 @@ public class IncrementalBuildTask extends
                     currentpmd.getRightSeparatorKey(),//
                     newResources, //
                     currentpmd.getHistory()+
-                    "incrementalBuild"//
+                    OverflowActionEnum.Build//
                     +"(lastCommitTime="+ segmentMetadata.getCreateTime()//
                     +",segment="+ segmentMetadata.getUUID()//
                     +",counter="+btree.getCounter().get()//

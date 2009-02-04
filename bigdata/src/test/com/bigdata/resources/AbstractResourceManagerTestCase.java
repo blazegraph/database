@@ -71,8 +71,10 @@ import com.bigdata.service.IClientIndex;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
+import com.bigdata.service.IService;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
  * Base class for {@link ResourceManager} test suites that can use normal
@@ -556,6 +558,40 @@ public class AbstractResourceManagerTestCase extends
         public IDataService[] getDataServices(UUID[] uuid) {
             // TODO Auto-generated method stub
             return null;
+        }
+
+        public void didStart() {
+            
+        }
+
+        public Class getServiceIface() {
+            return getClass();
+        }
+
+        public String getServiceName() {
+            return getClass().getName();
+        }
+
+        public UUID getServiceUUID() {
+            return serviceUUID;
+        }
+        private final UUID serviceUUID = UUID.randomUUID();
+
+        public boolean isServiceReady() {
+            return true;
+        }
+
+        public AbstractHTTPD newHttpd(int httpdPort, CounterSet counterSet) throws IOException {
+            return null;
+        }
+
+        public void reattachDynamicCounters() {
+        }
+
+        public void serviceJoin(IService service, UUID serviceUUID) {
+        }
+
+        public void serviceLeave(UUID serviceUUID) {
         }
         
     }

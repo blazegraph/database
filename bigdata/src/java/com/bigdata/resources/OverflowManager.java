@@ -30,10 +30,8 @@ package com.bigdata.resources;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.Map;
+import java.util.Iterator;
 import java.util.Properties;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -45,25 +43,20 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
-import com.bigdata.btree.Counters;
-import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.counters.CounterSet;
-import com.bigdata.io.DataInputBuffer;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.BufferedDiskStrategy;
-import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.journal.WriteExecutorService;
-import com.bigdata.journal.Name2Addr.Entry;
-import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.service.DataService;
+import com.bigdata.service.Event;
+import com.bigdata.service.EventType;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -152,6 +145,9 @@ abstract public class OverflowManager extends IndexManager {
      * @see Options#MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW
      */
     protected final int maximumCompactingMergesPerOverflow;
+    
+    protected final int maximumJournalsPerView;
+    protected final int maximumSegmentsPerView;
     
     /**
      * The timeout for {@link #shutdown()} -or- ZERO (0L) to wait for ever.
@@ -346,14 +342,16 @@ abstract public class OverflowManager extends IndexManager {
 
         /**
          * The #of index partitions below which we will accelerate the decision
-         * to split an index partition. When a new scale-out index is created
-         * there is by default only a single index partition on a single
-         * {@link IDataService}. Since each index (partition) is single
-         * threaded for writes, we can increase the potential concurrency if we
-         * split the initial index partition. We accelerate decisions to split
-         * index partitions by reducing the minimum and target #of tuples per
-         * index partition for an index with fewer than the #of index partitions
-         * specified by this parameter.
+         * to split an index partition (default
+         * {@value #DEFAULT_ACCELERATE_SPLIT_THRESHOLD}). When a new scale-out
+         * index is created there is by default only a single index partition on
+         * a single {@link IDataService}. Since each index (partition) is
+         * single threaded for writes, we can increase the potential concurrency
+         * if we split the initial index partition. We accelerate decisions to
+         * split index partitions by reducing the minimum and target #of tuples
+         * per index partition for an index with fewer than the #of index
+         * partitions specified by this parameter. When ZERO (0) this feature is
+         * disabled and we do not count the #of index partitions.
          */
         String ACCELERATE_SPLIT_THRESHOLD = OverflowManager.class.getName()
                 + ".accelerateSplitThreshold";
@@ -455,34 +453,105 @@ abstract public class OverflowManager extends IndexManager {
         String DEFAULT_MAXIMUM_SOURCES_PER_VIEW_BEFORE_COMPACTING_MERGE = "3";
 
         /**
-         * The maximum #of compacting merge operations that will be performed
-         * during a single overflow event (default
-         * {@value #DEFAULT_MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW}). A small
-         * value is normally appropriate and will reduce the amount of work done
-         * in any given overflow and help to stagger the compacting merges
-         * across different overflow events. Once this #of compacting merge
-         * tasks have been identified for a given overflow event, the remainder
-         * of the index partitions that are neither split, joined, moved, nor
-         * copied will use incremental builds. An incremental build is generally
-         * cheaper since it only copies the data on the mutable {@link BTree}
-         * for the lastCommitTime rather than the fused view. Either compacting
-         * merges or incremental builds are required in order for the old
-         * journals to eventually become releasable (otherwise they will remain
-         * part of the view, the #of components in the view will increase
-         * without bound, and you would eventually hit some hard limits).
+         * The maximum #of optional compacting merge operations that will be
+         * performed during a single overflow event (default
+         * {@value #DEFAULT_MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW}).
+         * <p>
+         * Once this #of compacting merge tasks have been identified for a given
+         * overflow event, the remainder of the index partitions that are
+         * neither split, joined, moved, nor copied will use incremental builds.
+         * An incremental build is generally cheaper since it only copies the
+         * data on the mutable {@link BTree} for the lastCommitTime rather than
+         * the fused view. However, a compacting merge will permit the older
+         * index segments to be released. Either a compacting merge or an
+         * incremental build will permit old journals to become releasable once
+         * the releaseTime has been advanced so as to outdate that resource.
+         * <p>
+         * Note: Mandatory compacting merges are identified based on
+         * {@link #MAXIMUM_JOURNALS_PER_VIEW} and
+         * {@link #MAXIMUM_SEGMENTS_PER_VIEW}. When compacting merges are
+         * enabled, there is NO limit the #of manditory compacting merges that
+         * will be performed during an asynchronous overflow event. However each
+         * manditory compacting merge does count towards this maximum. Therefore
+         * if the #of manditory compacting merges is greater than this parameter
+         * then NO optional compacting merges will be selected.
          * <p>
          * Note: This may be set to ZERO (0) to disable compacting merges, but
          * that is not recommended. If you disable both compacting merges and
          * moves (or if there is only a single data service) then you will
          * eventually developed index partition views with 100s of component
-         * indices and exceed various hard limits.
+         * indices, drag down performance, and exceed various hard limits.
          */
         String MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW = OverflowManager.class
                 .getName()
                 + ".maximumCompactingMergesPerOverflow";
 
-        String DEFAULT_MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW = "3";
+        String DEFAULT_MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW = "10";
 
+        /**
+         * The maximum #of journals that may appear in an index partition view
+         * before a compacting merge is triggered (default
+         * {@value #DEFAULT_MAXIMUM_JOURNALS_PER_VIEW}). The minimum value is
+         * TWO (2) since there will be two journals in a view when an index
+         * partition overflows and {@link OverflowActionEnum#Copy} is not
+         * selected. As long as index partition splits, builds or merges are
+         * performed the #of journals in the view WILL NOT exceed 2 and will
+         * always be ONE (1) after an asynchronous overflow in which a split,
+         * build or merge was performed.
+         * <p>
+         * It is extremely important to perform compacting merges in order to
+         * release dependencies on old resources (both journals and index
+         * segments) and keep down the #of sources in a view. This is especially
+         * true when those sources are journals. Journals are organized by write
+         * access, not read access. Once the backing buffer for a journal is
+         * released there will be large spikes in IOWAIT when reading on an old
+         * journal as reads are more or less random.
+         * <p>
+         * Note: The {@link #MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW} will be
+         * ignored if a compacting merge is recommended for an index partition
+         * based on this parameter UNLESS compacting merges have been entirely
+         * disabled.
+         * <p>
+         * Note: Synchronous overflow will refuse to copy tuples for an index
+         * partition whose mutable {@link BTree} otherwise satisifies the
+         * {@link #COPY_INDEX_THRESHOLD} if the #of sources in the view exceeds
+         * thresholds which demand a compacting merge.
+         */
+        String MAXIMUM_JOURNALS_PER_VIEW = OverflowManager.class.getName()
+                + ".maximumJournalsPerView";
+
+        String DEFAULT_MAXIMUM_JOURNALS_PER_VIEW = "3";
+
+        /**
+         * The maximum #of index segments that may appear in an index partition
+         * view before a compacting merge is triggered (default
+         * {@value #DEFAULT_MAXIMUM_SEGMENTS_PER_VIEW}).
+         * <p>
+         * It is extremely important to perform compacting merges in order to
+         * release dependencies on old resources (both journals and index
+         * segments) and keep down the #of sources in a view. However, this is
+         * less important when those resources are {@link IndexSegment}s since
+         * they are very efficient for read operations. In this case the main
+         * driver is to reduce the complexity of the view, to require fewer open
+         * index segments (and associated resources) in order to materialize the
+         * view, and to make it possible to release index segments and thus have
+         * less of a footprint on the disk.
+         * <p>
+         * Note: The {@link #MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW} will be
+         * ignored if a compacting merge is recommended for an index partition
+         * based on this parameter UNLESS compacting merges have been entirely
+         * disabled.
+         * <p>
+         * Note: Synchronous overflow will refuse to copy tuples for an index
+         * partition whose mutable {@link BTree} otherwise satisifies the
+         * {@link #COPY_INDEX_THRESHOLD} if the #of sources in the view exceeds
+         * thresholds which demand a compacting merge.
+         */
+        String MAXIMUM_SEGMENTS_PER_VIEW = OverflowManager.class.getName()
+                + ".maximumSegmentsPerView";
+
+        String DEFAULT_MAXIMUM_SEGMENTS_PER_VIEW = "6";
+        
         /**
          * The timeout in milliseconds for asynchronous overflow processing to
          * complete (default {@link #DEFAULT_OVERFLOW_TIMEOUT}). Any overflow
@@ -818,6 +887,44 @@ abstract public class OverflowManager extends IndexManager {
             }
             
         }
+
+        {
+            
+            maximumJournalsPerView = Integer.parseInt(properties.getProperty(
+                    Options.MAXIMUM_JOURNALS_PER_VIEW,
+                    Options.DEFAULT_MAXIMUM_JOURNALS_PER_VIEW));
+
+            if (INFO)
+                log.info(Options.MAXIMUM_JOURNALS_PER_VIEW + "="
+                        + maximumJournalsPerView);
+
+            if (maximumJournalsPerView < 2) {
+
+                throw new RuntimeException(Options.MAXIMUM_JOURNALS_PER_VIEW
+                        + " must be GTE 2");
+                
+            }
+            
+        }
+
+        {
+            
+            maximumSegmentsPerView = Integer.parseInt(properties.getProperty(
+                    Options.MAXIMUM_SEGMENTS_PER_VIEW,
+                    Options.DEFAULT_MAXIMUM_SEGMENTS_PER_VIEW));
+
+            if (INFO)
+                log.info(Options.MAXIMUM_SEGMENTS_PER_VIEW + "="
+                        + maximumSegmentsPerView);
+
+            if (maximumSegmentsPerView < 1) {
+
+                throw new RuntimeException(Options.MAXIMUM_SEGMENTS_PER_VIEW
+                        + " must be GTE 1");
+
+            }
+            
+        }
         
         // shutdownTimeout
         {
@@ -1087,97 +1194,94 @@ abstract public class OverflowManager extends IndexManager {
     public Future<Object> overflow() {
 
         assert overflowAllowed.get();
-        
-        final ConcurrencyManager concurrencyManager = (ConcurrencyManager) getConcurrencyManager();
 
-        /*
-         * We have an exclusive lock and the overflow conditions are satisifed.
-         */
-        final long lastCommitTime;
-        // names of all indices copied over to the new journal.
-        final Set<String> copied = new HashSet<String>(); //@todo capacity
-        final AtomicBoolean postProcess = new AtomicBoolean(false);
+        final Event e = new Event(getFederation(),
+                EventType.SynchronousOverflow, "overflowCounter="
+                        + overflowCounter).start();
 
-        // Do overflow processing.
-        lastCommitTime = doSynchronousOverflow(copied, postProcess);
-                    
-        // Note: commented out to protect access to the new journal until the write service is resumed.
-        // report event.
-//        notifyJournalOverflowEvent(getLiveJournal());
+        try {
 
-        if (asyncOverflowEnabled.get()) {
+            /*
+             * We have an exclusive lock and the overflow conditions are
+             * satisifed.
+             */
+            // Do overflow processing.
+            final OverflowMetadata overflowMetadata = doSynchronousOverflow();
 
-            if (postProcess.get()) {
+            // Note: commented out to protect access to the new journal until
+            // the write service is resumed.
+            // report event.
+            // notifyJournalOverflowEvent(getLiveJournal());
 
-                /*
-                 * Post-processing SHOULD be performed.
-                 */
-                
-                if (INFO)
-                    log.info("Will start asynchronous overflow processing.");
+            if (asyncOverflowEnabled.get()) {
 
-                /*
-                 * Start the asynchronous processing of the named indices on the
-                 * old journal.
-                 */
-                if (!overflowAllowed
-                        .compareAndSet(true/* expect */, false/* set */)) {
+                if (overflowMetadata.postProcess) {
 
-                    throw new AssertionError();
+                    /*
+                     * Post-processing SHOULD be performed.
+                     */
+
+                    if (INFO)
+                        log
+                                .info("Will start asynchronous overflow processing.");
+
+                    /*
+                     * Start the asynchronous processing of the named indices on
+                     * the old journal.
+                     */
+                    if (!overflowAllowed
+                            .compareAndSet(true/* expect */, false/* set */)) {
+
+                        throw new AssertionError();
+
+                    }
+
+                    /*
+                     * Submit task on private service that will run
+                     * asynchronously and clear [overflowAllowed] when done.
+                     * 
+                     * Note: No one ever checks the Future returned by this
+                     * method. Instead the PostProcessOldJournalTask logs
+                     * anything that it throws in its call() method.
+                     */
+
+                    return overflowService
+                            .submit(new PostProcessOldJournalTask(
+                                    (ResourceManager) this, overflowMetadata));
 
                 }
 
-                /*
-                 * Aggregate the statistics for the named indices and reset the
-                 * various counters for those indices. These statistics are used
-                 * to decide which indices are "hot" and which are not.
-                 */
-                final Counters totalCounters = concurrencyManager
-                        .getTotalIndexCounters();
-
-                final Map<String/* name */, Counters> indexCounters = concurrencyManager
-                        .resetIndexCounters();
+                if (INFO)
+                    log.info("Asynchronous overflow not required");
 
                 /*
-                 * Submit task on private service that will run asynchronously
-                 * and clear [overflowAllowed] when done.
-                 * 
-                 * Note: No one ever checks the Future returned by this method.
-                 * Instead the PostProcessOldJournalTask logs anything that it
-                 * throws in its call() method.
+                 * Note: increment the counter now since we will not do
+                 * asynchronous overflow processing.
                  */
 
-                return overflowService.submit(new PostProcessOldJournalTask(
-                        (ResourceManager) this, lastCommitTime, copied,
-                        totalCounters, indexCounters));
+                overflowCounter.incrementAndGet();
+
+                return null;
+
+            } else {
+
+                log.warn("Asynchronous overflow processing is disabled!");
+
+                /*
+                 * Note: increment the counter now since we will not do
+                 * asynchronous overflow processing.
+                 */
+
+                overflowCounter.incrementAndGet();
+
+                return null;
 
             }
 
-            if(INFO)
-                log.info("Asynchronous overflow not required");
+        } finally {
 
-            /*
-             * Note: increment the counter now since we will not do asynchronous
-             * overflow processing.
-             */
-            
-            overflowCounter.incrementAndGet();
-            
-            return null;
+            e.end();
 
-        } else {
-            
-            log.warn("Asynchronous overflow processing is disabled!");
-
-            /*
-             * Note: increment the counter now since we will not do asynchronous
-             * overflow processing.
-             */
-            
-            overflowCounter.incrementAndGet();
-            
-            return null;
-            
         }
 
     }
@@ -1201,23 +1305,17 @@ abstract public class OverflowManager extends IndexManager {
      * Note: You MUST have an exclusive lock on the {@link WriteExecutorService}
      * before you invoke this method!
      * 
-     * @param copied
-     *            Any index partitions that are copied are added to this set.
-     * @param postProcess
-     *            Flag is set iff some indices are NOT copied onto the new
-     *            journal such that asynchronous post-processing should be
-     *            performed.
-     * 
-     * @return The lastCommitTime of the old journal.
+     * @return Metadata about the overflow operation including whether or not
+     *         asynchronous should be performed.
      */
-    protected long doSynchronousOverflow(final Set<String> copied,
-            final AtomicBoolean postProcess) {
-        
+    protected OverflowMetadata doSynchronousOverflow() {
+
         if (INFO)
             log.info("begin");
-
-//        System.err.println("OverflowManager::doSynchronousOverflow: "+getLiveJournal().getFile());
         
+        final OverflowMetadata overflowMetadata = new OverflowMetadata(
+                (ResourceManager) this);
+
         final AbstractJournal oldJournal = getLiveJournal();
         final ManagedJournal newJournal;
 
@@ -1358,13 +1456,15 @@ abstract public class OverflowManager extends IndexManager {
          * journal!
          */
         // #of declared indices.
-        final int numIndices;
+        final int numIndices = overflowMetadata.getIndexCount();
         // #of indices processed (copied over or view redefined).
         int numIndicesProcessed = 0;
         // #of indices whose view was redefined on the new journal.
-        int numIndicesViewRefined = 0;
+        int numIndicesViewRedefined = 0;
         // #of indices with at least one index entry that were copied.
         int numIndicesNonZeroCopy = 0;
+        // #of indices that were copied over.
+        int ncopy = 0;
         /*
          * Maximum #of non-zero indices that we will copy over.
          * 
@@ -1385,36 +1485,41 @@ abstract public class OverflowManager extends IndexManager {
                     + getOverflowCount() + "\n"
                     + listIndexPartitions(TimestampUtility.asHistoricalRead(lastCommitTime)));
 
-            // using read-committed view of Name2Addr
-            numIndices = (int) oldJournal.getName2Addr().rangeCount(null,null);
+//            // using read-committed view of Name2Addr
+//            numIndices = (int) oldJournal.getName2Addr().rangeCount();
 
-            // using read-committed view of Name2Addr
-            final ITupleIterator itr = oldJournal.getName2Addr().rangeIterator();
+//            // using read-committed view of Name2Addr
+//            final ITupleIterator itr = oldJournal.getName2Addr().rangeIterator();
+//
+//            while (itr.hasNext()) {
+//
+//                final ITuple tuple = itr.next();
+//
+//                final Entry entry = EntrySerializer.INSTANCE
+//                        .deserialize(new DataInputBuffer(tuple.getValue()));
+//
+//                // old index (just the mutable btree on the old journal, not the full view of that index).
+//                final BTree oldBTree = (BTree) oldJournal.getIndex(entry.checkpointAddr);
+//
+//                // #of index entries on the old index.
+//                final int entryCount = oldBTree.getEntryCount();
 
-            while (itr.hasNext()) {
-
-                final ITuple tuple = itr.next();
-
-                final Entry entry = EntrySerializer.INSTANCE
-                        .deserialize(new DataInputBuffer(tuple.getValue()));
-
-                // old index (just the mutable btree on the old journal, not the full view of that index).
-                final BTree oldBTree = (BTree) oldJournal.getIndex(entry.checkpointAddr);
-
-                // #of index entries on the old index.
-                final int entryCount = oldBTree.getEntryCount();
+            final Iterator<ViewMetadata> itr = overflowMetadata.views();
+            
+            while(itr.hasNext()) {
+            
+                final ViewMetadata bm = itr.next();
+                
+                final BTree oldBTree = bm.getBTree();
                 
                 // clone index metadata.
                 final IndexMetadata indexMetadata = oldBTree.getIndexMetadata()
                         .clone();
 
-                // old partition metadata.
+                // old partition metadata (from cloned IndexMetadata record).
                 final LocalPartitionMetadata oldpmd = indexMetadata
                         .getPartitionMetadata();
                 
-                // true iff an overflow handler is defined.
-                final boolean hasOverflowHandler = indexMetadata.getOverflowHandler() != null;
-
                 if (oldpmd == null) {
 
                     /*
@@ -1428,13 +1533,18 @@ abstract public class OverflowManager extends IndexManager {
                      * problem to have an unpartitioned index if you are
                      * expecting to do overflows since the index can never be
                      * broken down and can't be moved around.
+                     * 
+                     * @todo move runtime check to before we close the old journal.
                      */
 
                     throw new RuntimeException("Not a partitioned index: "
-                            + entry.name);
+                            + bm.name);
                      
                 }
                 
+                // true iff an overflow handler is defined.
+                final boolean hasOverflowHandler = indexMetadata.getOverflowHandler() != null;
+
                 /*
                  * When an index partition is empty we always just copy it onto
                  * the new journal (since there is no data, all that we are
@@ -1454,13 +1564,22 @@ abstract public class OverflowManager extends IndexManager {
                  * index with an overflow handler since there may be large
                  * records on the journal that would have to be copied as well).
                  * 
+                 * Note: The other reason for NOT copying the tuples over is
+                 * that the view already includes more than one journal. We DO
+                 * NOT copy the tuples over in this case since we want to purge
+                 * that journal from the view using a compacting merge.
+                 * 
                  * Otherwise we will let the asynchronous post-processing figure
                  * out what it wants to do with this index partition.
                  */
+                final int entryCount = bm.entryCount;
                 final boolean copyIndex = (entryCount == 0)
                         || ((copyIndexThreshold > 0 && entryCount <= copyIndexThreshold) //
-                                && numIndicesNonZeroCopy < maxNonZeroCopy//
-                                && !hasOverflowHandler);
+                                && numIndicesNonZeroCopy < maxNonZeroCopy //
+                                && !hasOverflowHandler // must be applied
+                                && bm.sourceJournalCount <= maximumJournalsPerView //
+                                && bm.sourceSegmentCount <= maximumSegmentsPerView //
+                                );
 
                 if(copyIndex) {
                     
@@ -1489,12 +1608,13 @@ abstract public class OverflowManager extends IndexManager {
                                     oldpmd.getRightSeparatorKey(),//
                                     newResources, //
                                     oldpmd.getHistory()+
-                                    "copy(lastCommitTime="
+                                    OverflowActionEnum.Copy+
+                                    "(lastCommitTime="
                                             + lastCommitTime + ",entryCount="
                                             + entryCount + ",counter="
                                             + oldBTree.getCounter().get()
                                             + ") "));
-
+                    
                 } else {
 
                     /*
@@ -1562,7 +1682,7 @@ abstract public class OverflowManager extends IndexManager {
 
                     if(INFO)
                     log.info("Re-defining view on new journal"//
-                            + ": name=" + entry.name //
+                            + ": name=" + bm.name //
                             + ", copyIndex=" + copyIndex//
 //                            + ", copyIndexThreashold=" + copyIndexThreshold //
                             + ", entryCount=" + entryCount//
@@ -1611,14 +1731,16 @@ abstract public class OverflowManager extends IndexManager {
                          */
                         
                         if(DEBUG)
-                        log.debug("Copying data to new journal: name=" + entry.name
+                        log.debug("Copying data to new journal: name=" + bm.name
                                 + ", entryCount=" + entryCount + ", threshold="
                                 + copyIndexThreshold);
                         
                         newBTree.rangeCopy(oldBTree, null, null, true/*overflow*/);
 
                         // Note that index partition was copied for the caller.
-                        copied.add(entry.name);
+//                        overflowMetadata.copied.add(bm.name);
+                        bm.setAction(OverflowActionEnum.Copy);
+                        ncopy++;
                         
                         if (entryCount > 0) {
                             
@@ -1634,14 +1756,14 @@ abstract public class OverflowManager extends IndexManager {
                          * on the new journal.
                          */
                         
-                        numIndicesViewRefined++;
+                        numIndicesViewRedefined++;
                         
                     }
                     
                     /*
                      * Register the new B+Tree on the new journal.
                      */
-                    newJournal.registerIndex(entry.name, newBTree);
+                    newJournal.registerIndex(bm.name, newBTree);
 
                 }
 
@@ -1654,18 +1776,19 @@ abstract public class OverflowManager extends IndexManager {
 
             if (INFO)
                 log.info("Processed indices: #indices=" + numIndices
-                        + ", ncopy=" + copied.size() + ", ncopyNonZero="
+                        + ", ncopy=" + ncopy + ", ncopyNonZero="
                         + numIndicesNonZeroCopy + ", #viewRedefined="
-                        + numIndicesViewRefined);
+                        + numIndicesViewRedefined);
 
             assert numIndices == numIndicesProcessed;
-            assert numIndices == (copied.size() + numIndicesViewRefined);
+            assert numIndices == (ncopy + numIndicesViewRedefined);
+            assert ncopy == overflowMetadata.getActionCount(OverflowActionEnum.Copy);
 
             /*
              * post processing should be performed if any indices were redefined
              * onto the new journal rather than being copied over.
              */
-            postProcess.set(numIndicesViewRefined > 0);
+            overflowMetadata.postProcess = numIndicesViewRedefined > 0;
             
             // make the index declarations restart safe on the new journal.
             firstCommitTime = newJournal.commit();
@@ -1720,7 +1843,7 @@ abstract public class OverflowManager extends IndexManager {
         if(INFO)
             log.info("end");
         
-        return lastCommitTime;
+        return overflowMetadata;
 
     }
     

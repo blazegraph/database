@@ -30,20 +30,17 @@ package com.bigdata.resources;
 
 import java.text.NumberFormat;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.IndexSegment;
-import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.journal.TimestampUtility;
-import com.bigdata.rawstore.Bytes;
 
 /**
  * Class encapsulates reporting API for resource (index and store files) events.
@@ -102,14 +99,12 @@ public class ResourceEvents {
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final protected static boolean DEBUG = log.isDebugEnabled();
 
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final protected static boolean INFO = log.isInfoEnabled();
 
     static NumberFormat cf;
 
@@ -232,36 +227,7 @@ public class ResourceEvents {
             log.info("filename=" + filename);
 
     }
-
-    /**
-     * Report on a bulk merge/build of an {@link IndexSegment}.
-     * 
-     * @param builder
-     *            The object responsible for building the {@link IndexSegment}.
-     */
-    static public void notifyIndexSegmentBuildEvent(IndexSegmentBuilder builder) {
-
-        if (INFO) {
-
-            String name = builder.metadata.getName();
-            String filename = builder.outFile.toString();
-            int nentries = builder.plan.nentries;
-            long elapsed = builder.elapsed;
-            long commitTime = builder.getCheckpoint().commitTime;
-            long nbytes = builder.getCheckpoint().length;
-            
-            // data rate in MB/sec.
-            float mbPerSec = builder.mbPerSec;
-
-            log.info("name=" + name + ", filename=" + filename + ", nentries="
-                    + nentries + ", commitTime=" + commitTime + ", elapsed="
-                    + elapsed + ", "
-                    + fpf.format(((double) nbytes / Bytes.megabyte32)) + "MB"
-                    + ", rate=" + fpf.format(mbPerSec) + "MB/sec");
-        }
-
-    }
-
+    
     /*
      * Transaction reporting.
      * 
@@ -307,26 +273,7 @@ public class ResourceEvents {
                     + (revisionTime - tx));
 
     }
-
-    /**
-     * Report the extension of the {@link TemporaryRawStore} associated with a
-     * transaction and whether or not it has spilled onto the disk.
-     * 
-     * @param startTime
-     *            The transaction identifier.
-     * @param nbytes
-     *            The #of bytes written on the {@link TemporaryRawStore} for
-     *            that transaction.
-     * @param onDisk
-     *            True iff the {@link TemporaryRawStore} has spilled over to
-     *            disk for the transaction.
-     * 
-     * @todo event is not reported.
-     */
-    static public void extendTx(long startTime, long nbytes, boolean onDisk) {
-
-    }
-
+  
     /**
      * Report the isolation of a named index by a transaction.
      * 
@@ -395,24 +342,6 @@ public class ResourceEvents {
             log.info("filename=" + filename + ", #bytes=" + nbytes);
 
     }
-
-//    /**
-//     * Report an overflow event.
-//     * 
-//     * @param journal
-//     */
-//    public void notifyJournalOverflowEvent(AbstractJournal journal) {
-//
-//        if (INFO) {
-//
-//            log.info("filename=" + journal.getFile() + ", nextOffset="
-//                    + journal.getBufferStrategy().getNextOffset() + ", extent="
-//                    + journal.getBufferStrategy().getExtent() + ", maxExtent="
-//                    + journal.getMaximumExtent());
-//
-//        }
-//        
-//    }
 
     /**
      * Report close of an {@link IJournal} resource.

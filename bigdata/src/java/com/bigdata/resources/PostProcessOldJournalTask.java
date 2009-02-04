@@ -12,7 +12,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.PriorityQueue;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -27,7 +27,6 @@ import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.Counters;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
@@ -39,19 +38,18 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.proc.BatchLookup;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
-import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
-import com.bigdata.journal.Name2Addr.Entry;
-import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.service.DataService;
+import com.bigdata.service.Event;
+import com.bigdata.service.EventType;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.MetadataService;
@@ -156,43 +154,37 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      */
     private final ResourceManager resourceManager;
 
+    private final OverflowMetadata overflowMetadata;
+    
     private final long lastCommitTime;
 
     /**
-     * The names of any index partitions that were copied onto the new journal during
-     * synchronous overflow processing.
-     */
-    private final Set<String> copied; 
-    
-//    /** Aggregated counters for the named indices. */ 
-//    private final Counters totalCounters;
-//    
-//    /** Individual counters for the named indices. */
-//    private final Map<String/*name*/,Counters> indexCounters;
-
-    /** Raw score computed for those aggregated counters. */
-    private final double totalRawStore;
-    
-    /**
-     * Scores computed for each named index in order by ascending score
-     * (increased activity).
-     */
-    private final Score[] scores;
-
-    /**
-     * Random access to the index {@link Score}s.
-     */
-    private final Map<String, Score> scoreMap;
-
-    /**
-     * This is populated with each index partition that has been "used",
-     * starting with those that were copied during synchronous overflow
-     * processing. This allows us to detect when a possible join candidate can
-     * not in fact be joined because we have already applied another task to its
-     * rightSibling.
+     * Indices that have already been handled.
+     * <p>
+     * Note: An index that has been copied because its write set on the old
+     * journal was small should not undergo an incremental build since we have
+     * already captured the writes from the old journal. However, it MAY be used
+     * in other operations (merge, join, split, etc). So we DO NOT add the
+     * "copied" indices to the "used" set in the ctor.
+     * <p>
+     * Note: If a copy was performed AND we also perform another overflow action
+     * then the overflow action DOES NOT read from the post-copy view. Instead,
+     * it reads from the lastCommitTime view on the old journal and then
+     * performs an atomic update to "catch up" with any writes on the index
+     * partition on the live journal. This is still coherent.
      * <p>
      * Note: The {@link TreeMap} imposes an alpha order which is useful when
      * debugging.
+     * 
+     * @todo This is mostly redundent with
+     *       {@link OverflowMetadata#getAction(String)}.
+     *       <p>
+     *       There are some additional semantics here in terms of how we treat
+     *       indices that were copied over during synchronous overflow. If these
+     *       are reconciled, then those additional semantics need to be captured
+     *       as well.
+     *       <p>
+     *       The value here is pretty much action+"("+vmd+")".
      */
     private final Map<String, String> used = new TreeMap<String, String>();
 
@@ -204,7 +196,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * @param name
      *            The name of the index partition.
      */
-    protected boolean isUsed(String name) {
+    protected boolean isUsed(final String name) {
         
         if (name == null)
             throw new IllegalArgumentException();
@@ -224,8 +216,11 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * @throws IllegalStateException
      *             if the index partition was already used by some other
      *             operation.
+     * 
+     * @todo could be replaced by index on {@link BTreeMetadata} in the
+     *       {@link OverflowMetadata} object and {@link BTreeMetadata#action}
      */
-    protected void putUsed(String name,String action) {
+    protected void putUsed(final String name, final String action) {
         
         if (name == null)
             throw new IllegalArgumentException();
@@ -244,237 +239,25 @@ public class PostProcessOldJournalTask implements Callable<Object> {
     }
     
     /**
-     * Helper class assigns a raw and a normalized score to each index based on
-     * its per-index {@link Counters} and on the global (non-restart safe)
-     * {@link Counters} for the data service during the life cycle of the last
-     * journal.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    private static class Score implements Comparable<Score>{
-
-        /** The name of the index partition. */
-        public final String name;
-        /** The counters collected for that index partition. */
-        public final Counters counters;
-        /** The raw score computed for that index partition. */
-        public final double rawScore;
-        /** The normalized score computed for that index partition. */
-        public final double score;
-        /** The rank in [0:#scored].  This is an index into the Scores[]. */
-        public int rank = -1;
-        /** The normalized double precision rank in [0.0:1.0]. */
-        public double drank = -1d;
-        
-        public String toString() {
-            
-            return "Score{name=" + name + ", rawScore=" + rawScore + ", score="
-                    + score + ", rank=" + rank + ", drank=" + drank + "}";
-            
-        }
-        
-        public Score(final String name, final Counters counters,
-                final double totalRawScore) {
-            
-            assert name != null;
-            
-            assert counters != null;
-            
-            this.name = name;
-            
-            this.counters = counters;
-            
-            rawScore = counters.computeRawScore();
-            
-            score = Counters.normalize( rawScore , totalRawScore );
-            
-        }
-
-        /**
-         * Places elements into order by ascending {@link #rawScore}. The
-         * {@link #name} is used to break any ties.
-         */
-        public int compareTo(final Score arg0) {
-            
-            if(rawScore < arg0.rawScore) {
-                
-                return -1;
-                
-            } else if (rawScore > arg0.rawScore) {
-                
-                return 1;
-                
-            }
-            
-            return name.compareTo(arg0.name);
-            
-        }
-        
-    }
-    
-    /**
-     * Return <code>true</code> if the named index partition is "warm" for
-     * {@link ITx#UNISOLATED} and/or {@link ITx#READ_COMMITTED} operations.
-     * <p>
-     * Note: This method informs the selection of index partitions that will be
-     * moved to another {@link IDataService}. The preference is always to move
-     * an index partition that is "warm" rather than "hot" or "cold". Moving a
-     * "hot" index partition causes more latency since more writes will have
-     * been buffered and unisolated access to the index partition will be
-     * suspended during the atomic part of the move operation. Likewise, "cold"
-     * index partitions are not consuming any resources other than disk space
-     * for their history, and the history of an index is not moved when the
-     * index partition is moved.
-     * <p>
-     * Since the history of an index partition is not moved when the index
-     * partition is moved, the determination of cold, warm or hot is made in
-     * terms of the resources consumed by {@link ITx#READ_COMMITTED} and
-     * {@link ITx#UNISOLATED} access to named index partitions. If an index
-     * partition is hot for historical read, then your only choices are to shed
-     * other index partitions from the data service, to read from a failover
-     * data service having the same index partition, or possibly to increase the
-     * replication count for the index partition.
-     * 
-     * @param name
-     *            The name of an index partition.
-     * 
-     * @return The index {@link Score} -or- <code>null</code> iff the index
-     *         was not touched for read-committed or unisolated operations.
-     */
-    public Score getScore(final String name) {
-        
-        Score score = scoreMap.get(name);
-        
-        if(score == null) {
-            
-            /*
-             * Index was not touched for read-committed or unisolated
-             * operations.
-             */
-
-            if(DEBUG) 
-                log.debug("Index is cold: "+name);
-            
-            return null;
-            
-        }
-        
-        if (DEBUG)
-            log.debug("Index score: "+score);
-        
-        return score;
-        
-    }
-    
-    /**
      * 
      * @param resourceManager
-     * @param lastCommitTime
-     *            The lastCommitTime on the old journal.
-     * @param copied 
-     *            The names of any index partitions that were copied onto the
-     *            new journal during synchronous overflow processing.
-     * @param totalCounters
-     *            The total {@link Counters} reported for all unisolated and
-     *            read-committed index views on the old journal.
-     * @param indexCounters
-     *            The per-index {@link Counters} for the unisolated and
-     *            read-committed index views on the old journal.
+     * @param overflowMetadata
      */
     public PostProcessOldJournalTask(final ResourceManager resourceManager,
-            final long lastCommitTime, final Set<String> copied,
-            final Counters totalCounters,
-            final Map<String/* name */, Counters> indexCounters) {
+            final OverflowMetadata overflowMetadata) {
 
         if (resourceManager == null)
             throw new IllegalArgumentException();
 
-        if( lastCommitTime <= 0)
-            throw new IllegalArgumentException();
-
-        if( copied == null ) 
-            throw new IllegalArgumentException();
-        
-        if (totalCounters == null)
-            throw new IllegalArgumentException();
-
-        if (indexCounters == null)
+        if (overflowMetadata == null)
             throw new IllegalArgumentException();
 
         this.resourceManager = resourceManager;
 
-        this.lastCommitTime = lastCommitTime;
-
-        this.copied = copied;
-
-        /*
-         * Note: An index that has been copied because its write set on the old
-         * journal was small should not undergo an incremental build. It could
-         * be used in a full build if its view has too much history. Likewise we
-         * can still use it in a join operation. So we do not add the copied
-         * indices to the "used" set.
-         */ 
-//        // copied indices are used and should not be processed further.
-//        used.addAll(copied);
+        this.overflowMetadata = overflowMetadata;
         
-//        this.totalCounters = totalCounters;
-//        
-//        this.indexCounters = indexCounters;
-
-        final int nscores = indexCounters.size();
+        this.lastCommitTime = overflowMetadata.lastCommitTime;
         
-        this.scores = new Score[nscores];
-
-        this.scoreMap = new HashMap<String/*name*/,Score>(nscores);
-
-        this.totalRawStore = totalCounters.computeRawScore();
-
-        if (nscores > 0) {
-
-            final Iterator<Map.Entry<String, Counters>> itr = indexCounters
-                    .entrySet().iterator();
-
-            int i = 0;
-
-            while (itr.hasNext()) {
-
-                final Map.Entry<String, Counters> entry = itr.next();
-
-                final String name = entry.getKey();
-
-                final Counters counters = entry.getValue();
-
-                scores[i] = new Score(name, counters, totalRawStore);
-
-                i++;
-
-            }
-
-            // sort into ascending order (inceasing activity).
-            Arrays.sort(scores);
-            
-            for (i = 0; i < scores.length; i++) {
-                
-                scores[i].rank = i;
-                
-                scores[i].drank = ((double)i)/scores.length;
-                
-                scoreMap.put(scores[i].name, scores[i]);
-                
-            }
-            
-            if (DEBUG) {
-
-                log.debug("The most active index was: "
-                        + scores[scores.length - 1]);
-
-                log.debug("The least active index was: " + scores[0]);
-                
-            }
-
-        }
-
     }
 
     /**
@@ -534,34 +317,39 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             int nskip = 0; // nothing.
             int njoin = 0; // join task _candidate_.
             int nignored = 0; // #of index partitions that are NOT join candidates.
-
-            // the old journal.
-            final AbstractJournal oldJournal = resourceManager
-                    .getJournal(lastCommitTime);
             
-            // the name2addr view as of that commit time.
-            final ITupleIterator itr = oldJournal.getName2Addr(lastCommitTime)
-                    .rangeIterator();
+//            // the old journal.
+//            final AbstractJournal oldJournal = resourceManager
+//                    .getJournal(lastCommitTime);
+//            
+//            // the name2addr view as of that commit time.
+//            final ITupleIterator itr = oldJournal.getName2Addr(lastCommitTime)
+//                    .rangeIterator();
 
             assert used.isEmpty() : "There are " + used.size()
                     + " used index partitions";
+
+            final Iterator<ViewMetadata> itr = overflowMetadata.views();
             
             while (itr.hasNext()) {
 
-                final ITuple tuple = itr.next();
+//                final ITuple tuple = itr.next();
+//
+//                final Entry entry = EntrySerializer.INSTANCE
+//                        .deserialize(new DataInputBuffer(tuple.getValue()));
+//
+//                // the name of an index to consider.
+//                final String name = entry.name;
 
-                final Entry entry = EntrySerializer.INSTANCE
-                        .deserialize(new DataInputBuffer(tuple.getValue()));
+                final ViewMetadata vmd = itr.next();
 
-                // the name of an index to consider.
-                final String name = entry.name;
-
+                final String name = vmd.name;
+                
                 /*
                  * Open the historical view of that index at that time (not just
                  * the mutable BTree but the full view).
                  */
-                final IIndex view = resourceManager.getIndex(name,
-                        TimestampUtility.asHistoricalRead(lastCommitTime));
+                final IIndex view = vmd.getView();
 
                 if (view == null) {
 
@@ -572,14 +360,13 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 }
 
                 // index metadata for that index partition.
-                final IndexMetadata indexMetadata = view.getIndexMetadata();
+//                final IndexMetadata indexMetadata = vmd.indexMetadata;
 
                 // handler decides when and where to split an index partition.
-                final ISplitHandler splitHandler = getSplitHandler(indexMetadata);
+                final ISplitHandler splitHandler = vmd.getAdjustedSplitHandler();
 
                 // index partition metadata
-                final LocalPartitionMetadata pmd = indexMetadata
-                        .getPartitionMetadata();
+                final LocalPartitionMetadata pmd = vmd.pmd;
 
                 if (pmd.getSourcePartitionId() != -1) {
 
@@ -621,7 +408,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                      * were discovered in this loop.
                      */
 
-                    final String scaleOutIndexName = indexMetadata.getName();
+                    final String scaleOutIndexName = vmd.indexMetadata.getName();
 
                     BTree tmp = undercapacityIndexPartitions
                             .get(scaleOutIndexName);
@@ -694,7 +481,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             int njoin = 0; // do index partition join on local service.
             int nmove = 0; // move to another service for index partition join.
 
-            assert used.isEmpty() : "There are "+used.size()+" used index partitions";
+            assert used.isEmpty() : "There are " + used.size()
+                    + " used index partitions";
 
             // this data service.
             final UUID sourceDataService = resourceManager.getDataServiceUUID();
@@ -816,6 +604,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     // an underutilized index partition on this data service.
                     final LocalPartitionMetadata pmd = underUtilizedPartitions[i];
 
+                    final ViewMetadata vmd = overflowMetadata
+                            .getViewMetadata(DataService.getIndexPartitionName(
+                                    scaleOutIndexName, pmd.getPartitionId()));
+            
                     // the locator for the rightSibling.
                     final PartitionLocator rightSiblingLocator = (PartitionLocator) SerializerUtil
                             .deserialize(resultBuffer.getResult(i));
@@ -856,8 +648,16 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                         if(INFO)
                             log.info("Will JOIN: " + Arrays.toString(resources));
                         
+                        final ViewMetadata vmd2 = overflowMetadata
+                                .getViewMetadata(DataService
+                                        .getIndexPartitionName(
+                                                scaleOutIndexName,
+                                                rightSiblingLocator
+                                                        .getPartitionId()));
+
                         final AbstractTask task = new JoinIndexPartitionTask(
-                                    resourceManager, lastCommitTime, resources);
+                                resourceManager, lastCommitTime, resources,
+                                new ViewMetadata[] { vmd, vmd2 });
 
                         // add to set of tasks to be run.
                         tasks.add(task);
@@ -896,7 +696,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                         
                         final AbstractTask task = new MoveIndexPartitionTask(
                                 resourceManager, lastCommitTime,
-                                sourceIndexName, targetDataServiceUUID,
+                                sourceIndexName, vmd, targetDataServiceUUID,
                                 newPartitionId);
 
                         // get the target service name.
@@ -911,6 +711,14 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                         tasks.add(task);
 
+                        /*
+                         * FIXME If both this data service and the target data
+                         * service decide to JOIN these index partitions at the
+                         * same time then we will have a problem. They need to
+                         * establish a mutex for this decision. To avoid the
+                         * possibility of deadlock, perhaps a global lock on the
+                         * scale-out index name for the purpose of move?
+                         */
                         putUsed(resources[0], "willMoveToJoinWithRightSibling" +//
                                 "( "+sourceIndexName+" -> "+targetIndexName+//
                                 ", leftSibling=" + resources[0] +//
@@ -1034,7 +842,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         /*
          * The #of active index partitions on this data service.
          */
-        final int nactive = scores.length;
+        final int nactive = overflowMetadata.getActiveCount();
 
         if (!highlyUtilizedService || nactive <= minActiveIndexPartitions) {
 
@@ -1153,13 +961,14 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         
         final List<AbstractTask> tasks = new ArrayList<AbstractTask>(maxMoves);
 
-        // the old journal (pre-overflow).
-        final AbstractJournal oldJournal = resourceManager.getJournal(lastCommitTime);
-        
-        for (int i = 0; i < scores.length && nmove < maxMoves; i++) {
+        for (Score score : overflowMetadata.getScores()) {
 
-            final Score score = scores[i];
-                        
+            if (nmove >= maxMoves) {
+
+                break;
+                
+            }
+
             final String name = score.name;
             
             if(isUsed(name)) continue;
@@ -1185,10 +994,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 
             }
             
-            final BTree btree = (BTree) resourceManager.getIndexOnStore(
-                    score.name, lastCommitTime, oldJournal);
+            final ViewMetadata vmd = overflowMetadata.getViewMetadata(name);
             
-            if (btree == null) {
+            if (vmd == null) {
 
                 /*
                  * Note: The counters are accumulated over the live of the
@@ -1205,42 +1013,33 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 
             }
 
-            final IndexMetadata indexMetadata = btree.getIndexMetadata();
-            
-            {
-            
-                final LocalPartitionMetadata pmd = indexMetadata
-                        .getPartitionMetadata();
+            final IndexMetadata indexMetadata = vmd.indexMetadata;
 
-                if (pmd.getSourcePartitionId() != -1) {
+            if (vmd.pmd.getSourcePartitionId() != -1) {
 
-                    /*
-                     * This index is currently being moved onto this data
-                     * service so it is NOT a candidate for a split, join, or
-                     * move.
-                     */
-                    
-                    if (INFO)
-                        log.info("Skipping index: name=" + name
-                                    + ", reason=moveInProgress");
-                 
-                    continue;
-                    
-                }
-                
+                /*
+                 * This index is currently being moved onto this data service so
+                 * it is NOT a candidate for a split, join, or move.
+                 */
+
+                if (INFO)
+                    log.info("Skipping index: name=" + name
+                            + ", reason=moveInProgress");
+
+                continue;
+
             }
 
             // handler decides when and where to split an index partition.
-            final ISplitHandler splitHandler = getSplitHandler(indexMetadata);
+            final ISplitHandler splitHandler = vmd.getAdjustedSplitHandler();
 
-            if (splitHandler.shouldSplit(resourceManager.getIndex(score.name,
-                    lastCommitTime))) {
+            if (splitHandler.shouldSplit(vmd.getView())) {
 
                 /*
                  * This avoids moving index partitions that are large and really
                  * should be split before they are moved.
                  */
-                
+
                 if (INFO)
                     log.info("Skipping index: name=" + name
                             + ", reason=shouldSplit");
@@ -1248,7 +1047,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 continue;
 
             }
-            
+
             if (INFO)
                 log.info("Considering move candidate: " + score);
             
@@ -1308,12 +1107,13 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                         scaleOutIndexName, newPartitionId);
                 
                 final AbstractTask task = new MoveIndexPartitionTask(
-                        resourceManager, lastCommitTime, name,
+                        resourceManager, lastCommitTime, name, vmd,
                         targetDataServiceUUID, newPartitionId);
 
                 tasks.add(task);
                 
-                putUsed(name, "willMove(" + name + " -> " + targetName
+                putUsed(name, "willMove(" + name + ", rangeCount"
+                        + vmd.getRangeCount() + " -> " + targetName
                         + ", targetService=" + targetDataServiceName + ")");
 
                 nmove++;
@@ -1445,19 +1245,12 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * FIXME implement suggestions for handling cases when we are nearing DISK
      * exhaustion.
      * 
-     * @todo Explictly prioritize the tasks to be run, otherwise we risk never
-     *       processing some indices.
-     * 
-     * @todo track time for read historical and atomic update phases of each
-     *       kind of index partition task.
-     * 
-     * FIXME read locks for read-committed operations.
-     * 
-     * FIXME Look at whether the indices we need are getting flushed from the
-     * LRU cache while we are examining the lastCommitTime and verify that the
-     * unisolated indices for the last commit on the old journal were turned
-     * into read-historical indices for that commit time and that we are
-     * benefitting from the buffering for those indices.
+     * FIXME read locks for read-committed operations. For example, queries to
+     * the mds should use a read-historical tx so that overflow in the mds will
+     * not cause the views to be discarded during data service overflow. In
+     * fact, we can just create a read-historical transaction when we start data
+     * service overflow and then pass it into the rest of the process, aborting
+     * that tx when overflow is complete.
      * 
      * FIXME consider move as post-compact action using socket to blast the data
      * to the target data service.
@@ -1531,7 +1324,13 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
         tasks.addAll(chooseIndexPartitionSplitBuildOrCompact(compactingMerge));
 
-        // log the selected post-processing decisions at a high level.
+        /*
+         * Log the selected post-processing decisions at a high level.
+         * 
+         * @todo This is logging the pre-condition view. It would be nice to log
+         * the action taken and the post-condition view, perhaps with the
+         * pre-condition view as well.
+         */
         {
             final StringBuilder sb = new StringBuilder();
             final Iterator<Map.Entry<String, String>> itrx = used.entrySet()
@@ -1554,16 +1353,24 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * will:
      * <ul>
      * 
-     * <li>Split the index partition</li>
+     * <li>Split the index partition.</li>
+     * 
+     * <li>Compacting merge - build an {@link IndexSegment} the
+     * {@link FusedView} of the the index partition.</li>
      * 
      * <li>Incremental build - build an {@link IndexSegment} from the writes
      * absorbed by the mutable {@link BTree} on the old journal (this removes
      * the dependency on the old journal as of its lastCommitTime); or</li>
      * 
-     * <li>Compacting merge - build an {@link IndexSegment} the
-     * {@link FusedView} of the the index partition.</li>
-     * 
      * </ul>
+     * 
+     * Note: Compacting merges are decided in two passes. First manditory
+     * compacting merges and splits are identified and a "merge" priority is
+     * computed for the remaining index partitions. In the second pass, we
+     * consume the remaining index partitions in "merge priority" order,
+     * assigning compacting merge tasks until we reach the maximum #of
+     * compacting merges to be performed in a given asynchronous overflow
+     * operation.
      * 
      * @param compactingMerge
      *            When <code>true</code> a compacting merge will be performed
@@ -1581,27 +1388,25 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         int ncompact = 0; // compacting merge task.
         int nsplit = 0; // split task.
 
-        // @todo estimate using #of indices not yet handled.
+        // set of tasks created.
         final List<AbstractTask> tasks = new LinkedList<AbstractTask>();
 
-        // the old journal (pre-overflow).
-        final AbstractJournal oldJournal = resourceManager
-                .getJournal(lastCommitTime);
+        // set of index partition views to consider.
+        final Iterator<ViewMetadata> itr = overflowMetadata.views();
 
-        // the name2addr view as of the last commit time.
-        final ITupleIterator itr = oldJournal.getName2Addr(lastCommitTime)
-                .rangeIterator();
+        /*
+         * A priority queue used to decide between optional compacting merges
+         * and index segment builds. There is a common metric for this decision.
+         */
+        final PriorityQueue<Priority<ViewMetadata>> mergeQueue = new PriorityQueue<Priority<ViewMetadata>>(
+                overflowMetadata.getIndexCount());
 
         while (itr.hasNext()) {
 
-            final ITuple tuple = itr.next();
-
-            final Entry entry = EntrySerializer.INSTANCE
-                    .deserialize(new DataInputBuffer(tuple.getValue()));
-
-            // the name of an index to consider.
-            final String name = entry.name;
-
+            final ViewMetadata vmd = itr.next();
+            
+            final String name = vmd.name;
+            
             /*
              * The index partition has already been handled.
              */
@@ -1617,128 +1422,184 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 continue;
 
             }
-
-            /*
-             * Open the historical view of that index at that time (not just the
-             * mutable BTree but the full view).
-             * 
-             * @todo there is overhead in opening a view comprised of more than
-             * just the mutable BTree. we should be able to get by with lazy
-             * opening of the index segment, and perhaps even the index segment
-             * store.
-             */
-            final ILocalBTreeView view = (ILocalBTreeView) resourceManager
-                    .getIndex(name, TimestampUtility
-                            .asHistoricalRead(lastCommitTime));
-
-            if (view == null) {
-
-                throw new AssertionError("Index not found? : name" + name
-                        + ", lastCommitTime=" + lastCommitTime);
-
-            }
-
-            // note: the mutable btree - accessed here for debugging only.
-            final BTree btree = view.getMutableBTree();
-
-            // index metadata for that index partition.
-            final IndexMetadata indexMetadata = view.getIndexMetadata();
-
-            // handler decides when and where to split an index partition.
-            final ISplitHandler splitHandler = getSplitHandler(indexMetadata);
-
-            // index partition metadata
-            final LocalPartitionMetadata pmd = indexMetadata
-                    .getPartitionMetadata();
-
-            // #of sources in the view (very fast).
-            final int sourceCount = view.getSourceCount();
             
-            // range count for the view (fast).
-            final long rangeCount = view.rangeCount();
-
-            // BTree's directly maintained entry count (very fast).
-            final int entryCount = btree.getEntryCount(); 
-            
-            final String details = ", entryCount=" + entryCount
-                    + ", rangeCount=" + rangeCount + ", sourceCount="
-                    + sourceCount;
-            
-            if (copied.contains(name)) {
+            if (overflowMetadata.isCopied(name)) {
 
                 /*
                  * The write set from the old journal was already copied to the
                  * new journal so we do not need to do a build.
                  */
 
-                putUsed(name, "wasCopied(name=" + name + details +")");
+                putUsed(name, "wasCopied(name=" + name + ")");
 
                 if (INFO)
-                    log.info("was  copied : " + name + details + ", counter="
-                            + view.getCounter().get() + ", checkpoint="
-                            + btree.getCheckpoint());
+                    log.info("was  copied : " + vmd);
 
                 nskip++;
 
-            } else if (!compactingMerge && pmd.getSourcePartitionId() == -1
-                    && splitHandler != null && splitHandler.shouldSplit(view)) {
+                ndone++;
+
+                continue;
+                
+            }
+            
+            /*
+             * Open the historical view of that index at that time (not just the
+             * mutable BTree but the full view).
+             */
+            final ILocalBTreeView view = vmd.getView();
+
+            if (compactingMerge//
+                    || (resourceManager.maximumCompactingMergesPerOverflow != 0 //
+                    && (vmd.sourceJournalCount > resourceManager.maximumJournalsPerView || //
+                        vmd.sourceSegmentCount > resourceManager.maximumSegmentsPerView )//
+                        )//
+            ) {
+
+                /*
+                 * Mandatory compacting merge. 
+                 */
+                
+                vmd.setAction(OverflowActionEnum.Merge);
+
+                // the file to be generated.
+                final File outFile = resourceManager
+                        .getIndexSegmentFile(vmd.indexMetadata);
+
+                final AbstractTask task = new CompactingMergeTask(
+                        resourceManager, lastCommitTime, name, vmd, outFile);
+
+                // add to set of tasks to be run.
+                tasks.add(task);
+
+                putUsed(name, "willCompact(" + vmd + ")");
+
+                if (INFO)
+                    log.info("will compact  : " + vmd);
+
+                ncompact++;
+                
+                ndone++;
+
+                continue;
+            
+            }
+            
+            // the adjusted split handler.
+            final ISplitHandler splitHandler = vmd.getAdjustedSplitHandler();
+            
+            /*
+             * Should split?
+             * 
+             * Note: Split is NOT allowed if the index is currently being moved
+             * onto this data service. Split, join, and move are all disallowed
+             * until the index partition move is complete since each of them
+             * would cause the index partition to become invalidated.
+             * 
+             * Note: A split does a key-range constrained index segment build
+             * for each split identified for the index partition. Each new view
+             * will have all of the sources of the per-split view except the old
+             * journal as of the last overflow event. Split DOES NOT release
+             * older journals and index segments which might be in the view.
+             * Therefore we DO NOT take splits if the index partition triggers
+             * any of the requirements for a manditory compacting merge.
+             */
+            if (!compactingMerge //
+                    && vmd.pmd.getSourcePartitionId() == -1 // move not in
+                                                            // progress
+                    && splitHandler != null && splitHandler.shouldSplit(view)//
+            ) {
 
                 /*
                  * Do an index split task.
-                 * 
-                 * Note: Split is NOT allowed if the index is currently being
-                 * moved onto this data service. Split, join, and move are all
-                 * disallowed until the index partition move is complete since
-                 * each of them would cause the index partition to become
-                 * invalidated.
                  */
 
+                vmd.setAction(OverflowActionEnum.Split);
+                
                 final AbstractTask task = new SplitIndexPartitionTask(
                         resourceManager,//
                         lastCommitTime,//
                         name,//
-                        splitHandler// Note: MAY have been overriden!
+                        vmd
                 );
 
                 // add to set of tasks to be run.
                 tasks.add(task);
 
-                putUsed(name, "willSplit(name=" + name + details + ")");
+                putUsed(name, "willSplit(name=" + vmd + ")");
 
                 if (INFO)
-                    log.info("will split  : " + name + details + ", counter="
-                            + view.getCounter().get() + ", checkpoint="
-                            + btree.getCheckpoint());
+                    log.info("will split  : " + vmd);
 
                 nsplit++;
+                
+                ndone++;
+                
+                continue;
 
-            } else if (compactingMerge
-                    || (ncompact < resourceManager.maximumCompactingMergesPerOverflow && view
-                            .getSourceCount() >= resourceManager.maximumSourcesPerViewBeforeCompactingMerge)
-                    ) {
+            }
+            
+            /*
+             * Compute a score that will be used to prioritize compacting merges
+             * vs builds for index partitions where either option is allowable.
+             * 
+             * Note: The main purpose of an index partition builds is to convert
+             * from a write-order to a read-order and permit the release of the
+             * old journal. However, applications which require frequent access
+             * to historical commit points on the old journals will continue to
+             * rely on the write-order journals.
+             * 
+             * @todo if the application requires access to modest amounts of
+             * history then consider a policy where the buffers are retained for
+             * old journals up to the minReleaseAge. Of course, this can run
+             * into memory constraints so that needs to be traded off against
+             * IOWAIT.
+             */
+            final double mergePriority = (vmd.sourceJournalCount - 1) * 5
+                    + vmd.sourceSegmentCount;
+
+            // put into priority queue to be processed below.
+            mergeQueue.add(new Priority<ViewMetadata>(mergePriority, vmd));
+            
+        } // itr.hasNext()
+
+        /*
+         * Assign merge or build actions to the remaining index partitions based
+         * on the assigned priority.
+         */
+        while (!mergeQueue.isEmpty()) {
+            
+            final Priority<ViewMetadata> e = mergeQueue.poll();
+
+            final ViewMetadata vmd = e.v;
+            
+            if (ncompact < resourceManager.maximumCompactingMergesPerOverflow
+                    && vmd.sourceCount >= resourceManager.maximumSourcesPerViewBeforeCompactingMerge) {
 
                 /*
-                 * Compacting merge.
+                 * Select an optional compacting merge.
                  */
+                
+                vmd.setAction(OverflowActionEnum.Merge);
 
                 // the file to be generated.
                 final File outFile = resourceManager
-                        .getIndexSegmentFile(indexMetadata);
+                        .getIndexSegmentFile(vmd.indexMetadata);
 
                 final AbstractTask task = new CompactingMergeTask(
-                        resourceManager, lastCommitTime, name, outFile);
+                        resourceManager, lastCommitTime, vmd.name, vmd, outFile);
 
                 // add to set of tasks to be run.
                 tasks.add(task);
 
-                putUsed(name, "willCompact(name=" + name + details + ")");
+                putUsed(vmd.name, "willCompact(" + vmd + ")");
 
                 if (INFO)
-                    log.info("will compact  : " + name + details + ", counter="
-                            + view.getCounter().get() + ", checkpoint="
-                            + btree.getCheckpoint());
+                    log.info("will compact  : " + vmd);
 
                 ncompact++;
+                
+                ndone++;
 
             } else {
 
@@ -1746,33 +1607,33 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * Incremental build.
                  */
                 
-                assert !compactingMerge;
+                assert !compactingMerge : "Manditory compacting merge.";
 
+                vmd.setAction(OverflowActionEnum.Build);
+                
                 // the file to be generated.
                 final File outFile = resourceManager
-                        .getIndexSegmentFile(indexMetadata);
+                        .getIndexSegmentFile(vmd.indexMetadata);
 
                 final AbstractTask task = new IncrementalBuildTask(
-                        resourceManager, lastCommitTime, name, outFile);
+                        resourceManager, lastCommitTime, vmd.name, vmd, outFile);
 
                 // add to set of tasks to be run.
                 tasks.add(task);
 
-                putUsed(name, "willBuild(name=" + name + details + ")");
+                putUsed(vmd.name, "willBuild(" + vmd + ")");
 
                 if (INFO)
-                    log.info("will build: " + name + details + ", counter="
-                            + view.getCounter().get() + ", checkpoint="
-                            + btree.getCheckpoint());
+                    log.info("will build: " + vmd);
 
                 nbuild++;
 
+                ndone++;
+
             }
 
-            ndone++;
-
-        } // itr.hasNext()
-
+        } // while : next index partition
+        
         // verify counters.
         if (ndone != nskip + nbuild + ncompact + nsplit) {
 
@@ -1791,162 +1652,64 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         return tasks;
         
     }
-
+    
     /**
-     * Return an adjusted split handler. The split handler will be adjusted to
-     * be heavily biased in favor of splitting an index partition when the #of
-     * index partitions for a scale-out index is small. This adjustment is
-     * designed to very rapidly (re-)distribute a new scale-out index until
-     * there are at least 10 index partitions and rapidly (re-)distribute a
-     * scale-out index until they are at least 100 index partitions. Thereafter
-     * the as configured behavior will be observed.
+     * Return the priority of the next unused entry from the specified queue.
+     * Used entries are removed from the queue. The first unused entry is left
+     * in the queue and its priority is returned. If the queue is empty then
+     * ZERO (0d) is returned.
      * <p>
-     * Note: The potential parallelism of a data service is limited by the #of
-     * index partitions on that data service as well as by the workload of the
-     * application. By partitioning new and young indices aggressively we ensure
-     * that the index is broken into multiple index partitions on the initial
-     * data service. Those index partitions will be re-distributed across the
-     * available data services based on recommendations made by the load
-     * balancer. Both breaking an index into multiple partitions on a single
-     * data service and re-distributing those index partitions among the hosts
-     * of a cluster will increase the resources (CPU, DISK, RAM) which can be
-     * brought to bear on the index. In particular, there is a constraint of a
-     * single core per index partition (for writes). Therefore breaking a new
-     * index into 2 pieces doubles the potential concurrency for a data service
-     * on a host with at least 2 cores. This can be readily extrapolated to a
-     * cluster with 8 cores x 16 machines, etc.
-     * <p>
-     * Note: The adjustment is proportional to the #of existing index partitions
-     * and is adjusted using a floating point discount factor. This should
-     * prevent a split triggering a subsequent join on the next overflow.
+     * Note: Used entries are identified by an entry whose index partition name
+     * {@link #isUsed(String)}.
      * 
-     * @param indexMetadata
-     *            The {@link IndexMetadata} for an index partition being
-     *            considered for a split or join.
+     * @param q
+     *            The queue.
      * 
-     * @return The adjusted split handler.
-     * 
-     * @todo only supports the {@link DefaultSplitHandler}.
+     * @return The priority of the next unused entry. The corresponding entry is
+     *         left on the queue.
      */
-    protected ISplitHandler getSplitHandler(final IndexMetadata indexMetadata) {
+    private double nextUnused(PriorityQueue<Priority<ViewMetadata>> q) {
 
-        final ISplitHandler splitHandler = indexMetadata.getSplitHandler();
+        Priority<ViewMetadata> e = null;
 
-        if (splitHandler == null)
-            return splitHandler;
-        
-        if (splitHandler instanceof DefaultSplitHandler) {
+        while ((e = q.peek()) != null) {
 
-            final long npartitions;
-            try {
+            if (isUsed(e.v.name)) {
 
-                /*
-                 * The #of index partitions for this scale-out index.
-                 * 
-                 * Note: This may require RMI, but the metadata index is also
-                 * heavily cached by the client.
-                 */
-
-                npartitions = resourceManager.getFederation().getMetadataIndex(
-                        indexMetadata.getName(), lastCommitTime).rangeCount();
+                // remove used entry from the queue.
+                q.poll();
                 
-            } catch (Throwable t) {
-
-                if(InnerCause.isInnerCause(t, InterruptedException.class)) {
-
-                    // don't trap interrupts.
-                    throw new RuntimeException(t);
-                    
-                }
-                
-                /*
-                 * Traps any RMI failures (or anything else), logs a warning,
-                 * and returns the default splitHandler instead.
-                 */
-                
-                log.warn("name=" + indexMetadata.getName(), t);
-                
-                return splitHandler;
-                
-            }
-
-            if (npartitions == 0) {
-
-                /*
-                 * There must always be at least one index partition for a
-                 * scale-out index so this is an error condition.
-                 */
-                
-                log.error("No partitions? name=" + indexMetadata.getName());
-                
-                return splitHandler;
-
-            }
-            
-            if (npartitions >= resourceManager.accelerateSplitThreshold) {
-
-                /*
-                 * There are plenty of index partitions. Use the original split
-                 * handler.
-                 * 
-                 * Note: This also prevents our "discount" from becoming an
-                 * "inflation" factor!
-                 */
-
-                return splitHandler;
+                continue;
                 
             }
             
-            // the split handler as configured.
-            final DefaultSplitHandler s = (DefaultSplitHandler) splitHandler;
-
-            // discount: given T=100, will be 1 when N=100; 10 when N=10, and
-            // 100 when N=1.
-            final double d = (double) npartitions
-                    / resourceManager.accelerateSplitThreshold;
-
-            try {
-
-                // adjusted split handler.
-                final DefaultSplitHandler t = new DefaultSplitHandler(//
-                        (int)(s.getMinimumEntryCount() * d),  //
-                        (int)(s.getEntryCountPerSplit() * d), //
-                        s.getOverCapacityMultiplier(),  // unchanged 
-                        s.getUnderCapacityMultiplier(), // unchanged
-                        s.getSampleRate() // unchanged
-                );
-
-                if (INFO)
-                    log
-                            .info("Adjusted splitHandler:  name="
-                                    + indexMetadata.getName()
-                                    + ", npartitions=" + npartitions
-                                    + ", threshold="
-                                    + resourceManager.accelerateSplitThreshold
-                                    + ", discount=" + d
-                                    + ", adjustedSplitHandler=" + t);
-
-                return t;
-
-            } catch (IllegalArgumentException ex) {
-
-                /*
-                 * The adjustment violated some constraint. Log a warning and
-                 * use the original splitHandler since it was at least valid.
-                 */
-                
-                log.warn("Adjustment failed: name=" + indexMetadata.getName()
-                        + ", npartitions=" + npartitions + ", discount=" + d
-                        + ", splitHandler=" + splitHandler, ex);
-
-                return splitHandler;
-                
-            }
+            break;
             
         }
-        
-        return splitHandler;
 
+        if (e == null)
+            return 0d;
+
+        return e.d;
+        
+    }
+
+    /**
+     * Counters that report on the synchronous and asynchronous overflow action
+     * activities for a specific index partition.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * FIXME The overflow task counters are not really in use yet.
+     */
+    static class OverflowTaskCounters {
+        
+        /**
+         * The action taken and <code>null</code> if no action has been taken
+         * for this local index.
+         */
+        public OverflowActionEnum action;
     }
     
     /**
@@ -1977,6 +1740,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         }
 
         final long begin = System.currentTimeMillis();
+        
+        final Event e = new Event(resourceManager.getFederation(),
+                EventType.AsynchronousOverflow, ""/* details */).start();
         
         try {
 
@@ -2056,6 +1822,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             
         } finally {
 
+            e.end();
+            
             // enable overflow again as a post-condition.
             if (!resourceManager.overflowAllowed.compareAndSet(
                     false/* expect */, true/* set */)) {

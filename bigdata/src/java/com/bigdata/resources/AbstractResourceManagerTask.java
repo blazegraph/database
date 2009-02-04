@@ -80,10 +80,9 @@ abstract public class AbstractResourceManagerTask<T> extends AbstractTask<T> {
      * @param resourceManager
      * @param timestamp
      * @param resource
-     * @param latch
      */
-    public AbstractResourceManagerTask(ResourceManager resourceManager, long timestamp,
-            String resource) {
+    public AbstractResourceManagerTask(ResourceManager resourceManager,
+            long timestamp, String resource) {
 
         super(resourceManager.getConcurrencyManager(), timestamp, resource);
 
@@ -95,10 +94,9 @@ abstract public class AbstractResourceManagerTask<T> extends AbstractTask<T> {
      * @param resourceManager
      * @param timestamp
      * @param resource
-     * @param latch
      */
-    public AbstractResourceManagerTask(ResourceManager resourceManager, long timestamp,
-            String[] resource) { //, ILatch latch) {
+    public AbstractResourceManagerTask(ResourceManager resourceManager,
+            long timestamp, String[] resource) {
 
         super(resourceManager.getConcurrencyManager(), timestamp, resource);
 
