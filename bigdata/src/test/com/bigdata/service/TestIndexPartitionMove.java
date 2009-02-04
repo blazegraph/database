@@ -105,7 +105,11 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
          * service so that it will use our fakes scores.
          */
         properties.setProperty(LoadBalancerService.Options.INITIAL_ROUND_ROBIN_UPDATE_COUNT, "0");
-        
+
+        // turn off acceleration features.
+        properties.setProperty(Options.ACCELERATE_OVERFLOW_THRESHOLD, "0");
+        properties.setProperty(Options.ACCELERATE_SPLIT_THRESHOLD, "0");
+
 //        properties.setProperty(Options.INITIAL_EXTENT, ""+1*Bytes.megabyte);
         
 //        properties.setProperty(Options.MAXIMUM_EXTENT, ""+1*Bytes.megabyte);

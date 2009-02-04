@@ -169,7 +169,7 @@ public class JiniServiceProcessHelper extends ProcessHelper {
                 return super.kill(immediateShutdown);
             } catch (Throwable t) {
                 // delegate to the super class.
-                log.error(this, t);
+                log.warn(this, t);
                 return super.kill(immediateShutdown);
             }
         } else if (admin instanceof DestroyAdmin) {

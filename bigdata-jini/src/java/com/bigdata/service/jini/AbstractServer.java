@@ -134,6 +134,9 @@ import com.sun.jini.start.ServiceStarter;
  * @see http://java.sun.com/products/jini/2.0/doc/api/com/sun/jini/start/ServiceStarter.html
  *      for documentation on how to use the ServiceStarter.
  * 
+ * @todo delete the lock file, config file, etc. and the service directory if
+ * the service is destroyed.
+ * 
  * @todo document exit status codes and unify their use in this and derived
  *       classes.
  * 
@@ -1761,7 +1764,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
         }
         
-        if (lockFileRAF != null) {
+        if (lockFileRAF != null && lockFileRAF.getChannel().isOpen()) {
 
             /*
              * If there is a file lock then close the backing channel.

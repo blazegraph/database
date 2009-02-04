@@ -32,11 +32,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
-import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.Vector;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -58,7 +56,6 @@ import com.bigdata.counters.ICounter;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.IServiceCounters;
 import com.bigdata.counters.OneShotInstrument;
-import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.TemporaryStoreFactory;
 import com.bigdata.rawstore.Bytes;
@@ -70,7 +67,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.QueueStatisticsTask;
 import com.bigdata.util.concurrent.TaskCounters;
 import com.bigdata.util.httpd.AbstractHTTPD;
-import com.sun.org.apache.bcel.internal.generic.ILOAD;
 
 /**
  * Abstract base class for {@link IBigdataFederation} implementations.
@@ -83,8 +79,7 @@ import com.sun.org.apache.bcel.internal.generic.ILOAD;
  *       that the IServiceShutdown.Options interface is flattened into
  *       IServiceShutdown and it shadows the Options that are being used.
  */
-abstract public class AbstractFederation implements IBigdataFederation,
-        IFederationDelegate {
+abstract public class AbstractFederation implements IBigdataFederation {
 
     protected static final Logger log = Logger.getLogger(IBigdataFederation.class);
 
@@ -159,8 +154,8 @@ abstract public class AbstractFederation implements IBigdataFederation,
         // terminate sampling and reporting tasks.
         sampleService.shutdown();
 
-        // discard any events still in the queue.
-        events.clear();
+        // drain any events in one last report.
+        new SendEventsTask().run();
         
         // optional httpd service for the local counters. 
         if( httpd != null) {
@@ -751,7 +746,19 @@ abstract public class AbstractFederation implements IBigdataFederation,
         client.getDelegate().didStart();
         
     }
-    
+
+    /**
+     * Delegated.
+     */
+    public AbstractHTTPD newHttpd(final int httpdPort,
+            final CounterSet counterSet) throws IOException {
+
+        assertOpen();
+
+        return client.getDelegate().newHttpd(httpdPort, counterSet);
+        
+    }
+
     public void serviceJoin(IService service, UUID serviceUUID) {
         
         if(INFO) {
@@ -1092,10 +1099,10 @@ abstract public class AbstractFederation implements IBigdataFederation,
 
             }
 
+            final AbstractHTTPD httpd;
             try {
 
-                AbstractFederation.this.httpd = newHttpd(httpdPort,
-                        getCounterSet());
+                httpd = newHttpd(httpdPort, getCounterSet());
 
             } catch (IOException e) {
 
@@ -1105,65 +1112,28 @@ abstract public class AbstractFederation implements IBigdataFederation,
                 
             }
 
-            // the URL that may be used to access the local httpd.
-            httpdURL = "http://"
-                    + AbstractStatisticsCollector.fullyQualifiedHostName + ":"
-                    + httpd.getPort() + "?path="
-                    + URLEncoder.encode(path, "UTF-8");
+            if (httpd != null) {
 
-            if (INFO)
-                log.info("start:\n" + httpdURL);
+                // save reference to the daemon.
+                AbstractFederation.this.httpd = httpd;
+                
+                // the URL that may be used to access the local httpd.
+                httpdURL = "http://"
+                        + AbstractStatisticsCollector.fullyQualifiedHostName
+                        + ":" + httpd.getPort() + "?path="
+                        + URLEncoder.encode(path, "UTF-8");
 
-            // add counter reporting that url to the load balancer.
-            serviceRoot.addCounter(IServiceCounters.LOCAL_HTTPD,
-                    new OneShotInstrument<String>(httpdURL));
+                if (INFO)
+                    log.info("start:\n" + httpdURL);
+
+                // add counter reporting that url to the load balancer.
+                serviceRoot.addCounter(IServiceCounters.LOCAL_HTTPD,
+                        new OneShotInstrument<String>(httpdURL));
+
+            }
 
         }
         
-        /**
-         * Create a new {@link AbstractHTTPD} instance.
-         * 
-         * @param port
-         *            The port, or zero for a random port.
-         * @param counterSet
-         *            The root {@link CounterSet} that will be served up.
-         * 
-         * @throws IOException
-         */
-        protected final AbstractHTTPD newHttpd(final int httpdPort,
-                CounterSet counterSet) throws IOException {
-
-            return new CounterSetHTTPD(httpdPort, counterSet) {
-
-                public Response doGet(String uri, String method,
-                        Properties header,
-                        LinkedHashMap<String, Vector<String>> parms)
-                        throws Exception {
-
-                    try {
-
-                        reattachDynamicCounters();
-
-                    } catch (Exception ex) {
-
-                        /*
-                         * Typically this is because the live journal has been
-                         * concurrently closed during the request.
-                         */
-
-                        log.warn("Could not re-attach dynamic counters: " + ex,
-                                ex);
-
-                    }
-
-                    return super.doGet(uri, method, header, parms);
-
-                }
-
-            };
-
-        }
-
     }
     
     /**
@@ -1346,10 +1316,12 @@ abstract public class AbstractFederation implements IBigdataFederation,
 
     /**
      * Queues up an event to be sent to the {@link ILoadBalancerService}.
-     * Events are maintained on a non-blocking queue and sent by a scheduled
-     * task.
+     * Events are maintained on a non-blocking queue (no fixed capacity) and
+     * sent by a scheduled task.
      * 
      * @param e
+     * 
+     * @see SendEventsTask
      */
     protected void sendEvent(final Event e) {
         
@@ -1359,6 +1331,9 @@ abstract public class AbstractFederation implements IBigdataFederation,
         
     }
     
+    /**
+     * Queue of events sent periodically to the {@link ILoadBalancerService}.
+     */
     final private BlockingQueue<Event> events = new LinkedBlockingQueue<Event>();
     
     /**
@@ -1366,6 +1341,8 @@ abstract public class AbstractFederation implements IBigdataFederation,
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
+     * 
+     * FIXME should discard events if too many build up on the client.
      */
     private class SendEventsTask implements Runnable {
 
@@ -1379,34 +1356,63 @@ abstract public class AbstractFederation implements IBigdataFederation,
         public void run() {
 
             try {
-            
-            final ILoadBalancerService lbs = getLoadBalancerService();
 
-            if (lbs == null) {
+                final ILoadBalancerService lbs = getLoadBalancerService();
 
-                // Can't drain events : @todo might discard if queue is too full.
-                return;
-                
-            }
-            
-            final LinkedList<Event> c = new LinkedList<Event>();
-            
-            events.drainTo( c );
-            
-            for(Event e : events) {
-                
-                lbs.notifyEvent( e );
-                
-            }
+                if (lbs == null) {
 
-            } catch(Throwable t) {
+                    // Can't drain events
+                    return;
+
+                }
+
+                final long begin = System.currentTimeMillis();
                 
+                final LinkedList<Event> c = new LinkedList<Event>();
+
+                events.drainTo(c);
+
+                /*
+                 * @todo since there is a delay before events are sent along it
+                 * is quite common that the end() event will have been generated
+                 * such that the event is complete before we send it along.
+                 * there should be an easy way to notice this and avoid sending
+                 * an event twice when we can get away with just sending it
+                 * once. however the decision must be atomic with respect to the
+                 * state change in the event so that we do not lose any data by
+                 * concluding that we have handled the event when in fact its
+                 * state was not complete before we sent it along.
+                 */
+                
+                for (Event e : c) {
+
+                    // avoid modification when sending the event.
+                    synchronized(e) {
+
+                        lbs.notifyEvent(e);
+                        
+                    }
+
+                }
+
+                if (INFO) {
+                    
+                    final int nevents = c.size();
+
+                    if (nevents > 0)
+                        log.info("Sent " + c.size() + " events in "
+                                + (System.currentTimeMillis() - begin) + "ms");
+
+                }
+
+            } catch (Throwable t) {
+
                 log.warn(getServiceName(), t);
-                
+
             }
-            
+
         }
-        
+
     }
-    
+
 }

@@ -190,7 +190,7 @@ public abstract class AbstractServicesManagerService extends AbstractService
                 
             } catch (Throwable t) {
                 
-                log.error("Could not kill process: " + helper);
+                log.error("Process kill (ignored): " + helper);
 
                 // remove from list of running processes.
                 runningProcesses.remove(helper);

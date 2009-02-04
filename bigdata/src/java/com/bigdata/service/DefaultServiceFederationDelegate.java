@@ -33,9 +33,16 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
+import java.util.LinkedHashMap;
+import java.util.Properties;
 import java.util.UUID;
+import java.util.Vector;
 
 import org.apache.log4j.Logger;
+
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.httpd.CounterSetHTTPD;
+import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
  * Basic delegate for services that need to override the service UUID and
@@ -110,10 +117,41 @@ public class DefaultServiceFederationDelegate<T extends AbstractService>
 
     }
 
+    public AbstractHTTPD newHttpd(final int httpdPort,
+            final CounterSet counterSet) throws IOException {
+        
+        return new CounterSetHTTPD(httpdPort, counterSet, service) {
+
+            public Response doGet(String uri, String method, Properties header,
+                    LinkedHashMap<String, Vector<String>> parms)
+                    throws Exception {
+
+                try {
+
+                    reattachDynamicCounters();
+
+                } catch (Exception ex) {
+
+                    /*
+                     * Typically this is because the live journal has been
+                     * concurrently closed during the request.
+                     */
+
+                    log.warn("Could not re-attach dynamic counters: " + ex, ex);
+
+                }
+
+                return super.doGet(uri, method, header, parms);
+
+            }
+
+        };
+
+    }
+
     /**
      * Writes the URL of the local httpd service for the {@link DataService}
-     * onto a file named <code>httpd.url</code> in the specified
-     * directory.
+     * onto a file named <code>httpd.url</code> in the specified directory.
      */
     protected void logHttpdURL(final File dir) {
 

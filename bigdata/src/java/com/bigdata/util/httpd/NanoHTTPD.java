@@ -120,7 +120,7 @@ public class NanoHTTPD implements IServiceShutdown
      * @parm method "GET", "POST" etc.
      * @parm parms Parsed, percent decoded parameters from URI and, in case of
      *       POST, data. The keys are the parameter names. Each value is a
-     *       {@link Colelction} of {@link String}s containing the bindings for
+     *       {@link Collection} of {@link String}s containing the bindings for
      *       the named parameter. The order of the URL parameters is preserved.
      * @parm header Header entries, percent decoded
      * 

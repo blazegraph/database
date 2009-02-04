@@ -30,10 +30,7 @@ package com.bigdata.resources;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
@@ -164,14 +161,13 @@ public class TestOverflow extends AbstractResourceManagerTestCase {
 
             assertEquals(0, resourceManager.getManagedSegmentCount());
             
-            Set<String> copied = new HashSet<String>();
-            
             // do overflow.
-            final AtomicBoolean postProcess = new AtomicBoolean(false);
-            resourceManager.doSynchronousOverflow(copied,postProcess);
+            final OverflowMetadata overflowMetadata = resourceManager
+                    .doSynchronousOverflow();
 
             // Not expecting the index partition to be copied over.
-            assertEquals(0,copied.size());
+            assertEquals(0, overflowMetadata
+                    .getActionCount(OverflowActionEnum.Copy));
             
             assertEquals(2, resourceManager.getManagedJournalCount());
 

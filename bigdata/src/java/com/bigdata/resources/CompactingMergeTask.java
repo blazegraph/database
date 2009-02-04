@@ -16,16 +16,17 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.SegmentMetadata;
+import com.bigdata.service.Event;
+import com.bigdata.service.EventType;
 
 /**
  * Task builds an {@link IndexSegment} from the fused view of an index partition
  * as of some historical timestamp and then atomically updates the view (aka a
  * compacting merge).
  * <p>
- * Note: This task may be used after
- * {@link IResourceManager#overflow(boolean, boolean)} in order to produce a
- * compact view of the index as of the <i>lastCommitTime</i> on the old
- * journal.
+ * Note: This task may be used after {@link IResourceManager#overflow()} in
+ * order to produce a compact view of the index as of the <i>lastCommitTime</i>
+ * on the old journal.
  * <p>
  * Note: As its last action, this task submits a
  * {@link AtomicUpdateCompactingMergeTask} which replaces the view with one
@@ -38,11 +39,12 @@ import com.bigdata.mdi.SegmentMetadata;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class CompactingMergeTask extends
-        AbstractResourceManagerTask<BuildResult> {
+public class CompactingMergeTask extends AbstractPrepareTask<BuildResult> {
 
     final protected long lastCommitTime;
 
+    final protected ViewMetadata vmd;
+    
     final protected File outFile;
 
     /**
@@ -58,18 +60,35 @@ public class CompactingMergeTask extends
      *            written.
      */
     public CompactingMergeTask(final ResourceManager resourceManager,
-            final long lastCommitTime, final String name, final File outFile) {
+            final long lastCommitTime, final String name,
+            final ViewMetadata vmd, final File outFile) {
 
         super(resourceManager, TimestampUtility
-                .asHistoricalRead(lastCommitTime), name);
+                .asHistoricalRead(lastCommitTime), name,
+                OverflowActionEnum.Merge);
+        
+        if (vmd == null)
+            throw new IllegalArgumentException();
 
-        this.lastCommitTime = lastCommitTime;
-
+        if (!vmd.name.equals(name))
+            throw new IllegalArgumentException();
+        
         if (outFile == null)
             throw new IllegalArgumentException();
 
+        this.lastCommitTime = lastCommitTime;
+
+        this.vmd = vmd;
+        
         this.outFile = outFile;
 
+    }
+
+    @Override
+    protected void clearRefs() {
+        
+        vmd.clearRef();
+        
     }
 
     /**
@@ -78,82 +97,112 @@ public class CompactingMergeTask extends
      * 
      * @return The {@link BuildResult}.
      */
-    public BuildResult doTask() throws Exception {
+    protected BuildResult doTask() throws Exception {
 
-        if (resourceManager.isOverflowAllowed())
-            throw new IllegalStateException();
-        
-        // the name under which the index partition is registered.
-        final String name = getOnlyResource();
-
-        // The source view.
-        final ILocalBTreeView src = (ILocalBTreeView) getIndex(name);
-
-        // The UUID associated with the scale-out index.
-        final UUID indexUUID = src.getIndexMetadata().getIndexUUID();
-
-        if (INFO) {
-
-            // note: the mutable btree - accessed here for debugging only.
-            final BTree btree = src.getMutableBTree();
-
-            if (INFO)
-                log.info("src=" + name + ",counter=" + src.getCounter().get()
-                        + ",checkpoint=" + btree.getCheckpoint());
-
-        }
-        
-        // Build the index segment.
-        final BuildResult result = resourceManager.buildIndexSegment(name, src,
-                outFile, true/* compactingMerge */, lastCommitTime,
-                null/* fromKey */, null/* toKey */);
-
-        /*
-         * @todo error handling should be inside of the atomic update task since
-         * it has more visibility into the state changes and when we can no
-         * longer delete the new index segment.
-         */
+        e.start();
         try {
-            
-            // task will update the index partition view definition.
-            final AbstractTask<Void> task = new AtomicUpdateCompactingMergeTask(
-                    resourceManager, concurrencyManager, name, indexUUID,
-                    result);
 
-            if (INFO)
-                log.info("src=" + name + ", will run atomic update task");
+            final BuildResult result;
+            try {
 
-            // submit task and wait for it to complete @todo config timeout?
-            concurrencyManager.submit(task).get();
+                if (resourceManager.isOverflowAllowed())
+                    throw new IllegalStateException();
+
+                /*
+                 * Build the index segment.
+                 * 
+                 * Note: Since this is a compacting merge the view on the old
+                 * journal as of the last commit time will be fully captured by
+                 * the generated index segment. However, writes buffered by the
+                 * live journal WILL NOT be present in that index segment and
+                 * the post-condition view will include those writes.
+                 */
+                result = resourceManager.buildIndexSegment(vmd.name, vmd
+                        .getView(), outFile, true/* compactingMerge */,
+                        lastCommitTime, null/* fromKey */, null/* toKey */);
+
+            } finally {
+
+                /*
+                 * Release our hold on the source view - we only needed it when
+                 * we did the index segment build.
+                 */
+
+                clearRefs();
+
+            }
 
             /*
-             * Verify that the view was updated. If the atomic update task runs
-             * correctly then it will replace the IndexMetadata object on the
-             * mutable BTree with a new view containing only the live journal
-             * and the new index segment (for a compacting merge). We verify
-             * that right now to make sure that the state change to the BTree
-             * was noticed and resulted in a commit before returning control to
-             * us here.
-             * 
-             * @todo comment this out or replicate for the index build task also?
+             * @todo error handling should be inside of the atomic update task
+             * since it has more visibility into the state changes and when we
+             * can no longer delete the new index segment.
              */
-            concurrencyManager.submit(
-                    new VerifyAtomicUpdateTask(resourceManager,
-                            concurrencyManager, name, indexUUID, result)).get();
-            
-        } catch (Throwable t) {
+            try {
 
-            // delete the generated index segment.
-            resourceManager.deleteResource(result.segmentMetadata.getUUID(),
-                    false/* isJournal */);
+                // scale-out index UUID.
+                final UUID indexUUID = vmd.indexMetadata.getIndexUUID();
 
-            // re-throw the exception
-            throw new Exception(t);
+                // task will update the index partition view definition.
+                final AbstractTask<Void> task = new AtomicUpdateCompactingMergeTask(
+                        resourceManager, concurrencyManager, vmd.name,
+                        indexUUID, result);
+
+                if (INFO)
+                    log.info("src=" + vmd.name
+                            + ", will run atomic update task");
+
+                final Event updateEvent = new Event(resourceManager
+                        .getFederation(), EventType.AtomicViewUpdate, "src="
+                        + vmd).start();
+
+                try {
+
+                    // submit task and wait for it to complete
+                    concurrencyManager.submit(task).get();
+
+                } finally {
+
+                    updateEvent.end();
+
+                }
+
+                /*
+                 * Verify that the view was updated. If the atomic update task
+                 * runs correctly then it will replace the IndexMetadata object
+                 * on the mutable BTree with a new view containing only the live
+                 * journal and the new index segment (for a compacting merge).
+                 * We verify that right now to make sure that the state change
+                 * to the BTree was noticed and resulted in a commit before
+                 * returning control to us here.
+                 * 
+                 * @todo comment this out or replicate for the index build task
+                 * also?
+                 */
+                concurrencyManager
+                        .submit(
+                                new VerifyAtomicUpdateTask(resourceManager,
+                                        concurrencyManager, vmd.name,
+                                        indexUUID, result)).get();
+
+            } catch (Throwable t) {
+
+                // delete the generated index segment.
+                resourceManager
+                        .deleteResource(result.segmentMetadata.getUUID(), false/* isJournal */);
+
+                // re-throw the exception
+                throw new Exception(t);
+
+            }
+
+            return result;
+
+        } finally {
+
+            e.end();
 
         }
-
-        return result;
-
+        
     }
 
     /**
@@ -163,11 +212,12 @@ public class CompactingMergeTask extends
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static private class VerifyAtomicUpdateTask extends
-            AbstractResourceManagerTask<Void> {
+    static private class VerifyAtomicUpdateTask extends AbstractTask<Void> {
 
         final protected BuildResult buildResult;
 
+        protected final ResourceManager resourceManager;
+        
         /**
          * @param resourceManager
          * @param concurrencyManager
@@ -178,11 +228,16 @@ public class CompactingMergeTask extends
                 IConcurrencyManager concurrencyManager, String resource,
                 UUID indexUUID, BuildResult buildResult) {
 
-            super(resourceManager, ITx.UNISOLATED, resource);
+            super(concurrencyManager, ITx.UNISOLATED, resource);
+
+            if (resourceManager == null)
+                throw new IllegalArgumentException();
 
             if (buildResult == null)
                 throw new IllegalArgumentException();
 
+            this.resourceManager = resourceManager;
+            
             this.buildResult = buildResult;
 
             assert resource.equals(buildResult.name);
@@ -459,7 +514,7 @@ public class CompactingMergeTask extends
                     currentpmd.getRightSeparatorKey(),//
                     newResources, //
                     currentpmd.getHistory()+
-                    "compactingMerge"//
+                    OverflowActionEnum.Merge//
                     +"(lastCommitTime="+ segmentMetadata.getCreateTime()//
                     +",btreeEntryCount="+btree.getEntryCount()//
                     +",segmentEntryCount="+buildResult.builder.getCheckpoint().nentries//
@@ -496,7 +551,7 @@ public class CompactingMergeTask extends
             resourceManager.indexPartitionMergeCounter.incrementAndGet();
             
             return null;
-
+                
         }
 
     }

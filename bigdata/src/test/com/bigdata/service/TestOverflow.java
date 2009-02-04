@@ -151,6 +151,10 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
         properties.setProperty(Options.MAXIMUM_SOURCES_PER_VIEW_BEFORE_COMPACTING_MERGE, "1");
         properties.setProperty(Options.MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW, ""+Integer.MAX_VALUE);
 
+        // turn off acceleration features.
+        properties.setProperty(Options.ACCELERATE_OVERFLOW_THRESHOLD, "0");
+        properties.setProperty(Options.ACCELERATE_SPLIT_THRESHOLD, "0");
+        
 //        properties.setProperty(Options.INITIAL_EXTENT, ""+1*Bytes.megabyte);
         
 //        properties.setProperty(Options.MAXIMUM_EXTENT, ""+1*Bytes.megabyte);

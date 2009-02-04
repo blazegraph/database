@@ -73,7 +73,10 @@ import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.SegmentMetadata;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.service.Event;
+import com.bigdata.service.EventType;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IClientIndex;
 import com.bigdata.service.IDataService;
@@ -1494,43 +1497,99 @@ abstract public class IndexManager extends StoreManager {
             final long createTime, final byte[] fromKey, final byte[] toKey)
             throws Exception {
 
-        final IndexMetadata indexMetadata;
-        final SegmentMetadata segmentMetadata;
-        
-        final IndexSegmentBuilder builder;
+        final Event e = new Event(getFederation(), EventType.IndexSegmentBuild,
+                "name=" + name + ", merge=" + compactingMerge).start();
+
+        String moreDetails = null;
         try {
+            final IndexMetadata indexMetadata;
+            final SegmentMetadata segmentMetadata;
 
-            // new builder.
-            builder = IndexSegmentBuilder
-                    .newInstance(name, src, outFile, tmpDir, compactingMerge,
-                            createTime, fromKey, toKey);
+            final IndexSegmentBuilder builder;
+            try {
 
-            // metadata for that index / index partition.
-            indexMetadata = src.getIndexMetadata();
+                // new builder.
+                builder = IndexSegmentBuilder.newInstance(name, src, outFile,
+                        tmpDir, compactingMerge, createTime, fromKey, toKey);
 
-            // build the index segment.
-            builder.call();
+                // metadata for that index / index partition.
+                indexMetadata = src.getIndexMetadata();
 
-            // report event
-            notifyIndexSegmentBuildEvent(builder);
+                // build the index segment.
+                builder.call();
 
-            // Describe the index segment.
-            segmentMetadata = new SegmentMetadata(//
-                    outFile, //
-                    builder.segmentUUID, //
-                    createTime //
-            );
+                /*
+                 * Report on a bulk merge/build of an {@link IndexSegment}.
+                 */
+                {
 
-            // Notify the resource manager so that it can find this file.
-            addResource(segmentMetadata, outFile);
+                    final int nentries = builder.plan.nentries;
+                    final long commitTime = builder.getCheckpoint().commitTime;
+                    final long nbytes = builder.getCheckpoint().length;
+                    
+                    // data rate in MB/sec.
+                    float mbPerSec = builder.mbPerSec;
 
-        } catch (Throwable t) {
+                    moreDetails = "name=" + name + ", filename=" + outFile + ", nentries="
+                            + nentries + ", commitTime=" + commitTime + ", elapsed="
+                            + builder.elapsed + ", "
+                            + fpf.format(((double) nbytes / Bytes.megabyte32)) + "MB"
+                            + ", rate=" + fpf.format(mbPerSec) + "MB/sec";
 
-            if (outFile != null && outFile.exists()) {
+                }
+
+                // Describe the index segment.
+                segmentMetadata = new SegmentMetadata(//
+                        outFile, //
+                        builder.segmentUUID, //
+                        createTime //
+                );
+
+                // Notify the resource manager so that it can find this file.
+                addResource(segmentMetadata, outFile);
+
+            } catch (Throwable t) {
+
+                if (outFile != null && outFile.exists()) {
+
+                    try {
+
+                        outFile.delete();
+
+                    } catch (Throwable t2) {
+
+                        log.warn(t2.getLocalizedMessage(), t2);
+
+                    }
+
+                }
+
+                if (t instanceof Exception)
+                    throw (Exception) t;
+
+                throw new RuntimeException(t);
+
+            }
+
+            /*
+             * Note: Now that the resource is registered with the StoreManager
+             * we have to handle errors somewhat differently.
+             */
+
+            try {
+
+                if (INFO)
+                    log.info("built index segment: " + name + ", file="
+                            + outFile);
+
+                return new BuildResult(name, indexMetadata, segmentMetadata,
+                        builder);
+
+            } catch (Throwable t) {
 
                 try {
 
-                    outFile.delete();
+                    deleteResource(segmentMetadata.getUUID(), false/* isJournal */);
 
                 } catch (Throwable t2) {
 
@@ -1538,43 +1597,16 @@ abstract public class IndexManager extends StoreManager {
 
                 }
 
+                if (t instanceof Exception)
+                    throw (Exception) t;
+
+                throw new RuntimeException(t);
+
             }
 
-            if (t instanceof Exception)
-                throw (Exception) t;
+        } finally {
 
-            throw new RuntimeException(t);
-
-        }
-
-        /*
-         * Note: Now that the resource is registered with the StoreManager we
-         * have to handle errors somewhat differently.
-         */
-        
-        try {
-
-            if (INFO)
-                log.info("built index segment: " + name + ", file=" + outFile);
-
-            return new BuildResult(name, indexMetadata, segmentMetadata, builder);
-
-        } catch (Throwable t) {
-
-            try {
-
-                deleteResource(segmentMetadata.getUUID(), false/* isJournal */);
-                
-            } catch (Throwable t2) {
-                
-                log.warn(t2.getLocalizedMessage(), t2);
-                
-            }
-
-            if (t instanceof Exception)
-                throw (Exception) t;
-
-            throw new RuntimeException(t);
+            e.end(moreDetails);
 
         }
 

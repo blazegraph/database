@@ -260,7 +260,8 @@ abstract public class StoreManager extends ResourceEvents implements
          * this option is to promote rapid overflow of a new data service (where
          * new is measured by the #of bytes under management). This helps to
          * increase the rate at which index partitions are split (and moved if
-         * the there is more than one new data service starting).
+         * the there is more than one new data service starting). When ZERO (0)
+         * the feature is disabled.
          */
         String ACCELERATE_OVERFLOW_THRESHOLD = StoreManager.class.getName()
                 + ".accelerateOverflowThreshold";
@@ -666,8 +667,8 @@ abstract public class StoreManager extends ResourceEvents implements
     protected long lastOverflowTime = 0L;
 
     /**
-     * The maximum size of a journal (its length in bytes) as measured at each
-     * synchronous overflow event.
+     * The observed maximum size of a journal (its length in bytes) as measured
+     * at each synchronous overflow event.
      */
     protected long maximumJournalSizeAtOverflow = 0L;
     
@@ -2943,13 +2944,39 @@ abstract public class StoreManager extends ResourceEvents implements
 //
 //        }
 
+        /*
+         * Prevent concurrent access to the index cache.
+         */
         indexCacheLock.writeLock().lock();
-        
+
         try {
 
             /*
              * The earliest timestamp that MUST be retained for the
              * read-historical indices in the cache.
+             * 
+             * FIXME There is a cycle here which makes it impossible to release
+             * an index view sooner than the timeout on the index cache when the
+             * index cache capacity is larger than the current minimum
+             * requirements (review store cache and index segment as well).
+             * 
+             * The problem is that the backing hard reference queue for the
+             * index cache does not distinguish between actively used indices
+             * and those that are just being held open in case they might be
+             * used against "soon" so we are not able to figure out which
+             * indices can be closed and are therefore required to accept a
+             * release time which is MUCH earlier than the release time given by
+             * the transaction service.
+             * 
+             * There are a few ways to approach this. One is to use local
+             * read-historical transactions for flyweight read-only operations.
+             * That will give us a real measure of the #of operations reading on
+             * any given timestamp [a fair amount of work and requires
+             * duplicating many of the facilities of the distributed transaction
+             * manager so that we can track the earliest local tx]. Another is
+             * to reduce the index cache capacity and timeout and then use a
+             * fully buffered journal so it does not matter as much if we close
+             * out an index [a partial fix].
              */
             final long indexRetentionTime = getIndexRetentionTime();
 
@@ -2957,42 +2984,41 @@ abstract public class StoreManager extends ResourceEvents implements
              * Choose whichever timestamp would preserve more history (that is,
              * choose the earlier timestamp).
              */
-
             final long releaseTime = Math.min(indexRetentionTime,
                     this.releaseTime);
 
-//            final long releaseTime = Math.min(indexRetentionTime, Math.min(
-//                    maxReleaseTime, this.releaseTime));
+            // final long releaseTime = Math.min(indexRetentionTime, Math.min(
+            // maxReleaseTime, this.releaseTime));
 
             if (INFO)
                 log.info("Choosen releaseTime=" + releaseTime
-//                        + " : min(maxReleaseTime=" + maxReleaseTime
+                // + " : min(maxReleaseTime=" + maxReleaseTime
                         + ", set releaseTime=" + releaseTime + ")");
 
-        /*
-         * The earliest commit time on record in any journal available to the
-         * StoreManager.
-         */
-        final long firstCommitTime;
-        {
+            /*
+             * The earliest commit time on record in any journal available to
+             * the StoreManager.
+             */
+            final long firstCommitTime;
+            {
 
-            // the earliest journal available to the store manager.
-            final IResourceMetadata resource = journalIndex.findNext(0L);
+                // the earliest journal available to the store manager.
+                final IResourceMetadata resource = journalIndex.findNext(0L);
 
-            // open that journal.
-            final AbstractJournal j0 = (AbstractJournal) openStore(resource
-                    .getUUID());
+                // open that journal.
+                final AbstractJournal j0 = (AbstractJournal) openStore(resource
+                        .getUUID());
 
-            // the first commit time on the earliest journal available.
-            firstCommitTime = j0.getRootBlockView().getFirstCommitTime();
-            
-        }
-        
-        /*
-         * Find the commitTime that we are going to preserve.
-         */
-        final long commitTimeToPreserve;
-        if (releaseTime < firstCommitTime) {
+                // the first commit time on the earliest journal available.
+                firstCommitTime = j0.getRootBlockView().getFirstCommitTime();
+
+            }
+
+            /*
+             * Find the commitTime that we are going to preserve.
+             */
+            final long commitTimeToPreserve;
+            if (releaseTime < firstCommitTime) {
 
                 /*
                  * If the computed [releaseTime] is before the first commit
@@ -3005,83 +3031,83 @@ abstract public class StoreManager extends ResourceEvents implements
                     log.info("Release time is earlier than any commit time.");
 
                 // Nothing to do.
-            return;
+                return;
 
-        } else if (releaseTime >= lastCommitTime ) {
+            } else if (releaseTime >= lastCommitTime) {
+
+                /*
+                 * If the computed [releaseTime] GTE the last commit point then
+                 * we choose the [lastCommitTime] instead.
+                 * 
+                 * Note: If there have been no writes on this data service but
+                 * there have been writes on other data services then the
+                 * txService will eventually advance the releaseTime beyond the
+                 * lastCommitTime on this data service. Since we never release
+                 * the last commit point we set the commitTimeToPreserve to the
+                 * lastCommitTime on the local data service.
+                 */
+
+                if (INFO)
+                    log
+                            .info("Choosing commitTimeToPreserve as the lastCommitTime: "
+                                    + lastCommitTime);
+
+                commitTimeToPreserve = lastCommitTime;
+
+            } else {
+
+                /*
+                 * Find the timestamp for the commit record that is strictly
+                 * greater than the release time.
+                 */
+
+                if (INFO)
+                    log
+                            .info("Choosing commitTimeToPreserve as the first commitTime GT the releaseTime: "
+                                    + releaseTime);
+
+                commitTimeToPreserve = getCommitTimeStrictlyGreaterThan(releaseTime);
+
+            }
+
+            if (INFO)
+                log.info("commitTimeToPreserve=" + commitTimeToPreserve);
 
             /*
-             * If the computed [releaseTime] GTE the last commit point then we
-             * choose the [lastCommitTime] instead.
+             * Make a note for reporting purposes.
+             */
+            this.lastCommitTimePreserved = commitTimeToPreserve;
+
+            /*
+             * Find resources that were in use as of that commitTime.
+             */
+            final Set<UUID> resourcesInUse = getResourcesForTimestamp(commitTimeToPreserve);
+
+            // @todo log @info
+            log.warn("Purging old resources: #bytes="
+                    + getBytesUnderManagement() + ", #journals="
+                    + getManagedJournalCount() + ", #segments="
+                    + getManagedSegmentCount());
+
+            /*
+             * Delete anything that is:
+             *  ( NOT in use )
              * 
-             * Note: If there have been no writes on this data service but there
-             * have been writes on other data services then the txService will
-             * eventually advance the releaseTime beyond the lastCommitTime on
-             * this data service. Since we never release the last commit point
-             * we set the commitTimeToPreserve to the lastCommitTime on the
-             * local data service.
+             * AND
+             *  ( createTime < commitTimeToPreserve )
              */
+            deleteUnusedResources(commitTimeToPreserve, resourcesInUse);
 
-            if (INFO)
-                log
-                        .info("Choosing commitTimeToPreserve as the lastCommitTime: "
-                                + lastCommitTime);
-            
-            commitTimeToPreserve = lastCommitTime;
+            // @todo log @info
+            log.warn("Purged old resources: #bytes="
+                    + getBytesUnderManagement() + ", #journals="
+                    + getManagedJournalCount() + ", #segments="
+                    + getManagedSegmentCount());
 
-        } else {
-
-            /*
-             * Find the timestamp for the commit record that is strictly greater
-             * than the release time.
-             */
-
-            if (INFO)
-                log
-                        .info("Choosing commitTimeToPreserve as the first commitTime GT the releaseTime: "
-                                + releaseTime);
-
-            commitTimeToPreserve = getCommitTimeStrictlyGreaterThan(releaseTime);
-        
-        }
-        
-        if (INFO)
-            log.info("commitTimeToPreserve=" + commitTimeToPreserve);
-        
-        /*
-         * Make a note for reporting purposes.
-         */
-        this.lastCommitTimePreserved = commitTimeToPreserve;
-        
-        /*
-         * Find resources that were in use as of that commitTime.
-         */
-        final Set<UUID> resourcesInUse = getResourcesForTimestamp(commitTimeToPreserve);
-        
-        // @todo log @info
-        log.warn("Purging old resources: #bytes=" + getBytesUnderManagement()
-                + ", #journals=" + getManagedJournalCount() + ", #segments="
-                + getManagedSegmentCount());
-
-        /*
-         * Delete anything that is: 
-         * 
-         * ( NOT in use ) 
-         * 
-         * AND
-         * 
-         * ( createTime < commitTimeToPreserve )
-         */
-        deleteUnusedResources(commitTimeToPreserve, resourcesInUse);
-        
-        // @todo log @info
-        log.warn("Purged old resources: #bytes=" + getBytesUnderManagement()
-                + ", #journals=" + getManagedJournalCount() + ", #segments="
-                + getManagedSegmentCount());
-    
         } finally {
-        
+
             indexCacheLock.writeLock().unlock();
-            
+
         }
 
     }
@@ -4004,8 +4030,14 @@ abstract public class StoreManager extends ResourceEvents implements
              * resources to release.
              */
 
-            this.releaseTime = getFederation().getTransactionService()
-                    .getReleaseTime();
+            final ITransactionService txService = getFederation()
+                    .getTransactionService();
+
+            if (txService != null) {
+
+                this.releaseTime = txService.getReleaseTime();
+
+            }
             
         } catch (IOException ex) {
             
@@ -4073,7 +4105,8 @@ abstract public class StoreManager extends ResourceEvents implements
 
         final long bytesUnderManagement = this.bytesUnderManagement.get();
         
-        if (bytesUnderManagement >= accelerateOverflowThreshold) {
+        if (accelerateOverflowThreshold == 0
+                || bytesUnderManagement >= accelerateOverflowThreshold) {
 
             /*
              * Crossed the threshold where we no longer accelerate overflow.

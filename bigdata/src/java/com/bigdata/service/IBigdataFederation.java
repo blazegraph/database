@@ -47,7 +47,7 @@ import com.bigdata.sparse.SparseRowStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IBigdataFederation extends IIndexManager {
+public interface IBigdataFederation extends IIndexManager, IFederationDelegate {
 
     /**
      * Return the client object that was used to connect to the federation.

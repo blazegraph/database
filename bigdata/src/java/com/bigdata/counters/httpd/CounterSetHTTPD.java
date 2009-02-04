@@ -12,6 +12,7 @@ import java.util.Vector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.httpd.XHTMLRenderer.Model;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.service.IService;
 import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
@@ -27,16 +28,41 @@ public class CounterSetHTTPD extends AbstractHTTPD {
     
     protected final CounterSet root;
     
-    public CounterSetHTTPD(int port, CounterSet root) throws IOException {
+    /**
+     * The service reference iff one one specified to the ctor (may be null).
+     */
+    protected final IService service;
+    
+    public CounterSetHTTPD(final int port, final CounterSet root) throws IOException {
 
-        super(port);
-        
-        this.root = root;
+        this(port, root, null/*fed*/);
         
     }
     
-    public Response doGet(String uri, String method, Properties header,
-            LinkedHashMap<String, Vector<String>> parms) throws Exception {
+    /**
+     * 
+     * @param port
+     * @param root
+     * @param service
+     *            Optional reference to the service within which this httpd is
+     *            hosted.
+     * @throws IOException
+     */
+    public CounterSetHTTPD(final int port, final CounterSet root,
+            final IService service) throws IOException {
+
+        super(port);
+
+        this.root = root;
+        
+        // Note: MAY be null.
+        this.service = service;
+        
+    }
+    
+    public Response doGet(final String uri, final String method,
+            final Properties header,
+            final LinkedHashMap<String, Vector<String>> parms) throws Exception {
         
         final ByteArrayOutputStream baos = new ByteArrayOutputStream(
                 2 * Bytes.kilobyte32);
@@ -54,7 +80,7 @@ public class CounterSetHTTPD extends AbstractHTTPD {
             final OutputStreamWriter w = new OutputStreamWriter(baos);
 
             // build model of the controller state.
-            final Model model = new Model(root, uri, parms);
+            final Model model = new Model(service, root, uri, parms);
             
             // @todo if controller state error then send HTTP_BAD_REQUEST
             

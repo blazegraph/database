@@ -29,6 +29,7 @@ import com.bigdata.counters.IInstrument;
 import com.bigdata.counters.IServiceCounters;
 import com.bigdata.counters.PeriodEnum;
 import com.bigdata.counters.History.SampleIterator;
+import com.bigdata.service.IService;
 import com.bigdata.util.HTMLUtility;
 
 /**
@@ -109,6 +110,12 @@ public class XHTMLRenderer {
         final private String ps = ICounterSet.pathSeparator;
 
         /**
+         * The service reference IFF one was specified when
+         * {@link CounterSetHTTPD} was started.
+         */
+        final public IService service;
+        
+        /**
          * The {@link CounterSet} provided by the caller.
          */
         final public CounterSet root;
@@ -172,11 +179,25 @@ public class XHTMLRenderer {
 //        final DateFormat dateFormat;
         
         /**
-         * 
+         * @param fed
+         *            The service object IFF one was specified when
+         *            {@link CounterSetHTTPD} was started.
+         * @param root
+         *            The root of the counter set.
+         * @parm uri Percent-decoded URI without parameters, for example
+         *       "/index.cgi"
+         * @parm parms Parsed, percent decoded parameters from URI and, in case
+         *       of POST, data. The keys are the parameter names. Each value is
+         *       a {@link Collection} of {@link String}s containing the
+         *       bindings for the named parameter. The order of the URL
+         *       parameters is preserved.
          */
-        public Model(final CounterSet root, final String uri,
+        public Model(final IService service, final CounterSet root,
+                final String uri,
                 final LinkedHashMap<String, Vector<String>> params) {
 
+            this.service = service;
+            
             this.root = root;
 
             this.uri = uri;
