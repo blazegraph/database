@@ -48,6 +48,11 @@ public class CompactingMergeTask extends AbstractPrepareTask<BuildResult> {
     final protected File outFile;
 
     /**
+     * The event corresponding to the merge operation.
+     */
+    final private Event e;
+    
+    /**
      * 
      * @param resourceManager
      * @param lastCommitTime
@@ -64,8 +69,7 @@ public class CompactingMergeTask extends AbstractPrepareTask<BuildResult> {
             final ViewMetadata vmd, final File outFile) {
 
         super(resourceManager, TimestampUtility
-                .asHistoricalRead(lastCommitTime), name,
-                OverflowActionEnum.Merge);
+                .asHistoricalRead(lastCommitTime), name);
         
         if (vmd == null)
             throw new IllegalArgumentException();
@@ -82,6 +86,9 @@ public class CompactingMergeTask extends AbstractPrepareTask<BuildResult> {
         
         this.outFile = outFile;
 
+        this.e = new Event(resourceManager.getFederation(), vmd.name,
+                OverflowActionEnum.Merge, OverflowActionEnum.Merge + "("
+                        + vmd.name + ") : " + vmd);
     }
 
     @Override
@@ -147,13 +154,10 @@ public class CompactingMergeTask extends AbstractPrepareTask<BuildResult> {
                         resourceManager, concurrencyManager, vmd.name,
                         indexUUID, result);
 
-                if (INFO)
-                    log.info("src=" + vmd.name
-                            + ", will run atomic update task");
-
-                final Event updateEvent = new Event(resourceManager
-                        .getFederation(), EventType.AtomicViewUpdate, "src="
-                        + vmd).start();
+                final Event updateEvent = e.newSubEvent(
+                        EventType.AtomicViewUpdate,
+                        OverflowActionEnum.Merge + "(" + vmd.name + ") : "
+                                + vmd).start();
 
                 try {
 

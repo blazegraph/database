@@ -95,11 +95,6 @@ import com.bigdata.util.concurrent.QueueStatisticsTask;
  * perform a database at once closure afterwards if you are bulk loading some
  * dataset into an empty database.
  * 
- * @todo consider naming each instance and having the instance place its
- *       counters under the client using that name as part of its namespace.
- *       This will allow clients to avoid replacing the counters from prior runs
- *       if they so choose.
- * 
  * @todo As an alternative to indexing the locally loaded data, experiment with
  *       converting {@link StatementBuffer}s to {@link IBuffer}s (using the
  *       distributed terms indices), and then write out the long[3] data into a
@@ -158,15 +153,6 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
      * Counters for aggregated {@link WorkflowTask} progress.
      */
     protected final WorkflowTaskCounters counters = new WorkflowTaskCounters();
-    
-//    /**
-//     * Tasks on the {@link #successQueue} have completed successfully, but may
-//     * have been retried before they succeeded.
-//     * 
-//     * @todo why a {@link #successQueue}?  Who is draining it?
-//     */
-//    protected final LinkedBlockingQueue<WorkflowTask<ReaderTask, Object>> successQueue = new LinkedBlockingQueue<WorkflowTask<ReaderTask, Object>>(
-//    /* unbounded capacity */);
 
     /**
      * Tasks on the {@link #errorQueue} will be retried.
@@ -182,10 +168,8 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
 
     /**
      * The maximum #of times an attempt will be made to load any given file.
-     * 
-     * @todo ctor param.
      */
-    protected final int maxtries = 3;
+    protected final int maxtries;
     
     /**
      * The #of threads given to the ctor (the pool can be using a different
@@ -218,7 +202,22 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
      * give the tasks already in the queue time to progress before the caller
      * can try to (re-)submit a task for execution.
      */
-    protected final long REJECTED_EXECUTION_DELAY = 250L;
+    protected final long rejectedExecutionDelay;
+
+    /**
+     * Ctor for a concurrent data loader with a default queue capacity.
+     * 
+     * @param fed
+     *            The federation.
+     * @param nthreads
+     *            The #of threads that will process load tasks in parallel.
+     */
+    public ConcurrentDataLoader(final IBigdataFederation fed, final int nthreads) {
+        
+        this(fed, nthreads, Math.max(100, nthreads * 2),
+                250/* rejectedExecutionDelay(ms) */, 3/* maxtries */);
+        
+    }
 
     /**
      * Ctor for a concurrent data loader.
@@ -227,8 +226,18 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
      *            The federation.
      * @param nthreads
      *            The #of threads that will process load tasks in parallel.
+     * @param queueCapacity
+     *            The capacity of the queue of jobs awaiting execution.
+     * @param rejectedExecutionDelay
+     *            The delay in milliseconds between resubmits of a task when the
+     *            queue of tasks awaiting execution is at capacity.
+     * @param maxtries
+     *            The maximum #of times an attempt will be made to load any
+     *            given file.
      */
-    public ConcurrentDataLoader(final IBigdataFederation fed, final int nthreads) {
+    public ConcurrentDataLoader(final IBigdataFederation fed,
+            final int nthreads, final int queueCapacity,
+            final long rejectedExecutionDelay, final int maxtries) {
 
         if (fed == null)
             throw new IllegalArgumentException();
@@ -236,9 +245,22 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
         if (nthreads < 1)
             throw new IllegalArgumentException();
 
+        if (queueCapacity < 1)
+            throw new IllegalArgumentException();
+
+        if (rejectedExecutionDelay < 1)
+            throw new IllegalArgumentException();
+
+        if (maxtries < 1)
+            throw new IllegalArgumentException();
+
         this.fed = (AbstractFederation)fed;
         
         this.nthreads = nthreads;
+        
+        this.rejectedExecutionDelay = rejectedExecutionDelay;
+        
+        this.maxtries = maxtries;
         
         /*
          * Setup the load service. We will run the tasks that read the data and
@@ -252,7 +274,7 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
          */
 
         final BlockingQueue<Runnable> queue = new LinkedBlockingQueue<Runnable>(
-                Math.max(100, nthreads * 2));
+                queueCapacity);
         
         loadService = new ThreadPoolExecutor(nthreads, nthreads,
                 Integer.MAX_VALUE, TimeUnit.NANOSECONDS, queue,
@@ -417,7 +439,7 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
                  */
 
                 // pause a bit so that the running tasks can progress.
-                Thread.sleep(REJECTED_EXECUTION_DELAY/* ms */);
+                Thread.sleep(rejectedExecutionDelay/* ms */);
 
                 return false;
 
@@ -654,7 +676,7 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
                 }
                 
                 // resubmit task for execution after a delay
-                Thread.sleep(REJECTED_EXECUTION_DELAY/* ms */);
+                Thread.sleep(rejectedExecutionDelay/* ms */);
                 
             }
 

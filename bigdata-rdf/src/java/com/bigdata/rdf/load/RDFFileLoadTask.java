@@ -131,52 +131,66 @@ public class RDFFileLoadTask implements Callable<Void>, Serializable,
 
         // @todo factory method.
         final RDFLoadTaskFactory taskFactory = new RDFLoadTaskFactory(
-                tripleStore, jobState.bufferCapacity,
-                jobState.verifyRDFSourceData, jobState.deleteAfter,
-                jobState.fallback);
+                tripleStore, jobState.bufferCapacity, jobState.parserValidates,
+                jobState.deleteAfter, jobState.fallback);
 
         // Setup loader.
         final ConcurrentDataLoader loader = new ConcurrentDataLoader(fed,
-                jobState.nthreads);
+                jobState.nthreads, jobState.queueCapacity,
+                jobState.rejectedExecutionDelay, jobState.maxTries);
 
-        /*
-         * Note: Add the counters to be reported to the client's counter
-         * set. The added counters will be reported when the client reports its
-         * own counters.
-         */
-        final CounterSet serviceRoot = fed.getServiceCounterSet();
+        try {
 
-        final String relPath = jobState.jobName + ICounterSet.pathSeparator
-                + "Concurrent Data Loader";
+            /*
+             * Note: Add the counters to be reported to the client's counter
+             * set. The added counters will be reported when the client reports
+             * its own counters.
+             */
+            final CounterSet serviceRoot = fed.getServiceCounterSet();
 
-        synchronized (serviceRoot) {
+            final String relPath = jobState.jobName + ICounterSet.pathSeparator
+                    + "Concurrent Data Loader";
 
-            if (serviceRoot.getPath(relPath) == null) {
+            synchronized (serviceRoot) {
 
-                // Create path to CDL counter set.
-                final CounterSet tmp = serviceRoot.makePath(relPath);
+                if (serviceRoot.getPath(relPath) == null) {
 
-                // Attach CDL counters.
-                tmp.attach(loader.getCounters());
+                    // Create path to CDL counter set.
+                    final CounterSet tmp = serviceRoot.makePath(relPath);
 
-                // Attach task factory counters.
-                tmp.attach(taskFactory.getCounters());
+                    // Attach CDL counters.
+                    tmp.attach(loader.getCounters());
+
+                    // Attach task factory counters.
+                    tmp.attach(taskFactory.getCounters());
+
+                }
 
             }
+
+            // Let the loader know that we will run tasks.
+            taskFactory.notifyStart();
+
+            // Load data.
+            loadData(loader, taskFactory, tripleStore);
+
+            // Done loading data (stops the clock).
+            taskFactory.notifyEnd();
+
+            // Shutdown the loader.
+            loader.shutdown();
+
+        } catch (Throwable t) {
+
+            try {
+                loader.shutdownNow();
+            } catch (Throwable t2) {
+                log.warn(this, t2);
+            }
+
+            throw new RuntimeException(t);
             
         }
-
-        // Let the loader know that we will run tasks.
-        taskFactory.notifyStart();
-
-        // Load data.
-        loadData(loader, taskFactory, tripleStore);
-        
-        // Done loading data (stops the clock).
-        taskFactory.notifyEnd();
-
-        // Shutdown the loader.
-        loader.shutdown();
         
         return null;
 

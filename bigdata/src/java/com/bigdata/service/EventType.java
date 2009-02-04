@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
+import com.bigdata.btree.IndexSegment;
 import com.bigdata.journal.Journal;
 import com.bigdata.resources.OverflowActionEnum;
 
@@ -53,44 +54,6 @@ public enum EventType {
      * which split, join, or move index partitions.
      */
     AsynchronousOverflow,
-
-    /*
-     * Asynchronous overflow tasks.
-     */
-    
-    /**
-     * Move the index partition to another data service. Note that moves either
-     * to redistribute the load more equitably among the data services in the
-     * federation or to bring the left/right sibling of an index partition onto
-     * the same data service as its right/left sibling so that they may be
-     * joined.
-     */
-    IndexPartitionMove,
-
-    /**
-     * Join left- and right- index partition siblings which have underflowed.
-     */
-    IndexPartitionJoin,
-
-    /**
-     * Split an index partition that has overflowed into 2 or more siblings.
-     */
-    IndexPartitionSplit,
-
-    /**
-     * Copy the tuples from the last commit point on the old journal into an
-     * index segment. Builds are done both in order to improve read performance
-     * and to release dependencies on older journals.
-     */
-    IndexPartitionBuild,
-
-    /**
-     * Compacting merge of the sources for the index partition into a single
-     * index segment. Compacting merges are done to improve read performance and
-     * to keep index partition views from including too many distinct index
-     * segment sources.
-     */
-    IndexPartitionMerge,
     
     /*
      * Other kinds of events.
@@ -105,11 +68,21 @@ public enum EventType {
     IndexSegmentBuild,
     
     /**
+     * An {@link IndexSegmentStore} open-close event (start is open, end is close).
+     */
+    IndexSegmentStoreOpenClose,
+
+    /**
+     * An {@link IndexSegment} open-close event (start is open, end is close).
+     */
+    IndexSegmentOpenClose,
+
+    /**
      * Operation responsible for the atomic update of the index partition view
      * as part of any of the asynchronous overflow tasks
      * 
      * @see OverflowActionEnum
      */
     AtomicViewUpdate;
-    
+
 }

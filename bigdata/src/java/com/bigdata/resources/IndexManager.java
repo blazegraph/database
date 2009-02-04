@@ -1497,8 +1497,9 @@ abstract public class IndexManager extends StoreManager {
             final long createTime, final byte[] fromKey, final byte[] toKey)
             throws Exception {
 
-        final Event e = new Event(getFederation(), EventType.IndexSegmentBuild,
-                "name=" + name + ", merge=" + compactingMerge).start();
+        final Event e = new Event(getFederation(), name,
+                EventType.IndexSegmentBuild, "compactingMerge="
+                        + compactingMerge).start();
 
         String moreDetails = null;
         try {

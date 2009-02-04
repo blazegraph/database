@@ -11,7 +11,6 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
-import com.bigdata.resources.PostProcessOldJournalTask.OverflowTaskCounters;
 
 /**
  * Class encapsulates a bunch of metadata used to make decisions about how to

@@ -1695,24 +1695,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
     }
 
     /**
-     * Counters that report on the synchronous and asynchronous overflow action
-     * activities for a specific index partition.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * 
-     * FIXME The overflow task counters are not really in use yet.
-     */
-    static class OverflowTaskCounters {
-        
-        /**
-         * The action taken and <code>null</code> if no action has been taken
-         * for this local index.
-         */
-        public OverflowActionEnum action;
-    }
-    
-    /**
      * Note: This task is interrupted by {@link OverflowManager#shutdownNow()}.
      * Therefore is tests {@link Thread#isInterrupted()} and returns immediately
      * if it has been interrupted.
@@ -1742,12 +1724,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         final long begin = System.currentTimeMillis();
         
         final Event e = new Event(resourceManager.getFederation(),
+                resourceManager.getDataServiceUUID().toString(),
                 EventType.AsynchronousOverflow, ""/* details */).start();
         
         try {
-
-            if (INFO)
-                log.info("begin");
 
             if(INFO) {
                 

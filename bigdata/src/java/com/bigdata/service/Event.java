@@ -73,7 +73,7 @@ public class Event implements Serializable {
     /**
      * Unique event identifier.
      */
-    public final UUID uuid;
+    public final UUID eventUUID;
 
     /**
      * The host on which the event was generated.
@@ -97,9 +97,20 @@ public class Event implements Serializable {
     public final UUID serviceUUID;
     
     /**
-     * Event type (classification or category).
+     * The resource for which the event is reported (store file, index name,
+     * etc).
      */
-    public final EventType eventType;
+    public final String resource;
+    
+    /**
+     * Major event type (classification or category).
+     */
+    public final Object majorEventType;
+
+    /**
+     * Minor event type (classification or category).
+     */
+    public final Object minorEventType;
 
     /**
      * Event details.
@@ -136,7 +147,7 @@ public class Event implements Serializable {
     /**
      * <code>true</code> iff the event event has been generated.
      */
-    private boolean complete = false;
+    protected boolean complete = false;
 
     /**
      * <code>true</code> iff the event event has been generated.
@@ -159,13 +170,60 @@ public class Event implements Serializable {
 
     }
 
-    public Event(final IBigdataFederation fed, final EventType eventType,
+    /**
+     * Event ctor.
+     * 
+     * @param fed
+     *            The federation object (used to send the event to an
+     *            aggregator).
+     * @param resource
+     *            The resource for which the event was generated (store, index
+     *            partition, etc).
+     * @param majorEventType
+     *            The major type of the event (use of enums is encouraged).
+     * @param details
+     *            Some details for the event (unstructured).
+     */
+    public Event(final IBigdataFederation fed, final String resource,
+            final Object majorEventType, final String details) {
+
+        this(fed, resource, majorEventType, ""/* minorEventType */, details);
+        
+    }
+
+    /**
+     * Sub-event ctor.
+     * 
+     * @param fed
+     *            The federation object (used to send the event to an
+     *            aggregator).
+     * @param resource
+     *            The resource for which the event was generated (store, index
+     *            partition, etc).
+     * @param majorEventType
+     *            The major type of the event (use of enums is encouraged).
+     * @param minorEventType
+     *            The minor type of the event (use of enums is encouraged).
+     * @param details
+     *            Some details for the event (unstructured).
+     * 
+     * @todo consider passing along the {@link UUID} of the parent event but
+     *       then must correlate that {@link UUID} when the event is recieved.
+     */
+    protected Event(final IBigdataFederation fed, final String resource,
+            final Object majorEventType, final Object minorEventType,
             final String details) {
 
         if (fed == null)
             throw new IllegalArgumentException();
 
-        if (eventType == null)
+        if (resource == null)
+            throw new IllegalArgumentException();
+
+        if (majorEventType == null)
+            throw new IllegalArgumentException();
+
+        if (minorEventType == null)
             throw new IllegalArgumentException();
 
         if (details == null)
@@ -173,7 +231,7 @@ public class Event implements Serializable {
 
         this.fed = fed;
 
-        this.uuid = UUID.randomUUID();
+        this.eventUUID = UUID.randomUUID();
 
         this.hostname = AbstractStatisticsCollector.fullyQualifiedHostName;
 
@@ -183,7 +241,11 @@ public class Event implements Serializable {
 
         this.serviceUUID = this.fed.getServiceUUID();
 
-        this.eventType = eventType;
+        this.resource = resource;
+        
+        this.majorEventType = majorEventType;
+
+        this.minorEventType = minorEventType;
 
         this.details = details;
 
@@ -198,6 +260,22 @@ public class Event implements Serializable {
          * if local-assign, then use System.currentTimeMillis().
          */
 
+    }
+
+    /**
+     * A child event (major type is the type of the parent).
+     * 
+     * @param minorEventType
+
+     * @param details
+     * 
+     * @return
+     */
+    public Event newSubEvent(Object minorEventType, String details) {
+
+        return new Event(fed, this.resource, this.majorEventType,
+                minorEventType, details);
+        
     }
 
     /**
@@ -222,7 +300,11 @@ public class Event implements Serializable {
         
         if(fed instanceof AbstractFederation) {
 
-            ((AbstractFederation)fed).sendEvent(this);
+            try {
+                ((AbstractFederation) fed).sendEvent(this);
+            } catch (Throwable t) {
+                log.warn(t);
+            }
             
         } else {
             
@@ -282,7 +364,11 @@ public class Event implements Serializable {
         
         if(fed instanceof AbstractFederation) {
 
-            ((AbstractFederation) fed).sendEvent(this);
+            try {
+                ((AbstractFederation) fed).sendEvent(this);
+            } catch(Throwable t) {
+                log.warn(t);
+            }
 
         } else {
 
@@ -301,10 +387,15 @@ public class Event implements Serializable {
      */
     static public String getHeader() {
 
-        return  "uuid"
-            + "\teventType"
+        return  "eventUUID"
+            + "\tresource"
+            + "\tmajorEventType"
+            + "\tmajorEventValue"
+            + "\tminorEventType"
+            + "\tminorEventValue"
             + "\tstartTime"
             + "\tendTime"
+            + "\telapsed"
             + "\tcomplete"
             + "\thostname"
             + "\tserviceIface"
@@ -323,10 +414,20 @@ public class Event implements Serializable {
         
         StringBuilder sb = new StringBuilder();
         
-        sb.append(uuid); sb.append('\t'); 
-        sb.append(eventType); sb.append('\t'); 
+        sb.append(eventUUID); sb.append('\t'); 
+        sb.append(resource); sb.append('\t');
+        sb.append(majorEventType.getClass().getName()); sb.append('\t'); 
+        sb.append(majorEventType); sb.append('\t'); 
+        sb.append(minorEventType.getClass().getName()); sb.append('\t'); 
+        sb.append(minorEventType); sb.append('\t'); 
         sb.append(startTime); sb.append('\t'); 
-        sb.append(endTime); sb.append('\t'); 
+        sb.append(endTime); sb.append('\t');
+        if (complete) {
+            sb.append(endTime - startTime);
+            sb.append('\t');
+        } else {
+            sb.append('\t');
+        }
         sb.append(complete); sb.append('\t'); 
         sb.append(hostname); sb.append('\t'); 
         sb.append(serviceIface); sb.append('\t'); 

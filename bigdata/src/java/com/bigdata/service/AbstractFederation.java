@@ -1324,10 +1324,12 @@ abstract public class AbstractFederation implements IBigdataFederation {
      * @see SendEventsTask
      */
     protected void sendEvent(final Event e) {
-        
-        assertOpen();
-        
-        events.add(e);
+
+        if (isOpen()) {
+
+            events.add(e);
+
+        }
         
     }
     
