@@ -1947,12 +1947,6 @@ abstract public class LoadBalancerService extends AbstractService
          */
         final long cutoff = now - eventHistoryMillis;
 
-        if(EventLog.INFO) {
-            
-            EventLog.eventLog.info(e.toString());
-            
-        }
-          
         synchronized (events) {
 
             /*
@@ -1964,7 +1958,7 @@ abstract public class LoadBalancerService extends AbstractService
                 {
                     
                     // is this a known event?
-                    final Event t = events.get(e.uuid);
+                    final Event t = events.get(e.eventUUID);
 
                     if (t == null) {
 
@@ -1980,7 +1974,7 @@ abstract public class LoadBalancerService extends AbstractService
                          * this.
                          */
                     
-                        events.put(e.uuid, e);
+                        events.put(e.eventUUID, e);
                         
                         // timestamp when we got this event.
                         e.receiptTime = now;
@@ -1999,11 +1993,17 @@ abstract public class LoadBalancerService extends AbstractService
                          * possibility.
                          */
 
-                        if (!t.isComplete()) {
+                        if (t.isComplete()) {
 
-                            // copy potentially updated details.
+                            // copy potentially updated details from the new event.
                             t.details = e.details;
 
+                            // grab the end time from the new event.
+                            t.endTime = e.endTime;
+                            
+                            // mark the event as complete.
+                            t.complete = true;
+                            
                             // use the pre-existing event reference.
                             e = t;
 
@@ -2015,6 +2015,12 @@ abstract public class LoadBalancerService extends AbstractService
 
             }
 
+            if(EventLog.INFO) {
+                
+                EventLog.eventLog.info(e.toString());
+                
+            }
+              
             /*
              * Prune the events, discarding any whose end time is LTE to the
              * cutoff.

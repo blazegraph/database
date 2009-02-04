@@ -68,6 +68,11 @@ public class JoinIndexPartitionTask extends AbstractPrepareTask<JoinResult> {
     protected final ViewMetadata[] vmd;
     
     /**
+     * The event corresponding to the join operation.
+     */
+    private final Event e;
+    
+    /**
      * @param resourceManager
      * @param lastCommitTime
      * @param resource
@@ -79,8 +84,7 @@ public class JoinIndexPartitionTask extends AbstractPrepareTask<JoinResult> {
             long lastCommitTime, String[] resources, ViewMetadata[] vmd) {
 
         super(resourceManager, TimestampUtility
-                .asHistoricalRead(lastCommitTime), resources,
-                OverflowActionEnum.Join);
+                .asHistoricalRead(lastCommitTime), resources);
 
         if (vmd == null)
             throw new IllegalArgumentException();
@@ -89,6 +93,11 @@ public class JoinIndexPartitionTask extends AbstractPrepareTask<JoinResult> {
             throw new IllegalArgumentException();
         
         this.vmd = vmd;
+        
+        this.e = new Event(resourceManager.getFederation(), Arrays
+                .toString(resources), OverflowActionEnum.Join,
+                OverflowActionEnum.Join + "(" + Arrays.toString(resources)
+                        + ")");
     }
 
     @Override
@@ -347,9 +356,9 @@ public class JoinIndexPartitionTask extends AbstractPrepareTask<JoinResult> {
                 final AbstractTask<Void> task = new AtomicUpdateJoinIndexPartition(
                         resourceManager, names2, result);
 
-                final Event updateEvent = new Event(resourceManager
-                        .getFederation(), EventType.AtomicViewUpdate, summary);
-
+                final Event updateEvent = e.newSubEvent(
+                        EventType.AtomicViewUpdate, summary).start();
+                
                 try {
 
                     // submit task and wait for it to complete

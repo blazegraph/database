@@ -16,17 +16,16 @@ public enum OverflowActionEnum {
     Copy,
 
     /**
-     * Move the index partition to another data service. Note that moves
-     * either to redistribute the load more equitably among the data
-     * services in the federation or to bring the left/right sibling of an
-     * index partition onto the same data service as its right/left sibling
-     * so that they may be joined.
+     * Move the index partition to another data service. Note that moves may be
+     * initiated either to redistribute the load more equitably among the data
+     * services in the federation or to bring the left/right sibling of an index
+     * partition onto the same data service as its right/left sibling so that
+     * they may be joined.
      */
     Move,
 
     /**
-     * Join left- and right- index partition siblings which have
-     * underflowed.
+     * Join left- and right- index partition siblings which have underflowed.
      */
     Join,
 

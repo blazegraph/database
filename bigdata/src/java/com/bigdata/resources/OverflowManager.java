@@ -1195,9 +1195,9 @@ abstract public class OverflowManager extends IndexManager {
 
         assert overflowAllowed.get();
 
-        final Event e = new Event(getFederation(),
-                EventType.SynchronousOverflow, "overflowCounter="
-                        + overflowCounter).start();
+        final Event e = new Event(getFederation(), getDataServiceUUID()
+                .toString(), EventType.SynchronousOverflow, "overflowCounter="
+                + overflowCounter).start();
 
         try {
 

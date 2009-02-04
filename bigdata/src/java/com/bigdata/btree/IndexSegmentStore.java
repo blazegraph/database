@@ -58,6 +58,9 @@ import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.StoreManager;
+import com.bigdata.service.Event;
+import com.bigdata.service.EventType;
+import com.bigdata.service.IBigdataFederation;
 
 /**
  * A read-only store backed by a file containing a single {@link IndexSegment}.
@@ -258,6 +261,12 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      * True iff the store is open.
      */
     private volatile boolean open = false;
+
+    /**
+     * Optional.  When defined, {@link Event}s are reported out.
+     */
+    protected final IBigdataFederation fed;
+    private volatile Event openCloseEvent;
     
     /**
      * Open a read-only store containing an {@link IndexSegment}, but does not
@@ -281,11 +290,27 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
      */
     public IndexSegmentStore(final File file) {
 
+        this(file, null/* fed */);
+        
+    }
+
+    /**
+     * Ctor variant that accepts an {@link IBigdataFederation} reference and
+     * will report out {@link Event}s.
+     * 
+     * @param file
+     * @param fed
+     */
+    public IndexSegmentStore(final File file, final IBigdataFederation fed) {
+
         if (file == null)
             throw new IllegalArgumentException();
 
         this.file = file;
 
+        // MAY be null.
+        this.fed = fed;
+        
         /*
          * Mark as open so that we can use reopenChannel() and read(long addr)
          * to read other data (the root node/leaf).
@@ -400,6 +425,14 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
                 this.open = true;
 
                 counters.openCount++;
+                
+                if (fed != null) {
+
+                    openCloseEvent = new Event(fed, file.toString(),
+                            EventType.IndexSegmentStoreOpenClose, ""/* details */)
+                            .start();
+                    
+                }
 
             } catch (Throwable t) {
 
@@ -659,6 +692,18 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
 
             counters.closeCount++;
 
+            if (openCloseEvent != null) {
+
+                try {
+                    openCloseEvent.end();
+                } catch (Throwable t) {
+                    log.error(this, t);
+                } finally {
+                    openCloseEvent = null;
+                }
+
+            }
+            
             if (INFO)
                 log.info("Closed: file=" + getFile());
 

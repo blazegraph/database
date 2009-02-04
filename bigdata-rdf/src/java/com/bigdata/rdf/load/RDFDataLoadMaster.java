@@ -234,6 +234,13 @@ public class RDFDataLoadMaster implements Callable<Void> {
         String FORCE_OVERFLOW = "forceOverflow";
 
         /**
+         * When <code>true</code> a validating parsed will be used.
+         */
+        String PARSER_VALIDATES = "parserValidates";
+        
+        boolean DEFAULT_PARSER_VALIDATES = false;
+        
+        /**
          * The minimum #of {@link IDataService}s to discover before the master
          * will assign the clients to those services.
          */
@@ -245,6 +252,28 @@ public class RDFDataLoadMaster implements Callable<Void> {
          */
         String AWAIT_DATA_SERVICES_TIMEOUT = "awaitDataServicesTimeout";
 
+        /**
+         * The capacity of the queue of jobs awaiting execution.
+         */
+        String QUEUE_CAPACITY = "queueCapacity";
+        
+        /**
+         * The delay in milliseconds between resubmits of a task when the queue
+         * of tasks awaiting execution is at capacity.
+         */
+        String REJECTED_EXECUTION_DELAY = "rejectedExecutionDelay";
+
+        /** {@value #DEFAULT_REJECTED_EXECUTION_DELAY}ms */
+        long DEFAULT_REJECTED_EXECUTION_DELAY = 250;
+        
+        /**
+         * The maximum #of times an attempt will be made to load any given file.
+         */
+        String MAX_TRIES = "maxTries";
+
+        /** {@value #DEFAULT_MAX_TRIES} */
+        int DEFAULT_MAX_TRIES = 3;
+        
     }
 
     /**
@@ -344,9 +373,28 @@ public class RDFDataLoadMaster implements Callable<Void> {
          */
         public final boolean forceOverflow;
                 
-        // @todo config (parser verifies source data).
-        final public boolean verifyRDFSourceData = false;
+        /**
+         * When <code>true</code> a validating parsed will be used.
+         * 
+         * @see ConfigurationOptions#PARSER_VALIDATES
+         */
+        final public boolean parserValidates;
 
+        /**
+         * @see ConfigurationOptions#QUEUE_CAPACITY
+         */
+        final public int queueCapacity;
+        
+        /**
+         * @see ConfigurationOptions#REJECTED_EXECUTION_DELAY
+         */
+        final public long rejectedExecutionDelay;
+        
+        /**
+         * @see ConfigurationOptions#MAXTRIES
+         */
+        final public int maxTries;
+        
         /**
          * Default format assumed when file ext is unknown.
          * 
@@ -454,6 +502,25 @@ public class RDFDataLoadMaster implements Callable<Void> {
                     ConfigurationOptions.COMPONENT,
                     ConfigurationOptions.FORCE_OVERFLOW, Boolean.TYPE);
 
+            parserValidates = (Boolean) config.getEntry(
+                    ConfigurationOptions.COMPONENT,
+                    ConfigurationOptions.FORCE_OVERFLOW, Boolean.TYPE,
+                    ConfigurationOptions.DEFAULT_PARSER_VALIDATES);
+
+            queueCapacity = (Integer) config.getEntry(
+                    ConfigurationOptions.COMPONENT,
+                    ConfigurationOptions.QUEUE_CAPACITY, Integer.TYPE);
+            
+            rejectedExecutionDelay = (Long) config.getEntry(
+                    ConfigurationOptions.COMPONENT,
+                    ConfigurationOptions.REJECTED_EXECUTION_DELAY, Long.TYPE,
+                    ConfigurationOptions.DEFAULT_REJECTED_EXECUTION_DELAY);
+            
+            maxTries = (Integer) config.getEntry(
+                    ConfigurationOptions.COMPONENT,
+                    ConfigurationOptions.MAX_TRIES, Integer.TYPE,
+                    ConfigurationOptions.DEFAULT_MAX_TRIES);
+            
             client2DataService = new UUID[nclients];
 
         }

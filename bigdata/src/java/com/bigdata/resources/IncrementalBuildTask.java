@@ -45,6 +45,11 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
     final protected File outFile;
 
     /**
+     * The event corresponding to the build action.
+     */
+    final private Event e;
+    
+    /**
      * The source view.
      */
     BTree src;
@@ -66,8 +71,7 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
             final ViewMetadata vmd, final File outFile) {
 
         super(resourceManager, TimestampUtility
-                .asHistoricalRead(lastCommitTime), name,
-                OverflowActionEnum.Build);
+                .asHistoricalRead(lastCommitTime), name);
 
         if (vmd == null)
             throw new IllegalArgumentException();
@@ -84,7 +88,11 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
         
         this.outFile = outFile;
 
-//        // cache a soft reference to JUST the btree on the old journal.
+        this.e = new Event(resourceManager.getFederation(), vmd.name,
+                OverflowActionEnum.Build, OverflowActionEnum.Build + "("
+                        + name + ") : " + vmd);
+        
+// // cache a soft reference to JUST the btree on the old journal.
 //        this.ref = new SoftReference<BTree>(vmd.getBTree());
 
         /*
@@ -184,9 +192,10 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
                             + ", will run atomic update task");
 
 
-                final Event updateEvent = new Event(resourceManager
-                        .getFederation(), EventType.AtomicViewUpdate, "src="
-                        + vmd).start();
+                final Event updateEvent = e.newSubEvent(
+                        EventType.AtomicViewUpdate,
+                        OverflowActionEnum.Build + "(" + vmd.name + ") : "
+                                + vmd).start();
                 
                 try {
 

@@ -186,47 +186,47 @@ public class ResourceEvents {
      * Index segment reporting.
      */
 
-    /**
-     * Report that an {@link IndexSegment} has been opened.
-     * 
-     * @param name
-     *            The index name or null if this is not a named index.
-     * @param filename
-     *            The name of the file containing the {@link IndexSegment}.
-     * @param nbytes
-     *            The size of that file in bytes.
-     * 
-     * @todo memory burden depends on the buffered data (nodes or nodes +
-     *       leaves)
-     * 
-     * @todo the index name is not being reported since it is not part of the
-     *       extension metadata record at this time. this means that we can not
-     *       aggregate events for index segments for a given named index at this
-     *       time (actually, we can aggregate them by the indexUUID).
-     */
-    static public void openIndexSegment(String name, String filename,
-            long nbytes) {
-
-        if (INFO)
-            log.info("name=" + name + ", filename=" + filename + ", #bytes="
-                    + nbytes);
-
-    }
-
-    /**
-     * Report that an {@link IndexSegment} has been closed.
-     * 
-     * @param filename
-     * 
-     * @todo we do not close out index segments based on non-use (e.g., timeout
-     *       or LRU).
-     */
-    static public void closeIndexSegment(String filename) {
-
-        if (INFO)
-            log.info("filename=" + filename);
-
-    }
+//    /**
+//     * Report that an {@link IndexSegment} has been opened.
+//     * 
+//     * @param name
+//     *            The index name or null if this is not a named index.
+//     * @param filename
+//     *            The name of the file containing the {@link IndexSegment}.
+//     * @param nbytes
+//     *            The size of that file in bytes.
+//     * 
+//     * @todo memory burden depends on the buffered data (nodes or nodes +
+//     *       leaves)
+//     * 
+//     * @todo the index name is not being reported since it is not part of the
+//     *       extension metadata record at this time. this means that we can not
+//     *       aggregate events for index segments for a given named index at this
+//     *       time (actually, we can aggregate them by the indexUUID).
+//     */
+//    static public void openIndexSegment(String name, String filename,
+//            long nbytes) {
+//
+//        if (INFO)
+//            log.info("name=" + name + ", filename=" + filename + ", #bytes="
+//                    + nbytes);
+//
+//    }
+//
+//    /**
+//     * Report that an {@link IndexSegment} has been closed.
+//     * 
+//     * @param filename
+//     * 
+//     * @todo we do not close out index segments based on non-use (e.g., timeout
+//     *       or LRU).
+//     */
+//    static public void closeIndexSegment(String filename) {
+//
+//        if (INFO)
+//            log.info("filename=" + filename);
+//
+//    }
     
     /*
      * Transaction reporting.

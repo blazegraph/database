@@ -74,11 +74,16 @@ public class SplitIndexPartitionTask extends
     private final ISplitHandler splitHandler;
     
     /** The name of the scale-out index. */
-    final String scaleOutIndexName;
+    private final String scaleOutIndexName;
 
     /** The UUID associated with the scale-out index. */
-    final UUID indexUUID;
+    private final UUID indexUUID;
 
+    /**
+     * The event corresponding to the split action.
+     */
+    private final Event e;
+    
     /**
      * @param resourceManager
      * @param lastCommitTime
@@ -89,8 +94,7 @@ public class SplitIndexPartitionTask extends
             final ViewMetadata vmd) {
 
         super(resourceManager, TimestampUtility
-                .asHistoricalRead(lastCommitTime), name,
-                OverflowActionEnum.Split);
+                .asHistoricalRead(lastCommitTime), name);
 
         if (vmd == null)
             throw new IllegalArgumentException(); 
@@ -118,6 +122,10 @@ public class SplitIndexPartitionTask extends
         // The UUID associated with the scale-out index.
         indexUUID = vmd.indexMetadata.getIndexUUID();
 
+        this.e = new Event(resourceManager.getFederation(), vmd.name,
+                OverflowActionEnum.Split, OverflowActionEnum.Split + "("
+                        + name + ") : " + vmd);
+        
     }
 
     @Override
@@ -578,10 +586,13 @@ public class SplitIndexPartitionTask extends
                 final AbstractTask<Void> task = new AtomicUpdateSplitIndexPartitionTask(
                         resourceManager, resources, indexUUID, result);
 
-                final Event updateEvent = new Event(resourceManager
-                        .getFederation(), EventType.AtomicViewUpdate,
-                        OverflowActionEnum.Split + "(name=" + vmd.name + "->"
-                                + Arrays.toString(resources) + ") : src=" + vmd);
+
+                final Event updateEvent = e
+                        .newSubEvent(
+                                EventType.AtomicViewUpdate,
+                                OverflowActionEnum.Split + "(" + vmd.name
+                                        + "->" + Arrays.toString(resources)
+                                        + ") : src=" + vmd).start();
                 
                 try {
 

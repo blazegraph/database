@@ -199,6 +199,17 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
     private final String targetIndexName;
 
     /**
+     * The summary used for the event description and the partition history
+     * record.
+     */
+    private final String summary;
+    
+    /**
+     * The event corresponding to this action.
+     */
+    private final Event e;
+    
+    /**
      * Note: The <i>newPartitionId</i> is passed into this task, rather than
      * being obtained during the execution of this task, in order to increase
      * the readability of the trace of the choosen tasks for the
@@ -225,8 +236,7 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
             ) {
 
         super(resourceManager, TimestampUtility
-                .asHistoricalRead(lastCommitTime), name,
-                OverflowActionEnum.Move);
+                .asHistoricalRead(lastCommitTime), name);
 
         if (vmd == null)
             throw new IllegalArgumentException();
@@ -257,6 +267,12 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
         this.targetIndexName = DataService.getIndexPartitionName(
                 vmd.indexMetadata.getName(), newPartitionId);
         
+        this.summary = OverflowActionEnum.Move + "(" + sourceIndexName + "->"
+                + targetIndexName + ")";
+
+        this.e = new Event(resourceManager.getFederation(), vmd.name,
+                OverflowActionEnum.Move, summary + " : " + vmd);
+
     }
     
     @Override
@@ -277,8 +293,6 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
         e.start();
 
         try {
-
-            final long beginMove = System.currentTimeMillis();
 
             final IDataService targetDataService;
             final MoveResult moveResult;
@@ -314,33 +328,12 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
                          * description for the live journal on that data
                          * service.
                          */
-                        null, oldpmd.getHistory() + OverflowActionEnum.Move
-                                + "(" + oldpmd.getPartitionId() + "->"
-                                + newPartitionId + ") "));
+                        null,
+                        // history line.
+                        oldpmd.getHistory() + summary + " "));
 
-                // logging information.
-                if (INFO) {
-
-                    // #of sources in the view (very fast).
-                    final int sourceCount = src.getSourceCount();
-
-                    // range count for the view (fast).
-                    final long rangeCount = src.rangeCount();
-
-                    // BTree's directly maintained entry count (very fast).
-                    final int entryCount = src.getMutableBTree()
-                            .getEntryCount();
-
-                    final String details = ", entryCount=" + entryCount
-                            + ", rangeCount=" + rangeCount + ", sourceCount="
-                            + sourceCount;
-
-                    log.info("name=" + getOnlyResource() + ": "
-                            + OverflowActionEnum.Move + "("
-                            + oldpmd.getPartitionId() + "->" + newPartitionId
-                            + ")" + details);
-
-                }
+                if (INFO)
+                    log.info(summary + " : " + vmd);
 
                 // the data service on which we will register the new index
                 // partition.
@@ -360,16 +353,27 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
                             .info("Registered new index partition on target data service: targetIndexName="
                                     + targetIndexName);
 
-                /*
-                 * Run procedure on the target data service that will copy data
-                 * from the old index partition (on this data service) to the
-                 * new index partition (on the target data service) as of the
-                 * [lastCommitTime] of the old journal.
-                 */
-                targetDataService.submit(ITx.UNISOLATED, targetIndexName,
-                        new CopyIndexPartitionProcedure(resourceManager
-                                .getDataServiceUUID(), sourceIndexName,
-                                lastCommitTime));
+                final Event copyEvent = e.newSubEvent("CopyHistoricalData",
+                        summary + " : " + vmd).start();
+
+                try {
+                    
+                    /*
+                     * Run procedure on the target data service that will copy
+                     * data from the old index partition (on this data service)
+                     * to the new index partition (on the target data service)
+                     * as of the [lastCommitTime] of the old journal.
+                     */
+                    targetDataService.submit(ITx.UNISOLATED, targetIndexName,
+                            new CopyIndexPartitionProcedure(resourceManager
+                                    .getDataServiceUUID(), sourceIndexName,
+                                    lastCommitTime));
+                    
+                } finally {
+
+                    copyEvent.end();
+                    
+                }
 
                 /*
                  * At this point the historical view as of the [lastCommitTime]
@@ -414,13 +418,8 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
 
             }
 
-            final AtomicUpdateMoveIndexPartitionTask task = new AtomicUpdateMoveIndexPartitionTask(
-                    resourceManager, moveResult.name, moveResult);
-            
             /*
              * Submit atomic update task and await completion
-             * 
-             * @todo config timeout.
              * 
              * @todo If this task (the caller) is interrupted while the atomic
              * update task is running then the atomic update task will not
@@ -432,17 +431,14 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
              * terminate) until its atomic update task completes.
              */
 
-            final long beginAtomicUpdate = System.currentTimeMillis();
-
-            final Event updateEvent = new Event(
-                    resourceManager.getFederation(),
-                    EventType.AtomicViewUpdate, OverflowActionEnum.Move + "("
-                            + sourceIndexName + "->" + targetIndexName + ")")
-                    .start();
+            final Event updateEvent = e.newSubEvent(EventType.AtomicViewUpdate,
+                    summary + " : " + vmd).start();
 
             try {
 
-                concurrencyManager.submit(task).get();
+                concurrencyManager.submit(
+                        new AtomicUpdateMoveIndexPartitionTask(resourceManager,
+                                moveResult.name, moveResult)).get();
 
             } catch (Throwable t) {
 
@@ -536,19 +532,8 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
 
             } finally {
 
-                final long now = System.currentTimeMillis();
-
-                final long prepareMillis = now - beginMove;
-
-                final long atomicUpdateMillis = now - beginAtomicUpdate;
-
                 updateEvent.end();
                 
-                // log time for move regardless of the outcome.
-                log.warn("Move: prepare=" + prepareMillis + "ms, atomicUpdate="
-                        + atomicUpdateMillis + "ms, source=" + sourceIndexName
-                        + ", target=" + targetIndexName);
-
             }
 
             if (INFO)
@@ -630,13 +615,6 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
             
         }
         
-//        /**
-//         * De-serialization ctor.
-//         */
-//        public CopyIndexPartitionProcedure() {
-//            
-//        }
-        
         /**
          * @param sourceDataServiceUUIDs
          * @param sourceIndexName
@@ -707,29 +685,30 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
             final boolean isIsolatable = ndx.getIndexMetadata().isIsolatable();
 
             long ncopied = 0L;
-            
+
             while (itr.hasNext()) {
 
                 final ITuple tuple = itr.next();
-                
-                final byte[] key = tuple.getKey();
-                
-                final byte[] val = tuple.getValue();
-                
-               if(isIsolatable) {
-                   
-                   final long timestamp = tuple.getVersionTimestamp();
-                   
-                   dst.insert(key, val, false/* delete */, timestamp, null/* tuple */);
 
-               } else {
+                final byte[] key = tuple.getKey();
+
+                final byte[] val = tuple.getValue();
+
+                if (isIsolatable) {
+
+                    final long timestamp = tuple.getVersionTimestamp();
+
+                    dst.insert(key, val, false/* delete */, timestamp,
+                                    null/* tuple */);
+
+                } else {
 
                     dst.insert(key, val);
-                   
-               }
-               
-               ncopied++;
-                
+
+                }
+
+                ncopied++;
+
             }
 
             if(INFO)
@@ -964,13 +943,6 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
 
         private final ResultSet rset;
         
-//        /**
-//         * De-serialization ctor.
-//         */
-//        public CopyBufferedWritesProcedure() {
-//            
-//        }
-
         public CopyBufferedWritesProcedure(final ResultSet rset) {
         
             if (rset == null)
@@ -1085,7 +1057,8 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
 
                 } else {
 
-                    if (deleteMarkers && rset.getDeleteMarkers()[i]==0?false:true) {
+                    if (deleteMarkers && rset.getDeleteMarkers()[i] == 0 ? false
+                            : true) {
 
                         dst.remove(key);
 

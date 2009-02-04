@@ -29,11 +29,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.resources;
 
 import java.lang.ref.SoftReference;
-import java.util.Arrays;
-
-import com.bigdata.service.Event;
-import com.bigdata.service.EventType;
-import com.bigdata.service.IBigdataFederation;
 
 /**
  * Base class for the prepare phase which reads on the old journal.
@@ -43,17 +38,6 @@ import com.bigdata.service.IBigdataFederation;
  */
 abstract public class AbstractPrepareTask<T> extends
         AbstractResourceManagerTask<T> {
-
-    /**
-     * The action implemented by this task.
-     */
-    protected final OverflowActionEnum action;
-
-    /**
-     * The event used to report on this task within its {@link #doTask()}
-     * method.
-     */
-    protected final Event e;
     
     /**
      * @param resourceManager
@@ -61,9 +45,9 @@ abstract public class AbstractPrepareTask<T> extends
      * @param resource
      */
     public AbstractPrepareTask(ResourceManager resourceManager, long timestamp,
-            String resource, OverflowActionEnum action) {
+            String resource) {
 
-        this(resourceManager, timestamp, new String[] { resource }, action);
+        super(resourceManager, timestamp, resource);
 
     }
 
@@ -73,41 +57,9 @@ abstract public class AbstractPrepareTask<T> extends
      * @param resource
      */
     public AbstractPrepareTask(ResourceManager resourceManager, long timestamp,
-            String[] resource, OverflowActionEnum action) {
+            String[] resource) {
 
         super(resourceManager, timestamp, resource);
-
-        if (action == null)
-            throw new IllegalArgumentException();
-
-        final IBigdataFederation fed = resourceManager.getFederation();
-        
-        this.action = action;
-
-        switch (action) {
-        case Build:
-            e = new Event(fed, EventType.IndexPartitionBuild, Arrays
-                    .toString(resource));
-            break;
-        case Merge:
-            e = new Event(fed, EventType.IndexPartitionMerge, Arrays
-                    .toString(resource));
-            break;
-        case Join:
-            e = new Event(fed, EventType.IndexPartitionJoin, Arrays
-                    .toString(resource));
-            break;
-        case Move:
-            e = new Event(fed, EventType.IndexPartitionMove, Arrays
-                    .toString(resource));
-            break;
-        case Split:
-            e = new Event(fed, EventType.IndexPartitionSplit, Arrays
-                    .toString(resource));
-            break;
-        default:
-            throw new AssertionError(action);
-        }
         
     }
 

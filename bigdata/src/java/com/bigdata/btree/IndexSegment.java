@@ -29,7 +29,9 @@ import com.bigdata.btree.AbstractBTreeTupleCursor.AbstractCursorPosition;
 import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
-import com.bigdata.resources.ResourceManager;
+import com.bigdata.service.DataService;
+import com.bigdata.service.Event;
+import com.bigdata.service.EventType;
 
 /**
  * An index segment is read-only btree corresponding to some key range of a
@@ -51,6 +53,11 @@ public class IndexSegment extends AbstractBTree {
      * Type safe reference to the backing store.
      */
     private final IndexSegmentStore fileStore;
+
+    /**
+     * Iff events are being reported.
+     */
+    private volatile Event openCloseEvent = null;
 
     /**
      * An LRU for {@link ImmutableLeaf}s. This cache takes advantage of the
@@ -185,9 +192,14 @@ public class IndexSegment extends AbstractBTree {
             // close the backing file (can be re-opened).
             fileStore.close();
 
-            // report event.
-            ResourceManager.closeIndexSegment(fileStore.getFile().toString());
+            if (openCloseEvent != null) {
 
+                openCloseEvent.end();
+
+                openCloseEvent = null;
+
+            }
+            
         } finally {
 
             fileStore.lock.unlock();
@@ -235,6 +247,18 @@ public class IndexSegment extends AbstractBTree {
         fileStore.lock.lock();
         try {
 
+            if (fileStore.fed != null) {
+                
+                final String name = DataService.getIndexPartitionName(fileStore
+                        .getIndexMetadata().getName(), fileStore
+                        .getIndexMetadata().getPartitionMetadata()
+                        .getPartitionId());
+
+                openCloseEvent = new Event(fileStore.fed, name,
+                        EventType.IndexSegmentOpenClose, ""/* details */);
+
+            }
+            
             if (!fileStore.isOpen()) {
 
                 // reopen the store.
@@ -315,9 +339,9 @@ public class IndexSegment extends AbstractBTree {
 
             }
 
-            // report on the event.
-            ResourceManager.openIndexSegment(null/* name */, fileStore
-                    .getFile().toString(), fileStore.size());
+//            // report on the event.
+//            ResourceManager.openIndexSegment(null/* name */, fileStore
+//                    .getFile().toString(), fileStore.size());
 
         } finally {
 
