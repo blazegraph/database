@@ -89,6 +89,17 @@ import com.bigdata.resources.StoreManager.ManagedJournal;
  * 
  * @see DataServer, which is used to start this service.
  * 
+ * @todo Startup should be broken into two aspects: local startup and service
+ *       connect and disconnect events. For example, we on the tx service
+ *       connect the store manager should notify the tx service of the last
+ *       commit time on the live journal. On disconnect, the data service needs
+ *       to go offline. The metadata service is required only for overflow
+ *       processing, but if it remains down then we will eventually need to
+ *       bring the data service offline when the buffered writes would cause the
+ *       live journal to no longer be fully buffered as the overflow processing
+ *       time will be increased if we need to read through to the disk during
+ *       overflow.
+ * 
  * @todo Write benchmark test to measure interhost transfer rates. Should be
  *       100Mbits/sec (~12M/sec) on a 100BaseT switched network. With full
  *       duplex in the network and the protocol, that rate should be
