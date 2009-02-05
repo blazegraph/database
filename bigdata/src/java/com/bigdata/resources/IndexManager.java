@@ -271,7 +271,8 @@ abstract public class IndexManager extends StoreManager {
      *       definition (index segments in use) might have changed as well.
      */
 //    final private WeakValueCache<NT, IIndex> indexCache;
-    final private IndexCache indexCache;
+    final protected IndexCache indexCache; // FIXME make private
+//    final private IndexCache indexCache;
 
     /**
      * The earliest timestamp that MUST be retained for the read-historical
@@ -311,13 +312,16 @@ abstract public class IndexManager extends StoreManager {
          * 
          * @todo an alternative is to maintain a sorted set of the timestamps
          *       (breaking ties with the index name) and then always return the
-         *       first entry (lowest value) from the set.
+         *       first entry (lowest value) from the set. in fact the tx service
+         *       does something similar, but it has an easier time since the
+         *       timestamps are unique where the same timestamp may be used for
+         *       multiple indices here.
          */
         private AtomicLong retentionTime = new AtomicLong(-1L);
 
         /**
          * The earliest timestamp that MUST be retained for the read-historical
-         * indices in the cache and {@link Long#MAX_VALUE} if there a NO
+         * indices in the cache and {@link Long#MAX_VALUE} if there are NO
          * read-historical indices in the cache.
          * <p>
          * Note: Due to the concurrent operations of the garbage collector, this
@@ -334,13 +338,28 @@ abstract public class IndexManager extends StoreManager {
          */
         public long getRetentionTime() {
 
+            /*
+             * This will tend to clear stale references and cause them to be
+             * cleared in the cache, but probably not in time for the changes to
+             * be noticed within the loop below.
+             */
+
+            clearStaleRefs();
+            
             synchronized (retentionTime) {
 
+                // @todo remove debug flag.
+                final boolean debug = false;
+                
                 if (retentionTime.get() == -1L) {
 
                     // note: default if nothing is found.
                     long tmp = Long.MAX_VALUE;
 
+                    int n = 0;
+
+                    final long now = System.currentTimeMillis();
+                    
                     final Iterator<Map.Entry<NT, WeakReference<IIndex>>> itr = entryIterator();
 
                     while (itr.hasNext()) {
@@ -364,17 +383,35 @@ abstract public class IndexManager extends StoreManager {
 
                         }
 
+                        if(debug)
+                            log.warn("considering: " + entry.getKey());
+                        
                         if (timestamp < tmp) {
 
                             // choose the earliest timestamp for any index.
                             tmp = timestamp;
+                            
+                            if(debug)
+                            log.warn("Earliest so far: "
+                                    + tmp
+                                    + " (age="
+                                    + TimeUnit.MILLISECONDS
+                                            .toSeconds(tmp - now) + "secs)");
 
                         }
+                        
+                        n++;
 
                     } // next entry
 
                     retentionTime.set(tmp);
 
+                    if(debug)
+                        log.warn("Considered: " + n + " indices: retentionTime="
+                            + tmp + " (age="
+                            + TimeUnit.MILLISECONDS.toSeconds(tmp - now)
+                            + "secs)");
+                    
                 } // end search.
 
                 return retentionTime.get();
@@ -417,7 +454,11 @@ abstract public class IndexManager extends StoreManager {
             
         }
         
-        public IIndex remove(final NT k) {
+        /**
+         * Overriden to clear the {@link #retentionTime} if the map entry
+         * corresponding to that timestamp is being removed from the map.
+         */
+        protected WeakReference<IIndex> removeMapEntry(final NT k) {
             
             synchronized(retentionTime) {
                 
@@ -434,7 +475,7 @@ abstract public class IndexManager extends StoreManager {
                 
             }
 
-            return super.remove(k);
+            return super.removeMapEntry(k);
             
         }
         
@@ -451,6 +492,17 @@ abstract public class IndexManager extends StoreManager {
     
     /**
      * A canonicalizing cache for {@link IndexSegment}s.
+     * <p>
+     * Note: {@link IndexSegmentStore} already makes the {@link IndexSegment}s
+     * canonical and the {@link StoreManager#storeCache} makes the
+     * {@link IndexSegmentStore}s canonical so what this really does is give
+     * you a cache which lets you exert some more control over the #of
+     * {@link IndexSegment}s that are open.
+     * 
+     * FIXME It might be better to break this down as a journalCache and a
+     * segmentCache on the {@link StoreManager}.  That is more explicit and
+     * there is less interaction between the configuration choices with that
+     * breakdown.
      * 
      * @see Options#INDEX_SEGMENT_CACHE_CAPACITY
      * @see Options#INDEX_SEGMENT_CACHE_TIMEOUT

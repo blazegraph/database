@@ -368,6 +368,8 @@ public class HardReferenceQueue<T> {
     final public void evictStaleRefs(final long timeout) {
 
         final long now = System.nanoTime();
+
+        int ncleared = 0;
         
         while( count > 0 ) {
 
@@ -375,8 +377,16 @@ public class HardReferenceQueue<T> {
 
             final long age = now - timestamp;
             
-            if (age < timeout)
+            if (age < timeout) {
+
+                if (INFO)
+                    log.info("Stopping at age="
+                            + TimeUnit.NANOSECONDS.toMillis(age)
+                            + " : #ncleared=" + ncleared + ", size=" + count);
+                
                 break;
+                
+            }
 
             if (INFO)
                 log.info("Clearing reference: age="
@@ -385,6 +395,8 @@ public class HardReferenceQueue<T> {
 
             // evict the tail.
             evict();
+            
+            ncleared++;
             
         }
         

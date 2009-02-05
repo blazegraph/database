@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bfs.BigdataFileSystem;
+import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ISplitHandler;
@@ -23,26 +24,27 @@ import com.bigdata.service.IMetadataService;
 import com.bigdata.service.Split;
 
 /**
- * A configurable default policy for deciding when and where to split an
- * index partition into 2 or more index partitions.
+ * A configurable default policy for deciding when and where to split an index
+ * partition into 2 or more index partitions.
  * <p>
- * Note: There is probably no single value for
- * {@link #getEntryCountPerSplit()} that is going to be "right" across
- * applications. The space requirements for keys is very difficult to
- * estimate since leading key compression will often provide a good win.
- * Likewise, indices are free to use compression on their values as well so
- * the size of the byte[] values is not a good estimate of their size in the
- * index.
+ * Note: There is probably no single value for {@link #getEntryCountPerSplit()}
+ * that is going to be "right" across applications. The space requirements for
+ * keys is very difficult to estimate since leading key compression will often
+ * provide a good win. Likewise, indices are free to use compression on their
+ * values as well so the size of the byte[] values is not a good estimate of
+ * their size in the index.
  * <p>
  * Note: The #of index entries is a good proxy for the space requirements of
  * most indices. The {@link BigdataFileSystem} is one case where the space
- * requirements could be quite different since 64M blocks may be stored
- * along with the index entries, however in that case you can also test for
- * the size of the index segment that is part of the view and decide that
- * it's time to split the view.
+ * requirements could be quite different since 64M blocks may be stored along
+ * with the index entries, however in that case you can also test for the size
+ * of the index segment that is part of the view and decide that it's time to
+ * split the view.
  * 
- * @todo Perhaps I could do something to estimate the size of the nodes and
- *       the leaves in the index.
+ * @todo Perhaps I could do something to estimate the size of the nodes and the
+ *       leaves in the index. or the percent of the data on the journal that
+ *       belongs to the mutable {@link BTree} and then count the #of bytes in
+ *       the index segments (which is only accurate after a compacting merge).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -339,13 +341,7 @@ public class DefaultSplitHandler implements ISplitHandler {
 
     }
 
-    public boolean shouldSplit(final IIndex view) {
-
-        /*
-         * Range count the index. Will overestimate if deleted entries
-         * or overwritten entries exist.
-         */
-        final long rangeCount = view.rangeCount(null, null);
+    public boolean shouldSplit(final long rangeCount) {
 
         /*
          * Recommend split if the range count equals or exceeds the overcapacity
@@ -366,6 +362,20 @@ public class DefaultSplitHandler implements ISplitHandler {
 
         return false;
 
+    }
+
+    public double percentOfSplit(final long rangeCount) {
+
+        final double percentOfSplit = (double) rangeCount
+                / (double) entryCountPerSplit;
+
+        if (INFO)
+            log.info("percentOfSplit=" + percentOfSplit + " = rangeCount("
+                    + rangeCount + ") / entryCountPerSplit("
+                    + entryCountPerSplit + ")");
+
+        return percentOfSplit;
+        
     }
     
     /**

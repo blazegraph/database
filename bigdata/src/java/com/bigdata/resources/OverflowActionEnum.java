@@ -8,12 +8,27 @@ package com.bigdata.resources;
  * @version $Id$
  */
 public enum OverflowActionEnum {
-
+    
     /**
      * Copy all tuples on the old journal to the new journal during
      * synchronous overflow processing.
      */
     Copy,
+
+    /**
+     * Copy the tuples from the last commit point on the old journal into an
+     * index segment. Builds are done both in order to improve read
+     * performance and to release dependencies on older journals.
+     */
+    Build,
+
+    /**
+     * Compacting merge of the sources for the index partition into a single
+     * index segment. Compacting merges are done to improve read performance
+     * and to keep index partition views from including too many distinct
+     * index segment sources.
+     */
+    Merge,
 
     /**
      * Move the index partition to another data service. Note that moves may be
@@ -32,21 +47,6 @@ public enum OverflowActionEnum {
     /**
      * Split an index partition that has overflowed into 2 or more siblings.
      */
-    Split,
-
-    /**
-     * Copy the tuples from the last commit point on the old journal into an
-     * index segment. Builds are done both in order to improve read
-     * performance and to release dependencies on older journals.
-     */
-    Build,
-
-    /**
-     * Compacting merge of the sources for the index partition into a single
-     * index segment. Compacting merges are done to improve read performance
-     * and to keep index partition views from including too many distinct
-     * index segment sources.
-     */
-    Merge;
-
+    Split;
+    
 }

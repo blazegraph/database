@@ -150,10 +150,6 @@ public class CompactingMergeTask extends AbstractPrepareTask<BuildResult> {
                 final UUID indexUUID = vmd.indexMetadata.getIndexUUID();
 
                 // task will update the index partition view definition.
-                final AbstractTask<Void> task = new AtomicUpdateCompactingMergeTask(
-                        resourceManager, concurrencyManager, vmd.name,
-                        indexUUID, result);
-
                 final Event updateEvent = e.newSubEvent(
                         EventType.AtomicViewUpdate,
                         OverflowActionEnum.Merge + "(" + vmd.name + ") : "
@@ -162,7 +158,9 @@ public class CompactingMergeTask extends AbstractPrepareTask<BuildResult> {
                 try {
 
                     // submit task and wait for it to complete
-                    concurrencyManager.submit(task).get();
+                    concurrencyManager.submit(new AtomicUpdateCompactingMergeTask(
+                            resourceManager, concurrencyManager, vmd.name,
+                            indexUUID, result)).get();
 
                 } finally {
 
@@ -170,23 +168,23 @@ public class CompactingMergeTask extends AbstractPrepareTask<BuildResult> {
 
                 }
 
-                /*
-                 * Verify that the view was updated. If the atomic update task
-                 * runs correctly then it will replace the IndexMetadata object
-                 * on the mutable BTree with a new view containing only the live
-                 * journal and the new index segment (for a compacting merge).
-                 * We verify that right now to make sure that the state change
-                 * to the BTree was noticed and resulted in a commit before
-                 * returning control to us here.
-                 * 
-                 * @todo comment this out or replicate for the index build task
-                 * also?
-                 */
-                concurrencyManager
-                        .submit(
-                                new VerifyAtomicUpdateTask(resourceManager,
-                                        concurrencyManager, vmd.name,
-                                        indexUUID, result)).get();
+//                /*
+//                 * Verify that the view was updated. If the atomic update task
+//                 * runs correctly then it will replace the IndexMetadata object
+//                 * on the mutable BTree with a new view containing only the live
+//                 * journal and the new index segment (for a compacting merge).
+//                 * We verify that right now to make sure that the state change
+//                 * to the BTree was noticed and resulted in a commit before
+//                 * returning control to us here.
+//                 * 
+//                 * @todo comment this out or replicate for the index build task
+//                 * also?
+//                 */
+//                concurrencyManager
+//                        .submit(
+//                                new VerifyAtomicUpdateTask(resourceManager,
+//                                        concurrencyManager, vmd.name,
+//                                        indexUUID, result)).get();
 
             } catch (Throwable t) {
 

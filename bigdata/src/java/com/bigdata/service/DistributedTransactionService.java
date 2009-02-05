@@ -1866,15 +1866,20 @@ public abstract class DistributedTransactionService extends
              * are serialized so that we do not miss any.
              */
             
+            if (DEBUG)
+                log.debug("commitTime=" + commitTime + ", lastKnownCommitTime="
+                        + lastCommitTime
+                        + (lastCommitTime < commitTime ? " WILL UPDATE" : ""));
+            
             if (lastCommitTime < commitTime) {
 
                 lastCommitTime = commitTime;
                 
+                super.notifyCommit(commitTime);
+                
             }
             
         }
-        
-        super.notifyCommit(commitTime);
         
     }
     

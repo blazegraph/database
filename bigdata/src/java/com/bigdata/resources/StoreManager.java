@@ -61,6 +61,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
+import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -111,9 +112,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * segments), including the logic to compute the effective release time for the
  * managed resources and to release those resources by deleting them from the
  * file system.
- * 
- * @todo After restart, the release time needs to be set before we allow a purge
- *       (should be done during startup by the transaction manager).
  * 
  * @todo There is neither a "CREATE_TEMP_DIR" and "DELETE_ON_CLOSE" does not
  *       remove all directories created during setup. One of the consequences is
@@ -385,12 +383,18 @@ abstract public class StoreManager extends ResourceEvents implements
         String LastOverflowTime = "Last Overflow Time";
 
         /**
-         * The more recent commit time preserved when resources were last purged
+         * The most recent commit time preserved when resources were last purged
          * from the {@link StoreManger}.
          * 
          * @see StoreManager#purgeResources
          */
         String LastCommitTimePreserved = "Last Commit Time Preserved";
+
+        /**
+         * The most recent commit time.
+         */
+        String LastCommitTime = "Last Commit Time";
+       
     }
     
     /**
@@ -672,19 +676,6 @@ abstract public class StoreManager extends ResourceEvents implements
      */
     protected long maximumJournalSizeAtOverflow = 0L;
     
-//    /**
-//     * Resources MUST be at least this many milliseconds before they may be
-//     * deleted.
-//     * <p>
-//     * The minReleaseAge is just how long you want to hold onto an immortal
-//     * database view. E.g., 3 days of full history. Specify
-//     * {@link Long#MAX_VALUE} for an immortal database (resources will never be
-//     * deleted).
-//     * 
-//     * @see Options#MIN_RELEASE_AGE
-//     */
-//    final long minReleaseAge;
-
     /**
      * The #of {@link ManagedJournal}s that have been (re-)opened to date.
      */
@@ -944,9 +935,6 @@ abstract public class StoreManager extends ResourceEvents implements
                 throw new RuntimeException(Options.STORE_CACHE_TIMEOUT
                         + " must be non-negative");
             
-//            indexCache = new WeakValueCache<NT, IIndex>(
-//                    new LRUCache<NT, IIndex>(indexCacheCapacity));
-
             storeCache = new ConcurrentWeakValueCache<UUID, IRawStore>(
                     new HardReferenceQueue<IRawStore>(null/* evictListener */,
                             storeCacheCapacity,
@@ -2855,22 +2843,60 @@ abstract public class StoreManager extends ResourceEvents implements
      * {@link WriteExecutorService}.
      */
     protected void purgeOldResources() {
+        
+        /*
+         * The last commit time on record in the live journal.
+         * 
+         * Note: This used to be invoked during synchronous overflow so the
+         * [lastCommitTime] was in fact the last commit time on the OLD journal.
+         * However, this is now invoked at arbitrary times (as long as there is
+         * a lock on the write service) so we really need to use the
+         * [lastOverflowTime] here to have the same semantics.
+         */
+        final long lastCommitTime = getLiveJournal().getRootBlockView().getLastCommitTime(); 
 
-//        if (minReleaseAge == Long.MAX_VALUE) {
-//
-//            /*
-//             * Constant for an immortal database so we do not need to check the
-//             * timestamp service. Return zero(0) indicating that only resources
-//             * whose timestamp is LTE zero may be deleted (e.g., nothing may be
-//             * deleted).
-//             */
-//
-//            if (INFO)
-//                log.info("Immortal database");
-//            
-//            return;
-//
-//        }
+        if (lastCommitTime == 0L) {
+            
+            if (INFO)
+                log.info("Nothing committed yet.");
+            
+            return;
+            
+        }
+
+        /*
+         * Make sure that we have the current release time. It is periodically
+         * pushed by the transaction manager, but we pull it here since we are
+         * about to make a decision based on the releaseTime concerning which
+         * resources to release.
+         */
+        try {
+
+            final ITransactionService txService = getFederation()
+                    .getTransactionService();
+
+            if (txService != null) {
+
+                this.releaseTime = txService.getReleaseTime();
+
+            } else {
+
+                log
+                        .warn("Could not discover txService - Proceeding with current release time.");
+
+            }
+
+        } catch (IOException ex) {
+
+            /*
+             * Since the releaseTime is monotonically increasing, if there is an
+             * RMI problem then we use the last release time that was pushed to
+             * us by the txService.
+             */
+
+            log.warn("Proceeding with current release time: " + ex);
+            
+        }
 
         if (this.releaseTime == 0L) {
 
@@ -2892,58 +2918,34 @@ abstract public class StoreManager extends ResourceEvents implements
             return;
 
         }
-        
-        /*
-         * The last commit time on record in the live journal.
-         * 
-         * Note: This used to be invoked during synchronous overflow so the
-         * [lastCommitTime] was in fact the last commit time on the OLD journal.
-         * However, this is now invoked at arbitrary times (as long as there is
-         * a lock on the write service) so we really need to use the
-         * [lastOverflowTime] here to have the same semantics.
-         */
-//        final long lastOverflowTime = this.lastOverflowTime;
-        final long lastCommitTime = getLiveJournal().getRootBlockView().getLastCommitTime(); 
 
-        if (lastCommitTime == 0L) {
-            
-//            /*
-//             * Resources can only be purged after an overflow event. When we are
-//             * still on the 1st journal there has been no overflow and so we can
-//             * not purge anything.
-//             */
-//            
-//            log.info("Can not purge resources until the first overflow.");
-
-            if (INFO)
-                log.info("Nothing committed yet.");
-            
-            return;
-            
+        // debugging - writes out stores and indices in their respective caches.
+        if(false) {// @todo remove code.
+            int nstores = 0, nindices = 0;
+            {
+                Iterator<WeakReference<IRawStore>> itr = storeCache.iterator();
+                while (itr.hasNext()) {
+                    IRawStore store = itr.next().get();
+                    if (store != null) {
+                        log.warn("Store: " + store);
+                        nstores++;
+                    }
+                }
+            }
+            {
+                Iterator<WeakReference<IIndex>> itr2 = ((IndexManager) this).indexCache
+                        .iterator();
+                while (itr2.hasNext()) {
+                    IIndex ndx = itr2.next().get();
+                    if (ndx != null) {
+                        log.warn("Index: " + ndx);
+                        nindices++;
+                    }
+                }
+            }
+            log.warn("nstores="+nstores+", nindices="+nindices);
         }
-
-//        // the current time (RMI).
-//        final long currentTime = nextTimestamp();
-//
-//        // the upper bound on the release time.
-//        final long maxReleaseTime = currentTime - minReleaseAge;
-//
-//        if (maxReleaseTime < 0L) {
-//
-//            /*
-//             * Note: Someone specified a very large value for [minReleaseAge]
-//             * and the clock has not yet reached that value. (The test above for
-//             * Long.MAX_VALUE just avoids the RMI to the timestamp service when
-//             * we KNOW that the database is immortal).
-//             */
-//
-//            if (INFO)
-//                log.info("Nothing is old enough to release.");
-//
-//            return;
-//
-//        }
-
+        
         /*
          * Prevent concurrent access to the index cache.
          */
@@ -2982,18 +2984,27 @@ abstract public class StoreManager extends ResourceEvents implements
 
             /*
              * Choose whichever timestamp would preserve more history (that is,
-             * choose the earlier timestamp).
+             * choose the earlier timestamp). Note that the index retention time is -1 if there are no indices in the cache.
              */
-            final long releaseTime = Math.min(indexRetentionTime,
-                    this.releaseTime);
+            final long releaseTime = indexRetentionTime == -1L ? this.releaseTime
+                    : Math.min(indexRetentionTime, this.releaseTime);
 
             // final long releaseTime = Math.min(indexRetentionTime, Math.min(
             // maxReleaseTime, this.releaseTime));
 
+            /*
+             * This is the age of the selected release time as computed from the
+             * last commit time on the live journal.
+             */
+            final long releaseAge = (lastCommitTime - releaseTime); 
+            
             if (INFO)
                 log.info("Choosen releaseTime=" + releaseTime
-                // + " : min(maxReleaseTime=" + maxReleaseTime
-                        + ", set releaseTime=" + releaseTime + ")");
+                        + ": given releaseTime=" + this.releaseTime
+                        + ", indexRetentionTime=" + indexRetentionTime
+                        + " (this is "
+                        + TimeUnit.MILLISECONDS.toSeconds(releaseAge)
+                        + " seconds before/after the lastCommitTime="+lastCommitTime+")");
 
             /*
              * The earliest commit time on record in any journal available to
@@ -3047,12 +3058,11 @@ abstract public class StoreManager extends ResourceEvents implements
                  * lastCommitTime on the local data service.
                  */
 
-                if (INFO)
-                    log
-                            .info("Choosing commitTimeToPreserve as the lastCommitTime: "
-                                    + lastCommitTime);
-
                 commitTimeToPreserve = lastCommitTime;
+
+                if (INFO)
+                    log.info("commitTimeToPreserve := " + commitTimeToPreserve
+                            + " (this is the lastCommitTime)");
 
             } else {
 
@@ -3061,17 +3071,14 @@ abstract public class StoreManager extends ResourceEvents implements
                  * greater than the release time.
                  */
 
-                if (INFO)
-                    log
-                            .info("Choosing commitTimeToPreserve as the first commitTime GT the releaseTime: "
-                                    + releaseTime);
-
                 commitTimeToPreserve = getCommitTimeStrictlyGreaterThan(releaseTime);
 
-            }
+                if (INFO)
+                    log.info("commitTimeToPreserve := " + commitTimeToPreserve
+                            + " (this is the first commitTime GT the releaseTime=" + releaseTime
+                            + ")");
 
-            if (INFO)
-                log.info("commitTimeToPreserve=" + commitTimeToPreserve);
+            }
 
             /*
              * Make a note for reporting purposes.
@@ -3684,7 +3691,7 @@ abstract public class StoreManager extends ResourceEvents implements
         
         final long commitTime = commitRecord.getTimestamp();
         
-        log.warn("commitPoint=" + commitTime + " for releaseTime="
+        log.warn("Chose commitTime=" + commitTime + " given releaseTime="
                 + releaseTime);
         
         assert commitTime > releaseTime;
@@ -3715,7 +3722,8 @@ abstract public class StoreManager extends ResourceEvents implements
      */
     protected Set<UUID> getResourcesForTimestamp(final long commitTime) {
 
-        if (INFO) log.info("commitTime=" + commitTime + ", lastCommitTime="
+        if (DEBUG)
+            log.debug("commitTime=" + commitTime + ", lastCommitTime="
                     + getLiveJournal().getRootBlockView().getLastCommitTime());
         
         // must be a commitTime.
@@ -3773,8 +3781,8 @@ abstract public class StoreManager extends ResourceEvents implements
                  */
                 {
                     
-                    if (INFO)
-                        log.info("Examining journal: file="
+                    if (DEBUG)
+                        log.debug("Examining journal: file="
                             + journal.getFile() + ", lastCommitTime="
                             + lastCommitTime + ", uuid="
                             + journal.getRootBlockView().getUUID());
@@ -3853,8 +3861,8 @@ abstract public class StoreManager extends ResourceEvents implements
                                  * New checkpoint address.
                                  */
 
-                                if (INFO)
-                                    log.info("index: name=" + entry3.name);
+                                if (DEBUG)
+                                    log.debug("index: name=" + entry3.name);
                                 
                                 // load checkpoint record from the store.
                                 final Checkpoint checkpoint = Checkpoint.load(journal, entry3.checkpointAddr);
@@ -3885,8 +3893,8 @@ abstract public class StoreManager extends ResourceEvents implements
                                     
                                     if (uuids.add(t.getUUID())) {
 
-                                        if (INFO)
-                                            log.info("Dependency: file="
+                                        if (DEBUG)
+                                            log.debug("Dependency: file="
                                                 + t.getFile() + ", uuid="
                                                 + t.getUUID());
                                         
@@ -4021,36 +4029,6 @@ abstract public class StoreManager extends ResourceEvents implements
     public boolean purgeOldResources(final long timeout,
             final boolean truncateJournal) throws InterruptedException {
 
-        try {
-
-            /*
-             * Make sure that we have the current release time. It is periodically
-             * pushed by the transaction manager, but we pull it here since we are
-             * about to make a decision based on the releaseTime concerning which
-             * resources to release.
-             */
-
-            final ITransactionService txService = getFederation()
-                    .getTransactionService();
-
-            if (txService != null) {
-
-                this.releaseTime = txService.getReleaseTime();
-
-            }
-            
-        } catch (IOException ex) {
-            
-            /*
-             * Since the releaseTime is monotonically increasing, if there is an
-             * RMI problem then we use the last release time that was pushed to
-             * us by the txService.
-             */
-            
-            log.warn("Proceeding with current release time: " + ex);
-            
-        }
-        
         final WriteExecutorService writeService = getConcurrencyManager()
                 .getWriteService();
 

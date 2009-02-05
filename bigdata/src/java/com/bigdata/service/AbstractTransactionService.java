@@ -757,6 +757,10 @@ abstract public class AbstractTransactionService extends AbstractService
      */
     public long getReleaseTime() {
 
+        if (DEBUG)
+            log.debug("releaseTime=" + releaseTime + ", lastKnownCommitTime="
+                    + getLastCommitTime());
+        
         return releaseTime;
         
     }

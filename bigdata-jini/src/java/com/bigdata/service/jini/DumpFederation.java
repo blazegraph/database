@@ -33,23 +33,32 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
 
+import net.jini.config.ConfigurationException;
 import net.jini.core.entry.Entry;
 import net.jini.core.lookup.ServiceItem;
 import net.jini.lookup.entry.Name;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.AbstractBTree;
+import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexSegment;
+import com.bigdata.btree.IndexSegmentCheckpoint;
 import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.btree.proc.IIndexProcedure;
+import com.bigdata.config.Configuration;
 import com.bigdata.jini.lookup.entry.Hostname;
 import com.bigdata.journal.DumpJournal;
 import com.bigdata.journal.ITx;
@@ -57,6 +66,7 @@ import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.PartitionLocator;
+import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StoreManager;
 import com.bigdata.resources.StoreManager.ManagedJournal;
@@ -75,6 +85,11 @@ import com.bigdata.util.InnerCause;
  * @version $Id$
  * 
  * @see DumpJournal
+ * 
+ * @todo replace System.out with Writer or PrintStream.
+ * 
+ * @todo debug logic to dump only within the namespace (its hacked in
+ *       {@link ListIndicesTask}).
  */
 public class DumpFederation {
 
@@ -82,6 +97,32 @@ public class DumpFederation {
     
     protected static final boolean INFO = log.isInfoEnabled();
 
+    /**
+     * The component name for this class (for use with the
+     * {@link ConfigurationOptions}).
+     */
+    public static final String COMPONENT = DumpFederation.class.getName(); 
+
+    /**
+     * {@link Configuration} options for this class.
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public interface ConfigurationOptions {
+
+        /**
+         * An optional namespace prefix. When given, only indices having this
+         * prefix will be dumped.
+         */
+        String NAMESPACE = "namespace";
+
+        /**
+         * How long to wait for service discovery.
+         */
+        String DISCOVERY_DELAY = "discoveryDelay";
+   
+    }
+    
     /**
      * Dumps interesting things about the federation.
      * <p>
@@ -100,9 +141,10 @@ public class DumpFederation {
      * @throws IOException
      * @throws TimeoutException
      *             if no {@link DataService} can be discovered.
+     * @throws ConfigurationException 
      */
     static public void main(final String[] args) throws InterruptedException,
-            ExecutionException, IOException, TimeoutException {
+            ExecutionException, IOException, TimeoutException, ConfigurationException {
 
         if (args.length == 0) {
 
@@ -141,13 +183,26 @@ public class DumpFederation {
 
         final JiniFederation fed = client.connect();
 
+        final long discoveryDelay = (Long) fed.getClient().getConfiguration()
+                .getEntry(COMPONENT, ConfigurationOptions.DISCOVERY_DELAY,
+                        Long.TYPE, 5000L/* default */);
+
+        final String namespace = (String) fed.getClient().getConfiguration()
+                .getEntry(COMPONENT, ConfigurationOptions.NAMESPACE,
+                        String.class, ""/* default */);
+
         try {
 
             /*
-             * Wait until we have the metadata service : @todo config
+             * Wait until we have the metadata service
              */
-            fed.awaitServices(1/* minDataServices */, 10000L/* timeout(ms) */);
-          
+            if (INFO)
+                log.info("Waiting up to " + discoveryDelay
+                        + "ms for metadata service discovery.");
+
+            fed
+                    .awaitServices(1/* minDataServices */, discoveryDelay/* timeout(ms) */);
+
             // a read-only transaction as of the last commit time.
             final long tx = fed.getTransactionService().newTx(
                     ITx.READ_COMMITTED);
@@ -156,7 +211,9 @@ public class DumpFederation {
 
                 final DumpFederation dumper = new DumpFederation(fed, tx);
 
-                dumper.dumpIndexLocators();
+                dumper.writeHeaders();
+                
+                dumper.dumpIndices( namespace );
 
             } finally {
 
@@ -212,35 +269,42 @@ public class DumpFederation {
     }
     
     /**
-     * The names of all registered scale-out indices.
+     * The names of all registered scale-out indices having the specified
+     * namespace prefix.
+     * 
+     * @param namespace
+     *            The namespace prefix.
      * 
      * @throws IOException
      * @throws ExecutionException
      * @throws InterruptedException
      * 
      */
-    public String[] getIndexNames() throws InterruptedException,
-            ExecutionException, IOException {
+    public String[] getIndexNames(String namespace)
+            throws InterruptedException, ExecutionException, IOException {
 
+        if (namespace.length() != 0) {
+            
+            /*
+             * Note: Add the prefix that is used by the indices in the metadata
+             * service.
+             */
+            namespace = MetadataService.METADATA_INDEX_NAMESPACE + namespace;
+            
+        }
+        
         return (String[]) fed.getMetadataService().submit(
-                new ListIndicesTask(ts)).get();
+                new ListIndicesTask(ts, namespace)).get();
 
     }
-
+    
     /**
-     * Dumps metadata for all named indices.
+     * Write out column headers for the dump records.
      * 
-     * @throws IOException
-     * @throws ExecutionException
-     * @throws InterruptedException
-     * 
-     * @todo optional prefix or regex constraint on the scale-out index names or
-     *       the key range of an index.
+     * @todo document the columns.
      */
-    public void dumpIndexLocators() throws InterruptedException,
-            ExecutionException, IOException {
+    public void writeHeaders() {
 
-        // write out table header.
         System.out
                 .println("Timestamp"//
                         + "\tIndexName" //
@@ -256,8 +320,7 @@ public class DumpFederation {
                         + "\tSourceCount"//
                         + "\tSourceJournalCount"
                         + "\tSourceSegmentCount"
-                        + "\tRangeCount" //
-//                        + "\tRangeCountExact" //
+                        + "\tSumEntryCounts" //
                         + "\tSegmentBytes"// 
                         /*
                          * Note: These values are aggregates for the data
@@ -279,7 +342,24 @@ public class DumpFederation {
                         + "\tHistory"//
                         );
 
-        final String[] names = getIndexNames();
+    }
+
+    /**
+     * Generates the dump record for all scale-out indices having the specified
+     * namespace prefix.
+     * 
+     * @param namespace
+     *            The namespace prefix (may be an empty string to dump all
+     *            indices).
+     * 
+     * @throws IOException
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    public void dumpIndices(final String namespace)
+            throws InterruptedException, ExecutionException, IOException {
+
+        final String[] names = getIndexNames(namespace);
 
         if (INFO)
             log.info("Found " + names.length + " indices: "
@@ -292,22 +372,21 @@ public class DumpFederation {
                     .substring(MetadataService.METADATA_INDEX_NAMESPACE
                             .length());
 
-            dumpIndexLocators(scaleOutIndexName);
+            dumpIndex(scaleOutIndexName);
 
         }
 
     }
     
     /**
-     * Dumps the {@link PartitionLocator}s for the named index.
+     * Generates the dump record for the specified scale-out index.
      * 
      * @param indexName
      *            The name of a scale-out index.
      * 
      * @throws InterruptedException
      */
-    public void dumpIndexLocators(final String indexName)
-            throws InterruptedException {
+    public void dumpIndex(final String indexName) throws InterruptedException {
 
         final IMetadataIndex metadataIndex;
         try {
@@ -378,14 +457,14 @@ public class DumpFederation {
 
             }
 
-            // various byte counts of interest.
+            // all things of interest.
             IndexPartitionDetailRecord detailRec = null;
             try {
 
                 detailRec = (IndexPartitionDetailRecord) dataService
-                        .submit(ts, DataService.getIndexPartitionName(
-                                indexName, locator.getPartitionId()),
-                                new FetchIndexPartitionByteCountRecordTask()); 
+                        .submit(new FetchIndexPartitionByteCountRecordTask(ts,
+                                DataService.getIndexPartitionName(indexName,
+                                        locator.getPartitionId()))).get(); 
                 
             } catch(InterruptedException t) {
                 
@@ -416,30 +495,6 @@ public class DumpFederation {
          */
         public final ServiceMetadata smd;
 
-//        /**
-//         * The {@link LocalPartitionMetadata} for the index partition. This has
-//         * lots of interesting information.
-//         */
-//        public final LocalPartitionMetadata localPartitionMetadata;
-//        // fetch the LocalPartitionMetadata.
-//        LocalPartitionMetadata localPartitionMetadata = null;
-//        try {
-//            
-//            localPartitionMetadata = (LocalPartitionMetadata) dataService.submit(ts, DataService
-//                    .getIndexPartitionName(indexName, locator.getPartitionId()),
-//                    new FetchLocalPartitionMetadataTask());
-//            
-//        } catch (InterruptedException t) {
-//            
-//            throw t;
-//            
-//        } catch (Exception t) {
-//            
-//            log.warn("name=" + indexName + ", locator=" + locator, t);
-//            
-//        }
-//        this.localPartitionMetadata = localPartitionMetadata;
-        
         /**
          * The #of bytes across all {@link IndexSegment}s in the view.
          * <p>
@@ -524,14 +579,25 @@ public class DumpFederation {
         public final int segmentSourceCount;
         
         /**
-         * The fast range count for the index partition.
+         * The sum of the entry count for each {@link AbstractBTree} in the
+         * index partition view.
+         * <p>
+         * Note: This is computed from the {@link IndexSegmentCheckpoint}
+         * without requiring us to open the {@link IndexSegment} itself, so it
+         * can be significantly faster if the {@link IndexSegment} is trying to
+         * fully buffer the nodes region of the file and will also impose less
+         * of a memory burden since those node buffers will not be allocated in
+         * response to this operation. The only drawback of the sum of the entry
+         * counts is that it will overestimate the #of tuples in an index
+         * partition after a split until the next compacting merge because
+         * historical {@link IndexSegment}s in the old view will be reused by
+         * each of the view generated by the split until the next compacting
+         * merge, move, or join.
+         * <p>
+         * Note: The exact range count is MUCH too expensive as it requires
+         * materializing every tuple in the index partition view!
          */
-        public final long rangeCount;
-        
-//        /**
-//         * The exact range count for the index partition (w/o deleted tuples).
-//         */
-//        public final long rangeCountExact;
+        public final long sumEntryCounts;
         
         /**
          * The #of bytes across all {@link IndexSegment}s in the view.
@@ -578,19 +644,29 @@ public class DumpFederation {
          * The #of overflow events.
          */
         public final long overflowCount;
-        
-        public IndexPartitionDetailRecord(final IIndex ndx,
+
+        /**
+         * 
+         * @param btree
+         *            This should be the read-only {@link BTree} for the
+         *            historical timestamp for which the dump is being
+         *            generated. This is strongly typed as a {@link BTree} since
+         *            we DO NOT want to force the materialization of the index
+         *            partition view in case it is not already open.
+         *            Materializing the view will force the index segments in
+         *            the view to be materialized, and that means buffering
+         *            their nodes in memory which is a moderately expensive IO.
+         * @param resourceManager
+         */
+        public IndexPartitionDetailRecord(final BTree btree,
                 final ResourceManager resourceManager) {
 
-            final long rangeCount = ndx.rangeCount();
+//            final long rangeCount = ndx.rangeCount();
 
-            // @todo this appears to be too expensive to do all the time.
-//            final long rangeCountExact = -1L;
-//            final long rangeCountExact = ndx.rangeCountExact(
-//                    null/* fromKey */, null/* toKey */);
+            pmd = btree.getIndexMetadata().getPartitionMetadata();
+
+            long sumEntryCounts = btree.getEntryCount();
             
-            pmd = ndx.getIndexMetadata().getPartitionMetadata();
-
             long segmentByteCount = 0;
 
             int sourceCount = 0;
@@ -617,33 +693,35 @@ public class DumpFederation {
 
                     /*
                      * Note: This will force the (re-)open of the
-                     * IndexSegmentStore. However, the store should already be
-                     * open since we have an IIndex object and that should be a
-                     * FusedView of its components.
-                     * 
-                     * @todo The IIndex is either a BTree or a FusedView so we
-                     * can just enumerate its sources directly, which is much
-                     * more straightforward.
+                     * IndexSegmentStore, but not of the IndexSegment on that
+                     * store!
                      */
                     final IndexSegmentStore segStore = (IndexSegmentStore) resourceManager
                             .openStore(x.getUUID());
 
+                    if (segStore == null) {
+                        
+                        throw new RuntimeException(
+                                "Index segment not found? : " + x);
+                        
+                    }
+                    
                     /*
                      * Note: The size() of an IndexSegmentStore is always the
                      * length of the file. However, the #of bytes allocated by
                      * the OS to a file may differ depending on the block size
                      * for files on the volume.
                      */
-
                     segmentByteCount += segStore.size();
+                    
+                    // #of tuples in this index segment.
+                    sumEntryCounts += segStore.getCheckpoint().nentries;
 
                 }
 
             }
             
-            this.rangeCount = rangeCount;
-            
-//            this.rangeCountExact = rangeCountExact;
+            this.sumEntryCounts = sumEntryCounts;
             
             this.sourceCount = sourceCount;
 
@@ -682,18 +760,39 @@ public class DumpFederation {
      * @version $Id$
      */
     static public class FetchIndexPartitionByteCountRecordTask implements
-            IIndexProcedure, IDataServiceAwareProcedure {
+            Callable<IndexPartitionDetailRecord>, IDataServiceAwareProcedure {
 
         /**
          * 
          */
         private static final long serialVersionUID = 1656089893655069298L;
 
-        public FetchIndexPartitionByteCountRecordTask() {
+        private final long timestamp;
+        
+        private final String name;
+        
+        /**
+         * @param name
+         *            The name of the index partition.
+         * @param timestamp
+         *            The timestamp of the read-historical transaction that is
+         *            being used to generate the dump. This is used here to open
+         *            the journal on which the {@link BTree} is found for that
+         *            timestamp for the named index partition.
+         */
+        public FetchIndexPartitionByteCountRecordTask(final long timestamp,
+                final String name) {
 
+            if (name == null)
+                throw new IllegalArgumentException();
+            
+            this.timestamp = timestamp;
+            
+            this.name = name;
+            
         }
 
-        public IndexPartitionDetailRecord apply(final IIndex ndx) {
+        public IndexPartitionDetailRecord call() throws Exception {
 
             if (dataService == null) {
 
@@ -705,7 +804,26 @@ public class DumpFederation {
             final ResourceManager resourceManager = dataService
                     .getResourceManager();
 
-            return new IndexPartitionDetailRecord(ndx, resourceManager);
+            final IRawStore store = resourceManager.getJournal(timestamp);
+
+            if(store == null) {
+                
+                throw new RuntimeException("No journal? : timestamp="+timestamp);
+                
+            }
+            
+            final BTree btree = (BTree) resourceManager.getIndexOnStore(name,
+                    timestamp, store);
+
+            if(btree == null) {
+                
+                throw new RuntimeException(
+                        "No index partition on journal? : timestamp="
+                                + timestamp + ", name=" + name);
+                
+            }
+
+            return new IndexPartitionDetailRecord(btree, resourceManager);
 
         }
 
@@ -726,7 +844,9 @@ public class DumpFederation {
         
     /**
      * Dumps useful information about the index partition in the context of the
-     * data service on which it resides.
+     * data service on which it resides. The information is collected in
+     * parallel in order to minimize the total latency. This is especially
+     * important when there are a large #of index partitions.
      * 
      * @param indexName
      *            The name of the scale-out index.
@@ -739,18 +859,46 @@ public class DumpFederation {
         final ITupleIterator<PartitionLocator> itr = metadataIndex
                 .rangeIterator();
 
-        PartitionLocator lastLocator = null;
-
+        final List<Callable<IndexPartitionRecord>> tasks = new LinkedList<Callable<IndexPartitionRecord>>();
+        
         while (itr.hasNext()) {
 
             final PartitionLocator locator = itr.next().getObject();
 
-            final IndexPartitionRecord rec = new IndexPartitionRecord(fed, ts,
-                    indexName, locator);
+            tasks.add(new Callable<IndexPartitionRecord>(){
+                public IndexPartitionRecord call() throws Exception {
+
+                    return new IndexPartitionRecord(fed, ts, indexName, locator);
+
+                }
+            });
+            
+        }
+        
+        // execute all requests in parallel.
+        final List<Future<IndexPartitionRecord>> futures = fed.getExecutorService().invokeAll(tasks);
+        
+        final List<IndexPartitionRecord> results = new LinkedList<IndexPartitionRecord>();
+        
+        for(Future<IndexPartitionRecord> f : futures) {
+            
+            try {
+                results.add(f.get());
+            } catch(ExecutionException ex) {
+                log.error(indexName, ex);
+                continue;
+            }
+            
+        }
+        
+        PartitionLocator lastLocator = null;
+
+        for(IndexPartitionRecord rec : results) {
 
             /*
              * Verify some constraints on the index partition separator keys.
              */
+            final PartitionLocator locator = rec.locator;
             {
              
                 if (lastLocator == null) {
@@ -832,8 +980,7 @@ public class DumpFederation {
                 sb.append("\t" + rec.detailRec.sourceCount);
                 sb.append("\t" + rec.detailRec.journalSourceCount);
                 sb.append("\t" + rec.detailRec.segmentSourceCount);
-                sb.append("\t" + rec.detailRec.rangeCount);
-//                sb.append("\t" + rec.detailRec.rangeCountExact);
+                sb.append("\t" + rec.detailRec.sumEntryCounts);
                 sb.append("\t" + rec.detailRec.segmentByteCount);
 
                 // stats for the entire data service

@@ -924,11 +924,17 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             assert nactiveSurplus > 0;
             
             assert underUtilizedDataServiceUUIDs != null;
-            
-            final int maxTargetMoves = maxMovesPerTarget
-                    * underUtilizedDataServiceUUIDs.length;
-            
-            maxMoves = Math.min(nactiveSurplus, maxTargetMoves);
+
+            /*
+             * FIXME Place a configurable cap on the #of index partition moves
+             * per overflow cycle? We certainly don't want to move all active
+             * index partitions over the threshold corresponding to the minimum
+             * #of active index partitions on a data service.
+             */
+            final int MAX_MOVES = 5;
+
+            maxMoves = Math.min(MAX_MOVES, Math.min(nactiveSurplus,
+                    maxMovesPerTarget * underUtilizedDataServiceUUIDs.length));
             
         }
 
@@ -956,18 +962,14 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 + maxMovesPerTarget + ", nactive=" + nactive + ", maxMoves="
                 + maxMoves + ", sourceService="+sourceServiceUUID+", targetServices="
                 + Arrays.toString(underUtilizedDataServiceUUIDs));
-        
-        int nmove = 0;
-        
-        final List<AbstractTask> tasks = new ArrayList<AbstractTask>(maxMoves);
 
+        // The maximum range count for any active index.
+        long maxRangeCount = 0L;
+        
+        // just those indices that survive the cuts we impose here.
+        final List<Score> scores = new LinkedList<Score>();
+        
         for (Score score : overflowMetadata.getScores()) {
-
-            if (nmove >= maxMoves) {
-
-                break;
-                
-            }
 
             final String name = score.name;
             
@@ -994,6 +996,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 
             }
             
+            // get the view metadata.
             final ViewMetadata vmd = overflowMetadata.getViewMetadata(name);
             
             if (vmd == null) {
@@ -1004,16 +1007,14 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * sometimes during the life cycle of that old journal. Since it
                  * is gone we skip over it here.
                  */
-                
+
                 if (INFO)
                     log.info("Skipping index: name=" + name
                             + ", reason=dropped");
-                
-                continue;
-                
-            }
 
-            final IndexMetadata indexMetadata = vmd.indexMetadata;
+                continue;
+
+            }
 
             if (vmd.pmd.getSourcePartitionId() != -1) {
 
@@ -1033,7 +1034,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             // handler decides when and where to split an index partition.
             final ISplitHandler splitHandler = vmd.getAdjustedSplitHandler();
 
-            if (splitHandler.shouldSplit(vmd.getView())) {
+            final long rangeCount = vmd.getRangeCount();
+            
+            if (splitHandler.shouldSplit(rangeCount)) {
 
                 /*
                  * This avoids moving index partitions that are large and really
@@ -1048,77 +1051,221 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
             }
 
-            if (INFO)
-                log.info("Considering move candidate: " + score);
+            // this is an index that we will consider again below.
+            scores.add(score);
+            
+            // track the maximum range count over all active indices.
+            maxRangeCount = Math.max(maxRangeCount, vmd.getRangeCount());
+            
+        }
+        
+//        if(maxRangeCount == 0) {
+//            
+//            // avoid any possibility of divide by zero errors.
+//            maxRangeCount = 1;
+//            
+//        }
+            
+        /*
+         * Queue places the move candidates into a total order. We then choose
+         * from the candidates based on that order.
+         * 
+         * Note: The natural order of [Priority] is DESCENDING [largest
+         * numerical value to smallest numerical value]! We assign larger scores
+         * to the index partitions that we want to move.
+         */
+        final PriorityQueue<Priority<ViewMetadata>> moveQueue = new PriorityQueue<Priority<ViewMetadata>>();
+
+        for(Score score : scores) {
+
+            // get the view metadata.
+            final ViewMetadata vmd = overflowMetadata.getViewMetadata(score.name);
+
+            /*
+             * Note: Moving an index partition is the most expensive overflow
+             * operation. Its cost has two dimensions which affect the move
+             * time.
+             * 
+             * The first cost dimension is simply the #of bytes to be moved, and
+             * we use the rangeCount as an estimate of that cost.
+             * 
+             * The second cost dimension is the #of new bytes that arrive on the
+             * live journal for the index partition to be moved while we are
+             * moving its historical view onto the target data service - we use
+             * [score.drank] as a proxy for that cost. Since moving the buffered
+             * writes from the live journal requires an exclusive lock on the
+             * live index, an additional delay is imposed on the application
+             * during that phase of the move. The more writes buffered before
+             * the move, the longer the application will block during the move.
+             * 
+             * Whenever possible, we want to move the index partition with the
+             * smallest range count since it takes the least effort to move and
+             * move is the most expensive of the overflow operations.
+             * 
+             * Whenever feasible, we want to move the more active index
+             * partitions since that will shed more load BUT NOT if that makes
+             * us move more data. This decision is the most problematic when an
+             * index is hot for writes as newly buffered writes will increase
+             * the actual move time and cause the application to block during
+             * the atomic update phase of the move.
+             * 
+             * FIXME Note: One ideal candidate for a move is an index partition
+             * where most writes are on the tail of the index. In this case we
+             * can do tailSplit, leaving the majority of the data in place and
+             * only moving the empty or nearly empty tail of the index partition
+             * to the target data service. If the case is of pure tail append
+             * (we always write a key that is a successor of every prior key),
+             * then we can move an "empty" tail - this could even be done during
+             * synchronous overflow. However, if the tail writes are somewhat
+             * more distributed, then we need to move the key range of the tail
+             * that is recieving the writes. [If we can identify an index
+             * partition which is a candidate for a tail split then we could do
+             * the tail split immediately and move the tail to another data
+             * service. That would allow us to move the least possible data,
+             * even when the index was very "hot". The is the most possible
+             * reward for the least possible effort!]
+             */
+            final long rangeCount = vmd.getRangeCount();
+            
+            final double percentOfSplit = vmd.getAdjustedSplitHandler()
+                    .percentOfSplit(rangeCount);
             
             /*
-             * @todo could adjust the bounds here based on how important it
-             * is to begin moving index partitions off of this data service.
+             * Given two active indices having small range counts, we prefer to
+             * move the more active since that will let us shed more effort.
+             * 
+             * Note: This condition is formulated to reject a hot index
+             * (score.drank GTE .6) unless it has a low range rank (LT .3). It
+             * will also accept any active index if it has a lower range rank.
+             * We then choose the actual index partition moves based on the
+             * index scores (in the next step below).
+             * 
+             * Note: The code here is only considering active index partitions
+             * since we are trying to balance LOAD rather than the allocation of
+             * data on the disk.
+             * 
+             * @todo we also need to balance the on disk allocations - there are
+             * notes on that elsewhere. this is a tricky topic since historical
+             * data are not moved (the locators in the MDS for historical data
+             * are immutable - at least they are without some fancy footwork),
+             * so moving an index partition that is hot for writes is an
+             * excellent way to balance the on disk storage IF there is a
+             * history limit such that older data will be released thereby
+             * freeing space on the disk.
              */
-            if (score.drank > .3 && score.drank < .8) {
+            
+            final boolean moveCandidate =//
+                // Note: more active indices must be further from a split.
+                (score.drank > .6 && percentOfSplit < .3) || //
+                // Note: less active indices may be closer to a split.
+                (score.drank > .2 && percentOfSplit < .5)    //
+                /*
+                 * Note: barely active indices are not moved since moving them
+                 * does not change the load on the data service.
+                 * 
+                 * Note: This also helps to prevent very small indices that are
+                 * not getting much activity from bounding around.
+                 */ 
+                ;
+
+            // @todo conditionally log @ info
+            log.warn(vmd.name + " : moveCandidate=" + moveCandidate
+                    + ", percentOfSplit=" + percentOfSplit + ", drank="
+                    + score.drank + " : " + vmd + " : " + score);
+            
+            if (!moveCandidate) {
 
                 /*
-                 * Move this index partition to an under-utilized data service.
+                 * Don't attempt moves for indices with larger range counts.
                  */
 
-                // choose target using round robin among candidates.
-                final UUID targetDataServiceUUID = underUtilizedDataServiceUUIDs[nmove
-                        % underUtilizedDataServiceUUIDs.length];
-                
-                if (sourceServiceUUID.equals(targetDataServiceUUID)) {
-
-                    log
-                            .error("LBS included the source data service in the set of possible targets: source="
-                                    + sourceServiceUUID
-                                    + ", targets="
-                                    + Arrays
-                                            .toString(underUtilizedDataServiceUUIDs));
-                    
-                    /*
-                     * Note: by continuing here we will not do a move for this
-                     * index partition (it would throw an exception) but we will
-                     * at least consider the next index partition for a move.
-                     */
-                    
-                    continue;
-                    
-                }
-
-                // get the target service name.
-                String targetDataServiceName;
-                try {
-                    targetDataServiceName = resourceManager.getFederation()
-                            .getDataService(targetDataServiceUUID)
-                            .getServiceName();
-                } catch (Throwable t) {
-                    targetDataServiceName = targetDataServiceUUID.toString();
-                }
-                
-                if (INFO)
-                    log.info("Will move " + name + " to dataService="
-                            + targetDataServiceName);
-
-                // name of the corresponding scale-out index.
-                final String scaleOutIndexName = indexMetadata.getName();
-                        
-                final int newPartitionId = nextPartitionId(scaleOutIndexName);
-                
-                final String targetName = DataService.getIndexPartitionName(
-                        scaleOutIndexName, newPartitionId);
-                
-                final AbstractTask task = new MoveIndexPartitionTask(
-                        resourceManager, lastCommitTime, name, vmd,
-                        targetDataServiceUUID, newPartitionId);
-
-                tasks.add(task);
-                
-                putUsed(name, "willMove(" + name + ", rangeCount"
-                        + vmd.getRangeCount() + " -> " + targetName
-                        + ", targetService=" + targetDataServiceName + ")");
-
-                nmove++;
+                continue;
 
             }
+
+            /*
+             * Place into the queue for consideration. Among the indices that
+             * have lower range counts we prefer those which have the highest
+             * scores.
+             */
+            moveQueue.add(new Priority<ViewMetadata>(score.drank, vmd));
+
+        } // next Score (active index).
+
+        /*
+         * Now consider the move candidates in their assigned priority order.
+         */
+        int nmove = 0;
+
+        final List<AbstractTask> tasks = new ArrayList<AbstractTask>(maxMoves);
+        
+        while (nmove < maxMoves && !moveQueue.isEmpty()) {
+
+            // the highest priority candidate for a move.
+            final ViewMetadata vmd = moveQueue.poll().v;
+            
+            if (INFO)
+                log.info("Considering move candidate: " + vmd);
+            
+            /*
+             * Choose target using round robin among candidates. This means that
+             * we will choose the least utilized of the services first.
+             */
+            final UUID targetDataServiceUUID = underUtilizedDataServiceUUIDs[nmove
+                    % underUtilizedDataServiceUUIDs.length];
+
+            if (sourceServiceUUID.equals(targetDataServiceUUID)) {
+
+                log
+                        .error("LBS included the source data service in the set of possible targets: source="
+                                + sourceServiceUUID
+                                + ", targets="
+                                + Arrays
+                                        .toString(underUtilizedDataServiceUUIDs));
+
+                /*
+                 * Note: by continuing here we will not do a move for this index
+                 * partition (it would throw an exception) but we will at least
+                 * consider the next index partition for a move.
+                 */
+
+                continue;
+
+            }
+
+            // get the target service name.
+            String targetDataServiceName;
+            try {
+                targetDataServiceName = resourceManager.getFederation()
+                        .getDataService(targetDataServiceUUID).getServiceName();
+            } catch (Throwable t) {
+                targetDataServiceName = targetDataServiceUUID.toString();
+            }
+
+            if (INFO)
+                log.info("Will move " + vmd.name + " to dataService="
+                        + targetDataServiceName);
+
+            // name of the corresponding scale-out index.
+            final String scaleOutIndexName = vmd.indexMetadata.getName();
+
+            final int newPartitionId = nextPartitionId(scaleOutIndexName);
+
+            final String targetName = DataService.getIndexPartitionName(
+                    scaleOutIndexName, newPartitionId);
+
+            final AbstractTask task = new MoveIndexPartitionTask(
+                    resourceManager, lastCommitTime, vmd.name, vmd,
+                    targetDataServiceUUID, newPartitionId);
+
+            tasks.add(task);
+
+            putUsed(vmd.name, "willMove(" + vmd.name + " -> " + targetName
+                    + ") : " + vmd + " : "
+                    + overflowMetadata.getScore(vmd.name) + " : targetService="
+                    + targetDataServiceName);
+
+            nmove++;
 
         }
         
@@ -1137,6 +1284,11 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * range partition and identifies the historical resources required to
      * present a coherent view of that index partition.
      * <p>
+     * Note: Overflow actions which define a new index partition (Split, Join,
+     * and Move) all require a phase (which is part of their atomic update
+     * tasks) in which they will block the application. This is necessary in
+     * order for them to "catch up" with buffered writes on the new journal -
+     * those writes need to be incorporated into the new index partition.
      * 
      * <h2> Compacting Merge </h2>
      * 
@@ -1397,6 +1549,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         /*
          * A priority queue used to decide between optional compacting merges
          * and index segment builds. There is a common metric for this decision.
+         * 
+         * Note: The natural order of [Priority] is DESCENDING [largest
+         * numerical value to smallest numerical value]! We assign larger scores
+         * to the index partitions that we want to merge.
          */
         final PriorityQueue<Priority<ViewMetadata>> mergeQueue = new PriorityQueue<Priority<ViewMetadata>>(
                 overflowMetadata.getIndexCount());
@@ -1505,9 +1661,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * any of the requirements for a manditory compacting merge.
              */
             if (!compactingMerge //
-                    && vmd.pmd.getSourcePartitionId() == -1 // move not in
-                                                            // progress
-                    && splitHandler != null && splitHandler.shouldSplit(view)//
+                    // move not in progress
+                    && vmd.pmd.getSourcePartitionId() == -1//
+                    && splitHandler != null//
+                    && splitHandler.shouldSplit(vmd.getRangeCount())//
             ) {
 
                 /*
@@ -1542,8 +1699,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             /*
              * Compute a score that will be used to prioritize compacting merges
              * vs builds for index partitions where either option is allowable.
+             * The higher the score, the more we want to make sure that we do a
+             * compacting merge for that index.
              * 
-             * Note: The main purpose of an index partition builds is to convert
+             * Note: The main purpose of an index partition build is to convert
              * from a write-order to a read-order and permit the release of the
              * old journal. However, applications which require frequent access
              * to historical commit points on the old journals will continue to
@@ -1769,7 +1928,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     + resourceManager.listIndexPartitions(ITx.UNISOLATED));
 
             // purge resources that are no longer required.
-            purgeOldResources();
+            resourceManager.getFederation().getExecutorService().submit(
+                    new PurgeResourcesAfterActionTask(resourceManager));
             
             return null;
             
@@ -1816,6 +1976,46 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
     }
 
+    /**
+     * Helper task used to purge resources <strong>after</strong> asynchronous
+     * overflow is complete.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static private class PurgeResourcesAfterActionTask implements Callable<Void> {
+
+        private final OverflowManager overflowManager;
+        
+        public PurgeResourcesAfterActionTask(OverflowManager overflowManager) {
+            
+            this.overflowManager = overflowManager;
+            
+        }
+        
+        /**
+         * Sleeps for a few seconds to give asynchronous overflow processing a
+         * chance to quit and release its hard reference on the old journal and
+         * then invokes {@link OverflowManager#purgeOldResources()}.
+         */
+        public Void call() throws Exception {
+
+            // wait for the async overflow task to finish.
+            Thread.sleep(2000);
+
+            /*
+             * Try to get the exclusive write service lock and then purge
+             * resources.
+             */
+            overflowManager
+                    .purgeOldResources(3000/* timeout */, false/* truncateJournal */);
+
+            return null;
+
+        }
+
+    }
+    
     /**
      * Submit all tasks, awaiting their completion and check their futures for
      * errors.

@@ -56,13 +56,28 @@ public interface ISplitHandler extends Serializable {
      * Return <code>true</code> if a cursory examination of an index partition
      * suggests that it SHOULD be split into 2 or more index partitions.
      * 
-     * @param ndx
-     *            An index partition.
+     * @param rangeCount
+     *            A fast range count (may overestimate).
      * 
      * @return <code>true</code> if the index partition should be split.
      */
-    public boolean shouldSplit(IIndex ndx);
+    public boolean shouldSplit(long rangeCount);
 
+    /**
+     * Return the percentage of a single nominal split that would be satisified
+     * by an index partition based on the specified range count. If the index
+     * partition has exactly the desired number of tuples, then return ONE
+     * (1.0). If the index partition has 50% of the desired #of tuples, then
+     * return <code>.5</code>. If the index partition could be used to build
+     * two splits, then return TWO (2.0), etc.
+     * 
+     * @param rangeCount
+     *            A fast range count (may overestimate).
+     * 
+     * @return The percentage of a split per above.
+     */
+    public double percentOfSplit(long rangeCount);
+    
     /**
      * Choose a set of splits that completely span the key range of the index
      * view. The first split MUST use the leftSeparator of the index view as its
