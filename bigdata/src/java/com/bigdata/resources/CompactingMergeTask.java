@@ -151,7 +151,7 @@ public class CompactingMergeTask extends AbstractPrepareTask<BuildResult> {
 
                 // task will update the index partition view definition.
                 final Event updateEvent = e.newSubEvent(
-                        EventType.AtomicViewUpdate,
+                        EventType.AtomicUpdate,
                         OverflowActionEnum.Merge + "(" + vmd.name + ") : "
                                 + vmd).start();
 

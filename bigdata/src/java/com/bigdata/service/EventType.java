@@ -31,6 +31,7 @@ package com.bigdata.service;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.journal.Journal;
 import com.bigdata.resources.OverflowActionEnum;
+import com.bigdata.resources.OverflowManager;
 
 /**
  * Type safe enum for {@link Event}s.
@@ -83,6 +84,14 @@ public enum EventType {
      * 
      * @see OverflowActionEnum
      */
-    AtomicViewUpdate;
+    AtomicUpdate,
+    
+    /**
+     * Purge resources.
+     * 
+     * @see OverflowManager#purgeOldResources(long, boolean)
+     */
+    PurgeResources
+    ;
 
 }
