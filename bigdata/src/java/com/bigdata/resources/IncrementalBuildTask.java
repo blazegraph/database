@@ -193,7 +193,7 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
 
 
                 final Event updateEvent = e.newSubEvent(
-                        EventType.AtomicViewUpdate,
+                        EventType.AtomicUpdate,
                         OverflowActionEnum.Build + "(" + vmd.name + ") : "
                                 + vmd).start();
                 

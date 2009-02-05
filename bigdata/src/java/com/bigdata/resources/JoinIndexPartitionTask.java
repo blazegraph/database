@@ -357,7 +357,7 @@ public class JoinIndexPartitionTask extends AbstractPrepareTask<JoinResult> {
                         resourceManager, names2, result);
 
                 final Event updateEvent = e.newSubEvent(
-                        EventType.AtomicViewUpdate, summary).start();
+                        EventType.AtomicUpdate, summary).start();
                 
                 try {
 

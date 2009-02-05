@@ -102,6 +102,8 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.service.DataService;
+import com.bigdata.service.Event;
+import com.bigdata.service.EventType;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.sparse.SparseRowStore;
@@ -3114,7 +3116,7 @@ abstract public class StoreManager extends ResourceEvents implements
         } finally {
 
             indexCacheLock.writeLock().unlock();
-
+            
         }
 
     }
@@ -3347,11 +3349,11 @@ abstract public class StoreManager extends ResourceEvents implements
 
         }
 
-        if(INFO)
+        if (INFO)
             log.info("Given " + resourcesInUse.size()
-                + " resources that are in use as of timestamp="
-                + commitTimeToPreserve + ", deleted " + njournals
-                + " journals and " + nsegments + " segments");
+                    + " resources that are in use as of timestamp="
+                    + commitTimeToPreserve + ", deleted " + njournals
+                    + " journals and " + nsegments + " segments");
         
     }
     
@@ -3458,8 +3460,9 @@ abstract public class StoreManager extends ResourceEvents implements
 
             final File file = resourceFiles.remove(uuid);
 
-            if (INFO)
-                log.info("DELETE: file=" + file + ", uuid=" + uuid + ", isJournal="
+//            if (INFO)
+//                log.info
+                log.warn("DELETE: file=" + file + ", uuid=" + uuid + ", isJournal="
                     + isJournal);
             
             if (file == null) {
@@ -4038,13 +4041,25 @@ abstract public class StoreManager extends ResourceEvents implements
 
             try {
 
-                purgeOldResources();
-                
-                if(truncateJournal) {
+                final Event event = new Event(getFederation(),
+                        getDataServiceUUID().toString(),
+                        EventType.PurgeResources, "").start();
 
-                    assertRunning();
+                try {
                     
-                    getLiveJournal().truncate();
+                    purgeOldResources();
+
+                    if (truncateJournal) {
+
+                        assertRunning();
+
+                        getLiveJournal().truncate();
+
+                    }
+
+                } finally {
+                
+                    event.end();
                     
                 }
             

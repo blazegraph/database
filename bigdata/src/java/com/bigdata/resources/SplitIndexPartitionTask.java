@@ -589,7 +589,7 @@ public class SplitIndexPartitionTask extends
 
                 final Event updateEvent = e
                         .newSubEvent(
-                                EventType.AtomicViewUpdate,
+                                EventType.AtomicUpdate,
                                 OverflowActionEnum.Split + "(" + vmd.name
                                         + "->" + Arrays.toString(resources)
                                         + ") : src=" + vmd).start();

@@ -431,7 +431,7 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
              * terminate) until its atomic update task completes.
              */
 
-            final Event updateEvent = e.newSubEvent(EventType.AtomicViewUpdate,
+            final Event updateEvent = e.newSubEvent(EventType.AtomicUpdate,
                     summary + " : " + vmd).start();
 
             try {
