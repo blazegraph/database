@@ -511,6 +511,19 @@ abstract public class ResourceManager extends OverflowManager implements IResour
                             }
                         });
 
+                tmp.addCounter(IStoreManagerCounters.LastCommitTime,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                final ManagedJournal liveJournal;
+                                try {
+                                    liveJournal = getLiveJournal();
+                                    setValue(liveJournal.getLastCommitTime());
+                                } catch (Throwable t) {
+                                    log.warn(t);
+                                }
+                            }
+                        });
+
             }
 
             /*

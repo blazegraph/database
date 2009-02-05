@@ -1,5 +1,7 @@
 package com.bigdata.service;
 
+import java.io.Serializable;
+
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.DropIndexTask;
@@ -20,7 +22,7 @@ import com.bigdata.journal.RegisterIndexTask;
  *       extend {@link AbstractTask} - that class does not implement
  *       {@link IIndexProcedure} and can not be sent across the wire.
  */
-public interface IDataServiceAwareProcedure {
+public interface IDataServiceAwareProcedure extends Serializable {
 
     /**
      * Invoked before the task is executed to given the procedure a

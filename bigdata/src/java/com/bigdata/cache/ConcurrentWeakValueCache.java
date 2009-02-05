@@ -476,7 +476,7 @@ public class ConcurrentWeakValueCache<K, V> {
 
         try {
 
-            final WeakReference<V> ref = map.remove(k);
+            final WeakReference<V> ref = removeMapEntry(k);
 
             if (ref != null) {
 
@@ -529,7 +529,7 @@ public class ConcurrentWeakValueCache<K, V> {
 
                 }
 
-                map.remove(k);
+                removeMapEntry(k);
                 
                 counter++;
                 
@@ -549,6 +549,17 @@ public class ConcurrentWeakValueCache<K, V> {
         
     }
 
+    /**
+     * Invoked when a reference needs to be removed from the map.
+     * 
+     * @param k
+     */
+    protected WeakReference<V> removeMapEntry(final K k) {
+        
+        return map.remove(k);
+        
+    }
+    
     /**
      * An iterator that visits the weak reference values in the map. You must
      * test each weak reference in order to determine whether its value has been
@@ -591,6 +602,13 @@ public class ConcurrentWeakValueCache<K, V> {
             queue.evictStaleRefs();
             
         }
+
+        /*
+         * Note: I double that this will notice any stale references that we
+         * cleared above because the garbage collector is not synchronous with
+         * us here.
+         */
+        removeClearedEntries();
         
     }
     

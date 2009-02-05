@@ -145,18 +145,16 @@ public class Counters {
      * Return a score whose increasing value is correlated with the amount of
      * activity on an index as reflected in these {@link Counters}.
      * <p>
-     * The raw score is the (de)-serialization time plus the read/write time.
-     * Time was choosen since it is a common unit and since it reflects the
-     * combination of CPU time, memory time (for allocations and garbage
-     * collection - the latter can be quite significant), and the disk wait
-     * time. The other main component of time is key search, but that is not
-     * instrumented right now.
+     * The raw score is the serialization / deserialization time plus the read /
+     * write time. Time was choosen since it is a common unit and since it
+     * reflects the combination of CPU time, memory time (for allocations and
+     * garbage collection - the latter can be quite significant), and the disk
+     * wait time. The other main component of time is key search, but that is
+     * not instrumented right now.
      * <p>
-     * (de-)serialization is basically a CPU activity and drives memory to the
-     * extent that allocations are made. At present, de-serialization is much
-     * slower than serialization, primarily because a lot of object creation
-     * occurs during de-serialization. Changing to a raw record format for nodes
-     * and leaves would likely reduce the de-serialization costs significantly.
+     * Serialization and deserialization are basically a CPU activity and drive
+     * memory to the extent that allocations are made, especially during
+     * deserialization.
      * <p>
      * The read/write time is strongly dominated by actual DISK IO and by
      * garbage collection time (garbage collection can cause threads to be
@@ -165,6 +163,19 @@ public class Counters {
      * materialize any given leaf.
      * 
      * @return The computed score.
+     * 
+     * @todo instrument the key search time
+     * 
+     * @todo instrument bloom filter time when the bloom filter is used (this
+     *       should be done separately on the bloom filter object).
+     * 
+     * @todo At present, deserialization is much slower than serialization,
+     *       primarily because of object creation. Changing to a raw record
+     *       format for nodes and leaves would likely reduce the deserialization
+     *       costs significantly. The time could also be reduced by lazy
+     *       decompression of the values and lazy deserialization of the values
+     *       such that tuple scans for keys only do not require value
+     *       deserialization.
      */
     public double computeRawScore() {
         

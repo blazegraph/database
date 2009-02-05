@@ -416,22 +416,23 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
         if (partitionId != o2.partitionId)
             return false;
 
-        if( ! BytesUtil.bytesEqual(leftSeparatorKey,o2.leftSeparatorKey)) {
-            
+        if (!BytesUtil.bytesEqual(leftSeparatorKey, o2.leftSeparatorKey)) {
+
             return false;
-            
+
         }
-        
-        if(rightSeparatorKey==null) {
-            
-            if(o2.rightSeparatorKey!=null) return false;
-            
-        } else {
-            
-            if(!BytesUtil.bytesEqual(rightSeparatorKey, o2.rightSeparatorKey)) {
-                
+
+        if (rightSeparatorKey == null) {
+
+            if (o2.rightSeparatorKey != null)
                 return false;
-                
+
+        } else {
+
+            if (!BytesUtil.bytesEqual(rightSeparatorKey, o2.rightSeparatorKey)) {
+
+                return false;
+
             }
             
         }
