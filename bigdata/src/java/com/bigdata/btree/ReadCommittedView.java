@@ -77,7 +77,7 @@ import com.bigdata.resources.StoreManager.ManagedJournal;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ReadCommittedView implements IIndex {
+public class ReadCommittedView implements ILocalBTreeView {
 
     /**
      * Class encapsulates the state that provides the basis for the current
@@ -321,10 +321,34 @@ public class ReadCommittedView implements IIndex {
         
     }
 
-    public final Counters getBTreeCounters() {
+    public final BTreeCounters getBTreeCounters() {
         
-        return getIndex().counters;
+        return getIndex().btreeCounters;
         
+    }
+
+    public IBloomFilter getBloomFilter() {
+
+        return getIndex().getBloomFilter();
+        
+    }
+
+    public BTree getMutableBTree() {
+
+        return getIndex().getMutableBTree();
+        
+    }
+
+    public int getSourceCount() {
+        
+        return getIndex().getSourceCount();
+        
+    }
+
+    public AbstractBTree[] getSources() {
+
+        return getIndex().getSources();
+    
     }
     
 }

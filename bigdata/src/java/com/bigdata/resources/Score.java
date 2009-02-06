@@ -28,12 +28,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.resources;
 
-import com.bigdata.btree.Counters;
+import com.bigdata.btree.BTreeCounters;
 
 /**
  * Helper class assigns a raw and a normalized score to each index based on
- * its per-index {@link Counters} and on the global (non-restart safe)
- * {@link Counters} for the data service during the life cycle of the last
+ * its per-index {@link BTreeCounters} and on the global (non-restart safe)
+ * {@link BTreeCounters} for the data service during the life cycle of the last
  * journal.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -45,7 +45,7 @@ class Score implements Comparable<Score> {
     public final String name;
 
     /** The counters collected for that index partition. */
-    public final Counters counters;
+    public final BTreeCounters bTreeCounters;
 
     /** The raw score computed for that index partition. */
     public final double rawScore;
@@ -66,20 +66,20 @@ class Score implements Comparable<Score> {
 
     }
 
-    public Score(final String name, final Counters counters,
+    public Score(final String name, final BTreeCounters bTreeCounters,
             final double totalRawScore) {
 
         assert name != null;
 
-        assert counters != null;
+        assert bTreeCounters != null;
 
         this.name = name;
 
-        this.counters = counters;
+        this.bTreeCounters = bTreeCounters;
 
-        rawScore = counters.computeRawScore();
+        rawScore = bTreeCounters.computeRawScore();
 
-        score = Counters.normalize(rawScore, totalRawScore);
+        score = BTreeCounters.normalize(rawScore, totalRawScore);
 
     }
 

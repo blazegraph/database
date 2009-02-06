@@ -173,7 +173,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
     /**
      * Counters tracking various aspects of the btree.
      */
-    /* protected */public final Counters counters = new Counters();
+    /* protected */public final BTreeCounters btreeCounters = new BTreeCounters();
 
     /**
      * The persistence store.
@@ -347,24 +347,6 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
      * The #of distinct nodes and leaves on the {@link #writeRetentionQueue}.
      */
     protected int ndistinctOnWriteRetentionQueue;
-
-    /**
-     * The #of distinct nodes and leaves on the {@link #writeRetentionQueue}.
-     */
-    final public int getWriteRetentionQueueDistinctCount() {
-
-        return ndistinctOnWriteRetentionQueue;
-
-    }
-
-    /**
-     * The capacity of the {@link #writeRetentionQueue}.
-     */
-    final public int getWriteRetentionQueueCapacity() {
-
-        return writeRetentionQueue.capacity();
-
-    }
     
     /**
      * The {@link #readRetentionQueue} reduces reads through to the backing
@@ -397,52 +379,25 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
     final protected HardReferenceQueue<PO> readRetentionQueue;
 
     /**
-     * Return some "statistics" about the btree.
+     * Return some "statistics" about the btree including both the static
+     * {@link CounterSet} and the {@link BTreeCounters}s. Since this DOES NOT
+     * include the {@link #getDynamicCounterSet()}, holding a reference to the
+     * returned {@link ICounterSet} WILL NOT cause the {@link AbstractBTree} to
+     * remain strongly reachable.
      * 
-     * @todo fold in {@link #getUtilization()} here.
-     * 
-     * @todo factor counter names into interface.
+     * @see #getStaticCounterSet()
+     * @see #getDynamicCounterSet()
+     * @see #btreeCounters
+     * @see BTreeCounters#getCounters()
      */
     synchronized public ICounterSet getCounters() {
 
         if (counterSet == null) {
 
-            counterSet = getBasicCounterSet();
+            counterSet = getStaticCounterSet();
 
-            counterSet.attach(counters.getCounters());
+            counterSet.attach(btreeCounters.getCounters());
     
-            counterSet.addCounter("Write Retention Queue Capacity",
-                    new Instrument<Long>() {
-                        public void sample() {
-                            setValue((long)writeRetentionQueue.capacity());
-                        }
-                    });
-
-            counterSet.addCounter("Write Retention Queue Distinct Count",
-                    new Instrument<Long>() {
-                        public void sample() {
-                            setValue((long)ndistinctOnWriteRetentionQueue);
-                        }
-                    });
-
-            counterSet.addCounter("Read Retention Queue Capacity",
-                    new Instrument<Long>() {
-                        public void sample() {
-                            setValue((long) (readRetentionQueue == null ? 0
-                                    : readRetentionQueue.capacity()));
-                        }
-                    });
-
-            /*
-             * @todo report time open?
-             * 
-             * @todo report #of times open?
-             * 
-             * @todo estimate heap requirements for nodes and leaves based on their
-             * state (keys, values, and other arrays). report estimated heap
-             * consumption here.
-             */
-        
         }
         
         return counterSet;
@@ -451,39 +406,49 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
     private CounterSet counterSet;
    
     /**
-     * Return a new {@link CounterSet} containing counters for the
-     * {@link Checkpoint} record, aspects of the {@link IndexMetadata}, and
-     * aspects of the node/leaf hard reference queue.
-     * <p>
-     * Note: The returned {@link CounterSet} does NOT include the
-     * {@link Counters}. This apparently meaningless distinction allows us to
-     * report the basic counters with different aggregations of the
-     * {@link Counters}, including those that span re-opening of the
-     * {@link AbstractBTree}.
+     * Return a new {@link CounterSet} containing dynamic counters - <strong>DO
+     * NOT hold onto the returned {@link CounterSet} as it contains implicit
+     * hard references to the {@link AbstractBTree} and will prevent the
+     * {@link AbstractBTree} from being finalized! </strong>
+     * 
+     * @todo factor counter names into interface.
      */
-    public CounterSet getBasicCounterSet() {
+    public CounterSet getDynamicCounterSet() {
 
         final CounterSet counterSet = new CounterSet();
-        
-        counterSet.addCounter("index UUID", new OneShotInstrument<String>(
-                getIndexMetadata().getIndexUUID().toString()));
-        
-        counterSet.addCounter("branchingFactor",
-                new OneShotInstrument<Integer>(branchingFactor));
 
-        counterSet.addCounter("class",
-                new OneShotInstrument<String>(getClass().getName()));
+        counterSet.addCounter("Write Retention Queue Distinct Count",
+                new Instrument<Long>() {
+                    public void sample() {
+                        setValue((long) ndistinctOnWriteRetentionQueue);
+                    }
+                });
 
-        counterSet.addCounter("queueCapacity",
-                new OneShotInstrument<Integer>(
-                        getWriteRetentionQueueCapacity()));
+        counterSet.addCounter("Write Retention Queue Size",
+                new Instrument<Integer>() {
+                    protected void sample() {
+                        setValue(writeRetentionQueue.size());
+                    }
+                });
 
-        counterSet.addCounter("queueSize", new Instrument<Integer>() {
-            protected void sample() {
-                setValue(getWriteRetentionQueueDistinctCount());
-            }
-        });
+        counterSet.addCounter("Read Retention Queue Size",
+                new Instrument<Integer>() {
+                    protected void sample() {
+                        setValue(readRetentionQueue == null ? 0
+                                : readRetentionQueue.size());
+                    }
+                });
 
+        /*
+         * @todo report time open?
+         * 
+         * @todo report #of times open?
+         * 
+         * @todo estimate heap requirements for nodes and leaves based on their
+         * state (keys, values, and other arrays). report estimated heap
+         * consumption here.
+         */
+    
         // the % utilization in [0:1] for the whole tree (nodes + leaves).
         counterSet.addCounter("% utilization", new Instrument<Double>(){
             protected void sample() {
@@ -518,6 +483,41 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
 
         return counterSet;
         
+    }
+    
+    /**
+     * Returns a new {@link CounterSet} containing <strong>static</strong>
+     * counters. These counters are all {@link OneShotInstrument}s and DO NOT
+     * contain implicit references to the {@link AbstractBTree}. They may be
+     * safely held and will not cause the {@link AbstractBTree} to remain
+     * strongly reachable.
+     */
+    public CounterSet getStaticCounterSet() {
+
+        final CounterSet counterSet = new CounterSet();
+
+        counterSet.addCounter("index UUID", new OneShotInstrument<String>(
+                getIndexMetadata().getIndexUUID().toString()));
+
+        counterSet.addCounter("branchingFactor",
+                new OneShotInstrument<Integer>(branchingFactor));
+
+        counterSet.addCounter("class", new OneShotInstrument<String>(getClass()
+                .getName()));
+
+        counterSet.addCounter("Write Retention Queue Capacity",
+                new OneShotInstrument<Integer>(writeRetentionQueue.capacity()));
+
+        if (readRetentionQueue != null) {
+
+            counterSet.addCounter("Write Retention Queue Capacity",
+                    new OneShotInstrument<Integer>(writeRetentionQueue
+                            .capacity()));
+
+        }
+
+        return counterSet;
+
     }
     
     /**
@@ -1368,7 +1368,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
         // conditional range check on the key.
         assert rangeCheck(key, false);
 
-        counters.ninserts++;
+        btreeCounters.ninserts++;
         
         final Tuple oldTuple = getRootOrFinger(key).insert(key, value, delete,
                 timestamp, tuple);
@@ -1518,7 +1518,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
         // conditional range check on the key.
         assert rangeCheck(key, false);
 
-        counters.nremoves++;
+        btreeCounters.nremoves++;
 
         return getRootOrFinger(key).remove(key, tuple);
         
@@ -1619,7 +1619,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
 
         }
 
-        counters.nfinds++;
+        btreeCounters.nfinds++;
 
         tuple = getRootOrFinger(key).lookup(key, tuple);
         
@@ -1707,7 +1707,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
         // conditional range check on the key.
         assert rangeCheck(key, false);
 
-        counters.nindexOf++;
+        btreeCounters.nindexOf++;
 
         return getRootOrFinger(key).indexOf(key);
 
@@ -1721,7 +1721,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
         if (index >= getEntryCount())
             throw new IndexOutOfBoundsException(ERROR_TOO_LARGE);
 
-        counters.ngetKey++;
+        btreeCounters.ngetKey++;
 
         return getRoot().keyAt(index);
 
@@ -1748,7 +1748,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
         if (tuple == null || !tuple.getValuesRequested())
             throw new IllegalArgumentException();
 
-        counters.ngetKey++;
+        btreeCounters.ngetKey++;
 
         getRoot().valueAt(index, tuple);
 
@@ -1860,7 +1860,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
         }
 
         // only count the expensive ones.
-        counters.nrangeCount++;
+        btreeCounters.nrangeCount++;
         
         final AbstractNode root = getRoot();
 
@@ -2069,7 +2069,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
             final IFilterConstructor filter//
             ) {
 
-        counters.nrangeIterator++;
+        btreeCounters.nrangeIterator++;
 
         /*
          * Does the iterator declare that it will not write back on the index?
@@ -2874,17 +2874,17 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
 
                 buf = nodeSer.putLeaf((Leaf) node);
 
-                counters.leavesWritten++;
+                btreeCounters.leavesWritten++;
 
             } else {
 
                 buf = nodeSer.putNode((Node) node);
 
-                counters.nodesWritten++;
+                btreeCounters.nodesWritten++;
 
             }
             
-            counters.serializeNanos += System.nanoTime() - begin;
+            btreeCounters.serializeNanos += System.nanoTime() - begin;
             
         }
         
@@ -2896,9 +2896,9 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
             
             addr = store.write(buf);
 
-            counters.writeNanos += System.nanoTime() - begin;
+            btreeCounters.writeNanos += System.nanoTime() - begin;
     
-            counters.bytesWritten += store.getByteCount(addr);
+            btreeCounters.bytesWritten += store.getByteCount(addr);
 
         }
 
@@ -2963,11 +2963,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
                     + tmp.limit() + ", byteCount(addr)="
                     + store.getByteCount(addr)+", addr="+store.toString(addr);
 
-            counters.readNanos += System.nanoTime() - begin;
+            btreeCounters.readNanos += System.nanoTime() - begin;
             
             final int bytesRead = tmp.limit();
 
-            counters.bytesRead += bytesRead;
+            btreeCounters.bytesRead += bytesRead;
             
         }
 
@@ -2999,7 +2999,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
                 
             }
 
-            counters.deserializeNanos += System.nanoTime() - begin;
+            btreeCounters.deserializeNanos += System.nanoTime() - begin;
             
         }
 
@@ -3008,11 +3008,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
 
         if (node instanceof Leaf) {
 
-            counters.leavesRead++;
+            btreeCounters.leavesRead++;
 
         } else {
 
-            counters.nodesRead++;
+            btreeCounters.nodesRead++;
 
         }
 

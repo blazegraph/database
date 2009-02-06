@@ -332,14 +332,15 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         return versionTimestamps != null; 
         
     }
-    
+
     /**
      * Insert or update an entry in the leaf as appropriate. The caller MUST
      * ensure by appropriate navigation of parent nodes that the key for the
      * next tuple either exists in or belongs in this leaf. If the leaf
      * overflows then it is split after the insert.
      */
-    public Tuple insert(byte[] searchKey, byte[] newval, boolean delete, long timestamp, Tuple tuple) {
+    public Tuple insert(final byte[] searchKey, final byte[] newval,
+            final boolean delete, final long timestamp, final Tuple tuple) {
 
         if (delete && deleteMarkers == null) {
             
@@ -414,8 +415,34 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
             if (deleteMarkers != null) {
 
+                if(!this.deleteMarkers[entryIndex] && delete) { 
+                
+                    /*
+                     * Changing from a non-deleted to a deleted tuple (we don't
+                     * count re-deletes of an already deleted tuple).
+                     */
+                    btree.btreeCounters.ntupleUpdateDelete++;
+
+                } else if(!delete) { 
+                
+                    /*
+                     * Either changing from a deleted to a non-deleted tuple or
+                     * just overwriting an existing non-deleted tuple.
+                     */
+                    btree.btreeCounters.ntupleUpdateValue++;
+
+                }
+                
                 this.deleteMarkers[entryIndex] = delete;
 
+            } else {
+                
+                /*
+                 * Update value for existing tuple (delete markers are not in
+                 * use).
+                 */
+                btree.btreeCounters.ntupleUpdateValue++;
+                
             }
 
             if (versionTimestamps != null) {
@@ -466,7 +493,17 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
             keys.keys[entryIndex] = searchKey; // note: presumes caller does not reuse the searchKeys!
             this.values[entryIndex] = newval;
             if (deleteMarkers != null) {
-                deleteMarkers[entryIndex] = delete;
+                if (delete) {
+                    // Inserting a deleted tuple.
+                    btree.btreeCounters.ntupleInsertDelete++;
+                } else if (!delete) {
+                    // Inserting a non-deleted tuple.
+                    btree.btreeCounters.ntupleInsertValue++;
+                }
+                this.deleteMarkers[entryIndex] = delete;
+            } else {
+                // Inserting a tuple (delete markers not in use).
+                btree.btreeCounters.ntupleInsertValue++;
             }
             if (versionTimestamps != null) {
                 versionTimestamps[entryIndex] = timestamp;
@@ -481,7 +518,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
         if( parent != null ) {
             
-            parent.get().updateEntryCount(this,1);
+            parent.get().updateEntryCount(this, 1);
             
         }
 
@@ -492,7 +529,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 //            }
 //        }
 
-        if (nkeys == maxKeys+1) {
+        if (nkeys == maxKeys + 1) {
 
             /*
              * The insert caused the leaf to overflow, so now we split the leaf.
@@ -601,7 +638,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
         final BTree btree = (BTree)this.btree;
         
-        btree.counters.leavesSplit++;
+        btree.btreeCounters.leavesSplit++;
 
         // #of entries in the leaf before it is split.
         final int nentriesBeforeSplit = nkeys;
@@ -691,6 +728,44 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
             
             // this leaf now has fewer entries
             p.childEntryCounts[p.getIndexOf(this)] -= rightSibling.nkeys;
+
+            if (p != btree.root && p.isRightMostNode()) {
+                
+                /*
+                 * If the leaf that is split is a child of the right most node
+                 * in the tree then that is counted as a "tail split".
+                 * 
+                 * Note: We DO NOT count tail splits when the leaf is the root
+                 * leaf and we DO NOT count tail splits when the parent of the
+                 * leaf is the root leaf. In both of those cases any leaf split
+                 * would qualify, which is too liberal to be a useful measure.
+                 * 
+                 * Note: The ratio of tail splits to leaf splits may be used as
+                 * an indication of a pattern of index writes that bears heavily
+                 * on the tail of the index.
+                 */
+
+                btree.btreeCounters.tailSplit++;
+                
+            } else if (p != btree.root && p.isLeftMostNode()) {
+                
+                /*
+                 * If the leaf that is split is a child of the left-most node in
+                 * the tree then that is counted as a "head split".
+                 * 
+                 * Note: We DO NOT count head splits when the leaf is the root
+                 * leaf and we DO NOT count head splits when the parent of the
+                 * leaf is the root leaf. In both of those cases any leaf split
+                 * would qualify, which is too liberal to be a useful measure.
+                 * 
+                 * Note: The ratio of head splits to leaf splits may be used as
+                 * an indication of a pattern of index writes that bears heavily
+                 * on the head of the index.
+                 */
+
+                btree.btreeCounters.headSplit++;
+                
+            }
             
         }
 
@@ -1090,7 +1165,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         
     }
 
-    public Tuple remove(byte[] key, Tuple tuple) {
+    public Tuple remove(final byte[] key, final Tuple tuple) {
         
         if(btree.debug) assertInvariants();
         
@@ -1229,6 +1304,9 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         // One less entry in the tree.
         ((BTree)btree).nentries--;
         assert ((BTree)btree).nentries >= 0;
+        
+        // One more deleted tuple.
+        btree.btreeCounters.ntupleRemove++;
 
         // One less key in the leaf.
         nkeys--; keys.nkeys--;

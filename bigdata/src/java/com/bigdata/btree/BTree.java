@@ -1532,10 +1532,22 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter,
         }
         
     }
-    
+
+    /**
+     * Returns ONE (1).
+     */
     final public int getSourceCount() {
         
         return 1;
+        
+    }
+    
+    /**
+     * An array containing this {@link BTree}.
+     */
+    final public AbstractBTree[] getSources() {
+        
+        return new AbstractBTree[]{this};
         
     }
     

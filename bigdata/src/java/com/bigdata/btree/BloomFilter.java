@@ -113,7 +113,7 @@ public class BloomFilter implements IBloomFilter, Externalizable {
      * the ctor).
      * <p>
      * Note: This class does not know the actual false positive error rate.
-     * However, that is tracked by the {@link AbstractBTree#counters}.
+     * However, that is tracked by the {@link AbstractBTree#btreeCounters}.
      */
     final public double getP() {
         
@@ -128,7 +128,7 @@ public class BloomFilter implements IBloomFilter, Externalizable {
      * ctor.
      * <p>
      * Note: This class does not know the actual false positive error rate.
-     * However, that is tracked by the {@link AbstractBTree#counters}.
+     * However, that is tracked by the {@link AbstractBTree#btreeCounters}.
      */
     public double getErrorRate() {
 
@@ -669,7 +669,7 @@ public class BloomFilter implements IBloomFilter, Externalizable {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      * 
-     * @todo use long here and in {@link Counters}?
+     * @todo use long here and in {@link BTreeCounters}?
      */
     public static class BloomFilterCounters {
 
@@ -688,7 +688,7 @@ public class BloomFilter implements IBloomFilter, Externalizable {
         public int nbloomFalsePos = 0;
 
         /**
-         * @todo summarize when the {@link Counters} are summarized.
+         * @todo summarize when the {@link BTreeCounters} are summarized.
          * 
          * @param o
          */
@@ -754,7 +754,7 @@ public class BloomFilter implements IBloomFilter, Externalizable {
          * Return a {@link CounterSet} reporting on the various counters tracked
          * in the instance fields of this class.
          * 
-         * FIXME Integrate with {@link Counters}. This needs to happen when we
+         * FIXME Integrate with {@link BTreeCounters}. This needs to happen when we
          * setup the bloom filter, so that is in _reopen() for both
          * {@link BTree} and {@link IndexSegment}.
          */

@@ -35,7 +35,7 @@ import java.util.concurrent.Future;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.FusedView;
-import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentStore;
@@ -181,7 +181,7 @@ public interface IResourceManager extends IServiceShutdown {
      * 
      * @see IIndexStore#getIndex(String, long)
      */
-    public IIndex getIndex(String name, long timestamp);
+    public ILocalBTreeView getIndex(String name, long timestamp);
 
     /**
      * Return non-<code>null</code> iff <i>name</i> is the name of an

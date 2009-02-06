@@ -404,7 +404,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
         
         btree.nnodes++;
 
-        btree.counters.rootsSplit++;
+        btree.btreeCounters.rootsSplit++;
 
         // Note: nnodes and nleaves might not reflect rightSibling yet.
         if (BTree.INFO) {
@@ -978,7 +978,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
         // cast to mutable implementation class.
         BTree btree = (BTree)this.btree;
 
-        btree.counters.nodesSplit++;
+        btree.btreeCounters.nodesSplit++;
 
         /*
          * The #of entries spanned by this node _before_ the split.
@@ -1342,7 +1342,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      *            A direct sibling of this node (does NOT need to be mutable).
      *            The sibling MUST have exactly the minimum #of keys.
      */
-    protected void merge(AbstractNode sibling,boolean isRightSibling) {
+    protected void merge(final AbstractNode sibling, final boolean isRightSibling) {
 
         // the sibling of a Node must be a Node.
         final Node s = (Node) sibling;
@@ -1540,7 +1540,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      * @param child
      *            The new node.
      */
-    protected void insertChild(byte[] key, AbstractNode child) {
+    protected void insertChild(final byte[] key, final AbstractNode child) {
 
         if(btree.debug) assertInvariants();
         
@@ -1687,7 +1687,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         } else {
 
-            int index = i - 1;
+            final int index = i - 1;
 
             AbstractNode sibling = childRefs[index] == null ? null
                     : childRefs[index].get();
@@ -1728,7 +1728,8 @@ public class Node extends AbstractNode<Node> implements INodeData {
      *         and the caller MUST invoke copy-on-write before attempting to
      *         modify the returned sibling.
      */
-    protected AbstractNode getRightSibling(final AbstractNode child, boolean materialize) {
+    protected AbstractNode getRightSibling(final AbstractNode child,
+            final boolean materialize) {
 
         final int i = getIndexOf(child);
 
@@ -1743,7 +1744,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         } else {
 
-            int index = i + 1;
+            final int index = i + 1;
 
             AbstractNode sibling = childRefs[index] == null ? null
                     : childRefs[index].get();
@@ -1781,7 +1782,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      * @exception IllegalArgumentException
      *                iff child is not a child of this node.
      */
-    protected int getIndexOf(AbstractNode child) {
+    protected int getIndexOf(final AbstractNode child) {
 
         assert child != null;
         assert child.parent.get() == this;
@@ -1825,7 +1826,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
         throw new IllegalArgumentException("Not our child : child=" + child);
         
     }
-    
+
     /**
      * Invoked when a non-root node or leaf has no more keys to detach the child
      * from its parent. If the node becomes deficient, then the node is joined
@@ -2031,7 +2032,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
                             + btree.height + ", newRoot=" + btree.root);
                 }
                 
-                btree.counters.rootsJoined++;
+                btree.btreeCounters.rootsJoined++;
 
             }
 

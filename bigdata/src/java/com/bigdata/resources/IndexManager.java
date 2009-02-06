@@ -45,6 +45,7 @@ import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
@@ -271,7 +272,7 @@ abstract public class IndexManager extends StoreManager {
      *       definition (index segments in use) might have changed as well.
      */
 //    final private WeakValueCache<NT, IIndex> indexCache;
-    final protected IndexCache indexCache; // FIXME make private
+    final public IndexCache indexCache; // FIXME make private
 //    final private IndexCache indexCache;
 
     /**
@@ -302,7 +303,7 @@ abstract public class IndexManager extends StoreManager {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected class IndexCache extends ConcurrentWeakValueCache<NT, IIndex> {
+    public class IndexCache extends ConcurrentWeakValueCache<NT, ILocalBTreeView> {
 
         /**
          * The earliest timestamp that must be retained for the read-historical
@@ -360,11 +361,11 @@ abstract public class IndexManager extends StoreManager {
 
                     final long now = System.currentTimeMillis();
                     
-                    final Iterator<Map.Entry<NT, WeakReference<IIndex>>> itr = entryIterator();
+                    final Iterator<Map.Entry<NT, WeakReference<ILocalBTreeView>>> itr = entryIterator();
 
                     while (itr.hasNext()) {
 
-                        final Map.Entry<NT, WeakReference<IIndex>> entry = itr
+                        final Map.Entry<NT, WeakReference<ILocalBTreeView>> entry = itr
                                 .next();
 
                         if (entry.getValue().get() == null) {
@@ -420,7 +421,7 @@ abstract public class IndexManager extends StoreManager {
 
         }
 
-        public IIndex put(final NT k, final IIndex v) {
+        public ILocalBTreeView put(final NT k, final ILocalBTreeView v) {
 
             synchronized (retentionTime) {
 
@@ -437,7 +438,7 @@ abstract public class IndexManager extends StoreManager {
 
         }
 
-        public IIndex putIfAbsent(final NT k, final IIndex v) {
+        public ILocalBTreeView putIfAbsent(final NT k, final ILocalBTreeView v) {
             
             synchronized(retentionTime) {
                 
@@ -458,7 +459,7 @@ abstract public class IndexManager extends StoreManager {
          * Overriden to clear the {@link #retentionTime} if the map entry
          * corresponding to that timestamp is being removed from the map.
          */
-        protected WeakReference<IIndex> removeMapEntry(final NT k) {
+        protected WeakReference<ILocalBTreeView> removeMapEntry(final NT k) {
             
             synchronized(retentionTime) {
                 
@@ -481,7 +482,7 @@ abstract public class IndexManager extends StoreManager {
         
         public IndexCache(final int cacheCapacity, final long cacheTimeout) {
 
-            super(new HardReferenceQueue<IIndex>(null/* evictListener */,
+            super(new HardReferenceQueue<ILocalBTreeView>(null/* evictListener */,
                     cacheCapacity, HardReferenceQueue.DEFAULT_NSCAN,
                     TimeUnit.MILLISECONDS.toNanos(cacheTimeout)),
                     .75f/* loadFactor */, 16/* concurrencyLevel */, true/* removeClearedEntries */);
@@ -1152,7 +1153,7 @@ abstract public class IndexManager extends StoreManager {
      * 
      * @see Journal#getIndex(String, long)
      */
-    public IIndex getIndex(final String name, /*final*/ long timestamp) {
+    public ILocalBTreeView getIndex(final String name, /*final*/ long timestamp) {
         
         if (name == null) {
 
@@ -1196,7 +1197,7 @@ abstract public class IndexManager extends StoreManager {
                 // test the indexCache.
 //                synchronized (indexCache) {
 
-                    final IIndex ndx = indexCache.get(nt);
+                    final ILocalBTreeView ndx = indexCache.get(nt);
 
                     if (ndx != null) {
 
@@ -1266,7 +1267,7 @@ abstract public class IndexManager extends StoreManager {
             final boolean readOnly = TimestampUtility.isReadOnly(timestamp);
 //                        || (isReadWriteTx && tx.isReadOnly());
 
-            final IIndex tmp;
+            final ILocalBTreeView tmp;
 
             if (isReadWriteTx) {
 
@@ -1280,7 +1281,7 @@ abstract public class IndexManager extends StoreManager {
                  * for the same index (thread-safe).
                  */
 
-                final IIndex isolatedIndex = tx.getIndex(name);
+                final ILocalBTreeView isolatedIndex = tx.getIndex(name);
 
                 if (isolatedIndex == null) {
 
@@ -1343,7 +1344,7 @@ abstract public class IndexManager extends StoreManager {
 
                     if (sources.length == 1) {
 
-                        tmp = sources[0];
+                        tmp = (BTree) sources[0];
 
                     } else {
 
@@ -1394,7 +1395,7 @@ abstract public class IndexManager extends StoreManager {
 
                     if (sources.length == 1) {
 
-                        tmp = sources[0];
+                        tmp = (BTree) sources[0];
 
                     } else {
 

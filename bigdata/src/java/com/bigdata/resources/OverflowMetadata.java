@@ -11,13 +11,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.Counters;
+import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.ConcurrencyManager.ViewCounters;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.service.IDataService;
@@ -61,20 +62,20 @@ public class OverflowMetadata {
      */
     
     /**
-     * The total {@link Counters} reported for all unisolated and read-committed
+     * The total {@link BTreeCounters} reported for all unisolated and read-committed
      * index views on the old journal.
      * 
-     * @see ConcurrencyManager#getTotalIndexCounters()
+     * @see ConcurrencyManager#getAndClearIndexCounters(BTreeCounters)
      */
-    private final Counters totalCounters;
+    private final BTreeCounters totalCounters;
 
     /**
-     * The per-index {@link Counters} for the unisolated and read-committed
+     * The per-index {@link BTreeCounters} for the unisolated and read-committed
      * index views on the old journal.
      * 
-     * @see ConcurrencyManager#resetIndexCounters()
+     * @see ConcurrencyManager#getAndClearIndexCounters(BTreeCounters)
      */
-    private final Map<String/* name */, Counters> indexCounters;
+    private final Map<String/* name */, ViewCounters> indexCounters;
 
     /** Raw score computed for those aggregated counters. */
     private double totalRawStore;
@@ -330,9 +331,9 @@ public class OverflowMetadata {
             final ConcurrencyManager concurrencyManager = (ConcurrencyManager) resourceManager
                     .getConcurrencyManager();
 
-            totalCounters = concurrencyManager.getTotalIndexCounters();
+            totalCounters = new BTreeCounters();
 
-            indexCounters = concurrencyManager.resetIndexCounters();
+            indexCounters = concurrencyManager.getAndClearIndexCounters(totalCounters);
 
         }
 
@@ -348,20 +349,22 @@ public class OverflowMetadata {
 
             if (nscores > 0) {
 
-                final Iterator<Map.Entry<String, Counters>> itr = indexCounters
+                final Iterator<Map.Entry<String, ViewCounters>> itr = indexCounters
                         .entrySet().iterator();
 
                 int i = 0;
 
                 while (itr.hasNext()) {
 
-                    final Map.Entry<String, Counters> entry = itr.next();
+                    final Map.Entry<String, ViewCounters> entry = itr.next();
 
                     final String name = entry.getKey();
 
-                    final Counters counters = entry.getValue();
+                    final ViewCounters viewCounters = entry.getValue();
 
-                    scores[i] = new Score(name, counters, totalRawStore);
+                    final BTreeCounters btreeCounters = viewCounters.aggregate();
+                    
+                    scores[i] = new Score(name, btreeCounters, totalRawStore);
 
                     i++;
 
