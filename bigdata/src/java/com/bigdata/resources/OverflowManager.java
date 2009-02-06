@@ -125,6 +125,11 @@ abstract public class OverflowManager extends IndexManager {
     protected final int minimumActiveIndexPartitions;
     
     /**
+     * @see Options#MAXIMUM_MOVES
+     */
+    protected final int maximumMoves;
+
+    /**
      * @see Options#MAXIMUM_MOVES_PER_TARGET
      */
     protected final int maximumMovesPerTarget;
@@ -412,8 +417,25 @@ abstract public class OverflowManager extends IndexManager {
 
         /**
          * This is the maximum #of index partitions that the resource manager is
-         * willing to move in a given overflow onto identified under-utilized
-         * service (default {@value #DEFAULT_MAXIMUM_MOVES_PER_TARGET}).
+         * willing to move in a given overflow operations across all of the
+         * identified under-utilized services (default
+         * {@value #DEFAULT_MAXIMUM_MOVES}).
+         * <p>
+         * Note: Index partition moves MAY be disabled by setting this property
+         * to ZERO (0).
+         * 
+         * @see #DEFAULT_MAXIMUM_MOVES
+         */
+        String MAXIMUM_MOVES = OverflowManager.class.getName()
+                + ".maximumMoves";
+
+        String DEFAULT_MAXIMUM_MOVES = "3";
+
+        /**
+         * This is the maximum #of index partitions that the resource manager is
+         * willing to move in a given overflow operation onto each identified
+         * under-utilized service (default
+         * {@value #DEFAULT_MAXIMUM_MOVES_PER_TARGET}).
          * <p>
          * Note: Index partitions are moved to the identified under-utilized
          * services using a round-robin approach which aids in distributing the
@@ -427,7 +449,7 @@ abstract public class OverflowManager extends IndexManager {
         String MAXIMUM_MOVES_PER_TARGET = OverflowManager.class.getName()
                 + ".maximumMovesPerTarget";
 
-        String DEFAULT_MAXIMUM_MOVES_PER_TARGET = "3";
+        String DEFAULT_MAXIMUM_MOVES_PER_TARGET = "2";
 
         /**
          * The maximum #of sources for an index partition view before a
@@ -450,7 +472,7 @@ abstract public class OverflowManager extends IndexManager {
                 .getName()
                 + ".maximumSourcesPerViewBeforeCompactingMerge";
 
-        String DEFAULT_MAXIMUM_SOURCES_PER_VIEW_BEFORE_COMPACTING_MERGE = "3";
+        String DEFAULT_MAXIMUM_SOURCES_PER_VIEW_BEFORE_COMPACTING_MERGE = "5";
 
         /**
          * The maximum #of optional compacting merge operations that will be
@@ -829,6 +851,24 @@ abstract public class OverflowManager extends IndexManager {
             
         }
         
+        // maximum moves
+        {
+
+            maximumMoves = Integer.parseInt(properties.getProperty(
+                    Options.MAXIMUM_MOVES, Options.DEFAULT_MAXIMUM_MOVES));
+
+            if (INFO)
+                log.info(Options.MAXIMUM_MOVES + "=" + maximumMoves);
+
+            if (maximumMoves < 0) {
+
+                throw new RuntimeException(Options.MAXIMUM_MOVES
+                        + " must be non-negative");
+
+            }
+            
+        }
+
         // maximum moves per target
         {
             
@@ -844,6 +884,13 @@ abstract public class OverflowManager extends IndexManager {
 
                 throw new RuntimeException(Options.MAXIMUM_MOVES_PER_TARGET
                         + " must be non-negative");
+                
+            }
+
+            if (maximumMovesPerTarget > maximumMoves) {
+
+                throw new RuntimeException(Options.MAXIMUM_MOVES_PER_TARGET
+                        + " must be less than " + Options.MAXIMUM_MOVES);
                 
             }
             
