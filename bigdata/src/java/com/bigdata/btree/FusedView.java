@@ -44,6 +44,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.isolation.IsolatedFusedView;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.relation.accesspath.AbstractAccessPath;
 import com.bigdata.service.Split;
 
@@ -593,31 +594,36 @@ public class FusedView implements IIndex, ILocalBTreeView, IValueAge {
      */
     final public long rangeCount(byte[] fromKey, byte[] toKey) {
 
-        if (fromKey == null) {
+        if (fromKey == null || toKey == null) {
 
             /*
              * Note: When an index partition is split, the new index partitions
              * will initially use the same source index segments as the original
              * index partition. Therefore we MUST impose an explicit constraint
-             * on the fromKey/toKey if none is given so that we do not read
-             * tuples lying outside of the index partition boundaries!
+             * on the fromKey / toKey if none is given so that we do not read
+             * tuples lying outside of the index partition boundaries! However,
+             * if there is only a BTree in the view then the partition metadata
+             * might not be defined, so we check for that first.
              */
-            fromKey = getIndexMetadata().getPartitionMetadata()
-                    .getLeftSeparatorKey();
 
-        }
+            final LocalPartitionMetadata pmd = getIndexMetadata()
+                    .getPartitionMetadata();
 
-        if (toKey == null) {
+            if (pmd != null) {
+            
+                if (fromKey == null) {
+                
+                    fromKey = pmd.getLeftSeparatorKey();
+                    
+                }
 
-            /*
-             * Note: When an index partition is split, the new index partitions
-             * will initially use the same source index segments as the original
-             * index partition. Therefore we MUST impose an explicit constraint
-             * on the fromKey/toKey if none is given so that we do not read
-             * tuples lying outside of the index partition boundaries!
-             */
-            toKey = getIndexMetadata().getPartitionMetadata()
-                    .getRightSeparatorKey();
+                if (toKey == null) {
+
+                    toKey = pmd.getRightSeparatorKey();
+
+                }
+
+            }
 
         }
         
@@ -711,31 +717,36 @@ public class FusedView implements IIndex, ILocalBTreeView, IValueAge {
             final IFilterConstructor filter//
             ) {
 
-        if (fromKey == null) {
+        if (fromKey == null || toKey == null) {
 
             /*
              * Note: When an index partition is split, the new index partitions
              * will initially use the same source index segments as the original
              * index partition. Therefore we MUST impose an explicit constraint
-             * on the fromKey/toKey if none is given so that we do not read
-             * tuples lying outside of the index partition boundaries!
+             * on the fromKey / toKey if none is given so that we do not read
+             * tuples lying outside of the index partition boundaries! However,
+             * if there is only a BTree in the view then the partition metadata
+             * might not be defined, so we check for that first.
              */
-            fromKey = getIndexMetadata().getPartitionMetadata()
-                    .getLeftSeparatorKey();
 
-        }
+            final LocalPartitionMetadata pmd = getIndexMetadata()
+                    .getPartitionMetadata();
 
-        if (toKey == null) {
+            if (pmd != null) {
+            
+                if (fromKey == null) {
+                
+                    fromKey = pmd.getLeftSeparatorKey();
+                    
+                }
 
-            /*
-             * Note: When an index partition is split, the new index partitions
-             * will initially use the same source index segments as the original
-             * index partition. Therefore we MUST impose an explicit constraint
-             * on the fromKey/toKey if none is given so that we do not read
-             * tuples lying outside of the index partition boundaries!
-             */
-            toKey = getIndexMetadata().getPartitionMetadata()
-                    .getRightSeparatorKey();
+                if (toKey == null) {
+
+                    toKey = pmd.getRightSeparatorKey();
+
+                }
+
+            }
 
         }
 
