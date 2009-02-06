@@ -2843,8 +2843,11 @@ abstract public class StoreManager extends ResourceEvents implements
      * <p>
      * The caller MUST hold the exclusive lock on the
      * {@link WriteExecutorService}.
+     * 
+     * @return A summary of the work done -or- <code>null</code> if the
+     *         pre-conditions for the purge operation were not satisified.
      */
-    protected void purgeOldResources() {
+    final private PurgeResult purgeOldResources() {
         
         /*
          * The last commit time on record in the live journal.
@@ -2862,7 +2865,7 @@ abstract public class StoreManager extends ResourceEvents implements
             if (INFO)
                 log.info("Nothing committed yet.");
             
-            return;
+            return null;
             
         }
 
@@ -2917,7 +2920,7 @@ abstract public class StoreManager extends ResourceEvents implements
             if (INFO)
                 log.info("releaseTime not set.");
             
-            return;
+            return null;
 
         }
 
@@ -2986,9 +2989,10 @@ abstract public class StoreManager extends ResourceEvents implements
 
             /*
              * Choose whichever timestamp would preserve more history (that is,
-             * choose the earlier timestamp). Note that the index retention time is -1 if there are no indices in the cache.
+             * choose the earlier timestamp). Note that the index retention time
+             * is -1 if there are no indices in the cache.
              */
-            final long releaseTime = indexRetentionTime == -1L ? this.releaseTime
+            final long choosenReleaseTime = indexRetentionTime == -1L ? this.releaseTime
                     : Math.min(indexRetentionTime, this.releaseTime);
 
             // final long releaseTime = Math.min(indexRetentionTime, Math.min(
@@ -2998,10 +3002,10 @@ abstract public class StoreManager extends ResourceEvents implements
              * This is the age of the selected release time as computed from the
              * last commit time on the live journal.
              */
-            final long releaseAge = (lastCommitTime - releaseTime); 
+            final long releaseAge = (lastCommitTime - choosenReleaseTime); 
             
             if (INFO)
-                log.info("Choosen releaseTime=" + releaseTime
+                log.info("Choosen releaseTime=" + choosenReleaseTime
                         + ": given releaseTime=" + this.releaseTime
                         + ", indexRetentionTime=" + indexRetentionTime
                         + " (this is "
@@ -3031,7 +3035,7 @@ abstract public class StoreManager extends ResourceEvents implements
              * Find the commitTime that we are going to preserve.
              */
             final long commitTimeToPreserve;
-            if (releaseTime < firstCommitTime) {
+            if (choosenReleaseTime < firstCommitTime) {
 
                 /*
                  * If the computed [releaseTime] is before the first commit
@@ -3044,9 +3048,9 @@ abstract public class StoreManager extends ResourceEvents implements
                     log.info("Release time is earlier than any commit time.");
 
                 // Nothing to do.
-                return;
+                return null;
 
-            } else if (releaseTime >= lastCommitTime) {
+            } else if (choosenReleaseTime >= lastCommitTime) {
 
                 /*
                  * If the computed [releaseTime] GTE the last commit point then
@@ -3073,11 +3077,11 @@ abstract public class StoreManager extends ResourceEvents implements
                  * greater than the release time.
                  */
 
-                commitTimeToPreserve = getCommitTimeStrictlyGreaterThan(releaseTime);
+                commitTimeToPreserve = getCommitTimeStrictlyGreaterThan(choosenReleaseTime);
 
                 if (INFO)
                     log.info("commitTimeToPreserve := " + commitTimeToPreserve
-                            + " (this is the first commitTime GT the releaseTime=" + releaseTime
+                            + " (this is the first commitTime GT the releaseTime=" + choosenReleaseTime
                             + ")");
 
             }
@@ -3092,31 +3096,31 @@ abstract public class StoreManager extends ResourceEvents implements
              */
             final Set<UUID> resourcesInUse = getResourcesForTimestamp(commitTimeToPreserve);
 
-            // @todo log @info
-            log.warn("Purging old resources: #bytes="
-                    + getBytesUnderManagement() + ", #journals="
-                    + getManagedJournalCount() + ", #segments="
-                    + getManagedSegmentCount());
+            final int journalBeforeCount = getManagedJournalCount();
+            final int segmentBeforeCount = getManagedSegmentCount();
+            final long bytesBeforeCount = getBytesUnderManagement();
 
             /*
-             * Delete anything that is:
-             *  ( NOT in use )
+             * Delete anything that is: ( NOT in use )
              * 
-             * AND
-             *  ( createTime < commitTimeToPreserve )
+             * AND ( createTime < commitTimeToPreserve )
              */
             deleteUnusedResources(commitTimeToPreserve, resourcesInUse);
 
-            // @todo log @info
-            log.warn("Purged old resources: #bytes="
-                    + getBytesUnderManagement() + ", #journals="
-                    + getManagedJournalCount() + ", #segments="
-                    + getManagedSegmentCount());
+            final int journalAfterCount = getManagedJournalCount();
+            final int segmentAfterCount = getManagedSegmentCount();
+            final long bytesAfterCount = getBytesUnderManagement();
+            
+            return new PurgeResult(firstCommitTime, lastCommitTime,
+                    this.releaseTime, indexRetentionTime, choosenReleaseTime,
+                    commitTimeToPreserve, resourcesInUse.size(),
+                    journalBeforeCount, journalAfterCount, segmentBeforeCount,
+                    segmentAfterCount, bytesBeforeCount, bytesAfterCount);
 
         } finally {
 
             indexCacheLock.writeLock().unlock();
-            
+
         }
 
     }
@@ -4045,10 +4049,18 @@ abstract public class StoreManager extends ResourceEvents implements
                         getDataServiceUUID().toString(),
                         EventType.PurgeResources, "").start();
 
+                PurgeResult result = null;
+                
                 try {
-                    
-                    purgeOldResources();
 
+                    result = purgeOldResources();
+
+                    if (result != null) {
+
+                        log.warn(result.toString());
+                        
+                    }
+                    
                     if (truncateJournal) {
 
                         assertRunning();
@@ -4059,7 +4071,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
                 } finally {
                 
-                    event.end();
+                    event.end(result);
                     
                 }
             

@@ -925,16 +925,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             
             assert underUtilizedDataServiceUUIDs != null;
 
-            /*
-             * FIXME Place a configurable cap on the #of index partition moves
-             * per overflow cycle? We certainly don't want to move all active
-             * index partitions over the threshold corresponding to the minimum
-             * #of active index partitions on a data service.
-             */
-            final int MAX_MOVES = 5;
-
-            maxMoves = Math.min(MAX_MOVES, Math.min(nactiveSurplus,
-                    maxMovesPerTarget * underUtilizedDataServiceUUIDs.length));
+            maxMoves = Math.min(resourceManager.maximumMoves, //
+                    Math.min(nactiveSurplus, //
+                            maxMovesPerTarget
+                                    * underUtilizedDataServiceUUIDs.length));
             
         }
 
@@ -1058,13 +1052,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             maxRangeCount = Math.max(maxRangeCount, vmd.getRangeCount());
             
         }
-        
-//        if(maxRangeCount == 0) {
-//            
-//            // avoid any possibility of divide by zero errors.
-//            maxRangeCount = 1;
-//            
-//        }
             
         /*
          * Queue places the move candidates into a total order. We then choose
@@ -1108,22 +1095,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * index is hot for writes as newly buffered writes will increase
              * the actual move time and cause the application to block during
              * the atomic update phase of the move.
-             * 
-             * FIXME Note: One ideal candidate for a move is an index partition
-             * where most writes are on the tail of the index. In this case we
-             * can do tailSplit, leaving the majority of the data in place and
-             * only moving the empty or nearly empty tail of the index partition
-             * to the target data service. If the case is of pure tail append
-             * (we always write a key that is a successor of every prior key),
-             * then we can move an "empty" tail - this could even be done during
-             * synchronous overflow. However, if the tail writes are somewhat
-             * more distributed, then we need to move the key range of the tail
-             * that is recieving the writes. [If we can identify an index
-             * partition which is a candidate for a tail split then we could do
-             * the tail split immediately and move the tail to another data
-             * service. That would allow us to move the least possible data,
-             * even when the index was very "hot". The is the most possible
-             * reward for the least possible effort!]
              */
             final long rangeCount = vmd.getRangeCount();
             
@@ -1143,6 +1114,26 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * Note: The code here is only considering active index partitions
              * since we are trying to balance LOAD rather than the allocation of
              * data on the disk.
+             * 
+             * FIXME tailSplit : One ideal candidate for a move is an index
+             * partition where most writes are on the tail of the index. In this
+             * case we can do tailSplit, leaving the majority of the data in
+             * place and only moving the empty or nearly empty tail of the index
+             * partition to the target data service. If the case is of pure tail
+             * append (we always write a key that is a successor of every prior
+             * key), then we can move an "empty" tail - this could even be done
+             * during synchronous overflow. However, if the tail writes are
+             * somewhat more distributed, then we need to move the key range of
+             * the tail that is recieving the writes. [If we can identify an
+             * index partition which is a candidate for a tail split then we
+             * could do the tail split immediately and move the tail to another
+             * data service. That would allow us to move the least possible
+             * data, even when the index was very "hot". The is the most
+             * possible reward for the least possible effort!]
+             * 
+             * @todo a full hot index partition could be split and one of the
+             * splits moved.  a tailSplit (or a headSplit) is just a special
+             * case of this where the split is (nearly) empty.
              * 
              * @todo we also need to balance the on disk allocations - there are
              * notes on that elsewhere. this is a tricky topic since historical
@@ -1407,8 +1398,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * FIXME consider move as post-compact action using socket to blast the data
      * to the target data service.
      * 
-     * FIXME make the atomic update tasks truely atomic using distributed locks,
-     * paxos state, and correcting actions.
+     * FIXME make the atomic update tasks truely atomic using full transactions
+     * and/or distributed locks and correcting actions.
      */
     protected List<AbstractTask> chooseTasks() throws Exception {
 
@@ -1983,7 +1974,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static private class PurgeResourcesAfterActionTask implements Callable<Void> {
+    static protected class PurgeResourcesAfterActionTask implements Callable<Void> {
 
         private final OverflowManager overflowManager;
         
@@ -2003,19 +1994,32 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             // wait for the async overflow task to finish.
             Thread.sleep(2000);
 
-            /*
-             * Try to get the exclusive write service lock and then purge
-             * resources.
-             */
-            overflowManager
-                    .purgeOldResources(3000/* timeout */, false/* truncateJournal */);
+            try {
+
+                /*
+                 * Try to get the exclusive write service lock and then purge
+                 * resources.
+                 */
+                overflowManager
+                        .purgeOldResources(3000/* timeout */, false/* truncateJournal */);
+
+            } catch (InterruptedException ex) {
+
+                // Ignore.
+
+            } catch (Throwable t) {
+
+                // log and ignore.
+                log.error("Problem purging old resources?", t);
+
+            }
 
             return null;
 
         }
 
     }
-    
+
     /**
      * Submit all tasks, awaiting their completion and check their futures for
      * errors.
@@ -2215,33 +2219,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
         }
 
-    }
-    
-    /**
-     * Attempts to purge resources that are no longer required.
-     * <p>
-     * Note: Once asynchronous processing is complete there are likely to be
-     * resources that can be released because their views have been redefined,
-     * typically by a compacting merge.
-     */
-    protected void purgeOldResources() {
-
-        try {
-
-            resourceManager
-                    .purgeOldResources(2000/* timeout */, false/* truncateJournal */);
-
-        } catch (InterruptedException ex) {
-
-            // Ignore.
-
-        } catch (Throwable t) {
-
-            // log and ignore.
-            log.error("Problem purging old resources?", t);
-
-        }
-        
     }
     
     /**

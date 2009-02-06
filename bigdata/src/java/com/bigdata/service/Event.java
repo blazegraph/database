@@ -326,7 +326,7 @@ public class Event implements Serializable {
      * 
      * @return The event.
      */
-    synchronized public Event end(String moreDetails) {
+    synchronized public Event end(Object moreDetails) {
         
         if (moreDetails != null) {
 
