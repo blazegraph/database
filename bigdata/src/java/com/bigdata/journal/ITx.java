@@ -25,9 +25,8 @@ package com.bigdata.journal;
 
 import java.util.Date;
 
-import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.isolation.IsolatedFusedView;
-import com.bigdata.service.IDataService;
 
 /**
  * <p>
@@ -237,7 +236,7 @@ public interface ITx {
      * @exception IllegalStateException
      *                if the transaction is not active.
      */
-    public IIndex getIndex(String name);
+    public ILocalBTreeView getIndex(String name);
     
     /**
      * Return an array of the resource(s) (the named indices) on which the

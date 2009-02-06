@@ -3,6 +3,7 @@ package com.bigdata.journal;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -10,6 +11,7 @@ import java.util.Properties;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -27,11 +29,11 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.Counters;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.ReadCommittedView;
+import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
@@ -40,10 +42,11 @@ import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.resources.ResourceManager;
-import com.bigdata.resources.StaleLocatorException;
+import com.bigdata.resources.StaleLocatorReason;
 import com.bigdata.resources.StoreManager;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IServiceShutdown;
+import com.bigdata.util.NT;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.QueueStatisticsTask;
 import com.bigdata.util.concurrent.TaskCounters;
@@ -1461,45 +1464,147 @@ public class ConcurrencyManager implements IConcurrencyManager {
      */
 
     /**
-     * Per index {@link Counters}.
-     */
-    private Map<String/* name */, Counters> indexCounters = new HashMap<String, Counters>();
-
-    /**
-     * Total {@link Counters} across all accessed indices.
-     */
-    private Counters totalCounters = new Counters();
-
-    /**
-     * Lock used to coordinate access to the {@link #indexCounters} and the
-     * {@link #totalCounters}.
-     */
-    private ReentrantLock countersLock = new ReentrantLock();
-    
-    /**
-     * Return the aggregated counters for all named indices accessed by an
-     * {@link AbstractTask} with either {@link ITx#UNISOLATED} or
-     * {@link ITx#READ_COMMITTED} isolation since the {@link #resetIndexCounters()}
-     * was last invoked (typically at the last journal overflow event).
+     * Data structure captures {@link BTreeCounters} for a view over some period
+     * of use. After each operation on the view, {@link AbstractTask} notifies
+     * our outer class which delegates to this inner class the responsibility
+     * for updating the counters for the view. This class retains each distinct
+     * {@link BTreeCounters} reference for each source in the view and can
+     * aggregate those data on demand into the total activity for the view. This
+     * class DOES NOT retain a reference to the source view and therefore DOES
+     * NOT force the source view to remain strongly reachable.
+     * <P>
+     * It is normal that a view will be closed and transparently re-opened from
+     * time to time. When it is re-opened, each source MAY be a distinct
+     * {@link AbstractBTree} reference paired with a distinct
+     * {@link BTreeCounters} reference. That is why we store the distinct
+     * {@link BTreeCounters} references here and aggregate them on demand.
+     * Otherwise we would not have all end states for all {@link BTreeCounters}
+     * for each source in the view.
+     * <p>
+     * Note: The definition of the source view (the #of sources in the view and
+     * the order in which they appear) can change over time. Operations which
+     * can change the view definition include BUILD and MERGE since both update
+     * the existing index partition definition rather than creating a new index
+     * partition. However some of the operation which create a new index
+     * partition will also update the view definition between the time when they
+     * register the new index partition and the time when it is ready for use. I
+     * believe that MOVE is in this category. Because the view definition can be
+     * updated over time, we DO NOT store the per-source counters distinctly
+     * here as the definition of the #of and order of the sources is not stable.
+     * This means that we can accurately report the activity on an index
+     * partition even as its definition is changing, but that we can not report
+     * the detailed activity on each source in the index partition.
      * 
-     * @see ResourceManager#overflow()
+     * @todo if you really want to get after that then pair the
+     *       {@link BTreeCounters} with the {@link IResourceMetadata} so that
+     *       you can later tell which {@link BTreeCounters} are associated with
+     *       which source even as the view definition changes.
      */
-    public Counters getTotalIndexCounters() {
-        
-        countersLock.lock();
-        
-        try {
+    public static class ViewCounters {
 
-            return new Counters(totalCounters);
+        /**
+         * The #of sources in the view.
+         */
+        final int sourceCount;
+        
+        /**
+         * If the index is a view then this will be the definition of the view.
+         * This field get updated each time by {@link #reportCounters(ILocalBTreeView)}
+         * since the view definition can change over time and only the most
+         * current definition will be retained.
+         */
+        LocalPartitionMetadata pmd;
+        
+        /**
+         * Update each time in case it has changed.
+         * 
+         * @deprecated since the definition is not stable?
+         */
+        ICounterSet[] staticCounters;
+        
+        /**
+         * An array containing the distinct {@link BTreeCounters} objects which
+         * have been reported for each source in the view of the named index.
+         * The {@link LinkedHashSet} is used so that those {@link BTreeCounters}
+         * will be in the order in which they were reported, but that is just to
+         * make the data somewhat saner if you are examining it in a debugger.
+         */
+        final LinkedHashSet<BTreeCounters> btreeCounters;
+        
+        public ViewCounters(final ILocalBTreeView ndx) {
+
+            if(ndx == null)
+                throw new IllegalArgumentException();
             
-        } finally {
+            this.sourceCount = ndx.getSourceCount();
             
-            countersLock.unlock();
+            this.staticCounters = new ICounterSet[sourceCount];
+            
+            this.btreeCounters = new LinkedHashSet<BTreeCounters>();
+            
+            int i = 0;
+            for (AbstractBTree src : ndx.getSources()) {
+
+                staticCounters[i] = src.getStaticCounterSet();
+                
+                i++;
+                
+            }
             
         }
         
-    }
+        public void reportCounters(final ILocalBTreeView ndx) {
 
+            pmd = ndx.getIndexMetadata().getPartitionMetadata();
+
+            int i = 0;
+            for (AbstractBTree src : ndx.getSources()) {
+                
+                btreeCounters.add(src.btreeCounters);
+                
+                i++;
+                
+            }
+            
+        }
+
+        /**
+         * Aggregates all reported activity for each source in the index.
+         */
+        public BTreeCounters aggregate() {
+
+            final BTreeCounters total = new BTreeCounters();
+            
+            for (BTreeCounters c : btreeCounters) {
+
+                total.add(c);
+
+            }
+
+            return total;
+
+        }
+        
+    }
+    
+    /**
+     * Per index {@link ViewCounters}.
+     * 
+     * @todo If we want to keep the counters reports for unisolated,
+     *       read-committed, and various historical reads and transactional
+     *       views of an index separate then we must maintain it separately in
+     *       this map, e.g., using an {@link NT} key rather than [name].
+     */
+    private Map<String/* name */, ViewCounters> indexCounters = new HashMap<String, ViewCounters>();
+
+    /**
+     * Lock used to coordinate access to the {@link #indexCounters}.
+     * 
+     * @todo could we use a {@link ConcurrentHashMap} and then use the lock
+     *       less?
+     */
+    private final ReentrantLock countersLock = new ReentrantLock();
+    
     /**
      * Return the aggregated counters for the named index as accessed by an
      * {@link AbstractTask} with either {@link ITx#UNISOLATED} or
@@ -1515,7 +1620,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
      *         {@link ITx#UNISOLATED} or {@link ITx#READ_COMMITTED} isolation
      *         since the counters were last reset.
      */
-    public Counters getIndexCounters(String name) {
+    public ViewCounters getIndexCounters(final String name) {
 
         countersLock.lock();
         
@@ -1532,88 +1637,85 @@ public class ConcurrencyManager implements IConcurrencyManager {
     }
 
     /**
-     * Return and then reset the total and per-index counters for each named
-     * indices accessed by an {@link AbstractTask} with either
-     * {@link ITx#UNISOLATED} or {@link ITx#READ_COMMITTED} isolation.
+     * Return and and then reset per-index counters for each named indices
+     * accessed by an {@link AbstractTask} with either {@link ITx#UNISOLATED} or
+     * {@link ITx#READ_COMMITTED} isolation.
+     * 
+     * @param totalCounters
+     *            When non-<code>null</code>, the aggregate of the counters
+     *            for each source in each index view will be added into the
+     *            caller's <i>totalCounters</i>.
+     * 
+     * @return The old per-index counters.
      */
-    public Map<String/* name */, Counters> resetIndexCounters() {
+    public Map<String/* name */, ViewCounters> getAndClearIndexCounters(
+            final BTreeCounters totalCounters) {
+
+        final Map<String, ViewCounters> oldIndexCounters;
 
         countersLock.lock();
         
         try {
 
-            final Map<String,Counters> tmp = indexCounters;
-            
-            indexCounters = new HashMap<String,Counters>();
+            oldIndexCounters = indexCounters;
 
-            totalCounters = new Counters();
+            indexCounters = new HashMap<String, ViewCounters>();
 
-            return tmp;
-            
         } finally {
-            
+
             countersLock.unlock();
-            
+
         }
-        
+
+        if (totalCounters != null) {
+
+            for (ViewCounters c : oldIndexCounters.values()) {
+
+                totalCounters.add(c.aggregate());
+
+            }
+
+        }
+
+        return oldIndexCounters;
+            
     }
     
     /**
-     * Adds the counters to the global total and to the total for the named
-     * index.
+     * Invoked by {@link AbstractTask} to notify the {@link ConcurrencyManager}
+     * that additional activity MAY have occurred for the specified index. The
+     * event is delegated to the appropriate {@link ViewCounters}s in our
+     * internal map which tracks each distinct set of {@link BTreeCounters}s
+     * for each source in the view. Those data may be aggregated on demand in
+     * order to provide the statistics for a named index.
      * 
      * @param name
      *            The index name.
+     * @param timestamp
+     *            The timestamp of the index view.
      * @param ndx
-     *            An {@link ITx#UNISOLATED} or {@link ITx#READ_COMMITTED} index
-     *            view.
+     *            The index view.
      * 
-     * @todo this does not account for writes isolated by a transaction.
+     * @see #getAndClearIndexCounters(BTreeCounters)
      */
-    protected void addIndexCounters(String name, IIndex ndx) {
+    protected void addIndexCounters(final String name, final long timestamp,
+            final ILocalBTreeView ndx) {
     
-        final Counters c;
-        if(ndx instanceof AbstractBTree) {
-            
-            c = ((AbstractBTree)ndx).counters;
-            
-        } else if(ndx instanceof ReadCommittedView) {
-            
-            c = ((ReadCommittedView)ndx).getBTreeCounters();
-            
-        } else {
-            
-            final FusedView view = (FusedView)ndx;
-            
-            final AbstractBTree[] sources = view.getSources();
-            
-            c = new Counters();
-            
-            for (int i = 0; i < sources.length; i++) {
-                
-                c.add(sources[i].counters);
-                
-            }
-            
-        }
-                    
         countersLock.lock();
         
         try {
             
-            totalCounters.add(c);
-        
-            Counters tmp = indexCounters.get(name);
+            ViewCounters tmp = indexCounters.get(name);
             
             if (tmp == null) {
                 
-                tmp = new Counters();
+                tmp = new ViewCounters(ndx);
                 
                 indexCounters.put(name, tmp);
                 
             }
             
-            tmp.add(c);
+            tmp.reportCounters(ndx);
             
         } finally {
             
@@ -1632,6 +1734,22 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * {@link CounterSet}s are reported directly under the index name.
      * 
      * @return A new {@link CounterSet} reflecting the use of the named indices.
+     * 
+     * FIXME This needs to be rewritten.
+     * <p>
+     * We have the {@link LocalPartitionMetadata} on the {@link ViewCounters},
+     * so we can use that to distinguish between an index and an index
+     * partition.
+     * <p>
+     * Make sure that we report out the static counters for each source as well.
+     * That can be captured in the {@link ViewCounters} using a hash map where
+     * the key is {@link IResourceMetadata#getUUID()}, which will be distinct
+     * for each journal or index segment source in the view.
+     * <p>
+     * We don't really need the pmd breakdown here since we don't have the
+     * {@link BTreeCounters} per source and I am not sure if that information
+     * would be interesting in any case and we do report the pmd stuff with
+     * DumpFederation (in bigdata-jini).
      */
     public CounterSet getIndexCounters() {
         
@@ -1641,18 +1759,18 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
             final CounterSet tmp = new CounterSet();
 
-            final Iterator<Map.Entry<String, Counters>> itr = indexCounters
+            final Iterator<Map.Entry<String, ViewCounters>> itr = indexCounters
                     .entrySet().iterator();
 
             while (itr.hasNext()) {
 
-                final Map.Entry<String, Counters> entry = itr.next();
+                final Map.Entry<String, ViewCounters> entry = itr.next();
 
                 final String name = entry.getKey();
 
-                final Counters counters = entry.getValue();
+                final ViewCounters viewCounters = entry.getValue();
                 
-                assert counters != null : "name=" + name;
+                assert viewCounters != null : "name=" + name;
 
                 /*
                  * Note: this is a hack. We parse the index name in order to
@@ -1677,114 +1795,135 @@ public class ConcurrencyManager implements IConcurrencyManager {
                 // create counter set for this index / index partition.
                 final CounterSet t = tmp.makePath(path);
                 
-                // attach the counter for the index / index partition.
-                t.attach(counters.getCounters());
+                /*
+                 * Attach the aggregated counters for the index / index
+                 * partition.
+                 */
+                t.attach(viewCounters.aggregate().getCounters());
 
                 IIndex view = null;
                 try {
-
-                    /*
-                     * Request the read-committed view of the index from the
-                     * resource manager.
-                     */
-                    try {
-                        view = resourceManager.getIndex(name,
-                                ITx.READ_COMMITTED);
-                    } catch (Throwable ex) {
-                        log.error("Could not update counters: name=" + name
-                                + " : " + ex, ex);
-                        // fall through - [view] will be null.
-                    }
-                    
-                    if(view == null) {
-                        
+                    if (resourceManager instanceof ResourceManager) {
                         /*
-                         * Note: the read-committed view can be unavailable
-                         * either because the index was concurrently registered
-                         * and has not been committed yet or because the index
-                         * has been dropped.  However, if an index partition was
-                         * moved, split, or joined then a StaleLocatorException
-                         * will be reported instead, which is handled below.
+                         * Get the live index object from the cache and [null]
+                         * if it is not in the cache. When the view is not in
+                         * the cache we simply do not update our counters from
+                         * the view.
+                         * 
+                         * Note: Using the cache prevents a request for the
+                         * counters from forcing the index to be re-loaded.
+                         * 
+                         * Note: This is the LIVE index object. We DO NOT hold
+                         * an exclusive lock. Therefore we MUST NOT use most of
+                         * its API, but we are only concerned with its counters
+                         * here and that is thread-safe.
                          */
-                        
-                        t.addCounter("No data", new OneShotInstrument<String>(
-                                "Read committed view not available"));
-                        
-                        continue;
-                        
-                    }
-                    
-                    final LocalPartitionMetadata pmd = view.getIndexMetadata()
-                            .getPartitionMetadata();
-
-                    if (pmd == null) {
-                        
-                        /*
-                         * An unpartitioned index.
-                         */
-                        
-                        t.attach(((AbstractBTree)view).getBasicCounterSet());
-                        
-                    } else {
-                        
-                        /*
-                         * A partitioned index.
-                         */
-                        
-                        final CounterSet pmdcs = t.makePath("pmd");
-                        
-                        pmdcs.addCounter("leftSeparatorKey",
-                                new OneShotInstrument<String>(BytesUtil
-                                        .toString(pmd.getLeftSeparatorKey())));
-                        
-                        pmdcs.addCounter("rightSeparatorKey",
-                                new OneShotInstrument<String>(BytesUtil
-                                        .toString(pmd.getRightSeparatorKey())));
-                        
-                        pmdcs.addCounter("history",
-                                        new OneShotInstrument<String>(pmd
-                                                .getHistory()));
-                        
-                        final IResourceMetadata[] resources = pmd.getResources();
-                        
-                        for(int i=0; i<resources.length; i++) {
-                            
-                            final IResourceMetadata resource = resources[i];
-                            
-                            final CounterSet rescs = pmdcs.makePath("resource["+i+"]");
-                            
-                            rescs.addCounter("file", new OneShotInstrument<String>(resource.getFile()));
-
-                            rescs.addCounter("uuid", new OneShotInstrument<String>(resource.getUUID().toString()));
-
-//                            rescs.addCounter("size", new OneShotInstrument<String>(""+resource.size()));
-
-                            rescs.addCounter("createTime", new OneShotInstrument<String>(""+resource.getCreateTime()));
-
-                            final AbstractBTree source;
-                            if(view instanceof AbstractBTree) {
-                                assert i == 0 : "i="+i; // only the first resource in the view.
-                                source = (BTree)view;
-                            } else {
-                                source = ((FusedView) view).getSources()[i];
-                            }
-                            
-                            rescs.attach(source.getBasicCounterSet());
-                            
+                        final ResourceManager rmgr = ((ResourceManager) resourceManager);
+                        view = rmgr.indexCache.get(new NT(name, ITx.UNISOLATED));
+                        final StaleLocatorReason reason = rmgr.getIndexPartitionGone(name);
+                        if (reason != null) {
+                            // Note that the index partition is gone.
+                            t.addCounter("pmd" + ICounterSet.pathSeparator+"StaleLocator",
+                                    new OneShotInstrument<String>(reason.toString()));
                         }
-                        
+                    } else {
+                        /*
+                         * Get the live index object from Name2Addr's cache. It
+                         * will be [null] if the index is not in the cache. When
+                         * the index is not in the cache we simply do not update
+                         * our counters from the view.
+                         */
+                        final Journal jnl = ((Journal)resourceManager);
+                        synchronized(jnl.name2Addr) {
+                            view = jnl.name2Addr.getIndexCache(name);
+//                            view = jnl.getIndex(name, ITx.READ_COMMITTED);
+                        }
                     }
-                    
-                } catch (StaleLocatorException ex) {
+                } catch (Throwable ex) {
+                    log.error("Could not update counters: name=" + name + " : "
+                            + ex, ex);
+                    // fall through - [view] will be null.
+                }
+
+                if (view == null) {
 
                     /*
-                     * Note that the index partition is gone.
+                     * Note: the view can be unavailable either because the
+                     * index was concurrently registered and has not been
+                     * committed yet or because the index has been dropped.
+                     * 
+                     * Note: an index partition that moved, split, or joined is
+                     * handled above.
                      */
-                    
-                    t.addCounter("pmd" + ICounterSet.pathSeparator
-                            + "StaleLocator", new OneShotInstrument<String>(ex
-                            .getReason().toString()));
-                    
+
+//                    t.addCounter("No data", new OneShotInstrument<String>(
+//                            "Read committed view not available"));
+
+                    continue;
+
+                }
+
+                final LocalPartitionMetadata pmd = view.getIndexMetadata()
+                        .getPartitionMetadata();
+
+                if (pmd == null) {
+
+                    /*
+                     * An unpartitioned index.
+                     */
+
+                    t.attach(((AbstractBTree) view).getCounters());
+
+                } else {
+
+                    /*
+                     * A partitioned index.
+                     */
+
+                    final CounterSet pmdcs = t.makePath("pmd");
+
+                    pmdcs.addCounter("leftSeparatorKey",
+                            new OneShotInstrument<String>(BytesUtil
+                                    .toString(pmd.getLeftSeparatorKey())));
+
+                    pmdcs.addCounter("rightSeparatorKey",
+                            new OneShotInstrument<String>(BytesUtil
+                                    .toString(pmd.getRightSeparatorKey())));
+
+                    pmdcs.addCounter("history", new OneShotInstrument<String>(
+                            pmd.getHistory()));
+
+                    final IResourceMetadata[] resources = pmd.getResources();
+
+                    for (int i = 0; i < resources.length; i++) {
+
+                        final IResourceMetadata resource = resources[i];
+
+                        final CounterSet rescs = pmdcs.makePath("resource[" + i
+                                + "]");
+
+                        rescs.addCounter("file", new OneShotInstrument<String>(
+                                resource.getFile()));
+
+                        rescs.addCounter("uuid", new OneShotInstrument<String>(
+                                resource.getUUID().toString()));
+
+                        rescs.addCounter("createTime",
+                                new OneShotInstrument<String>(Long
+                                        .toString(resource.getCreateTime())));
+
+                        final AbstractBTree source;
+                        if (view instanceof AbstractBTree) {
+                            assert i == 0 : "i=" + i; // only the first resource in the view.
+                            source = (BTree) view;
+                        } else {
+                            source = ((FusedView) view).getSources()[i];
+                        }
+
+                        rescs.attach(source.getCounters());
+
+                    }
+
                 }
 
             }

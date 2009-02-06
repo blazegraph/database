@@ -513,13 +513,13 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
 
                 newNode = new Node((Node) this, triggeredByChildId );
                 
-                btree.counters.nodesCopyOnWrite++;
+                btree.btreeCounters.nodesCopyOnWrite++;
 
             } else {
 
                 newNode = new Leaf((Leaf) this);
 
-                btree.counters.leavesCopyOnWrite++;
+                btree.btreeCounters.leavesCopyOnWrite++;
 
             }
 
@@ -970,11 +970,11 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
         
         if( this instanceof Leaf ) {
 
-            btree.counters.leavesJoined++;
+            btree.btreeCounters.leavesJoined++;
 
         } else {
             
-            btree.counters.nodesJoined++;
+            btree.btreeCounters.nodesJoined++;
 
         }
 
@@ -1051,14 +1051,14 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
         
         if( rightSibling != null ) {
             
-            merge(rightSibling,true);
-            
+            merge(rightSibling, true);
+
             return;
-            
-        } else if( leftSibling != null ) {
-            
-            merge(leftSibling,false);
-            
+
+        } else if (leftSibling != null) {
+
+            merge(leftSibling, false);
+
             return;
             
         } else {
@@ -1067,6 +1067,87 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
             
         }
         
+    }
+    
+    /**
+     * Return <code>true</code> if this node is the left-most node at its
+     * level within the tree.
+     * 
+     * @return <code>true</code> iff the child is the left-most node at its
+     *         level within the tree.
+     */
+    protected boolean isLeftMostNode() {
+
+        final Node p = getParent();
+
+        if (p == null) {
+
+            // always true of the root.
+            return true;
+
+        }
+
+        final int i = p.getIndexOf(this);
+
+        if (i == 0) {
+
+            /*
+             * We are the left-most child of our parent node. Now recursively
+             * check our parent and make sure that it is the left-most child of
+             * its parent. This continues recursively until we either discover
+             * an ancestor which is not the left-most child of its parent or we
+             * reach the root.
+             */
+
+            return p.isLeftMostNode();
+            
+        }
+
+        return false;
+        
+    }
+    
+    /**
+     * Return <code>true</code> if this node is the right-most node at its
+     * level within the tree.
+     * 
+     * @return <code>true</code> iff the child is the right-most node at its
+     *         level within the tree.
+     */
+    protected boolean isRightMostNode() {
+
+        final Node p = getParent();
+
+        if (p == null) {
+
+            // always true of the root.
+            return true;
+
+        }
+
+        /*
+         * Note: test against the #of keys in the parent to determine if we are
+         * the right-most child, not the #of keys in this node.
+         */
+        
+        final int i = p.getIndexOf(this);
+
+        if (i == p.nkeys) {
+
+            /*
+             * We are the right-most child of our parent node. Now recursively
+             * check our parent and make sure that it is the right-most child of
+             * its parent. This continues recursively until we either discover
+             * an ancestor which is not the right-most child of its parent or we
+             * reach the root.
+             */
+
+            return p.isRightMostNode();
+            
+        }
+
+        return false;
+
     }
     
     /**

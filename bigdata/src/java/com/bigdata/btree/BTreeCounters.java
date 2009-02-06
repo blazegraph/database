@@ -29,33 +29,46 @@ import com.bigdata.counters.Instrument;
 
 /**
  * A helper class that collects statistics on an {@link AbstractBTree}.
+ * <p>
+ * Note: This class DOES NOT have a hard reference to the {@link AbstractBTree}.
+ * Holding an instance of this class WILL NOT force the {@link AbstractBTree} to
+ * remain strongly reachable.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Counters {
+final public class BTreeCounters {
 
-    public Counters() {
+    public BTreeCounters() {
         
     }
 
+    /**
+     * Equal iff they are the same instance.
+     */
+    public boolean equals(Object o) {
+        
+        return this == o;
+        
+    }
+    
     /**
      * Copy constructor.
      * 
      * @param c
      */
-    public Counters(Counters c) {
+    public BTreeCounters(final BTreeCounters c) {
         
         add(c);
         
     }
     
     /**
-     * Adds the values from another {@link Counters} object to this one.
+     * Adds the values from another {@link BTreeCounters} object to this one.
      * 
      * @param o
      */
-    public void add(Counters o) {
+    public void add(final BTreeCounters o) {
         
         // IKeySearch
 //        nbloomTest += o.nbloomTest;
@@ -78,8 +91,16 @@ public class Counters {
         nodesJoined += o.nodesJoined;
         leavesSplit += o.leavesSplit;
         leavesJoined += o.leavesJoined;
+        headSplit += o.headSplit;
+        tailSplit += o.tailSplit;
         nodesCopyOnWrite += o.nodesCopyOnWrite;
         leavesCopyOnWrite += o.leavesCopyOnWrite;
+        // tuple mutation.
+        ntupleInsertValue += o.ntupleInsertValue;
+        ntupleInsertDelete += o.ntupleInsertDelete;
+        ntupleUpdateValue += o.ntupleUpdateValue;
+        ntupleUpdateDelete += o.ntupleUpdateDelete;
+        ntupleRemove += o.ntupleRemove;
         // IO
         nodesRead += o.nodesRead;
         leavesRead += o.leavesRead;
@@ -107,16 +128,16 @@ public class Counters {
      * those rejected by the bloom filter before they are tested against the
      * B+Tree).
      */
-    int nfinds = 0;
-    int ninserts = 0;
-    int nremoves = 0;
+    long nfinds = 0;
+    long ninserts = 0;
+    long nremoves = 0;
     // ILinearList
-    int nindexOf = 0;
-    int ngetKey = 0;
-    int ngetValue = 0;
+    long nindexOf = 0;
+    long ngetKey = 0;
+    long ngetValue = 0;
     // IRangeQuery
-    int nrangeCount = 0;
-    int nrangeIterator = 0;
+    long nrangeCount = 0;
+    long nrangeIterator = 0;
     // Structural change.
     int rootsSplit = 0;
     int rootsJoined = 0;
@@ -124,8 +145,61 @@ public class Counters {
     int nodesJoined = 0;
     int leavesSplit = 0;
     int leavesJoined = 0;
+    int tailSplit = 0;
+    int headSplit = 0;
     int nodesCopyOnWrite = 0;
     int leavesCopyOnWrite = 0;
+    
+    /*
+     * Tuple counters.
+     * 
+     * Note: The tuple level counters can be used to determine the degree of
+     * insert, vs update, vs delete activity on a B+Tree. How you count
+     * "deletes" depends on whether or not delete markers are in use - when they
+     * are in use deletes are in fact updates (or inserts if the key was not
+     * pre-existing). When delete markers are not in use, deletes actually
+     * remove the tuple.
+     * 
+     * Note: You CAN NOT determine the actual net change in the #of tuples in
+     * the B+Tree that is part of a fused view using these counters since the
+     * same tuple may have been inserted, deleted and updated and may or may not
+     * exist in the other sources of the fused view. However, these counters MAY
+     * be used as an indication that a compacting merge might reduce the #of
+     * tuples in the view (e.g., a lot of insertDelete or updateDelete activity)
+     * and that might lead you to choose to perform a compacting merge before
+     * deciding whether or not to split an index partition.
+     */
+    
+    /**
+     * #of non-deleted tuples that were inserted into the B+Tree (rather than
+     * updating the value for an existing tuple).
+     */
+    long ntupleInsertValue = 0;
+    /**
+     * #of deleted tuples that were inserted into the B+Tree (rather than
+     * deleting the value for an existing tuple). Note that delete markers MAY
+     * be written into a B+Tree when there is no tuple for that key in the
+     * BTree. Those cases arise when the B+Tree is used to isolate a
+     * transaction's write set and are counted here.
+     */
+    long ntupleInsertDelete = 0;
+    /**
+     * #of pre-existing tuples whose value was updated to a non-deleted value
+     * (includes update of a deleted tuple to a non-deleted tuple by overwrite
+     * of the tuple).
+     */
+    long ntupleUpdateValue = 0;
+    /**
+     * #of pre-existing un-deleted tuples whose delete marker was set (we don't
+     * count re-deletes of an already deleted tuple).
+     */
+    long ntupleUpdateDelete = 0;
+    /**
+     * #of pre-existing tuples that were removed from the B+Tree (only non-zero
+     * when the B+Tree does not support delete markers).
+     */
+    long ntupleRemove = 0;
+    
     // IO
     int nodesRead = 0;
     int leavesRead = 0;
@@ -143,7 +217,7 @@ public class Counters {
     
     /**
      * Return a score whose increasing value is correlated with the amount of
-     * activity on an index as reflected in these {@link Counters}.
+     * activity on an index as reflected in these {@link BTreeCounters}.
      * <p>
      * The raw score is the serialization / deserialization time plus the read /
      * write time. Time was choosen since it is a common unit and since it
@@ -196,14 +270,15 @@ public class Counters {
      *            
      * @return The normalized score.
      */
-    static public double normalize(double rawScore, double totalRawScore ) {
+    static public double normalize(final double rawScore,
+            final double totalRawScore) {
         
-        if(totalRawScore == 0d) {
-            
+        if (totalRawScore == 0d) {
+
             return 0d;
-            
+
         }
-        
+
         return rawScore / totalRawScore;
         
     }
@@ -244,25 +319,6 @@ public class Counters {
         
     }
 
-//    /**
-//     * The effective error rate (false positive rate) for the bloom filter and
-//     * ZERO (0d) if the bloom filter is not enabled. A false positive is an
-//     * instance where the bloom filter reports that the key is in the index but
-//     * a read against the index demonstrates that the key does not exist in the
-//     * index. False positives are in the nature of bloom filters and arise
-//     * because keys may be hash equivalent for the bloom filter.
-//     * 
-//     * @return The bloom filter error rate.
-//     */
-//    final public double getBloomErrorRate() {
-//
-//        if (nbloomTest == 0)
-//            return 0d;
-//
-//        return (nbloomFalsePos / (double) nbloomTest);
-//
-//    }
-
     /**
      * Return a {@link CounterSet} reporting on the various counters tracked in
      * the instance fields of this class.
@@ -282,43 +338,19 @@ public class Counters {
                 
                 final CounterSet tmp = counterSet.makePath("keySearch");
 
-//                tmp.addCounter("#bloomTest", new Instrument<Integer>() {
-//                    protected void sample() {
-//                        setValue(nbloomTest);
-//                    }
-//                });
-//
-//                tmp.addCounter("#bloomReject", new Instrument<Integer>() {
-//                    protected void sample() {
-//                        setValue(nbloomRejects);
-//                    }
-//                });
-//
-//                tmp.addCounter("#bloomFalsePos", new Instrument<Integer>() {
-//                    protected void sample() {
-//                        setValue(nbloomFalsePos);
-//                    }
-//                });
-//
-//                tmp.addCounter("bloomErrorRate", new Instrument<Double>() {
-//                    protected void sample() {
-//                        setValue(getBloomErrorRate());
-//                    }
-//                });
-
-                tmp.addCounter("#find", new Instrument<Integer>() {
+                tmp.addCounter("#find", new Instrument<Long>() {
                     protected void sample() {
                         setValue(nfinds);
                     }
                 });
 
-                tmp.addCounter("#insert", new Instrument<Integer>() {
+                tmp.addCounter("#insert", new Instrument<Long>() {
                     protected void sample() {
                         setValue(ninserts);
                     }
                 });
 
-                tmp.addCounter("#nremove", new Instrument<Integer>() {
+                tmp.addCounter("#nremove", new Instrument<Long>() {
                     protected void sample() {
                         setValue(nremoves);
                     }
@@ -332,19 +364,19 @@ public class Counters {
                 
                 final CounterSet tmp = counterSet.makePath("linearList");
 
-                tmp.addCounter("#indexOf", new Instrument<Integer>() {
+                tmp.addCounter("#indexOf", new Instrument<Long>() {
                     protected void sample() {
                         setValue(nindexOf);
                     }
                 });
 
-                tmp.addCounter("#getKey", new Instrument<Integer>() {
+                tmp.addCounter("#getKey", new Instrument<Long>() {
                     protected void sample() {
                         setValue(ngetKey);
                     }
                 });
 
-                tmp.addCounter("#getValue", new Instrument<Integer>() {
+                tmp.addCounter("#getValue", new Instrument<Long>() {
                     protected void sample() {
                         setValue(ngetValue);
                     }
@@ -365,13 +397,13 @@ public class Counters {
                 
                 final CounterSet tmp = counterSet.makePath("rangeQuery");
 
-                tmp.addCounter("#rangeCount", new Instrument<Integer>() {
+                tmp.addCounter("#rangeCount", new Instrument<Long>() {
                     protected void sample() {
                         setValue(nrangeCount);
                     }
                 });
                 
-                tmp.addCounter("#rangeIterator", new Instrument<Integer>() {
+                tmp.addCounter("#rangeIterator", new Instrument<Long>() {
                     protected void sample() {
                         setValue(nrangeIterator);
                     }
@@ -425,6 +457,18 @@ public class Counters {
                     }
                 });
 
+                tmp.addCounter("#headSplit", new Instrument<Integer>() {
+                    protected void sample() {
+                        setValue(headSplit);
+                    }
+                });
+
+                tmp.addCounter("#tailSplit", new Instrument<Integer>() {
+                    protected void sample() {
+                        setValue(tailSplit);
+                    }
+                });
+
                 tmp.addCounter("#leafCopyOnWrite", new Instrument<Integer>() {
                     protected void sample() {
                         setValue(leavesCopyOnWrite);
@@ -439,6 +483,43 @@ public class Counters {
 
             }
          
+            /*
+             * Tuple stats.
+             */
+            {
+                
+                final CounterSet tmp = counterSet.makePath("tuples");
+
+                tmp.addCounter("#insertValue", new Instrument<Long>() {
+                    protected void sample() {
+                        setValue(ntupleInsertValue);
+                    }
+                });
+                tmp.addCounter("#insertDelete", new Instrument<Long>() {
+                    protected void sample() {
+                        setValue(ntupleInsertDelete);
+                    }
+                });
+
+                tmp.addCounter("#updateValue", new Instrument<Long>() {
+                    protected void sample() {
+                        setValue(ntupleUpdateValue);
+                    }
+                });
+
+                tmp.addCounter("#updateDelete", new Instrument<Long>() {
+                    protected void sample() {
+                        setValue(ntupleUpdateDelete);
+                    }
+                });
+
+                tmp.addCounter("#tupleRemove", new Instrument<Long>() {
+                    protected void sample() {
+                        setValue(ntupleRemove);
+                    }
+                });
+            }
+
             /*
              * IO stats.
              */
@@ -580,19 +661,4 @@ public class Counters {
         
     }
 
-//    /**
-//     * shows the effective bloom filter error rate to date (or at
-//     * least since the index object was last read from the store).
-//     * 
-//     * @todo remove - this is for testing.
-//     */
-//    public String getBloomFilterPerformance() {
-//
-//        return "nfind=" + nfinds + ", bloom filter: ntest="
-//                + nbloomTest + ", nreject=" + nbloomRejects + ", nfalsePos="
-//                + nbloomFalsePos + ", effective error rate="
-//                + getBloomErrorRate();
-//        
-//    }
-    
 }

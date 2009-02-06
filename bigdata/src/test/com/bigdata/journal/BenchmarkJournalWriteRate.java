@@ -552,17 +552,17 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
         // The unisolated btree on which the data were actually written.
         final BTree btree = (BTree)journal.getIndex(name);
         
-        final int nodesWritten = btree.counters.getNodesWritten();
+        final int nodesWritten = btree.btreeCounters.getNodesWritten();
         
-        final int leavesWritten = btree.counters.getLeavesWritten();
+        final int leavesWritten = btree.btreeCounters.getLeavesWritten();
         
-        final long bytesWrittenByBTree = btree.counters.getBytesWritten();
+        final long bytesWrittenByBTree = btree.btreeCounters.getBytesWritten();
         
         final long bytesWritten = journal.getBufferStrategy().getNextOffset();
 
         System.err.println("bytesWritten: btree="+bytesWrittenByBTree+", journal="+bytesWritten);
         
-        System.err.println("btree counters: "+btree.counters);
+        System.err.println("btree counters: "+btree.btreeCounters);
 
         final int recordsWritten = (nodesWritten+leavesWritten);
         

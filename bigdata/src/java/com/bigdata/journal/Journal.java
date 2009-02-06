@@ -41,6 +41,7 @@ import com.bigdata.bfs.GlobalFileSystemHelper;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.ReadCommittedView;
@@ -449,7 +450,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      *  
      * @see IndexManager#getIndex(String, long)
      */
-    public IIndex getIndex(final String name, final long timestamp) {
+    public ILocalBTreeView getIndex(final String name, final long timestamp) {
         
         if (name == null) {
 
@@ -517,7 +518,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 //        final boolean readOnly = (timestamp < ITx.UNISOLATED)
 //                || (isReadWriteTx && tx.isReadOnly());
 
-        final IIndex tmp;
+        final ILocalBTreeView tmp;
 
         if (isReadWriteTx) {
 
@@ -528,7 +529,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
              * index.
              */
 
-            final IIndex isolatedIndex = tx.getIndex(name);
+            final ILocalBTreeView isolatedIndex = tx.getIndex(name);
 
             if (isolatedIndex == null) {
 

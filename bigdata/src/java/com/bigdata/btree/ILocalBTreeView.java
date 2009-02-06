@@ -42,6 +42,13 @@ public interface ILocalBTreeView extends IIndex {
      * (1) if the view is a {@link BTree}.
      */
     public int getSourceCount();
+
+    /**
+     * An array containing the ordered sources in the view. Changes to the array
+     * DO NOT affect the view. If the view is a {@link BTree} then the array
+     * will contain a single element which is that {@link BTree}.
+     */
+    public AbstractBTree[] getSources();
     
     /**
      * The {@link BTree} that is absorbing writes for the view.
@@ -49,7 +56,7 @@ public interface ILocalBTreeView extends IIndex {
     public BTree getMutableBTree();
 
     /**
-     * Teturn the bloom filter.
+     * Return the bloom filter.
      * 
      * @return The bloom filter if one exists and otherwise <code>null</code>.
      */

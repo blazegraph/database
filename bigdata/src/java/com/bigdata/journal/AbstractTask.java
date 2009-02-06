@@ -56,6 +56,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IDirtyListener;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.concurrent.LockManagerTask;
@@ -245,7 +246,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * 
      * @see #getIndex(String name)
      */
-    final private Map<String,IIndex> indexCache;
+    final private Map<String,ILocalBTreeView> indexCache;
 
     /**
      * Read-only copy of a {@link Name2Addr.Entry} with additional flags to
@@ -442,27 +443,27 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             log.info("Clearing hard reference cache: " + indexCache.size()
                     + " indices accessed");
         
-        if (timestamp == ITx.UNISOLATED || timestamp == ITx.READ_COMMITTED) {
-            
-            /*
-             * Report counters for unisolated and read-committed indices.
-             */
-            
-            Iterator<Map.Entry<String, IIndex>> itr = indexCache.entrySet()
-                    .iterator();
+//        if (timestamp == ITx.UNISOLATED || timestamp == ITx.READ_COMMITTED) {
+//            
+//            /*
+//             * Report counters for unisolated and read-committed indices.
+//             */
+
+            final Iterator<Map.Entry<String, ILocalBTreeView>> itr = indexCache
+                    .entrySet().iterator();
 
             while (itr.hasNext()) {
 
-                final Map.Entry<String, IIndex> entry = itr.next();
+                final Map.Entry<String, ILocalBTreeView> entry = itr.next();
 
                 final String name = entry.getKey();
 
-                final IIndex ndx = entry.getValue();
+                final ILocalBTreeView ndx = entry.getValue();
 
-                ((ConcurrencyManager) concurrencyManager)
-                        .addIndexCounters(name, ndx);
+                ((ConcurrencyManager) concurrencyManager).addIndexCounters(
+                        name, timestamp, ndx);
                 
-            }
+//            }
         
         }
         
@@ -603,7 +604,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         } else {
 
-            final IIndex tmp = resourceManager.getIndex(name, timestamp);
+            final ILocalBTreeView tmp = resourceManager.getIndex(name, timestamp);
 
             if (tmp == null) {
 
@@ -653,10 +654,10 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         assert !sources[0].isReadOnly();
 
-        final IIndex view;
+        final ILocalBTreeView view;
         if (sources.length == 1) {
 
-            view = sources[0];
+            view = (BTree)sources[0];
 
         } else {
 
@@ -1130,15 +1131,18 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         this.timestamp = timestamp;
 
         /*
-         * FIXME A read-lock should be asserted for abs(timestamp) for the
+         * Note: A read-lock should be asserted for abs(timestamp) for the
          * duration of the task. This can be accomplished either by requesting
          * the necessary index views or by explicit handshaking with the
          * ResourceManager (no read locks are required for simple journals).
+         * 
+         * [This is currently handled by the weak value cache for clean indices
+         * and the commit list for dirty indices].
          */
 
         this.resource = resource;
         
-        this.indexCache = new HashMap<String,IIndex>(resource.length);
+        this.indexCache = new HashMap<String,ILocalBTreeView>(resource.length);
 
         this.isReadWriteTx = TimestampUtility.isReadWriteTx(timestamp);
         

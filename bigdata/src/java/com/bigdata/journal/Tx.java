@@ -38,7 +38,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.isolation.IsolatedFusedView;
 import com.bigdata.rawstore.IRawStore;
@@ -191,7 +191,7 @@ public class Tx implements ITx {
      * same transaction (however, those operations will be serialized if they
      * declare any named indices in common).
      */
-    private ConcurrentHashMap<String, IIndex> indices = new ConcurrentHashMap<String, IIndex>();
+    private ConcurrentHashMap<String, ILocalBTreeView> indices = new ConcurrentHashMap<String, ILocalBTreeView>();
 
     /**
      * Create a transaction reading from the most recent committed state not
@@ -697,12 +697,12 @@ public class Tx implements ITx {
          * for all isolated btrees, if(!validate()) return false;
          */
 
-        final Iterator<Map.Entry<String, IIndex>> itr = indices.entrySet()
+        final Iterator<Map.Entry<String, ILocalBTreeView>> itr = indices.entrySet()
                 .iterator();
 
         while (itr.hasNext()) {
 
-            final Map.Entry<String, IIndex> entry = itr.next();
+            final Map.Entry<String, ILocalBTreeView> entry = itr.next();
 
             final String name = entry.getKey();
 
@@ -755,12 +755,12 @@ public class Tx implements ITx {
         
         this.revisionTime = revisionTime;
         
-        final Iterator<Map.Entry<String, IIndex>> itr = indices.entrySet()
+        final Iterator<Map.Entry<String, ILocalBTreeView>> itr = indices.entrySet()
                 .iterator();
 
         while (itr.hasNext()) {
 
-            final Map.Entry<String, IIndex> entry = itr.next();
+            final Map.Entry<String, ILocalBTreeView> entry = itr.next();
 
             final String name = entry.getKey();
 
@@ -820,7 +820,7 @@ public class Tx implements ITx {
      * @exception IllegalStateException
      *                if the transaction is not active.
      */
-    public IIndex getIndex(final String name) {
+    public ILocalBTreeView getIndex(final String name) {
 
         if (name == null)
             throw new IllegalArgumentException();
@@ -852,7 +852,7 @@ public class Tx implements ITx {
 
             }
 
-            final IIndex index;
+            final ILocalBTreeView index;
 
             /*
              * See if the index was registered as of the ground state used by
@@ -948,7 +948,7 @@ public class Tx implements ITx {
 
         try {
 
-            final Iterator<IIndex> itr = indices.values().iterator();
+            final Iterator<ILocalBTreeView> itr = indices.values().iterator();
 
             while (itr.hasNext()) {
 

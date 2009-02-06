@@ -36,9 +36,17 @@ import com.bigdata.btree.keys.KeyBuilder;
 /**
  * Test suite using {@link IIndex#insert(int, Object)} to split a tree to height
  * two (2) (three levels) and then using {@link IIndex#remove(int)} to reduce
- * the tree back to a single, empty root leaf.  This test suite is focused on 
- * m := 3 since we are capable of excercising all split() and join() code paths
- * with that branching factor.
+ * the tree back to a single, empty root leaf. This test suite is focused on m :=
+ * 3 since we are capable of excercising all split() and join() code paths with
+ * that branching factor.
+ * <p>
+ * Note: This also tests the {@link AbstractNode#isLeftMostNode()} and
+ * {@link AbstractNode#isRightMostNode()} methods. In order to test those
+ * methods as applied to track the #of head splits and tail splits we need a
+ * btree with at least 2 levels of nodes above a layer of leaves. This is
+ * because the methods are tested on a leaf, which checks its parent, which,
+ * really, needs to test a non-root parent before we can say that this is
+ * working as it should.
  * 
  * @see src/architecture/btree.xls for the examples used in this test suite.
  * 
@@ -393,6 +401,37 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
             assertKeys(new int[]{7,8},b);
             assertValues(new Object[]{v7,v8},b);
 
+        }
+
+        /*
+         * Do some tests of isLeftMostNode() and isRightMostNode().
+         */
+        {
+            
+            // test the root.
+            assertTrue(g.isLeftMostNode());
+            assertTrue(g.isRightMostNode());
+            
+            // test the next layer of nodes.
+            assertTrue(c.isLeftMostNode());
+            assertFalse(c.isRightMostNode());
+            
+            assertFalse(f.isLeftMostNode());
+            assertTrue(f.isRightMostNode());
+            
+            // test the leaves.
+            assertTrue(a.isLeftMostNode());
+            assertFalse(a.isRightMostNode());
+            
+            assertFalse(e.isLeftMostNode());
+            assertFalse(e.isRightMostNode());
+            
+            assertFalse(d.isLeftMostNode());
+            assertFalse(d.isRightMostNode());
+            
+            assertFalse(b.isLeftMostNode());
+            assertTrue(b.isRightMostNode());
+            
         }
         
         /*

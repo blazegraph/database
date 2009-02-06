@@ -52,7 +52,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.commons.io.FileSystemUtils;
@@ -62,6 +61,7 @@ import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -2374,16 +2374,16 @@ abstract public class StoreManager extends ResourceEvents implements
 
     }
 
-    /**
-     * This lock is used to prevent asynchronous processes such as
-     * {@link ConcurrencyManager#getIndexCounters()} from acquiring the live
-     * journal during the period between when we close out the old journal
-     * against future writes and when the new live journal is in place.
-     * <p>
-     * Note: {@link AbstractJournal#closeForWrites(long)} does not disturb
-     * concurrent readers.
-     */
-    protected ReentrantLock liveJournalLock = new ReentrantLock();
+//    /**
+//     * This lock is used to prevent asynchronous processes such as
+//     * {@link ConcurrencyManager#getIndexCounters()} from acquiring the live
+//     * journal during the period between when we close out the old journal
+//     * against future writes and when the new live journal is in place.
+//     * <p>
+//     * Note: {@link AbstractJournal#closeForWrites(long)} does not disturb
+//     * concurrent readers.
+//     */
+//    protected final ReentrantLock liveJournalLock = new ReentrantLock();
     
     /**
      * @throws IllegalStateException
@@ -2396,7 +2396,7 @@ abstract public class StoreManager extends ResourceEvents implements
      *       (there should not be since we do a commit when we register the
      *       indices on the new store).
      */
-    public AbstractJournal getJournal(long timestamp) {
+    public AbstractJournal getJournal(final long timestamp) {
 
         assertRunning();
 
@@ -2938,7 +2938,7 @@ abstract public class StoreManager extends ResourceEvents implements
                 }
             }
             {
-                Iterator<WeakReference<IIndex>> itr2 = ((IndexManager) this).indexCache
+                Iterator<WeakReference<ILocalBTreeView>> itr2 = ((IndexManager) this).indexCache
                         .iterator();
                 while (itr2.hasNext()) {
                     IIndex ndx = itr2.next().get();
@@ -2948,7 +2948,7 @@ abstract public class StoreManager extends ResourceEvents implements
                     }
                 }
             }
-            log.warn("nstores="+nstores+", nindices="+nindices);
+            log.warn("nstores=" + nstores + ", nindices=" + nindices);
         }
         
         /*
