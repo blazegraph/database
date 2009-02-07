@@ -241,6 +241,11 @@ abstract public class OverflowManager extends IndexManager {
     protected final AtomicLong indexPartitionSplitCounter = new AtomicLong(0L);
     
     /**
+     * #of successful index partition tail split operations.
+     */
+    protected final AtomicLong indexPartitionTailSplitCounter = new AtomicLong(0L);
+    
+    /**
      * #of successful index partition join operations.
      */
     protected final AtomicLong indexPartitionJoinCounter = new AtomicLong(0L);
@@ -679,41 +684,57 @@ abstract public class OverflowManager extends IndexManager {
          */
         String AsynchronousOverflowTaskCancelledCount = "Asynchronous Overflow Task Cancelled Count";
 
+    }
+    
+    /**
+     * Performance counters for the index partition tasks.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static interface IIndexPartitionTaskCounters {
+        
         /**
          * The #of index partition build operations which have completed
          * successfully.
          */
-        String IndexPartitionBuildCount = "Index Partition Build Count";
+        String BuildCount = "Build Count";
 
         /**
          * The #of index partition merge (compacting merge) operations which
          * have completed successfully.
          */
-        String IndexPartitionMergeCount = "Index Partition Merge Count";
+        String MergeCount = "Merge Count";
 
         /**
          * The #of index partition split operations which have completed
          * successfully.
          */
-        String IndexPartitionSplitCount = "Index Partition Split Count";
+        String SplitCount = "Split Count";
+
+        /**
+         * The #of index partition tail split operations which have completed
+         * successfully.
+         */
+        String TailSplitCount = "Tail Split Count";
 
         /**
          * The #of index partition join operations which have completed
          * successfully.
          */
-        String IndexPartitionJoinCount = "Index Partition Join Count";
+        String JoinCount = "Join Count";
 
         /**
          * The #of index partition move operations which have completed
          * successfully.
          */
-        String IndexPartitionMoveCount = "Index Partition Move Count";
+        String MoveCount = "Move Count";
 
         /**
          * The #of index partitions received by this data service in response to
          * an index partition move from another data service.
          */
-        String IndexPartitionReceiveCount = "Index Partition Receive Count";
+        String ReceiveCount = "Receive Count";
 
     }
     

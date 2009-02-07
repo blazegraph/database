@@ -435,6 +435,17 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         }
         
         /*
+         * Do some tests of getRightMostChild()
+         */
+        {
+         
+            assertTrue(f == btree.getRightMostNode(true/* nodesOnly */));
+
+            assertTrue(b == btree.getRightMostNode(false/* nodesOnly */));
+            
+        }
+        
+        /*
          * At this point the tree is setup and we start deleting keys. We delete
          * the keys in (nearly) the reverse order and verify that joins correctly
          * reduce the tree as each node or leaf is reduced below its minimum.

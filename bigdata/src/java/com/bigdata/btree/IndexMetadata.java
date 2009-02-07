@@ -530,6 +530,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * otherwise cause the C heap to be exhausted!
          * 
          * @see #DEFAULT_INDEX_SEGMENT_BUFFER_NODES
+         * 
+         * @todo should be on by default?
          */
         String INDEX_SEGMENT_BUFFER_NODES = IndexSegment.class.getName()
                 + ".bufferNodes";

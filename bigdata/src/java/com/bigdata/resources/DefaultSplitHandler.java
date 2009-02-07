@@ -739,7 +739,7 @@ public class DefaultSplitHandler implements ISplitHandler {
             }
 
             final LocalPartitionMetadata pmd = new LocalPartitionMetadata(
-                    partitionId,
+                    partitionId,//
                     -1, // Note: split not allowed during move.
                     fromKey,//
                     toKey,//

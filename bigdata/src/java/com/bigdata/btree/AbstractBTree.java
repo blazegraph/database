@@ -2427,6 +2427,32 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
     }
     
     /**
+     * Utility method returns the right-most node in the B+Tree.
+     * 
+     * @param nodesOnly
+     *            when <code>true</code> the search will halt at the
+     *            right-most non-leaf. Otherwise it will return the right-most
+     *            leaf.
+     * 
+     * @return The right-most child in the B+Tree -or- <code>null</code> if
+     *         the root of the B+Tree is a leaf and
+     *         <code>nodesOnly == true</code>.
+     */
+    public AbstractNode getRightMostNode(final boolean nodesOnly) {
+        
+        final AbstractNode root = getRoot();
+
+        if (root.isLeaf()) {
+
+            return null;
+
+        }
+
+        return ((Node)root).getRightMostChild(nodesOnly);
+        
+    }
+
+    /**
      * Return a cursor that may be used to efficiently locate and scan the
      * leaves in the B+Tree. The cursor will be initially positioned on the leaf
      * identified by the symbolic constant.

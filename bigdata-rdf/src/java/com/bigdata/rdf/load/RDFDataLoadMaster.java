@@ -802,9 +802,7 @@ public class RDFDataLoadMaster implements Callable<Void> {
         }
 
         // open/create the kb.
-        final AbstractTripleStore tripleStore = openTripleStore();
-
-        showProperties(tripleStore);
+        openTripleStore();
 
         /*
          * Start the producer and consumer tasks.
@@ -1051,7 +1049,7 @@ public class RDFDataLoadMaster implements Callable<Void> {
         if (INFO)
             log.info("Creating tripleStore: " + jobState.namespace);
 
-        AbstractTripleStore tripleStore = new ScaleOutTripleStore(fed,
+        final AbstractTripleStore tripleStore = new ScaleOutTripleStore(fed,
                 jobState.namespace, ITx.UNISOLATED,
                 getProperties(jobState.namespace));
 
@@ -1352,7 +1350,7 @@ public class RDFDataLoadMaster implements Callable<Void> {
              * sizes for the index partitions.
              */
 
-            // turn on direct buffering for index segment nodes.
+            // turn on direct buffering for index segment nodes : @todo should be on by default?
             properties.setProperty(com.bigdata.config.Configuration
                     .getOverrideProperty(namespace,
                             IndexMetadata.Options.INDEX_SEGMENT_BUFFER_NODES),

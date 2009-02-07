@@ -128,27 +128,27 @@ final public class BTreeCounters {
      * those rejected by the bloom filter before they are tested against the
      * B+Tree).
      */
-    long nfinds = 0;
-    long ninserts = 0;
-    long nremoves = 0;
+    public long nfinds = 0;
+    public long ninserts = 0;
+    public long nremoves = 0;
     // ILinearList
-    long nindexOf = 0;
-    long ngetKey = 0;
-    long ngetValue = 0;
+    public long nindexOf = 0;
+    public long ngetKey = 0;
+    public long ngetValue = 0;
     // IRangeQuery
-    long nrangeCount = 0;
-    long nrangeIterator = 0;
+    public long nrangeCount = 0;
+    public long nrangeIterator = 0;
     // Structural change.
-    int rootsSplit = 0;
-    int rootsJoined = 0;
-    int nodesSplit = 0;
-    int nodesJoined = 0;
-    int leavesSplit = 0;
-    int leavesJoined = 0;
-    int tailSplit = 0;
-    int headSplit = 0;
-    int nodesCopyOnWrite = 0;
-    int leavesCopyOnWrite = 0;
+    public int rootsSplit = 0;
+    public int rootsJoined = 0;
+    public int nodesSplit = 0;
+    public int nodesJoined = 0;
+    public int leavesSplit = 0;
+    public int leavesJoined = 0;
+    public int tailSplit = 0;
+    public int headSplit = 0;
+    public int nodesCopyOnWrite = 0;
+    public int leavesCopyOnWrite = 0;
     
     /*
      * Tuple counters.
@@ -174,7 +174,8 @@ final public class BTreeCounters {
      * #of non-deleted tuples that were inserted into the B+Tree (rather than
      * updating the value for an existing tuple).
      */
-    long ntupleInsertValue = 0;
+    public long ntupleInsertValue = 0;
+
     /**
      * #of deleted tuples that were inserted into the B+Tree (rather than
      * deleting the value for an existing tuple). Note that delete markers MAY
@@ -182,38 +183,38 @@ final public class BTreeCounters {
      * BTree. Those cases arise when the B+Tree is used to isolate a
      * transaction's write set and are counted here.
      */
-    long ntupleInsertDelete = 0;
+    public long ntupleInsertDelete = 0;
     /**
      * #of pre-existing tuples whose value was updated to a non-deleted value
      * (includes update of a deleted tuple to a non-deleted tuple by overwrite
      * of the tuple).
      */
-    long ntupleUpdateValue = 0;
+    public long ntupleUpdateValue = 0;
     /**
      * #of pre-existing un-deleted tuples whose delete marker was set (we don't
      * count re-deletes of an already deleted tuple).
      */
-    long ntupleUpdateDelete = 0;
+    public long ntupleUpdateDelete = 0;
     /**
      * #of pre-existing tuples that were removed from the B+Tree (only non-zero
      * when the B+Tree does not support delete markers).
      */
-    long ntupleRemove = 0;
+    public long ntupleRemove = 0;
     
     // IO
-    int nodesRead = 0;
-    int leavesRead = 0;
-    int nodesWritten = 0;
-    int leavesWritten = 0;
-    long bytesRead = 0L;
-    long bytesWritten = 0L;
+    public int nodesRead = 0;
+    public int leavesRead = 0;
+    public int nodesWritten = 0;
+    public int leavesWritten = 0;
+    public long bytesRead = 0L;
+    public long bytesWritten = 0L;
     /*
      * Note: The nano time fields are for nodes+leaves.
      */
-    long serializeNanos = 0;
-    long deserializeNanos = 0;
-    long writeNanos = 0;
-    long readNanos = 0;
+    public long serializeNanos = 0;
+    public long deserializeNanos = 0;
+    public long writeNanos = 0;
+    public long readNanos = 0;
     
     /**
      * Return a score whose increasing value is correlated with the amount of

@@ -41,6 +41,8 @@ import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IMetadataService;
+import com.bigdata.service.MetadataService;
 
 /**
  * The {@link ResourceManager} has broad responsibility for journal files, index
@@ -112,6 +114,12 @@ abstract public class ResourceManager extends OverflowManager implements IResour
          * The namespace for counters pertaining to the {@link OverflowManager}.
          */
         String OverflowManager = "Overflow Manager";
+
+        /**
+         * The namespace for counters pertaining for overflow tasks (within the
+         * {@link #OverflowManager} namespace).
+         */
+        String IndexPartitionTasks = "Overflow Tasks";
         
         /**
          * The namespace for counters pertaining to the {@link IndexManager}.
@@ -214,53 +222,61 @@ abstract public class ResourceManager extends OverflowManager implements IResour
                                     }
                                 });
 
-                tmp.addCounter(
-                        IOverflowManagerCounters.IndexPartitionBuildCount,
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(indexPartitionBuildCounter.get());
-                            }
-                        });
+                {
+                
+                    final CounterSet tmp2 = tmp
+                            .makePath(IResourceManagerCounters.IndexPartitionTasks);
 
-                tmp.addCounter(
-                        IOverflowManagerCounters.IndexPartitionMergeCount,
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(indexPartitionMergeCounter.get());
-                            }
-                        });
+                    tmp2.addCounter(IIndexPartitionTaskCounters.BuildCount,
+                            new Instrument<Long>() {
+                                public void sample() {
+                                    setValue(indexPartitionBuildCounter.get());
+                                }
+                            });
 
-                tmp.addCounter(
-                        IOverflowManagerCounters.IndexPartitionSplitCount,
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(indexPartitionSplitCounter.get());
-                            }
-                        });
+                    tmp2.addCounter(IIndexPartitionTaskCounters.MergeCount,
+                            new Instrument<Long>() {
+                                public void sample() {
+                                    setValue(indexPartitionMergeCounter.get());
+                                }
+                            });
 
-                tmp.addCounter(
-                        IOverflowManagerCounters.IndexPartitionJoinCount,
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(indexPartitionJoinCounter.get());
-                            }
-                        });
+                    tmp2.addCounter(IIndexPartitionTaskCounters.SplitCount,
+                            new Instrument<Long>() {
+                                public void sample() {
+                                    setValue(indexPartitionSplitCounter.get());
+                                }
+                            });
 
-                tmp.addCounter(
-                        IOverflowManagerCounters.IndexPartitionMoveCount,
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(indexPartitionMoveCounter.get());
-                            }
-                        });
+                    tmp2.addCounter(IIndexPartitionTaskCounters.TailSplitCount,
+                            new Instrument<Long>() {
+                                public void sample() {
+                                    setValue(indexPartitionTailSplitCounter.get());
+                                }
+                            });
 
-                tmp.addCounter(
-                        IOverflowManagerCounters.IndexPartitionReceiveCount,
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(indexPartitionReceiveCounter.get());
-                            }
-                        });
+                    tmp2.addCounter(IIndexPartitionTaskCounters.JoinCount,
+                            new Instrument<Long>() {
+                                public void sample() {
+                                    setValue(indexPartitionJoinCounter.get());
+                                }
+                            });
+
+                    tmp2.addCounter(IIndexPartitionTaskCounters.MoveCount,
+                            new Instrument<Long>() {
+                                public void sample() {
+                                    setValue(indexPartitionMoveCounter.get());
+                                }
+                            });
+
+                    tmp2.addCounter(IIndexPartitionTaskCounters.ReceiveCount,
+                            new Instrument<Long>() {
+                                public void sample() {
+                                    setValue(indexPartitionReceiveCounter.get());
+                                }
+                            });
+
+                }
 
             }
 
@@ -626,6 +642,40 @@ abstract public class ResourceManager extends OverflowManager implements IResour
 
         super(properties);
         
+    }
+
+    /**
+     * Requests a new index partition identifier from the
+     * {@link MetadataService} for the specified scale-out index (RMI).
+     * 
+     * @return The new index partition identifier.
+     * 
+     * @throws RuntimeException
+     *             if something goes wrong.
+     */
+    protected int nextPartitionId(final String scaleOutIndexName) {
+
+        final IMetadataService mds = getFederation().getMetadataService();
+
+        if (mds == null) {
+
+            throw new RuntimeException("Metadata service not discovered.");
+            
+        }
+        
+        try {
+
+            // obtain new partition identifier from the metadata service (RMI)
+            final int newPartitionId = mds.nextPartitionId(scaleOutIndexName);
+
+            return newPartitionId;
+
+        } catch (Throwable t) {
+
+            throw new RuntimeException(t);
+
+        }
+
     }
 
 }
