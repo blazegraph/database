@@ -529,7 +529,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
     final public int getChildCount() {
         
-        return nkeys+1;
+        return nkeys + 1;
         
     }
     
@@ -554,7 +554,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      * @exception IllegalArgumentException
      *                if the child is not a child of this node.
      */
-    void setChildKey(AbstractNode child) {
+    void setChildKey(final AbstractNode child) {
 
         if (!child.isPersistent()) {
 
@@ -1846,7 +1846,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      *       simplify things a bit further by making this adjustment here and in
      *       those merge() methods.
      */
-    protected void removeChild(AbstractNode child) {
+    protected void removeChild(final AbstractNode child) {
         
         assert child != null;
         assert !child.deleted;
@@ -2129,7 +2129,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      * 
      * @return The child node or leaf and never null.
      */
-    final protected AbstractNode getChild(int index) {
+    final public AbstractNode getChild(final int index) {
 
         /*
          * I've take out this test since it turns out to be relatively
@@ -2320,11 +2320,44 @@ public class Node extends AbstractNode<Node> implements INodeData {
         return a;
         
     }
+
+    /**
+     * Return the right-most child of this node.
+     * 
+     * @param nodesOnly
+     *            when <code>true</code> the search will halt at the
+     *            right-most non-leaf. Otherwise it will return the right-most
+     *            leaf.
+     *            
+     * @return The right-most child of this node.
+     */
+    protected AbstractNode getRightMostChild(final boolean nodesOnly) {
+
+        AbstractNode child = getChild(nkeys);
+
+        assert child != null;
+
+        if (child.isLeaf()) {
+            
+            if (nodesOnly) {
+
+                return this;
+
+            } else {
+            
+                return child;
+                
+            }
+            
+        }
+
+        return ((Node)child).getRightMostChild(nodesOnly);
+        
+    }
     
     /**
      * Iterator visits children, recursively expanding each child with a
-     * post-order traversal of its children and finally visits this node
-     * itself.
+     * post-order traversal of its children and finally visits this node itself.
      */
     @SuppressWarnings("unchecked")
     public Iterator<AbstractNode> postOrderNodeIterator(final boolean dirtyNodesOnly) {

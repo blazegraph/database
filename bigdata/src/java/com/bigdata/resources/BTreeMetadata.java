@@ -141,7 +141,8 @@ class BTreeMetadata {
      * @param oldJournal
      * @param entry
      */
-    public BTreeMetadata(final OverflowMetadata omd, final AbstractJournal oldJournal, final Entry entry) {
+    public BTreeMetadata(final OverflowMetadata omd,
+            final AbstractJournal oldJournal, final Entry entry) {
 
         if (omd == null)
             throw new IllegalArgumentException();
@@ -153,9 +154,9 @@ class BTreeMetadata {
             throw new IllegalArgumentException();
 
         this.omd = omd;
-        
+
         this.oldJournal = oldJournal;
-        
+
         this.checkpointAddr = entry.checkpointAddr;
 
         this.name = entry.name;
@@ -170,7 +171,7 @@ class BTreeMetadata {
         pmd = indexMetadata.getPartitionMetadata();
 
         if (pmd == null)
-            PostProcessOldJournalTask.log.warn("Not an index partition: " + name);
+            log.warn("Not an index partition: " + name);
 
         // #of sources in the view (very fast).
         int sourceCount = 0, sourceJournalCount = 0, sourceSegmentCount = 0;

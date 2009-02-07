@@ -47,6 +47,13 @@ public enum OverflowActionEnum {
     /**
      * Split an index partition that has overflowed into 2 or more siblings.
      */
-    Split;
+    Split,
+    
+    /**
+     * Split an index partition receiving a lot of writes on the tail of the key
+     * range into 2 siblings where the left-sibling has most of the key range
+     * and the right-sibling has the tail of the key range.
+     */
+    TailSplit;
     
 }

@@ -29,7 +29,6 @@ import org.apache.log4j.MDC;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -687,8 +686,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                                 .getIndexPartitionName(scaleOutIndexName, pmd
                                         .getPartitionId());
 
-                        // obtain new partition identifier from the metadata service (RMI)
-                        final int newPartitionId = nextPartitionId(scaleOutIndexName);
+                        // obtain new partition identifier from the metadata
+                        // service (RMI)
+                        final int newPartitionId = resourceManager
+                                .nextPartitionId(scaleOutIndexName);
 
                         final String targetIndexName = DataService
                                 .getIndexPartitionName(scaleOutIndexName,
@@ -744,33 +745,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         
     }
 
-    /**
-     * Requests a new index partition identifier from the
-     * {@link MetadataService} for the specified scale-out index (RMI).
-     * 
-     * @return The new index partition identifier.
-     * 
-     * @throws RuntimeException
-     *             if something goes wrong.
-     */
-    protected int nextPartitionId(final String scaleOutIndexName) {
-
-        try {
-
-            // obtain new partition identifier from the metadata service (RMI)
-            final int newPartitionId = resourceManager.getFederation()
-                    .getMetadataService().nextPartitionId(scaleOutIndexName);
-
-            return newPartitionId;
-        
-        } catch(Throwable t) {
-            
-            throw new RuntimeException(t);
-            
-        }
- 
-    }
-    
     protected List<AbstractTask> chooseIndexPartitionMoves() {
 
         if (resourceManager.maximumMovesPerTarget == 0) {
@@ -1132,8 +1106,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * possible reward for the least possible effort!]
              * 
              * @todo a full hot index partition could be split and one of the
-             * splits moved.  a tailSplit (or a headSplit) is just a special
-             * case of this where the split is (nearly) empty.
+             * splits moved. a tailSplit (or a headSplit) is just a special case
+             * of this where the split is (nearly) empty.
              * 
              * @todo we also need to balance the on disk allocations - there are
              * notes on that elsewhere. this is a tricky topic since historical
@@ -1143,6 +1117,13 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * excellent way to balance the on disk storage IF there is a
              * history limit such that older data will be released thereby
              * freeing space on the disk.
+             * 
+             * @todo it deleted tuples are a large part of the operations on the
+             * index partition during its life on the old journal then do a
+             * compacting merge on the index before doing any other operation so
+             * that we can better tell how many tuples remain in the index
+             * partition.
+             * 
              */
             
             final boolean moveCandidate =//
@@ -1240,7 +1221,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             // name of the corresponding scale-out index.
             final String scaleOutIndexName = vmd.indexMetadata.getName();
 
-            final int newPartitionId = nextPartitionId(scaleOutIndexName);
+            final int newPartitionId = resourceManager
+                    .nextPartitionId(scaleOutIndexName);
 
             final String targetName = DataService.getIndexPartitionName(
                     scaleOutIndexName, newPartitionId);
@@ -1465,7 +1447,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
          * journal).
          */
 
-        tasks.addAll(chooseIndexPartitionSplitBuildOrCompact(compactingMerge));
+        tasks.addAll(chooseIndexPartitionSplitBuildOrMerge(compactingMerge));
 
         /*
          * Log the selected post-processing decisions at a high level.
@@ -1521,14 +1503,14 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * 
      * @return The list of tasks.
      */
-    protected List<AbstractTask> chooseIndexPartitionSplitBuildOrCompact(
+    protected List<AbstractTask> chooseIndexPartitionSplitBuildOrMerge(
             final boolean compactingMerge) {
 
         // counters : must sum to ndone as post-condition.
         int ndone = 0; // for each named index we process
         int nskip = 0; // nothing.
         int nbuild = 0; // incremental build task.
-        int ncompact = 0; // compacting merge task.
+        int nmerge = 0; // compacting merge task.
         int nsplit = 0; // split task.
 
         // set of tasks created.
@@ -1590,12 +1572,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 
             }
             
-            /*
-             * Open the historical view of that index at that time (not just the
-             * mutable BTree but the full view).
-             */
-            final ILocalBTreeView view = vmd.getView();
-
             if (compactingMerge//
                     || (resourceManager.maximumCompactingMergesPerOverflow != 0 //
                     && (vmd.sourceJournalCount > resourceManager.maximumJournalsPerView || //
@@ -1619,12 +1595,12 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 // add to set of tasks to be run.
                 tasks.add(task);
 
-                putUsed(name, "willCompact(" + vmd + ")");
+                putUsed(name, "willMerge(" + vmd + ")");
 
                 if (INFO)
-                    log.info("will compact  : " + vmd);
+                    log.info("will merge    : " + vmd);
 
-                ncompact++;
+                nmerge++;
                 
                 ndone++;
 
@@ -1634,6 +1610,61 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             
             // the adjusted split handler.
             final ISplitHandler splitHandler = vmd.getAdjustedSplitHandler();
+            
+            /*
+             * Tail split?
+             * 
+             * Note: We can do a tail split as long as we are "close" to a full
+             * index partition. We have an expectation that the head of the
+             * split will be over the minimum capacity. While the tail of the
+             * split MIGHT be under the minimum capacity, if there are continued
+             * heavy writes on the tail then it will should reach the minimum
+             * capacity for an index partition by the time the live journal
+             * overflows again.
+             * 
+             * @todo this does not pay attention to the #of tuples at which the
+             * index partition would underflow. instead it assumes that
+             * underflow is a modest distance from a full split.
+             */
+            if (!compactingMerge //
+                    // move not in progress
+                    && vmd.pmd.getSourcePartitionId() == -1//
+                    // index partition is near a full split
+                    && splitHandler.percentOfSplit(vmd.getRangeCount()) > .9//
+                    // note: +1 in denominator avoids possibility of divide by
+                    // zero.
+                    && (vmd.getBTree().btreeCounters.tailSplit / (double) vmd
+                            .getBTree().btreeCounters.leavesSplit + 1) > .5) {
+
+                /*
+                 * Do an index (tail) split task.
+                 */
+
+                vmd.setAction(OverflowActionEnum.TailSplit);
+                
+                final AbstractTask task = new SplitTailTask(//
+                        resourceManager,//
+                        lastCommitTime,//
+                        name,//
+                        vmd,//
+                        null// moveTarget
+                );
+
+                // add to set of tasks to be run.
+                tasks.add(task);
+
+                putUsed(name, "tailSplit(name=" + vmd + ")");
+
+                if (INFO)
+                    log.info("will tailSpl: " + vmd);
+
+                nsplit++;
+                
+                ndone++;
+                
+                continue;
+                
+            }
             
             /*
              * Should split?
@@ -1723,7 +1754,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
             final ViewMetadata vmd = e.v;
             
-            if (ncompact < resourceManager.maximumCompactingMergesPerOverflow
+            if (nmerge < resourceManager.maximumCompactingMergesPerOverflow
                     && vmd.sourceCount >= resourceManager.maximumSourcesPerViewBeforeCompactingMerge) {
 
                 /*
@@ -1747,7 +1778,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 if (INFO)
                     log.info("will compact  : " + vmd);
 
-                ncompact++;
+                nmerge++;
                 
                 ndone++;
 
@@ -1785,10 +1816,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         } // while : next index partition
         
         // verify counters.
-        if (ndone != nskip + nbuild + ncompact + nsplit) {
+        if (ndone != nskip + nbuild + nmerge + nsplit) {
 
             log.warn("ndone=" + ndone + ", but : nskip=" + nskip + ", nbuild="
-                    + nbuild + ", ncompact=" + ncompact + ", nsplit=" + nsplit);
+                    + nbuild + ", ncompact=" + nmerge + ", nsplit=" + nsplit);
 
         }
 

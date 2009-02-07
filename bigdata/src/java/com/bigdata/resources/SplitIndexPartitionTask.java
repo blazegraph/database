@@ -1,15 +1,11 @@
 package com.bigdata.resources;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.ISplitHandler;
@@ -27,7 +23,6 @@ import com.bigdata.service.Event;
 import com.bigdata.service.EventType;
 import com.bigdata.service.Split;
 import com.bigdata.sparse.SparseRowStore;
-import com.bigdata.util.concurrent.ExecutionExceptions;
 
 /**
  * Task splits an index partition and should be invoked when there is strong
@@ -73,12 +68,6 @@ public class SplitIndexPartitionTask extends
      */
     private final ISplitHandler splitHandler;
     
-    /** The name of the scale-out index. */
-    private final String scaleOutIndexName;
-
-    /** The UUID associated with the scale-out index. */
-    private final UUID indexUUID;
-
     /**
      * The event corresponding to the split action.
      */
@@ -102,9 +91,23 @@ public class SplitIndexPartitionTask extends
         this.lastCommitTime = lastCommitTime;
 
         this.vmd = vmd;
-        
+
         if (!vmd.name.equals(name))
             throw new IllegalArgumentException();
+
+        if (vmd.pmd == null) {
+
+            throw new IllegalStateException("Not an index partition.");
+
+        }
+
+        if (vmd.pmd.getSourcePartitionId() != -1) {
+
+            throw new IllegalStateException(
+                    "Split not allowed during move: sourcePartitionId="
+                            + vmd.pmd.getSourcePartitionId());
+
+        }
 
         this.splitHandler = vmd.getAdjustedSplitHandler();
 
@@ -115,12 +118,6 @@ public class SplitIndexPartitionTask extends
             throw new AssertionError();
             
         }
-
-        // The name of the scale-out index.
-        scaleOutIndexName = vmd.indexMetadata.getName();
-
-        // The UUID associated with the scale-out index.
-        indexUUID = vmd.indexMetadata.getIndexUUID();
 
         this.e = new Event(resourceManager.getFederation(), vmd.name,
                 OverflowActionEnum.Split, OverflowActionEnum.Split + "("
@@ -136,139 +133,12 @@ public class SplitIndexPartitionTask extends
     }
     
     /**
-     * Validate splits, including: that the separator keys are strictly
-     * ascending, that the separator keys perfectly cover the source key range
-     * without overlap, that the rightSeparator for each split is the
-     * leftSeparator for the prior split, that the fromIndex offsets are
-     * strictly ascending, etc.
-     * 
-     * @param src
-     *            The source index.
-     * @param splits
-     *            The recommended split points.
-     * 
-     * @todo move to a utility class? (could be used by unit tests).
-     */
-    static public void validateSplits(final IIndex src, final Split[] splits) {
-
-        final IndexMetadata indexMetadata = src.getIndexMetadata();
-
-        final int nsplits = splits.length;
-
-        assert nsplits > 1 : "Expecting at least two splits, but found "
-                + nsplits;
-
-        // verify splits obey index order constraints.
-        int lastToIndex = -1;
-
-        // Note: the first leftSeparator must be this value.
-        byte[] fromKey = indexMetadata.getPartitionMetadata()
-                .getLeftSeparatorKey();
-
-        for (int i = 0; i < nsplits; i++) {
-
-            final Split split = splits[i];
-
-            assert split != null;
-
-            assert split.pmd != null;
-
-            assert split.pmd instanceof LocalPartitionMetadata;
-
-            LocalPartitionMetadata pmd = (LocalPartitionMetadata) split.pmd;
-
-            // check the leftSeparator key.
-            assert pmd.getLeftSeparatorKey() != null;
-            assert BytesUtil.bytesEqual(fromKey, pmd.getLeftSeparatorKey());
-
-            // verify rightSeparator is ordered after the left
-            // separator.
-            assert pmd.getRightSeparatorKey() == null
-                    || BytesUtil.compareBytes(fromKey, pmd
-                            .getRightSeparatorKey()) < 0;
-
-            // next expected leftSeparatorKey.
-            fromKey = pmd.getRightSeparatorKey();
-
-            if (i == 0) {
-
-                assert split.fromIndex == 0;
-
-                assert split.toIndex > split.fromIndex;
-
-            } else {
-
-                assert split.fromIndex == lastToIndex;
-
-            }
-
-            if (i + 1 == nsplits && split.toIndex == 0) {
-
-                /*
-                 * Note: This is allowed in case the index partition has
-                 * more than int32 entries in which case the toIndex of the
-                 * last split can not be defined and will be zero.
-                 */
-
-                assert split.ntuples == 0;
-
-                log.warn("Last split has no definate tuple count");
-
-            } else {
-
-                assert split.toIndex - split.fromIndex == split.ntuples;
-
-            }
-
-            lastToIndex = split.toIndex;
-
-        }
-
-        /*
-         * verify left separator key for 1st partition is equal to the left
-         * separator key of the source (this condition is also checked
-         * above).
-         */
-        assert ((LocalPartitionMetadata) splits[0].pmd)
-                .getLeftSeparatorKey().equals(
-                        indexMetadata.getPartitionMetadata()
-                                .getLeftSeparatorKey());
-
-        /*
-         * verify right separator key for last partition is equal to the
-         * right separator key of the source.
-         */
-        {
-            
-            // right separator for the last split.
-            final byte[] rightSeparator = ((LocalPartitionMetadata) splits[splits.length - 1].pmd)
-                    .getRightSeparatorKey();
-            
-            if(rightSeparator == null ) {
-                
-                // if null then the source right separator must have been null.
-                assert indexMetadata.getPartitionMetadata()
-                        .getRightSeparatorKey() == null;
-                
-            } else {
-                
-                // otherwise must compare as equals byte-by-byte.
-                assert rightSeparator.equals(
-                        indexMetadata.getPartitionMetadata()
-                                .getRightSeparatorKey());
-                
-            }
-        }
-
-    }
-    
-    /**
      * Decides how many index partitions should be generated (N) and builds N
      * {@link IndexSegment}s from the source index partition. If N will be ONE
      * (1) if a detailed inspection of the source index partition reveals that
      * it SHOULD NOT be split.
      * 
-     * @return A {@link SplitResult } if the index partition was split into 2 or
+     * @return A {@link SplitResult} if the index partition was split into 2 or
      *         more index partitions -or- a {@link BuildResult} iff the index
      *         partition was not split.
      */
@@ -280,7 +150,7 @@ public class SplitIndexPartitionTask extends
         try {
 
             Split[] splits;
-            final BuildResult[] buildResults;
+            final SplitResult result;
             try {
 
                 if (resourceManager.isOverflowAllowed())
@@ -304,52 +174,14 @@ public class SplitIndexPartitionTask extends
 
                 }
 
-                // final long createTime = Math.abs(startTime);
-
-                final IndexMetadata indexMetadata = src.getIndexMetadata();
-
-                {
-
-                    final LocalPartitionMetadata oldpmd = indexMetadata
-                            .getPartitionMetadata();
-
-                    if (oldpmd == null) {
-
-                        throw new IllegalStateException(
-                                "Not an index partition.");
-
-                    }
-
-                    if (oldpmd.getSourcePartitionId() != -1) {
-
-                        throw new IllegalStateException(
-                                "Split not allowed during move: sourcePartitionId="
-                                        + oldpmd.getSourcePartitionId());
-
-                    }
-
-                }
-
                 /*
                  * Get the split points for the index. Each split point
                  * describes a new index partition. Together the split points
                  * MUST exactly span the source index partitions key range.
                  * There MUST NOT be any overlap in the key ranges for the
                  * splits.
-                 * 
-                 * FIXME Recognize and support a tailSplit.
-                 * 
-                 * How can we detect the preconditions for a tail split? One
-                 * should be triggered when the writes are mostly on the end of
-                 * the index. The BTree could track the #of right-most sibling
-                 * splits or of splits of the bottom-most right-most node (the
-                 * parent of the right-most sibling leaves). Any BTree where 25%
-                 * of the node/leaf splits are in these regions should be a
-                 * candidate for a tail split.
-                 * 
-                 * The tail split just creates a new btree having either NO
-                 * tuples or just the tuples from the right-most sibling leaves.
                  */
+                
                 try {
 
                     splits = splitHandler.getSplits(resourceManager, src);
@@ -411,7 +243,7 @@ public class SplitIndexPartitionTask extends
 
                     // the file to be generated.
                     final File outFile = resourceManager
-                            .getIndexSegmentFile(indexMetadata);
+                            .getIndexSegmentFile(vmd.indexMetadata);
 
                     return concurrencyManager.submit(
                             new IncrementalBuildTask(resourceManager,
@@ -428,101 +260,11 @@ public class SplitIndexPartitionTask extends
                             + Arrays.toString(splits));
 
                 // validate the splits before processing them.
-                validateSplits(src, splits);
+                SplitUtility.validateSplits(src, splits);
 
-                /*
-                 * Build N index segments based on those split points.
-                 * 
-                 * Note: This is done in parallel to minimize latency.
-                 * 
-                 * @todo However, the operation could be serialized (or run with
-                 * limited parallelism) in order to minimize the RAM burden for
-                 * buffers during index segment creation. You can also limit the
-                 * parallelism to some upper bound. During normal operations,
-                 * the #of splits generated should be fairly small, e.g., N >= 2
-                 * and N ~ 2. This requires a thread pool (or delegate for a
-                 * thread pool) that can impose a limit on the actual
-                 * parallelism.
-                 */
-
-                // final int MAX_PARALLELISM = 4; // Integer.MAX_VALUE for no
-                // limit.
-                final List<BuildIndexSegmentSplitTask> tasks = new ArrayList<BuildIndexSegmentSplitTask>(
-                        nsplits);
-
-                for (int i = 0; i < splits.length; i++) {
-
-                    final Split split = splits[i];
-
-                    final File outFile = resourceManager
-                            .getIndexSegmentFile(indexMetadata);
-
-                    // create task to build an index segment from the key-range
-                    // for
-                    // the split.
-                    final BuildIndexSegmentSplitTask task = new BuildIndexSegmentSplitTask(
-                            resourceManager, lastCommitTime, name, //
-                            indexUUID, outFile,//
-                            split //
-                    );
-
-                    // add to set of tasks to be run.
-                    tasks.add(task);
-
-                }
-
-                // submit and await completion.
-                final List<Future<BuildResult>> futures = resourceManager
-                        .getConcurrencyManager().invokeAll(tasks);
-
-                // copy the individual build results into an array.
-                buildResults = new BuildResult[nsplits];
-                final List<Throwable> causes = new LinkedList<Throwable>();
-                {
-
-                    int i = 0;
-                    for (Future<BuildResult> f : futures) {
-
-                        try {
-
-                            buildResults[i] = f.get();
-
-                        } catch (Throwable t) {
-
-                            causes.add(t);
-
-                            log.error(t.getLocalizedMessage());
-
-                        }
-
-                        // increment regardless of the task outcome.
-                        i++;
-
-                    }
-
-                }
-
-                if (!causes.isEmpty()) {
-
-                    /*
-                     * Error handling - remove all generated files.
-                     */
-
-                    for (BuildResult result : buildResults) {
-
-                        if (result == null)
-                            continue;
-
-                        resourceManager.deleteResource(result.segmentMetadata
-                                .getUUID(), false/* isJournal */);
-
-                    }
-
-                    // throw wrapped set of exceptions.
-                    throw new ExecutionExceptions(causes);
-
-                }
-
+                result = SplitUtility.buildSplits(resourceManager, vmd,
+                        lastCommitTime, splits);
+                
             } finally {
 
                 /*
@@ -534,109 +276,129 @@ public class SplitIndexPartitionTask extends
 
             }
 
-            try {
+            /*
+             * Do the atomic update
+             */
+            doSplitAtomicUpdate(resourceManager, vmd, splits, result,
+                    OverflowActionEnum.Split,
+                    resourceManager.indexPartitionSplitCounter, e);
 
-                if (INFO)
-                    log.info("Generated " + splits.length
-                            + " index segments: name=" + vmd.name);
-
-                // form the split result.
-                final SplitResult result = new SplitResult(vmd.name,
-                        vmd.indexMetadata, splits, buildResults);
-
-                /*
-                 * Form up the set of resources on which the atomic update task
-                 * must have an exclusive lock before it can run. This includes
-                 * both the source index partition and the name of each new
-                 * index partition which will be generated by this split.
-                 * 
-                 * Note: We MUST declare the resource locks for the indices that
-                 * we are going to create in order to prevent tasks from
-                 * accessing those indices until the atomic update task has
-                 * committed. Note that the metadata index will be updated
-                 * before the atomic update task commits, so it is possible (and
-                 * does in fact happen) for clients to submit tasks that wind up
-                 * directed to one of the new index partitions before the atomic
-                 * update task commits.
-                 */
-                final String[] resources = new String[splits.length + 1];
-                {
-
-                    resources[0] = result.name;
-
-                    int i = 0;
-
-                    for (final Split split : splits) {
-
-                        final int partitionId = split.pmd.getPartitionId();
-
-                        resources[i + 1] = DataService.getIndexPartitionName(
-                                scaleOutIndexName, partitionId);
-
-                        i++;
-
-                    }
-
-                }
-
-                /*
-                 * Create task that will perform atomic update, converting the
-                 * source index partition into N new index partitions.
-                 */
-                final AbstractTask<Void> task = new AtomicUpdateSplitIndexPartitionTask(
-                        resourceManager, resources, indexUUID, result);
-
-
-                final Event updateEvent = e
-                        .newSubEvent(
-                                EventType.AtomicUpdate,
-                                OverflowActionEnum.Split + "(" + vmd.name
-                                        + "->" + Arrays.toString(resources)
-                                        + ") : src=" + vmd).start();
-                
-                try {
-
-                    // submit atomic update task and wait for it to complete
-                    concurrencyManager.submit(task).get();
-                    
-                } finally {
-                    
-                    updateEvent.end();
-                    
-                }
-
-                return result;
-
-            } catch (Throwable t) {
-
-                /*
-                 * Error handling - remove all generated files.
-                 * 
-                 * @todo error handling should be in the atomic update task since it
-                 * has greater visibility into when the resources are incorporated
-                 * into a view and hence accessible to concurrent processes.
-                 */
-
-                for (BuildResult result : buildResults) {
-
-                    if (result == null)
-                        continue;
-
-                    resourceManager.deleteResource(result.segmentMetadata
-                            .getUUID(), false/* isJournal */);
-
-                }
-
-                if (t instanceof Exception)
-                    throw (Exception) t;
-
-                throw new Exception(t);
-
-            }
-
+            // Done.
+            return result;
+            
         } finally {
 
             e.end();
+
+        }
+
+    }
+
+    /**
+     * 
+     * @param resourceManager
+     * @param vmd
+     * @param splits
+     * @param result
+     * @param action
+     * @param counter
+     * @param e
+     */
+    static protected void doSplitAtomicUpdate(
+            final ResourceManager resourceManager, final ViewMetadata vmd,
+            final Split[] splits, final SplitResult result,
+            final OverflowActionEnum action,
+            final AtomicLong counter,
+            final Event e) {
+
+        try {
+
+            /*
+             * Form up the set of resources on which the atomic update task
+             * must have an exclusive lock before it can run. This includes
+             * both the source index partition and the name of each new
+             * index partition which will be generated by this split.
+             * 
+             * Note: We MUST declare the resource locks for the indices that
+             * we are going to create in order to prevent tasks from
+             * accessing those indices until the atomic update task has
+             * committed. Note that the metadata index will be updated
+             * before the atomic update task commits, so it is possible (and
+             * does in fact happen) for clients to submit tasks that wind up
+             * directed to one of the new index partitions before the atomic
+             * update task commits.
+             */
+            final String[] resources = new String[splits.length + 1];
+            {
+
+                resources[0] = result.name;
+
+                int i = 0;
+
+                for (final Split split : splits) {
+
+                    final int partitionId = split.pmd.getPartitionId();
+
+                    resources[i + 1] = DataService.getIndexPartitionName(
+                            vmd.indexMetadata.getName(), partitionId);
+
+                    i++;
+
+                }
+
+            }
+
+            /*
+             * Create task that will perform atomic update, converting the
+             * source index partition into N new index partitions.
+             */
+            final AbstractTask<Void> task = new AtomicUpdateSplitIndexPartitionTask(
+                    resourceManager, resources, action, vmd.indexMetadata
+                            .getIndexUUID(), result);
+
+
+            final Event updateEvent = e.newSubEvent(
+                    EventType.AtomicUpdate,
+                    action + "(" + vmd.name + "->" + Arrays.toString(resources)
+                            + ") : src=" + vmd).start();
+            
+            try {
+
+                // submit atomic update task and wait for it to complete
+                resourceManager.getConcurrencyManager().submit(task).get();
+                
+                // update the counter.
+                counter.incrementAndGet();
+
+            } finally {
+                
+                updateEvent.end();
+                
+            }
+
+            return;
+
+        } catch (Throwable t) {
+
+            /*
+             * Error handling - remove all generated files.
+             * 
+             * @todo error handling should be in the atomic update task since it
+             * has greater visibility into when the resources are incorporated
+             * into a view and hence accessible to concurrent processes.
+             */
+
+            for (BuildResult r : result.buildResults) {
+
+                if (r == null)
+                    continue;
+
+                resourceManager.deleteResource(r.segmentMetadata.getUUID(),
+                        false/* isJournal */);
+
+            }
+
+            throw new RuntimeException(t);
 
         }
 
@@ -761,22 +523,26 @@ public class SplitIndexPartitionTask extends
     static protected class AtomicUpdateSplitIndexPartitionTask extends
             AbstractAtomicUpdateTask<Void> {
 
+        protected final OverflowActionEnum action;
         protected final SplitResult splitResult;
         
         public AtomicUpdateSplitIndexPartitionTask(
                 final ResourceManager resourceManager,
                 final String[] resource,
+                final OverflowActionEnum action,
                 final UUID indexUUID,
                 final SplitResult splitResult
                 ) {
 
             super(resourceManager, ITx.UNISOLATED, resource, indexUUID);
 
+            if (action == null)
+                throw new IllegalArgumentException();
+
             if (splitResult == null)
                 throw new IllegalArgumentException();
 
-            if (indexUUID == null)
-                throw new IllegalArgumentException();
+            this.action = action;
             
             this.splitResult = splitResult;
 
@@ -867,10 +633,11 @@ public class SplitIndexPartitionTask extends
 
                 // the new partition identifier.
                 final int partitionId = pmd.getPartitionId();
-                
+
                 // name of the new index partition.
-                final String name2 = DataService.getIndexPartitionName(scaleOutIndexName, partitionId);
-                
+                final String name2 = DataService.getIndexPartitionName(
+                        scaleOutIndexName, partitionId);
+
                 /*
                  * form locator for the new index partition for this split..
                  */
@@ -895,8 +662,7 @@ public class SplitIndexPartitionTask extends
                 
                 locators[i] = locator;
                 
-                final String summary = OverflowActionEnum.Split + "(" + name
-                        + "->" + name2 + ")";
+                final String summary = action + "(" + name + "->" + name2 + ")";
                 
                 /*
                  * Update the view definition.
@@ -1007,9 +773,6 @@ public class SplitIndexPartitionTask extends
             resourceManager.setIndexPartitionGone(name,
                     StaleLocatorReason.Split);
            
-            // notify successful index partition split.
-            resourceManager.indexPartitionSplitCounter.incrementAndGet();
-
             return null;
             
         }
