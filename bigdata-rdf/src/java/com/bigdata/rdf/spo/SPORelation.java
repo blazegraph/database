@@ -56,6 +56,7 @@ import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.BatchRemove;
 import com.bigdata.btree.proc.LongAggregator;
 import com.bigdata.cache.ConcurrentWeakValueCache;
+import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
@@ -777,10 +778,14 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * 
      * @todo config cache capacity.
      * 
-     * @todo config concurrency level, e.g., based on maxParallelSubqueries.
+     * @todo config concurrency level, e.g., based on maxParallelSubqueries times the
+     * expected concurrency for queries against a given view.
      */
-    final private ConcurrentWeakValueCache<SPOPredicate, SPOAccessPath> cache = new ConcurrentWeakValueCache<SPOPredicate, SPOAccessPath>(
-            100/* queueCapacity */, 0.75f/* loadFactor */, 50/* concurrencyLevel */);
+//  0.75f// loadFactor
+//  50// concurrencyLevel
+    final private ConcurrentWeakValueCache<SPOPredicate, SPOAccessPath> cache = new ConcurrentWeakValueCacheWithTimeout<SPOPredicate, SPOAccessPath>(
+            100/* queueCapacity */, 60 * 1000/* timeout */
+    );
 
     /**
      * Isolates the logic for selecting the {@link SPOKeyOrder} from the

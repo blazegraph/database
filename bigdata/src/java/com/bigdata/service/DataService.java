@@ -359,29 +359,29 @@ abstract public class DataService extends AbstractService
         
     }
     
-    /**
-     * Invoked periodically to clear stale entries from a variety of LRU caches.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    protected class ClearStaleCacheEntries implements Runnable {
-
-        public void run() {
-
-            if (!resourceManager.isRunning()) {
-
-                log.warn("Halting task : resource manager is not running.");
-                
-                throw new RuntimeException();
-                
-            }
-            
-            resourceManager.clearStaleCacheEntries();
-            
-        }
-        
-    }
+//    /**
+//     * Invoked periodically to clear stale entries from a variety of LRU caches.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    protected class ClearStaleCacheEntries implements Runnable {
+//
+//        public void run() {
+//
+//            if (!resourceManager.isRunning()) {
+//
+//                log.warn("Halting task : resource manager is not running.");
+//                
+//                throw new RuntimeException();
+//                
+//            }
+//            
+//            resourceManager.clearStaleCacheEntries();
+//            
+//        }
+//        
+//    }
     
     /**
      * Concrete implementation manages the local state of transactions executing
@@ -427,37 +427,37 @@ abstract public class DataService extends AbstractService
         
         resourceManager = (ResourceManager) newResourceManager(properties);
 
-        /*
-         * Schedule tasks that will clear stale references from the index cache,
-         * the index segment cache, and the store cache. This ensures that the
-         * LRU references in these caches will become weakly reachable after a
-         * timeout even in the event that there are no touched on the cache.
-         * 
-         * @todo config params for initialDelay and delay.
-         * 
-         * @todo do we need to do this for the Journal as well? Probably else
-         * these indices will still be strongly references. Also the resource
-         * locator cache, etc. All instances of ConcurrentWeakReferenceCache.
-         * 
-         * @todo one consequence of this is that you can shutdown heavily
-         * buffered indices, which you might not want to do.  In that case
-         * the delay should be ZERO and the task should not be run.
-         */
-        {
-
-            final long initialDelay = 5000;
-            
-            final long delay = 5000;
-            
-            /*
-             * Note: The task will self-cancel by throwing an exception once the
-             * resource manager is no longer running.
-             */
-
-            getFederation().addScheduledTask(new ClearStaleCacheEntries(),
-                    initialDelay, delay, TimeUnit.MILLISECONDS);
-            
-        }
+//        /*
+//         * Schedule tasks that will clear stale references from the index cache,
+//         * the index segment cache, and the store cache. This ensures that the
+//         * LRU references in these caches will become weakly reachable after a
+//         * timeout even in the event that there are no touched on the cache.
+//         * 
+//         * @todo config params for initialDelay and delay.
+//         * 
+//         * @todo do we need to do this for the Journal as well? Probably else
+//         * these indices will still be strongly references. Also the resource
+//         * locator cache, etc. All instances of ConcurrentWeakReferenceCache.
+//         * 
+//         * @todo one consequence of this is that you can shutdown heavily
+//         * buffered indices, which you might not want to do.  In that case
+//         * the delay should be ZERO and the task should not be run.
+//         */
+//        {
+//
+//            final long initialDelay = 5000;
+//            
+//            final long delay = 5000;
+//            
+//            /*
+//             * Note: The task will self-cancel by throwing an exception once the
+//             * resource manager is no longer running.
+//             */
+//
+//            getFederation().addScheduledTask(new ClearStaleCacheEntries(),
+//                    initialDelay, delay, TimeUnit.MILLISECONDS);
+//            
+//        }
         
         localTransactionManager = new DataServiceTransactionManager();
         

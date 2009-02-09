@@ -11,7 +11,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.cache.ConcurrentWeakValueCache;
-import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.concurrent.NamedLock;
 import com.bigdata.journal.ITx;
 import com.bigdata.util.NT;
@@ -61,12 +61,8 @@ abstract public class AbstractIndexCache<T extends IRangeQuery> {
 
 //        indexCache = new WeakValueCache<NT, T>(new LRUCache<NT, T>(capacity));
 
-        indexCache = new ConcurrentWeakValueCache<NT, T>(
-                new HardReferenceQueue<T>(null/* evictListener */,
-                        capacity,
-                        HardReferenceQueue.DEFAULT_NSCAN,
-                        TimeUnit.MILLISECONDS.toNanos(timeout)),
-                .75f/* loadFactor */, 16/* concurrencyLevel */, true/* removeClearedEntries */);
+        indexCache = new ConcurrentWeakValueCacheWithTimeout<NT, T>(capacity,
+                TimeUnit.MILLISECONDS.toNanos(timeout));
 
     }
 
@@ -77,8 +73,8 @@ abstract public class AbstractIndexCache<T extends IRangeQuery> {
      * @param name
      * @param timestamp
      * 
-     * @return The index view -or- <code>null</code> if the described
-     *         index does not exist.
+     * @return The index view -or- <code>null</code> if the described index
+     *         does not exist.
      */
     abstract protected T newView(final String name, final long timestamp);
 

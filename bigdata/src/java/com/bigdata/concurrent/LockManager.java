@@ -96,6 +96,10 @@ public class LockManager</*T,*/R extends Comparable<R>> {
      * while concurrent operations resolve resources to their queues. Stale
      * {@link ResourceQueue}s are purged after they become only weakly
      * reachable.
+     * 
+     * @todo could also use timeout to purge stale resource queues, but it
+     *       should not matter since the {@link ResourceQueue} does not have a
+     *       reference to the resource itself - just to its name.
      */
     final private ConcurrentWeakValueCache<R, ResourceQueue<R, Thread>> resourceQueues = new ConcurrentWeakValueCache<R, ResourceQueue<R, Thread>>(
             1000/* nresources */);

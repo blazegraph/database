@@ -50,7 +50,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.cache.ConcurrentWeakValueCache;
-import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.counters.CounterSet;
@@ -411,11 +411,8 @@ public class Name2Addr extends BTree {
         // indexCache = new WeakValueCache<String, BTree>(
         // new LRUCache<String, BTree>(cacheCapacity));
 
-        indexCache = new ConcurrentWeakValueCache<String, BTree>(
-                new HardReferenceQueue<BTree>(null/* evictListener */,
-                        cacheCapacity, HardReferenceQueue.DEFAULT_NSCAN,
-                        TimeUnit.MILLISECONDS.toNanos(cacheTimeout)),
-                .75f/* loadFactor */, 16/* concurrencyLevel */, true/* removeClearedEntries */);
+        indexCache = new ConcurrentWeakValueCacheWithTimeout<String, BTree>(
+                cacheCapacity, TimeUnit.MILLISECONDS.toNanos(cacheTimeout));
 
     }
     

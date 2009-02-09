@@ -34,7 +34,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.log4j.Logger;
 
 import com.bigdata.cache.ConcurrentWeakValueCache;
-import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.util.NT;
 
 /**
@@ -53,14 +53,14 @@ abstract public class AbstractCachingResourceLocator<T extends ILocatableResourc
 
     protected static final boolean INFO = log.isInfoEnabled();
 
-    private transient ConcurrentWeakValueCache<NT, T> cache;
+    final private transient ConcurrentWeakValueCache<NT, T> cache;
 
-    private int capacity;
+    final private int capacity;
 
     /**
      * The cache capacity.
      */
-    public int capacity() {
+    final public int capacity() {
         
         return capacity;
         
@@ -86,11 +86,8 @@ abstract public class AbstractCachingResourceLocator<T extends ILocatableResourc
         
 //        this.cache = new WeakValueCache<NT, T>(new LRUCache<NT, T>(capacity));
 
-        this.cache = new ConcurrentWeakValueCache<NT, T>(
-                new HardReferenceQueue<T>(null/* evictListener */, capacity,
-                        HardReferenceQueue.DEFAULT_NSCAN, TimeUnit.MILLISECONDS
-                                .toNanos(timeout)), .75f/* loadFactor */,
-                16/* concurrencyLevel */, true/* removeClearedEntries */);
+        this.cache = new ConcurrentWeakValueCacheWithTimeout<NT, T>(capacity,
+                TimeUnit.MILLISECONDS.toNanos(timeout));
 
     }
 
@@ -104,7 +101,7 @@ abstract public class AbstractCachingResourceLocator<T extends ILocatableResourc
      * 
      * @return The relation -or- <code>null</code> iff it is not in the cache.
      */
-    protected T get(String namespace, long timestamp) {
+    protected T get(final String namespace, final long timestamp) {
 
         if (namespace == null)
             throw new IllegalArgumentException();
@@ -144,7 +141,7 @@ abstract public class AbstractCachingResourceLocator<T extends ILocatableResourc
      * @param resource
      *            The resource.
      */
-    protected void put(T resource) {
+    protected void put(final T resource) {
         
         if (resource == null)
             throw new IllegalArgumentException();
@@ -159,7 +156,6 @@ abstract public class AbstractCachingResourceLocator<T extends ILocatableResourc
                     + timestamp);
 
         }
-
 
         cache.put(new NT(namespace, timestamp), resource);
 
@@ -177,19 +173,19 @@ abstract public class AbstractCachingResourceLocator<T extends ILocatableResourc
      *         same resource namespace and timestamp, in which case it was
      *         cleared from the cache.
      */
-    protected boolean clear(String namespace, long timestamp) {
+    protected boolean clear(final String namespace, final long timestamp) {
         
         if (namespace == null)
             throw new IllegalArgumentException();
-        
-        if(cache.remove(new NT(namespace,timestamp))!=null) {
-            
+
+        if (cache.remove(new NT(namespace, timestamp)) != null) {
+
             return true;
-            
+
         }
-        
+
         return false;
-        
+
     }
     
 }

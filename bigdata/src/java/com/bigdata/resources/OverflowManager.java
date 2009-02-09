@@ -54,6 +54,7 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
+import com.bigdata.resources.ResourceManager.IResourceManagerCounters;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Event;
 import com.bigdata.service.EventType;
@@ -1961,29 +1962,17 @@ abstract public class OverflowManager extends IndexManager {
         try {
 
             final CounterSet tmp = (CounterSet)getCounters();
+
+            tmp.detach(IResourceManagerCounters.LiveJournal);
             
-            tmp.detach("Live Journal");
-            
-            tmp.makePath("Live Journal").attach(getLiveJournal().getCounters());
+            tmp.makePath(IResourceManagerCounters.LiveJournal).attach(
+                    getLiveJournal().getCounters());
 
         } catch(Throwable t) {
             
             log.warn("Problem updating counters: "+t, t);
             
         }
-
-//        /*
-//         * Cause old resources to be deleted on the file system.
-//         * 
-//         * Note: This is run while we have a lock on the write executor service
-//         * so that we can guarentee that no tasks are running with access to
-//         * historical views which might be deleted when we purge old resources.
-//         * 
-//         * Note: If [postProcess == false] then ALL indices were copied to the
-//         * new live journal and the old journal will be purged if
-//         * [minReleaseTime == 0].
-//         */
-//        purgeOldResources();
         
         if(INFO)
             log.info("end");

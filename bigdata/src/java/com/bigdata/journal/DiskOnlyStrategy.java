@@ -26,6 +26,7 @@ package com.bigdata.journal;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ClosedByInterruptException;
@@ -1105,7 +1106,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      * @param maximumExtent
      * @param fileMetadata
      */
-    DiskOnlyStrategy(long maximumExtent, FileMetadata fileMetadata) {
+    DiskOnlyStrategy(final long maximumExtent, final FileMetadata fileMetadata) {
 
         super(fileMetadata.extent, maximumExtent, fileMetadata.offsetBits,
                 fileMetadata.nextOffset, fileMetadata.bufferMode,

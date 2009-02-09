@@ -53,7 +53,6 @@ import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
 import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.proc.ISimpleIndexProcedure;
 import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.cache.IValueAge;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
@@ -113,7 +112,7 @@ import com.bigdata.service.Split;
  * 
  * @see KeyBuilder
  */
-abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearList, IValueAge  {
+abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearList {//, IValueAge  {
 
     /**
      * The index is already closed.
@@ -3144,30 +3143,31 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
         
     }
     
-    /*
-     * API used to report how long it has been since the BTree was last used.
-     * This is used to clear BTrees that are not in active use from a variety of
-     * caches. This helps us to better manage RAM.
-     */
-    
-    /**
-     * Note: DO NOT invoke this method from hot code such as
-     * {@link #touch(AbstractNode)} as that will impose a huge performance
-     * penalty! It is sufficient to let the {@link HardReferenceQueue} invoke
-     * this method itself when it adds an {@link AbstractBTree} reference.
-     */
-    final public void touch() {
-    
-        timestamp = System.nanoTime();
-        
-    }
-    
-    final public long timestamp() {
-        
-        return timestamp;
-        
-    }
-    
-    private long timestamp = System.nanoTime();
+//    /*
+//     * API used to report how long it has been since the BTree was last used.
+//     * This is used to clear BTrees that are not in active use from a variety of
+//     * caches. This helps us to better manage RAM.
+//     */
+//    
+//    /**
+//     * Note: DO NOT invoke this method from hot code such as
+//     * {@link #touch(AbstractNode)} as that will impose a huge performance
+//     * penalty! It is sufficient to let the
+//     * {@link SynchronizedHardReferenceQueueWithTimeout} invoke this method
+//     * itself when it adds an {@link AbstractBTree} reference.
+//     */
+//    final public void touch() {
+//    
+//        timestamp = System.nanoTime();
+//        
+//    }
+//    
+//    final public long timestamp() {
+//        
+//        return timestamp;
+//        
+//    }
+//    
+//    private long timestamp = System.nanoTime();
     
 }

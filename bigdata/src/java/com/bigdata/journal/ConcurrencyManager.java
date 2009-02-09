@@ -557,9 +557,9 @@ public class ConcurrencyManager implements IConcurrencyManager {
      *            The object managing the resources on which the indices are
      *            stored.
      */
-    public ConcurrencyManager(Properties properties,
-            ILocalTransactionManager transactionManager,
-            IResourceManager resourceManager) {
+    public ConcurrencyManager(final Properties properties,
+            final ILocalTransactionManager transactionManager,
+            final IResourceManager resourceManager) {
 
         if (properties == null)
             throw new IllegalArgumentException();

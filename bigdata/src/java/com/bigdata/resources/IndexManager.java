@@ -54,8 +54,10 @@ import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.btree.ReadCommittedView;
 import com.bigdata.cache.ConcurrentWeakValueCache;
+import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.cache.LRUCache;
+import com.bigdata.cache.SynchronizedHardReferenceQueue;
 import com.bigdata.concurrent.NamedLock;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.journal.AbstractJournal;
@@ -303,7 +305,8 @@ abstract public class IndexManager extends StoreManager {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public class IndexCache extends ConcurrentWeakValueCache<NT, ILocalBTreeView> {
+    public class IndexCache extends
+            ConcurrentWeakValueCacheWithTimeout<NT, ILocalBTreeView> {
 
         /**
          * The earliest timestamp that must be retained for the read-historical
@@ -339,13 +342,13 @@ abstract public class IndexManager extends StoreManager {
          */
         public long getRetentionTime() {
 
-            /*
-             * This will tend to clear stale references and cause them to be
-             * cleared in the cache, but probably not in time for the changes to
-             * be noticed within the loop below.
-             */
-
-            clearStaleRefs();
+//            /*
+//             * This will tend to clear stale references and cause them to be
+//             * cleared in the cache, but probably not in time for the changes to
+//             * be noticed within the loop below.
+//             */
+//
+//            clearStaleRefs();
             
             synchronized (retentionTime) {
 
@@ -482,10 +485,7 @@ abstract public class IndexManager extends StoreManager {
         
         public IndexCache(final int cacheCapacity, final long cacheTimeout) {
 
-            super(new HardReferenceQueue<ILocalBTreeView>(null/* evictListener */,
-                    cacheCapacity, HardReferenceQueue.DEFAULT_NSCAN,
-                    TimeUnit.MILLISECONDS.toNanos(cacheTimeout)),
-                    .75f/* loadFactor */, 16/* concurrencyLevel */, true/* removeClearedEntries */);
+            super(cacheCapacity, TimeUnit.MILLISECONDS.toNanos(cacheTimeout));
 
         }
         
@@ -528,20 +528,20 @@ abstract public class IndexManager extends StoreManager {
      */
     private final transient NamedLock<UUID> segmentLock = new NamedLock<UUID>();
     
-    /**
-     * Clears any stale entries in the LRU backing the {@link #indexCache} or
-     * the {@link #indexSegmentCache}.
-     */
-    public void clearStaleCacheEntries() {
-
-        // the store manager.
-        super.clearStaleCacheEntries();
-        
-        indexCache.clearStaleRefs();
-
-        indexSegmentCache.clearStaleRefs();
-        
-    }
+//    /**
+//     * Clears any stale entries in the LRU backing the {@link #indexCache} or
+//     * the {@link #indexSegmentCache}.
+//     */
+//    public void clearStaleCacheEntries() {
+//
+//        // the store manager.
+//        super.clearStaleCacheEntries();
+//        
+//        indexCache.clearStaleRefs();
+//
+//        indexSegmentCache.clearStaleRefs();
+//        
+//    }
 
     /**
      * The #of entries in the hard reference cache for {@link IIndex}s. There
@@ -719,16 +719,11 @@ abstract public class IndexManager extends StoreManager {
                 throw new RuntimeException(Options.INDEX_SEGMENT_CACHE_TIMEOUT
                         + " must be non-negative");
 
-            indexSegmentCache = new ConcurrentWeakValueCache<UUID, IndexSegment>(
-                    new HardReferenceQueue<IndexSegment>(
-                            null/* evictListener */,
-                            indexSegmentCacheCapacity,
-                            HardReferenceQueue.DEFAULT_NSCAN,
-                            TimeUnit.MILLISECONDS
-                                    .toNanos(indexSegmentCacheTimeout)),
-                    .75f/* loadFactor */, 16/* concurrencyLevel */, true/* removeClearedEntries */);
+            indexSegmentCache = new ConcurrentWeakValueCacheWithTimeout<UUID, IndexSegment>(
+                    indexSegmentCacheCapacity, TimeUnit.MILLISECONDS
+                            .toNanos(indexSegmentCacheTimeout));
 
-//            indexSegmentCache = new WeakValueCache<UUID, IndexSegment>(
+// indexSegmentCache = new WeakValueCache<UUID, IndexSegment>(
 ////                    WeakValueCache.INITIAL_CAPACITY,//
 ////                    WeakValueCache.LOAD_FACTOR, //
 //                    new LRUCache<UUID, IndexSegment>(indexSegmentCacheCapacity)
