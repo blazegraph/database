@@ -1,12 +1,10 @@
 package com.bigdata.resources;
 
-import java.io.File;
 import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.IndexMetadata;
@@ -20,7 +18,6 @@ import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Event;
-import com.bigdata.service.EventType;
 import com.bigdata.service.Split;
 import com.bigdata.sparse.SparseRowStore;
 
@@ -57,8 +54,6 @@ import com.bigdata.sparse.SparseRowStore;
 public class SplitIndexPartitionTask extends
         AbstractPrepareTask<AbstractResult> {
 
-    private final long lastCommitTime;
-
     protected final ViewMetadata vmd;
     
     /**
@@ -78,22 +73,15 @@ public class SplitIndexPartitionTask extends
      * @param lastCommitTime
      * @param name
      */
-    protected SplitIndexPartitionTask(final ResourceManager resourceManager,
-            final long lastCommitTime, final String name,
-            final ViewMetadata vmd) {
+    protected SplitIndexPartitionTask(final ViewMetadata vmd) {
 
-        super(resourceManager, TimestampUtility
-                .asHistoricalRead(lastCommitTime), name);
+        super(vmd.resourceManager, TimestampUtility
+                .asHistoricalRead(vmd.commitTime), vmd.name);
 
         if (vmd == null)
             throw new IllegalArgumentException(); 
         
-        this.lastCommitTime = lastCommitTime;
-
         this.vmd = vmd;
-
-        if (!vmd.name.equals(name))
-            throw new IllegalArgumentException();
 
         if (vmd.pmd == null) {
 
@@ -121,7 +109,7 @@ public class SplitIndexPartitionTask extends
 
         this.e = new Event(resourceManager.getFederation(), vmd.name,
                 OverflowActionEnum.Split, OverflowActionEnum.Split + "("
-                        + name + ") : " + vmd);
+                        + vmd.name + ") : " + vmd);
         
     }
 
@@ -149,7 +137,6 @@ public class SplitIndexPartitionTask extends
 
         try {
 
-            Split[] splits;
             final SplitResult result;
             try {
 
@@ -182,6 +169,7 @@ public class SplitIndexPartitionTask extends
                  * splits.
                  */
                 
+                Split[] splits;
                 try {
 
                     splits = splitHandler.getSplits(resourceManager, src);
@@ -241,13 +229,8 @@ public class SplitIndexPartitionTask extends
                     log.warn("No splits identified - will build instead: "
                             + vmd);
 
-                    // the file to be generated.
-                    final File outFile = resourceManager
-                            .getIndexSegmentFile(vmd.indexMetadata);
-
                     return concurrencyManager.submit(
-                            new IncrementalBuildTask(resourceManager,
-                                    lastCommitTime, name, vmd, outFile)).get();
+                            new IncrementalBuildTask(vmd)).get();
 
                 }
 
@@ -262,9 +245,8 @@ public class SplitIndexPartitionTask extends
                 // validate the splits before processing them.
                 SplitUtility.validateSplits(src, splits);
 
-                result = SplitUtility.buildSplits(resourceManager, vmd,
-                        lastCommitTime, splits);
-                
+                result = SplitUtility.buildSplits(vmd, splits);
+
             } finally {
 
                 /*
@@ -279,7 +261,7 @@ public class SplitIndexPartitionTask extends
             /*
              * Do the atomic update
              */
-            doSplitAtomicUpdate(resourceManager, vmd, splits, result,
+            doSplitAtomicUpdate(resourceManager, vmd, result,
                     OverflowActionEnum.Split,
                     resourceManager.indexPartitionSplitCounter, e);
 
@@ -302,14 +284,14 @@ public class SplitIndexPartitionTask extends
      * @param result
      * @param action
      * @param counter
-     * @param e
+     * @param parentEvent
      */
     static protected void doSplitAtomicUpdate(
             final ResourceManager resourceManager, final ViewMetadata vmd,
-            final Split[] splits, final SplitResult result,
+            final SplitResult result,
             final OverflowActionEnum action,
             final AtomicLong counter,
-            final Event e) {
+            final Event parentEvent) {
 
         try {
 
@@ -328,6 +310,7 @@ public class SplitIndexPartitionTask extends
              * directed to one of the new index partitions before the atomic
              * update task commits.
              */
+            final Split[] splits = result.splits;
             final String[] resources = new String[splits.length + 1];
             {
 
@@ -356,9 +339,8 @@ public class SplitIndexPartitionTask extends
                     resourceManager, resources, action, vmd.indexMetadata
                             .getIndexUUID(), result);
 
-
-            final Event updateEvent = e.newSubEvent(
-                    EventType.AtomicUpdate,
+            final Event updateEvent = parentEvent.newSubEvent(
+                    OverflowSubtaskEnum.AtomicUpdate,
                     action + "(" + vmd.name + "->" + Arrays.toString(resources)
                             + ") : src=" + vmd).start();
             
@@ -405,110 +387,6 @@ public class SplitIndexPartitionTask extends
     }
 
     /**
-     * Task used to build an {@link IndexSegment} from a restricted key-range of
-     * an index during a {@link SplitIndexPartitionTask}. This is a compacting
-     * merge since we want as much of the data for the index as possible in a
-     * single {@link IndexSegment}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static protected class BuildIndexSegmentSplitTask extends
-            AbstractAtomicUpdateTask<BuildResult> {
-
-        /**
-         * The file on which the index segment is being written.
-         */
-        private final File outFile;
-        
-        private final long lastCommitTime;
-
-        private final Split split;
-
-        /**
-         * @param resourceManager
-         * @param lastCommitTime
-         * @param resource
-         */
-        public BuildIndexSegmentSplitTask(ResourceManager resourceManager,
-                long lastCommitTime, String resource, UUID indexUUID,
-                File outFile, Split split) {
-
-            super(resourceManager, TimestampUtility
-                    .asHistoricalRead(lastCommitTime), resource, indexUUID);
-
-            this.lastCommitTime = lastCommitTime;
-
-            this.outFile = outFile;
-
-            if (outFile == null)
-                throw new IllegalArgumentException();
-            
-            if (split == null)
-                throw new IllegalArgumentException();
-            
-            this.split = split;
-            
-        }
-
-        @Override
-        protected BuildResult doTask() throws Exception {
-
-            if (resourceManager.isOverflowAllowed())
-                throw new IllegalStateException();
-
-            final String name = getOnlyResource();
-            
-            final IIndex src = getIndex(name);
-
-            if (INFO) {
-                
-                // note: the mutable btree - accessed here for debugging only.
-                final BTree btree = ((ILocalBTreeView) src).getMutableBTree();
-
-                log.info("src=" + name + ",counter=" + src.getCounter().get()
-                        + ",checkpoint=" + btree.getCheckpoint());
-            
-            }
-
-            final LocalPartitionMetadata pmd = (LocalPartitionMetadata)split.pmd;
-
-            final byte[] fromKey = pmd.getLeftSeparatorKey();
-            
-            final byte[] toKey = pmd.getRightSeparatorKey();
-
-            if (fromKey == null && toKey == null) {
-
-                /*
-                 * Note: This is not legal because it implies that we are
-                 * building the index segment from the entire source key range -
-                 * hence not a split at all!
-                 */
-                
-                throw new RuntimeException("Not a key-range?");
-                
-            }
-            
-            if (INFO)
-                log.info("begin: name=" + name + ", outFile=" + outFile
-                        + ", pmd=" + pmd);
-            
-            // build the index segment from the key range.
-            final BuildResult result = resourceManager.buildIndexSegment(name,
-                    src, outFile, true/* compactingMerge */, lastCommitTime,
-                    fromKey, toKey);
-
-            if (INFO)
-                log.info("done: name=" + name + ", outFile=" + outFile
-                        + ", pmd=" + pmd);
-            
-            return result;
-            
-        }
-        
-    }
-
-    /**
      * An {@link ITx#UNISOLATED} operation that splits the live index using the
      * same {@link Split} points, generating new index partitions with new
      * partition identifiers. The old index partition is deleted as a
@@ -523,26 +401,46 @@ public class SplitIndexPartitionTask extends
     static protected class AtomicUpdateSplitIndexPartitionTask extends
             AbstractAtomicUpdateTask<Void> {
 
+
+        /**
+         * The expected UUID of the scale-out index.
+         */
+        final protected UUID indexUUID;
+        
+        /**
+         * Either a normal split or a tail split.
+         */
         protected final OverflowActionEnum action;
+        
         protected final SplitResult splitResult;
         
+        /**
+         * 
+         * @param resourceManager
+         * @param resource
+         * @param action
+         * @param indexUUID The UUID of the scale-out index.
+         * @param splitResult
+         */
         public AtomicUpdateSplitIndexPartitionTask(
-                final ResourceManager resourceManager,
-                final String[] resource,
-                final OverflowActionEnum action,
-                final UUID indexUUID,
-                final SplitResult splitResult
-                ) {
+                final ResourceManager resourceManager, final String[] resource,
+                final OverflowActionEnum action, final UUID indexUUID,
+                final SplitResult splitResult) {
 
-            super(resourceManager, ITx.UNISOLATED, resource, indexUUID);
+            super(resourceManager, ITx.UNISOLATED, resource);
 
             if (action == null)
+                throw new IllegalArgumentException();
+
+            if (indexUUID == null)
                 throw new IllegalArgumentException();
 
             if (splitResult == null)
                 throw new IllegalArgumentException();
 
             this.action = action;
+
+            this.indexUUID = indexUUID;
             
             this.splitResult = splitResult;
 
@@ -574,26 +472,15 @@ public class SplitIndexPartitionTask extends
              * buffered writes onto the B+Trees buffering writes for the new
              * index partitions created by the split.
              */
-            final BTree src = ((ILocalBTreeView)getIndex(name)).getMutableBTree();
-            
-            if (!indexUUID.equals(src.getIndexMetadata().getIndexUUID())) {
-                
-                /*
-                 * This can happen if you drop/add a scale-out index during
-                 * overflow processing. The new index will have a new UUID. We
-                 * check this to prevent merging in data from the old index.
-                 */
+            final BTree src = ((ILocalBTreeView) getIndex(name))
+                    .getMutableBTree();
 
-                throw new RuntimeException(
-                        "Different UUID: presuming drop/add of index: name="
-                                + getOnlyResource());
-                
-            }
+            assertSameIndex(indexUUID, src);
                         
             if (INFO) {
             
-                log.info("src=" + name + ",counter=" + src.getCounter().get()
-                        + ",checkpoint=" + src.getCheckpoint());
+                log.info("src=" + name + ", counter=" + src.getCounter().get()
+                        + ", checkpoint=" + src.getCheckpoint());
 
                 log.info("src=" + name + ", splitResult=" + splitResult);
                 

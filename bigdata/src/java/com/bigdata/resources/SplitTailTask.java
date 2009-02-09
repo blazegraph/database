@@ -30,7 +30,7 @@ package com.bigdata.resources;
 
 import java.util.UUID;
 
-import com.bigdata.btree.BTreeCounters;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Event;
 import com.bigdata.service.Split;
@@ -48,12 +48,12 @@ import com.bigdata.service.Split;
  * partitions. However, it require RMI to the metadata index to do that and
  * therefore should not be done during synchronous overflow in order to reduce
  * the possibility for errors during that operation.
- * 
- * @todo do this as a variant on move? The right-sibling of tail split is a
- *       prime candidate for a move since there is an expectation that it will
- *       continue to be hot for writes. Therefore the caller has an opportunity
- *       when specifying a tail split to also specify that the new right-sibling
- *       index partition will be moved onto a caller specified data service.
+ * <p>
+ * The right-sibling of tail split is a prime candidate for a move since there
+ * is an expectation that it will continue to be hot for writes. Therefore the
+ * caller has an opportunity when specifying a tail split to also specify that
+ * the new right-sibling index partition will be moved onto a caller specified
+ * data service.
  * 
  * @todo unit tests.
  * 
@@ -62,8 +62,6 @@ import com.bigdata.service.Split;
  */
 public class SplitTailTask extends AbstractPrepareTask {
 
-    private final long lastCommitTime;
-    
     private final ViewMetadata vmd;
 
     /**
@@ -78,26 +76,17 @@ public class SplitTailTask extends AbstractPrepareTask {
     private final Event e;
     
     /**
-     * @param resourceManager
-     * @param lastCommitTime
-     * @param name
      * @param vmd
      * @param moveTarget
      *            When non-<code>null</code> the new right-sibling (the tail)
      *            will be moved to the specified data service after the split.
      */
-    public SplitTailTask(final ResourceManager resourceManager,
-            final long lastCommitTime, final String name,
-            final ViewMetadata vmd, final UUID moveTarget) {
+    public SplitTailTask(final ViewMetadata vmd, final UUID moveTarget) {
 
-        super(resourceManager, lastCommitTime, name);
-
-        this.lastCommitTime = lastCommitTime;
+        super(vmd.resourceManager, TimestampUtility
+                .asHistoricalRead(vmd.commitTime), vmd.name);
 
         this.vmd = vmd;
-        
-        if (!vmd.name.equals(name))
-            throw new IllegalArgumentException();
         
         if (vmd.pmd == null) {
 
@@ -115,23 +104,9 @@ public class SplitTailTask extends AbstractPrepareTask {
 
         this.moveTarget = moveTarget;
 
-        final BTreeCounters counters = vmd.getBTree().btreeCounters;
-
-        this.e = new Event(
-                resourceManager.getFederation(),
-                vmd.name,
-                OverflowActionEnum.TailSplit,
-                OverflowActionEnum.TailSplit
-                        + "("
-                        + name
-                        + ") : "
-                        + vmd
-                        + " : #tailSplit="
-                        + counters.tailSplit
-                        + ", #leafSplit="
-                        + counters.leavesSplit
-                        + ", ratio="
-                        + (counters.tailSplit / (double) counters.leavesSplit + 1));
+        this.e = new Event(resourceManager.getFederation(), vmd.name,
+                OverflowActionEnum.TailSplit, OverflowActionEnum.TailSplit
+                        + "(" + vmd.name + ") : " + vmd);
         
     }
 
@@ -145,10 +120,11 @@ public class SplitTailTask extends AbstractPrepareTask {
     @Override
     protected Object doTask() throws Exception {
         
+        e.start();
+
         try {
 
             final SplitResult result;
-            final Split[] splits;
             try {
                 
                 /*
@@ -156,14 +132,13 @@ public class SplitTailTask extends AbstractPrepareTask {
                  * partitions.
                  */
 
-                splits = SplitUtility
-                        .tailSplit(resourceManager, vmd.getBTree());
+                final Split[] splits = SplitUtility.tailSplit(resourceManager,
+                        vmd.getBTree());
 
                 // validate the splits before processing them.
                 SplitUtility.validateSplits(vmd.getBTree(), splits);
 
-                result = SplitUtility.buildSplits(resourceManager, vmd,
-                        lastCommitTime, splits);
+                result = SplitUtility.buildSplits(vmd, splits);
 
             } finally {
 
@@ -178,38 +153,48 @@ public class SplitTailTask extends AbstractPrepareTask {
         
             // Do the atomic update
             SplitIndexPartitionTask.doSplitAtomicUpdate(resourceManager, vmd,
-                    splits, result, OverflowActionEnum.TailSplit,
+                    result, OverflowActionEnum.TailSplit,
                     resourceManager.indexPartitionTailSplitCounter, e);
             
             if (moveTarget != null) {
              
-                // the name of the newly created rightSibling index partition.
-                final String rightSiblingName = DataService
-                        .getIndexPartitionName(vmd.indexMetadata.getName(),
-                                splits[1].pmd.getPartitionId());
-
                 /*
-                 * The partitionId that will be used when the rightSibling is
-                 * moved to the target data service (moving it will cause a new
-                 * index partition to be defined using this partitionId).
-                 */
-                final int newPartitionId = resourceManager
-                        .nextPartitionId(rightSiblingName);
-
-                /*
-                 * FIXME Unlike a normal move where there are writes on the old
+                 * Note: Unlike a normal move where there are writes on the old
                  * journal, all the data for the rightSibling is in an index
                  * segment that we just built and new writes MAY be buffered on
-                 * the live journal. Therefore we need a different entry point
+                 * the live journal. Therefore we use a different entry point
                  * into the MOVE operation, one which does not copy over the
                  * data from the old journal.
                  */
 
-//                new MoveIndexPartitionTask(resourceManager,
-//                        rightSiblingRegisterTime, rightSiblingName,
-//                        rightSiblingVMD, moveTarget, newPartitionId).call();
+                /*
+                 * The name of the post-split rightSibling (this is the source
+                 * index partition for the move operation).
+                 */
+                final String rightSiblingName = DataService
+                        .getIndexPartitionName(vmd.indexMetadata.getName(),
+                                result.splits[1].pmd.getPartitionId());
 
-                throw new UnsupportedOperationException();
+                /*
+                 * Obtain a new partition identifier for the partition that will
+                 * be created when we move the rightSibling to the target data
+                 * service.
+                 */
+                final int newPartitionId = resourceManager
+                        .nextPartitionId(vmd.indexMetadata.getName());
+                
+                // register the new index partition.
+                final MoveResult moveResult = MoveIndexPartitionTask
+                        .registerNewPartitionOnTargetDataService(
+                                resourceManager, moveTarget, rightSiblingName,
+                                newPartitionId, e);
+            
+                /*
+                 * Move the buffered writes since the tail split and go live
+                 * with the new index partition.
+                 */
+                MoveIndexPartitionTask.moveBufferedWritesAndGoLive(
+                        resourceManager, moveResult, e);
                 
             }
             

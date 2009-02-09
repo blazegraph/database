@@ -357,7 +357,7 @@ public class JoinIndexPartitionTask extends AbstractPrepareTask<JoinResult> {
                         resourceManager, names2, result);
 
                 final Event updateEvent = e.newSubEvent(
-                        EventType.AtomicUpdate, summary).start();
+                        OverflowSubtaskEnum.AtomicUpdate, summary).start();
                 
                 try {
 
@@ -398,7 +398,7 @@ public class JoinIndexPartitionTask extends AbstractPrepareTask<JoinResult> {
      * @version $Id$
      */
     static protected class AtomicUpdateJoinIndexPartition extends
-            AbstractResourceManagerTask<Void> {
+            AbstractAtomicUpdateTask<Void> {
 
         private final JoinResult result;
         

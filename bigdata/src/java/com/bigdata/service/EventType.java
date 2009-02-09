@@ -77,14 +77,6 @@ public enum EventType {
      * An {@link IndexSegment} open-close event (start is open, end is close).
      */
     IndexSegmentOpenClose,
-
-    /**
-     * Operation responsible for the atomic update of the index partition view
-     * as part of any of the asynchronous overflow tasks
-     * 
-     * @see OverflowActionEnum
-     */
-    AtomicUpdate,
     
     /**
      * Purge resources.

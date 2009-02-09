@@ -39,13 +39,14 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.Leaf;
 import com.bigdata.btree.Node;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.LocalPartitionMetadata;
-import com.bigdata.resources.SplitIndexPartitionTask.BuildIndexSegmentSplitTask;
-import com.bigdata.service.IMetadataService;
 import com.bigdata.service.Split;
 import com.bigdata.util.concurrent.ExecutionExceptions;
 
@@ -231,13 +232,11 @@ public class SplitUtility {
             
         }
         
-        // @todo unit tests.
-        final Node node = (Node) btree.getRightMostNode(true/*nodesOnly*/);
-        
         /*
          * We need to choose a key that will separate the head and the tail and
          * also identify the index of the last key that will enter into the
-         * head. We do this using the node which we just located.
+         * head. We do this using the right-most node (not a leaf) in the
+         * mutable BTree loaded from the last commit time on the old journal.
          * 
          * First we choose a Leaf which is a child of that node. The one in the
          * middle is choosen as a decent guess at where we might split the index
@@ -248,13 +247,37 @@ public class SplitUtility {
          * NOT copied into the head. For simplicity, we choose the first key in
          * this leaf since it is always defined.
          */
+
+        final Node node = (Node) btree.getRightMostNode(true/* nodesOnly */);
+        
+        final int childIndex = (node.getChildCount() + 1) / 2;
         
         // leaf from the middle of the leaves of the node.
-        final Leaf leaf = (Leaf) node.getChild((node.getKeyCount() + 1) / 2);
-
+        final Leaf leaf = (Leaf) node.getChild(childIndex);
+        
         // separator key is the first key in the leaf.
-        final byte[] separatorKey = leaf.getKeys().getKey(0/* index */);
+        final byte[] separatorKey = leaf == null ? null : leaf.getKeys()
+                .getKey(0/* index */);
 
+        if (leaf == null || separatorKey == null) {
+
+            /*
+             * Note: I have never seen a problem here.
+             */
+            
+            throw new RuntimeException("Could not locate separator key? Node="
+                    + node
+                    + ", nchildren="
+                    + node.getChildCount()
+                    + ", childIndex="
+                    + childIndex
+                    + ", leaf="
+                    + leaf
+                    + (leaf == null ? "" : ("nkeys=" + leaf.getKeyCount()
+                            + ", keys=" + leaf.getKeys())));
+            
+        }
+        
         // The index within the btree of the tuple associated with that key.
         final int separatorIndex = btree.indexOf(separatorKey);
 
@@ -268,14 +291,17 @@ public class SplitUtility {
          * Ready to define the splits.
          */
         final Split[] splits = new Split[2];
-
         {
 
+            /*
+             * Head split.
+             */
+            
             // New partition identifier.
             final int partitionId = resourceManager.nextPartitionId(name);
 
             // Note: always assign the leftSeparator to the head split.
-            final byte[] fromKey = oldpmd.getRightSeparatorKey();
+            final byte[] fromKey = oldpmd.getLeftSeparatorKey();
 
             final LocalPartitionMetadata pmd = new LocalPartitionMetadata(
                     partitionId, //
@@ -299,6 +325,10 @@ public class SplitUtility {
 
         {
 
+            /*
+             * Tail split.
+             */
+            
             // New partition identifier.
             final int partitionId = resourceManager.nextPartitionId(name);
 
@@ -338,6 +368,7 @@ public class SplitUtility {
      * Build N index segments based on those split points.
      * <p>
      * Note: This is done in parallel to minimize latency.
+     * 
      * @throws InterruptedException 
      * @throws ExecutionExceptions 
      * 
@@ -349,13 +380,9 @@ public class SplitUtility {
      *       (or delegate for a thread pool) that can impose a limit on the
      *       actual parallelism.
      */
-    public static SplitResult buildSplits(
-            final ResourceManager resourceManager, final ViewMetadata vmd,
-            final long lastCommitTime, final Split[] splits)
-            throws InterruptedException, ExecutionExceptions {
-
-        if (resourceManager == null)
-            throw new IllegalArgumentException();
+    public static SplitResult buildSplits(final ViewMetadata vmd,
+            final Split[] splits) throws InterruptedException,
+            ExecutionExceptions {
 
         if (vmd == null)
             throw new IllegalArgumentException();
@@ -372,18 +399,12 @@ public class SplitUtility {
 
             final Split split = splits[i];
 
-            final File outFile = resourceManager
-                    .getIndexSegmentFile(vmd.indexMetadata);
-
             /*
              * Create task to build an index segment from the key-range
              * for the split.
              */
             final BuildIndexSegmentSplitTask task = new BuildIndexSegmentSplitTask(
-                    resourceManager, lastCommitTime, vmd.name, //
-                    vmd.indexMetadata.getIndexUUID(), outFile,//
-                    split //
-            );
+                    vmd, split);
 
             // add to set of tasks to be run.
             tasks.add(task);
@@ -391,7 +412,7 @@ public class SplitUtility {
         }
 
         // submit and await completion.
-        final List<Future<BuildResult>> futures = resourceManager
+        final List<Future<BuildResult>> futures = vmd.resourceManager
                 .getConcurrencyManager().invokeAll(tasks);
 
         // copy the individual build results into an array.
@@ -432,7 +453,7 @@ public class SplitUtility {
                 if (result == null)
                     continue;
 
-                resourceManager.deleteResource(result.segmentMetadata
+                vmd.resourceManager.deleteResource(result.segmentMetadata
                         .getUUID(), false/* isJournal */);
 
             }
@@ -454,4 +475,100 @@ public class SplitUtility {
         
     }
     
+    /**
+     * Task used to build an {@link IndexSegment} from a restricted key-range of
+     * an index during a {@link SplitIndexPartitionTask}. This is a compacting
+     * merge since we want as much of the data for the index as possible in a
+     * single {@link IndexSegment}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static protected class BuildIndexSegmentSplitTask extends
+            AbstractResourceManagerTask<BuildResult> {
+
+        private final ViewMetadata vmd;
+        private final Split split;
+
+        /**
+         * 
+         * @param vmd
+         * @param split
+         */
+        public BuildIndexSegmentSplitTask(final ViewMetadata vmd,
+                final Split split) {
+
+            super(vmd.resourceManager, TimestampUtility
+                    .asHistoricalRead(vmd.commitTime), vmd.name);
+            
+            if (split == null)
+                throw new IllegalArgumentException();
+
+            this.vmd = vmd;
+            
+            this.split = split;
+            
+        }
+
+        @Override
+        protected BuildResult doTask() throws Exception {
+
+            // The file on which the index segment is being written.
+            final File outFile = vmd.resourceManager
+                    .getIndexSegmentFile(vmd.indexMetadata);
+
+            if (resourceManager.isOverflowAllowed())
+                throw new IllegalStateException();
+
+            final String name = getOnlyResource();
+            
+            final IIndex src = getIndex(name);
+
+            if (INFO) {
+                
+                // note: the mutable btree - accessed here for debugging only.
+                final BTree btree = ((ILocalBTreeView) src).getMutableBTree();
+
+                log.info("src=" + name + ",counter=" + src.getCounter().get()
+                        + ",checkpoint=" + btree.getCheckpoint());
+            
+            }
+
+            final LocalPartitionMetadata pmd = (LocalPartitionMetadata)split.pmd;
+
+            final byte[] fromKey = pmd.getLeftSeparatorKey();
+            
+            final byte[] toKey = pmd.getRightSeparatorKey();
+
+            if (fromKey == null && toKey == null) {
+
+                /*
+                 * Note: This is not legal because it implies that we are
+                 * building the index segment from the entire source key range -
+                 * hence not a split at all!
+                 */
+                
+                throw new RuntimeException("Not a key-range?");
+                
+            }
+            
+            if (INFO)
+                log.info("begin: name=" + name + ", outFile=" + outFile
+                        + ", pmd=" + pmd);
+            
+            // build the index segment from the key range.
+            final BuildResult result = resourceManager.buildIndexSegment(name,
+                    src, outFile, true/* compactingMerge */, vmd.commitTime,
+                    fromKey, toKey);
+
+            if (INFO)
+                log.info("done: name=" + name + ", outFile=" + outFile
+                        + ", pmd=" + pmd);
+            
+            return result;
+            
+        }
+        
+    }
+
 }

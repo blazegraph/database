@@ -3,13 +3,11 @@ package com.bigdata.resources;
 import java.lang.ref.SoftReference;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
-import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.TimestampUtility;
-import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.util.InnerCause;
 
@@ -28,8 +26,6 @@ import com.bigdata.util.InnerCause;
  */
 class ViewMetadata extends BTreeMetadata {
 
-    private final ResourceManager resourceManager;
-    
     /**
      * Set <code>true</code> iff the index partition view is requested and the
      * various additional data are collected from that view (e.g., range count).
@@ -79,8 +75,7 @@ class ViewMetadata extends BTreeMetadata {
                 if (view == null) {
 
                     view = (ILocalBTreeView) resourceManager.getIndex(name,
-                            TimestampUtility
-                                    .asHistoricalRead(omd.lastCommitTime));
+                            commitTime);
 
                     ref = new SoftReference<ILocalBTreeView>(view);
 
@@ -100,13 +95,25 @@ class ViewMetadata extends BTreeMetadata {
 
     /**
      * Release the {@link SoftReference} for the index partition view.
+     * 
+     * @todo refactor into clearBTreeRef() and clearViewRef(). The latter calls
+     *       the former.  check all usage to make sure that we are invoking the
+     *       correct method.
      */
     public void clearRef() {
+        
+        synchronized(this) {
+            
+            if(ref != null) { 
+                
+                ref.clear();
+        
+            }
 
-        ref.clear();
+        }
 
         super.clearRef();
-
+        
     }
 
     /**
@@ -116,7 +123,7 @@ class ViewMetadata extends BTreeMetadata {
      * @param view
      *            The view.
      */
-    private void initView(final ILocalBTreeView view) {
+    synchronized private void initView(final ILocalBTreeView view) {
 
         if(view == null) {
             
@@ -141,15 +148,16 @@ class ViewMetadata extends BTreeMetadata {
          * Even though that RMI is heavily cached it still makes sense to do
          * this outside of synchronous overflow.
          */
-        adjustedSplitHandler = getSplitHandler(resourceManager, indexMetadata,
-                omd.lastCommitTime);
+        this.adjustedSplitHandler = getSplitHandler();
 
         /*
          * range count for the view (fast, but slower when an index segment is
          * used by more than one index since the partition bounds are a subset
          * of the index segment key range).
          */
-        rangeCount = view.rangeCount();
+        this.rangeCount = view.rangeCount();
+
+        this.percentOfSplit = adjustedSplitHandler.percentOfSplit(rangeCount);
 
         initView = true;
 
@@ -193,35 +201,46 @@ class ViewMetadata extends BTreeMetadata {
 
     }
 
+    public double getPercentOfSplit() {
+        
+        if (!initView) {
+
+            // materialize iff never initialized.
+            getView();
+
+        }
+
+        return this.percentOfSplit;
+
+    }
+
+    private volatile double percentOfSplit;
+
     /**
-     * Note: The initial metadata available from the view and with RMI will not
-     * be initialized until the view is explicitly materialized.
-     * 
-     * @param resourceManager
-     * @param btreeMetadata
-     * @param lastCommitTime
+     * {@inheritDoc}
+     * <p>
+     * Note: The ctor intentionally does not force the materialization of the
+     * view or perform any RMI. Those operations are done lazily in order to not
+     * impose their latency during synchronous overflow.
      */
-    public ViewMetadata(final OverflowMetadata omd,
-            final ResourceManager resourceManager,
-            final AbstractJournal oldJournal, final Entry entry) {
+    public ViewMetadata(
+            final ResourceManager resourceManager, final long commitTime,
+            final String name, final BTreeCounters btreeCounters) {
 
-        super(omd, oldJournal, entry);
-
-        if (resourceManager == null)
-            throw new IllegalArgumentException();
-
-        this.resourceManager = resourceManager;
+        super(resourceManager, commitTime, name, btreeCounters);
 
     }
 
     /**
-     * Extended for more metadata. 
+     * Extended for more metadata.
      */
     protected void toString(final StringBuilder sb) {
 
         if (initView) {
 
             sb.append(", rangeCount=" + rangeCount);
+
+            sb.append(", percentOfSplit=" + percentOfSplit);
 
             sb.append(", adjustedSplitHandler=" + adjustedSplitHandler);
 
@@ -268,8 +287,7 @@ class ViewMetadata extends BTreeMetadata {
      * 
      * @todo only supports the {@link DefaultSplitHandler}.
      */
-    protected ISplitHandler getSplitHandler(final ResourceManager resourceManager,
-            final IndexMetadata indexMetadata, final long commitTime) {
+    private ISplitHandler getSplitHandler() {
 
         if (resourceManager == null)
             throw new IllegalArgumentException();

@@ -1610,11 +1610,10 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * 
      * @param name
      *            The name of the index.
-     *            
+     * 
      * @return The counters for that index -or- <code>null</code> if the index
-     *         has not been accessed by an {@link AbstractTask} with either
-     *         {@link ITx#UNISOLATED} or {@link ITx#READ_COMMITTED} isolation
-     *         since the counters were last reset.
+     *         has not been accessed by an {@link AbstractTask} since the
+     *         counters were last reset.
      */
     public ViewCounters getIndexCounters(final String name) {
 
@@ -1775,15 +1774,6 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
                 }
 
-                // create counter set for this index / index partition.
-                final CounterSet t = tmp.makePath(path);
-                
-                /*
-                 * Attach the aggregated counters for the index / index
-                 * partition.
-                 */
-                t.attach(viewCounters.aggregate().getCounters());
-
                 /*
                  * Note: The code below works and avoids re-opening a closed
                  * index but it makes the presence of the additional counters
@@ -1852,8 +1842,12 @@ public class ConcurrencyManager implements IConcurrencyManager {
 //
 //                }
 
+                // create counter set for this index / index partition.
+                final CounterSet t = tmp.makePath(path);
+                
                 /*
-                 * Attach the aggregated counters for any index.
+                 * Attach the aggregated counters for the index / index
+                 * partition.
                  */
                 t.attach(viewCounters.aggregate().getCounters());
 

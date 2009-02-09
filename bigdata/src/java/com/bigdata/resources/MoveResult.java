@@ -5,6 +5,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.mdi.PartitionLocator;
+import com.bigdata.service.DataService;
 
 /**
  * The object returned by {@link MoveIndexPartitionTask}.
@@ -18,6 +19,14 @@ public class MoveResult extends AbstractResult {
 
     final public int newPartitionId;
 
+    /**
+     * The name of the new index partition on the target data service.
+     * <p>
+     * Note: {@link AbstractResult#name} is the name of the source index
+     * partition that was moved to the target data service.
+     */
+    final public String targetIndexName;
+    
     final public PartitionLocator oldLocator;
     final public PartitionLocator newLocator;
 
@@ -41,7 +50,7 @@ public class MoveResult extends AbstractResult {
     public MoveResult(final String name,// 
             final IndexMetadata indexMetadata,//
             final UUID targetDataServiceUUID, //
-            int newPartitionId,//
+            final int newPartitionId,//
             final PartitionLocator oldLocator,//
             final PartitionLocator newLocator//
     ) {
@@ -61,6 +70,9 @@ public class MoveResult extends AbstractResult {
 
         this.newPartitionId = newPartitionId;
 
+        this.targetIndexName = DataService.getIndexPartitionName(indexMetadata
+                .getName(), newPartitionId);
+        
         this.oldLocator = oldLocator;
 
         this.newLocator = newLocator;

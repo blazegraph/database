@@ -874,7 +874,7 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
         
     }
     
-    final public void copyKey(int index,OutputStream os) {
+    final public void copyKey(final int index, final OutputStream os) {
         
         try {
             
