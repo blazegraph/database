@@ -181,10 +181,8 @@ public class DefaultSplitHandler implements ISplitHandler {
      * build to purge the deleted index entries. This is true even when all
      * index entries in the index partition have been deleted!
      */
-    public boolean shouldJoin(final IIndex ndx) {
+    public boolean shouldJoin(final long rangeCount) {
 
-        final long rangeCount = ndx.rangeCount();
-        
         final boolean shouldJoin = rangeCount <= getMinimumEntryCount();
         
         if (INFO)

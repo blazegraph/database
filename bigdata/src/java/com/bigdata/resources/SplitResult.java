@@ -79,7 +79,8 @@ public class SplitResult extends AbstractResult {
     public String toString() {
         
         return "SplitResult{name=" + name + ", splits="
-                + Arrays.toString(splits) + "}";
+                + Arrays.toString(splits) + ", buildResults="
+                + Arrays.toString(buildResults) + "}";
         
     }
 
