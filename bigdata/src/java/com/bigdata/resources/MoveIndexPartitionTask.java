@@ -28,7 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.resources;
 
+import java.io.IOException;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
@@ -42,6 +44,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.ResultSet;
 import com.bigdata.btree.proc.IIndexProcedure;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.LocalPartitionMetadata;
@@ -49,7 +52,6 @@ import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Event;
-import com.bigdata.service.EventType;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IDataServiceAwareProcedure;
@@ -167,11 +169,6 @@ import com.bigdata.service.RawDataServiceTupleIterator;
  */
 public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
     
-    /**
-     * Last commit time on the old journal.
-     */
-    private final long lastCommitTime;
-
     private final ViewMetadata vmd;
     
     /**
@@ -182,22 +179,15 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
 
     /**
      * The partition identifier for the target index partition that will be
-     * created by the move.
+     * created by the move (RMI).
      */
-    private final int newPartitionId;
+    final int newPartitionId;
+
+    /**
+     * The name of the new index partition on the target data service.
+     */
+    final String targetIndexName; 
     
-    /**
-     * The name of the source index partition on this data service.
-     */
-    private final String sourceIndexName;
-
-    /**
-     * The name of the target index partition on the target data service. This
-     * is formed using the name of the scale-out index and the partition
-     * identifier that was assigned to the new index partition.
-     */
-    private final String targetIndexName;
-
     /**
      * The summary used for the event description and the partition history
      * record.
@@ -215,34 +205,16 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
      * the readability of the trace of the choosen tasks for the
      * {@link PostProcessOldJournalTask}.
      * 
-     * @param resourceManager
-     * @param lastCommitTime
-     *            The lastCommitTime of the old journal.
-     * @param name
-     *            The name of the source index partition.
      * @param targetDataServiceUUID
      *            The UUID for the target data service.
-     * @param newPartitionId
-     *            The partition identifier for the target index partition that
-     *            will be created by the move.
      */
     public MoveIndexPartitionTask(//
-            final ResourceManager resourceManager,//
-            final long lastCommitTime,//
-            final String name, //
             final ViewMetadata vmd,//
-            final UUID targetDataServiceUUID,//
-            final int newPartitionId//
+            final UUID targetDataServiceUUID//
             ) {
-
-        super(resourceManager, TimestampUtility
-                .asHistoricalRead(lastCommitTime), name);
-
-        if (vmd == null)
-            throw new IllegalArgumentException();
-
-        if (!vmd.name.equals(name))
-            throw new IllegalArgumentException();
+        
+        super(vmd.resourceManager, TimestampUtility
+                .asHistoricalRead(vmd.commitTime), vmd.name);
 
         if (targetDataServiceUUID == null)
             throw new IllegalArgumentException();
@@ -255,26 +227,23 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
         }
 
         this.vmd = vmd;
-        
-        this.lastCommitTime = lastCommitTime;
-        
+
         this.targetDataServiceUUID = targetDataServiceUUID;
-        
-        this.newPartitionId = newPartitionId;
-        
-        this.sourceIndexName = vmd.name;
+
+        this.newPartitionId = resourceManager.nextPartitionId(vmd.indexMetadata
+                .getName());
 
         this.targetIndexName = DataService.getIndexPartitionName(
                 vmd.indexMetadata.getName(), newPartitionId);
-        
-        this.summary = OverflowActionEnum.Move + "(" + sourceIndexName + "->"
+
+        this.summary = OverflowActionEnum.Move + "(" + vmd.name + "->"
                 + targetIndexName + ")";
 
         this.e = new Event(resourceManager.getFederation(), vmd.name,
                 OverflowActionEnum.Move, summary + " : " + vmd);
 
     }
-    
+
     @Override
     protected void clearRefs() {
         
@@ -296,68 +265,39 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
 
             final IDataService targetDataService;
             final MoveResult moveResult;
-            final PartitionLocator newLocator;
 
             try {
 
                 if (resourceManager.isOverflowAllowed())
                     throw new IllegalStateException();
-
+                
                 // view of the source index partition.
                 final ILocalBTreeView src = (ILocalBTreeView) getIndex(getOnlyResource());
-
-                // clone metadata.
-                final IndexMetadata newMetadata = src.getIndexMetadata()
-                        .clone();
-
-                // the partition metadata for the source index partition.
-                final LocalPartitionMetadata oldpmd = newMetadata
-                        .getPartitionMetadata();
-
-                newMetadata.setPartitionMetadata(new LocalPartitionMetadata(//
-                        newPartitionId,//
-                        oldpmd.getPartitionId(),// The source partition
-                                                // identifier.
-                        oldpmd.getLeftSeparatorKey(),//
-                        oldpmd.getRightSeparatorKey(),//
-                        /*
-                         * Note: This is [null] to indicate that the resource
-                         * metadata needs to be filled in by the target data
-                         * service when the new index partition is registered.
-                         * It will be populated with the resource metadata
-                         * description for the live journal on that data
-                         * service.
-                         */
-                        null,
-                        // history line.
-                        oldpmd.getHistory() + summary + " "));
-
-                if (INFO)
-                    log.info(summary + " : " + vmd);
-
-                // the data service on which we will register the new index
-                // partition.
-                targetDataService = resourceManager.getFederation()
-                        .getDataService(targetDataServiceUUID);
-
-                /*
-                 * Register new index partition on the target data service.
-                 * 
-                 * Note: The correct resource metadata for the new index
-                 * partition will be assigned when it is registered on the
-                 * target data service. See above and RegisterIndexTask.
-                 */
-                targetDataService.registerIndex(targetIndexName, newMetadata);
-                if (INFO)
-                    log
-                            .info("Registered new index partition on target data service: targetIndexName="
-                                    + targetIndexName);
-
-                final Event copyEvent = e.newSubEvent("CopyHistoricalData",
-                        summary + " : " + vmd).start();
+                
+                moveResult = registerNewPartitionOnTargetDataService(
+                        resourceManager, targetDataServiceUUID, vmd.name,
+                        newPartitionId, e);
+                
+                final Event copyEvent = e.newSubEvent(
+                        OverflowSubtaskEnum.CopyHistory, summary + " : " + vmd)
+                        .start();
 
                 try {
-                    
+
+                    /*
+                     * Name of the newly registered index partition.
+                     */
+                    final String targetIndexName = DataService
+                            .getIndexPartitionName(src.getIndexMetadata()
+                                    .getName(), moveResult.newPartitionId);
+            
+                    /*
+                     * The data service on which we will register the new index
+                     * partition.
+                     */
+                    targetDataService = resourceManager.getFederation()
+                            .getDataService(targetDataServiceUUID);
+
                     /*
                      * Run procedure on the target data service that will copy
                      * data from the old index partition (on this data service)
@@ -366,44 +306,14 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
                      */
                     targetDataService.submit(ITx.UNISOLATED, targetIndexName,
                             new CopyIndexPartitionProcedure(resourceManager
-                                    .getDataServiceUUID(), sourceIndexName,
-                                    lastCommitTime));
+                                    .getDataServiceUUID(), vmd.name,
+                                    vmd.commitTime));
                     
                 } finally {
 
                     copyEvent.end();
                     
                 }
-
-                /*
-                 * At this point the historical view as of the [lastCommitTime]
-                 * has been copied to the target data service.
-                 * 
-                 * The MoveResult contains the information that we need to run
-                 * the atomic move update task which will bring that view up to
-                 * the current state of the index partition and then atomically
-                 * switch over to the new index partition.
-                 */
-
-                final LocalPartitionMetadata pmd = src.getIndexMetadata()
-                        .getPartitionMetadata();
-
-                final PartitionLocator oldLocator = new PartitionLocator(//
-                        pmd.getPartitionId(),//
-                        resourceManager.getDataServiceUUID(),//
-                        pmd.getLeftSeparatorKey(),//
-                        pmd.getRightSeparatorKey()//
-                );
-
-                newLocator = new PartitionLocator(newPartitionId,//
-                        targetDataServiceUUID,//
-                        pmd.getLeftSeparatorKey(),//
-                        pmd.getRightSeparatorKey()//
-                );
-
-                moveResult = new MoveResult(sourceIndexName, vmd.indexMetadata,
-                        targetDataServiceUUID, newPartitionId, oldLocator,
-                        newLocator);
 
             } finally {
 
@@ -418,127 +328,10 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
 
             }
 
-            /*
-             * Submit atomic update task and await completion
-             * 
-             * @todo If this task (the caller) is interrupted while the atomic
-             * update task is running then the atomic update task will not
-             * notice the interrupt since it runs in a different thread. This is
-             * true for all of the atomic update tasks when we chain them from
-             * the task that prepares for the update. This is mainly an issue
-             * for responsiveness to the timeout since this task can not notice
-             * its interrupt (and therefore the post-processing will not
-             * terminate) until its atomic update task completes.
-             */
-
-            final Event updateEvent = e.newSubEvent(EventType.AtomicUpdate,
-                    summary + " : " + vmd).start();
-
-            try {
-
-                concurrencyManager.submit(
-                        new AtomicUpdateMoveIndexPartitionTask(resourceManager,
-                                moveResult.name, moveResult)).get();
-
-            } catch (Throwable t) {
-
-                if (moveResult.registeredInMDS.get()) {
-
-                    /*
-                     * The move operation got as far as registering the target
-                     * index partition in the metadata service before the move
-                     * failed. This means that clients are now being directed to
-                     * the target index partition and that the commit of the
-                     * unisolated task failed implying that the source index
-                     * partition was not deleted on the local data service.
-                     * 
-                     * Note: This is safe as all data has been replicated to the
-                     * target index partition.
-                     * 
-                     * At this point we could drop the source index partition
-                     * since the move is complete even though atomic update task
-                     * failed.
-                     * 
-                     * Note: This is just cleaning up the source data service.
-                     * The only consequence of failing to delete the source at
-                     * this point is that the source index partition will hang
-                     * around forever (or at least until a service restart).
-                     * 
-                     * Note: The task in which we are running does not have
-                     * access to to the unisolated view of the source index
-                     * partition (it is a read-historical task). Rather than
-                     * attempting gain the exclusive lock I am letting the drop
-                     * of the source index partition slide for now. The reason
-                     * is that error handling here is not really all that robust
-                     * since we are not using a distributed lock service and it
-                     * will all have to be redone anyway. Trying to drop the
-                     * source index partition here is just trying too hard in my
-                     * opinion. By the time the data has been copied to the
-                     * target data service and the target index partition has
-                     * been registered with the metadata service about the only
-                     * thing left that can go wrong is running out of disk or
-                     * ram on the local data service and error correcting
-                     * actions are likely to fail themselves under those extreme
-                     * conditions (another cause could be the shutdown of the
-                     * source data service or interrupting the atomic update
-                     * task at just the wrong moment).
-                     */
-
-                } else {
-
-                    /*
-                     * The move operation did not succeed in registering the
-                     * target index partition on the metadata service. This
-                     * means that clients are still being directed to the source
-                     * index partition on this data service.
-                     * 
-                     * Note: This is safe as all data is still on the source
-                     * index partition.
-                     */
-
-                    try {
-
-                        /*
-                         * Drop the target index partition since the move failed
-                         * and we will continue to use the source index
-                         * partition.
-                         * 
-                         * Note: This is just cleaning up the target data
-                         * service. The only consequence of failing to delete
-                         * the target index partition after a failed move is
-                         * that the data will hang around forever on the target
-                         * data service (or at least until a service restart).
-                         */
-
-                        targetDataService.dropIndex(targetIndexName);
-
-                        log
-                                .warn("Dropped target index partition after failed move: name="
-                                        + targetIndexName);
-
-                    } catch (Throwable t2) {
-
-                        log.warn(
-                                "Could not drop target index partition after failed move: name="
-                                        + targetIndexName + ", locator"
-                                        + newLocator, t2);
-
-                    }
-
-                }
-
-                // the move failed - rethrow the exception.
-                throw new RuntimeException(t);
-
-            } finally {
-
-                updateEvent.end();
-                
-            }
-
+            moveBufferedWritesAndGoLive(resourceManager, moveResult, e);
+            
             if (INFO)
-                log.info("Successfully moved index partition: source="
-                        + sourceIndexName + ", target=" + targetIndexName);
+                log.info("Successfully moved index partition: "+summary);
 
             return moveResult;
 
@@ -551,10 +344,322 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
     }
 
     /**
+     * 
+     * @param resourceManager
+     * @param targetDataServiceUUID
+     * @param sourceIndexName
+     * @param indexMetadata
+     * @param newPartitionId
+     * 
+     * @return
+     * @throws ExecutionException
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    static MoveResult registerNewPartitionOnTargetDataService(
+            final ResourceManager resourceManager,
+            final UUID targetDataServiceUUID,//
+            final String sourceIndexName,
+            final int newPartitionId,//
+            final Event parentEvent
+            ) throws IOException, InterruptedException, ExecutionException {
+
+        if (resourceManager == null)
+            throw new IllegalArgumentException();
+        
+        if (targetDataServiceUUID == null)
+            throw new IllegalArgumentException();
+        
+        if (sourceIndexName == null)
+            throw new IllegalArgumentException();
+        
+        if (parentEvent == null)
+            throw new IllegalArgumentException();
+        
+        /*
+         * @todo Because the registration of the new index partition is based on
+         * an historical view of the old index partition it is possible that we
+         * will miss an update to the index partition metadata. This really
+         * should be modified to grap the current index metadata, which would
+         * mean either running as an unisolated operation (which would mean in
+         * turn that we could not copy historical tuples separately) or settling
+         * for the read-committed copy of the index metadata from the live
+         * journal for the sourceIndexName.
+         * 
+         * FIXME The only way to really close this hole is to NOT copy the
+         * historical data to the target data service but to do everything in a
+         * single unisolated operation which obtains the necessary exclusive
+         * lock on the index partition to be moved. It is doubtless better to be
+         * correct even at the expense of perhaps doing more work. Also, we can
+         * use tail splits and other devices to choose moves that will achieve
+         * more impact while doing less work.
+         */
+        final IndexMetadata indexMetadata;
+        {
+            
+            final AbstractJournal journal = resourceManager.getLiveJournal();
+
+            // just the mutable BTree (last committed state).
+            indexMetadata = resourceManager.getIndexOnStore(sourceIndexName,
+                    ITx.READ_COMMITTED, journal).getIndexMetadata();
+            
+        }
+        
+        /*
+         * The name of the target index partition on the target data service.
+         * This is formed using the name of the scale-out index and the
+         * partition identifier that was assigned to the new index partition.
+         */
+        final String targetIndexName = DataService.getIndexPartitionName(
+                indexMetadata.getName(), newPartitionId);
+
+        final String summary = OverflowActionEnum.Move + "(" + sourceIndexName
+                + "->" + targetIndexName + ")";
+
+        final Event e = parentEvent.newSubEvent(
+                OverflowSubtaskEnum.RegisterIndex, targetIndexName).start();
+
+        try {
+
+            /*
+             * The data service on which we will register the new index
+             * partition.
+             */
+            final IDataService targetDataService = resourceManager
+                    .getFederation().getDataService(targetDataServiceUUID);
+
+            // clone metadata.
+            final IndexMetadata newMetadata = indexMetadata.clone();
+
+            // the partition metadata for the source index partition.
+            final LocalPartitionMetadata oldpmd = newMetadata
+                    .getPartitionMetadata();
+
+            newMetadata.setPartitionMetadata(new LocalPartitionMetadata(//
+                    newPartitionId,//
+                    // The source partition identifier.
+                    oldpmd.getPartitionId(), oldpmd.getLeftSeparatorKey(),//
+                    oldpmd.getRightSeparatorKey(),//
+                    /*
+                     * Note: This is [null] to indicate that the resource
+                     * metadata needs to be filled in by the target data service
+                     * when the new index partition is registered. It will be
+                     * populated with the resource metadata description for the
+                     * live journal on that data service.
+                     */
+                    null,
+                    // history line.
+                    oldpmd.getHistory() + summary + " "));
+
+            if (INFO)
+                log.info(summary);
+
+            /*
+             * Register new index partition on the target data service.
+             * 
+             * Note: The correct resource metadata for the new index partition
+             * will be assigned when it is registered on the target data
+             * service. See above and RegisterIndexTask.
+             */
+            targetDataService.registerIndex(targetIndexName, newMetadata);
+
+            if (INFO)
+                log
+                        .info("Registered new index partition on target data service: targetIndexName="
+                                + targetIndexName);
+
+            /*
+             * At this point the historical view as of the [lastCommitTime] has
+             * been copied to the target data service.
+             * 
+             * The MoveResult contains the information that we need to run the
+             * atomic move update task which will bring that view up to the
+             * current state of the index partition and then atomically switch
+             * over to the new index partition.
+             */
+
+            final LocalPartitionMetadata pmd = indexMetadata
+                    .getPartitionMetadata();
+
+            final PartitionLocator oldLocator = new PartitionLocator(//
+                    pmd.getPartitionId(),//
+                    resourceManager.getDataServiceUUID(),//
+                    pmd.getLeftSeparatorKey(),//
+                    pmd.getRightSeparatorKey()//
+            );
+
+            final PartitionLocator newLocator = new PartitionLocator(
+                    newPartitionId,//
+                    targetDataServiceUUID,//
+                    pmd.getLeftSeparatorKey(),//
+                    pmd.getRightSeparatorKey()//
+            );
+
+            return new MoveResult(sourceIndexName, indexMetadata,
+                    targetDataServiceUUID, newPartitionId, oldLocator,
+                    newLocator);
+
+        } finally {
+
+            e.end();
+
+        }
+
+    }
+
+    /**
+     * Copy any writes buffered by the live journal for the index partition that
+     * is being moved to the new index partition on the target data service and
+     * cutover to the new index partition.
+     * 
+     * @param resourceManager
+     * @param moveResult
+     *            This contains all the metadata that we need to execute this
+     *            task.
+     * @param parentEvent
+     *            Used to report the atomic update event.
+     * 
+     * @todo If this task (the caller) is interrupted while the atomic update
+     *       task is running then the atomic update task will not notice the
+     *       interrupt since it runs in a different thread. This is true for all
+     *       of the atomic update tasks when we chain them from the task that
+     *       prepares for the update. This is mainly an issue for responsiveness
+     *       to the timeout since this task can not notice its interrupt (and
+     *       therefore the post-processing will not terminate) until its atomic
+     *       update task completes.
+     */
+    static void moveBufferedWritesAndGoLive(
+            final ResourceManager resourceManager,//
+            final MoveResult moveResult,//
+            final Event parentEvent//
+            ) {
+
+        if (resourceManager == null)
+            throw new IllegalArgumentException();
+
+        if (moveResult == null)
+            throw new IllegalArgumentException();
+
+        if (parentEvent == null)
+            throw new IllegalArgumentException();
+
+        final Event updateEvent = parentEvent.newSubEvent(
+                OverflowSubtaskEnum.AtomicUpdate, "").start();
+
+        try {
+
+            resourceManager.getConcurrencyManager().submit(
+                    new AtomicUpdateMoveIndexPartitionTask(resourceManager,
+                            moveResult.name, moveResult)).get();
+
+        } catch (Throwable t) {
+
+            if (moveResult.registeredInMDS.get()) {
+
+                /*
+                 * The move operation got as far as registering the target index
+                 * partition in the metadata service before the move failed.
+                 * This means that clients are now being directed to the target
+                 * index partition and that the commit of the unisolated task
+                 * failed implying that the source index partition was not
+                 * deleted on the local data service.
+                 * 
+                 * Note: This is safe as all data has been replicated to the
+                 * target index partition.
+                 * 
+                 * At this point we could drop the source index partition since
+                 * the move is complete even though atomic update task failed.
+                 * 
+                 * Note: This is just cleaning up the source data service. The
+                 * only consequence of failing to delete the source at this
+                 * point is that the source index partition will hang around
+                 * forever (or at least until a service restart).
+                 * 
+                 * @todo The task in which we are running does not have access
+                 * to to the unisolated view of the source index partition (it
+                 * is a read-historical task). Rather than attempting gain the
+                 * exclusive lock I am letting the drop of the source index
+                 * partition slide for now. The reason is that error handling
+                 * here is not really all that robust since we are not using a
+                 * distributed lock service and it will all have to be redone
+                 * anyway. Trying to drop the source index partition here is
+                 * just trying too hard in my opinion. By the time the data has
+                 * been copied to the target data service and the target index
+                 * partition has been registered with the metadata service about
+                 * the only thing left that can go wrong is running out of disk
+                 * or ram on the local data service and error correcting actions
+                 * are likely to fail themselves under those extreme conditions
+                 * (another cause could be the shutdown of the source data
+                 * service or interrupting the atomic update task at just the
+                 * wrong moment).
+                 */
+
+            } else {
+
+                /*
+                 * The move operation did not succeed in registering the target
+                 * index partition on the metadata service. This means that
+                 * clients are still being directed to the source index
+                 * partition on this data service.
+                 * 
+                 * Note: This is safe as all data is still on the source index
+                 * partition.
+                 */
+
+                try {
+
+                    /*
+                     * Drop the target index partition since the move failed and
+                     * we will continue to use the source index partition.
+                     * 
+                     * Note: This is just cleaning up the target data service.
+                     * The only consequence of failing to delete the target
+                     * index partition after a failed move is that the data will
+                     * hang around forever on the target data service (or at
+                     * least until a service restart).
+                     */
+
+                    /*
+                     * The data service on which we will register the new index
+                     * partition.
+                     */
+                    final IDataService targetDataService = resourceManager
+                            .getFederation().getDataService(
+                                    moveResult.targetDataServiceUUID);
+
+                    targetDataService.dropIndex(moveResult.targetIndexName);
+
+                    log
+                            .warn("Dropped target index partition after failed move: name="
+                                    + moveResult.targetIndexName);
+
+                } catch (Throwable t2) {
+
+                    log.warn(
+                            "Could not drop target index partition after failed move: name="
+                                    + moveResult.targetIndexName + ", locator"
+                                    + moveResult.newLocator, t2);
+
+                }
+
+            }
+
+            // the move failed - rethrow the exception.
+            throw new RuntimeException(t);
+
+        } finally {
+
+            updateEvent.end();
+
+        }
+
+    }
+    
+    /**
      * Procedure copies data from the old index partition to the new index
-     * partition. This runs as an {@link ITx#UNISOLATED} operations on the
-     * target {@link IDataService}. It is {@link ITx#UNISOLATED} because it
-     * must write on the new index partition.
+     * partition. This runs as an {@link ITx#UNISOLATED} operation on the target
+     * {@link IDataService}. It is {@link ITx#UNISOLATED} because it must write
+     * on the new index partition.
      * <p>
      * Note: This procedure only copies the view as of the lastCommitTime. It
      * does NOT copy deleted tuples since the historical views for the source
@@ -616,7 +721,7 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
         }
         
         /**
-         * @param sourceDataServiceUUIDs
+         * @param sourceDataServiceUUID
          * @param sourceIndexName
          * @param lastCommitTime
          * 
@@ -639,7 +744,7 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
          }
         
         /**
-         * Copy the non-deleted index entries from the source index view
+         * Copy the non-deleted index entries from the source index view.
          * <P>
          * Note: We copy only the non-deleted keys and values since this is the
          * initial state of this view on this data service.
@@ -740,8 +845,8 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
      * {@link MetadataService} it will discover that the key range has been
      * assigned to a new index partition - the one on the target data service.
      * <p>
-     * Note: This task runs as {@link ITx#UNISOLATED} since it MUST have an
-     * exclusive lock in order to ensure that the buffered writes are
+     * Note: This task runs as an {@link ITx#UNISOLATED} operation since it MUST
+     * have an exclusive lock in order to ensure that the buffered writes are
      * transferred to the target index partition without allowing concurrent
      * writes on the source index partition. This means that the target index
      * partition WILL NOT be able to issue read-requests against the live view
@@ -761,7 +866,7 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
      * @version $Id$
      */
     static protected class AtomicUpdateMoveIndexPartitionTask extends
-            AbstractResourceManagerTask<Long> {
+            AbstractAtomicUpdateTask<Long> {
 
         final private MoveResult moveResult;
 

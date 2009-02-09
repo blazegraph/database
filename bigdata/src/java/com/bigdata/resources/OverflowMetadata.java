@@ -283,6 +283,9 @@ public class OverflowMetadata {
 
         lastCommitTime = oldJournal.getRootBlockView().getLastCommitTime();
 
+        final ConcurrencyManager concurrencyManager = (ConcurrencyManager) resourceManager
+                .getConcurrencyManager();
+
         /*
          * Generate the metadata summaries of the index partitions that we will
          * need to process.
@@ -307,13 +310,38 @@ public class OverflowMetadata {
                         .deserialize(new DataInputBuffer(tuple.getValue()));
 
                 /*
-                 * Note: The initial metadata available from the view and with
-                 * RMI will not be initialized until the view is explicitly
-                 * materialized.
+                 * Obtain the counters for this index.
+                 * 
+                 * Note: We must do this before we reset the counters (below).
+                 */
+                final ViewCounters viewCounters = concurrencyManager
+                        .getIndexCounters(entry.name);
+
+                if (viewCounters == null) {
+
+                    /*
+                     * This will happen for a cold index (one that has not been
+                     * touched since the last synchronous overflow and which was
+                     * just copied over at that time).
+                     */
+
+                    //@todo log @ info
+                    log.warn("No performance counters: " + entry.name);
+                    
+                }
+                
+                final BTreeCounters btreeCounters = viewCounters == null ? new BTreeCounters()
+                        : viewCounters.aggregate();
+
+                /*
+                 * Note: This captures metadata which has low latency and does
+                 * not force the materialization of the fused view of an index
+                 * partition but may force the loading of the BTree from the old
+                 * journal, which it itself a very light weight operation.
                  */
 
-                final ViewMetadata vmd = new ViewMetadata(this,
-                        resourceManager, oldJournal, entry);
+                final ViewMetadata vmd = new ViewMetadata(resourceManager,
+                        lastCommitTime, entry.name, btreeCounters);
 
                 views.put(entry.name, vmd);
 
@@ -322,14 +350,11 @@ public class OverflowMetadata {
         }
 
         /*
-         * Aggregate the statistics for the named indices and reset the
-         * various counters for those indices. These statistics are used to
-         * decide which indices are "hot" and which are not.
+         * Aggregate the statistics for the named indices and reset the various
+         * counters for those indices. These statistics are used to decide which
+         * indices are "hot" and which are not.
          */
         {
-
-            final ConcurrencyManager concurrencyManager = (ConcurrencyManager) resourceManager
-                    .getConcurrencyManager();
 
             totalCounters = new BTreeCounters();
 

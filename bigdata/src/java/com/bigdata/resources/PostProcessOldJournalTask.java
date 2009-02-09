@@ -317,28 +317,12 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             int njoin = 0; // join task _candidate_.
             int nignored = 0; // #of index partitions that are NOT join candidates.
             
-//            // the old journal.
-//            final AbstractJournal oldJournal = resourceManager
-//                    .getJournal(lastCommitTime);
-//            
-//            // the name2addr view as of that commit time.
-//            final ITupleIterator itr = oldJournal.getName2Addr(lastCommitTime)
-//                    .rangeIterator();
-
             assert used.isEmpty() : "There are " + used.size()
                     + " used index partitions";
 
             final Iterator<ViewMetadata> itr = overflowMetadata.views();
             
             while (itr.hasNext()) {
-
-//                final ITuple tuple = itr.next();
-//
-//                final Entry entry = EntrySerializer.INSTANCE
-//                        .deserialize(new DataInputBuffer(tuple.getValue()));
-//
-//                // the name of an index to consider.
-//                final String name = entry.name;
 
                 final ViewMetadata vmd = itr.next();
 
@@ -357,9 +341,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                                     + ", lastCommitTime=" + lastCommitTime);
 
                 }
-
-                // index metadata for that index partition.
-//                final IndexMetadata indexMetadata = vmd.indexMetadata;
 
                 // handler decides when and where to split an index partition.
                 final ISplitHandler splitHandler = vmd.getAdjustedSplitHandler();
@@ -606,12 +587,13 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     final ViewMetadata vmd = overflowMetadata
                             .getViewMetadata(DataService.getIndexPartitionName(
                                     scaleOutIndexName, pmd.getPartitionId()));
-            
+
                     // the locator for the rightSibling.
                     final PartitionLocator rightSiblingLocator = (PartitionLocator) SerializerUtil
                             .deserialize(resultBuffer.getResult(i));
 
-                    final UUID targetDataServiceUUID = rightSiblingLocator.getDataServiceUUID();
+                    final UUID targetDataServiceUUID = rightSiblingLocator
+                            .getDataServiceUUID();
 
                     final String[] resources = new String[2];
 
@@ -686,19 +668,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                                 .getIndexPartitionName(scaleOutIndexName, pmd
                                         .getPartitionId());
 
-                        // obtain new partition identifier from the metadata
-                        // service (RMI)
-                        final int newPartitionId = resourceManager
-                                .nextPartitionId(scaleOutIndexName);
-
-                        final String targetIndexName = DataService
-                                .getIndexPartitionName(scaleOutIndexName,
-                                        newPartitionId);
-                        
                         final AbstractTask task = new MoveIndexPartitionTask(
-                                resourceManager, lastCommitTime,
-                                sourceIndexName, vmd, targetDataServiceUUID,
-                                newPartitionId);
+                                vmd, targetDataServiceUUID);
 
                         // get the target service name.
                         String targetDataServiceName;
@@ -720,12 +691,12 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                          * possibility of deadlock, perhaps a global lock on the
                          * scale-out index name for the purpose of move?
                          */
-                        putUsed(resources[0], "willMoveToJoinWithRightSibling" +//
-                                "( "+sourceIndexName+" -> "+targetIndexName+//
-                                ", leftSibling=" + resources[0] +//
-                                ", rightSibling=" + resources[1] + //
-                                ", targetService=" + targetDataServiceName +// 
-                                ")");
+                        putUsed(resources[0], "willMoveToJoinWithRightSibling"
+                                + "( " + sourceIndexName + " -> "
+                                + targetDataServiceName //
+                                + ", leftSibling=" + resources[0] //
+                                + ", rightSibling=" + resources[1] //
+                                + ")");
 
                         nmove++;
                         
@@ -1069,13 +1040,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * index is hot for writes as newly buffered writes will increase
              * the actual move time and cause the application to block during
              * the atomic update phase of the move.
-             */
-            final long rangeCount = vmd.getRangeCount();
-            
-            final double percentOfSplit = vmd.getAdjustedSplitHandler()
-                    .percentOfSplit(rangeCount);
-            
-            /*
+             * 
+             * ---------------
+             * 
              * Given two active indices having small range counts, we prefer to
              * move the more active since that will let us shed more effort.
              * 
@@ -1088,26 +1055,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * Note: The code here is only considering active index partitions
              * since we are trying to balance LOAD rather than the allocation of
              * data on the disk.
-             * 
-             * FIXME tailSplit : One ideal candidate for a move is an index
-             * partition where most writes are on the tail of the index. In this
-             * case we can do tailSplit, leaving the majority of the data in
-             * place and only moving the empty or nearly empty tail of the index
-             * partition to the target data service. If the case is of pure tail
-             * append (we always write a key that is a successor of every prior
-             * key), then we can move an "empty" tail - this could even be done
-             * during synchronous overflow. However, if the tail writes are
-             * somewhat more distributed, then we need to move the key range of
-             * the tail that is recieving the writes. [If we can identify an
-             * index partition which is a candidate for a tail split then we
-             * could do the tail split immediately and move the tail to another
-             * data service. That would allow us to move the least possible
-             * data, even when the index was very "hot". The is the most
-             * possible reward for the least possible effort!]
-             * 
-             * @todo a full hot index partition could be split and one of the
-             * splits moved. a tailSplit (or a headSplit) is just a special case
-             * of this where the split is (nearly) empty.
              * 
              * @todo we also need to balance the on disk allocations - there are
              * notes on that elsewhere. this is a tricky topic since historical
@@ -1123,14 +1070,16 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * compacting merge on the index before doing any other operation so
              * that we can better tell how many tuples remain in the index
              * partition.
-             * 
              */
             
             final boolean moveCandidate =//
                 // Note: more active indices must be further from a split.
-                (score.drank > .6 && percentOfSplit < .3) || //
+                (score.drank > .6 && vmd.getPercentOfSplit() < .3) || //
                 // Note: less active indices may be closer to a split.
-                (score.drank > .2 && percentOfSplit < .5)    //
+                (score.drank > .2 && vmd.getPercentOfSplit() < .5) || //
+                // Note: tail splits are ideal move candidates.
+                (vmd.getPercentOfSplit() > resourceManager.percentOfSplitThreshold//
+                    && vmd.percentTailSplits > resourceManager.tailSplitThreshold)
                 /*
                  * Note: barely active indices are not moved since moving them
                  * does not change the load on the data service.
@@ -1142,8 +1091,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
             // @todo conditionally log @ info
             log.warn(vmd.name + " : moveCandidate=" + moveCandidate
-                    + ", percentOfSplit=" + percentOfSplit + ", drank="
-                    + score.drank + " : " + vmd + " : " + score);
+                    + ", percentOfSplit=" + vmd.getPercentOfSplit()
+                    + ", drank=" + score.drank + " : " + vmd + " : " + score);
             
             if (!moveCandidate) {
 
@@ -1214,31 +1163,73 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 targetDataServiceName = targetDataServiceUUID.toString();
             }
 
-            if (INFO)
-                log.info("Will move " + vmd.name + " to dataService="
-                        + targetDataServiceName);
+            if (vmd.getPercentOfSplit() > resourceManager.percentOfSplitThreshold//
+                    && vmd.percentTailSplits > resourceManager.tailSplitThreshold) {
 
-            // name of the corresponding scale-out index.
-            final String scaleOutIndexName = vmd.indexMetadata.getName();
+                /*
+                 * tailSplit
+                 * 
+                 * Note: One ideal candidate for a move is an index partition
+                 * where most writes are on the tail of the index. In this case
+                 * we can do tailSplit, leaving the majority of the data in
+                 * place and only moving the empty or nearly empty tail of the
+                 * index partition to the target data service. If the case is of
+                 * pure tail append (we always write a key that is a successor
+                 * of every prior key), then we can move an "empty" tail - this
+                 * could even be done during synchronous overflow. However, if
+                 * the tail writes are somewhat more distributed, then we need
+                 * to move the key range of the tail that is recieving the
+                 * writes.
+                 * 
+                 * Tail splits allow us to move the least possible data. This is
+                 * the most possible reward for the least possible effort. Even
+                 * when the index is very hot, the move of the post-split
+                 * rightSibling will typically move less data than the move of
+                 * another index partition.
+                 * 
+                 * @todo a full hot index partition could be split and any one
+                 * of the splits moved. a tailSplit (or a headSplit) is just a
+                 * special case of this where the split is (nearly) empty.
+                 */
+                
+                if (INFO)
+                    log.info("Will tailSplit and move the rightSibling of "
+                            + vmd.name + " to dataService="
+                            + targetDataServiceName);
 
-            final int newPartitionId = resourceManager
-                    .nextPartitionId(scaleOutIndexName);
+                final AbstractTask task = new SplitTailTask(vmd,
+                        targetDataServiceUUID);
 
-            final String targetName = DataService.getIndexPartitionName(
-                    scaleOutIndexName, newPartitionId);
+                tasks.add(task);
 
-            final AbstractTask task = new MoveIndexPartitionTask(
-                    resourceManager, lastCommitTime, vmd.name, vmd,
-                    targetDataServiceUUID, newPartitionId);
+                putUsed(vmd.name, "willTailSplit + moveRightSibling("
+                        + vmd.name + " -> " + targetDataServiceName + ") : "
+                        + vmd + " : " + overflowMetadata.getScore(vmd.name));
 
-            tasks.add(task);
+                nmove++;
 
-            putUsed(vmd.name, "willMove(" + vmd.name + " -> " + targetName
-                    + ") : " + vmd + " : "
-                    + overflowMetadata.getScore(vmd.name) + " : targetService="
-                    + targetDataServiceName);
+            } else {
 
-            nmove++;
+                /*
+                 * Normal move (does not split first).
+                 */
+
+                if (INFO)
+                    log.info("Will move " + vmd.name + " to dataService="
+                            + targetDataServiceName);
+
+                final AbstractTask task = new MoveIndexPartitionTask(vmd,
+                        targetDataServiceUUID);
+
+                tasks.add(task);
+
+                putUsed(vmd.name, "willMove(" + vmd.name + " -> "
+                        + targetDataServiceName + ") : " + vmd + " : "
+                        + overflowMetadata.getScore(vmd.name));
+
+                nmove++;
+
+            }
 
         }
         
@@ -1366,6 +1357,25 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * down the rate at which the disk space is consumed; and (d) the resource
      * manager MAY aggressively release old resources, even at the expense of
      * forcing transactions to abort.
+     * 
+     * @todo document tailSplits.
+     * 
+     * @todo Move, Split, and Join could run immediately as UNISOLATED tasks
+     *       without a historical catchup period. Each of these operations must
+     *       produce a new coherent index partition view. The historical read
+     *       from the last committed view on the old journal provides a catch up
+     *       period which does not block writers on the unisolated indices on
+     *       the live journal. However, by the same token it permits additional
+     *       writes to accumulate so the task must do more work. Even if writers
+     *       obey the rules for relations (do not overwrite a tuple with an
+     *       identical tuple), we will still wind up with two versions of
+     *       updated tuples (including tuples that have been deleted). Since an
+     *       application can block if any of its indices becomes unavailable for
+     *       write, we might be as well off doing operations which define new
+     *       index partitions concurrently and locking out the application until
+     *       those tasks are done. This could be tested both ways. [In fact, I
+     *       used to run with synchronous overflow and it was slow but this does
+     *       bear re-examination.]
      * 
      * FIXME implement suggestions for handling cases when we are nearing DISK
      * exhaustion.
@@ -1583,7 +1593,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * Mandatory compacting merge. 
                  */
                 
-                vmd.setAction(OverflowActionEnum.Merge);
+                overflowMetadata.setAction(vmd.name, OverflowActionEnum.Merge);
 
                 // the file to be generated.
                 final File outFile = resourceManager
@@ -1630,25 +1640,17 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     // move not in progress
                     && vmd.pmd.getSourcePartitionId() == -1//
                     // index partition is near a full split
-                    && splitHandler.percentOfSplit(vmd.getRangeCount()) > .9//
-                    // note: +1 in denominator avoids possibility of divide by
-                    // zero.
-                    && (vmd.getBTree().btreeCounters.tailSplit / (double) vmd
-                            .getBTree().btreeCounters.leavesSplit + 1) > .5) {
+                    && vmd.getPercentOfSplit() > resourceManager.percentOfSplitThreshold//
+                    && vmd.percentTailSplits > resourceManager.tailSplitThreshold) {
 
                 /*
                  * Do an index (tail) split task.
                  */
 
-                vmd.setAction(OverflowActionEnum.TailSplit);
+                overflowMetadata.setAction(vmd.name,
+                        OverflowActionEnum.TailSplit);
                 
-                final AbstractTask task = new SplitTailTask(//
-                        resourceManager,//
-                        lastCommitTime,//
-                        name,//
-                        vmd,//
-                        null// moveTarget
-                );
+                final AbstractTask task = new SplitTailTask(vmd, null/* moveTarget */);
 
                 // add to set of tasks to be run.
                 tasks.add(task);
@@ -1693,14 +1695,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * Do an index split task.
                  */
 
-                vmd.setAction(OverflowActionEnum.Split);
+                overflowMetadata.setAction(vmd.name, OverflowActionEnum.Split);
                 
-                final AbstractTask task = new SplitIndexPartitionTask(
-                        resourceManager,//
-                        lastCommitTime,//
-                        name,//
-                        vmd
-                );
+                final AbstractTask task = new SplitIndexPartitionTask(vmd);
 
                 // add to set of tasks to be run.
                 tasks.add(task);
@@ -1761,7 +1758,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * Select an optional compacting merge.
                  */
                 
-                vmd.setAction(OverflowActionEnum.Merge);
+                overflowMetadata.setAction(vmd.name, OverflowActionEnum.Merge);
 
                 // the file to be generated.
                 final File outFile = resourceManager
@@ -1790,14 +1787,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 
                 assert !compactingMerge : "Manditory compacting merge.";
 
-                vmd.setAction(OverflowActionEnum.Build);
+                overflowMetadata.setAction(vmd.name, OverflowActionEnum.Build);
                 
-                // the file to be generated.
-                final File outFile = resourceManager
-                        .getIndexSegmentFile(vmd.indexMetadata);
-
-                final AbstractTask task = new IncrementalBuildTask(
-                        resourceManager, lastCommitTime, vmd.name, vmd, outFile);
+                final AbstractTask task = new IncrementalBuildTask(vmd);
 
                 // add to set of tasks to be run.
                 tasks.add(task);

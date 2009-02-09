@@ -1,7 +1,6 @@
 package com.bigdata.resources;
 
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.IndexSegment;
 import com.bigdata.service.DataService;
 
 /**
@@ -14,30 +13,25 @@ import com.bigdata.service.DataService;
 public abstract class AbstractResult {
 
     /**
-     * The name under which the processed index partition was registered.
+     * The source index partition for the operation.
      * 
      * @see DataService#getIndexPartitionName(String, int)
      */
     public final String name;
 
     /**
-     * The index metadata object for the processed index as of the timestamp
-     * of the view from which the {@link IndexSegment} was generated.
+     * The index metadata object for the source index partition.
      */
     public final IndexMetadata indexMetadata;
 
     /**
      * 
      * @param name
-     *            The name under which the processed index partition was
-     *            registered (this is typically different from the name of
-     *            the scale-out index).
+     *            The name of the source index partition.
      * @param indexMetadata
-     *            The index metadata object for the processed index as of
-     *            the timestamp of the view from which the
-     *            {@link IndexSegment} was generated.
+     *            The index metadata object for the source index partition.
      */
-    public AbstractResult(String name, IndexMetadata indexMetadata) {
+    public AbstractResult(final String name, final IndexMetadata indexMetadata) {
 
         if (name == null)
             throw new IllegalArgumentException();

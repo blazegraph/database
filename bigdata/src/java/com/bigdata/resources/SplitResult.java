@@ -28,7 +28,7 @@ public class SplitResult extends AbstractResult {
      * An array of the {@link BuildResult}s for each output split.
      */
     public final BuildResult[] buildResults;
-
+    
     /**
      * @param name
      *            The name under which the processed index partition was
@@ -47,19 +47,19 @@ public class SplitResult extends AbstractResult {
      * @param buildResults
      *            A {@link BuildResult} for each output split.
      */
-    public SplitResult(String name, IndexMetadata indexMetadata,
-            Split[] splits, BuildResult[] buildResults) {
+    public SplitResult(final String name, final IndexMetadata indexMetadata,
+            final Split[] splits, final BuildResult[] buildResults) {
 
-        super( name, indexMetadata);
+        super(name, indexMetadata);
 
         assert splits != null;
-        
+
         assert buildResults != null;
-        
+
         assert splits.length == buildResults.length;
-        
-        for(int i=0; i<splits.length; i++) {
-            
+
+        for (int i = 0; i < splits.length; i++) {
+
             assert splits[i] != null;
 
             assert splits[i].pmd != null;
@@ -67,7 +67,7 @@ public class SplitResult extends AbstractResult {
             assert splits[i].pmd instanceof LocalPartitionMetadata;
 
             assert buildResults[i] != null;
-            
+
         }
         
         this.splits = splits;
@@ -78,7 +78,8 @@ public class SplitResult extends AbstractResult {
     
     public String toString() {
         
-        return "SplitResult{name="+name+", splits="+Arrays.toString(splits)+"}";
+        return "SplitResult{name=" + name + ", splits="
+                + Arrays.toString(splits) + "}";
         
     }
 

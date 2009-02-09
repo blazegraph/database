@@ -151,7 +151,7 @@ public class CompactingMergeTask extends AbstractPrepareTask<BuildResult> {
 
                 // task will update the index partition view definition.
                 final Event updateEvent = e.newSubEvent(
-                        EventType.AtomicUpdate,
+                        OverflowSubtaskEnum.AtomicUpdate,
                         OverflowActionEnum.Merge + "(" + vmd.name + ") : "
                                 + vmd).start();
 
@@ -337,6 +337,11 @@ public class CompactingMergeTask extends AbstractPrepareTask<BuildResult> {
     static protected class AtomicUpdateCompactingMergeTask extends
             AbstractAtomicUpdateTask<Void> {
 
+        /**
+         * The expected UUID of the scale-out index.
+         */
+        final protected UUID indexUUID;
+        
         final protected BuildResult buildResult;
         
         /**
@@ -349,11 +354,16 @@ public class CompactingMergeTask extends AbstractPrepareTask<BuildResult> {
                 IConcurrencyManager concurrencyManager, String resource,
                 UUID indexUUID, BuildResult buildResult) {
 
-            super(resourceManager, ITx.UNISOLATED, resource, indexUUID);
+            super(resourceManager, ITx.UNISOLATED, resource);
+
+            if (indexUUID == null)
+                throw new IllegalArgumentException();
 
             if (buildResult == null)
                 throw new IllegalArgumentException();
 
+            this.indexUUID = indexUUID;
+            
             this.buildResult = buildResult;
 
             assert resource.equals(buildResult.name);
@@ -390,7 +400,7 @@ public class CompactingMergeTask extends AbstractPrepareTask<BuildResult> {
             final ILocalBTreeView view = (ILocalBTreeView) getIndex(getOnlyResource());
 
             // make sure that this is the same scale-out index.
-            assertSameIndex(view.getMutableBTree());
+            assertSameIndex(indexUUID, view.getMutableBTree());
 
             if(view instanceof BTree) {
                 

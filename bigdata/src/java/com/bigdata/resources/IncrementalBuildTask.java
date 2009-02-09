@@ -38,7 +38,7 @@ import com.bigdata.service.EventType;
  */
 public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
 
-    final protected long lastCommitTime;
+//    final protected long lastCommitTime;
 
     final protected ViewMetadata vmd;
     
@@ -66,31 +66,22 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
      * @param outFile
      *            The file on which the {@link IndexSegment} will be written.
      */
-    public IncrementalBuildTask(final ResourceManager resourceManager,
-            final long lastCommitTime, final String name,
-            final ViewMetadata vmd, final File outFile) {
+    public IncrementalBuildTask(final ViewMetadata vmd) {
 
-        super(resourceManager, TimestampUtility
-                .asHistoricalRead(lastCommitTime), name);
+        super(vmd.resourceManager, TimestampUtility
+                .asHistoricalRead(vmd.commitTime), vmd.name);
 
         if (vmd == null)
             throw new IllegalArgumentException();
 
-        if (!vmd.name.equals(name))
-            throw new IllegalArgumentException();
-
-        if (outFile == null)
-            throw new IllegalArgumentException();
-
-        this.lastCommitTime = lastCommitTime;
-
         this.vmd = vmd;
-        
-        this.outFile = outFile;
+
+        // the file to be generated.
+        this.outFile = resourceManager.getIndexSegmentFile(vmd.indexMetadata);
 
         this.e = new Event(resourceManager.getFederation(), vmd.name,
                 OverflowActionEnum.Build, OverflowActionEnum.Build + "("
-                        + name + ") : " + vmd);
+                        + vmd.name + ") : " + vmd);
         
 // // cache a soft reference to JUST the btree on the old journal.
 //        this.ref = new SoftReference<BTree>(vmd.getBTree());
@@ -161,7 +152,7 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
 
                 // Build the index segment.
                 result = resourceManager.buildIndexSegment(name, src, outFile,
-                        false/* compactingMerge */, lastCommitTime,
+                        false/* compactingMerge */, vmd.commitTime,
                         null/* fromKey */, null/* toKey */);
 
             } finally {
@@ -193,7 +184,7 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
 
 
                 final Event updateEvent = e.newSubEvent(
-                        EventType.AtomicUpdate,
+                        OverflowSubtaskEnum.AtomicUpdate,
                         OverflowActionEnum.Build + "(" + vmd.name + ") : "
                                 + vmd).start();
                 
@@ -264,6 +255,11 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
     static protected class AtomicUpdateIncrementalBuildTask extends
             AbstractAtomicUpdateTask<Void> {
 
+        /**
+         * The expected UUID of the scale-out index.
+         */
+        final protected UUID indexUUID;
+        
         final protected BuildResult buildResult;
         
         /**
@@ -276,11 +272,16 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
                 IConcurrencyManager concurrencyManager, String resource,
                 UUID indexUUID, BuildResult buildResult) {
 
-            super(resourceManager, ITx.UNISOLATED, resource, indexUUID);
+            super(resourceManager, ITx.UNISOLATED, resource);
 
+            if(indexUUID == null)
+                throw new IllegalArgumentException();
+            
             if(buildResult == null)
                 throw new IllegalArgumentException();
 
+            this.indexUUID = indexUUID;
+            
             this.buildResult = buildResult;
 
             assert resource.equals( buildResult.name );
@@ -317,7 +318,7 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
             final ILocalBTreeView view = (ILocalBTreeView)getIndex(getOnlyResource());
 
             // make sure that we are working with the same index.
-            assertSameIndex(view.getMutableBTree());
+            assertSameIndex(indexUUID, view.getMutableBTree());
             
             if(view instanceof BTree) {
                 

@@ -115,6 +115,16 @@ abstract public class OverflowManager extends IndexManager {
     final protected int accelerateSplitThreshold; 
     
     /**
+     * @see Options#PERCENT_OF_SPLIT_THRESHOLD
+     */
+    final protected double percentOfSplitThreshold;
+
+    /**
+     * @see Options#TAIL_SPLIT_THRESHOLD
+     */
+    final protected double tailSplitThreshold;
+    
+    /**
      * @see Options#JOINS_ENABLED
      */
     final protected boolean joinsEnabled;
@@ -368,6 +378,32 @@ abstract public class OverflowManager extends IndexManager {
 
         String DEFAULT_ACCELERATE_SPLIT_THRESHOLD = "20";
 
+
+        /**
+         * The minimum percentage (where <code>1.0</code> corresponds to 100
+         * percent) that an index partition must constitute of a nominal index
+         * partition before a head or tail split will be considered (default
+         * {@value #DEFAULT_PERCENT_OF_SPLIT_THRESHOLD}). Values near to and
+         * greater than <code>1.0</code> are permissible and imply that the
+         * post-split leftSibling index partition will be approximately a
+         * nominal index partition. However the maximum percentage may not be
+         * greater than <code>2.0</code> (200 percent).
+         */
+        String PERCENT_OF_SPLIT_THRESHOLD = OverflowManager.class.getName()
+                + ".percentOfSplitThreshold";
+
+        String DEFAULT_PERCENT_OF_SPLIT_THRESHOLD = ".9";
+        
+        /**
+         * The minimum percentage (in [0:1]) of leaf splits which must be in the
+         * tail of the index partition before a tail split of an index partition
+         * will be considered (default {@value #DEFAULT_TAIL_SPLIT_THRESHOLD}).
+         */
+        String TAIL_SPLIT_THRESHOLD = OverflowManager.class.getName()
+                + ".tailSplitThreshold";
+        
+        String DEFAULT_TAIL_SPLIT_THRESHOLD = ".4";
+        
         /**
          * Option may be used to disable index partition joins.
          * 
@@ -838,6 +874,46 @@ abstract public class OverflowManager extends IndexManager {
 
             }
             
+        }
+        
+        // percentOfSplitThreshold
+        {
+
+            percentOfSplitThreshold = Double.parseDouble(properties.getProperty(
+                    Options.PERCENT_OF_SPLIT_THRESHOLD,
+                    Options.DEFAULT_PERCENT_OF_SPLIT_THRESHOLD));
+
+            if (INFO)
+                log.info(Options.PERCENT_OF_SPLIT_THRESHOLD + "="
+                        + percentOfSplitThreshold);
+
+            if (percentOfSplitThreshold < 0 || percentOfSplitThreshold > 2) {
+
+                throw new RuntimeException(Options.PERCENT_OF_SPLIT_THRESHOLD
+                        + " must be in [0:2]");
+
+            }
+
+        }
+
+        // tailSplitThreshold
+        {
+
+            tailSplitThreshold = Double.parseDouble(properties.getProperty(
+                    Options.TAIL_SPLIT_THRESHOLD,
+                    Options.DEFAULT_TAIL_SPLIT_THRESHOLD));
+
+            if (INFO)
+                log.info(Options.TAIL_SPLIT_THRESHOLD + "="
+                        + tailSplitThreshold);
+
+            if (tailSplitThreshold < 0 || tailSplitThreshold > 1) {
+
+                throw new RuntimeException(Options.TAIL_SPLIT_THRESHOLD
+                        + " must be in [0:1]");
+
+            }
+
         }
         
         // joinsEnabled
@@ -1807,7 +1883,8 @@ abstract public class OverflowManager extends IndexManager {
 
                         // Note that index partition was copied for the caller.
 //                        overflowMetadata.copied.add(bm.name);
-                        bm.setAction(OverflowActionEnum.Copy);
+                        overflowMetadata.setAction(bm.name,
+                                OverflowActionEnum.Copy);
                         ncopy++;
                         
                         if (entryCount > 0) {

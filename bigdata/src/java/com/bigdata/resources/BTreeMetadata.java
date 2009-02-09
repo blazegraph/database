@@ -2,13 +2,15 @@ package com.bigdata.resources;
 
 import java.lang.ref.SoftReference;
 
+import javax.swing.text.View;
+
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.Checkpoint;
+import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.Name2Addr.Entry;
+import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 
@@ -34,17 +36,17 @@ class BTreeMetadata {
     
     static protected final boolean DEBUG = log.isDebugEnabled();
     
-    protected final OverflowMetadata omd;
+    /**
+     * The object which may be used to (re-)open the {@link BTree} and the index
+     * partition view.
+     */
+    protected final ResourceManager resourceManager;
 
     /**
-     * This is where we can (re-)load the {@link BTree}.
+     * The commit time associated with the {@link BTree} and the index partition
+     * view.
      */
-    private final AbstractJournal oldJournal;
-    
-    /**
-     * This is the {@link Checkpoint} record address on that journal.
-     */
-    private final long checkpointAddr;
+    public final long commitTime;
     
     /**
      * Name of the local index (the index partition name).
@@ -77,11 +79,15 @@ class BTreeMetadata {
                 btree = ref == null ? null : ref.get();
 
                 /*
-                 * The mutable btree on the old journal, not the full view of
-                 * that index.
+                 * The mutable btree on the journal associated with the
+                 * commitTime, not the full view of that index.
                  */
 
-                btree = (BTree) oldJournal.getIndex(checkpointAddr);
+                final AbstractJournal store = resourceManager
+                        .getJournal(commitTime);
+
+                btree = (BTree) resourceManager.getIndexOnStore(name,
+                        commitTime, store);
 
                 if (btree == null)
                     throw new IllegalArgumentException();
@@ -101,7 +107,15 @@ class BTreeMetadata {
      */
     public void clearRef() {
         
-        ref.clear();
+        synchronized(this) {
+            
+            if(ref != null) { 
+                
+                ref.clear();
+        
+            }
+
+        }
         
     }
 
@@ -121,49 +135,72 @@ class BTreeMetadata {
     public final int entryCount;
 
     /**
-     * The action taken and <code>null</code> if no action has been taken
-     * for this local index.
+     * The counters for the index partition view.
+     */
+    public final BTreeCounters btreeCounters;
+    
+    /**
+     * The percentage of leaf splits which occurred at or near the head of the
+     * {@link BTree}.
+     */
+    public final double percentHeadSplits;
+
+    /**
+     * The percentage of leaf splits which occurred at or near the tail of the
+     * {@link BTree}.
+     */
+    public final double percentTailSplits;
+
+    /**
+     * The action taken and <code>null</code> if no action has been taken for
+     * this local index.
      */
     public OverflowActionEnum action;
     
-    public void setAction(final OverflowActionEnum action) {
-
-        if (action == null)
-            throw new IllegalArgumentException();
-        
-        omd.setAction(name, action);
-        
-    }
+//    public void setAction(final OverflowActionEnum action) {
+//
+//        if (action == null)
+//            throw new IllegalArgumentException();
+//        
+//        omd.setAction(name, action);
+//        
+//    }
     
     /**
      * 
-     * @param omd
-     * @param oldJournal
-     * @param entry
+     * @param resourceManager
+     *            Used to (re-)open the {@link BTree} as necessary.
+     * @param commitTime
+     *            The commit time corresponding to the desired commit point.
+     * @param name
+     *            The name of the {@link BTree}.
+     * @param btreeCounters
+     *            The aggregated counters for the {@link BTree} or the index
+     *            partition {@link View} as reported by the
+     *            {@link ConcurrencyManager}
      */
-    public BTreeMetadata(final OverflowMetadata omd,
-            final AbstractJournal oldJournal, final Entry entry) {
+    public BTreeMetadata(final ResourceManager resourceManager,
+            final long commitTime, final String name,
+            final BTreeCounters btreeCounters) {
 
-        if (omd == null)
+        if (resourceManager == null)
             throw new IllegalArgumentException();
 
-        if (oldJournal == null)
+        if (name == null)
             throw new IllegalArgumentException();
 
-        if (entry == null)
+        if (btreeCounters == null)
             throw new IllegalArgumentException();
+        
+        this.resourceManager = resourceManager;
 
-        this.omd = omd;
-
-        this.oldJournal = oldJournal;
-
-        this.checkpointAddr = entry.checkpointAddr;
-
-        this.name = entry.name;
+        this.commitTime = commitTime;
+        
+        this.name = name;
 
         // eager resolution to put a SoftReference in place.
         final BTree btree = getBTree();
-        
+
         // index metadata for that index partition.
         indexMetadata = btree.getIndexMetadata();
 
@@ -188,12 +225,32 @@ class BTreeMetadata {
         this.sourceCount = sourceCount;
         this.sourceJournalCount = sourceJournalCount;
         this.sourceSegmentCount = sourceSegmentCount;
-        
-        // BTree's directly maintained entry count (very fast).
-        entryCount = btree.getEntryCount(); 
-        
-    }
 
+        // BTree's directly maintained entry count (very fast).
+        this.entryCount = btree.getEntryCount();
+
+        this.btreeCounters = btreeCounters;
+
+        if (btreeCounters != null) {
+
+            // Note: +1 in the denominator to avoid divide by zero.
+            this.percentHeadSplits = btreeCounters.headSplit
+                    / (btreeCounters.leavesSplit + 1d);
+
+            // Note: +1 in the denominator to avoid divide by zero.
+            this.percentTailSplits = btreeCounters.tailSplit
+                    / (btreeCounters.leavesSplit + 1d);
+
+        } else {
+            
+            this.percentHeadSplits = 0d;
+
+            this.percentTailSplits = 0d;
+            
+        }
+
+    }
+    
     public String toString() {
 
         final StringBuilder sb = new StringBuilder();
@@ -205,6 +262,16 @@ class BTreeMetadata {
         sb.append(", sourceCounts=" + "{all=" + sourceCount + ",journals="
                 + sourceJournalCount + ",segments=" + sourceSegmentCount + "}");
 
+        sb.append(", #leafSplit=" + btreeCounters.leavesSplit);
+        
+        sb.append(", #headSplit=" + btreeCounters.headSplit);
+        
+        sb.append(", #tailSplit=" + btreeCounters.tailSplit);
+
+        sb.append(", percentHeadSplits=" + percentHeadSplits);
+
+        sb.append(", percentTailSplits=" + percentTailSplits);
+        
         toString(sb);
 
         return sb.toString();

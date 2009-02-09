@@ -1120,7 +1120,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
                 // the URL that may be used to access the local httpd.
                 httpdURL = "http://"
                         + AbstractStatisticsCollector.fullyQualifiedHostName
-                        + ":" + httpd.getPort() + "?path="
+                        + ":" + httpd.getPort() + "/?path="
                         + URLEncoder.encode(path, "UTF-8");
 
                 if (INFO)
