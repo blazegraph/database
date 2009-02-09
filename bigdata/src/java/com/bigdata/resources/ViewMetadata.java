@@ -159,6 +159,12 @@ class ViewMetadata extends BTreeMetadata {
 
         this.percentOfSplit = adjustedSplitHandler.percentOfSplit(rangeCount);
 
+        // true iff this is a good candidate for a tail split.
+        this.tailSplit = //
+        this.percentOfSplit > resourceManager.percentOfSplitThreshold && //
+        super.percentTailSplits > resourceManager.tailSplitThreshold//
+        ;
+
         initView = true;
 
     }
@@ -216,6 +222,23 @@ class ViewMetadata extends BTreeMetadata {
 
     private volatile double percentOfSplit;
 
+    /**
+     * Return <code>true</code> if the index partition satisifies the criteria
+     * for a tail split. 
+     */
+    public boolean isTailSplit() {
+        
+        if(!initView) {
+            
+            getView();
+            
+        }
+        
+        return tailSplit;
+        
+    }
+    private volatile boolean tailSplit;
+    
     /**
      * {@inheritDoc}
      * <p>

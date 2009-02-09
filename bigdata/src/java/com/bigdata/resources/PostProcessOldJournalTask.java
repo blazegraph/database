@@ -363,14 +363,14 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     continue;
 
                 }
-
+                
                 if (INFO)
                     log.info("Considering join: name=" + name + ", rangeCount="
-                            + view.rangeCount() + ", pmd=" + pmd);
+                            + vmd.getRangeCount() + ", pmd=" + pmd);
                 
                 if (splitHandler != null
                         && pmd.getRightSeparatorKey() != null
-                        && splitHandler.shouldJoin(view)) {
+                        && splitHandler.shouldJoin(vmd.getRangeCount())) {
 
                     /*
                      * Add to the set of index partitions that are candidates
@@ -1070,29 +1070,72 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * compacting merge on the index before doing any other operation so
              * that we can better tell how many tuples remain in the index
              * partition.
+             * 
+             * FIXME We are currently using the performance counters for all
+             * AbstractTask operations, not just those which are UNISOLATED or
+             * READ_COMMITTED. Think about what this means when choosing an
+             * index partition to move. E.g., a read-hot index would appear to
+             * be hot, not just a write-hot index. This could be changed easily
+             * enough by changing the indices for which AbstractTask will report
+             * the performance counters or by tracking the read-only vs
+             * unisolated and read-committed performance counters separately.
+             * 
+             * @todo it would be nice to get the moveCandidate and moveRatio
+             * onto the ViewMetadata but we would need to have the score.drank
+             * available in that context.
              */
             
-            final boolean moveCandidate =//
-                // Note: more active indices must be further from a split.
-                (score.drank > .6 && vmd.getPercentOfSplit() < .3) || //
-                // Note: less active indices may be closer to a split.
-                (score.drank > .2 && vmd.getPercentOfSplit() < .5) || //
-                // Note: tail splits are ideal move candidates.
-                (vmd.getPercentOfSplit() > resourceManager.percentOfSplitThreshold//
-                    && vmd.percentTailSplits > resourceManager.tailSplitThreshold)
+            // true iff this is a good candidate for a tail split.
+            final boolean tailSplit = vmd.isTailSplit();
+            final double moveMinScore = .1;
+            /*
+             * Either the index partition is a tail split, which is an ideal
+             * move candidate and we will move the righSibling, or it is not
+             * "too large" and we will move the index partition, or it is
+             * overdue for a split and we will split the index partition and
+             * then move the smallest of the post-split index partitions.
+             * 
+             * Very cold index partitions are ignored.
+             * 
+             * Note: It is important that we choose a move if this data service
+             * is highly utilized. Failure to choose a move will result in the
+             * host on which the data service resides becoming a bottleneck in
+             * the federation. For that reason we have move variants that handle
+             * large index partitions (tail split, normal split) and also the
+             * standard move operation when the index partition is not too
+             * large.
+             */
+            final boolean moveCandidate = //
                 /*
                  * Note: barely active indices are not moved since moving them
                  * does not change the load on the data service.
-                 * 
-                 * Note: This also helps to prevent very small indices that are
-                 * not getting much activity from bounding around.
-                 */ 
+                 */
+                score.drank >= moveMinScore
+//                (tailSplit || (vmd.getPercentOfSplit() < MOVE_MAX_PERCENT_OF_SPLIT))
+                ;
+
+            /*
+             * Ratio used to choose prioritize the index partitions for moves.
+             * 
+             * Note: Since the rightSibling of a tail split is always very small
+             * we substitute a small "percentOfSplit" (.1) if a tail split would
+             * be choosen. This let's tail split + move candidates rank up there
+             * with small index partitions which are equally hot.
+             * 
+             * Note: This also helps to prevent very small indices that are not
+             * getting much activity from bounding around.
+             */
+            final double movePriority = tailSplit //
+                ? score.drank / .1// 
+                : score.drank / vmd.getPercentOfSplit()//
                 ;
 
             // @todo conditionally log @ info
-            log.warn(vmd.name + " : moveCandidate=" + moveCandidate
-                    + ", percentOfSplit=" + vmd.getPercentOfSplit()
-                    + ", drank=" + score.drank + " : " + vmd + " : " + score);
+            log.warn(vmd.name + " : tailSplit=" + tailSplit
+                    + ", moveCandidate=" + moveCandidate + ", movePriority="
+                    + movePriority + ", drank=" + score.drank
+                    + ", percentOfSplit=" + vmd.getPercentOfSplit() + " : "
+                    + vmd + " : " + score);
             
             if (!moveCandidate) {
 
@@ -1109,7 +1152,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * have lower range counts we prefer those which have the highest
              * scores.
              */
-            moveQueue.add(new Priority<ViewMetadata>(score.drank, vmd));
+            moveQueue.add(new Priority<ViewMetadata>(movePriority, vmd));
 
         } // next Score (active index).
 
@@ -1163,8 +1206,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 targetDataServiceName = targetDataServiceUUID.toString();
             }
 
-            if (vmd.getPercentOfSplit() > resourceManager.percentOfSplitThreshold//
-                    && vmd.percentTailSplits > resourceManager.tailSplitThreshold) {
+            if (vmd.isTailSplit()) {
 
                 /*
                  * tailSplit
@@ -1185,16 +1227,15 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * the most possible reward for the least possible effort. Even
                  * when the index is very hot, the move of the post-split
                  * rightSibling will typically move less data than the move of
-                 * another index partition.
+                 * another index partition
                  * 
-                 * @todo a full hot index partition could be split and any one
-                 * of the splits moved. a tailSplit (or a headSplit) is just a
-                 * special case of this where the split is (nearly) empty.
+                 * @todo support headSplits? what kind of application pattern
+                 * can produce the necessary preconditions?. Maybe a FIFO queue?
                  */
                 
                 if (INFO)
-                    log.info("Will tailSplit and move the rightSibling of "
-                            + vmd.name + " to dataService="
+                    log.info("Will tailSplit " + vmd.name
+                            + " and move the rightSibling to dataService="
                             + targetDataServiceName);
 
                 final AbstractTask task = new SplitTailTask(vmd,
@@ -1205,6 +1246,38 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 putUsed(vmd.name, "willTailSplit + moveRightSibling("
                         + vmd.name + " -> " + targetDataServiceName + ") : "
                         + vmd + " : " + overflowMetadata.getScore(vmd.name));
+
+                nmove++;
+
+              } else if (!vmd.getAdjustedSplitHandler().shouldJoin(
+                    vmd.getRangeCount())) {
+
+                /*
+                 * Split the index partition and then move the smallest of the
+                 * post-split index partitions.
+                 * 
+                 * Note: This uses a more eager criteria for selecting a split
+                 * than is applied in a non-move context. This is done so that
+                 * we can move smaller post-split index partitions rather than
+                 * moving the entire index partition which would otherwise not
+                 * be split until it was "overcapacity".
+                 */
+
+                if (INFO)
+                    log
+                            .info("Will split "
+                                    + vmd.name
+                                    + " and move the smallest post-split index partition to dataService="
+                                    + targetDataServiceName);
+
+                final AbstractTask task = new SplitIndexPartitionTask(vmd,
+                        targetDataServiceUUID);
+
+                tasks.add(task);
+
+                putUsed(vmd.name, "willSplit+Move(" + vmd.name + " -> "
+                        + targetDataServiceName + ") : " + vmd + " : "
+                        + overflowMetadata.getScore(vmd.name));
 
                 nmove++;
 
@@ -1639,9 +1712,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             if (!compactingMerge //
                     // move not in progress
                     && vmd.pmd.getSourcePartitionId() == -1//
-                    // index partition is near a full split
-                    && vmd.getPercentOfSplit() > resourceManager.percentOfSplitThreshold//
-                    && vmd.percentTailSplits > resourceManager.tailSplitThreshold) {
+                    // satisifies tail split criteria
+                    && vmd.isTailSplit()//
+                    ) {
 
                 /*
                  * Do an index (tail) split task.
@@ -1696,8 +1769,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  */
 
                 overflowMetadata.setAction(vmd.name, OverflowActionEnum.Split);
-                
-                final AbstractTask task = new SplitIndexPartitionTask(vmd);
+
+                final AbstractTask task = new SplitIndexPartitionTask(vmd, null/* moveTarget */);
 
                 // add to set of tasks to be run.
                 tasks.add(task);

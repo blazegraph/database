@@ -55,6 +55,8 @@ public class SplitIndexPartitionTask extends
         AbstractPrepareTask<AbstractResult> {
 
     protected final ViewMetadata vmd;
+
+    protected final UUID moveTarget;
     
     /**
      * The split handler to be applied. Note that this MAY have been overriden
@@ -69,11 +71,13 @@ public class SplitIndexPartitionTask extends
     private final Event e;
     
     /**
-     * @param resourceManager
-     * @param lastCommitTime
-     * @param name
+     * @param vmd
+     * @param moveTarget
+     *            When non-<code>null</code> the new right-sibling (the tail)
+     *            will be moved to the specified data service after the split.
      */
-    protected SplitIndexPartitionTask(final ViewMetadata vmd) {
+    protected SplitIndexPartitionTask(final ViewMetadata vmd,
+            final UUID moveTarget) {
 
         super(vmd.resourceManager, TimestampUtility
                 .asHistoricalRead(vmd.commitTime), vmd.name);
@@ -97,6 +101,8 @@ public class SplitIndexPartitionTask extends
 
         }
 
+        this.moveTarget = moveTarget;
+        
         this.splitHandler = vmd.getAdjustedSplitHandler();
 
         if (splitHandler == null) {
@@ -264,6 +270,73 @@ public class SplitIndexPartitionTask extends
             doSplitAtomicUpdate(resourceManager, vmd, result,
                     OverflowActionEnum.Split,
                     resourceManager.indexPartitionSplitCounter, e);
+
+            if (moveTarget != null) {
+                
+                /*
+                 * Note: Unlike a normal move where there are writes on the old
+                 * journal, all the data for the each of the index partitions is
+                 * in an index segment that we just built and new writes MAY be
+                 * buffered on the live journal. Therefore we use a different
+                 * entry point into the MOVE operation, one which does not copy
+                 * over the data from the old journal.
+                 */
+
+                /*
+                 * Find the split whose newly built index partition has the
+                 * smallest size.
+                 */
+                final int bestMoveIndex;
+                {
+                    int indexOfMinLength = -1;
+                    long minLength = Long.MAX_VALUE;
+                    for (int i = 0; i < result.buildResults.length; i++) {
+                        final BuildResult r = result.buildResults[i];
+                        // #of bytes in that index segment.
+                        final long length = r.builder.getCheckpoint().length;
+                        if(length<minLength) {
+                            indexOfMinLength = i;
+                            minLength = length;
+                        }
+                    }
+                    assert indexOfMinLength != -1 : result.toString();
+                    bestMoveIndex = indexOfMinLength;
+                    if (INFO)
+                        log.info("Best split to move: "
+                                + result.splits[bestMoveIndex]);
+                }
+                
+                /*
+                 * The name of the post-split index partition that is the source
+                 * for the move operation.
+                 */
+                final String nameOfPartitionToMove = DataService
+                        .getIndexPartitionName(vmd.indexMetadata.getName(),
+                                result.splits[bestMoveIndex].pmd
+                                        .getPartitionId());
+
+                /*
+                 * Obtain a new partition identifier for the partition that will
+                 * be created when we move the index partition to the target
+                 * data service.
+                 */
+                final int newPartitionId = resourceManager
+                        .nextPartitionId(vmd.indexMetadata.getName());
+
+                // register the new index partition.
+                final MoveResult moveResult = MoveIndexPartitionTask
+                        .registerNewPartitionOnTargetDataService(
+                                resourceManager, moveTarget,
+                                nameOfPartitionToMove, newPartitionId, e);
+
+                /*
+                 * Move the buffered writes since the split and go live with the
+                 * new index partition.
+                 */
+                MoveIndexPartitionTask.moveBufferedWritesAndGoLive(
+                        resourceManager, moveResult, e);
+                
+            }
 
             // Done.
             return result;

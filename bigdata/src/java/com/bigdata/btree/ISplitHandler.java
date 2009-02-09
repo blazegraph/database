@@ -79,6 +79,20 @@ public interface ISplitHandler extends Serializable {
     public double percentOfSplit(long rangeCount);
     
     /**
+     * Return <code>true</code> if a cursory examination of an index partition
+     * suggests that it SHOULD be joined with either its left or right sibling.
+     * The basic determination is that the index partition is "undercapacity".
+     * Normally this is decided in terms of the range count of the index
+     * partition.
+     * 
+     * @param rangeCount
+     *            A fast range count (may overestimate).
+     * 
+     * @return <code>true</code> if the index partition should be joined.
+     */
+    public boolean shouldJoin(long rangeCount);
+    
+    /**
      * Choose a set of splits that completely span the key range of the index
      * view. The first split MUST use the leftSeparator of the index view as its
      * leftSeparator. The last split MUST use the rightSeparator of the index
@@ -95,19 +109,5 @@ public interface ISplitHandler extends Serializable {
      *         time.
      */
     public Split[] getSplits(IResourceManager resourceManager, IIndex ndx);
-    
-    /**
-     * Return <code>true</code> if a cursory examination of an index partition
-     * suggests that it SHOULD be joined with either its left or right sibling.
-     * The basic determination is that the index partition is "undercapacity".
-     * Normally this is decided in terms of the range count of the index
-     * partition.
-     * 
-     * @param ndx
-     *            An index partition.
-     * 
-     * @return <code>true</code> if the index partition should be joined.
-     */
-    public boolean shouldJoin(IIndex ndx);
 
 }
