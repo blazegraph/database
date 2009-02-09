@@ -29,13 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.mdi;
 
 import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.ResultSet;
-import com.bigdata.btree.filter.IFilterConstructor;
-import com.bigdata.btree.proc.IIndexProcedure;
-import com.bigdata.journal.ITx;
-import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.service.IDataService;
 

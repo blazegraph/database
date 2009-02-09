@@ -39,7 +39,6 @@ import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
 import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
 import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.proc.ISimpleIndexProcedure;
-import com.bigdata.cache.IValueAge;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.isolation.IsolatedFusedView;
@@ -67,7 +66,7 @@ import com.bigdata.service.Split;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class FusedView implements IIndex, ILocalBTreeView, IValueAge {
+public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
 
     protected static final Logger log = Logger.getLogger(FusedView.class);
 
@@ -1043,24 +1042,24 @@ public class FusedView implements IIndex, ILocalBTreeView, IValueAge {
         
     }
 
-    /*
-     * API used to report how long it has been since the BTree was last used.
-     * This is used to clear BTrees that are not in active use from a variety of
-     * caches. This helps us to better manage RAM.
-     */
-
-    final public void touch() {
-        
-        timestamp = System.nanoTime();
-        
-    }
-    
-    final public long timestamp() {
-        
-        return timestamp;
-        
-    }
-    
-    private long timestamp = System.nanoTime();
+//    /*
+//     * API used to report how long it has been since the BTree was last used.
+//     * This is used to clear BTrees that are not in active use from a variety of
+//     * caches. This helps us to better manage RAM.
+//     */
+//
+//    final public void touch() {
+//        
+//        timestamp = System.nanoTime();
+//        
+//    }
+//    
+//    final public long timestamp() {
+//        
+//        return timestamp;
+//        
+//    }
+//    
+//    private long timestamp = System.nanoTime();
     
 }

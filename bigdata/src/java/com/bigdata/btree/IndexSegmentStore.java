@@ -43,7 +43,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.cache.IValueAge;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
@@ -68,8 +67,8 @@ import com.bigdata.service.IBigdataFederation;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
-        IValueAge {
+public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
+//        IValueAge {
 
     /**
      * Logger.
@@ -1435,24 +1434,24 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore,
         return addressManager.unpackAddr(in);
     }
     
-    /*
-     * API used to report how long it has been since the store was last
-     * used. This is used to clear stores are not in active use from the
-     * value cache, which helps us to better manage RAM.
-     */
-    
-    final public void touch() {
-    
-        timestamp = System.nanoTime();
-        
-    }
-    
-    final public long timestamp() {
-        
-        return timestamp;
-        
-    }
-    
-    private long timestamp = System.nanoTime();
+//    /*
+//     * API used to report how long it has been since the store was last
+//     * used. This is used to clear stores are not in active use from the
+//     * value cache, which helps us to better manage RAM.
+//     */
+//    
+//    final public void touch() {
+//    
+//        timestamp = System.nanoTime();
+//        
+//    }
+//    
+//    final public long timestamp() {
+//        
+//        return timestamp;
+//        
+//    }
+//    
+//    private long timestamp = System.nanoTime();
 
 }

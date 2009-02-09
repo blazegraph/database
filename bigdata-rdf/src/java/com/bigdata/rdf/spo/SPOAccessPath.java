@@ -271,4 +271,30 @@ public class SPOAccessPath extends AbstractAccessPath<ISPO> {
         
     }
     
+//    /*
+//     * API used to report how long it has been since the access path was last
+//     * used. This is used to clear access paths that are not in active use from
+//     * the SPORelation's cache. This helps us to better manage RAM.
+//     */
+//    
+//    /**
+//     * Note: DO NOT invoke this method from hot code such as that will impose a
+//     * huge performance penalty! It is sufficient to let the
+//     * {@link SynchronizedHardReferenceQueueWithTimeout} invoke this method
+//     * itself when it adds an {@link SPOAccessPath} reference.
+//     */
+//    final public void touch() {
+//    
+//        timestamp = System.nanoTime();
+//        
+//    }
+//    
+//    final public long timestamp() {
+//        
+//        return timestamp;
+//        
+//    }
+//    
+//    private long timestamp = System.nanoTime();
+    
 }

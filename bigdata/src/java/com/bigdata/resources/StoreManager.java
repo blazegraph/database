@@ -69,8 +69,8 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.cache.ConcurrentWeakValueCache;
+import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.cache.IValueAge;
 import com.bigdata.concurrent.NamedLock;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.SerializerUtil;
@@ -937,12 +937,9 @@ abstract public class StoreManager extends ResourceEvents implements
                 throw new RuntimeException(Options.STORE_CACHE_TIMEOUT
                         + " must be non-negative");
             
-            storeCache = new ConcurrentWeakValueCache<UUID, IRawStore>(
-                    new HardReferenceQueue<IRawStore>(null/* evictListener */,
-                            storeCacheCapacity,
-                            HardReferenceQueue.DEFAULT_NSCAN,
-                            TimeUnit.MILLISECONDS.toNanos(storeCacheTimeout)),
-                    .75f/* loadFactor */, 16/* concurrencyLevel */, true/* removeClearedEntries */);
+            storeCache = new ConcurrentWeakValueCacheWithTimeout<UUID, IRawStore>(
+                    storeCacheCapacity, TimeUnit.MILLISECONDS
+                            .toNanos(storeCacheTimeout));
             
 //            storeCache = new WeakValueCache<UUID, IRawStore>(
 //                    new LRUCache<UUID, IRawStore>(storeCacheCapacity));
@@ -1638,14 +1635,14 @@ abstract public class StoreManager extends ResourceEvents implements
 
     }
     
-    /**
-     * Clears any stale entries in the LRU backing the {@link #storeCache}
-     */
-    public void clearStaleCacheEntries() {
-
-        storeCache.clearStaleRefs();
-        
-    }
+//    /**
+//     * Clears any stale entries in the LRU backing the {@link #storeCache}
+//     */
+//    public void clearStaleCacheEntries() {
+//
+//        storeCache.clearStaleRefs();
+//        
+//    }
     
     synchronized public void shutdown() {
 
@@ -2207,7 +2204,7 @@ abstract public class StoreManager extends ResourceEvents implements
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public class ManagedJournal extends AbstractJournal implements IValueAge {
+    public class ManagedJournal extends AbstractJournal { // implements IValueAge {
 
         /**
          * Note: Each instance of the {@link ManagedJournal} reuses the SAME
@@ -2319,27 +2316,27 @@ abstract public class StoreManager extends ResourceEvents implements
             
         }
         
-        /*
-         * API used to report how long it has been since the store was last
-         * used. This is used to clear stores are not in active use from the
-         * value cache, which helps us to better manage RAM.
-         */
-        
-        final public void touch() {
-        
-            timestamp = System.nanoTime();
-            
-        }
-        
-        final public long timestamp() {
-            
-            return timestamp;
-            
-        }
-        
-        private long timestamp = System.nanoTime();
+//        /*
+//         * API used to report how long it has been since the store was last
+//         * used. This is used to clear stores are not in active use from the
+//         * value cache, which helps us to better manage RAM.
+//         */
+//        
+//        final public void touch() {
+//        
+//            timestamp = System.nanoTime();
+//            
+//        }
+//        
+//        final public long timestamp() {
+//            
+//            return timestamp;
+//            
+//        }
+//        
+//        private long timestamp = System.nanoTime();
 
-    }
+    } // class ManagedJournal
 
     /**
      * The journal on which writes are made.

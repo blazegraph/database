@@ -52,6 +52,7 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.btree.BTree.Counter;
 import com.bigdata.cache.ConcurrentWeakValueCache;
+import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.config.Configuration;
 import com.bigdata.config.IValidator;
@@ -61,6 +62,7 @@ import com.bigdata.config.LongRangeValidator;
 import com.bigdata.config.LongValidator;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
+import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
@@ -628,13 +630,9 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 //            historicalIndexCache = new WeakValueCache<Long, ICommitter>(
 //                    new LRUCache<Long, ICommitter>(historicalIndexCacheCapacity));
 
-            historicalIndexCache = new ConcurrentWeakValueCache<Long, BTree>(
-                    new HardReferenceQueue<BTree>(null/* evictListener */,
-                            historicalIndexCacheCapacity,
-                            HardReferenceQueue.DEFAULT_NSCAN,
-                            TimeUnit.MILLISECONDS
-                                    .toNanos(historicalIndexCacheTimeout)),
-                    .75f/* loadFactor */, 16/* concurrencyLevel */, true/* removeClearedEntries */);
+            historicalIndexCache = new ConcurrentWeakValueCacheWithTimeout<Long, BTree>(
+                    historicalIndexCacheCapacity, TimeUnit.MILLISECONDS
+                            .toNanos(historicalIndexCacheTimeout));
 
             liveIndexCacheCapacity = getProperty(
                     Options.LIVE_INDEX_CACHE_CAPACITY,
@@ -1204,41 +1202,75 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         
         if (counters == null) {
 
-            counters = new CounterSet();
-
-            counters.addCounter("file", new Instrument<String>() {
-                public void sample() {
-                    File file = _bufferStrategy.getFile();
-                    setValue(file == null ? "N/A" : file.getAbsolutePath());
-                }
-            });
-
-            counters.addCounter("createTime", new Instrument<Long>() {
-                public void sample() {
-                    setValue(getRootBlockView().getCreateTime());
-                }
-             });
-
-            counters.addCounter("closeTime", new Instrument<Long>() {
-                public void sample() {
-                    setValue(getRootBlockView().getCloseTime());
-                }
-             });
-
-            counters.addCounter("commitCount", new Instrument<Long>() {
-                public void sample() {
-                    setValue(getRootBlockView().getCommitCounter());
-                }
-             });
-
-            counters.attach(_bufferStrategy.getCounters());
-
+            counters = CountersFactory.getCounters(this);
         }
 
         return counters;
         
     }
     private CounterSet counters;
+    
+    private static class CountersFactory {
+
+        /**
+         * Note: A combination of a static inner class and a weak reference to
+         * the outer class are used to avoid the returned {@link CounterSet}
+         * having a hard reference to the outer class while retaining the
+         * ability to update the {@link CounterSet} dynamically as long as the
+         * referenced object exists.
+         */
+        static public CounterSet getCounters(final AbstractJournal jnl) {
+        
+            final CounterSet counters = new CounterSet();
+
+            final WeakReference<AbstractJournal> ref = new WeakReference<AbstractJournal>(jnl);
+            
+            counters.addCounter("file", new OneShotInstrument<String>(""
+                    + jnl.getFile()));
+
+            counters.addCounter("createTime", new Instrument<Long>() {
+                public void sample() {
+                    final AbstractJournal jnl = ref.get();
+                    if (jnl != null) {
+                        final IRootBlockView rootBlock = jnl._rootBlock;
+                        if (rootBlock != null) {
+                            setValue(rootBlock.getCreateTime());
+                        }
+                    }
+                }
+            });
+
+            counters.addCounter("closeTime", new Instrument<Long>() {
+                public void sample() {
+                    final AbstractJournal jnl = ref.get();
+                    if (jnl != null) {
+                        final IRootBlockView rootBlock = jnl._rootBlock;
+                        if (rootBlock != null) {
+                            setValue(rootBlock.getCloseTime());
+                        }
+                    }
+                }
+            });
+
+            counters.addCounter("commitCount", new Instrument<Long>() {
+                public void sample() {
+                    final AbstractJournal jnl = ref.get();
+                    if (jnl != null) {
+                        final IRootBlockView rootBlock = jnl._rootBlock;
+                        if (rootBlock != null) {
+                            setValue(rootBlock.getCommitCounter());
+                        }
+                    }
+                }
+             });
+
+            counters.attach(jnl._bufferStrategy.getCounters());
+
+        return counters;
+
+        }
+        
+    }
 
     /**
      * Returns a {@link CounterSet} that it reflects the {@link Counter}s for
@@ -1641,9 +1673,9 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
     /**
      * Return <code>true</code> if the journal was opened in a read-only mode
-     * or if {@link #closeForWrites(long)} was used to seal the journal against
-     * further writes.
      */
+//    * or if {@link #closeForWrites(long)} was used to seal the journal against
+//    * further writes.
     public boolean isReadOnly() {
         
 //        return readOnly || getRootBlockView().getCloseTime() != 0L;
@@ -2223,7 +2255,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      * 
      * @see Options#LIVE_INDEX_CACHE_CAPACITY
      */
-    Name2Addr setupName2AddrBTree(long addr) {
+    Name2Addr setupName2AddrBTree(final long addr) {
 
         assert name2Addr == null;
 

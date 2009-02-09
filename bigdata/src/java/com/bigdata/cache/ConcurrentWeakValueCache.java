@@ -24,13 +24,6 @@ import org.apache.log4j.Logger;
  * initialCapacity for the inner {@link ConcurrentHashMap} that is larger than
  * the <i>queueCapacity</i>. This helps to prevent resizing the
  * {@link ConcurrentHashMap} which is a relatively expensive operation.
- * <p>
- * Note: you can set a <i>timeout</i> for the {@link HardReferenceQueue}. This
- * may be used to evict references from the tail of the queue whose last access
- * time exceeds the timeout. The entries for those references WILL NOT be
- * cleared from this map as long as those references remain strongly reachable.
- * You may periodically invoke {@link #clearStaleRefs()} in order to clear
- * references even when the map is not being touched.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -39,7 +32,7 @@ import org.apache.log4j.Logger;
  * @param <V>
  *            The generic type of the values.
  */
-public class ConcurrentWeakValueCache<K, V> {
+public class ConcurrentWeakValueCache<K, V> implements IConcurrentWeakValueCache<K, V> {
 
     protected static final Logger log = Logger.getLogger(ConcurrentWeakValueCache.class);
     
@@ -56,7 +49,7 @@ public class ConcurrentWeakValueCache<K, V> {
      * Used to ensure that the [cacheCapacity] MRU weak references are not
      * finalized.
      */
-    final private HardReferenceQueue<V> queue;
+    final private IHardReferenceQueue<V> queue;
 
     /**
      * Reference queue for weak references in entered into the cache. A weak
@@ -177,7 +170,7 @@ public class ConcurrentWeakValueCache<K, V> {
                 loadFactor, concurrencyLevel, removeClearedReferences);
         
     }
-    
+
     /**
      * Uses the specified values.
      * 
@@ -192,7 +185,7 @@ public class ConcurrentWeakValueCache<K, V> {
      *            cleared references. When <code>false</code> those entries
      *            will remain in the cache.
      */
-    public ConcurrentWeakValueCache(final HardReferenceQueue<V> queue,
+    public ConcurrentWeakValueCache(final IHardReferenceQueue<V> queue,
             final float loadFactor, final int concurrencyLevel,
             final boolean removeClearedReferences
             ) {
@@ -358,9 +351,9 @@ public class ConcurrentWeakValueCache<K, V> {
             synchronized (queue) {
 
                 // put onto the hard reference queue.
-                if(queue.append(v) && INFO && v instanceof IValueAge) {
+                if(queue.append(v) && DEBUG) {
 
-                    log.info("put: key="+k+", val="+v);
+                    log.debug("put: key=" + k + ", val=" + v);
                     
                 }
 
@@ -423,9 +416,9 @@ public class ConcurrentWeakValueCache<K, V> {
                     synchronized (queue) {
 
                         // put the new value onto the hard reference queue.
-                        if(queue.append(v) && INFO && v instanceof IValueAge) {
+                        if(queue.append(v) && DEBUG) {
 
-                            log.info("put: key="+k+", val="+v);
+                            log.debug("put: key=" + k + ", val=" + v);
                             
                         }
 
@@ -444,9 +437,9 @@ public class ConcurrentWeakValueCache<K, V> {
                 synchronized (queue) {
 
                     // put it onto the hard reference queue.
-                    if(queue.append(v) && INFO && v instanceof IValueAge) {
+                    if (queue.append(v) && DEBUG) {
 
-                        log.info("put: key="+k+", val="+v);
+                        log.debug("put: key=" + k + ", val=" + v);
                         
                     }
 
@@ -582,38 +575,38 @@ public class ConcurrentWeakValueCache<K, V> {
         
     }
 
-    /**
-     * Clears stale references from the backing {@link HardReferenceQueue}.
-     * <p>
-     * Note: Evictions from the backing hard reference queue are driven by
-     * touches (get, put, remove). This means that the LRU entries in the map
-     * will not be cleared from the backing {@link HardReferenceQueue}
-     * regardless of their age. Applications may invoke this method occasionally
-     * (in general, with a delay of not less than the configured time) in order
-     * to ensure that stale references are cleared in the absence of touched and
-     * thus may become weakly reachable in a timely fashion.
-     * 
-     * @see HardReferenceQueue#evictStaleRefs()
-     */
-    public void clearStaleRefs() {
-        
-        synchronized(queue) {
-            
-            queue.evictStaleRefs();
-            
-        }
-
-        /*
-         * Note: I double that this will notice any stale references that we
-         * cleared above because the garbage collector is not synchronous with
-         * us here.
-         */
-        removeClearedEntries();
-        
-    }
+//    /**
+//     * Clears stale references from the backing {@link HardReferenceQueue}.
+//     * <p>
+//     * Note: Evictions from the backing hard reference queue are driven by
+//     * touches (get, put, remove). This means that the LRU entries in the map
+//     * will not be cleared from the backing {@link HardReferenceQueue}
+//     * regardless of their age. Applications may invoke this method occasionally
+//     * (in general, with a delay of not less than the configured time) in order
+//     * to ensure that stale references are cleared in the absence of touched and
+//     * thus may become weakly reachable in a timely fashion.
+//     * 
+//     * @see HardReferenceQueue#evictStaleRefs()
+//     */
+//    public void clearStaleRefs() {
+//        
+//        synchronized(queue) {
+//            
+//            queue.evictStaleRefs();
+//            
+//        }
+//
+//        /*
+//         * Note: I double that this will notice any stale references that we
+//         * cleared above because the garbage collector is not synchronous with
+//         * us here.
+//         */
+//        removeClearedEntries();
+//        
+//    }
     
     /**
-     * Adds the key and a timestamp to the weak reference.
+     * Adds the key to the weak reference.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -633,5 +626,5 @@ public class ConcurrentWeakValueCache<K, V> {
         }
 
     }
-
+    
 }
