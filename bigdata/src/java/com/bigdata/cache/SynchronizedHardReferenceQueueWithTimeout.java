@@ -332,7 +332,7 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
                         "StaleReferenceCleaner"));
         
         cleanerService.scheduleWithFixedDelay(new Cleaner(),
-                1000/* initialDelay */, 1000/* delay */, TimeUnit.MILLISECONDS);
+                5000/* initialDelay */, 5000/* delay */, TimeUnit.MILLISECONDS);
    
     }
     
