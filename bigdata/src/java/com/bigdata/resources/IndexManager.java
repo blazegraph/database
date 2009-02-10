@@ -57,7 +57,6 @@ import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.cache.LRUCache;
-import com.bigdata.cache.SynchronizedHardReferenceQueue;
 import com.bigdata.concurrent.NamedLock;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.journal.AbstractJournal;
@@ -1540,14 +1539,29 @@ abstract public class IndexManager extends StoreManager {
      *             will be deleted as a side-effect before returning control to
      *             the caller.
      */
-    public BuildResult buildIndexSegment(final String name, final IIndex src,
-            final File outFile, final boolean compactingMerge,
-            final long createTime, final byte[] fromKey, final byte[] toKey)
+    public BuildResult buildIndexSegment(final String name,
+            final ILocalBTreeView src, final File outFile,
+            final boolean compactingMerge, final long createTime,
+            final byte[] fromKey, final byte[] toKey, final Event parentEvent)
             throws Exception {
 
-        final Event e = new Event(getFederation(), name,
-                EventType.IndexSegmentBuild, "compactingMerge="
-                        + compactingMerge).start();
+        if (name == null)
+            throw new IllegalArgumentException();
+
+        if (src == null)
+            throw new IllegalArgumentException();
+        
+        if (outFile == null)
+            throw new IllegalArgumentException();
+        
+        if (parentEvent == null)
+            throw new IllegalArgumentException();
+
+        final String details = "name=" + name + ", merge=" + compactingMerge
+                + ", #sources=" + src.getSourceCount();
+        
+        final Event e = parentEvent.newSubEvent(EventType.IndexSegmentBuild,
+                details).start();
 
         String moreDetails = null;
         try {

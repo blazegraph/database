@@ -32,6 +32,7 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 
 import com.bigdata.io.FileChannelUtility;
+import com.bigdata.io.NOPReopener;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.RootBlockException;
 import com.bigdata.rawstore.Bytes;
@@ -322,6 +323,9 @@ public class IndexSegmentCheckpoint {
      */
     public IndexSegmentCheckpoint(final RandomAccessFile raf) throws IOException {
 
+        if (raf == null)
+            throw new IllegalArgumentException();
+        
         final long len = raf.length();
         
         if (len == 0L) {
@@ -341,7 +345,7 @@ public class IndexSegmentCheckpoint {
         ByteBuffer buf = ByteBuffer.allocate(SIZE);
         
         // read in the serialized checkpoint record.
-        FileChannelUtility.readAll(raf.getChannel(), buf, 0L);
+        FileChannelUtility.readAll(new NOPReopener(raf), buf, 0L);
         
         // prepare for reading.
         buf.rewind();
@@ -879,7 +883,7 @@ public class IndexSegmentCheckpoint {
      *            
      * @throws IOException
      */
-    public void write(RandomAccessFile raf) throws IOException {
+    public void write(final RandomAccessFile raf) throws IOException {
 
         FileChannelUtility.writeAll(raf.getChannel(), asReadOnlyBuffer(), 0L);
 

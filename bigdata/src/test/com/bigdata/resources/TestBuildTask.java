@@ -28,7 +28,6 @@
 
 package com.bigdata.resources;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.Random;
 import java.util.UUID;
@@ -201,20 +200,12 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
              * from a fused view of all data as of the final commit state of the
              * old journal.
              */
-            final long lastCommitTime = oldJournal.getRootBlockView()
-                    .getLastCommitTime();
-
-            final File outFile = resourceManager
-                    .getIndexSegmentFile(indexMetadata);
-
             final OverflowMetadata omd = new OverflowMetadata(resourceManager);
             
             final ViewMetadata vmd = omd.getViewMetadata(name);
             
             // task to run.
-            final AbstractTask task = new CompactingMergeTask(
-                    resourceManager, lastCommitTime, name, vmd,
-                    outFile);
+            final AbstractTask task = new CompactingMergeTask(vmd);
 
             try {
 
@@ -225,9 +216,8 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
                  * Submit task and await result (metadata describing the new
                  * index segment).
                  */
-                result = (BuildResult) concurrencyManager.submit(
-                    task).get();
-                
+                result = (BuildResult) concurrencyManager.submit(task).get();
+
             } finally {
 
                 // re-enable overflow processing.

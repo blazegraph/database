@@ -106,7 +106,9 @@ public class SplitTailTask extends AbstractPrepareTask {
 
         this.e = new Event(resourceManager.getFederation(), vmd.name,
                 OverflowActionEnum.TailSplit, OverflowActionEnum.TailSplit
-                        + "(" + vmd.name + ") : " + vmd);
+                        + (moveTarget != null ? "+" + OverflowActionEnum.Move
+                                : "") + "(" + vmd.name + ") : " + vmd
+                        + ", moveTarget=" + moveTarget);
         
     }
 
@@ -138,7 +140,7 @@ public class SplitTailTask extends AbstractPrepareTask {
                 // validate the splits before processing them.
                 SplitUtility.validateSplits(vmd.getBTree(), splits);
 
-                result = SplitUtility.buildSplits(vmd, splits);
+                result = SplitUtility.buildSplits(vmd, splits, e);
 
             } finally {
 

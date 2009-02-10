@@ -30,7 +30,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
 import com.bigdata.io.FileChannelUtility;
-import com.bigdata.io.FileLockUtility;
+import com.bigdata.io.IReopenChannel;
 
 /**
  * Abstract base class for implementations that use a direct buffer as a write
@@ -133,7 +133,12 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
 
         try {
 
-            FileLockUtility.closeFile(file, raf);
+//            FileLockUtility.closeFile(file, raf);
+            synchronized (this) {
+                if (raf != null && raf.getChannel().isOpen()) {
+                    raf.close();
+                }
+            }
             
         } catch( IOException ex ) {
             
@@ -180,8 +185,7 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
 
         try {
 
-            // @todo retry if asynchronously closed by NIO 
-            FileChannelUtility.readAll(getChannel(), tmp,
+            FileChannelUtility.readAll(opener, tmp,
                     rootBlock0 ? FileMetadata.OFFSET_ROOT_BLOCK0
                             : FileMetadata.OFFSET_ROOT_BLOCK1);
 
@@ -209,8 +213,7 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
             final long pos = rootBlock.isRootBlock0() ? FileMetadata.OFFSET_ROOT_BLOCK0
                     : FileMetadata.OFFSET_ROOT_BLOCK1;
             
-            // @todo retry if asynchronously closed by NIO 
-            FileChannelUtility.writeAll(getChannel(), data, pos);
+            FileChannelUtility.writeAll(opener, data, pos);
 
             if( forceOnCommit != ForceEnum.No ) {
 
@@ -242,11 +245,15 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
      * in response to an interrupt (that is, if we discover that the channel is
      * closed but {@link #isOpen()} still returns true).
      */
-    public ByteBuffer read(long addr) {
+    public ByteBuffer read(final long addr) {
         
         if(isOpen() && !raf.getChannel().isOpen()) {
             
-            reopenChannel();
+            try {
+                reopenChannel();
+            } catch (IOException ex) {
+                throw new RuntimeException(ex);
+            }
             
         }
         
@@ -254,62 +261,163 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
         
     }
         
+//    /**
+//     * This method transparently re-opens the channel for the backing file.
+//     * <p>
+//     * Note: This method is synchronized so that concurrent readers do not try
+//     * to all open the store at the same time.
+//     * <p>
+//     * Note: This method is ONLY invoked by readers. This helps to ensure that a
+//     * writer that has been interrupted can not regain access to the channel (it
+//     * does not prevent it, but re-opening for writers is asking for trouble).
+//     * 
+//     * @return true iff the channel was re-opened.
+//     * 
+//     * @throws IllegalStateException
+//     *             if the buffer strategy has been closed.
+//     *             
+//     * @throws RuntimeException
+//     *             if the backing file can not be opened (can not be found or
+//     *             can not acquire a lock).
+//     */
+//    synchronized private boolean reopenChannel() {
+//        
+//        if(raf.getChannel().isOpen()) {
+//            
+//            /* The channel is still open.  If you are allowing concurrent reads
+//             * on the channel, then this could indicate that two readers each 
+//             * found the channel closed and that one was able to re-open the
+//             * channel before the other such that the channel was open again
+//             * by the time the 2nd reader got here.
+//             */
+//            
+//            return true;
+//            
+//        }
+//        
+//        if(!isOpen()) {
+//
+//            // the buffer strategy has been closed.
+//            
+//            return false;
+//            
+//        }
+//
+//        try {
+//
+//            raf = FileLockUtility.openFile(file, fileMode, true/*tryFileLock*/);
+//        
+//            log.warn("Re-opened file: "+file);
+//            
+//        } catch(IOException ex) {
+//            
+//            throw new RuntimeException(ex);
+//            
+//        }
+//
+//        return true;
+//        
+//    }
+    
+    /**
+     * Used to re-open the {@link FileChannel} in this class.
+     */
+    protected final IReopenChannel opener = new IReopenChannel() {
+
+        public String toString() {
+            
+            return file.toString();
+            
+        }
+        
+        public FileChannel reopenChannel() throws IOException {
+
+            return DiskBackedBufferStrategy.this.reopenChannel();
+
+        }
+        
+    };
+    
     /**
      * This method transparently re-opens the channel for the backing file.
-     * <p>
-     * Note: This method is synchronized so that concurrent readers do not try
-     * to all open the store at the same time.
-     * <p>
-     * Note: This method is ONLY invoked by readers. This helps to ensure that a
-     * writer that has been interrupted can not regain access to the channel (it
-     * does not prevent it, but re-opening for writers is asking for trouble).
-     * 
-     * @return true iff the channel was re-opened.
      * 
      * @throws IllegalStateException
-     *             if the buffer strategy has been closed.
-     *             
-     * @throws RuntimeException
-     *             if the backing file can not be opened (can not be found or
-     *             can not acquire a lock).
+     *             if the store is closed.
+     * 
+     * @throws IOException
+     *             if the backing file can not be locked.
      */
-    synchronized private boolean reopenChannel() {
+    final synchronized private FileChannel reopenChannel() throws IOException {
+
+        assertOpen();
         
-        if(raf.getChannel().isOpen()) {
+        if (raf != null && raf.getChannel().isOpen()) {
             
-            /* The channel is still open.  If you are allowing concurrent reads
-             * on the channel, then this could indicate that two readers each 
+            /*
+             * The channel is still open. If you are allowing concurrent reads
+             * on the channel, then this could indicate that two readers each
              * found the channel closed and that one was able to re-open the
-             * channel before the other such that the channel was open again
-             * by the time the 2nd reader got here.
+             * channel before the other such that the channel was open again by
+             * the time the 2nd reader got here.
              */
             
-            return true;
+            return raf.getChannel();
             
         }
         
-        if(!isOpen()) {
+        // open the file.
+        this.raf = new RandomAccessFile(file, fileMode);
 
-            // the buffer strategy has been closed.
-            
-            return false;
-            
+        if (INFO)
+            log.info("(Re-)opened file: " + file);
+
+        if (bufferMode != BufferMode.Mapped) {
+
+            try {
+
+                /*
+                 * Request a shared file lock.
+                 */
+
+                final boolean readOnly = "r".equals(fileMode);
+
+                if (raf.getChannel()
+                        .tryLock(0, Long.MAX_VALUE, readOnly/* shared */) == null) {
+
+                    /*
+                     * Note: A null return indicates that someone else holds the
+                     * lock. This can happen if the platform does not support
+                     * shared locks or if someone requested an exclusive file
+                     * lock.
+                     */
+
+                    try {
+                        raf.close();
+                    } catch (Throwable t) {
+                        // ignore.
+                    }
+
+                    throw new IOException("File already locked? file=" + file);
+
+                }
+
+            } catch (IOException ex) {
+
+                /*
+                 * Note: This is true of NFS volumes. This is Ok and should be
+                 * ignored. However the backing file is not protected against
+                 * accidental deletes or overwrites.
+                 */
+
+                if (INFO)
+                    log.info("FileLock not supported: file=" + file, ex);
+
+            }
+
         }
 
-        try {
-
-            raf = FileLockUtility.openFile(file, fileMode, true/*tryFileLock*/);
-        
-            log.warn("Re-opened file: "+file);
-            
-        } catch(IOException ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
-
-        return true;
+        return raf.getChannel();
         
     }
-    
+
 }

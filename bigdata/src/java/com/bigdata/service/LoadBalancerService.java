@@ -1581,15 +1581,14 @@ abstract public class LoadBalancerService extends AbstractService
          * <p>
          * Note: The host and service scores will not appear until the
          * {@link UpdateTask} has executed and those scores have been computed.
-         * By default, the first execution of the {@link UpdateTask} is delayed
-         * until we expect to have the host and service counters from two
-         * reporting periods. This means that you can expect to wait at least
-         * two minutes before these data will appear.
+         * 
+         * @see LoadBalancerService.Options#UPDATE_DELAY
          * 
          * @todo counters for service scores should be eventually removed after
          *       the service leaves. Likewise for host scores. However, these
          *       counters SHOULD remain available for a while for post-mortem of
-         *       the service/host, e.g., at least 2-3 days.
+         *       the service/host, e.g., at least 2-3 days. This would be fixed
+         *       with a persistence model for the scores.
          */
         protected void setupCounters() {
             
@@ -1601,77 +1600,140 @@ abstract public class LoadBalancerService extends AbstractService
             // per-host scores.
             {
 
-//                if (INFO)
-//                    log.info("Will setup counters for " + activeHosts.size()
-//                            + " hosts");
-                
-                final CounterSet tmp = serviceRoot.makePath("hosts");
+                final CounterSet hosts = serviceRoot.makePath("hosts");
+                final CounterSet tmpScores = hosts.makePath("scores");
+                final CounterSet tmpFormula = hosts.makePath("formula");
 
-                synchronized (tmp) {
-                    
+                synchronized (tmpScores) {
+
                     for (HostScore hs : activeHosts.values()) {
 
                         final String hn = hs.hostname;
 
-                        if (tmp.getChild(hn) == null) {
+                        if (tmpScores.getChild(hn) == null) {
 
-//                            if (INFO)
-//                                log.info("Adding counter for host: " + hn);
-                            
-                            tmp.addCounter(hn, new HistoryInstrument<String>(new String[]{}));
-                            
+                            tmpScores.addCounter(hn,
+                                    new HistoryInstrument<Double>(
+                                            new Double[] {}));
+
                         }
-                        
+
                         {
 
-                            final ICounter counter = (ICounter) tmp.getChild(hn);
+                            final ICounter counter = (ICounter) tmpScores
+                                    .getChild(hn);
+
+                            final HistoryInstrument<Double> inst = (HistoryInstrument<Double>) counter
+                                    .getInstrument();
+
+                            final HostScore score = activeHosts.get(hn);
+
+                            if (score != null) {
+
+                                inst.add(now, score.drank);
+
+                            }
+
+                        }
+                    }
+
+                } // synchronized(scores)
+
+                synchronized (tmpFormula) {
+
+                    for (HostScore hs : activeHosts.values()) {
+
+                        final String hn = hs.hostname;
+
+                        if (tmpFormula.getChild(hn) == null) {
+
+                            tmpFormula.addCounter(hn,
+                                    new HistoryInstrument<String>(
+                                            new String[] {}));
+
+                        }
+
+                        {
+
+                            final ICounter counter = (ICounter) tmpFormula
+                                    .getChild(hn);
 
                             final HistoryInstrument<String> inst = (HistoryInstrument<String>) counter
                                     .getInstrument();
 
                             final HostScore score = activeHosts.get(hn);
-                            
+
                             if (score != null) {
 
                                 inst.add(now, score.toString());
-                                
+
                             }
 
                         }
 
                     }
 
-                }
-                
-            }
+                } // synchronized(formula)
+
+            } // host scores
             
             // per-service scores.
             {
                 
-//                if (INFO)
-//                    log.info("Will setup counters for " + activeDataServices.size()
-//                            + " services");
+                final CounterSet services = serviceRoot.makePath("services");
 
-                final CounterSet tmp = serviceRoot.makePath("services");
+                final CounterSet tmpScores = services.makePath("scores");
+                final CounterSet tmpFormula = services.makePath("formula");
 
-                synchronized (tmp) {
+                synchronized (tmpScores) {
 
                     for (ServiceScore ss : activeDataServices.values()) {
 
                         final String uuidStr = ss.serviceUUID.toString();
 
-                        if (tmp.getChild(uuidStr) == null) {
+                        if (tmpScores.getChild(uuidStr) == null) {
 
-//                            if(INFO)
-//                                log.info("Adding counter for service: "+uuidStr);
-
-                            tmp.addCounter(uuidStr, new HistoryInstrument<String>(new String[]{}));
+                            tmpScores.addCounter(uuidStr, new HistoryInstrument<Double>(new Double[]{}));
                             
                         }
                         
                         {
 
-                            final ICounter counter = (ICounter) tmp.getChild(uuidStr);
+                            final ICounter counter = (ICounter) tmpScores.getChild(uuidStr);
+
+                            final HistoryInstrument<Double> inst = (HistoryInstrument<Double>) counter
+                                    .getInstrument();
+
+                            final ServiceScore score = activeDataServices
+                                    .get(ss.serviceUUID);
+
+                            if (score != null) {
+
+                                inst.add(now, score.drank);
+
+                            }
+
+                        }
+
+                    }
+
+                } // synchronized(scores)
+
+                synchronized (tmpFormula) {
+
+                    for (ServiceScore ss : activeDataServices.values()) {
+
+                        final String uuidStr = ss.serviceUUID.toString();
+
+                        if (tmpFormula.getChild(uuidStr) == null) {
+
+                            tmpFormula.addCounter(uuidStr, new HistoryInstrument<String>(new String[]{}));
+                            
+                        }
+                        
+                        {
+
+                            final ICounter counter = (ICounter) tmpFormula.getChild(uuidStr);
 
                             final HistoryInstrument<String> inst = (HistoryInstrument<String>) counter
                                     .getInstrument();
@@ -1689,11 +1751,11 @@ abstract public class LoadBalancerService extends AbstractService
 
                     }
 
-                }
+                }// synchronized(formula)
                 
-            }
+            } // service scores.
             
-        }
+        } // end method
         
         /**
          * Writes the counters on a file.

@@ -31,6 +31,9 @@ package com.bigdata.io;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.channels.AsynchronousCloseException;
+import java.nio.channels.ClosedByInterruptException;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 
 import org.apache.log4j.Logger;
@@ -84,11 +87,54 @@ public class FileChannelUtility {
      * @todo This might need to use a static direct buffer pool to avoid leaking
      *       temporary direct buffers since Java may attempt to allocate a
      *       "temporary" direct buffer if [dst] is not already a direct buffer.
+     * 
+     * @deprecated by {@link #readAll(IReopenChannel, ByteBuffer, long)} which
+     *             handles transparent re-opening of the store in order to
+     *             complete the read operation.
      */
     static public int readAll(final FileChannel channel, final ByteBuffer src,
             final long pos) throws IOException {
 
-        if (channel == null)
+        return readAll(new NOPReopener(channel), src, pos);
+        
+    }
+    
+    /**
+     * Reads {@link ByteBuffer#remaining()} bytes into the caller's
+     * {@link ByteBuffer} from the channel starting at offset <i>pos</i>. The
+     * position of the {@link ByteBuffer} is advanced to the limit. The offset
+     * of the channel is NOT modified as a side-effect.
+     * <p>
+     * This handles partial reads by reading until nbytes bytes have been
+     * transferred.
+     * 
+     * @param opener
+     *            An object which knows how to re-open the {@link FileChannel}
+     *            and knows when the resource is no longer available.
+     * @param src
+     *            A {@link ByteBuffer} into which the data will be read.
+     * @param pos
+     *            The offset from which the data will be read.
+     * 
+     * @return The #of disk read operations that were required.
+     * 
+     * @throws IOException
+     * 
+     * @throws IllegalArgumentException
+     *             if any parameter is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if <i>pos</i> is negative.
+     * @throws IllegalArgumentException
+     *             if <i>dst</i> does not have any bytes remaining.
+     * 
+     * @todo This might need to use a static direct buffer pool to avoid leaking
+     *       temporary direct buffers since Java may attempt to allocate a
+     *       "temporary" direct buffer if [dst] is not already a direct buffer.
+     */
+    static public int readAll(final IReopenChannel opener, final ByteBuffer src,
+                final long pos) throws IOException {
+
+        if (opener == null)
             throw new IllegalArgumentException();
         if (src == null)
             throw new IllegalArgumentException();
@@ -116,8 +162,64 @@ public class FileChannelUtility {
 
         while (count < nbytes) {
 
-            // copy the data into the buffer
-            final int nread = channel.read(src, pos + count);
+            final FileChannel channel;
+            try {
+                
+                channel = opener.reopenChannel();
+                
+                if(channel == null) {
+                    
+                    throw new AssertionError("Channel is null?");
+                    
+                }
+                
+            } catch (IllegalStateException ex) {
+                
+                // the channel could not be re-opened.
+                throw ex;
+                
+            }
+
+            final int nread;
+            try {
+
+                // copy the data into the buffer
+                nread = channel.read(src, pos + count);
+                
+            } catch (ClosedByInterruptException ex) {
+                
+                /*
+                 * This indicates that this thread was interrupted. We
+                 * always abort in this case.
+                 */
+                
+                throw ex;
+
+            } catch (AsynchronousCloseException ex) {
+                
+                /*
+                 * The channel was closed asynchronously while blocking during
+                 * the read. We will continue to read if the channel can be
+                 * reopened.
+                 */
+                continue;
+                
+            } catch (ClosedChannelException ex) {
+                
+                /*
+                 * The channel is closed. This could have occurred between the
+                 * moment when we got the FileChannel reference and the moment
+                 * when we tried to read on the FileChannel. We will continue to
+                 * read if the channel can be reopened.
+                 */
+                continue;
+                
+            } catch (IOException ex) {
+
+                // anything else.
+                throw ex;
+
+            }
 
             if (nread == -1)
                 throw new IOException("EOF reading on channel: remaining="
@@ -189,9 +291,82 @@ public class FileChannelUtility {
      *       direct buffer. There is logic in {@link TemporaryRawStore} for
      *       handling the overflow from a heap buffer onto the disk which
      *       already does this.
+     * 
+     * @deprecated by {@link #writeAll(IReopenChannel, ByteBuffer, long)}
      */
     static public int writeAll(final FileChannel channel, final ByteBuffer data,
             final long pos) throws IOException {
+
+        return writeAll(new NOPReopener(channel),data,pos);
+        
+//        final int nbytes = data.remaining();
+//        
+//        int count = 0;
+//        int nwrites = 0;
+//
+//        while (data.remaining() > 0) {
+//
+//            final int nwritten = channel.write(data, pos + count);
+//
+//            count += nwritten;
+//            
+//            nwrites++;
+//
+//            if (nwrites == 100) {
+//
+//                log.warn("writing on channel: remaining=" + data.remaining()
+//                        + ", nwrites=" + nwrites + ", written=" + count);
+//
+//            } else if (nwrites == 1000) {
+//
+//                log.error("writing on channel: remaining=" + data.remaining()
+//                        + ", nwrites=" + nwrites + ", written=" + count);
+//
+//            } else if (nwrites > 10000) {
+//
+//                throw new RuntimeException("writing on channel: remaining="
+//                        + data.remaining() + ", nwrites=" + nwrites
+//                        + ", written=" + count);
+//
+//            }
+//
+//        }
+//
+//        if (count != nbytes) {
+//
+//            throw new RuntimeException("Expecting to write " + nbytes
+//                    + " bytes, but wrote " + count + " bytes in " + nwrites);
+//
+//        }
+//
+//        return nwrites;
+
+    }
+
+    /**
+     * Write bytes in <i>data</i> from the position to the limit on the channel
+     * starting at <i>pos</i>. The position of the buffer will be advanced to
+     * the limit. The position of the channel is not changed by this method. If
+     * the backing channel is asynchronously in another thread closed then it
+     * will be re-opened and the write will continue.
+     * <p>
+     * Note: I have seen count != remaining() for a single invocation of
+     * FileChannel#write(). This occured 5 hours into a run with the write cache
+     * disabled (so lots of small record writes). All of a sudden, several
+     * writes wound up reporting too few bytes written - this persisted until
+     * the end of the run (Fedora core 6 with Sun JDK 1.6.0_03). I have since
+     * modified this code to use a loop to ensure that all bytes get written.
+     * 
+     * @param opener
+     * @param data
+     * @param pos
+     * 
+     * @return The #of disk write operations that were required.
+     * 
+     * @throws IOException
+     */
+    static public int writeAll(final IReopenChannel opener,
+            final ByteBuffer data, final long pos) throws IOException {
 
         final int nbytes = data.remaining();
         
@@ -200,7 +375,63 @@ public class FileChannelUtility {
 
         while (data.remaining() > 0) {
 
-            final int nwritten = channel.write(data, pos + count);
+            final FileChannel channel;
+            try {
+                
+                channel = opener.reopenChannel();
+                
+                if(channel == null) {
+                    
+                    throw new AssertionError("Channel is null?");
+                    
+                }
+                
+            } catch (IllegalStateException ex) {
+                
+                // the channel could not be re-opened.
+                throw ex;
+                
+            }
+
+            final int nwritten;
+            try {
+            
+                nwritten = channel.write(data, pos + count);
+                
+            } catch (ClosedByInterruptException ex) {
+
+                /*
+                 * This indicates that this thread was interrupted. We always
+                 * abort in this case.
+                 */
+                
+                throw ex;
+
+            } catch (AsynchronousCloseException ex) {
+                
+                /*
+                 * The channel was closed asynchronously while blocking during
+                 * the write. We will continue to write if the channel can be
+                 * reopened.
+                 */
+                continue;
+                
+            } catch (ClosedChannelException ex) {
+                
+                /*
+                 * The channel is closed. This could have occurred between the
+                 * moment when we got the FileChannel reference and the moment
+                 * when we tried to write on the FileChannel. We will continue
+                 * to write if the channel can be reopened.
+                 */
+                continue;
+                
+            } catch (IOException ex) {
+
+                // anything else.
+                throw ex;
+
+            }
 
             count += nwritten;
             
@@ -273,6 +504,11 @@ public class FileChannelUtility {
      * 
      * @todo as a workaround, detect the Windows platform and do the IO
      *       ourselves when the #of bytes to transfer exceeds 500M.
+     * 
+     * @todo does not handle asynchronous closes due to interrupts in other
+     *       threads during a concurrent NIO operation on the same source/dest
+     *       file channel (I have never seen this problem and perhaps the NIO
+     *       API excludes it).
      */
      static public int transferAll(final FileChannel sourceChannel,
             final long fromPosition, final long count,

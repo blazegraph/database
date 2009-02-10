@@ -1,6 +1,5 @@
 package com.bigdata.resources;
 
-import java.io.File;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedChannelException;
@@ -1534,10 +1533,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
         /*
          * Log the selected post-processing decisions at a high level.
-         * 
-         * @todo This is logging the pre-condition view. It would be nice to log
-         * the action taken and the post-condition view, perhaps with the
-         * pre-condition view as well.
          */
         {
             final StringBuilder sb = new StringBuilder();
@@ -1654,31 +1649,22 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 continue;
                 
             }
-            
-            if (compactingMerge//
-                    || (resourceManager.maximumCompactingMergesPerOverflow != 0 //
-                    && (vmd.sourceJournalCount > resourceManager.maximumJournalsPerView || //
-                        vmd.sourceSegmentCount > resourceManager.maximumSegmentsPerView )//
-                        )//
-            ) {
+
+            // manditory merge.
+            if (compactingMerge || vmd.manditoryMerge) {
 
                 /*
-                 * Mandatory compacting merge. 
+                 * Mandatory compacting merge.
                  */
                 
                 overflowMetadata.setAction(vmd.name, OverflowActionEnum.Merge);
 
-                // the file to be generated.
-                final File outFile = resourceManager
-                        .getIndexSegmentFile(vmd.indexMetadata);
-
-                final AbstractTask task = new CompactingMergeTask(
-                        resourceManager, lastCommitTime, name, vmd, outFile);
+                final AbstractTask task = new CompactingMergeTask(vmd);
 
                 // add to set of tasks to be run.
                 tasks.add(task);
 
-                putUsed(name, "willMerge(" + vmd + ")");
+                putUsed(name, "willManditoryMerge(" + vmd + ")");
 
                 if (INFO)
                     log.info("will merge    : " + vmd);
@@ -1704,10 +1690,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * heavy writes on the tail then it will should reach the minimum
              * capacity for an index partition by the time the live journal
              * overflows again.
-             * 
-             * @todo this does not pay attention to the #of tuples at which the
-             * index partition would underflow. instead it assumes that
-             * underflow is a modest distance from a full split.
              */
             if (!compactingMerge //
                     // move not in progress
@@ -1760,7 +1742,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             if (!compactingMerge //
                     // move not in progress
                     && vmd.pmd.getSourcePartitionId() == -1//
-                    && splitHandler != null//
+                    // looks like a split candidate.
                     && splitHandler.shouldSplit(vmd.getRangeCount())//
             ) {
 
@@ -1806,7 +1788,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * into memory constraints so that needs to be traded off against
              * IOWAIT.
              */
-            final double mergePriority = (vmd.sourceJournalCount - 1) * 5
+            final double mergePriority = (vmd.sourceJournalCount - 1) * 3
                     + vmd.sourceSegmentCount;
 
             // put into priority queue to be processed below.
@@ -1823,9 +1805,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             final Priority<ViewMetadata> e = mergeQueue.poll();
 
             final ViewMetadata vmd = e.v;
-            
-            if (nmerge < resourceManager.maximumCompactingMergesPerOverflow
-                    && vmd.sourceCount >= resourceManager.maximumSourcesPerViewBeforeCompactingMerge) {
+                        
+            // optional merge.
+            if (nmerge < resourceManager.maximumOptionalMergesPerOverflow) {
 
                 /*
                  * Select an optional compacting merge.
@@ -1833,20 +1815,15 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 
                 overflowMetadata.setAction(vmd.name, OverflowActionEnum.Merge);
 
-                // the file to be generated.
-                final File outFile = resourceManager
-                        .getIndexSegmentFile(vmd.indexMetadata);
-
-                final AbstractTask task = new CompactingMergeTask(
-                        resourceManager, lastCommitTime, vmd.name, vmd, outFile);
+                final AbstractTask task = new CompactingMergeTask(vmd);
 
                 // add to set of tasks to be run.
                 tasks.add(task);
 
-                putUsed(vmd.name, "willCompact(" + vmd + ")");
+                putUsed(vmd.name, "willOptionalMerge(" + vmd + ")");
 
                 if (INFO)
-                    log.info("will compact  : " + vmd);
+                    log.info("will merge : " + vmd);
 
                 nmerge++;
                 
@@ -1858,8 +1835,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * Incremental build.
                  */
                 
-                assert !compactingMerge : "Manditory compacting merge.";
-
                 overflowMetadata.setAction(vmd.name, OverflowActionEnum.Build);
                 
                 final AbstractTask task = new IncrementalBuildTask(vmd);
@@ -1899,47 +1874,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         
     }
     
-    /**
-     * Return the priority of the next unused entry from the specified queue.
-     * Used entries are removed from the queue. The first unused entry is left
-     * in the queue and its priority is returned. If the queue is empty then
-     * ZERO (0d) is returned.
-     * <p>
-     * Note: Used entries are identified by an entry whose index partition name
-     * {@link #isUsed(String)}.
-     * 
-     * @param q
-     *            The queue.
-     * 
-     * @return The priority of the next unused entry. The corresponding entry is
-     *         left on the queue.
-     */
-    private double nextUnused(PriorityQueue<Priority<ViewMetadata>> q) {
-
-        Priority<ViewMetadata> e = null;
-
-        while ((e = q.peek()) != null) {
-
-            if (isUsed(e.v.name)) {
-
-                // remove used entry from the queue.
-                q.poll();
-                
-                continue;
-                
-            }
-            
-            break;
-            
-        }
-
-        if (e == null)
-            return 0d;
-
-        return e.d;
-        
-    }
-
     /**
      * Note: This task is interrupted by {@link OverflowManager#shutdownNow()}.
      * Therefore is tests {@link Thread#isInterrupted()} and returns immediately

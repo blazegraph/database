@@ -41,7 +41,6 @@ import java.util.concurrent.Callable;
 import org.apache.log4j.Logger;
 
 import com.bigdata.io.DirectBufferPool;
-import com.bigdata.io.FileLockUtility;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IResourceMetadata;
@@ -865,11 +864,13 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         try {
 
             /*
-             * Open the output channel and get an exclusive lock.
+             * Open the output channel
+             * 
+             * @todo get an exclusive lock (FileLock).
              */
             
-            out = FileLockUtility.openFile(outFile, mode, true/*useFileLock*/);
-//            out = new RandomAccessFile(outFile, mode);
+//            out = FileLockUtility.openFile(outFile, mode, true/*useFileLock*/);
+            out = new RandomAccessFile(outFile, mode);
 //            
             outChannel = out.getChannel();
 //            
@@ -1140,8 +1141,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
              * use.
              */
             outChannel.force(true);
-            FileLockUtility.closeFile(outFile, out);
-//            out.close(); // also releases the lock.
+//            FileLockUtility.closeFile(outFile, out);
+            out.close(); // also releases the lock.
 ////            out = null;
 
             elapsed_write = System.currentTimeMillis() - begin_write;
@@ -1238,8 +1239,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             
             try {
             
-                FileLockUtility.closeFile(outFile, out);
-                // out.close();
+//                FileLockUtility.closeFile(outFile, out);
+                 out.close();
                 
             } catch (Throwable t) {
              
@@ -1249,10 +1250,10 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         
         }
 
-        if(!outFile.delete()) {
-            
+        if (!outFile.delete()) {
+
             log.warn("Could not delete: file=" + outFile.getAbsolutePath());
-            
+
         }
         
     }

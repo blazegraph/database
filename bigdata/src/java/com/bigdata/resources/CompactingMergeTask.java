@@ -17,7 +17,6 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.service.Event;
-import com.bigdata.service.EventType;
 
 /**
  * Task builds an {@link IndexSegment} from the fused view of an index partition
@@ -41,51 +40,20 @@ import com.bigdata.service.EventType;
  */
 public class CompactingMergeTask extends AbstractPrepareTask<BuildResult> {
 
-    final protected long lastCommitTime;
-
     final protected ViewMetadata vmd;
-    
-    final protected File outFile;
 
     /**
      * The event corresponding to the merge operation.
      */
     final private Event e;
     
-    /**
-     * 
-     * @param resourceManager
-     * @param lastCommitTime
-     *            The lastCommitTime of the journal whose view of the index
-     *            you wish to capture in the generated {@link IndexSegment}.
-     * @param name
-     *            The name of the index.
-     * @param outFile
-     *            The file on which the {@link IndexSegment} will be
-     *            written.
-     */
-    public CompactingMergeTask(final ResourceManager resourceManager,
-            final long lastCommitTime, final String name,
-            final ViewMetadata vmd, final File outFile) {
+    public CompactingMergeTask(final ViewMetadata vmd) {
 
-        super(resourceManager, TimestampUtility
-                .asHistoricalRead(lastCommitTime), name);
+        super(vmd.resourceManager, TimestampUtility
+                .asHistoricalRead(vmd.commitTime), vmd.name);
         
-        if (vmd == null)
-            throw new IllegalArgumentException();
-
-        if (!vmd.name.equals(name))
-            throw new IllegalArgumentException();
-        
-        if (outFile == null)
-            throw new IllegalArgumentException();
-
-        this.lastCommitTime = lastCommitTime;
-
         this.vmd = vmd;
         
-        this.outFile = outFile;
-
         this.e = new Event(resourceManager.getFederation(), vmd.name,
                 OverflowActionEnum.Merge, OverflowActionEnum.Merge + "("
                         + vmd.name + ") : " + vmd);
@@ -124,9 +92,16 @@ public class CompactingMergeTask extends AbstractPrepareTask<BuildResult> {
                  * live journal WILL NOT be present in that index segment and
                  * the post-condition view will include those writes.
                  */
-                result = resourceManager.buildIndexSegment(vmd.name, vmd
-                        .getView(), outFile, true/* compactingMerge */,
-                        lastCommitTime, null/* fromKey */, null/* toKey */);
+
+                // the file to be generated.
+                final File outFile = resourceManager
+                        .getIndexSegmentFile(vmd.indexMetadata);
+
+                // build the index segment.
+                result = resourceManager
+                        .buildIndexSegment(vmd.name, vmd.getView(), outFile,
+                                true/* compactingMerge */, vmd.commitTime,
+                                null/* fromKey */, null/* toKey */, e);
 
             } finally {
 

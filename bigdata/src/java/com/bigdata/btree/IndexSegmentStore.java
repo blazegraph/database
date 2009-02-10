@@ -32,9 +32,6 @@ import java.io.RandomAccessFile;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
-import java.nio.channels.AsynchronousCloseException;
-import java.nio.channels.ClosedByInterruptException;
-import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.util.concurrent.TimeUnit;
@@ -48,6 +45,7 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
+import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.RootBlockException;
@@ -84,14 +82,19 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     protected static final boolean DEBUG = log.isDebugEnabled();
 
     /**
+     * The mode that will be used to open the {@link #file} .
+     */
+    protected static final String mode = "r"; 
+    
+    /**
      * The file containing the index segment.
      */
     protected final File file;
 
     /**
-     * The mode that will be used to open the {@link #file} .
+     * For reporting via {@link #getResourceMetadata()}.
      */
-    protected static final String mode = "r"; 
+    final private SegmentMetadata segmentMetadata;
     
     /**
      * Used to correct decode region-based addresses. The
@@ -207,7 +210,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
      */
     private final IndexSegmentStoreCounters counters = new IndexSegmentStoreCounters();
     
-    protected void assertOpen() {
+    final protected void assertOpen() {
 
         if (!open) {
             
@@ -324,6 +327,10 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             // read the checkpoint record from the file.
             this.checkpoint = new IndexSegmentCheckpoint(raf);
 
+            // for reporting via getResourceMetadata and toString().
+            this.segmentMetadata = new SegmentMetadata(file,
+                    checkpoint.segmentUUID, checkpoint.commitTime);
+            
             // handles transparent decoding of offsets within regions.
             this.addressManager = new IndexSegmentAddressManager(checkpoint);
 
@@ -368,8 +375,8 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         /*
          * Note: Only depends on final fields.
          */
-        // @todo add filename if filename dropped from resourcemetadata.
-        return getResourceMetadata().toString();
+
+        return file.toString();
         
     }
 
@@ -378,10 +385,8 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         /*
          * Note: Only depends on final fields.
          */
-//        if(!open) reopen();
 
-        return new SegmentMetadata(file, //checkpoint.length,
-                checkpoint.segmentUUID, checkpoint.commitTime);
+        return segmentMetadata;
         
     }
     
@@ -409,20 +414,15 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
 
             try {
 
-                // open the file.
-                if (this.raf == null) {
-
-                    // Note: Throws FileNotFoundException
-                    this.raf = new RandomAccessFile(file, mode);
-
-                }
-
                 /*
                  * Mark as open so that we can use read(long addr) to read other
                  * data (the root node/leaf).
                  */
                 this.open = true;
 
+                // open the file channel for the 1st time.
+                reopenChannel();
+                
                 counters.openCount++;
                 
                 if (fed != null) {
@@ -996,110 +996,71 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
      */
     final private ByteBuffer readFromFile(final long offset, final int length) {
 
-        // Allocate buffer: limit = capacity; pos = 0.
-        final ByteBuffer dst = ByteBuffer.allocate(length);
+        try {
+            
+            // Allocate buffer: limit = capacity; pos = 0.
+            final ByteBuffer dst = ByteBuffer.allocate(length);
 
-        /*
-         * Read the record from the file.
-         * 
-         * Note: Java will close the backing FileChannel if Thread is
-         * interrupted during an NIO operation. Since the index segment is a
-         * read-only data structure, all of the in-memory state remains
-         * valid and we only need to re-open the FileChannel to the backing
-         * store and retry.
-         */
+            // read into [dst] - does not modify the channel's position().
+            FileChannelUtility.readAll(opener, dst, offset);
+            
+            // successful read from file; flip buffer for reading by caller.
+            dst.flip();
 
-        while(true) {
+            // done.
+            return dst;
+            
+        } catch (IOException ex) {
 
-            try {
+            throw new RuntimeException(ex);
+            
+        }
 
-                // read into [dst] - does not modify the channel's
-                // position().
-                FileChannelUtility.readAll(raf.getChannel(), dst, offset);
-
-                // successful read - exit the loop.
-                break;
-
-            } catch (ClosedByInterruptException ex) {
-
-                /*
-                 * This indicates that this thread was interrupted. We
-                 * always abort in this case.
-                 */
-
-                throw new RuntimeException(ex);
-
-            } catch (AsynchronousCloseException ex) {
-
-                /*
-                 * The channel was closed asynchronously while blocking
-                 * during the read. If the buffer strategy still thinks that
-                 * it is open then we re-open the channel and re-read.
-                 */
-
-                if (reopenChannel())
-                    continue;
-
-                throw new RuntimeException(ex);
-
-            } catch (ClosedChannelException ex) {
-
-                /*
-                 * The channel is closed. If the buffer strategy still
-                 * thinks that it is open then we re-open the channel and
-                 * re-read.
-                 */
-
-                if (reopenChannel())
-                    continue;
-
-                throw new RuntimeException(ex);
-
-            } catch (IOException ex) {
-
-                throw new RuntimeException(ex);
-
-            }
-
-        } // while(true)
-        
-        // Flip buffer for reading.
-        dst.flip();
-
-        return dst;
-        
     }
+    
+    private final IReopenChannel opener = new IReopenChannel() {
+
+        public String toString() {
+            
+            return IndexSegmentStore.this.toString();
+            
+        }
+        
+        public FileChannel reopenChannel() throws IOException {
+
+            return IndexSegmentStore.this.reopenChannel();
+
+        }
+        
+    };
     
     /**
      * This method transparently re-opens the channel for the backing file.
      * <p>
-     * Note: This method is synchronized so that concurrent readers do not try
-     * to all open the store at the same time.
+     * Since the {@link IndexSegment} is a read-only data structure, all of the
+     * in-memory state remains valid and we only need to re-open the
+     * {@link FileChannel} to the backing store and retry. In particular, we do
+     * not need to re-read the root node, {@link IndexMetadata},
+     * {@link BloomFilter}, etc. All we have to do is re-open the
+     * {@link FileChannel}.
      * <p>
-     * Note: Java will close the backing {@link FileChannel} if {@link Thread}
-     * is interrupted during an NIO operation. However, since the
-     * {@link IndexSegment} is a read-only data structure, all of the in-memory
-     * state remains valid and we only need to re-open the {@link FileChannel}
-     * to the backing store and retry. In particular, we do not need to re-read
-     * the root node, {@link IndexMetadata}, {@link BloomFilter}, etc. All we
-     * have to do is re-open the {@link FileChannel}.
+     * Note: This method is synchronized so that concurrent readers do not try
+     * to all open the store at the same time. Further, this is the only method
+     * other than {@link #_close()} that can set {@link #raf}. Since both this
+     * method and {@link #_close()} are synchronized the state of that field is
+     * well known inside of this method.
      * 
-     * @return <code>true</code> iff the channel was re-opened.
-     *         <code>false</code> if the {@link IndexSegmentStore} is closed.
+     * @return The {@link FileChannel}.
      * 
-     * @throws RuntimeException
-     *             if the backing file can not be opened (can not be found or
-     *             can not acquire a lock).
+     * @throws IllegalStateException
+     *             if the store is closed.
+     * 
+     * @throws IOException
+     *             if the backing file can not be locked.
      */
-    final synchronized private boolean reopenChannel() {
+    final synchronized private FileChannel reopenChannel() throws IOException {
         
-        if(!isOpen()) {
-
-            // the IndexSegmentStore has been closed.
-            
-            return false;
-            
-        }
+        assertOpen();
         
         if (raf != null && raf.getChannel().isOpen()) {
             
@@ -1111,23 +1072,15 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
              * the time the 2nd reader got here.
              */
             
-            return true;
+            return raf.getChannel();
             
         }
         
-        try {
+        // open the file.
+        this.raf = new RandomAccessFile(file, mode);
 
-            // open the file.
-            this.raf = new RandomAccessFile(file, "r");
-
-            if (INFO)
-                log.info("(Re-)opened file: "+file);
-            
-        } catch(IOException ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
+        if (INFO)
+            log.info("(Re-)opened file: " + file);
 
         try {
 
@@ -1148,9 +1101,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
                     // ignore.
                 }
 
-                throw new RuntimeException(
-                        "File is locked: service already running? file="
-                                + getFile());
+                throw new IOException("File already locked: file=" + getFile());
 
             }
 
@@ -1163,11 +1114,11 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
              */
 
             if (INFO)
-                log.warn("FileLock not supported: file=" + getFile(), ex);
+                log.info("FileLock not supported: file=" + getFile(), ex);
 
         }
 
-        return true;
+        return raf.getChannel();
         
     }
 
@@ -1253,7 +1204,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             buf_nodes.limit((int)checkpoint.extentNodes);
             
             // attempt to read the nodes into the buffer.
-            FileChannelUtility.readAll(raf.getChannel(), buf_nodes,
+            FileChannelUtility.readAll(opener, buf_nodes,
                     checkpoint.offsetNodes);
             
             buf_nodes.flip();
@@ -1328,10 +1279,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         try {
 
             // read into [dst] - does not modify the channel's position().
-            FileChannelUtility.readAll(raf.getChannel(), buf, off);
-//            final int nread = raf.getChannel().read(buf, off);
-//            
-//            assert nread == len;
+            FileChannelUtility.readAll(opener, buf, off);
             
             buf.flip(); // Flip buffer for reading.
             
@@ -1379,11 +1327,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         try {
 
             // read into [dst] - does not modify the channel's position().
-            FileChannelUtility.readAll(raf.getChannel(), buf, off);
-            
-//            final int nread = raf.getChannel().read(buf, off);
-//            
-//            assert nread == len;
+            FileChannelUtility.readAll(opener, buf, off);
             
             buf.flip(); // Flip buffer for reading.
             

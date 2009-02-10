@@ -93,12 +93,13 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
         properties.setProperty(ResourceManager.Options.MAXIMUM_MOVES_PER_TARGET,"1");
 
         /*
-         * Note: Together these two properties disable incremental index builds
+         * Note: Together these properties disable incremental index builds
          * (this test was written before incremental builds were implemented so
          * this keeps the logic of the test intact).
          */
-        properties.setProperty(Options.MAXIMUM_SOURCES_PER_VIEW_BEFORE_COMPACTING_MERGE, "1");
-        properties.setProperty(Options.MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW, ""+Integer.MAX_VALUE);
+        properties.setProperty(Options.MAXIMUM_JOURNALS_PER_VIEW, "2");
+        properties.setProperty(Options.MAXIMUM_SEGMENTS_PER_VIEW, "1");
+        properties.setProperty(Options.MAXIMUM_OPTIONAL_MERGES_PER_OVERFLOW, ""+Integer.MAX_VALUE);
 
         /*
          * Note: Disables the initial round robin policy for the load balancer

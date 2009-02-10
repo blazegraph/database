@@ -47,6 +47,7 @@ import com.bigdata.btree.Leaf;
 import com.bigdata.btree.Node;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.LocalPartitionMetadata;
+import com.bigdata.service.Event;
 import com.bigdata.service.Split;
 import com.bigdata.util.concurrent.ExecutionExceptions;
 
@@ -381,8 +382,8 @@ public class SplitUtility {
      *       actual parallelism.
      */
     public static SplitResult buildSplits(final ViewMetadata vmd,
-            final Split[] splits) throws InterruptedException,
-            ExecutionExceptions {
+            final Split[] splits, final Event parentEvent)
+            throws InterruptedException, ExecutionExceptions {
 
         if (vmd == null)
             throw new IllegalArgumentException();
@@ -404,7 +405,7 @@ public class SplitUtility {
              * for the split.
              */
             final BuildIndexSegmentSplitTask task = new BuildIndexSegmentSplitTask(
-                    vmd, split);
+                    vmd, split, parentEvent);
 
             // add to set of tasks to be run.
             tasks.add(task);
@@ -489,6 +490,7 @@ public class SplitUtility {
 
         private final ViewMetadata vmd;
         private final Split split;
+        private final Event parentEvent;
 
         /**
          * 
@@ -496,7 +498,7 @@ public class SplitUtility {
          * @param split
          */
         public BuildIndexSegmentSplitTask(final ViewMetadata vmd,
-                final Split split) {
+                final Split split, final Event parentEvent) {
 
             super(vmd.resourceManager, TimestampUtility
                     .asHistoricalRead(vmd.commitTime), vmd.name);
@@ -507,6 +509,8 @@ public class SplitUtility {
             this.vmd = vmd;
             
             this.split = split;
+            
+            this.parentEvent = parentEvent;
             
         }
 
@@ -522,19 +526,19 @@ public class SplitUtility {
 
             final String name = getOnlyResource();
             
-            final IIndex src = getIndex(name);
+            final ILocalBTreeView src = (ILocalBTreeView)getIndex(name);
 
             if (INFO) {
                 
                 // note: the mutable btree - accessed here for debugging only.
-                final BTree btree = ((ILocalBTreeView) src).getMutableBTree();
+                final BTree btree = src.getMutableBTree();
 
                 log.info("src=" + name + ",counter=" + src.getCounter().get()
                         + ",checkpoint=" + btree.getCheckpoint());
             
             }
 
-            final LocalPartitionMetadata pmd = (LocalPartitionMetadata)split.pmd;
+            final LocalPartitionMetadata pmd = (LocalPartitionMetadata) split.pmd;
 
             final byte[] fromKey = pmd.getLeftSeparatorKey();
             
@@ -559,7 +563,7 @@ public class SplitUtility {
             // build the index segment from the key range.
             final BuildResult result = resourceManager.buildIndexSegment(name,
                     src, outFile, true/* compactingMerge */, vmd.commitTime,
-                    fromKey, toKey);
+                    fromKey, toKey, parentEvent);
 
             if (INFO)
                 log.info("done: name=" + name + ", outFile=" + outFile

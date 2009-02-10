@@ -461,6 +461,9 @@ public interface Options {
      * {@link FileLock} fails then we always back down to an advisory lock.
      * 
      * @see FileLockUtility#openFile(File, String, boolean)
+     * 
+     * @deprecated {@link FileLockUtility} is going away since advisory locks
+     *             are not automatically removed if an application dies.
      */
     String FILE_LOCK_ENABLED = AbstractJournal.class.getName()+".fileLockEnabled";
     

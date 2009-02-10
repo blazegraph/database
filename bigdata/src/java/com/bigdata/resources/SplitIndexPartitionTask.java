@@ -10,6 +10,7 @@ import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.journal.AbstractTask;
+import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.IResourceMetadata;
@@ -114,8 +115,10 @@ public class SplitIndexPartitionTask extends
         }
 
         this.e = new Event(resourceManager.getFederation(), vmd.name,
-                OverflowActionEnum.Split, OverflowActionEnum.Split + "("
-                        + vmd.name + ") : " + vmd);
+                OverflowActionEnum.Split, OverflowActionEnum.Split
+                        + (moveTarget != null ? "+" + OverflowActionEnum.Move
+                                : "") + "(" + vmd.name + ") : " + vmd
+                        + ", moveTarget=" + moveTarget);
         
     }
 
@@ -232,11 +235,29 @@ public class SplitIndexPartitionTask extends
                      * there is an expectation that we are close to a split.
                      */
 
-                    log.warn("No splits identified - will build instead: "
-                            + vmd);
+                    if (moveTarget != null) {
 
-                    return concurrencyManager.submit(
-                            new IncrementalBuildTask(vmd)).get();
+                        log.warn("No splits identified: will move: " + vmd);
+
+                        return concurrencyManager.submit(
+                                new MoveIndexPartitionTask(vmd, moveTarget))
+                                .get();
+
+                    } else if (vmd.manditoryMerge) {
+
+                        log.warn("No splits identified: will merge: " + vmd);
+
+                        return concurrencyManager.submit(
+                                new CompactingMergeTask(vmd)).get();
+
+                    } else {
+                        
+                        log.warn("No splits identified: will build: " + vmd);
+
+                        return concurrencyManager.submit(
+                                new IncrementalBuildTask(vmd)).get();
+
+                    }
 
                 }
 
@@ -251,7 +272,7 @@ public class SplitIndexPartitionTask extends
                 // validate the splits before processing them.
                 SplitUtility.validateSplits(src, splits);
 
-                result = SplitUtility.buildSplits(vmd, splits);
+                result = SplitUtility.buildSplits(vmd, splits, e);
 
             } finally {
 
