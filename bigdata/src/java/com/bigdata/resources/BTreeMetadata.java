@@ -128,6 +128,13 @@ class BTreeMetadata {
     public final int sourceJournalCount;
     
     public final int sourceSegmentCount;
+
+    /**
+     * <code>true</code> iff this index partition meets the criteria for a
+     * manditory compacting merge (too many journals in the view, too many
+     * index segments in the view, or too many sources in the view).
+     */
+    public final boolean manditoryMerge;
     
     /**
      * The entry count for the {@link BTree} itself NOT the view.
@@ -156,15 +163,6 @@ class BTreeMetadata {
      * this local index.
      */
     public OverflowActionEnum action;
-    
-//    public void setAction(final OverflowActionEnum action) {
-//
-//        if (action == null)
-//            throw new IllegalArgumentException();
-//        
-//        omd.setAction(name, action);
-//        
-//    }
     
     /**
      * 
@@ -226,6 +224,12 @@ class BTreeMetadata {
         this.sourceJournalCount = sourceJournalCount;
         this.sourceSegmentCount = sourceSegmentCount;
 
+        this.manditoryMerge //
+            =  sourceJournalCount > resourceManager.maximumJournalsPerView //
+            || sourceSegmentCount > resourceManager.maximumSegmentsPerView //
+//          || sourceCount > resourceManager.maximumSourcesPerView//
+        ;
+        
         // BTree's directly maintained entry count (very fast).
         this.entryCount = btree.getEntryCount();
 
@@ -262,6 +266,8 @@ class BTreeMetadata {
         sb.append(", sourceCounts=" + "{all=" + sourceCount + ",journals="
                 + sourceJournalCount + ",segments=" + sourceSegmentCount + "}");
 
+        sb.append(", manditoryMerge=" + manditoryMerge);
+        
         sb.append(", #leafSplit=" + btreeCounters.leavesSplit);
         
         sb.append(", #headSplit=" + btreeCounters.headSplit);

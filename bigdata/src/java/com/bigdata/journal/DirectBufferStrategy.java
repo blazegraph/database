@@ -78,7 +78,7 @@ public class DirectBufferStrategy extends DiskBackedBufferStrategy {
      * interrupted. This means that you basically can not interrupt running
      * writers without having to re-open the channel.
      */
-    public long write(ByteBuffer data) {
+    public long write(final ByteBuffer data) {
 
         /*
          * write the record on the buffer - this also detects and handles
@@ -111,16 +111,7 @@ public class DirectBufferStrategy extends DiskBackedBufferStrategy {
              * optimized by Java and the OS.
              */
 
-            FileChannelUtility.writeAll(getChannel(), buffer, headerSize + offset);
-            
-//            final int count = getChannel().write(buffer, headerSize + offset);
-//            
-//            if (count != nbytes) {
-//
-//                throw new RuntimeException("Expected to write " + nbytes
-//                        + " bytes but wrote " + count);
-//
-//            }
+            FileChannelUtility.writeAll(opener, buffer, headerSize + offset);
             
         } catch( IOException ex ) {
             

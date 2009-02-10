@@ -53,6 +53,9 @@ import com.bigdata.resources.StoreManager;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated This can lead to trouble. Use a {@link FileLock} if supported and
+ *             otherwise proceed without a {@link FileLock}.
  */
 public class FileLockUtility {
 

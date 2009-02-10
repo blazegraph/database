@@ -50,6 +50,8 @@ import junit.framework.TestCase;
  *       isolated since it has side-effects on the position of the source and
  *       target channels.
  * 
+ * @todo test the new {@link IReopenChannel} variants.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

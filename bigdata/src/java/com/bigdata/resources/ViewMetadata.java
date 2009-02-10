@@ -159,7 +159,14 @@ class ViewMetadata extends BTreeMetadata {
 
         this.percentOfSplit = adjustedSplitHandler.percentOfSplit(rangeCount);
 
-        // true iff this is a good candidate for a tail split.
+        /*
+         * true iff this is a good candidate for a tail split.
+         * 
+         * @todo this does not pay attention to the #of tuples at which the
+         * index partition would underflow. instead it assumes that underflow is
+         * a modest distance from a full split. for example, we could also test
+         * NOT(isJoinCandidate) to determine if the tail split would underflow.
+         */
         this.tailSplit = //
         this.percentOfSplit > resourceManager.percentOfSplitThreshold && //
         super.percentTailSplits > resourceManager.tailSplitThreshold//
@@ -224,7 +231,11 @@ class ViewMetadata extends BTreeMetadata {
 
     /**
      * Return <code>true</code> if the index partition satisifies the criteria
-     * for a tail split. 
+     * for a tail split (heavy writes on the tail of the index partition and the
+     * size of the index partition is large enough to warrant a tail split).
+     * 
+     * @see OverflowManager.Options#TAIL_SPLIT_THRESHOLD
+     * @see OverflowManager.Options#PERCENT_OF_SPLIT_THRESHOLD
      */
     public boolean isTailSplit() {
         

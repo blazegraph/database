@@ -865,6 +865,8 @@ abstract public class AbstractMRMWTestCase
         properties.setProperty(TestOptions.NWRITES,"100");
 
         properties.setProperty(TestOptions.NREADS,"100");
+
+        properties.setProperty(TestOptions.PERCENT_WRITER_WILL_FLUSH, "0.01");
         
 //      properties.setProperty(Options.USE_DIRECT_BUFFERS,"true");
         

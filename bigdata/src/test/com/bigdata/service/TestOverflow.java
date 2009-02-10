@@ -143,13 +143,14 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
         properties.setProperty(Options.MAXIMUM_MOVES_PER_TARGET, "0");
 
         /*
-         * Note: Together these two properties disable incremental index builds.
-         * We need to do that since a compacting build is required before the
+         * Note: Together these properties disable incremental index builds. We
+         * need to do that since a compacting build is required before the
          * rangeCount() for the view will drop, which is a precondition for the
          * JOIN.
          */
-        properties.setProperty(Options.MAXIMUM_SOURCES_PER_VIEW_BEFORE_COMPACTING_MERGE, "1");
-        properties.setProperty(Options.MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW, ""+Integer.MAX_VALUE);
+        properties.setProperty(Options.MAXIMUM_JOURNALS_PER_VIEW, "2");
+        properties.setProperty(Options.MAXIMUM_SEGMENTS_PER_VIEW, "1");
+        properties.setProperty(Options.MAXIMUM_OPTIONAL_MERGES_PER_OVERFLOW, ""+Integer.MAX_VALUE);
 
         // turn off acceleration features.
         properties.setProperty(Options.ACCELERATE_OVERFLOW_THRESHOLD, "0");

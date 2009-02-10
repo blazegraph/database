@@ -568,6 +568,9 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
              * on the [myid] file will start zookeeper. If the dataDir already
              * contains a non-empty [myid] file, then a new instance will not be
              * started.
+             * 
+             * @todo use a normal FileLock but only if the platform supports it
+             * rather than FileLockUtility.
              */
             final RandomAccessFile raf = FileLockUtility.openFile(myidFile,
                     "rw", true/* useFileLock */);

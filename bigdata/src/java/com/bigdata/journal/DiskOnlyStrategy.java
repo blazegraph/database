@@ -26,10 +26,8 @@ package com.bigdata.journal;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousCloseException;
-import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 import java.util.Map;
@@ -44,7 +42,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.FileChannelUtility;
-import com.bigdata.io.FileLockUtility;
+import com.bigdata.io.IReopenChannel;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.IUpdateStore;
@@ -1261,7 +1259,12 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
             if (raf != null) {
 
-                FileLockUtility.closeFile(file,raf);
+//                FileLockUtility.closeFile(file,raf);
+                synchronized (this) {
+                    if (raf != null && raf.getChannel().isOpen()) {
+                        raf.close();
+                    }
+                }
                 
             }
             
@@ -1307,7 +1310,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      * {@link AsynchronousCloseException} can get thrown out of this method
      * (wrapped as {@link RuntimeException}s) if a reader task is interrupted.
      */
-    public ByteBuffer read(long addr) {
+    public ByteBuffer read(final long addr) {
 
         final long begin = System.nanoTime();
         
@@ -1395,7 +1398,11 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
          * this class that DO NOT retry writes if the channel is concurrently
          * closed! Those methods would need to be modified to retry in order for
          * this class to remain thread-safe. ( @todo DirectBuffer probably has
-         * the same problem.)
+         * the same problem.) (@todo this is probably the explaination for the
+         * need for the synchronized block that is documented immediately
+         * above.) [@todo now that FileChannelUtility supports transparent
+         * re-opening I should try to remove the synchronization for writers vs
+         * readers and see if i can get better throughput.]
          */
 
         synchronized (this) 
@@ -1457,59 +1464,59 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             // the offset into the disk file.
             final long pos = offset + headerSize;
 
-            for (int ntries = 0; ntries < 3; ntries++) {
-
-                if (ntries > 0) {
-
-                    /*
-                     * Note: clear if we are retrying since the buffer may have
-                     * been modified by a partial read.
-                     */ 
-
-                    dst.clear();
-                    
-                }
+//            for (int ntries = 0; ntries < 3; ntries++) {
+//
+//                if (ntries > 0) {
+//
+//                    /*
+//                     * Note: clear if we are retrying since the buffer may have
+//                     * been modified by a partial read.
+//                     */ 
+//
+//                    dst.clear();
+//                    
+//                }
                 
                 try {
 
-                    counters.ndiskRead += FileChannelUtility.readAll(
-                            getChannel(), dst, pos);
+                    counters.ndiskRead += FileChannelUtility.readAll(opener, dst,
+                        pos);
 
                     // successful read - exit the loop.
-                    break;
+//                    break;
 
-                } catch (ClosedByInterruptException ex) {
-                    
-                    /*
-                     * This indicates that this thread was interrupted. We
-                     * always abort in this case.
-                     */
-                    
-                    throw new RuntimeException(ex);
-
-                } catch (AsynchronousCloseException ex) {
-                    
-                    /*
-                     * The channel was closed asynchronously while blocking
-                     * during the read. If the buffer strategy still thinks that
-                     * it is open then we re-open the channel and re-read.
-                     */
-                    
-                    if(reopenChannel()) continue;
-                    
-                    throw new RuntimeException(ex);
-                    
-                } catch (ClosedChannelException ex) {
-                    
-                    /*
-                     * The channel is closed. If the buffer strategy still
-                     * thinks that it is open then we re-open the channel and
-                     * re-read.
-                     */
-
-                    if(reopenChannel()) continue;
-
-                    throw new RuntimeException(ex);
+//                } catch (ClosedByInterruptException ex) {
+//                    
+//                    /*
+//                     * This indicates that this thread was interrupted. We
+//                     * always abort in this case.
+//                     */
+//                    
+//                    throw new RuntimeException(ex);
+//
+//                } catch (AsynchronousCloseException ex) {
+//                    
+//                    /*
+//                     * The channel was closed asynchronously while blocking
+//                     * during the read. If the buffer strategy still thinks that
+//                     * it is open then we re-open the channel and re-read.
+//                     */
+//                    
+//                    if(reopenChannel()) continue;
+//                    
+//                    throw new RuntimeException(ex);
+//                    
+//                } catch (ClosedChannelException ex) {
+//                    
+//                    /*
+//                     * The channel is closed. If the buffer strategy still
+//                     * thinks that it is open then we re-open the channel and
+//                     * re-read.
+//                     */
+//
+//                    if(reopenChannel()) continue;
+//
+//                    throw new RuntimeException(ex);
                     
                 } catch (IOException ex) {
 
@@ -1517,7 +1524,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
                 }
 
-            }
+//            }
 
             // flip for reading.
             dst.flip();
@@ -1568,23 +1575,39 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
     }
 
     /**
+     * Used to re-open the {@link FileChannel} in this class.
+     */
+    private final IReopenChannel opener = new IReopenChannel() {
+
+        public String toString() {
+            
+            return file.toString();
+            
+        }
+        
+        public FileChannel reopenChannel() throws IOException {
+
+            return DiskOnlyStrategy.this.reopenChannel();
+
+        }
+        
+    };
+    
+    /**
      * This method transparently re-opens the channel for the backing file.
      * <p>
      * Note: This method is synchronized so that concurrent readers do not try
      * to all open the store at the same time.
-     * <p>
-     * Note: This method is ONLY invoked by readers. This helps to ensure that a
-     * writer that has been interrupted can not regain access to the channel (it
-     * does not prevent it, but re-opening for writers is asking for trouble).
      * 
-     * @return true iff the channel was re-opened.
-     * 
-     * @throws RuntimeException
-     *             if the backing file can not be opened (can not be found or
-     *             can not acquire a lock).
+     * @todo This method is ONLY invoked by readers. It should be used for
+     *       writers as well. Note that this method WILL NOT be invoked by
+     *       {@link FileChannelUtility} if the channel was closed by an
+     *       interrupt in the current thread (a different exception is thrown).
      */
-    synchronized private boolean reopenChannel() {
-        
+    synchronized private FileChannel reopenChannel() throws IOException {
+
+        assertOpen();
+
         if (raf != null && raf.getChannel().isOpen()) {
             
             /* The channel is still open.  If you are allowing concurrent reads
@@ -1594,18 +1617,10 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
              * by the time the 2nd reader got here.
              */
             
-            return true;
+            return raf.getChannel();
             
         }
         
-        if(!isOpen()) {
-
-            // the buffer strategy has been closed.
-            
-            return false;
-            
-        }
-
         if(temporaryStore && !fileOpened) {
 
             /*
@@ -1619,25 +1634,59 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
              * to be paranoid.
              */
             
-            return false;
+            throw new AssertionError("TemporaryStore not yet open: "+file);
         
         }
-        
+    
+        // open the file.
+        this.raf = new RandomAccessFile(file, fileMode);
+
+        if (INFO)
+            log.info("(Re-)opened file: " + file);
+
         try {
 
-            raf = FileLockUtility.openFile(file, fileMode, true/*tryFileLock*/);
-        
-            if(WARN) log.warn("Re-opened file: "+file);
-            
-        } catch(IOException ex) {
-            
-            throw new RuntimeException(ex);
-            
+            /*
+             * Request a shared file lock.
+             */
+
+            final boolean readOnly = "r".equals(fileMode);
+
+            if (raf.getChannel()
+                    .tryLock(0, Long.MAX_VALUE, readOnly/* shared */) == null) {
+
+                /*
+                 * Note: A null return indicates that someone else holds the
+                 * lock. This can happen if the platform does not support shared
+                 * locks or if someone requested an exclusive file lock.
+                 */
+
+                try {
+                    raf.close();
+                } catch (Throwable t) {
+                    // ignore.
+                }
+
+                throw new IOException("File already locked? file=" + file);
+
+            }
+
+        } catch (IOException ex) {
+
+            /*
+             * Note: This is true of NFS volumes. This is Ok and should be
+             * ignored. However the backing file is not protected against
+             * accidental deletes or overwrites.
+             */
+
+            if (INFO)
+                log.info("FileLock not supported: file=" + file, ex);
+
         }
 
         counters.nreopen++;
         
-        return true;
+        return raf.getChannel();
         
     }
 
@@ -1961,9 +2010,11 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             
             try {
                 
-                // open the file for the first time (create).
-                raf = FileLockUtility.openFile(file, fileMode,
-                        bufferMode != BufferMode.Mapped/*useTryLock*/);
+//                // open the file for the first time (create).
+//                raf = FileLockUtility.openFile(file, fileMode,
+//                        bufferMode != BufferMode.Mapped/*useTryLock*/);
+
+                reopenChannel();
                 
                 // note that it has been opened.
                 fileOpened = true;
@@ -2074,13 +2125,13 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
              * Note: Synchronized on [this] to pervent concurrent NIO requests
              * which might lead to the channel being closed asynchronously.
              */
-            synchronized (this) {
+//            synchronized (this) {
 
-                FileChannelUtility.readAll(getChannel(), tmp,
-                        rootBlock0 ? FileMetadata.OFFSET_ROOT_BLOCK0
-                                : FileMetadata.OFFSET_ROOT_BLOCK1);
+                FileChannelUtility.readAll(opener, tmp,
+                    rootBlock0 ? FileMetadata.OFFSET_ROOT_BLOCK0
+                            : FileMetadata.OFFSET_ROOT_BLOCK1);
                 
-            }
+//            }
             
             tmp.position(0); // resets the position.
 
@@ -2217,7 +2268,9 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
              * RandomAccessFile was concurrently closed? Something to look out
              * for if it happens again. [@todo probably a concurrent reader was
              * interrupted, in which case this method should just try the
-             * setLength() operation again.]
+             * setLength() operation again.] [@todo the MRMW test can throw this
+             * during test shutdown, which simulates interrupt of NIO
+             * operations].
              */
             throw new RuntimeException(ex);
             

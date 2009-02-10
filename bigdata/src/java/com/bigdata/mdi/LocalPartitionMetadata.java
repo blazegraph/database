@@ -43,6 +43,7 @@ import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.resources.MoveIndexPartitionTask;
 import com.bigdata.service.DataService;
+import com.bigdata.service.Event;
 
 /**
  * An immutable object providing metadata about a local index partition,
@@ -392,6 +393,14 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
         
     }
 
+    /**
+     * 
+     * @return
+     * 
+     * @todo I am not convince that the history is worth keeping. It definately
+     *       swell the size of the {@link IndexMetadata} record and is MUST less
+     *       useful than an analysis of the {@link Event} log.
+     */
     final public String getHistory() {
         
         return history;

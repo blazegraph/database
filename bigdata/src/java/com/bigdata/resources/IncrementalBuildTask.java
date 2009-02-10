@@ -18,7 +18,6 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.service.Event;
-import com.bigdata.service.EventType;
 
 /**
  * Task builds an {@link IndexSegment} from the mutable {@link BTree} for an
@@ -153,7 +152,7 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
                 // Build the index segment.
                 result = resourceManager.buildIndexSegment(name, src, outFile,
                         false/* compactingMerge */, vmd.commitTime,
-                        null/* fromKey */, null/* toKey */);
+                        null/* fromKey */, null/* toKey */, e);
 
             } finally {
 

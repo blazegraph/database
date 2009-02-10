@@ -329,7 +329,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
      * Note: This is synchronized so that concurrent writers must block during
      * this operation.
      */
-    synchronized public long transferTo(RandomAccessFile out)
+    synchronized public long transferTo(final RandomAccessFile out)
             throws IOException {
         
         final long count = nextOffset;
@@ -357,7 +357,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
         
         FileChannelUtility.writeAll(outChannel, buffer, toPosition);
 
-        outChannel.position(toPosition+count);
+        outChannel.position(toPosition + count);
 
 //        // write the data : @todo use an explicit position for this write?
 //        final long nwritten = outChannel.write(buffer);

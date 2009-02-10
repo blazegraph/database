@@ -34,7 +34,7 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 
 import com.bigdata.io.FileChannelUtility;
-import com.bigdata.io.FileLockUtility;
+import com.bigdata.io.IReopenChannel;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.util.ChecksumUtility;
@@ -87,7 +87,7 @@ public class FileMetadata {
     /**
      * The interface for IO performed on that file.
      */
-    final RandomAccessFile raf;
+    RandomAccessFile raf;
     
     /**
      * The 32-bit magic value at offset 0L in the file.
@@ -394,8 +394,17 @@ public class FileMetadata {
             /*
              * Open/create the file (temporary files are not opened/created eagerly).
              */
-            this.raf = temporary ? null : FileLockUtility.openFile(file, fileMode,
-                    bufferMode != BufferMode.Mapped); 
+//            this.raf = temporary ? null : FileLockUtility.openFile(file, fileMode,
+//                    bufferMode != BufferMode.Mapped); 
+            if (!temporary) {
+
+                /*
+                 * Open / create and obtain shared/exclusive lock if possible.
+                 * Sets [raf] as a side-effect.
+                 */
+                opener.reopenChannel();
+                
+            }
                 
             if (exists && !temporary) {
     
@@ -470,22 +479,11 @@ public class FileMetadata {
                  * constants (slotSize, segmentId).
                  */
                 
-                FileChannel channel = raf.getChannel();
-                ByteBuffer tmp0 = ByteBuffer.allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
-                ByteBuffer tmp1 = ByteBuffer.allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
-                FileChannelUtility.readAll(channel, tmp0, OFFSET_ROOT_BLOCK0);
-                FileChannelUtility.readAll(channel, tmp1, OFFSET_ROOT_BLOCK1);
-//                int nread;
-//                if ((nread = channel.read(tmp0, OFFSET_ROOT_BLOCK0)) != RootBlockView.SIZEOF_ROOT_BLOCK) {
-//                    throw new IOException("Expected to read "
-//                            + RootBlockView.SIZEOF_ROOT_BLOCK + " bytes, but read "
-//                            + nread + " bytes");
-//                }
-//                if ((nread = channel.read(tmp1, OFFSET_ROOT_BLOCK1)) != RootBlockView.SIZEOF_ROOT_BLOCK) {
-//                    throw new IOException("Expected to read "
-//                            + RootBlockView.SIZEOF_ROOT_BLOCK + " bytes, but read "
-//                            + nread + " bytes");
-//                }
+//                final FileChannel channel = raf.getChannel();
+                final ByteBuffer tmp0 = ByteBuffer.allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
+                final ByteBuffer tmp1 = ByteBuffer.allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
+                FileChannelUtility.readAll(opener, tmp0, OFFSET_ROOT_BLOCK0);
+                FileChannelUtility.readAll(opener, tmp1, OFFSET_ROOT_BLOCK1);
                 tmp0.position(0); // resets the position.
                 tmp1.position(0);
                 try {
@@ -561,19 +559,13 @@ public class FileMetadata {
                     buffer.limit((int)nextOffset);
                     buffer.position(0);
                     // Read the file image into the direct buffer.
-                    FileChannelUtility.readAll(raf.getChannel(), buffer, headerSize0);
-//                    final int nbytes = raf.getChannel().read(buffer,
-//                            headerSize0);
-//                    if (nbytes != nextOffset) {
-//                        throw new IOException("Expected to read " + nextOffset
-//                                + " bytes, but read " + nbytes + " bytes");
-//                    }
+                    FileChannelUtility.readAll(opener, buffer, headerSize0);
                     break;
                 }
                 case Mapped: {
                     // Map the file.
                     boolean loadMappedFile = false; // @todo expose as property.
-                    buffer = raf.getChannel().map(
+                    buffer = opener.reopenChannel().map(
                             FileChannel.MapMode.READ_WRITE, headerSize0, extent);
                     if( loadMappedFile ) {
                         /*
@@ -704,18 +696,20 @@ public class FileMetadata {
                 
                 if(!temporary) {
                 
-                    FileChannel channel = raf.getChannel();
+//                    FileChannel channel = raf.getChannel();
                     
-                    FileChannelUtility.writeAll(channel, rootBlock0.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK0);
-                    
-                    FileChannelUtility.writeAll(channel, rootBlock1.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK1);
-                    
+                    FileChannelUtility.writeAll(opener, rootBlock0
+                            .asReadOnlyBuffer(), OFFSET_ROOT_BLOCK0);
+
+                    FileChannelUtility.writeAll(opener, rootBlock1
+                            .asReadOnlyBuffer(), OFFSET_ROOT_BLOCK1);
+
                     /*
-                     * Force the changes to disk. We also force the file metadata to
-                     * disk since we just changed the file size and we do not want to
-                     * loose track of that.
+                     * Force the changes to disk. We also force the file
+                     * metadata to disk since we just changed the file size and
+                     * we do not want to loose track of that.
                      */
-                    channel.force(true);
+                    opener.reopenChannel().force(true);
         
                 }
 
@@ -741,7 +735,7 @@ public class FileMetadata {
                      */
                     if(INFO)
                         log.info("Mapping file="+file);
-                    buffer = raf.getChannel().map(FileChannel.MapMode.READ_WRITE,
+                    buffer = opener.reopenChannel().map(FileChannel.MapMode.READ_WRITE,
                             headerSize0, userExtent);
                     break;
                 case Disk:
@@ -764,4 +758,103 @@ public class FileMetadata {
         
     }
     
+    /**
+     * Used to re-open the {@link FileChannel} in this class.
+     */
+    private final IReopenChannel opener = new IReopenChannel() {
+
+        public String toString() {
+            
+            return file.toString();
+            
+        }
+        
+        public FileChannel reopenChannel() throws IOException {
+
+            return FileMetadata.this.reopenChannel();
+
+        }
+        
+    };
+    
+    /**
+     * This method transparently re-opens the channel for the backing file.
+     * 
+     * @throws IllegalStateException
+     *             if the store is closed.
+     * 
+     * @throws IOException
+     *             if the backing file can not be locked.
+     */
+    final synchronized private FileChannel reopenChannel() throws IOException {
+
+        if (raf != null && raf.getChannel().isOpen()) {
+            
+            /*
+             * The channel is still open. If you are allowing concurrent reads
+             * on the channel, then this could indicate that two readers each
+             * found the channel closed and that one was able to re-open the
+             * channel before the other such that the channel was open again by
+             * the time the 2nd reader got here.
+             */
+            
+            return raf.getChannel();
+            
+        }
+        
+        // open the file.
+        this.raf = new RandomAccessFile(file, fileMode);
+
+        if (INFO)
+            log.info("(Re-)opened file: " + file);
+            
+        if (bufferMode != BufferMode.Mapped) {
+
+            try {
+
+                /*
+                 * Request a shared file lock.
+                 */
+
+                final boolean readOnly = "r".equals(fileMode);
+
+                if (raf.getChannel()
+                        .tryLock(0, Long.MAX_VALUE, readOnly/* shared */) == null) {
+
+                    /*
+                     * Note: A null return indicates that someone else holds the
+                     * lock. This can happen if the platform does not support
+                     * shared locks or if someone requested an exclusive file
+                     * lock.
+                     */
+
+                    try {
+                        raf.close();
+                    } catch (Throwable t) {
+                        // ignore.
+                    }
+
+                    throw new IOException("File already locked? file=" + file);
+
+                }
+
+            } catch (IOException ex) {
+
+                /*
+                 * Note: This is true of NFS volumes. This is Ok and should be
+                 * ignored. However the backing file is not protected against
+                 * accidental deletes or overwrites.
+                 */
+
+                if (INFO)
+                    log.info("FileLock not supported: file=" + file, ex);
+
+            }
+
+        }
+
+        return raf.getChannel();
+        
+    }
+
 }

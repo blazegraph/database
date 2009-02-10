@@ -78,7 +78,6 @@ import org.apache.zookeeper.data.ACL;
 import com.bigdata.Banner;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.PIDUtil;
-import com.bigdata.io.FileLockUtility;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.jini.lookup.entry.Hostname;
 import com.bigdata.jini.lookup.entry.ServiceUUID;
@@ -906,8 +905,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * <p>
      * Note: The {@link FileLock} (if acquired) will be automatically released
      * if the process dies. It is also explicitly closed by
-     * {@link #shutdownNow()}. The {@link FileLockUtility} is NOT used since
-     * advisory locks are not automatically removed if the service dies.
+     * {@link #shutdownNow()}. DO NOT use advisory locks since they are not
+     * automatically removed if the service dies.
      * 
      * @throws RuntimeException
      *             if the file is already locked by another process.

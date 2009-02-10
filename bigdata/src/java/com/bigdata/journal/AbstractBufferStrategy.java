@@ -123,7 +123,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
     /**
      * <code>true</code> iff the {@link IBufferStrategy} is open.
      */
-    private boolean open = false;
+    private volatile boolean open = false;
 
     /**
      * <code>true</code> iff the {@link IBufferStrategy} is read-only.

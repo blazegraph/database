@@ -37,6 +37,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
+import com.bigdata.service.Event;
 
 /**
  * Unit test of the {@link StoreManager} when adding and deleting journals and
@@ -143,7 +144,9 @@ public class TestAddDeleteResource extends AbstractResourceManagerTestCase {
             // build an index segment from that btree.
             buildResult = resourceManager.buildIndexSegment(INDEX_NAME, btree,
                     outFile, true/* compactingMerge */, createTime,
-                    null/* fromKey */, null /* toKey */);
+                    null/* fromKey */, null /* toKey */, new Event(
+                            resourceManager.getFederation(), INDEX_NAME,
+                            "test", ""/*details*/));
 
         }
 

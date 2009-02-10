@@ -3220,8 +3220,8 @@ abstract public class StoreManager extends ResourceEvents implements
                 } catch (Throwable t) {
 
                     // log error and keep going.
-                    
-                    log.error("Could not delete journal: "+t, t);
+                    log.error("Could not delete journal: "
+                            + resourceMetadata.getFile(), t);
                     
                 }
 
@@ -3323,7 +3323,8 @@ abstract public class StoreManager extends ResourceEvents implements
                 } catch (Throwable t) {
 
                     // log error and keep going.
-                    log.error("Could not delete segment: " + t, t);
+                    log.error("Could not delete segment: "
+                            + resourceMetadata.getFile(), t);
 
                 }
 
@@ -3399,9 +3400,10 @@ abstract public class StoreManager extends ResourceEvents implements
     private void deleteResource(final UUID uuid, final boolean isJournal,
             boolean callerWillRemoveFromIndex) throws NoSuchStoreException {
 
-        if(INFO) log.info("deleteResource: uuid=" + uuid + ", isJournal="
-                + isJournal + ", callerWillRemoveFromIndex="
-                + callerWillRemoveFromIndex);
+        if (INFO)
+            log.info("deleteResource: uuid=" + uuid + ", isJournal="
+                    + isJournal + ", callerWillRemoveFromIndex="
+                    + callerWillRemoveFromIndex);
         
         if (uuid == liveJournalRef.get().getRootBlockView().getUUID()) {
 
@@ -3426,6 +3428,8 @@ abstract public class StoreManager extends ResourceEvents implements
 
             if (store != null) {
                 
+                final File file = store.getFile();
+
                 if(isJournal) {
                     
                     assert store instanceof AbstractJournal;
@@ -3436,19 +3440,36 @@ abstract public class StoreManager extends ResourceEvents implements
                     
                 }
                 
-//                try {
+                try {
 
-                /*
-                 * @todo why not trap an IllegalStateException if the store is
-                 * not open or if it is concurrently closed?
-                 */
-                    store.close();
-                    
-//                } catch(Throwable t) {
-//                    
-//                    log.error(t.getMessage(),t);
-//                    
-//                }
+                    if (store.isOpen()) {
+
+                        // make sure the store is closed.
+                        store.close();
+                        
+                    }
+
+                } catch (IllegalStateException t) {
+
+                    /*
+                     * There should not be closed journals in the cache since
+                     * they are only closed by the finalizer.
+                     * 
+                     * However, an IndexSegmentStore will be closed if the
+                     * IndexSegment is closed and it can still be in the cache
+                     * until its reference is cleared when it gets finalized.
+                     * 
+                     * Note: if there is a concurrent close then that might be
+                     * interesting and should at least be explored further.
+                     */
+                    if (isJournal)
+                        // probably a problem.
+                        log.error(file, t);
+                    else
+                        // probably NOT a problem.
+                        log.warn(file, t);
+
+                }
 
             }
 

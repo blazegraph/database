@@ -30,10 +30,12 @@ package com.bigdata.btree;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.channels.FileChannel;
 import java.util.UUID;
 
 import junit.framework.TestCase;
 
+import com.bigdata.io.IReopenChannel;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
 
@@ -187,7 +189,7 @@ public class TestIndexSegmentCheckpoint extends TestCase {
         
         tmp.deleteOnExit();
         
-        RandomAccessFile raf = new RandomAccessFile(tmp,"rw");
+        final RandomAccessFile raf = new RandomAccessFile(tmp,"rw");
         
         try {
 

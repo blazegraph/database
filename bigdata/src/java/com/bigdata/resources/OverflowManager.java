@@ -146,23 +146,33 @@ abstract public class OverflowManager extends IndexManager {
     protected final int maximumMovesPerTarget;
 
     /**
-     * The maximum #of sources for an index partition view before a compacting
-     * merge of the index partition will be triggered in preference to an
-     * incremental build.
+     * The maximum #of optional compacting merge operations that will be
+     * performed during a single overflow event.
      * 
-     * @see Options#MAXIMUM_SOURCES_PER_VIEW_BEFORE_COMPACTING_MERGE
+     * @see Options#MAXIMUM_OPTIONAL_MERGES_PER_OVERFLOW
      */
-    protected final int maximumSourcesPerViewBeforeCompactingMerge;
+    protected final int maximumOptionalMergesPerOverflow;
+    
+//    /**
+//     * The maximum #of sources for an index partition view before a compacting
+//     * merge of the index partition will be triggered in preference to an
+//     * incremental build.
+//     * 
+//     * @see Options#MAXIMUM_SOURCES_PER_VIEW
+//     * 
+//     * @deprecated should be redundent with {@link #maximumJournalsPerView} and
+//     *             {@link #maximumSegmentsPerView}
+//     */
+//    protected final int maximumSourcesPerView;
     
     /**
-     * The maximum #of compacting merge operations that will be performed during
-     * a single overflow event.
-     * 
-     * @see Options#MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW
+     * @see Options#MAXIMUM_JOURNALS_PER_VIEW
      */
-    protected final int maximumCompactingMergesPerOverflow;
-    
     protected final int maximumJournalsPerView;
+    
+    /**
+     * @see Options#MAXIMUM_SEGMENTS_PER_VIEW
+     */
     protected final int maximumSegmentsPerView;
     
     /**
@@ -494,63 +504,64 @@ abstract public class OverflowManager extends IndexManager {
         String DEFAULT_MAXIMUM_MOVES_PER_TARGET = "2";
 
         /**
-         * The maximum #of sources for an index partition view before a
-         * compacting merge of the index partition will be triggered in
-         * preference to an incremental build (default
-         * {@value #DEFAULT_MAXIMUM_SOURCES_PER_VIEW_BEFORE_COMPACTING_MERGE}).
-         * The minimum value is ONE (1) since the source view must always
-         * include the mutable {@link BTree}. When ONE (1), a compacting merge
-         * is always indicated.
-         * <p>
-         * Note: An index partition view is comprised of a mutable {@link BTree}
-         * on the live journal, zero or more mutable {@link BTree}s from
-         * historical journals, and zero or more {@link IndexSegment}s. An
-         * incremental build replaces the {@link BTree} from the old journal (as
-         * of the lastCommitTime for that journal) with an {@link IndexSegment}
-         * having the same data. A compacting merge replaces the <em>view</em>
-         * as of the lastCommitTime of the old journal.
-         */
-        String MAXIMUM_SOURCES_PER_VIEW_BEFORE_COMPACTING_MERGE = OverflowManager.class
-                .getName()
-                + ".maximumSourcesPerViewBeforeCompactingMerge";
-
-        String DEFAULT_MAXIMUM_SOURCES_PER_VIEW_BEFORE_COMPACTING_MERGE = "5";
-
-        /**
          * The maximum #of optional compacting merge operations that will be
          * performed during a single overflow event (default
-         * {@value #DEFAULT_MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW}).
+         * {@value #DEFAULT_OPTIONAL_COMPACTING_MERGES_PER_OVERFLOW}).
          * <p>
-         * Once this #of compacting merge tasks have been identified for a given
-         * overflow event, the remainder of the index partitions that are
-         * neither split, joined, moved, nor copied will use incremental builds.
-         * An incremental build is generally cheaper since it only copies the
-         * data on the mutable {@link BTree} for the lastCommitTime rather than
-         * the fused view. However, a compacting merge will permit the older
-         * index segments to be released. Either a compacting merge or an
-         * incremental build will permit old journals to become releasable once
-         * the releaseTime has been advanced so as to outdate that resource.
+         * Once this #of optional compacting merge tasks have been identified
+         * for a given overflow event, the remainder of the index partitions
+         * that are neither split, joined, moved, nor copied will use
+         * incremental builds. An incremental build is generally cheaper since
+         * it only copies the data on the mutable {@link BTree} for the
+         * lastCommitTime rather than the fused view. Acompacting merge permits
+         * the older index segments to be released and results in a simpler view
+         * with view {@link IndexSegment}s. Either a compacting merge or an
+         * incremental build will permit old journals to be released once the
+         * commit points on those journals are no longer required.
          * <p>
          * Note: Mandatory compacting merges are identified based on
          * {@link #MAXIMUM_JOURNALS_PER_VIEW} and
-         * {@link #MAXIMUM_SEGMENTS_PER_VIEW}. When compacting merges are
-         * enabled, there is NO limit the #of manditory compacting merges that
-         * will be performed during an asynchronous overflow event. However each
-         * manditory compacting merge does count towards this maximum. Therefore
-         * if the #of manditory compacting merges is greater than this parameter
-         * then NO optional compacting merges will be selected.
-         * <p>
-         * Note: This may be set to ZERO (0) to disable compacting merges, but
-         * that is not recommended. If you disable both compacting merges and
-         * moves (or if there is only a single data service) then you will
-         * eventually developed index partition views with 100s of component
-         * indices, drag down performance, and exceed various hard limits.
+         * {@link #MAXIMUM_SEGMENTS_PER_VIEW}. There is NO limit the #of
+         * manditory compacting merges that will be performed during an
+         * asynchronous overflow event. However, each manditory compacting merge
+         * does count towards the maximum #of optional merges. Therefore if the
+         * #of manditory compacting merges is greater than this parameter then
+         * NO optional compacting merges will be selected in a given overflow
+         * cycle.
          */
-        String MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW = OverflowManager.class
+        String MAXIMUM_OPTIONAL_MERGES_PER_OVERFLOW = OverflowManager.class
                 .getName()
-                + ".maximumCompactingMergesPerOverflow";
+                + ".maximumOptionalMergesPerOverflow";
 
-        String DEFAULT_MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW = "10";
+        String DEFAULT_OPTIONAL_COMPACTING_MERGES_PER_OVERFLOW = "10";
+
+//        /**
+//         * The maximum #of sources for an index partition view before a
+//         * compacting merge of the index partition will be triggered in
+//         * preference to an incremental build (default
+//         * {@value #DEFAULT_MAXIMUM_SOURCES_PER_VIEW}). The minimum value is
+//         * ONE (1) since the source view must always include the mutable
+//         * {@link BTree}. When ONE (1), a compacting merge is always indicated.
+//         * <p>
+//         * Note: An index partition view is comprised of a mutable {@link BTree}
+//         * on the live journal, zero or more mutable {@link BTree}s from
+//         * historical journals, and zero or more {@link IndexSegment}s. An
+//         * incremental build replaces the {@link BTree} from the old journal (as
+//         * of the lastCommitTime for that journal) with an {@link IndexSegment}
+//         * having the same data. A compacting merge replaces the <em>view</em>
+//         * as of the lastCommitTime of the old journal and results in a mutable
+//         * {@link BTree} on the live journal and a single {@link IndexSegment}.
+//         * Split and move operations have the same effect as a compacting merge
+//         * since their output will contain at most one {@link IndexSegment}.
+//         * 
+//         * @deprecated should be redundent with
+//         *             {@link #MAXIMUM_JOURNALS_PER_VIEW} and
+//         *             {@link #MAXIMUM_SEGMENTS_PER_VIEW}.
+//         */
+//        String MAXIMUM_SOURCES_PER_VIEW = OverflowManager.class.getName()
+//                + ".maximumSourcesPerView";
+//
+//        String DEFAULT_MAXIMUM_SOURCES_PER_VIEW = "5";
 
         /**
          * The maximum #of journals that may appear in an index partition view
@@ -571,10 +582,9 @@ abstract public class OverflowManager extends IndexManager {
          * released there will be large spikes in IOWAIT when reading on an old
          * journal as reads are more or less random.
          * <p>
-         * Note: The {@link #MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW} will be
+         * Note: The {@link #MAXIMUM_OPTIONAL_MERGES_PER_OVERFLOW} will be
          * ignored if a compacting merge is recommended for an index partition
-         * based on this parameter UNLESS compacting merges have been entirely
-         * disabled.
+         * based on this parameter.
          * <p>
          * Note: Synchronous overflow will refuse to copy tuples for an index
          * partition whose mutable {@link BTree} otherwise satisifies the
@@ -601,10 +611,9 @@ abstract public class OverflowManager extends IndexManager {
          * view, and to make it possible to release index segments and thus have
          * less of a footprint on the disk.
          * <p>
-         * Note: The {@link #MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW} will be
+         * Note: The {@link #MAXIMUM_OPTIONAL_MERGES_PER_OVERFLOW} will be
          * ignored if a compacting merge is recommended for an index partition
-         * based on this parameter UNLESS compacting merges have been entirely
-         * disabled.
+         * based on this parameter.
          * <p>
          * Note: Synchronous overflow will refuse to copy tuples for an index
          * partition whose mutable {@link BTree} otherwise satisifies the
@@ -994,39 +1003,39 @@ abstract public class OverflowManager extends IndexManager {
             
         }
 
+//        {
+//            maximumSourcesPerView = Integer.parseInt(properties.getProperty(
+//                    Options.MAXIMUM_SOURCES_PER_VIEW,
+//                    Options.DEFAULT_MAXIMUM_SOURCES_PER_VIEW));
+//
+//            if(INFO)
+//                log.info(Options.MAXIMUM_SOURCES_PER_VIEW+ "="
+//                    + maximumSourcesPerView);
+//
+//            if (maximumSourcesPerView < 1) {
+//
+//                throw new RuntimeException(
+//                        Options.MAXIMUM_SOURCES_PER_VIEW
+//                                + " must be GT ONE (1)");
+//                
+//            }
+//            
+//        }
+
         {
-            maximumSourcesPerViewBeforeCompactingMerge = Integer.parseInt(properties.getProperty(
-                    Options.MAXIMUM_SOURCES_PER_VIEW_BEFORE_COMPACTING_MERGE,
-                    Options.DEFAULT_MAXIMUM_SOURCES_PER_VIEW_BEFORE_COMPACTING_MERGE));
-
-            if(INFO)
-                log.info(Options.MAXIMUM_SOURCES_PER_VIEW_BEFORE_COMPACTING_MERGE+ "="
-                    + maximumSourcesPerViewBeforeCompactingMerge);
-
-            if (maximumSourcesPerViewBeforeCompactingMerge < 1) {
-
-                throw new RuntimeException(
-                        Options.MAXIMUM_SOURCES_PER_VIEW_BEFORE_COMPACTING_MERGE
-                                + " must be GT ONE (1)");
-                
-            }
             
-        }
-
-        {
-            
-            maximumCompactingMergesPerOverflow = Integer.parseInt(properties.getProperty(
-                    Options.MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW,
-                    Options.DEFAULT_MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW));
+            maximumOptionalMergesPerOverflow = Integer.parseInt(properties.getProperty(
+                    Options.MAXIMUM_OPTIONAL_MERGES_PER_OVERFLOW,
+                    Options.DEFAULT_OPTIONAL_COMPACTING_MERGES_PER_OVERFLOW));
 
             if (INFO)
-                log.info(Options.MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW + "="
-                        + maximumCompactingMergesPerOverflow);
+                log.info(Options.MAXIMUM_OPTIONAL_MERGES_PER_OVERFLOW + "="
+                        + maximumOptionalMergesPerOverflow);
 
-            if (maximumCompactingMergesPerOverflow < 0) {
+            if (maximumOptionalMergesPerOverflow < 0) {
 
                 throw new RuntimeException(
-                        Options.MAXIMUM_COMPACTING_MERGES_PER_OVERFLOW
+                        Options.MAXIMUM_OPTIONAL_MERGES_PER_OVERFLOW
                                 + " must be non-negative");
                 
             }
@@ -1722,8 +1731,7 @@ abstract public class OverflowManager extends IndexManager {
                         || ((copyIndexThreshold > 0 && entryCount <= copyIndexThreshold) //
                                 && numIndicesNonZeroCopy < maxNonZeroCopy //
                                 && !hasOverflowHandler // must be applied
-                                && bm.sourceJournalCount <= maximumJournalsPerView //
-                                && bm.sourceSegmentCount <= maximumSegmentsPerView //
+                                && !bm.manditoryMerge // 
                                 );
 
                 if(copyIndex) {
