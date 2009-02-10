@@ -2014,11 +2014,11 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 //                raf = FileLockUtility.openFile(file, fileMode,
 //                        bufferMode != BufferMode.Mapped/*useTryLock*/);
 
+                // note: set true so that reopenChannel will create the file.
+                fileOpened = true;
+                
                 reopenChannel();
                 
-                // note that it has been opened.
-                fileOpened = true;
-
                 if (INFO)
                     log.info("Opened backing file for temporary store: "
                                     + file);
