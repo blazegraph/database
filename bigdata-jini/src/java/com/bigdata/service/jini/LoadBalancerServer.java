@@ -298,31 +298,64 @@ public class LoadBalancerServer extends AbstractServer {
                             LinkedHashMap<String, Vector<String>> parms)
                             throws Exception {
                         
-                        final Vector<String> namespaces = parms.get("namespace");
+                        Vector<String> namespaces = parms.get("namespace");
+
+                        Vector<String> timestamps = parms.get("timestamp");
+
+                        // default is all indices.
+                        if (namespaces == null) {
+
+                            namespaces = new Vector<String>();
+
+                            namespaces.add("");
+
+                        }
+
+                        // default is the most recently committed state.
+                        if (timestamps == null) {
+
+                            timestamps = new Vector<String>();
+
+                            timestamps.add("" + ITx.READ_COMMITTED);
+
+                        }
                         
                         final JiniFederation fed = (JiniFederation) ((LoadBalancerService) service)
                                 .getFederation();
                         
                         final StringWriter w = new StringWriter();
                         
+                        // @todo conneg for the mime type and the formatter.
                         final FormatRecord formatter = new FormatTabTable(w);
-                        
-                        // a read-only transaction as of the last commit time.
-                        final long tx = fed.getTransactionService().newTx(
-                                ITx.READ_COMMITTED);
 
-                        try {
+                        formatter.writeHeaders();
 
-                            final DumpFederation dumper = new DumpFederation(
-                                    fed, tx, formatter);
+                        for (String t : timestamps) {
 
-                            formatter.writeHeaders();
+                            final long timestamp;
+                            try {
 
-                            if (namespaces == null) {
+                                timestamp = Long.valueOf(t);
+                                
+                            } catch (NumberFormatException ex) {
+                                
+                                return new Response(NanoHTTPD.HTTP_BADREQUEST,
+                                        NanoHTTPD.MIME_TEXT_PLAIN,
+                                        "Not a valid timestamp: " + t);
+                                
+                            }
+                            
+                            /*
+                             * A read-only transaction as of the specified
+                             * commit time.
+                             */
+                            final long tx = fed.getTransactionService().newTx(
+                                    timestamp);
 
-                                dumper.dumpIndices("");
+                            try {
 
-                            } else {
+                                final DumpFederation dumper = new DumpFederation(
+                                        fed, tx, formatter);
 
                                 for (String s : namespaces) {
 
@@ -330,12 +363,12 @@ public class LoadBalancerServer extends AbstractServer {
 
                                 }
 
+                            } finally {
+
+                                // discard read-only transaction.
+                                fed.getTransactionService().abort(tx);
+
                             }
-
-                        } finally {
-
-                            // discard read-only transaction.
-                            fed.getTransactionService().abort(tx);
 
                         }
                         
