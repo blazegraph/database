@@ -325,8 +325,21 @@ public class LoadBalancerServer extends AbstractServer {
                             
                         }
                         
-                        return new Response(NanoHTTPD.HTTP_OK,
+                        final Response r = new Response(NanoHTTPD.HTTP_OK,
                                 NanoHTTPD.MIME_TEXT_PLAIN, w.toString());
+
+                        /*
+                         * Sets the cache behavior.
+                         * 
+                         * Note: These cache control parameters SHOULD indicate
+                         * that the response is valid for 60 seconds, that the
+                         * client must revalidate, and that the response is
+                         * cachable even if the client was authenticated.
+                         */
+                        r.addHeader("Cache-Control",
+                                "max-age=60, must-revalidate, public");
+                        
+                        return r;
                         
                     }
                     

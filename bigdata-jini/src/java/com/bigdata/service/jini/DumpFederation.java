@@ -90,9 +90,6 @@ import com.bigdata.util.InnerCause;
  * 
  * @see DumpJournal
  * 
- * @todo replace System.out with Writer or PrintStream or call method that
- *       handles formatting.
- * 
  * @todo debug logic to dump only within the namespace (its hacked in
  *       {@link ListIndicesTask}).
  */
@@ -336,7 +333,9 @@ public class DumpFederation {
                             + "\tSourceJournalCount"
                             + "\tSourceSegmentCount"
                             + "\tSumEntryCounts" //
-                            + "\tSegmentBytes"// 
+                            + "\tSumSegmentBytes"// 
+                            + "\tSumSegmentNodeBytes" //
+                            + "\tSumSegmentLeafBytes"// 
                             /*
                              * Note: These values are aggregates for the data
                              * service on which the index partition resides.
@@ -376,12 +375,20 @@ public class DumpFederation {
             
             if (rec.detailRec != null) {
                 
+                // aggregate across all sources in the view.
+                final SourceDetailRecord sourceDetailRec = new SourceDetailRecord(
+                        rec.detailRec.sources);
+                
                 // core view stats.
                 sb.append("\t" + rec.detailRec.sourceCount);
                 sb.append("\t" + rec.detailRec.journalSourceCount);
                 sb.append("\t" + rec.detailRec.segmentSourceCount);
-                sb.append("\t" + rec.detailRec.sumEntryCounts);
-                sb.append("\t" + rec.detailRec.segmentByteCount);
+                
+                // per source stats (aggregated across sources in the view).
+                sb.append("\t" + sourceDetailRec.entryCount);
+                sb.append("\t" + sourceDetailRec.segmentByteCount);
+                sb.append("\t" + sourceDetailRec.segmentNodeByteCount);
+                sb.append("\t" + sourceDetailRec.segmentLeafByteCount);
 
                 // stats for the entire data service
                 sb.append("\t" + rec.detailRec.dataDirFreeSpace);
@@ -394,14 +401,22 @@ public class DumpFederation {
                 
             } else {
                 
-                // error obtaining the data of interest.
+                /*
+                 * Error obtaining the data of interest.
+                 */
+                
+                // core view stats.
                 sb.append("\tN/A");
                 sb.append("\tN/A");
                 sb.append("\tN/A");
+                
+                // aggregated per-source in view stats.
                 sb.append("\tN/A");
-//                sb.append("\tN/A");
+                sb.append("\tN/A");
+                sb.append("\tN/A");
                 sb.append("\tN/A");
 
+                // data service stats.
                 sb.append("\tN/A");
                 sb.append("\tN/A");
                 sb.append("\tN/A");
@@ -453,7 +468,8 @@ public class DumpFederation {
      * @param formatter
      *            Object used to format the output.
      */
-    public DumpFederation(final JiniFederation fed, final long tx, final FormatRecord formatter) {
+    public DumpFederation(final JiniFederation fed, final long tx,
+            final FormatRecord formatter) {
 
         if (fed == null)
             throw new IllegalArgumentException();
@@ -710,43 +726,20 @@ public class DumpFederation {
         }
         
     }
-    
+
     /**
-     * Encapsulates several different kinds of byte counts for the index
-     * partition and the data service on which it resides.
+     * A record detailing various things counted on a per-source basis.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class IndexPartitionDetailRecord implements Serializable {
-       
+    public static class SourceDetailRecord implements Serializable {
+
         /**
          * 
          */
-        private static final long serialVersionUID = 6275468354120307662L;
+        private static final long serialVersionUID = -2064727234836478585L;
 
-        /**
-         * The detailed description of the index view.
-         */
-        public final LocalPartitionMetadata pmd;
-        
-        /**
-         * The #of resources in the view for the index partition.
-         */
-        public final int sourceCount;
-        
-        /**
-         * The #of resources in the view for the index partition which are
-         * {@link ManagedJournal}s.
-         */
-        public final int journalSourceCount;
-        
-        /**
-         * The #of resources in the view for the index partition which are
-         * {@link IndexSegment}s.
-         */
-        public final int segmentSourceCount;
-        
         /**
          * The sum of the entry count for each {@link AbstractBTree} in the
          * index partition view.
@@ -766,13 +759,137 @@ public class DumpFederation {
          * Note: The exact range count is MUCH too expensive as it requires
          * materializing every tuple in the index partition view!
          */
-        public final long sumEntryCounts;
+        public final long entryCount;
         
         /**
          * The #of bytes across all {@link IndexSegment}s in the view.
          */
         public final long segmentByteCount;
+        
+        /**
+         * The #of bytes in the node region of the {@link IndexSegment}s in
+         * the view.
+         */
+        public final long segmentNodeByteCount;
 
+        /**
+         * The #of bytes in the leaf region of the {@link IndexSegment}s in
+         * the view.
+         */
+        public final long segmentLeafByteCount;
+
+        /**
+         * 
+         * @param entryCount
+         * @param segmentByteCount
+         * @param segmentNodeByteCount
+         * @param segmentLeafByteCount
+         */
+        public SourceDetailRecord(//
+                final long entryCount,//
+                final long segmentByteCount,//
+                final long segmentNodeByteCount,//
+                final long segmentLeafByteCount//
+                ) {
+            
+            this.entryCount = entryCount;
+            
+            this.segmentByteCount = segmentByteCount;
+            
+            this.segmentNodeByteCount = segmentNodeByteCount;
+            
+            this.segmentLeafByteCount = segmentLeafByteCount;
+            
+        }
+
+        /**
+         * Ctor returns a record that contains the sum across the given array of
+         * record.
+         * 
+         * @param a
+         *            An array of records to be summed.
+         */
+        public SourceDetailRecord(final SourceDetailRecord[] a) {
+
+            if (a == null)
+                throw new IllegalArgumentException();
+            
+            long entryCount = 0;
+            long segmentByteCount = 0;
+            long nodeByteCount = 0;
+            long leafByteCount = 0;
+            
+            for (SourceDetailRecord t : a) {
+
+                entryCount += t.entryCount;
+
+                segmentByteCount += t.segmentByteCount;
+
+                nodeByteCount += t.segmentNodeByteCount;
+
+                leafByteCount += t.segmentLeafByteCount;
+
+            }
+
+            this.entryCount = entryCount;
+
+            this.segmentByteCount = segmentByteCount;
+
+            this.segmentNodeByteCount = nodeByteCount;
+
+            this.segmentLeafByteCount = leafByteCount;
+
+        }
+
+    }
+
+    /**
+     * Encapsulates several different kinds of byte counts for the index
+     * partition and the data service on which it resides.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class IndexPartitionDetailRecord implements Serializable {
+       
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 6275468354120307662L;
+
+        /**
+         * The name of the index partition.
+         */
+        public final String indexPartitionName;
+        
+        /**
+         * The detailed description of the index view.
+         */
+        public final LocalPartitionMetadata pmd;
+        
+        /**
+         * Details on each source in the view.  The order is the order
+         * of the sources in the view.
+         */
+        public SourceDetailRecord[] sources;
+        
+        /**
+         * The #of resources in the view for the index partition.
+         */
+        public final int sourceCount;
+        
+        /**
+         * The #of resources in the view for the index partition which are
+         * {@link ManagedJournal}s.
+         */
+        public final int journalSourceCount;
+        
+        /**
+         * The #of resources in the view for the index partition which are
+         * {@link IndexSegment}s.
+         */
+        public final int segmentSourceCount;
+        
         /**
          * The free space in bytes on the volume holding the data service's data
          * directory.
@@ -817,88 +934,164 @@ public class DumpFederation {
         /**
          * 
          * @param btree
-         *            This should be the read-only {@link BTree} for the
-         *            historical timestamp for which the dump is being
-         *            generated. This is strongly typed as a {@link BTree} since
-         *            we DO NOT want to force the materialization of the index
-         *            partition view in case it is not already open.
-         *            Materializing the view will force the index segments in
-         *            the view to be materialized, and that means buffering
-         *            their nodes in memory which is a moderately expensive IO.
          * @param resourceManager
          */
-        public IndexPartitionDetailRecord(final BTree btree,
-                final ResourceManager resourceManager) {
-
-//            final long rangeCount = ndx.rangeCount();
-
-            pmd = btree.getIndexMetadata().getPartitionMetadata();
-
-            long sumEntryCounts = btree.getEntryCount();
+        public IndexPartitionDetailRecord(
+                final ResourceManager resourceManager, final long timestamp,
+                final String name) {
             
-            long segmentByteCount = 0;
+            if (resourceManager == null)
+                throw new IllegalArgumentException();
 
-            int sourceCount = 0;
+            if (name == null)
+                throw new IllegalArgumentException();
+
+            this.indexPartitionName = name;
             
-            int journalSourceCount = 0;
-            
-            int segmentSourceCount = 0;
-            
-            if (pmd != null) {
+            // the mutable BTree for the view.
+            final BTree btree;
+            {
+
+                /*
+                 * Obtain the read-only {@link BTree} for the historical
+                 * timestamp for which the dump is being generated. This is
+                 * strongly typed as a {@link BTree} since we DO NOT want to
+                 * force the materialization of the index partition view in case
+                 * it is not already open. Materializing the view will force the
+                 * index segments in the view to be materialized, and that means
+                 * buffering their nodes in memory which is a moderately
+                 * expensive IO.
+                 */
                 
-                for (IResourceMetadata x : pmd.getResources()) {
+                final IRawStore store = resourceManager.getJournal(timestamp);
+
+                if (store == null) {
+
+                    throw new RuntimeException("No journal? : timestamp="
+                            + timestamp);
+
+                }
+
+                btree = (BTree) resourceManager.getIndexOnStore(
+                        name, timestamp, store);
+
+                if (btree == null) {
+
+                    throw new RuntimeException(
+                            "No index partition on journal? : timestamp="
+                                    + timestamp + ", name=" + name);
+
+                }
+
+                pmd = btree.getIndexMetadata().getPartitionMetadata();
+                
+            }
+
+            if (pmd == null) {
+
+                sources = new SourceDetailRecord[] { //
+                // the btree on the live journal.
+                new SourceDetailRecord(btree.getEntryCount(), 0L, 0L, 0L) //
+                };
+
+                this.sourceCount = 1;
+
+                this.journalSourceCount = 1;
+
+                this.segmentSourceCount = 0;
+                
+            } else {
+                
+                int sourceCount = 0;
+                
+                int journalSourceCount = 0;
+                
+                int segmentSourceCount = 0;
+                
+                final IResourceMetadata[] resources = pmd.getResources();
+                
+                sources = new SourceDetailRecord[resources.length];
+
+                for (int i = 0; i < resources.length; i++) {
+
+                    final IResourceMetadata x = resources[i];
 
                     sourceCount++;
-
-                    if (x.isJournal()) {
-
-                        journalSourceCount++;
-
-                        continue;
-                    
-                    }
-
-                    segmentSourceCount++;
 
                     /*
                      * Note: This will force the (re-)open of the
                      * IndexSegmentStore, but not of the IndexSegment on that
                      * store!
                      */
-                    final IndexSegmentStore segStore = (IndexSegmentStore) resourceManager
-                            .openStore(x.getUUID());
+                    final IRawStore store = resourceManager.openStore(x
+                            .getUUID());
 
-                    if (segStore == null) {
+                    if (store == null) {
                         
                         throw new RuntimeException(
-                                "Index segment not found? : " + x);
+                                "Store not found? : " + x);
                         
                     }
                     
-                    /*
-                     * Note: The size() of an IndexSegmentStore is always the
-                     * length of the file. However, the #of bytes allocated by
-                     * the OS to a file may differ depending on the block size
-                     * for files on the volume.
-                     */
-                    segmentByteCount += segStore.size();
-                    
-                    // #of tuples in this index segment.
-                    sumEntryCounts += segStore.getCheckpoint().nentries;
+                    if (x.isJournal()) {
 
+                        journalSourceCount++;
+
+//                        if (i == 0) {
+//
+//                            sources[i] = new SourceDetailRecord(btree
+//                                    .getEntryCount(), 0L, 0L, 0L);
+//
+//                        } else {
+
+                            final BTree tmp = (BTree) resourceManager
+                                    .getIndexOnStore(name, timestamp, store);
+
+                            if (tmp == null) {
+
+                                throw new RuntimeException(
+                                        "No index partition on journal? : timestamp="
+                                                + timestamp + ", name=" + name);
+
+                            }
+
+                            sources[i] = new SourceDetailRecord(tmp
+                                    .getEntryCount(), 0L, 0L, 0L);
+
+//                        }
+
+                        continue;
+
+                    } else {
+
+                        segmentSourceCount++;
+
+                        final IndexSegmentStore segStore = (IndexSegmentStore) store;
+
+                        // #of tuples in this index segment.
+                        final long entryCount = segStore.getCheckpoint().nentries;
+
+                        sources[i] = new SourceDetailRecord(//
+                                // #of tuples
+                                entryCount,//
+                                // #of bytes in the index segment.
+                                segStore.size(),//
+                                // #of bytes in the nodes extent of the seg.
+                                segStore.getCheckpoint().extentNodes,
+                                // #of bytes in the leaves extent of the seg.
+                                segStore.getCheckpoint().extentLeaves);
+
+                    }
+                    
                 }
 
-            }
-            
-            this.sumEntryCounts = sumEntryCounts;
-            
-            this.sourceCount = sourceCount;
+                this.sourceCount = sourceCount;
 
-            this.journalSourceCount = journalSourceCount;
-            
-            this.segmentSourceCount = segmentSourceCount;
-            
-            this.segmentByteCount = segmentByteCount;
+                this.journalSourceCount = journalSourceCount;
+                
+                this.segmentSourceCount = segmentSourceCount;
+                
+            }
             
             this.dataDirFreeSpace = resourceManager.getDataDirFreeSpace();
 
@@ -973,26 +1166,8 @@ public class DumpFederation {
             final ResourceManager resourceManager = dataService
                     .getResourceManager();
 
-            final IRawStore store = resourceManager.getJournal(timestamp);
-
-            if(store == null) {
-                
-                throw new RuntimeException("No journal? : timestamp="+timestamp);
-                
-            }
-            
-            final BTree btree = (BTree) resourceManager.getIndexOnStore(name,
-                    timestamp, store);
-
-            if(btree == null) {
-                
-                throw new RuntimeException(
-                        "No index partition on journal? : timestamp="
-                                + timestamp + ", name=" + name);
-                
-            }
-
-            return new IndexPartitionDetailRecord(btree, resourceManager);
+            return new IndexPartitionDetailRecord(resourceManager, timestamp,
+                    name);
 
         }
 

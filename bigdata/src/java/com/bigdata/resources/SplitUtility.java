@@ -251,7 +251,11 @@ public class SplitUtility {
 
         final Node node = (Node) btree.getRightMostNode(true/* nodesOnly */);
         
-        final int childIndex = (node.getChildCount() + 1) / 2;
+        // choose the leaf that is in the center of the nodes children.
+//        final int childIndex = (node.getChildCount() + 1) / 2;
+        
+        // choose the first leaf that is a child of this node.
+        final int childIndex = 0;
         
         // leaf from the middle of the leaves of the node.
         final Leaf leaf = (Leaf) node.getChild(childIndex);

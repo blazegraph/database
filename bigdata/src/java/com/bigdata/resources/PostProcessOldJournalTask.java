@@ -1084,9 +1084,23 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * available in that context.
              */
             
-            // true iff this is a good candidate for a tail split.
-            final boolean tailSplit = vmd.isTailSplit();
-            final double moveMinScore = .1;
+            /*
+             * FIXME As an alternative design a split could just occur when the
+             * sum of the segment bytes after a compacting merge was GTE the
+             * target split size. The split would occur in the atomic update
+             * task of the compacting merge (or a build which had compacting
+             * merge semantics).
+             * 
+             * If we select moves solely based on activity and begin a move with
+             * a compacting merge then we could do a split if required (index
+             * segment is too large to move). Since a split involves a
+             * compacting merge of each key-range, we have the history in a
+             * compact index segment either way. At that point we can just blast
+             * the index segment (and the selected index segment if we did a
+             * split first) across a socket and then catch up with any writes
+             * buffered by the live journal to complete the move.
+             */
+            
             /*
              * Either the index partition is a tail split, which is an ideal
              * move candidate and we will move the righSibling, or it is not
@@ -1104,6 +1118,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * standard move operation when the index partition is not too
              * large.
              */
+            final double moveMinScore = .1;
             final boolean moveCandidate = //
                 /*
                  * Note: barely active indices are not moved since moving them
@@ -1124,13 +1139,13 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * Note: This also helps to prevent very small indices that are not
              * getting much activity from bounding around.
              */
-            final double movePriority = tailSplit //
+            final double movePriority = vmd.isTailSplit() //
                 ? score.drank / .1// 
                 : score.drank / vmd.getPercentOfSplit()//
                 ;
 
             // @todo conditionally log @ info
-            log.warn(vmd.name + " : tailSplit=" + tailSplit
+            log.warn(vmd.name + " : tailSplit=" + vmd.isTailSplit()
                     + ", moveCandidate=" + moveCandidate + ", movePriority="
                     + movePriority + ", drank=" + score.drank
                     + ", percentOfSplit=" + vmd.getPercentOfSplit() + " : "

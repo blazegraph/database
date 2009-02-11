@@ -10,7 +10,6 @@ import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.journal.AbstractTask;
-import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.IResourceMetadata;
@@ -181,7 +180,8 @@ public class SplitIndexPartitionTask extends
                 Split[] splits;
                 try {
 
-                    splits = splitHandler.getSplits(resourceManager, src);
+                    splits = splitHandler.getSplits(resourceManager, src,
+                            vmd.btreeCounters);
 
                 } catch (Throwable t) {
 

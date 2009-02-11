@@ -30,7 +30,7 @@ package com.bigdata.btree;
 
 import java.io.Serializable;
 
-import com.bigdata.journal.IResourceManager;
+import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.Split;
 import com.bigdata.sparse.SparseRowStore;
 
@@ -99,8 +99,13 @@ public interface ISplitHandler extends Serializable {
      * view as its rightSeparator. The #of splits SHOULD be choosen such that
      * the resulting index partitions are each at least 50% full.
      * 
+     * @param resourceManager
+     * 
      * @param ndx
      *            The source index partition.
+     * @param btreeCounters
+     *            Performance counters for the index partition view collected
+     *            since the last overflow.
      * 
      * @return A {@link Split}[] array contains everything that we need to
      *         define the new index partitions <em>except</em> the partition
@@ -108,6 +113,7 @@ public interface ISplitHandler extends Serializable {
      *         examination reveals that the index SHOULD NOT be split at this
      *         time.
      */
-    public Split[] getSplits(IResourceManager resourceManager, IIndex ndx);
+    public Split[] getSplits(ResourceManager resourceManager,
+            ILocalBTreeView ndx, BTreeCounters btreeCounters);
 
 }

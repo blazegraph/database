@@ -1645,8 +1645,8 @@ abstract public class IndexManager extends StoreManager {
                     log.info("built index segment: " + name + ", file="
                             + outFile);
 
-                return new BuildResult(name, indexMetadata, segmentMetadata,
-                        builder);
+                return new BuildResult(name, compactingMerge, src.getSources(),
+                        indexMetadata, segmentMetadata, builder);
 
             } catch (Throwable t) {
 

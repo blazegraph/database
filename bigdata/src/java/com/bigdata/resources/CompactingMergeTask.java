@@ -32,7 +32,7 @@ import com.bigdata.service.Event;
  * defined by the current {@link BTree} on the journal and the newly built
  * {@link IndexSegment}.
  * <p>
- * Note: If the task fails, then the output {@link IndexSegment} will be
+ * Note: If the task fails, then the generated {@link IndexSegment} will be
  * deleted.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -213,6 +213,9 @@ public class CompactingMergeTask extends AbstractPrepareTask<BuildResult> {
             if (buildResult == null)
                 throw new IllegalArgumentException();
 
+            if(!buildResult.compactingMerge)
+                throw new IllegalArgumentException();
+            
             this.resourceManager = resourceManager;
             
             this.buildResult = buildResult;

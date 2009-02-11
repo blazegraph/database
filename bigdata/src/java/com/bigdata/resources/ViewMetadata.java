@@ -43,6 +43,17 @@ class ViewMetadata extends BTreeMetadata {
      * Cached adjusted split handler once initialized from view.
      */
     private ISplitHandler adjustedSplitHandler;
+
+    /**
+     * Cached estimated percentage of a split once initialized from the view.
+     */
+    private volatile double percentOfSplit;
+
+    /**
+     * Cached decision whether or not a tail split is warranted once initialized
+     * from the view.
+     */
+    private volatile boolean tailSplit;
     
     /**
      * A {@link SoftReference} is used to cache the view since we really want to
@@ -227,8 +238,6 @@ class ViewMetadata extends BTreeMetadata {
 
     }
 
-    private volatile double percentOfSplit;
-
     /**
      * Return <code>true</code> if the index partition satisifies the criteria
      * for a tail split (heavy writes on the tail of the index partition and the
@@ -248,7 +257,6 @@ class ViewMetadata extends BTreeMetadata {
         return tailSplit;
         
     }
-    private volatile boolean tailSplit;
     
     /**
      * {@inheritDoc}
