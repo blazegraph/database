@@ -24,6 +24,7 @@ import org.apache.log4j.MDC;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.counters.httpd.CounterSetHTTPDServer;
+import com.bigdata.journal.ITx;
 import com.bigdata.service.DefaultServiceFederationDelegate;
 import com.bigdata.service.Event;
 import com.bigdata.service.IFederationDelegate;
@@ -306,23 +307,36 @@ public class LoadBalancerServer extends AbstractServer {
                         
                         final FormatRecord formatter = new FormatTabTable(w);
                         
-                        final DumpFederation dumper = new DumpFederation(fed, fed
-                                .getLastCommitTime(), formatter);
+                        // a read-only transaction as of the last commit time.
+                        final long tx = fed.getTransactionService().newTx(
+                                ITx.READ_COMMITTED);
 
-                        formatter.writeHeaders();
-                        
-                        if (namespaces == null) {
+                        try {
 
-                            dumper.dumpIndices("");
+                            final DumpFederation dumper = new DumpFederation(
+                                    fed, tx, formatter);
 
-                        } else {
+                            formatter.writeHeaders();
 
-                            for (String s : namespaces) {
+                            if (namespaces == null) {
 
-                                dumper.dumpIndices(s);
+                                dumper.dumpIndices("");
+
+                            } else {
+
+                                for (String s : namespaces) {
+
+                                    dumper.dumpIndices(s);
+
+                                }
 
                             }
-                            
+
+                        } finally {
+
+                            // discard read-only transaction.
+                            fed.getTransactionService().abort(tx);
+
                         }
                         
                         final Response r = new Response(NanoHTTPD.HTTP_OK,
