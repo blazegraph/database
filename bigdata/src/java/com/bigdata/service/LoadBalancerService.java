@@ -336,7 +336,7 @@ abstract public class LoadBalancerService extends AbstractService
      * events in temporal order, filtering for desired criteria and makes it
      * possible to prune the events in the buffer as new events arrive.
      */
-    protected LinkedHashMap<UUID,Event> events = new LinkedHashMap<UUID,Event>(10000/* initialCapacity */);
+    protected final LinkedHashMap<UUID,Event> events = new LinkedHashMap<UUID,Event>(10000/* initialCapacity */);
     
     /**
      * Options understood by the {@link LoadBalancerService}.
@@ -1414,7 +1414,7 @@ abstract public class LoadBalancerService extends AbstractService
                             + ps + IStoreManagerCounters.TmpDirBytesAvailable,
                     Bytes.gigabyte * 10/* default */, historyMinutes);
 
-            final double rawScore = (averageQueueLength + 1) * (hostScore.score + 1);
+            final double rawScore = (averageQueueingTime + 1) * (hostScore.score + 1);
 
             double adjustedRawScore = rawScore;
             

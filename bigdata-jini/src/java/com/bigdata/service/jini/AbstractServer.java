@@ -33,7 +33,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
@@ -173,6 +172,13 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      */
     private ServiceID serviceID;
 
+    /**
+     * The directory for the service. This is the directory within which the
+     * {@link #serviceIdFile} exists. A service MAY have its own concept of a
+     * data directory, log directory, etc. which can be somewhere else.
+     */
+    private File serviceDir;
+    
     /**
      * The file where the {@link ServiceID} will be written / read.
      */
@@ -470,14 +476,13 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
              * always exists in the former - and in both of those cases we do
              * not have to create the parent directory.
              */
-            final File parentDir = serviceIdFile.getAbsoluteFile()
-                    .getParentFile();
+            serviceDir = serviceIdFile.getAbsoluteFile().getParentFile();
 
-            if (parentDir != null && !parentDir.exists()) {
+            if (serviceDir != null && !serviceDir.exists()) {
 
-                log.warn("Creating: " + parentDir);
+                log.warn("Creating: " + serviceDir);
 
-                parentDir.mkdirs();
+                serviceDir.mkdirs();
 
             }
 
@@ -486,6 +491,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
              * directory as the serviceIdFile.
              */
             acquireFileLock();
+            
+            writePIDFile();
             
             // convert Entry[] to a mutable list.
             entries = new LinkedList<Entry>(Arrays
@@ -898,10 +905,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * Attempt to acquire an exclusive lock on a file in the same directory as
      * the {@link #serviceIdFile} (non-blocking). This is designed to prevent
      * concurrent service starts and service restarts while the service is
-     * already running. THis also writes the pid of the JVM (best guess) on the
-     * file. If the server is run from the command line, then the pid will be
-     * the pid of the server. If you are running multiple servers inside of the
-     * same JVM, then the pid will be the same for each of those servers.
+     * already running.
      * <p>
      * Note: The {@link FileLock} (if acquired) will be automatically released
      * if the process dies. It is also explicitly closed by
@@ -913,9 +917,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      */
     private void acquireFileLock() {
 
-        final File file = new File(serviceIdFile.getParent(), "pid.lock");
-
-//        final RandomAccessFile raf;
+        final File file = new File(serviceDir, ".lock");
 
         try {
 
@@ -965,31 +967,43 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
         }
 
-        /*
-         * Write the pid on the file (best attempt).
-         */
+    }
+
+    /**
+     * Writes the PID on a file in the service directory (best attempt to obtain
+     * the PID). If the server is run from the command line, then the pid will
+     * be the pid of the server. If you are running multiple servers inside of
+     * the same JVM, then the pid will be the same for each of those servers.
+     */
+    private void writePIDFile() {
+
+        final File file = new File(serviceDir, "pid");
+
         try {
 
+            // best guess at the PID of the JVM.
             final String pid = Integer.toString(PIDUtil.getPID());
 
-            final OutputStream os = new FileOutputStream(lockFileRAF.getFD());
+            // open the file.
+            final FileOutputStream os = new FileOutputStream(file);
 
-//            try {
+            try {
 
+                // discard anything already in the file.
+                os.getChannel().truncate(0L);
+                
+                // write on the PID using ASCII characters.
                 os.write(pid.getBytes("ASCII"));
 
+                // flush buffers.
                 os.flush();
 
-                /*
-                 * Note: DO NOT close the OutputStream!!!!! That will close the
-                 * backing FileChannel and release our lock!
-                 */
-                
-//            } finally {
-//
-//                os.close();
-//
-//            }
+            } finally {
+
+                // and close the file.
+                os.close();
+
+            }
 
         } catch (IOException ex) {
 

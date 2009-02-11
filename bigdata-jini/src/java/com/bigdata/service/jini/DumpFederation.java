@@ -30,7 +30,10 @@ package com.bigdata.service.jini;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.io.Serializable;
+import java.io.Writer;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -73,6 +76,7 @@ import com.bigdata.resources.StoreManager.ManagedJournal;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IDataServiceAwareProcedure;
+import com.bigdata.service.IMetadataService;
 import com.bigdata.service.ListIndicesTask;
 import com.bigdata.service.MetadataService;
 import com.bigdata.util.InnerCause;
@@ -86,7 +90,8 @@ import com.bigdata.util.InnerCause;
  * 
  * @see DumpJournal
  * 
- * @todo replace System.out with Writer or PrintStream.
+ * @todo replace System.out with Writer or PrintStream or call method that
+ *       handles formatting.
  * 
  * @todo debug logic to dump only within the namespace (its hacked in
  *       {@link ListIndicesTask}).
@@ -209,9 +214,12 @@ public class DumpFederation {
 
             try {
 
-                final DumpFederation dumper = new DumpFederation(fed, tx);
+                final FormatRecord formatter = new FormatTabTable(System.out);
 
-                dumper.writeHeaders();
+                final DumpFederation dumper = new DumpFederation(fed, tx,
+                        formatter);
+
+                formatter.writeHeaders();
                 
                 dumper.dumpIndices( namespace );
 
@@ -247,24 +255,217 @@ public class DumpFederation {
      * The read-historical transaction that will be used to dump the database.
      */
     private final long ts;
+
+    /**
+     * Object used to format the output.
+     */
+    private final FormatRecord formatter;
+    
+    /**
+     * Interface reponsible for formatting the output.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public interface FormatRecord {
+       
+        /**
+         * Write out column headers for the dump records.
+         */
+        public void writeHeaders();
+        
+        /**
+         * Write out the details for a record corresponding to a single index
+         * partition.
+         * 
+         * @param rec
+         *            The record.
+         */
+        public void writeRecord(IndexPartitionRecord rec);
+        
+    }
+    
+    /**
+     * Tab-delimited tabular output.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class FormatTabTable implements FormatRecord {
+        
+        private final PrintWriter out;
+        
+        public FormatTabTable(final PrintWriter w) {
+
+            if (w == null)
+                throw new IllegalArgumentException();
+
+            this.out = w;
+
+        }
+
+        public FormatTabTable(final Writer w) {
+
+            this( new PrintWriter( w ));
+
+        }
+
+        public FormatTabTable(final PrintStream w) {
+
+            this(new PrintWriter(w));
+            
+        }
+
+        /**
+         * @todo document the columns.
+         */
+        public void writeHeaders() {
+            
+            final String s = "Timestamp"//
+                            + "\tIndexName" //
+                            + "\tIndexPartitionName"//
+                            + "\tPartitionId" //
+                            + "\tServiceUUID" //
+                            + "\tServiceName" //
+                            + "\tHostname" //
+                            + "\tServiceCode"//
+                            /*
+                             * Basic metadata about the index partition.
+                             */
+                            + "\tSourceCount"//
+                            + "\tSourceJournalCount"
+                            + "\tSourceSegmentCount"
+                            + "\tSumEntryCounts" //
+                            + "\tSegmentBytes"// 
+                            /*
+                             * Note: These values are aggregates for the data
+                             * service on which the index partition resides.
+                             */
+                            + "\tDataDirFreeSpace"// 
+                            + "\tBytesUnderManagement"// 
+                            + "\tJournalBytesUnderManagement"// 
+                            + "\tIndexSegmentBytesUnderManagement"// 
+                            + "\tManagedJournalCount"// 
+                            + "\tManagedSegmentCount"//
+                            + "\tOverflowCount"//
+                            /*
+                             * Extended metadata about the index partition.
+                             */
+                            + "\tLeftSeparator"//
+                            + "\tRightSeparator"//
+                            + "\tView"
+                            + "\tHistory"//
+                            ;
+
+            out.println(s);
+            
+        }
+
+        /** format row for table. */
+        public void writeRecord(final IndexPartitionRecord rec) {
+            
+            final StringBuilder sb = new StringBuilder();
+            sb.append(rec.ts);//new Date(ts));
+            sb.append("\t" + rec.indexName);
+            sb.append("\t" + DataService.getIndexPartitionName(rec.indexName,rec.locator.getPartitionId()));
+            sb.append("\t" + rec.locator.getPartitionId());
+            sb.append("\t" + rec.locator.getDataServiceUUID());
+            sb.append("\t" + rec.smd.getName());
+            sb.append("\t" + rec.smd.getHostname());
+            sb.append("\t" + "DS" + rec.smd.getCode());
+            
+            if (rec.detailRec != null) {
+                
+                // core view stats.
+                sb.append("\t" + rec.detailRec.sourceCount);
+                sb.append("\t" + rec.detailRec.journalSourceCount);
+                sb.append("\t" + rec.detailRec.segmentSourceCount);
+                sb.append("\t" + rec.detailRec.sumEntryCounts);
+                sb.append("\t" + rec.detailRec.segmentByteCount);
+
+                // stats for the entire data service
+                sb.append("\t" + rec.detailRec.dataDirFreeSpace);
+                sb.append("\t" + rec.detailRec.bytesUnderManagement);
+                sb.append("\t" + rec.detailRec.journalBytesUnderManagement);
+                sb.append("\t" + rec.detailRec.segmentBytesUnderManagement);
+                sb.append("\t" + rec.detailRec.managedJournalCount);
+                sb.append("\t" + rec.detailRec.managedSegmentCount);
+                sb.append("\t" + rec.detailRec.overflowCount);
+                
+            } else {
+                
+                // error obtaining the data of interest.
+                sb.append("\tN/A");
+                sb.append("\tN/A");
+                sb.append("\tN/A");
+                sb.append("\tN/A");
+//                sb.append("\tN/A");
+                sb.append("\tN/A");
+
+                sb.append("\tN/A");
+                sb.append("\tN/A");
+                sb.append("\tN/A");
+                sb.append("\tN/A");
+                sb.append("\tN/A");
+                sb.append("\tN/A");
+                sb.append("\tN/A");
+                
+            }
+
+            // extended view stats.
+            sb.append("\t"
+                    + BytesUtil.toString(rec.locator.getLeftSeparatorKey()));
+            sb.append("\t"
+                    + BytesUtil.toString(rec.locator.getRightSeparatorKey()));
+
+            if (rec.detailRec != null && rec.detailRec.pmd != null) {
+
+                // current view definition.
+                sb.append("\t\""
+                        + Arrays.toString(rec.detailRec.pmd.getResources())
+                        + "\"");
+
+                // history
+                sb.append("\t\"" + rec.detailRec.pmd.getHistory() + "\"");
+
+            } else {
+
+                sb.append("\tN/A");
+                sb.append("\tN/A");
+
+            }
+            
+            out.println(sb.toString());
+            
+        }
+
+    }
     
     /**
      * 
      * @param fed
+     *            The federation whose indices will be dump.
      * @param tx
      *            The timestamp that will be used to dump the database. This
      *            SHOULD be a read-historical transaction since that will put a
      *            read-lock into place on the data during any operations by this
      *            class.
+     * @param formatter
+     *            Object used to format the output.
      */
-    public DumpFederation(final JiniFederation fed, final long tx) {
+    public DumpFederation(final JiniFederation fed, final long tx, final FormatRecord formatter) {
 
         if (fed == null)
+            throw new IllegalArgumentException();
+        
+        if (formatter == null)
             throw new IllegalArgumentException();
         
         this.fed = fed;
         
         this.ts = tx;
+        
+        this.formatter = formatter;
         
     }
     
@@ -293,54 +494,15 @@ public class DumpFederation {
             
         }
         
-        return (String[]) fed.getMetadataService().submit(
-                new ListIndicesTask(ts, namespace)).get();
-
-    }
-    
-    /**
-     * Write out column headers for the dump records.
-     * 
-     * @todo document the columns.
-     */
-    public void writeHeaders() {
-
-        System.out
-                .println("Timestamp"//
-                        + "\tIndexName" //
-                        + "\tIndexPartitionName"//
-                        + "\tPartitionId" //
-                        + "\tServiceUUID" //
-                        + "\tServiceName" //
-                        + "\tHostname" //
-                        + "\tServiceCode"//
-                        /*
-                         * Basic metadata about the index partition.
-                         */
-                        + "\tSourceCount"//
-                        + "\tSourceJournalCount"
-                        + "\tSourceSegmentCount"
-                        + "\tSumEntryCounts" //
-                        + "\tSegmentBytes"// 
-                        /*
-                         * Note: These values are aggregates for the data
-                         * service on which the index partition resides.
-                         */
-                        + "\tDataDirFreeSpace"// 
-                        + "\tBytesUnderManagement"// 
-                        + "\tJournalBytesUnderManagement"// 
-                        + "\tIndexSegmentBytesUnderManagement"// 
-                        + "\tManagedJournalCount"// 
-                        + "\tManagedSegmentCount"//
-                        + "\tOverflowCount"//
-                        /*
-                         * Extended metadata about the index partition.
-                         */
-                        + "\tLeftSeparator"//
-                        + "\tRightSeparator"//
-                        + "\tView"
-                        + "\tHistory"//
-                        );
+        final IMetadataService mds = fed.getMetadataService();
+        
+        if(mds == null) {
+            
+            throw new RuntimeException("Could not discover the metadata service");
+            
+        }
+        
+        return (String[]) mds.submit(new ListIndicesTask(ts, namespace)).get();
 
     }
 
@@ -436,6 +598,8 @@ public class DumpFederation {
             if (locator == null)
                 throw new IllegalArgumentException();
 
+            this.ts = ts;
+            
             this.indexName = indexName;
 
             this.locator = locator;
@@ -479,6 +643,11 @@ public class DumpFederation {
             
         }
 
+        /**
+         * The timestamp used to obtain the view.
+         */
+        public final long ts;
+        
         /**
          * The scale-out index name (from the ctor).
          */
@@ -963,80 +1132,8 @@ public class DumpFederation {
 
             lastLocator = locator;
 
-            // format row for table.
-            final StringBuilder sb = new StringBuilder();
-            sb.append(ts);//new Date(ts));
-            sb.append("\t" + indexName);
-            sb.append("\t" + DataService.getIndexPartitionName(indexName,rec.locator.getPartitionId()));
-            sb.append("\t" + rec.locator.getPartitionId());
-            sb.append("\t" + rec.locator.getDataServiceUUID());
-            sb.append("\t" + rec.smd.getName());
-            sb.append("\t" + rec.smd.getHostname());
-            sb.append("\t" + "DS" + rec.smd.getCode());
+            formatter.writeRecord(rec);
             
-            if (rec.detailRec != null) {
-                
-                // core view stats.
-                sb.append("\t" + rec.detailRec.sourceCount);
-                sb.append("\t" + rec.detailRec.journalSourceCount);
-                sb.append("\t" + rec.detailRec.segmentSourceCount);
-                sb.append("\t" + rec.detailRec.sumEntryCounts);
-                sb.append("\t" + rec.detailRec.segmentByteCount);
-
-                // stats for the entire data service
-                sb.append("\t" + rec.detailRec.dataDirFreeSpace);
-                sb.append("\t" + rec.detailRec.bytesUnderManagement);
-                sb.append("\t" + rec.detailRec.journalBytesUnderManagement);
-                sb.append("\t" + rec.detailRec.segmentBytesUnderManagement);
-                sb.append("\t" + rec.detailRec.managedJournalCount);
-                sb.append("\t" + rec.detailRec.managedSegmentCount);
-                sb.append("\t" + rec.detailRec.overflowCount);
-                
-            } else {
-                
-                // error obtaining the data of interest.
-                sb.append("\tN/A");
-                sb.append("\tN/A");
-                sb.append("\tN/A");
-                sb.append("\tN/A");
-//                sb.append("\tN/A");
-                sb.append("\tN/A");
-
-                sb.append("\tN/A");
-                sb.append("\tN/A");
-                sb.append("\tN/A");
-                sb.append("\tN/A");
-                sb.append("\tN/A");
-                sb.append("\tN/A");
-                sb.append("\tN/A");
-                
-            }
-
-            // extended view stats.
-            sb.append("\t"
-                    + BytesUtil.toString(rec.locator.getLeftSeparatorKey()));
-            sb.append("\t"
-                    + BytesUtil.toString(rec.locator.getRightSeparatorKey()));
-
-            if (rec.detailRec != null && rec.detailRec.pmd != null) {
-
-                // current view definition.
-                sb.append("\t\""
-                        + Arrays.toString(rec.detailRec.pmd.getResources())
-                        + "\"");
-
-                // history
-                sb.append("\t\"" + rec.detailRec.pmd.getHistory() + "\"");
-
-            } else {
-
-                sb.append("\tN/A");
-                sb.append("\tN/A");
-
-            }
-            
-            System.out.println(sb.toString());
-
         } // next index partition.
 
         /*
