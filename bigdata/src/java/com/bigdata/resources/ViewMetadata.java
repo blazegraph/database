@@ -422,13 +422,13 @@ class ViewMetadata extends BTreeMetadata {
                         s.getSampleRate() // unchanged
                 );
 
-                if (INFO)
-                    log.info("Adjusted splitHandler:  name="
-                            + indexMetadata.getName() + ", npartitions="
-                            + npartitions + ", threshold="
-                            + accelerateSplitThreshold + ", discount=" + d
-                            + ", adjustedSplitHandler=" + t);
+                log.warn(name + " : npartitions=" + npartitions + ", discount="
+                        + d + ", threshold=" + accelerateSplitThreshold);
 
+                if (INFO)
+                    log.info("Adjusted splitHandler:  name=" + name
+                            + ", adjustedSplitHandler=" + t);
+                
                 return t;
 
             } catch (IllegalArgumentException ex) {

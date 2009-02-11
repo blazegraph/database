@@ -533,7 +533,7 @@ abstract public class OverflowManager extends IndexManager {
                 .getName()
                 + ".maximumOptionalMergesPerOverflow";
 
-        String DEFAULT_OPTIONAL_COMPACTING_MERGES_PER_OVERFLOW = "10";
+        String DEFAULT_OPTIONAL_COMPACTING_MERGES_PER_OVERFLOW = "2";
 
 //        /**
 //         * The maximum #of sources for an index partition view before a
