@@ -17,8 +17,14 @@ public enum OverflowActionEnum {
 
     /**
      * Copy the tuples from the last commit point on the old journal into an
-     * index segment. Builds are done both in order to improve read
-     * performance and to release dependencies on older journals.
+     * index segment, and may incorporate tuples from zero or more additional
+     * sources in the view. Builds are done both in order to improve read
+     * performance and to release dependencies on older journals. If all sources
+     * in the view are used, then a build has the same semantics as a
+     * {@link #Merge}. The #of sources to use in a build is choosen in order to
+     * keep the build operation fast while also minimizing the #of sources that
+     * are accumulated in the view over time and thereby reducing the frequency
+     * with which a compacting merge must be performed.
      */
     Build,
 

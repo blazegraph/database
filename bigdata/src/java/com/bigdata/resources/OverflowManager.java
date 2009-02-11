@@ -45,6 +45,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
+import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.BufferedDiskStrategy;
@@ -54,6 +55,7 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.resources.ResourceManager.IResourceManagerCounters;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Event;
@@ -174,6 +176,11 @@ abstract public class OverflowManager extends IndexManager {
      * @see Options#MAXIMUM_SEGMENTS_PER_VIEW
      */
     protected final int maximumSegmentsPerView;
+    
+    /**
+     * @see Options#MAXIMUM_BUILD_SEGMENT_BYTES
+     */
+    final protected long maximumBuildSegmentBytes;
     
     /**
      * The timeout for {@link #shutdown()} -or- ZERO (0L) to wait for ever.
@@ -298,7 +305,7 @@ abstract public class OverflowManager extends IndexManager {
      * @see Options#OVERFLOW_CANCELLED_WHEN_JOURNAL_FULL
      */
     protected final boolean overflowCancelledWhenJournalFull;
-    
+
     /**
      * #of overflows that have taken place. This counter is incremented each
      * time the entire overflow operation is complete, including any
@@ -624,6 +631,25 @@ abstract public class OverflowManager extends IndexManager {
                 + ".maximumSegmentsPerView";
 
         String DEFAULT_MAXIMUM_SEGMENTS_PER_VIEW = "6";
+        
+        /**
+         * Option limits the #of {@link IndexSegmentStore} bytes that an
+         * {@link OverflowActionEnum#Build} operation will process (default
+         * {@value #DEFAULT_MAXIMUM_BUILD_SEGMENTS_BYTES}). Given that the
+         * nominal size of an index partition is 200M, a reasonable value for
+         * this might be 1/10th to 1/5th of that, so 20-40M. The key is to keep
+         * the builds fast so they should not do too much work while reducing
+         * the frequency with which we must do a compacting merge. This option
+         * only effects the #of {@link IndexSegment}s that will be incorporated
+         * into an {@link OverflowActionEnum#Build} operation. When ZERO (0L),
+         * {@link OverflowActionEnum#Build} operations will only include the
+         * data from the historical journal.
+         */
+        String MAXIMUM_BUILD_SEGMENT_BYTES = OverflowManager.class.getName()
+                + ".maximumBuildSegmentsBytes";
+
+        String DEFAULT_MAXIMUM_BUILD_SEGMENTS_BYTES = ""
+                + (Bytes.megabyte * 20);
         
         /**
          * The timeout in milliseconds for asynchronous overflow processing to
@@ -1080,6 +1106,26 @@ abstract public class OverflowManager extends IndexManager {
             
         }
         
+        // maximumBuildSegmentBytes
+        {
+
+            maximumBuildSegmentBytes = Long.parseLong(properties.getProperty(
+                    Options.MAXIMUM_BUILD_SEGMENT_BYTES,
+                    Options.DEFAULT_MAXIMUM_BUILD_SEGMENTS_BYTES));
+
+            if (maximumBuildSegmentBytes < 0) {
+
+                throw new RuntimeException("The '" + Options.SHUTDOWN_TIMEOUT
+                        + "' must be non-negative.");
+
+            }
+
+            if (INFO)
+                log.info(Options.MAXIMUM_BUILD_SEGMENT_BYTES + "="
+                        + maximumBuildSegmentBytes);
+
+        }
+
         // shutdownTimeout
         {
 

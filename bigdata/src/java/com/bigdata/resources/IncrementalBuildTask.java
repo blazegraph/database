@@ -1,11 +1,13 @@
 package com.bigdata.resources;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 
+import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexMetadata;
@@ -20,9 +22,29 @@ import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.service.Event;
 
 /**
- * Task builds an {@link IndexSegment} from the mutable {@link BTree} for an
- * index partition as of some historical timestamp and then atomically updates
- * the view (aka an incremental build).
+ * Task builds an {@link IndexSegment} from the mutable {@link BTree} and zero
+ * or more additional sources in the index partition view and then atomically
+ * updates the view (aka an incremental build).
+ * <p>
+ * Build uses mutable {@link BTree} of the lastCommitTime for the old journal
+ * PLUS ZERO OR MORE additional source(s) taken in view order up to but not
+ * including the source in the view with significant content. This let's us keep
+ * the #of {@link IndexSegment}s in the view down without incurring the cost of
+ * a compacting merge. (The cost of the compacting merge itself comes from
+ * having a large index segment in the view, generally in the last position of
+ * the view.) In turn, this keeps the cost of overflow down and can be a
+ * significant win if there are a number of large index partitions that receive
+ * a few writes in each overflow.
+ * <p>
+ * For example, assuming a large index segment exists from a previous compacting
+ * merge, then once the #of writes exceeds the "copy" threshold there will be an
+ * index build. The view will then have [live, smallSeg1, largeSeg1]. The next
+ * time the copy threshold is exceeded we would get [live, smallSeg2, smallSeg1,
+ * largeSeg1]. However if we include smallSeg1 in the build, then we get [live,
+ * smallSeg2, largeSeg1]. This can continue until we have enough data to warrant
+ * a split or until we have another "large" segment but not yet enough data to
+ * split, at which point we get [live, largeSeg2, largeSeg1] and then [live,
+ * smallSeg3, largeSeg2, largeSeg1].
  * <p>
  * Note: As its last action, this task submits a
  * {@link AtomicUpdateIncrementalBuildTask} which replaces the view with one
@@ -37,10 +59,11 @@ import com.bigdata.service.Event;
  */
 public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
 
-//    final protected long lastCommitTime;
-
     final protected ViewMetadata vmd;
-    
+
+    /**
+     * The file on which the {@link IndexSegment} will be written.
+     */
     final protected File outFile;
 
     /**
@@ -52,26 +75,15 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
      * The source view.
      */
     BTree src;
-//    final SoftReference<BTree> ref;
 
     /**
-     * 
-     * @param resourceManager
-     * @param lastCommitTime
-     *            The lastCommitTime of the journal whose view of the index you
-     *            wish to capture in the generated {@link IndexSegment}.
-     * @param name
-     *            The name of the index.
-     * @param outFile
-     *            The file on which the {@link IndexSegment} will be written.
+     * @param vmd
+     *            Metadata about the index partition view.
      */
     public IncrementalBuildTask(final ViewMetadata vmd) {
 
         super(vmd.resourceManager, TimestampUtility
                 .asHistoricalRead(vmd.commitTime), vmd.name);
-
-        if (vmd == null)
-            throw new IllegalArgumentException();
 
         this.vmd = vmd;
 
@@ -81,9 +93,6 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
         this.e = new Event(resourceManager.getFederation(), vmd.name,
                 OverflowActionEnum.Build, OverflowActionEnum.Build + "("
                         + vmd.name + ") : " + vmd);
-        
-// // cache a soft reference to JUST the btree on the old journal.
-//        this.ref = new SoftReference<BTree>(vmd.getBTree());
 
         /*
          * Put a hard reference hold on the btree.
@@ -107,13 +116,16 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
     protected void clearRefs() {
 
         // release soft references.
-//        ref.clear();
         vmd.clearRef();
 
         // release hard reference.
         src = null;
         
     }
+
+//    final int BUILD_MAX_JOURNAL_COUNT = 3;
+//
+//    final long BUILD_MAX_SUM_ENTRY_COUNT = Bytes.megabyte * 10;
 
     /**
      * Build an {@link IndexSegment} from the compacting merge of an index
@@ -139,8 +151,6 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
                 /*
                  * The source view.
                  */
-                // final BTree src = ((ILocalBTreeView) getIndex(name))
-                // .getMutableBTree();
                 if (INFO) {
 
                     log.info("src=" + name + ", counter="
@@ -149,10 +159,69 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
 
                 }
 
+                /*
+                 * Figure out which sources we want to include. We MUST always
+                 * include the 1st source in the view since that is the mutable
+                 * BTree on the old journal. We continue to include sources in
+                 * the view until we find the first "large" source. We stop
+                 * there because the goal is to keep down the #of components in
+                 * the view without doing the heavy work of processing a large
+                 * source (winds up copying a lot of tuples). We only do that
+                 * additional work on a compacting merge.
+                 */
+                final AbstractBTree[] sources = src.getSources();
+
+                final List<AbstractBTree> accepted = new ArrayList<AbstractBTree>(
+                        sources.length);
+                
+                // the mutable BTree on the old journal.
+                accepted.add( sources[ 0 ] );
+
+                int journalCount = 1;
+                long sumEntryCount = sources[0].getEntryCount();
+                long sumSegBytes = 0L;
+                for (int i = 1; i < sources.length; i++) {
+
+                    final AbstractBTree s = sources[i];
+
+                    sumEntryCount += s.getEntryCount();
+
+                    if (s instanceof IndexSegment) {
+
+                        final IndexSegment seg = (IndexSegment) s;
+
+                        sumSegBytes += seg.getStore().size();
+
+                    } else {
+                        
+                        journalCount++;
+                        
+                    }
+
+//                    if (journalCount > BUILD_MAX_JOURNAL_COUNT)
+//                        break;
+//
+//                    if (sumEntryCount > BUILD_MAX_SUM_ENTRY_COUNT)
+//                        break;
+
+                    if (sumSegBytes > resourceManager.maximumBuildSegmentBytes)
+                        break;
+
+                    // accept another source into the view for the build.
+                    accepted.add(s);
+                    
+                }
+                
+                /*
+                 * Note: If ALL sources are accepted, then we are actually doing
+                 * a compacting merge and we set the flag appropriately!
+                 */
+                final boolean compactingMerge = accepted.size() == sources.length;
+
                 // Build the index segment.
                 result = resourceManager.buildIndexSegment(name, src, outFile,
-                        false/* compactingMerge */, vmd.commitTime,
-                        null/* fromKey */, null/* toKey */, e);
+                        compactingMerge, vmd.commitTime, null/* fromKey */,
+                        null/* toKey */, e);
 
             } finally {
 
@@ -177,15 +246,11 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
                         resourceManager, concurrencyManager, vmd.name,
                         vmd.indexMetadata.getIndexUUID(), result);
 
-                if (INFO)
-                    log.info("src=" + vmd.name
-                            + ", will run atomic update task");
-
-
                 final Event updateEvent = e.newSubEvent(
                         OverflowSubtaskEnum.AtomicUpdate,
-                        OverflowActionEnum.Build + "(" + vmd.name + ") : "
-                                + vmd).start();
+                        (result.compactingMerge ? OverflowActionEnum.Merge
+                                : OverflowActionEnum.Build)
+                                + "(" + vmd.name + ") : " + vmd).start();
                 
                 try {
 
@@ -316,8 +381,11 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
              */
             final ILocalBTreeView view = (ILocalBTreeView)getIndex(getOnlyResource());
 
+            // The live B+Tree.
+            final BTree btree = view.getMutableBTree();
+            
             // make sure that we are working with the same index.
-            assertSameIndex(indexUUID, view.getMutableBTree());
+            assertSameIndex(indexUUID, btree);
             
             if(view instanceof BTree) {
                 
@@ -339,15 +407,10 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
                 
             }
             
-            // The live B+Tree.
-            final BTree btree = view.getMutableBTree();
-            
             if (INFO)
                 log.info("src=" + getOnlyResource() + ", counter="
                         + view.getCounter().get() + ", checkpoint="
                         + btree.getCheckpoint());
-
-            assert btree != null : "Expecting index: "+getOnlyResource();
             
             // clone the current metadata record for the live index.
             final IndexMetadata indexMetadata = btree.getIndexMetadata().clone();
@@ -430,11 +493,38 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
                 // the live journal.
                 newView.add(getJournal().getResourceMetadata());
 
-                // the newly built index segment.
+                /*
+                 * The newly built index segment. This was built from at least
+                 * one source, but it MAY have been built from more than one
+                 * source.
+                 */
                 newView.add(segmentMetadata);
 
-                // the rest of the components of the old view.
-                for (int i = 2; i < currentResources.length; i++) {
+                /*
+                 * The rest of the components of the old view.
+                 * 
+                 * Note: We start copying resources into the view AFTER the last
+                 * source which was included in the view used to generate the
+                 * index segment.
+                 * 
+                 * For example, if the index segment was built from a single
+                 * journal (the old journal), then [startIndex := 1 + 1 == 2].
+                 * So we retain resources in the current view start at
+                 * currentResources[2].
+                 * 
+                 * If there are 3 sources in the current view (new journal, old
+                 * journal, and an index segment) and the sourceCount was 2 then
+                 * then build was actually a compacting merge and [startIndex :=
+                 * 1 + 2 == 3]. Since 3 EQ currentResources.length we will not
+                 * include ANY sources from the old view. This is the semantics
+                 * of a compacting merge. All data in the view is captured by
+                 * the data on the live journal and the newly built index
+                 * segment [live, newSeg].
+                 */
+                
+                final int startIndex = 1 + buildResult.sourceCount;
+                
+                for (int i = startIndex; i < currentResources.length; i++) {
 
                     newView.add(currentResources[i]);
 
@@ -456,6 +546,8 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
                     OverflowActionEnum.Build//
                     +"(lastCommitTime="+ segmentMetadata.getCreateTime()//
                     +",segment="+ segmentMetadata.getUUID()//
+                    +",#buildSources="+buildResult.sourceCount//
+                    +",merge="+buildResult.compactingMerge//
                     +",counter="+btree.getCounter().get()//
                     +",oldResources="+Arrays.toString(currentResources)
                     +") "
@@ -479,6 +571,7 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
             assert btree.needsCheckpoint();
 
             // notify successful index partition build.
+            // @todo could count as a compacting merge if we used all sources.
             resourceManager.indexPartitionBuildCounter.incrementAndGet();
             
             return null;

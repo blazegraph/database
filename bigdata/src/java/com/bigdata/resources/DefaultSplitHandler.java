@@ -9,10 +9,14 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ILinearList;
+import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleCursor;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexMetadata.Options;
@@ -21,6 +25,7 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.resources.SplitIndexPartitionTask.AtomicUpdateSplitIndexPartitionTask;
 import com.bigdata.service.IMetadataService;
+import com.bigdata.service.MetadataService;
 import com.bigdata.service.Split;
 
 /**
@@ -418,15 +423,22 @@ public class DefaultSplitHandler implements ISplitHandler {
     }
 
     /**
-     * Sample index using a range scan choosing ({@link #getSampleRate()} x
-     * N) {@link Sample}s. The key range scan will filter out both
-     * duplicates and deleted index entries. The scan will halt if the index
-     * entry offsets would exceed an int32 value.
+     * Sample index using a range scan choosing ({@link #getSampleRate()} x N)
+     * {@link Sample}s. The key range scan will filter out both duplicates and
+     * deleted index entries. The scan will halt if the index entry offsets
+     * would exceed an int32 value.
+     * 
+     * @param ndx
+     *            The index partition.
+     * @param nvisited
+     *            Used to return the actual #of tuples in the view as measured
+     *            by a scan of the index partition.
      * 
      * @return An ordered array of {@link Sample}s as an aid to choosen the
      *         split points for the view.
      */
-    public Sample[] sampleIndex(final IIndex ndx, final AtomicLong nvisited) {
+    public Sample[] sampleIndex(final ILocalBTreeView ndx,
+            final AtomicLong nvisited) {
 
         final int rangeCount = (int) Math.min(ndx.rangeCount(null, null),
                 Integer.MAX_VALUE);
@@ -507,37 +519,101 @@ public class DefaultSplitHandler implements ISplitHandler {
     }
 
     /**
-     * Note: There are configuation parameters so that you can choose to let
-     * the index partition grow until it reaches e.g., 150-200% of its
-     * maximum entry count and then split it into N index partitions each of
-     * which is e.g., 50-75% full.
+     * Note: There are configuation parameters so that you can choose to let the
+     * index partition grow until it reaches e.g., 150-200% of its maximum entry
+     * count and then split it into N index partitions each of which is e.g.,
+     * 50-75% full.
      * <p>
-     * Note: If the index partition has more than int32 index entries then
-     * the last split will have a zero (0) toIndex since we don't know how
-     * many index entries will go into that split.
+     * Note: If the index partition has more than int32 index entries then the
+     * last split will have a zero (0) toIndex since we don't know how many
+     * index entries will go into that split.
      * 
      * @param ndx
      *            The source index partition.
+     * @param btreeCounters
+     *            The performance counters (optional, but tail splits will not
+     *            be choosen when <code>null</code>).
      * 
      * @return A {@link Split}[] array contains everything that we need to
-     *         define the new index partitions <em>except</em> the
-     *         partition identifiers.
+     *         define the new index partitions <em>except</em> the partition
+     *         identifiers.
      * 
      * @see #getSplits(IIndex, int, Sample[])
+     * 
+     * FIXME Can't we use an {@link ITupleCursor} or {@link ILinearList} here
+     * and do less work by advancing to a desired #of tuples into the
+     * {@link BTree}? E.g., scanning forward or backward and using keyAt() and
+     * indexOf().
+     * 
+     * @todo Subclasses which impose constraints on where the index partition
+     *       can be split need to use {@link ITupleCursor}. They can simply
+     *       scan forward or backward looking for an acceptable separator key.
+     *       If none is found, then they will have to delete the {@link Split}
+     *       from the set of recommended splits but that is hugely unlikely
+     *       except when the target index partition size is quite small.
      */
-    public Split[] getSplits(final IResourceManager resourceManager,
-            final IIndex ndx) {
+    public Split[] getSplits(final ResourceManager resourceManager,
+            final ILocalBTreeView ndx, final BTreeCounters btreeCounters) {
 
+        // Sample the index for tuples used to split into key-ranges.
         final AtomicLong nvisited = new AtomicLong();
-
         final Sample[] samples = sampleIndex(ndx, nvisited);
+        // range count back from sampleIndex.
+        final long rangeCount = nvisited.get();
 
-        if (nvisited.get() < overCapacityMultiplier * getEntryCountPerSplit()) {
+//        // percentage of leaf splits that occur in the head of the BTree.
+//        final double percentHeadSplits;
+//
+//        // percentage of leaf splits that occur in the tail of the BTree.
+//        final double percentTailSplits;
+//        
+//        if (btreeCounters != null) {
+//
+//            // Note: +1 in the denominator to avoid divide by zero.
+//            percentHeadSplits = btreeCounters.headSplit
+//                    / (btreeCounters.leavesSplit + 1d);
+//
+//            // Note: +1 in the denominator to avoid divide by zero.
+//            percentTailSplits = btreeCounters.tailSplit
+//                    / (btreeCounters.leavesSplit + 1d);
+//
+//        } else {
+//
+//            percentHeadSplits = 0d;
+//
+//            percentTailSplits = 0d;
+//
+//        }
+//
+//        // true iff this is a good candidate for a tail split.
+//        final boolean tailSplit = percentTailSplits > resourceManager.tailSplitThreshold;
 
-            if(INFO)
-            log.info("Will not split : nvisited=" + nvisited + " is less than "
-                    + overCapacityMultiplier + " * entryCountPerSplit("
-                    + entryCountPerSplit + ")");
+        if (rangeCount < overCapacityMultiplier * getEntryCountPerSplit()) {
+
+            /*
+             * The index is too small to split.
+             */
+            
+//            if (tailSplit
+//                    && rangeCount >= underCapacityMultiplier
+//                            * getEntryCountPerSplit()) {
+//
+//                /*
+//                 * There are heavy writes on the tail of the index and the total
+//                 * index GTE the undercapacity threshold so we can do a
+//                 * tailSplit and wind up with a head that is near the
+//                 * undercapacity threshold and a tail that is getting a lot of
+//                 * writes.
+//                 */
+//                
+//                return SplitUtility.tailSplit(resourceManager, ndx.getMutableBTree());
+//                
+//            }
+            
+            if (INFO)
+                log.info("Will not split : nvisited=" + rangeCount
+                        + " is less than " + overCapacityMultiplier
+                        + " * entryCountPerSplit(" + entryCountPerSplit + ")");
 
             return null;
 
@@ -547,19 +623,19 @@ public class DefaultSplitHandler implements ISplitHandler {
          * Compute the actual #of splits
          */
         final int nsplits = (int) Math
-                .floor((nvisited.get() / getUnderCapacityMultiplier())
+                .floor((rangeCount / getUnderCapacityMultiplier())
                         / getEntryCountPerSplit());
 
         if (nsplits < 2) {
 
             /*
-             * Split rejected based on insufficient capacity in the result
-             * splits for the configured undercapacity multiplier.
+             * Split is rejected based on insufficient capacity in the computed
+             * Split[] for the configured undercapacity multiplier.
              */
 
             if(INFO)
             log.info("Will not split : nsplits(" + nsplits
-                    + ") := floor(nvisited(" + nvisited
+                    + ") := floor(nvisited(" + rangeCount
                     + ") / underCapacityMultiplier("
                     + getUnderCapacityMultiplier() + ") / entryCountPerSplit("
                     + +entryCountPerSplit + ")");
@@ -568,7 +644,7 @@ public class DefaultSplitHandler implements ISplitHandler {
 
         }
 
-        return getSplits(resourceManager, ndx, nsplits, samples, nvisited.get());
+        return getSplits(resourceManager, ndx, nsplits, samples, rangeCount);
 
     }
 
@@ -659,10 +735,10 @@ public class DefaultSplitHandler implements ISplitHandler {
 
                 if (count >= targetCapacity) {
 
-                    if(INFO)
-                    log.info("Filled split[" + i + "] with " + count
-                            + " entries: targetCapacity=" + targetCapacity
-                            + ", samples[j]=" + sample);
+                    if (INFO)
+                        log.info("Filled split[" + i + "] with " + count
+                                + " entries: targetCapacity=" + targetCapacity
+                                + ", samples[j]=" + sample);
 
                     j++; // consumed.
 
@@ -724,17 +800,8 @@ public class DefaultSplitHandler implements ISplitHandler {
             }
 
             // Get the next partition identifier for the named scale-out index.
-            final IMetadataService mds = resourceManager.getFederation().getMetadataService();
-            final int partitionId;
-            try {
-
-                partitionId = mds.nextPartitionId(indexMetadata.getName());
-
-            } catch (Exception ex) {
-
-                throw new RuntimeException(ex);
-
-            }
+            final int partitionId = nextPartitionId(resourceManager,
+                    indexMetadata.getName());
 
             final LocalPartitionMetadata pmd = new LocalPartitionMetadata(
                     partitionId,//
@@ -760,16 +827,52 @@ public class DefaultSplitHandler implements ISplitHandler {
         } // next split.
 
         final int splitCount = splits.size();
-        
+
         if (splitCount <= 1) {
 
-            log.warn("No splits! splitCount="+splitCount);
-            
+            log.warn("No splits! splitCount=" + splitCount);
+
             return null;
-            
+
         }
-        
+
         return splits.toArray(new Split[splitCount]);
+
+    }
+
+    /**
+     * Requests a new index partition identifier from the
+     * {@link MetadataService} for the specified scale-out index (RMI).
+     * 
+     * @return The new index partition identifier.
+     * 
+     * @throws RuntimeException
+     *             if something goes wrong.
+     */
+    protected int nextPartitionId(IResourceManager resourceManager,
+            final String scaleOutIndexName) {
+
+        final IMetadataService mds = resourceManager.getFederation()
+                .getMetadataService();
+
+        if (mds == null) {
+
+            throw new RuntimeException("Metadata service not discovered.");
+
+        }
+
+        try {
+
+            // obtain new partition identifier from the metadata service (RMI)
+            final int newPartitionId = mds.nextPartitionId(scaleOutIndexName);
+
+            return newPartitionId;
+
+        } catch (Throwable t) {
+
+            throw new RuntimeException(t);
+
+        }
 
     }
 
