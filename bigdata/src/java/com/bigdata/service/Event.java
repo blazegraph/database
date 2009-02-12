@@ -98,9 +98,9 @@ public class Event implements Serializable {
     
     /**
      * The resource for which the event is reported (store file, index name,
-     * etc).
+     * etc). Note that the {@link #serviceUUID} will also be reported.
      */
-    public final String resource;
+    public final EventResource resource;
     
     /**
      * Major event type (classification or category).
@@ -184,7 +184,7 @@ public class Event implements Serializable {
      * @param details
      *            Some details for the event (unstructured).
      */
-    public Event(final IBigdataFederation fed, final String resource,
+    public Event(final IBigdataFederation fed, final EventResource resource,
             final Object majorEventType, final String details) {
 
         this(fed, resource, majorEventType, ""/* minorEventType */, details);
@@ -210,7 +210,7 @@ public class Event implements Serializable {
      * @todo consider passing along the {@link UUID} of the parent event but
      *       then must correlate that {@link UUID} when the event is recieved.
      */
-    protected Event(final IBigdataFederation fed, final String resource,
+    protected Event(final IBigdataFederation fed, final EventResource resource,
             final Object majorEventType, final Object minorEventType,
             final String details) {
 
@@ -415,7 +415,9 @@ public class Event implements Serializable {
         StringBuilder sb = new StringBuilder();
         
         sb.append(eventUUID); sb.append('\t'); 
-        sb.append(resource); sb.append('\t');
+        sb.append(resource.indexName); sb.append('\t');
+        sb.append(resource.partitionId); sb.append('\t');
+        sb.append(resource.file); sb.append('\t');
         sb.append(majorEventType.getClass().getName()); sb.append('\t'); 
         sb.append(majorEventType); sb.append('\t'); 
         sb.append(minorEventType.getClass().getName()); sb.append('\t'); 

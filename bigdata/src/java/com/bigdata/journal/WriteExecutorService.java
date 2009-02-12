@@ -34,6 +34,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -248,6 +250,21 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         }
 
         this.resourceManager = resourceManager;
+
+        /*
+         * Tracks rejected executions on a counter.
+         */
+        setRejectedExecutionHandler(new RejectedExecutionHandler(){
+
+            public void rejectedExecution(Runnable arg0, ThreadPoolExecutor arg1) {
+                
+                rejectedExecutionCount.incrementAndGet();
+                
+                throw new RejectedExecutionException();
+                
+            }
+            
+        });
         
     }
 
@@ -290,6 +307,11 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      */
     final private Condition commit = lock.newCondition();
 
+    /**
+     * The #of rejected tasks.
+     */
+    final private AtomicLong rejectedExecutionCount = new AtomicLong();
+    
     /** #of tasks that are running. */
     final private AtomicInteger nrunning = new AtomicInteger(0);
 
@@ -324,6 +346,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     private long maxCommitServiceTime = 0;
     private int maxCommitGroupSize = 0;
     private int commitGroupSize = 0;
+    private long byteCountPerCommit = 0L;
     private AtomicLong ngroupCommits = new AtomicLong();
     private long naborts = 0;
     private long failedTaskCount = 0;
@@ -333,6 +356,15 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
     protected AtomicInteger activeTaskCountWithLocksHeld = new AtomicInteger(0);
 
+    /**
+     * The #of rejected tasks.
+     */
+    public long getRejectedExecutionCount() {
+        
+        return rejectedExecutionCount.get();
+        
+    }
+    
     /**
      * The maximum #of threads in the pool.
      */
@@ -403,6 +435,16 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     public long getGroupCommitCount() {
         
         return ngroupCommits.get();
+        
+    }
+
+    /**
+     * The #of bytes written by the last commit. This must be sampled to turn it
+     * into useful information.
+     */
+    public long getByteCountPerCommit() {
+        
+        return byteCountPerCommit;
         
     }
     
@@ -1893,7 +1935,13 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 
             }
 
+            // #of bytes on the journal as of the previous commit point.
+            final long byteCountBefore = journal.getRootBlockView().getNextOffset();
+            
             final long timestamp = journal.commit();
+            
+            // #of bytes on the journal after the commit.
+            final long byteCountAfter = journal.getRootBlockView().getNextOffset();
             
             if (timestamp == 0L) {
 
@@ -1904,6 +1952,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 
             }
 
+            // #of bytes written since the last commit.
+            this.byteCountPerCommit = (byteCountAfter - byteCountBefore);
+            
             /*
              * Set the commitTime on each of the tasks in the commitGroup.
              * 

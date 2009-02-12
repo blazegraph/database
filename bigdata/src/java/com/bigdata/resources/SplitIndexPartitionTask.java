@@ -18,6 +18,7 @@ import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Event;
+import com.bigdata.service.EventResource;
 import com.bigdata.service.Split;
 import com.bigdata.sparse.SparseRowStore;
 
@@ -66,11 +67,6 @@ public class SplitIndexPartitionTask extends
     private final ISplitHandler splitHandler;
     
     /**
-     * The event corresponding to the split action.
-     */
-    private final Event e;
-    
-    /**
      * @param vmd
      * @param moveTarget
      *            When non-<code>null</code> the new right-sibling (the tail)
@@ -113,12 +109,6 @@ public class SplitIndexPartitionTask extends
             
         }
 
-        this.e = new Event(resourceManager.getFederation(), vmd.name,
-                OverflowActionEnum.Split, OverflowActionEnum.Split
-                        + (moveTarget != null ? "+" + OverflowActionEnum.Move
-                                : "") + "(" + vmd.name + ") : " + vmd
-                        + ", moveTarget=" + moveTarget);
-        
     }
 
     @Override
@@ -141,7 +131,12 @@ public class SplitIndexPartitionTask extends
     @Override
     protected AbstractResult doTask() throws Exception {
 
-        e.start();
+        final Event e = new Event(resourceManager.getFederation(),
+                new EventResource(vmd.indexMetadata), OverflowActionEnum.Split,
+                OverflowActionEnum.Split
+                        + (moveTarget != null ? "+" + OverflowActionEnum.Move
+                                : "") + "(" + vmd.name + ") : " + vmd
+                        + ", moveTarget=" + moveTarget).start();
 
         try {
 
@@ -221,21 +216,12 @@ public class SplitIndexPartitionTask extends
 
                     /*
                      * No splits were choosen so the index will not be split at
-                     * this time. Instead we do a normal index segment build
-                     * task.
-                     * 
-                     * Note: The logic here is basically identical to the logic
-                     * used by BuildIndexPartitionTask. In fact, we just submit
-                     * an instance of that task and return its result. This is
-                     * not a problem since these tasks do not hold any locks
-                     * until the atomic update task runs.
-                     * 
-                     * Note: We are probably better off here doing a
-                     * non-compacting merge for just the mutable BTree since
-                     * there is an expectation that we are close to a split.
+                     * this time.
                      */
 
                     if (moveTarget != null) {
+
+                        // There is a move target, so move the index partition.
 
                         log.warn("No splits identified: will move: " + vmd);
 
@@ -245,13 +231,17 @@ public class SplitIndexPartitionTask extends
 
                     } else if (vmd.manditoryMerge) {
 
+                        // Manditory compacting merge.
+
                         log.warn("No splits identified: will merge: " + vmd);
 
                         return concurrencyManager.submit(
                                 new CompactingMergeTask(vmd)).get();
 
                     } else {
-                        
+
+                        // Incremental build.
+
                         log.warn("No splits identified: will build: " + vmd);
 
                         return concurrencyManager.submit(
@@ -431,26 +421,17 @@ public class SplitIndexPartitionTask extends
              */
             final AbstractTask<Void> task = new AtomicUpdateSplitIndexPartitionTask(
                     resourceManager, resources, action, vmd.indexMetadata
-                            .getIndexUUID(), result);
+                            .getIndexUUID(), result, parentEvent.newSubEvent(
+                            OverflowSubtaskEnum.AtomicUpdate, action + "("
+                                    + vmd.name + "->"
+                                    + Arrays.toString(resources) + ") : src="
+                                    + vmd));
 
-            final Event updateEvent = parentEvent.newSubEvent(
-                    OverflowSubtaskEnum.AtomicUpdate,
-                    action + "(" + vmd.name + "->" + Arrays.toString(resources)
-                            + ") : src=" + vmd).start();
+            // submit atomic update task and wait for it to complete
+            resourceManager.getConcurrencyManager().submit(task).get();
             
-            try {
-
-                // submit atomic update task and wait for it to complete
-                resourceManager.getConcurrencyManager().submit(task).get();
-                
-                // update the counter.
-                counter.incrementAndGet();
-
-            } finally {
-                
-                updateEvent.end();
-                
-            }
+            // update the counter.
+            counter.incrementAndGet();
 
             return;
 
@@ -507,6 +488,8 @@ public class SplitIndexPartitionTask extends
         protected final OverflowActionEnum action;
         
         protected final SplitResult splitResult;
+
+        private final Event updateEvent;
         
         /**
          * 
@@ -519,7 +502,7 @@ public class SplitIndexPartitionTask extends
         public AtomicUpdateSplitIndexPartitionTask(
                 final ResourceManager resourceManager, final String[] resource,
                 final OverflowActionEnum action, final UUID indexUUID,
-                final SplitResult splitResult) {
+                final SplitResult splitResult, final Event updateEvent) {
 
             super(resourceManager, ITx.UNISOLATED, resource);
 
@@ -532,12 +515,17 @@ public class SplitIndexPartitionTask extends
             if (splitResult == null)
                 throw new IllegalArgumentException();
 
+            if (updateEvent == null)
+                throw new IllegalArgumentException();
+
             this.action = action;
 
             this.indexUUID = indexUUID;
             
             this.splitResult = splitResult;
 
+            this.updateEvent = updateEvent;
+            
         }
 
         /**
@@ -548,216 +536,229 @@ public class SplitIndexPartitionTask extends
         @Override
         protected Void doTask() throws Exception {
 
-            if (resourceManager.isOverflowAllowed())
-                throw new IllegalStateException();
+            updateEvent.start();
 
-            // The name of the scale-out index.
-            final String scaleOutIndexName = splitResult.indexMetadata.getName();
-            
-            // the name of the source index.
-            final String name = splitResult.name;
-            
-            /*
-             * Note: the source index is the BTree on the live journal that has
-             * been absorbing writes since the last overflow (while the split
-             * was running asynchronously).
-             * 
-             * This is NOT a fused view. All we are doing is re-distributing the
-             * buffered writes onto the B+Trees buffering writes for the new
-             * index partitions created by the split.
-             */
-            final BTree src = ((ILocalBTreeView) getIndex(name))
-                    .getMutableBTree();
+            try {
 
-            assertSameIndex(indexUUID, src);
-                        
-            if (INFO) {
-            
-                log.info("src=" + name + ", counter=" + src.getCounter().get()
-                        + ", checkpoint=" + src.getCheckpoint());
+                if (resourceManager.isOverflowAllowed())
+                    throw new IllegalStateException();
 
-                log.info("src=" + name + ", splitResult=" + splitResult);
-                
-            }
+                // The name of the scale-out index.
+                final String scaleOutIndexName = splitResult.indexMetadata
+                        .getName();
 
-            // the value of the counter on the source BTree.
-            final long oldCounter = src.getCounter().get();
-            
-            /*
-             * Locators for the new index partitions.
-             */
-
-            final LocalPartitionMetadata oldpmd = (LocalPartitionMetadata) src
-                    .getIndexMetadata().getPartitionMetadata();
-
-            if (oldpmd.getSourcePartitionId() != -1) {
-
-                throw new IllegalStateException(
-                        "Split not allowed during move: sourcePartitionId="
-                                + oldpmd.getSourcePartitionId());
-
-            }
-
-            final Split[] splits = splitResult.splits;
-
-            final PartitionLocator[] locators = new PartitionLocator[splits.length];
-
-            for (int i = 0; i < splits.length; i++) {
-
-                // new metadata record (cloned).
-                final IndexMetadata md = src.getIndexMetadata().clone();
-
-                final LocalPartitionMetadata pmd = (LocalPartitionMetadata) splits[i].pmd;
-
-                assert pmd.getResources() == null : "Not expecting resources for index segment: "
-                        + pmd;
-
-                // the new partition identifier.
-                final int partitionId = pmd.getPartitionId();
-
-                // name of the new index partition.
-                final String name2 = DataService.getIndexPartitionName(
-                        scaleOutIndexName, partitionId);
+                // the name of the source index.
+                final String name = splitResult.name;
 
                 /*
-                 * form locator for the new index partition for this split..
+                 * Note: the source index is the BTree on the live journal that
+                 * has been absorbing writes since the last overflow (while the
+                 * split was running asynchronously).
+                 * 
+                 * This is NOT a fused view. All we are doing is re-distributing
+                 * the buffered writes onto the B+Trees buffering writes for the
+                 * new index partitions created by the split.
                  */
-                final PartitionLocator locator = new PartitionLocator(
-                        pmd.getPartitionId(),//
-                        /*
-                         * The (logical) data service.
-                         * 
-                         * @todo The index partition data will be replicated at
-                         * the byte image level for the live journal.
-                         * 
-                         * @todo New index segment resources must be replicated
-                         * as well.
-                         * 
-                         * @todo Once the index partition data is fully
-                         * replicated we update the metadata index.
-                         */
-                        resourceManager.getDataServiceUUID(),//
-                        pmd.getLeftSeparatorKey(),//
-                        pmd.getRightSeparatorKey()//
-                        );
-                
-                locators[i] = locator;
-                
-                final String summary = action + "(" + name + "->" + name2 + ")";
-                
+                final BTree src = ((ILocalBTreeView) getIndex(name))
+                        .getMutableBTree();
+
+                assertSameIndex(indexUUID, src);
+
+                if (INFO) {
+
+                    log.info("src=" + name + ", counter="
+                            + src.getCounter().get() + ", checkpoint="
+                            + src.getCheckpoint());
+
+                    log.info("src=" + name + ", splitResult=" + splitResult);
+
+                }
+
+                // the value of the counter on the source BTree.
+                final long oldCounter = src.getCounter().get();
+
                 /*
-                 * Update the view definition.
+                 * Locators for the new index partitions.
                  */
-                md.setPartitionMetadata(new LocalPartitionMetadata(
-                        pmd.getPartitionId(),//
-                        -1, // Note: Split not allowed during move.
-                        pmd.getLeftSeparatorKey(),//
-                        pmd.getRightSeparatorKey(),//
-                        new IResourceMetadata[] {//
+
+                final LocalPartitionMetadata oldpmd = (LocalPartitionMetadata) src
+                        .getIndexMetadata().getPartitionMetadata();
+
+                if (oldpmd.getSourcePartitionId() != -1) {
+
+                    throw new IllegalStateException(
+                            "Split not allowed during move: sourcePartitionId="
+                                    + oldpmd.getSourcePartitionId());
+
+                }
+
+                final Split[] splits = splitResult.splits;
+
+                final PartitionLocator[] locators = new PartitionLocator[splits.length];
+
+                for (int i = 0; i < splits.length; i++) {
+
+                    // new metadata record (cloned).
+                    final IndexMetadata md = src.getIndexMetadata().clone();
+
+                    final LocalPartitionMetadata pmd = (LocalPartitionMetadata) splits[i].pmd;
+
+                    assert pmd.getResources() == null : "Not expecting resources for index segment: "
+                            + pmd;
+
+                    // the new partition identifier.
+                    final int partitionId = pmd.getPartitionId();
+
+                    // name of the new index partition.
+                    final String name2 = DataService.getIndexPartitionName(
+                            scaleOutIndexName, partitionId);
+
+                    /*
+                     * form locator for the new index partition for this split..
+                     */
+                    final PartitionLocator locator = new PartitionLocator(pmd
+                            .getPartitionId(),//
                             /*
-                             * Resources are (a) the new btree; and (b) the new
-                             * index segment.
+                             * The (logical) data service.
+                             * 
+                             * @todo The index partition data will be replicated
+                             * at the byte image level for the live journal.
+                             * 
+                             * @todo New index segment resources must be
+                             * replicated as well.
+                             * 
+                             * @todo Once the index partition data is fully
+                             * replicated we update the metadata index.
                              */
-                            resourceManager.getLiveJournal().getResourceMetadata(),
-                            splitResult.buildResults[i].segmentMetadata
-                        },
-                        /* 
-                         * Note: history is record of the split.
-                         */
-                        pmd.getHistory() + summary + " ")//
-                );
+                            resourceManager.getDataServiceUUID(),//
+                            pmd.getLeftSeparatorKey(),//
+                            pmd.getRightSeparatorKey()//
+                    );
+
+                    locators[i] = locator;
+
+                    final String summary = action + "(" + name + "->" + name2
+                            + ")";
+
+                    /*
+                     * Update the view definition.
+                     */
+                    md
+                            .setPartitionMetadata(new LocalPartitionMetadata(
+                                    pmd.getPartitionId(),//
+                                    -1, // Note: Split not allowed during move.
+                                    pmd.getLeftSeparatorKey(),//
+                                    pmd.getRightSeparatorKey(),//
+                                    new IResourceMetadata[] {//
+                                            /*
+                                             * Resources are (a) the new btree;
+                                             * and (b) the new index segment.
+                                             */
+                                            resourceManager.getLiveJournal()
+                                                    .getResourceMetadata(),
+                                            splitResult.buildResults[i].segmentMetadata },
+                                    /*
+                                     * Note: history is record of the split.
+                                     */
+                                    pmd.getHistory() + summary + " ")//
+                            );
+
+                    /*
+                     * create new btree.
+                     * 
+                     * Note: the lower 32-bits of the counter will be zero. The
+                     * high 32-bits will be the partition identifier assigned to
+                     * the new index partition.
+                     */
+                    final BTree btree = BTree.create(resourceManager
+                            .getLiveJournal(), md);
+
+                    // make sure the partition identifier was asserted.
+                    assert partitionId == btree.getIndexMetadata()
+                            .getPartitionMetadata().getPartitionId();
+
+                    final long newCounter = btree.getCounter().get();
+
+                    /*
+                     * Note: this is true because partition identifiers always
+                     * increase and the partition identifier is placed into the
+                     * high word of the counter value for an index partition.
+                     */
+
+                    assert newCounter > oldCounter : "newCounter=" + newCounter
+                            + " not GT oldCounter=" + oldCounter;
+
+                    // lower bound (inclusive) for copy.
+                    final byte[] fromKey = pmd.getLeftSeparatorKey();
+
+                    // upper bound (exclusive) for copy.
+                    final byte[] toKey = pmd.getRightSeparatorKey();
+
+                    if (INFO)
+                        log.info("Copying data to new btree: index="
+                                + scaleOutIndexName + ", pmd=" + pmd);
+
+                    /*
+                     * Copy all data in this split from the source index.
+                     * 
+                     * Note: [overflow := false] since the btrees are on the
+                     * same backing store.
+                     */
+                    final long ncopied = btree.rangeCopy(src, fromKey, toKey,
+                            false/* overflow */);
+
+                    if (INFO)
+                        log.info("Copied " + ncopied
+                                + " index entries from the live index " + name
+                                + " onto " + name2);
+
+                    // register it on the live journal
+
+                    if (INFO)
+                        log.info("Registering index: " + name2);
+
+                    getJournal().registerIndex(name2, btree);
+
+                }
+
+                // drop the source index (the old index partition)
+
+                if (INFO)
+                    log.info("Dropping source index: " + name);
+
+                getJournal().dropIndex(name);
 
                 /*
-                 * create new btree.
-                 * 
-                 * Note: the lower 32-bits of the counter will be zero. The high
-                 * 32-bits will be the partition identifier assigned to the new
-                 * index partition.
+                 * Notify the metadata service that the index partition has been
+                 * split.
                  */
-                final BTree btree = BTree.create(resourceManager
-                        .getLiveJournal(), md);
+                resourceManager.getFederation().getMetadataService()
+                        .splitIndexPartition(src.getIndexMetadata().getName(),//
+                                new PartitionLocator(//
+                                        oldpmd.getPartitionId(), //
+                                        resourceManager.getDataServiceUUID(), //
+                                        oldpmd.getLeftSeparatorKey(),//
+                                        oldpmd.getRightSeparatorKey()//
+                                ), locators);
 
-                // make sure the partition identifier was asserted.
-                assert partitionId == btree.getIndexMetadata()
-                        .getPartitionMetadata().getPartitionId();
-                
-                final long newCounter = btree.getCounter().get();
-                
-                /*
-                 * Note: this is true because partition identifiers always
-                 * increase and the partition identifier is placed into the high
-                 * word of the counter value for an index partition.
-                 */
-                
-                assert newCounter > oldCounter : "newCounter=" + newCounter
-                        + " not GT oldCounter=" + oldCounter;
-                
-                // lower bound (inclusive) for copy.
-                final byte[] fromKey = pmd.getLeftSeparatorKey();
-                
-                // upper bound (exclusive) for copy.
-                final byte[] toKey = pmd.getRightSeparatorKey();
-                
                 if (INFO)
-                    log.info("Copying data to new btree: index="
-                            + scaleOutIndexName + ", pmd=" + pmd);
-                
-                /*
-                 * Copy all data in this split from the source index.
-                 * 
-                 * Note: [overflow := false] since the btrees are on the same
-                 * backing store.
-                 */
-                final long ncopied = btree
-                        .rangeCopy(src, fromKey, toKey, false/*overflow*/);
-                
-                if (INFO)
-                    log.info("Copied " + ncopied
-                            + " index entries from the live index " + name
-                            + " onto " + name2);
-                
-                // register it on the live journal
-                
-                if (INFO)
-                    log.info("Registering index: " + name2);
-                
-                getJournal().registerIndex(name2, btree);
-                
+                    log.info("Notified metadata service: name=" + name
+                            + " was split into " + Arrays.toString(locators));
+
+                // will notify tasks that index partition was split.
+                resourceManager.setIndexPartitionGone(name,
+                        StaleLocatorReason.Split);
+
+                return null;
+
+            } finally {
+
+                updateEvent.end();
+
             }
-
-            // drop the source index (the old index partition)
             
-            if(INFO)
-                log.info("Dropping source index: " + name);
-            
-            getJournal().dropIndex(name);
-            
-            /*
-             * Notify the metadata service that the index partition has been
-             * split.
-             */
-            resourceManager.getFederation().getMetadataService().splitIndexPartition(
-                    src.getIndexMetadata().getName(),//
-                    new PartitionLocator(//
-                            oldpmd.getPartitionId(), //
-                            resourceManager.getDataServiceUUID(), //
-                            oldpmd.getLeftSeparatorKey(),//
-                            oldpmd.getRightSeparatorKey()//
-                            ),
-                    locators);
-
-            if (INFO)
-                log.info("Notified metadata service: name=" + name
-                        + " was split into " + Arrays.toString(locators));
-
-            // will notify tasks that index partition was split.
-            resourceManager.setIndexPartitionGone(name,
-                    StaleLocatorReason.Split);
-           
-            return null;
-            
-        }
+        } // doTask()
         
-    }
+    } // class AtomicUpdate
     
 }

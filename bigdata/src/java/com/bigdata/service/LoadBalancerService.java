@@ -1689,17 +1689,22 @@ abstract public class LoadBalancerService extends AbstractService
 
                     for (ServiceScore ss : activeDataServices.values()) {
 
-                        final String uuidStr = ss.serviceUUID.toString();
+                        /*
+                         * @todo use serviceName, but it has embedded slashes
+                         * (in bigdata-jini) just like a path which makes life
+                         * difficult.
+                         */
+                        final String idStr = ss.serviceUUID.toString();
 
-                        if (tmpScores.getChild(uuidStr) == null) {
+                        if (tmpScores.getChild(idStr) == null) {
 
-                            tmpScores.addCounter(uuidStr, new HistoryInstrument<Double>(new Double[]{}));
+                            tmpScores.addCounter(idStr, new HistoryInstrument<Double>(new Double[]{}));
                             
                         }
                         
                         {
 
-                            final ICounter counter = (ICounter) tmpScores.getChild(uuidStr);
+                            final ICounter counter = (ICounter) tmpScores.getChild(idStr);
 
                             final HistoryInstrument<Double> inst = (HistoryInstrument<Double>) counter
                                     .getInstrument();
@@ -1723,17 +1728,22 @@ abstract public class LoadBalancerService extends AbstractService
 
                     for (ServiceScore ss : activeDataServices.values()) {
 
-                        final String uuidStr = ss.serviceUUID.toString();
+                        /*
+                         * @todo use serviceName, but it has embedded slashes
+                         * (in bigdata-jini) just like a path which makes life
+                         * difficult.
+                         */
+                        final String idStr = ss.serviceUUID.toString();
 
-                        if (tmpFormula.getChild(uuidStr) == null) {
+                        if (tmpFormula.getChild(idStr) == null) {
 
-                            tmpFormula.addCounter(uuidStr, new HistoryInstrument<String>(new String[]{}));
+                            tmpFormula.addCounter(idStr, new HistoryInstrument<String>(new String[]{}));
                             
                         }
                         
                         {
 
-                            final ICounter counter = (ICounter) tmpFormula.getChild(uuidStr);
+                            final ICounter counter = (ICounter) tmpFormula.getChild(idStr);
 
                             final HistoryInstrument<String> inst = (HistoryInstrument<String>) counter
                                     .getInstrument();
@@ -1790,13 +1800,26 @@ abstract public class LoadBalancerService extends AbstractService
      * @param basename
      *            The basename of the file. The file will be written in the
      *            {@link #logDir}.
-     * 
-     * @throws IOException
      */
     protected void logCounters(final String basename) {
 
         final File file = new File(logDir, "counters" + basename + ".xml");
 
+        logCounters(file);
+        
+    }
+    
+    /**
+     * Writes the counters on a file.
+     * 
+     * @param file
+     *            The file. If the file exists it will be overwritten.
+     */
+    protected void logCounters(final File file) {
+
+        if (file == null)
+            throw new IllegalArgumentException();
+        
         if (INFO)
             log.info("Writing counters on " + file);
         
@@ -1865,13 +1888,23 @@ abstract public class LoadBalancerService extends AbstractService
             log.info("serviceUUID=" + serviceUUID + ", serviceIface="
                     + serviceIface + ", hostname=" + hostname);
         
-        String serviceName = "N/A";//@todo should really be passed in to avoid boundback RMI.
+        /*
+         * @todo should really be passed in to avoid boundback RMI. Also, this
+         * is available for jini as an attribute on the ServiceItem. And in any
+         * case the serviceName can be cached here.
+         */
+        String serviceName;
         if (IDataService.class == serviceIface) {
-        try {
-            serviceName = getFederation().getDataService(serviceUUID).getServiceName();
-        } catch(Throwable t) {
-            log.warn(t.getMessage(),t);
-        }}
+            try {
+                serviceName = getFederation().getDataService(serviceUUID)
+                        .getServiceName();
+            } catch (Throwable t) {
+                log.warn(t.getMessage(), t);
+                serviceName = serviceUUID.toString();
+            }
+        } else {
+            serviceName = serviceUUID.toString();
+        }
         
         lock.lock();
 

@@ -52,6 +52,7 @@ import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Event;
+import com.bigdata.service.EventResource;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IDataServiceAwareProcedure;
@@ -239,8 +240,9 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
         this.summary = OverflowActionEnum.Move + "(" + vmd.name + "->"
                 + targetIndexName + ")";
 
-        this.e = new Event(resourceManager.getFederation(), vmd.name,
-                OverflowActionEnum.Move, summary + " : " + vmd);
+        this.e = new Event(resourceManager.getFederation(), new EventResource(
+                vmd.indexMetadata), OverflowActionEnum.Move, summary + " : "
+                + vmd);
 
     }
 
@@ -278,6 +280,12 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
                         resourceManager, targetDataServiceUUID, vmd.name,
                         newPartitionId, e);
                 
+                /*
+                 * FIXME this is reporting the time of the copy history task on
+                 * the queue in addition to its execution time. The only way to
+                 * report just its execution time is to report it from the
+                 * target data service!
+                 */ 
                 final Event copyEvent = e.newSubEvent(
                         OverflowSubtaskEnum.CopyHistory, summary + " : " + vmd)
                         .start();
@@ -416,6 +424,12 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
         final String summary = OverflowActionEnum.Move + "(" + sourceIndexName
                 + "->" + targetIndexName + ")";
 
+        /*
+         * @todo this is reporting the time required to formulate the task and
+         * wait for it to begin executing not just the time for it to execute on
+         * the target data service.  since the time register an index is so short
+         * this is not that important.
+         */ 
         final Event e = parentEvent.newSubEvent(
                 OverflowSubtaskEnum.RegisterIndex, targetIndexName).start();
 
@@ -543,14 +557,11 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
         if (parentEvent == null)
             throw new IllegalArgumentException();
 
-        final Event updateEvent = parentEvent.newSubEvent(
-                OverflowSubtaskEnum.AtomicUpdate, "").start();
-
         try {
 
             resourceManager.getConcurrencyManager().submit(
                     new AtomicUpdateMoveIndexPartitionTask(resourceManager,
-                            moveResult.name, moveResult)).get();
+                            moveResult.name, moveResult, parentEvent)).get();
 
         } catch (Throwable t) {
 
@@ -646,10 +657,6 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
 
             // the move failed - rethrow the exception.
             throw new RuntimeException(t);
-
-        } finally {
-
-            updateEvent.end();
 
         }
 
@@ -870,6 +877,8 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
 
         final private MoveResult moveResult;
 
+        final private Event updateEvent;
+        
         /**
          * @param resourceManager
          * @param resource
@@ -880,7 +889,8 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
         public AtomicUpdateMoveIndexPartitionTask(
                 final ResourceManager resourceManager, //
                 final String resource,//
-                final MoveResult moveResult //
+                final MoveResult moveResult, //
+                final Event parentEvent
                 ) {
 
             super(resourceManager, ITx.UNISOLATED, resource);
@@ -888,7 +898,13 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
             if (moveResult == null)
                 throw new UnsupportedOperationException();
             
+            if (parentEvent == null)
+                throw new UnsupportedOperationException();
+            
             this.moveResult = moveResult;
+
+            this.updateEvent = parentEvent.newSubEvent(OverflowSubtaskEnum.AtomicUpdate,
+                    moveResult.toString());
 
         }
 
@@ -898,6 +914,10 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
         @Override
         protected Long doTask() throws Exception {
 
+            updateEvent.start();
+            
+            try {
+            
             if (resourceManager.isOverflowAllowed())
                 throw new IllegalStateException();
 
@@ -1021,6 +1041,12 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
             
             return ncopied;
             
+        } finally {
+            
+            updateEvent.end();
+            
+        }
+        
         }
         
     }

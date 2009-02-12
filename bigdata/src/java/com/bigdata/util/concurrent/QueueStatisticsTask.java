@@ -1,5 +1,6 @@
 package com.bigdata.util.concurrent;
 
+import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -162,6 +163,7 @@ public class QueueStatisticsTask implements Runnable {
     private double averageCommitWaitingTime = 0d;
     private double averageCommitServiceTime = 0d;
     private double averageCommitGroupSize = 0d;
+    private double averageByteCountPerCommit = 0d;
     
     private long queueWaitingTime = 0L;
     private long lockWaitingTime = 0L;
@@ -291,6 +293,23 @@ public class QueueStatisticsTask implements Runnable {
         protected void sample() {
 
             setValue(averageCommitGroupSize);
+
+        }
+
+    };
+
+    /**
+     * Moving average of the #of bytes written since the previous commit (zero
+     * unless the service is unisolated).
+     * 
+     * @see IQueueCounters#AverageByteCountPerCommit
+     */
+    public final Instrument<Double> averageByteCountPerCommitInst = new Instrument<Double>() {
+
+        @Override
+        protected void sample() {
+
+            setValue(averageByteCountPerCommit);
 
         }
 
@@ -616,6 +635,12 @@ public class QueueStatisticsTask implements Runnable {
                     averageCommitGroupSize = getMovingAverage(
                             averageCommitGroupSize, tmp.getCommitGroupSize(), w);
 
+                    // moving average of the #of bytes written since the
+                    // previous commit.
+                    averageByteCountPerCommit = getMovingAverage(
+                            averageByteCountPerCommit, tmp
+                                    .getByteCountPerCommit(), w);
+
                 } // end (if service instanceof WriteExecutorService )
 
             }
@@ -811,6 +836,12 @@ public class QueueStatisticsTask implements Runnable {
                 }
             });
 
+            counterSet.addCounter(IQueueCounters.RejectedExecutionCount, new Instrument<Long>() {
+                public void sample() {
+                    setValue(writeService.getRejectedExecutionCount());
+                }
+            });
+
             /*
              * Maximum observed values.
              */
@@ -859,6 +890,8 @@ public class QueueStatisticsTask implements Runnable {
             counterSet.addCounter(IQueueCounters.AverageCommitServiceTime,
                         averageCommitServiceTimeInst);
                     
+            counterSet.addCounter(IQueueCounters.AverageByteCountPerCommit,
+                    averageByteCountPerCommitInst);
             
         }
 
@@ -976,6 +1009,18 @@ public class QueueStatisticsTask implements Runnable {
         String AverageCommitServiceTime = "Average Commit Service Time";
 
         /**
+         * Moving average of the #of bytes written since the previous commit
+         * (zero unless the service is unisolated).
+         * <p>
+         * Note: This DOES NOT imply that this many bytes were written in the
+         * commit itself. Indices are checkpointed after each task. All writes
+         * on the journal should have already occurred before the group commit.
+         * The commit protocol itself involves writing a very few bytes and then
+         * syncing the disk.
+         */
+        String AverageByteCountPerCommit = "Average Byte Count Per Commit";
+
+        /**
          * The #of commits (only reported services which do commit processing).
          */
         String CommitCount = "Commit Count";
@@ -994,6 +1039,14 @@ public class QueueStatisticsTask implements Runnable {
          * etc.
          */
         String OverflowCount = "Overflow Count";
+
+        /**
+         * The #of tasks whose execution was rejected, typically because the
+         * queue was at capacity.
+         * 
+         * @see RejectedExecutionHandler
+         */
+        String RejectedExecutionCount = "Rejected Execution Count";
 
         /**
          * The maximum observed value in milliseconds of the time that the task

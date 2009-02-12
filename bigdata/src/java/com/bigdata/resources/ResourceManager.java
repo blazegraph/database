@@ -40,6 +40,7 @@ import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.Journal;
+import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.MetadataService;
@@ -636,7 +637,7 @@ abstract public class ResourceManager extends OverflowManager implements IResour
      * @param properties
      *            See {@link Options}.
      * 
-     * @see #start()
+     * @see DataService#start()
      */
     public ResourceManager(Properties properties) {
 

@@ -56,6 +56,7 @@ import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.StoreManager;
 import com.bigdata.service.Event;
+import com.bigdata.service.EventResource;
 import com.bigdata.service.EventType;
 import com.bigdata.service.IBigdataFederation;
 
@@ -427,7 +428,8 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
                 
                 if (fed != null) {
 
-                    openCloseEvent = new Event(fed, file.toString(),
+                    openCloseEvent = new Event(fed, new EventResource(
+                            indexMetadata, file),
                             EventType.IndexSegmentStoreOpenClose, ""/* details */)
                             .start();
                     

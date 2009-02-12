@@ -20,6 +20,7 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.service.Event;
+import com.bigdata.service.EventResource;
 
 /**
  * Task builds an {@link IndexSegment} from the mutable {@link BTree} and zero
@@ -65,11 +66,6 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
      * The file on which the {@link IndexSegment} will be written.
      */
     final protected File outFile;
-
-    /**
-     * The event corresponding to the build action.
-     */
-    final private Event e;
     
     /**
      * The source view.
@@ -89,10 +85,6 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
 
         // the file to be generated.
         this.outFile = resourceManager.getIndexSegmentFile(vmd.indexMetadata);
-
-        this.e = new Event(resourceManager.getFederation(), vmd.name,
-                OverflowActionEnum.Build, OverflowActionEnum.Build + "("
-                        + vmd.name + ") : " + vmd);
 
         /*
          * Put a hard reference hold on the btree.
@@ -135,7 +127,10 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
      */
     protected BuildResult doTask() throws Exception {
 
-        e.start();
+        final Event e = new Event(resourceManager.getFederation(),
+                new EventResource(vmd.indexMetadata), OverflowActionEnum.Build,
+                OverflowActionEnum.Build + "(" + vmd.name + ") : " + vmd)
+                .start();
 
         try {
 
@@ -244,25 +239,15 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
                 // task will update the index partition view definition.
                 final AbstractTask<Void> task = new AtomicUpdateIncrementalBuildTask(
                         resourceManager, concurrencyManager, vmd.name,
-                        vmd.indexMetadata.getIndexUUID(), result);
+                        vmd.indexMetadata.getIndexUUID(), result, e.newSubEvent(
+                                OverflowSubtaskEnum.AtomicUpdate,
+                                (result.compactingMerge ? OverflowActionEnum.Merge
+                                        : OverflowActionEnum.Build)
+                                        + "(" + vmd.name + ") : " + vmd));
 
-                final Event updateEvent = e.newSubEvent(
-                        OverflowSubtaskEnum.AtomicUpdate,
-                        (result.compactingMerge ? OverflowActionEnum.Merge
-                                : OverflowActionEnum.Build)
-                                + "(" + vmd.name + ") : " + vmd).start();
-                
-                try {
-
-                    // submit task and wait for it to complete
-                    concurrencyManager.submit(task).get();
-
-                } finally {
-
-                    updateEvent.end();
+                // submit task and wait for it to complete
+                concurrencyManager.submit(task).get();
                     
-                }
-
             } catch (Throwable t) {
 
                 // delete the generated index segment.
@@ -326,6 +311,8 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
         
         final protected BuildResult buildResult;
         
+        final private Event updateEvent;
+        
         /**
          * @param resourceManager 
          * @param concurrencyManager
@@ -334,7 +321,7 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
          */
         public AtomicUpdateIncrementalBuildTask(ResourceManager resourceManager,
                 IConcurrencyManager concurrencyManager, String resource,
-                UUID indexUUID, BuildResult buildResult) {
+                UUID indexUUID, BuildResult buildResult, Event updateEvent) {
 
             super(resourceManager, ITx.UNISOLATED, resource);
 
@@ -344,11 +331,17 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
             if(buildResult == null)
                 throw new IllegalArgumentException();
 
+            if (!resource.equals(buildResult.name))
+                throw new IllegalArgumentException();
+
+            if (updateEvent == null)
+                throw new IllegalArgumentException();
+
             this.indexUUID = indexUUID;
             
             this.buildResult = buildResult;
-
-            assert resource.equals( buildResult.name );
+            
+            this.updateEvent = updateEvent;
             
         }
 
@@ -362,219 +355,242 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
         @Override
         protected Void doTask() throws Exception {
 
-            if (resourceManager.isOverflowAllowed())
-                throw new IllegalStateException();
-
-            final SegmentMetadata segmentMetadata = buildResult.segmentMetadata;
-
-            if (INFO)
-                log.info("Begin: name=" + getOnlyResource() + ", newSegment="
-                        + segmentMetadata);
-
-            /*
-             * Open the unisolated B+Tree on the live journal that is absorbing
-             * writes. We are going to update its index metadata.
-             * 
-             * Note: I am using AbstractTask#getIndex(String name) so that the
-             * concurrency control logic will notice the changes to the BTree
-             * and cause it to be checkpointed if this task succeeds normally.
-             */
-            final ILocalBTreeView view = (ILocalBTreeView)getIndex(getOnlyResource());
-
-            // The live B+Tree.
-            final BTree btree = view.getMutableBTree();
+            updateEvent.start();
             
-            // make sure that we are working with the same index.
-            assertSameIndex(indexUUID, btree);
-            
-            if(view instanceof BTree) {
-                
+            try {
+
+                if (resourceManager.isOverflowAllowed())
+                    throw new IllegalStateException();
+
+                final SegmentMetadata segmentMetadata = buildResult.segmentMetadata;
+
+                if (INFO)
+                    log.info("Begin: name=" + getOnlyResource()
+                            + ", newSegment=" + segmentMetadata);
+
                 /*
-                 * Note: there is an expectation that this is not a simple BTree
-                 * because this the build task is supposed to be invoked after
-                 * an overflow event, and that event should have re-defined the
-                 * view to include the BTree on the new journal plus the
-                 * historical view.
+                 * Open the unisolated B+Tree on the live journal that is
+                 * absorbing writes. We are going to update its index metadata.
                  * 
-                 * One explanation for finding a simple view here is that the
-                 * old index was deleted and a new one created in its place. We
-                 * check that above.
+                 * Note: I am using AbstractTask#getIndex(String name) so that
+                 * the concurrency control logic will notice the changes to the
+                 * BTree and cause it to be checkpointed if this task succeeds
+                 * normally.
                  */
-                
-                throw new RuntimeException("View is only a B+Tree: name="
-                        + buildResult.name + ", pmd="
-                        + view.getIndexMetadata().getPartitionMetadata());
-                
+                final ILocalBTreeView view = (ILocalBTreeView) getIndex(getOnlyResource());
+
+                // The live B+Tree.
+                final BTree btree = view.getMutableBTree();
+
+                // make sure that we are working with the same index.
+                assertSameIndex(indexUUID, btree);
+
+                if (view instanceof BTree) {
+
+                    /*
+                     * Note: there is an expectation that this is not a simple
+                     * BTree because this the build task is supposed to be
+                     * invoked after an overflow event, and that event should
+                     * have re-defined the view to include the BTree on the new
+                     * journal plus the historical view.
+                     * 
+                     * One explanation for finding a simple view here is that
+                     * the old index was deleted and a new one created in its
+                     * place. We check that above.
+                     */
+
+                    throw new RuntimeException("View is only a B+Tree: name="
+                            + buildResult.name + ", pmd="
+                            + view.getIndexMetadata().getPartitionMetadata());
+
+                }
+
+                if (INFO)
+                    log.info("src=" + getOnlyResource() + ", counter="
+                            + view.getCounter().get() + ", checkpoint="
+                            + btree.getCheckpoint());
+
+                // clone the current metadata record for the live index.
+                final IndexMetadata indexMetadata = btree.getIndexMetadata()
+                        .clone();
+
+                /*
+                 * This is the index partition definition on the live index -
+                 * the one that will be replaced with a new view as the result
+                 * of this atomic update.
+                 */
+                final LocalPartitionMetadata currentpmd = indexMetadata
+                        .getPartitionMetadata();
+
+                // Check pre-conditions.
+                final IResourceMetadata[] currentResources = currentpmd
+                        .getResources();
+                {
+
+                    if (currentpmd == null) {
+
+                        throw new IllegalStateException(
+                                "Not an index partition: " + getOnlyResource());
+
+                    }
+
+                    /*
+                     * verify that there are at least two resources in the
+                     * current view:
+                     * 
+                     * 1. currentResources[0] is the mutable BTree on the live
+                     * journal
+                     * 
+                     * 2. currentResources[1] is the mutable BTree on the old
+                     * journal (since closed out for writes so it is no longer
+                     * mutable).
+                     */
+
+                    if (currentResources.length < 2) {
+
+                        throw new IllegalStateException(
+                                "Expecting at least 2 resources in the view: "
+                                        + Arrays.toString(currentResources));
+
+                    }
+
+                    if (!currentResources[0].getUUID().equals(
+                            getJournal().getRootBlockView().getUUID())) {
+
+                        throw new IllegalStateException(
+                                "Expecting live journal to be the first resource: "
+                                        + currentResources);
+
+                    }
+
+                    /*
+                     * verify that the 2nd resource in the view is the BTree on
+                     * the old journal [this only verifies that the 2nd resource
+                     * in the view is also on a journal].
+                     */
+                    if (!currentResources[1].isJournal()) {
+
+                        throw new IllegalStateException(
+                                "Expecting live journal to be the first resource: "
+                                        + currentResources);
+
+                    }
+
+                    /*
+                     * verify that the new index segment was built from a view
+                     * that did not include data from the live journal.
+                     */
+                    assert segmentMetadata.getCreateTime() < getJournal()
+                            .getRootBlockView().getFirstCommitTime();
+
+                }
+
+                // new view definition.
+                final IResourceMetadata[] newResources;
+                {
+
+                    final List<IResourceMetadata> newView = new LinkedList<IResourceMetadata>();
+
+                    // the live journal.
+                    newView.add(getJournal().getResourceMetadata());
+
+                    /*
+                     * The newly built index segment. This was built from at
+                     * least one source, but it MAY have been built from more
+                     * than one source.
+                     */
+                    newView.add(segmentMetadata);
+
+                    /*
+                     * The rest of the components of the old view.
+                     * 
+                     * Note: We start copying resources into the view AFTER the
+                     * last source which was included in the view used to
+                     * generate the index segment.
+                     * 
+                     * For example, if the index segment was built from a single
+                     * journal (the old journal), then [startIndex := 1 + 1 ==
+                     * 2]. So we retain resources in the current view start at
+                     * currentResources[2].
+                     * 
+                     * If there are 3 sources in the current view (new journal,
+                     * old journal, and an index segment) and the sourceCount
+                     * was 2 then then build was actually a compacting merge and
+                     * [startIndex := 1 + 2 == 3]. Since 3 EQ
+                     * currentResources.length we will not include ANY sources
+                     * from the old view. This is the semantics of a compacting
+                     * merge. All data in the view is captured by the data on
+                     * the live journal and the newly built index segment [live,
+                     * newSeg].
+                     */
+
+                    final int startIndex = 1 + buildResult.sourceCount;
+
+                    for (int i = startIndex; i < currentResources.length; i++) {
+
+                        newView.add(currentResources[i]);
+
+                    }
+
+                    newResources = (IResourceMetadata[]) newView
+                            .toArray(new IResourceMetadata[] {});
+
+                }
+
+                // describe the index partition.
+                indexMetadata.setPartitionMetadata(new LocalPartitionMetadata(//
+                        currentpmd.getPartitionId(),//
+                        currentpmd.getSourcePartitionId(),//
+                        currentpmd.getLeftSeparatorKey(),//
+                        currentpmd.getRightSeparatorKey(),//
+                        newResources, //
+                        currentpmd.getHistory()
+                                + OverflowActionEnum.Build//
+                                + "(lastCommitTime="
+                                + segmentMetadata.getCreateTime()//
+                                + ",segment="
+                                + segmentMetadata.getUUID()//
+                                + ",#buildSources="
+                                + buildResult.sourceCount//
+                                + ",merge="
+                                + buildResult.compactingMerge//
+                                + ",counter="
+                                + btree.getCounter().get()//
+                                + ",oldResources="
+                                + Arrays.toString(currentResources) + ") "));
+
+                // update the metadata associated with the btree
+                btree.setIndexMetadata(indexMetadata);
+
+                if (INFO)
+                    log
+                            .info("Updated view: name=" + getOnlyResource()
+                                    + ", pmd="
+                                    + indexMetadata.getPartitionMetadata()
+                                    + "\noldResources="
+                                    + Arrays.toString(currentResources)
+                                    + "\nnewResources="
+                                    + Arrays.toString(newResources));
+
+                /*
+                 * Verify that the btree recognizes that it needs to be
+                 * checkpointed.
+                 * 
+                 * Note: The atomic commit point is when this task commits.
+                 */
+                assert btree.needsCheckpoint();
+
+                // notify successful index partition build.
+                // @todo could count as a compacting merge if we used all sources.
+                resourceManager.indexPartitionBuildCounter.incrementAndGet();
+
+                return null;
+
+            } finally {
+
+                updateEvent.end();
+
             }
-            
-            if (INFO)
-                log.info("src=" + getOnlyResource() + ", counter="
-                        + view.getCounter().get() + ", checkpoint="
-                        + btree.getCheckpoint());
-            
-            // clone the current metadata record for the live index.
-            final IndexMetadata indexMetadata = btree.getIndexMetadata().clone();
-
-            /*
-             * This is the index partition definition on the live index - the
-             * one that will be replaced with a new view as the result of this
-             * atomic update.
-             */
-            final LocalPartitionMetadata currentpmd = indexMetadata.getPartitionMetadata();
-
-            // Check pre-conditions.
-            final IResourceMetadata[] currentResources = currentpmd.getResources();
-            {
-
-                if (currentpmd == null) {
-                 
-                    throw new IllegalStateException("Not an index partition: "
-                            + getOnlyResource());
-                    
-                }
-
-                /*
-                 * verify that there are at least two resources in the current
-                 * view:
-                 * 
-                 * 1. currentResources[0] is the mutable BTree on the live
-                 * journal
-                 * 
-                 * 2. currentResources[1] is the mutable BTree on the old
-                 * journal (since closed out for writes so it is no longer
-                 * mutable).
-                 */
-                
-                if (currentResources.length < 2) {
-                    
-                    throw new IllegalStateException(
-                            "Expecting at least 2 resources in the view: "
-                                    + Arrays.toString(currentResources));
-                    
-                }
-                
-                if (!currentResources[0].getUUID().equals(
-                        getJournal().getRootBlockView().getUUID())) {
-                 
-                    throw new IllegalStateException(
-                            "Expecting live journal to be the first resource: "
-                                    + currentResources);
-                    
-                }
-                
-                /*
-                 * verify that the 2nd resource in the view is the BTree on the
-                 * old journal [this only verifies that the 2nd resource in the
-                 * view is also on a journal].
-                 */
-                if (!currentResources[1].isJournal()) {
-                 
-                    throw new IllegalStateException(
-                            "Expecting live journal to be the first resource: "
-                                    + currentResources);
-                    
-                }
-
-                /*
-                 * verify that the new index segment was built from a view that
-                 * did not include data from the live journal.
-                 */
-                assert segmentMetadata.getCreateTime() < getJournal().getRootBlockView()
-                        .getFirstCommitTime();
-                
-            }
-
-            // new view definition.
-            final IResourceMetadata[] newResources;
-            {
-                
-                final List<IResourceMetadata> newView = new LinkedList<IResourceMetadata>();
-
-                // the live journal.
-                newView.add(getJournal().getResourceMetadata());
-
-                /*
-                 * The newly built index segment. This was built from at least
-                 * one source, but it MAY have been built from more than one
-                 * source.
-                 */
-                newView.add(segmentMetadata);
-
-                /*
-                 * The rest of the components of the old view.
-                 * 
-                 * Note: We start copying resources into the view AFTER the last
-                 * source which was included in the view used to generate the
-                 * index segment.
-                 * 
-                 * For example, if the index segment was built from a single
-                 * journal (the old journal), then [startIndex := 1 + 1 == 2].
-                 * So we retain resources in the current view start at
-                 * currentResources[2].
-                 * 
-                 * If there are 3 sources in the current view (new journal, old
-                 * journal, and an index segment) and the sourceCount was 2 then
-                 * then build was actually a compacting merge and [startIndex :=
-                 * 1 + 2 == 3]. Since 3 EQ currentResources.length we will not
-                 * include ANY sources from the old view. This is the semantics
-                 * of a compacting merge. All data in the view is captured by
-                 * the data on the live journal and the newly built index
-                 * segment [live, newSeg].
-                 */
-                
-                final int startIndex = 1 + buildResult.sourceCount;
-                
-                for (int i = startIndex; i < currentResources.length; i++) {
-
-                    newView.add(currentResources[i]);
-
-                }
-
-                newResources = (IResourceMetadata[]) newView
-                        .toArray(new IResourceMetadata[] {});
-
-            }
-
-            // describe the index partition.
-            indexMetadata.setPartitionMetadata(new LocalPartitionMetadata(//
-                    currentpmd.getPartitionId(),//
-                    currentpmd.getSourcePartitionId(),//
-                    currentpmd.getLeftSeparatorKey(),//
-                    currentpmd.getRightSeparatorKey(),//
-                    newResources, //
-                    currentpmd.getHistory()+
-                    OverflowActionEnum.Build//
-                    +"(lastCommitTime="+ segmentMetadata.getCreateTime()//
-                    +",segment="+ segmentMetadata.getUUID()//
-                    +",#buildSources="+buildResult.sourceCount//
-                    +",merge="+buildResult.compactingMerge//
-                    +",counter="+btree.getCounter().get()//
-                    +",oldResources="+Arrays.toString(currentResources)
-                    +") "
-                    ));
-            
-            // update the metadata associated with the btree
-            btree.setIndexMetadata(indexMetadata);
-
-            if (INFO)
-                log.info("Updated view: name=" + getOnlyResource() + ", pmd="
-                        + indexMetadata.getPartitionMetadata()
-                        + "\noldResources=" + Arrays.toString(currentResources)
-                        + "\nnewResources=" + Arrays.toString(newResources));
-            
-            /*
-             * Verify that the btree recognizes that it needs to be
-             * checkpointed.
-             * 
-             * Note: The atomic commit point is when this task commits.
-             */
-            assert btree.needsCheckpoint();
-
-            // notify successful index partition build.
-            // @todo could count as a compacting merge if we used all sources.
-            resourceManager.indexPartitionBuildCounter.incrementAndGet();
-            
-            return null;
 
         }
 

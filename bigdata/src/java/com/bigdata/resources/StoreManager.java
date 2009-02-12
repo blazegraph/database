@@ -103,6 +103,7 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Event;
+import com.bigdata.service.EventResource;
 import com.bigdata.service.EventType;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.MetadataService;
@@ -4064,8 +4065,8 @@ abstract public class StoreManager extends ResourceEvents implements
             try {
 
                 final Event event = new Event(getFederation(),
-                        getDataServiceUUID().toString(),
-                        EventType.PurgeResources, "").start();
+                        new EventResource(), EventType.PurgeResources, "")
+                        .start();
 
                 PurgeResult result = null;
                 

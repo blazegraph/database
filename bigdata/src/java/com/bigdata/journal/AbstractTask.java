@@ -448,6 +448,11 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 //            /*
 //             * Report counters for unisolated and read-committed indices.
 //             */
+        /*
+         * @todo should probably report the unisolated and read-historical
+         * counters separately since the unisolated counters reflects the write
+         * workload while the read-historical counters reflect query.
+         */
 
             final Iterator<Map.Entry<String, ILocalBTreeView>> itr = indexCache
                     .entrySet().iterator();
