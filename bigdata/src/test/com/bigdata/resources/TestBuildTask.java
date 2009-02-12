@@ -52,6 +52,8 @@ import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.resources.CompactingMergeTask.AtomicUpdateCompactingMergeTask;
+import com.bigdata.service.Event;
+import com.bigdata.service.EventResource;
 
 /**
  * Basic test of building an index segment from an index partition on overflow.
@@ -259,8 +261,11 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
             // fake out the task so that it will run (it can only run during asyn overflow).
             resourceManager.overflowAllowed.set(false);
             
-            AbstractTask task = new AtomicUpdateCompactingMergeTask(resourceManager,
-                    concurrencyManager, name, indexUUID, result);
+            AbstractTask task = new AtomicUpdateCompactingMergeTask(
+                    resourceManager, concurrencyManager, name, indexUUID,
+                    result, new Event(resourceManager.getFederation(),
+                            new EventResource(name), OverflowActionEnum.Merge,
+                            ""));
 
             // run task, await completion.
             concurrencyManager.submit(task).get();

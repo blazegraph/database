@@ -59,6 +59,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.resources.ResourceManager.IResourceManagerCounters;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Event;
+import com.bigdata.service.EventResource;
 import com.bigdata.service.EventType;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IServiceShutdown;
@@ -1395,9 +1396,9 @@ abstract public class OverflowManager extends IndexManager {
 
         assert overflowAllowed.get();
 
-        final Event e = new Event(getFederation(), getDataServiceUUID()
-                .toString(), EventType.SynchronousOverflow, "overflowCounter="
-                + overflowCounter).start();
+        final Event e = new Event(getFederation(), new EventResource(),
+                EventType.SynchronousOverflow, "overflowCounter="
+                        + overflowCounter).start();
 
         try {
 

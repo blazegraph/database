@@ -33,6 +33,7 @@ import java.util.UUID;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Event;
+import com.bigdata.service.EventResource;
 import com.bigdata.service.Split;
 
 /**
@@ -71,11 +72,6 @@ public class SplitTailTask extends AbstractPrepareTask {
     private final UUID moveTarget;
     
     /**
-     * The event corresponding to the split action.
-     */
-    private final Event e;
-    
-    /**
      * @param vmd
      * @param moveTarget
      *            When non-<code>null</code> the new right-sibling (the tail)
@@ -103,12 +99,6 @@ public class SplitTailTask extends AbstractPrepareTask {
         }
 
         this.moveTarget = moveTarget;
-
-        this.e = new Event(resourceManager.getFederation(), vmd.name,
-                OverflowActionEnum.TailSplit, OverflowActionEnum.TailSplit
-                        + (moveTarget != null ? "+" + OverflowActionEnum.Move
-                                : "") + "(" + vmd.name + ") : " + vmd
-                        + ", moveTarget=" + moveTarget);
         
     }
 
@@ -122,7 +112,12 @@ public class SplitTailTask extends AbstractPrepareTask {
     @Override
     protected Object doTask() throws Exception {
         
-        e.start();
+        final Event e = new Event(resourceManager.getFederation(),
+                new EventResource(vmd.indexMetadata),
+                OverflowActionEnum.TailSplit, OverflowActionEnum.TailSplit
+                        + (moveTarget != null ? "+" + OverflowActionEnum.Move
+                                : "") + "(" + vmd.name + ") : " + vmd
+                        + ", moveTarget=" + moveTarget).start();
 
         try {
 

@@ -34,17 +34,26 @@ public class DefaultClientDelegate implements IFederationDelegate {
 
     }
 
+    /**
+     * Returns a stable but randomly assigned {@link UUID}.
+     */
     public UUID getServiceUUID() {
 
         return uuid;
 
     }
 
+    /**
+     * Return a stable identifier for this client based on the name of the
+     * implementation class, the hostname, and the hash code of the client
+     * (readable and likely to be unique, but uniqueness is not guarenteed).
+     */
     public String getServiceName() {
         
         return fed.getClient().getClass().getName() + "@"
-                + AbstractStatisticsCollector.fullyQualifiedHostName;
-        
+                + AbstractStatisticsCollector.fullyQualifiedHostName + "#"
+                + fed.getClient().hashCode();
+    
     }
     
     public Class getServiceIface() {

@@ -47,6 +47,7 @@ import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Event;
+import com.bigdata.service.EventResource;
 import com.bigdata.service.EventType;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
@@ -1919,8 +1920,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         final long begin = System.currentTimeMillis();
         
         final Event e = new Event(resourceManager.getFederation(),
-                resourceManager.getDataServiceUUID().toString(),
-                EventType.AsynchronousOverflow, ""/* details */).start();
+                new EventResource(), EventType.AsynchronousOverflow, ""/* details */)
+                .start();
         
         try {
 

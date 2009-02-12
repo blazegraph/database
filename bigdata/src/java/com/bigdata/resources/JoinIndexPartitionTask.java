@@ -43,7 +43,7 @@ import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Event;
-import com.bigdata.service.EventType;
+import com.bigdata.service.EventResource;
 
 /**
  * Task joins one or more index partitions and should be invoked when their is
@@ -68,11 +68,6 @@ public class JoinIndexPartitionTask extends AbstractPrepareTask<JoinResult> {
     protected final ViewMetadata[] vmd;
     
     /**
-     * The event corresponding to the join operation.
-     */
-    private final Event e;
-    
-    /**
      * @param resourceManager
      * @param lastCommitTime
      * @param resource
@@ -94,10 +89,6 @@ public class JoinIndexPartitionTask extends AbstractPrepareTask<JoinResult> {
         
         this.vmd = vmd;
         
-        this.e = new Event(resourceManager.getFederation(), Arrays
-                .toString(resources), OverflowActionEnum.Join,
-                OverflowActionEnum.Join + "(" + Arrays.toString(resources)
-                        + ")");
     }
 
     @Override
@@ -118,7 +109,11 @@ public class JoinIndexPartitionTask extends AbstractPrepareTask<JoinResult> {
     @Override
     protected JoinResult doTask() throws Exception {
 
-        e.start();
+        final Event e = new Event(resourceManager.getFederation(),
+                // Note: using the leftSibling for the event resource.
+                new EventResource(vmd[0].indexMetadata),
+                OverflowActionEnum.Join, OverflowActionEnum.Join + "("
+                        + Arrays.toString(getResource()) + ")").start();
 
         try {
 
@@ -354,21 +349,11 @@ public class JoinIndexPartitionTask extends AbstractPrepareTask<JoinResult> {
                  * metadata index.
                  */
                 final AbstractTask<Void> task = new AtomicUpdateJoinIndexPartition(
-                        resourceManager, names2, result);
-
-                final Event updateEvent = e.newSubEvent(
-                        OverflowSubtaskEnum.AtomicUpdate, summary).start();
+                        resourceManager, names2, result, e.newSubEvent(
+                                OverflowSubtaskEnum.AtomicUpdate, summary));
                 
-                try {
-
-                    // submit task and wait for it to complete
-                    concurrencyManager.submit(task).get();
-
-                } finally {
-
-                    updateEvent.end();
-
-                }
+                // submit task and wait for it to complete
+                concurrencyManager.submit(task).get();
 
             }
 
@@ -402,6 +387,8 @@ public class JoinIndexPartitionTask extends AbstractPrepareTask<JoinResult> {
 
         private final JoinResult result;
         
+        private final Event updateEvent;
+        
         /**
          * @param resourceManager
          * @param startTime
@@ -413,117 +400,137 @@ public class JoinIndexPartitionTask extends AbstractPrepareTask<JoinResult> {
          * @param result
          */
         public AtomicUpdateJoinIndexPartition(ResourceManager resourceManager,
-                String[] resource, JoinResult result) {
+                String[] resource, JoinResult result, Event updateEvent) {
 
             super(resourceManager, ITx.UNISOLATED, resource);
 
             if (result == null)
                 throw new IllegalArgumentException();
 
+            if (updateEvent == null)
+                throw new IllegalArgumentException();
+
             this.result = result;
-            
+
+            this.updateEvent = updateEvent;
+
         }
 
         @Override
         protected Void doTask() throws Exception {
 
-            if (resourceManager.isOverflowAllowed())
-                throw new IllegalStateException();
+            updateEvent.start();
 
-            /*
-             * Load the btree from the live journal that already contains all
-             * data from the source index partitions to the merge as of the
-             * lastCommitTime of the old journal.
-             * 
-             * Note: At this point the btree exists on the journal but has not
-             * been registered and is therefore NOT visible to concurrent tasks.
-             * 
-             * In order to make this btree complete we will now copy in any
-             * writes absorbed by those index partitions now that we have an
-             * exclusive lock on everyone on the new journal.
-             */
-            final BTree btree = BTree.load(resourceManager.getLiveJournal(),
-                    result.checkpointAddr);
-            // resourceManager.getLiveJournal().getIndex(result.checkpointAddr);
+            try {
 
-            assert btree != null;
+                if (resourceManager.isOverflowAllowed())
+                    throw new IllegalStateException();
 
-            assert !btree.isReadOnly();
+                /*
+                 * Load the btree from the live journal that already contains
+                 * all data from the source index partitions to the merge as of
+                 * the lastCommitTime of the old journal.
+                 * 
+                 * Note: At this point the btree exists on the journal but has
+                 * not been registered and is therefore NOT visible to
+                 * concurrent tasks.
+                 * 
+                 * In order to make this btree complete we will now copy in any
+                 * writes absorbed by those index partitions now that we have an
+                 * exclusive lock on everyone on the new journal.
+                 */
+                final BTree btree = BTree
+                        .load(resourceManager.getLiveJournal(),
+                                result.checkpointAddr);
+                // resourceManager.getLiveJournal().getIndex(result.checkpointAddr);
 
-            final String scaleOutIndexName = btree.getIndexMetadata().getName();
+                assert btree != null;
 
-            final int njoined = result.oldnames.length;
+                assert !btree.isReadOnly();
 
-            final PartitionLocator[] oldLocators = new PartitionLocator[njoined];
+                final String scaleOutIndexName = btree.getIndexMetadata()
+                        .getName();
 
-            for (int i = 0; i < njoined; i++) {
+                final int njoined = result.oldnames.length;
 
-                final String name = result.oldnames[i];
+                final PartitionLocator[] oldLocators = new PartitionLocator[njoined];
 
-                final IIndex src = getIndex(name);
+                for (int i = 0; i < njoined; i++) {
 
-                assert src != null;
+                    final String name = result.oldnames[i];
 
-                // same scale-out index.
-                if (!btree.getIndexMetadata().getIndexUUID().equals(
-                        src.getIndexMetadata().getIndexUUID())) {
+                    final IIndex src = getIndex(name);
 
-                    throw new AssertionError();
+                    assert src != null;
+
+                    // same scale-out index.
+                    if (!btree.getIndexMetadata().getIndexUUID().equals(
+                            src.getIndexMetadata().getIndexUUID())) {
+
+                        throw new AssertionError();
+
+                    }
+
+                    final LocalPartitionMetadata pmd = src.getIndexMetadata()
+                            .getPartitionMetadata();
+
+                    oldLocators[i] = new PartitionLocator(pmd.getPartitionId(),
+                            resourceManager.getDataServiceUUID(), pmd
+                                    .getLeftSeparatorKey(), pmd
+                                    .getRightSeparatorKey());
+
+                    /*
+                     * Copy in all data.
+                     * 
+                     * Note: [overflow := false] since the btrees are on the
+                     * same backing store.
+                     */
+                    btree.rangeCopy(src, null, null, false/* overflow */);
+
+                    // drop the old index partition
+                    getJournal().dropIndex(name);
 
                 }
 
-                final LocalPartitionMetadata pmd = src.getIndexMetadata()
+                // register the new index partition
+                getJournal().registerIndex(result.name, btree);
+
+                final LocalPartitionMetadata pmd = btree.getIndexMetadata()
                         .getPartitionMetadata();
 
-                oldLocators[i] = new PartitionLocator(pmd.getPartitionId(),
+                assert pmd != null;
+
+                final PartitionLocator newLocator = new PartitionLocator(pmd
+                        .getPartitionId(),
                         resourceManager.getDataServiceUUID(), pmd
                                 .getLeftSeparatorKey(), pmd
                                 .getRightSeparatorKey());
 
-                /*
-                 * Copy in all data.
-                 * 
-                 * Note: [overflow := false] since the btrees are on the same
-                 * backing store.
-                 */
-                btree.rangeCopy(src, null, null, false/* overflow */);
+                resourceManager.getFederation().getMetadataService()
+                        .joinIndexPartition(scaleOutIndexName, oldLocators,
+                                newLocator);
 
-                // drop the old index partition
-                getJournal().dropIndex(name);
+                for (String name : result.oldnames) {
 
-            }
+                    // will notify tasks that the index partition was joined.
+                    resourceManager.setIndexPartitionGone(name,
+                            StaleLocatorReason.Join);
 
-            // register the new index partition
-            getJournal().registerIndex(result.name, btree);
+                }
 
-            final LocalPartitionMetadata pmd = btree.getIndexMetadata()
-                    .getPartitionMetadata();
+                // notify successful index partition join.
+                resourceManager.indexPartitionJoinCounter.incrementAndGet();
 
-            assert pmd != null;
+                return null;
 
-            final PartitionLocator newLocator = new PartitionLocator(pmd
-                    .getPartitionId(), resourceManager.getDataServiceUUID(),
-                    pmd.getLeftSeparatorKey(), pmd.getRightSeparatorKey());
+            } finally {
 
-            resourceManager.getFederation().getMetadataService()
-                    .joinIndexPartition(scaleOutIndexName, oldLocators,
-                            newLocator);
-
-            for (String name : result.oldnames) {
-
-                // will notify tasks that the index partition was joined.
-                resourceManager.setIndexPartitionGone(name,
-                        StaleLocatorReason.Join);
+                updateEvent.end();
 
             }
+            
+        } // doTask()
 
-            // notify successful index partition join.
-            resourceManager.indexPartitionJoinCounter.incrementAndGet();
-
-            return null;
-
-        }
-
-    }
+    } // class AtomicUpdate
 
 }

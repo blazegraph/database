@@ -83,8 +83,7 @@ public class ServiceScore implements Comparable<ServiceScore> {
     public String toString() {
 
         return "ServiceScore{hostname=" + hostname + ", serviceUUID="
-                + serviceUUID + ", serviceName="
-                + (serviceName == null ? "N/A" : serviceName) + ", rawScore="
+                + serviceUUID + ", serviceName=" + serviceName + ", rawScore="
                 + rawScore + ", score=" + score + ", rank=" + rank + ", drank="
                 + drank + "}";
 

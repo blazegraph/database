@@ -29,8 +29,8 @@ import com.bigdata.btree.AbstractBTreeTupleCursor.AbstractCursorPosition;
 import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
-import com.bigdata.service.DataService;
 import com.bigdata.service.Event;
+import com.bigdata.service.EventResource;
 import com.bigdata.service.EventType;
 
 /**
@@ -248,13 +248,9 @@ public class IndexSegment extends AbstractBTree {
         try {
 
             if (fileStore.fed != null) {
-                
-                final String name = DataService.getIndexPartitionName(fileStore
-                        .getIndexMetadata().getName(), fileStore
-                        .getIndexMetadata().getPartitionMetadata()
-                        .getPartitionId());
 
-                openCloseEvent = new Event(fileStore.fed, name,
+                openCloseEvent = new Event(fileStore.fed, new EventResource(
+                        fileStore.getIndexMetadata(), fileStore.file),
                         EventType.IndexSegmentOpenClose, ""/* details */);
 
             }

@@ -80,6 +80,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.axioms.RdfsAxioms;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
@@ -232,6 +233,56 @@ public class RDFDataLoadMaster implements Callable<Void> {
          * @see AbstractScaleOutFederation#forceOverflow(boolean)
          */
         String FORCE_OVERFLOW = "forceOverflow";
+
+        /**
+         * When <code>true</code> the {@link StatementBuffer} is flushed after
+         * each document and cleared on error. When <code>false</code> the
+         * buffer is only flushed when it would overflow and the caller has
+         * responsibility to make buffer is flushed before the total job
+         * completes.
+         * <p>
+         * Note: The use of this option will blur the boundaries between one
+         * document and the next and therefore can cause {@link BNode}
+         * resolution to span document boundaries. However, the use of blank
+         * nodes is already not "safe" (meaning idempotent) since each time a
+         * given document is loaded the blank nodes in that document will be
+         * recognized as distinct resources.
+         * 
+         * FIXME This option MAY NOT be turned off yet. There are two main
+         * problems.
+         * <p>
+         * (1) A thread-local {@link IStatementBuffer} is used to bind the
+         * buffer to the thread. This keeps down the #of buffers and makes it
+         * possible to reuse the same buffer for each task run by a given
+         * thread. However, to turn off {@link #AUTO_FLUSH} we would have to
+         * identify and flush those thread-local buffers in
+         * {@link ConcurrentDataLoader#awaitCompletion(long, java.util.concurrent.TimeUnit)}
+         * or perhaps by signaling {@link ReaderTask} that it must flush the
+         * buffer(s). Raising the buffer into the caller is a bit difficult as
+         * we queue up tasks before they are executed so we can't really assign
+         * the buffer to the task until it starts to execute.
+         * <p>
+         * (2) If {@link #AUTO_FLUSH} is turned off then {@link #DELETE_AFTER}
+         * can delete a file before the {@link IStatementBuffer} containing its
+         * assertions has been flushed. This weakens the "eventual success"
+         * guarentee since the file will not be re-processed once it has been
+         * deleted and a database error could occur after the file has been
+         * parsed and deleted but before the statement buffer containing the
+         * last of its assertions has been flushed to the database. To regain
+         * that guarentee we can not deletes a file until the statement buffer
+         * on which it wrote has been successfully flushed to the database.
+         * <p>
+         * (3) Also, the {@link PresortRioLoader}, the {@link DataLoader} and
+         * various other things need to be sure that they do not reset, clear,
+         * etc. the buffer on error or on success when autoFlush is turned off.
+         * 
+         * @see ConcurrentDataLoader#submitTask(String, ITaskFactory)
+         * @see AbstractRDFTaskFactory#newTask(String)
+         * @see ReaderTask#readData()
+         */
+        String AUTO_FLUSH = "autoFlush";
+
+        boolean DEFAULT_AUTO_FLUSH = true;
 
         /**
          * When <code>true</code> a validating parsed will be used.
