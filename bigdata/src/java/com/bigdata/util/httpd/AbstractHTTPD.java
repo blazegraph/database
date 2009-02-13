@@ -29,6 +29,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.util.httpd;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.LinkedHashMap;
 import java.util.Properties;
 import java.util.Vector;
@@ -79,12 +81,21 @@ public abstract class AbstractHTTPD extends NanoHTTPD {
 
             }
 
-        } catch (Exception e) {
+        } catch (Throwable e) {
 
             log.error(e.getMessage(), e);
 
-            return new Response(HTTP_INTERNALERROR, MIME_TEXT_PLAIN, e
-                    .getMessage());
+            final StringWriter w = new StringWriter();
+            
+            e.printStackTrace(new PrintWriter(w));
+            
+            /*
+             * Note: if you send an HTTP_INTERNALERROR (500) the browser won't
+             * display the response body so you have to send an Ok with the text
+             * of the error message....
+             */
+
+            return new Response(HTTP_OK, MIME_TEXT_PLAIN, w.toString());
 
         }
 

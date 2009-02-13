@@ -182,8 +182,44 @@ public class History<T> {
 //
 //        }
         
-        private class Entry implements IHistoryEntry<T> {
+        private class Entry implements IHistoryEntry<T>, Cloneable {
 
+            public IHistoryEntry<T> clone() {
+
+                final int count = _counts[current];
+                final long lastModified = _timestamps[current];
+                final T total = _data[current];
+                final T value = getValue();
+                
+                return new IHistoryEntry<T>() {
+
+                    public int getCount() {
+                        return count;
+                    }
+
+                    public T getTotal() {
+                        return total;
+                    }
+
+                    public T getValue() {
+                        return value;
+                    }
+
+                    public long lastModified() {
+                        return lastModified;
+                    }
+                
+                    public String toString() {
+
+                        return "(" + getValue() + ", " + getCount() + ","
+                                + new Date(lastModified()) + ")";
+                        
+                    }
+                    
+                };
+                
+            }
+            
             public long lastModified() {
 
                 return _timestamps[current];
@@ -353,10 +389,26 @@ public class History<T> {
 
             current++;
 
-            return entry;
+            return (IHistoryEntry) entry.clone();
 
         }
 
+//        /**
+//         * Return the current sample (the one which was last visited by
+//         * {@link #next()}).
+//         * 
+//         * @throws IllegalStateException
+//         *             if you have not called {@link #next()}
+//         */
+//        public IHistoryEntry<T> current() {
+//            
+//            if (current == -1)
+//                throw new IllegalStateException();
+//            
+//            return entry;
+//            
+//        }
+        
         public void remove() {
 
             throw new UnsupportedOperationException();

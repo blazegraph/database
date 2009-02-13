@@ -348,9 +348,9 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
 
                     final String path = counter.getPath();
                     
-                    Matcher matcher = filter.matcher(path);
+                    final Matcher matcher = filter.matcher(path);
                     
-                    boolean matched = matcher.matches();
+                    final boolean matched = matcher.matches();
 
                     return matched;
                     
