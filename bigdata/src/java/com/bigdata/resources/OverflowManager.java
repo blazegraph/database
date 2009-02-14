@@ -397,7 +397,6 @@ abstract public class OverflowManager extends IndexManager {
 
         String DEFAULT_ACCELERATE_SPLIT_THRESHOLD = "20";
 
-
         /**
          * The minimum percentage (where <code>1.0</code> corresponds to 100
          * percent) that an index partition must constitute of a nominal index
@@ -2006,7 +2005,7 @@ abstract public class OverflowManager extends IndexManager {
                 + "\nfile=" + newJournal.getFile()
                 + "\npost-condition views: overflowCounter="
                 + getOverflowCount() + "\n"
-                + listIndexPartitions(-firstCommitTime));
+                + listIndexPartitions(TimestampUtility.asHistoricalRead(firstCommitTime)));
         
         /*
          * Change over the counter set to the new live journal.
@@ -2016,12 +2015,16 @@ abstract public class OverflowManager extends IndexManager {
          */
         try {
 
-            final CounterSet tmp = (CounterSet)getCounters();
+            final CounterSet tmp = (CounterSet) getCounters();
 
-            tmp.detach(IResourceManagerCounters.LiveJournal);
-            
-            tmp.makePath(IResourceManagerCounters.LiveJournal).attach(
-                    getLiveJournal().getCounters());
+            synchronized (tmp) {
+
+                tmp.detach(IResourceManagerCounters.LiveJournal);
+
+                tmp.makePath(IResourceManagerCounters.LiveJournal).attach(
+                        getLiveJournal().getCounters());
+
+            }
 
         } catch(Throwable t) {
             

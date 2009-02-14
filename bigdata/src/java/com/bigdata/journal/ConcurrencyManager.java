@@ -1505,7 +1505,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
         
         /**
          * If the index is a view then this will be the definition of the view.
-         * This field get updated each time by {@link #reportCounters(ILocalBTreeView)}
+         * This field get updated each time by {@link #add(ILocalBTreeView)}
          * since the view definition can change over time and only the most
          * current definition will be retained.
          */
@@ -1526,35 +1526,37 @@ public class ConcurrencyManager implements IConcurrencyManager {
          * make the data somewhat saner if you are examining it in a debugger.
          */
         final LinkedHashSet<BTreeCounters> btreeCounters;
-        
-        public ViewCounters(final ILocalBTreeView ndx) {
 
-            if(ndx == null)
+        /**
+         * @param view
+         *            The counters for the sources in the specified view are
+         *            {@link #add(ILocalBTreeView)}ed in automatically.
+         */
+        public ViewCounters(final ILocalBTreeView view) {
+
+            if (view == null)
                 throw new IllegalArgumentException();
-            
-            this.sourceCount = ndx.getSourceCount();
-            
-//            this.staticCounters = new ICounterSet[sourceCount];
-            
-            this.btreeCounters = new LinkedHashSet<BTreeCounters>();
-            
-            int i = 0;
-            for (AbstractBTree src : ndx.getSources()) {
 
-//                staticCounters[i] = src.getStaticCounterSet();
-                
-                i++;
-                
-            }
-            
+            this.sourceCount = view.getSourceCount();
+
+            this.btreeCounters = new LinkedHashSet<BTreeCounters>();
+
+            add(view);
+
         }
         
-        public void reportCounters(final ILocalBTreeView ndx) {
+        /**
+         * Add the counters in the view.
+         * 
+         * @param view
+         *            The view.
+         */
+        public void add(final ILocalBTreeView view) {
 
-            pmd = ndx.getIndexMetadata().getPartitionMetadata();
+            pmd = view.getIndexMetadata().getPartitionMetadata();
 
             int i = 0;
-            for (AbstractBTree src : ndx.getSources()) {
+            for (AbstractBTree src : view.getSources()) {
                 
                 btreeCounters.add(src.btreeCounters);
                 
@@ -1708,9 +1710,11 @@ public class ConcurrencyManager implements IConcurrencyManager {
                 
                 indexCounters.put(name, tmp);
                 
-            }
+            } else {
             
-            tmp.reportCounters(ndx);
+                tmp.add(ndx);
+                
+            }
             
         } finally {
             
