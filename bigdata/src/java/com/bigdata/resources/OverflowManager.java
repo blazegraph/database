@@ -2012,6 +2012,10 @@ abstract public class OverflowManager extends IndexManager {
          * 
          * Note: The spelling of the counter set names MUST be consistent with
          * their declarations!
+         * 
+         * @todo this is done redundently here and in the DataService's
+         * reattachDynamicCounters() because it seems like the logic here is not
+         * doing the trick for me. Look into this further.
          */
         try {
 

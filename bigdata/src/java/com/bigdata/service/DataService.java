@@ -76,6 +76,7 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StoreManager;
+import com.bigdata.resources.ResourceManager.IResourceManagerCounters;
 import com.bigdata.resources.StoreManager.ManagedJournal;
 
 /**
@@ -515,20 +516,49 @@ abstract public class DataService extends AbstractService
             if (service.isOpen() && service.resourceManager.isRunning()
                     && elapsed > 1000/* ms */) {
 
-                final CounterSet tmp = service.resourceManager
-                        .getIndexManagerCounters();
+                {
+                    
+                    final CounterSet tmp = service.resourceManager
+                            .getIndexManagerCounters();
 
-                assert tmp != null;
+                    assert tmp != null;
 
-                synchronized (tmp) {
+                    synchronized (tmp) {
 
-                    tmp.detach("indices");
+                        tmp.detach("indices");
 
-                    tmp.makePath("indices").attach(
-                            service.concurrencyManager.getIndexCounters()
-                    // resourceManager.getLiveJournal().getNamedIndexCounters()
-                            );
+                        tmp.makePath("indices").attach(
+                                service.concurrencyManager.getIndexCounters()
+                        // resourceManager.getLiveJournal().getNamedIndexCounters()
+                                );
 
+                    }
+                    
+                }
+                
+                {
+
+                    /*
+                     * @todo this is done redundently here and in the overflow()
+                     * because it seems like the logic in overflow() is not
+                     * doing the trick for me.  Look into this further.
+                     */
+                    final CounterSet tmp = service.resourceManager
+                            .getCounters();
+
+                    assert tmp != null;
+
+                    synchronized (tmp) {
+
+                        tmp.detach(IResourceManagerCounters.LiveJournal);
+
+                        tmp.makePath(IResourceManagerCounters.LiveJournal)
+                                .attach(
+                                        service.getResourceManager()
+                                                .getLiveJournal().getCounters());
+
+                    }
+                    
                 }
 
                 lastReattachMillis = now;

@@ -737,15 +737,6 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
                 }
 
-                if (writeServiceQueueCapacity < writeServiceCorePoolSize) {
-
-                    throw new RuntimeException("The '"
-                            + ConcurrencyManager.Options.WRITE_SERVICE_QUEUE_CAPACITY
-                            + "' must be greater than the "
-                            + ConcurrencyManager.Options.WRITE_SERVICE_CORE_POOL_SIZE);
-
-                }
-
                 if(INFO)
                     log.info(ConcurrencyManager.Options.WRITE_SERVICE_QUEUE_CAPACITY+ "="
                         + writeServiceQueueCapacity);
