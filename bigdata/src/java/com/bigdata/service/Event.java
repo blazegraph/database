@@ -456,7 +456,7 @@ public class Event implements Serializable {
      */
     protected Event(String s) throws ClassNotFoundException {
 //        System.err.println(s);
-        NonIdioticStringTokenizer st = new NonIdioticStringTokenizer(s, "\t");
+        MyStringTokenizer st = new MyStringTokenizer(s, "\t");
         this.eventUUID = UUID.fromString(st.nextToken());    
 //        System.err.println("eventUUID: <"+eventUUID+">");
         String resourceIndexName = st.nextToken();
@@ -537,12 +537,12 @@ public class Event implements Serializable {
     }
     
     /**
-     * Dissimilar from  the regular StringTokenizer, which is totally idiotic 
-     * and cannot handle empty fields.
+     * Dissimilar from  the regular StringTokenizer, which is cannot handle 
+     * empty fields.
      * 
      * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
      */
-    private static class NonIdioticStringTokenizer {
+    private static class MyStringTokenizer {
         
         private final List<String> tokens;
         
@@ -550,7 +550,7 @@ public class Event implements Serializable {
         
         private int i;
         
-        public NonIdioticStringTokenizer(String s, String delim) {
+        public MyStringTokenizer(String s, String delim) {
             this.tokens = new LinkedList<String>();
             StringTokenizer st = new StringTokenizer(s, delim, true);
             while (st.hasMoreTokens()) {
