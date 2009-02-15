@@ -388,7 +388,9 @@ public class Event implements Serializable {
     static public String getHeader() {
 
         return  "eventUUID"
-            + "\tresource"
+            + "\tindexName"
+            + "\tpartitionId"
+            + "\tfile"
             + "\tmajorEventType"
             + "\tmajorEventValue"
             + "\tminorEventType"
