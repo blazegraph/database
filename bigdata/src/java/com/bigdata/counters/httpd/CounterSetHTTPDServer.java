@@ -29,8 +29,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.counters.httpd;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -39,6 +41,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.DefaultInstrumentFactory;
+import com.bigdata.service.IEventReportingService;
 import com.bigdata.util.httpd.AbstractHTTPD;
 import com.bigdata.util.httpd.NanoHTTPD;
 
@@ -81,9 +84,11 @@ public class CounterSetHTTPDServer implements Runnable {
     public static void main(String[] args) throws Exception {
 
         // default port.
-        int port = 80;
+        int port = 8080;
 
         final CounterSet counterSet = new CounterSet();
+        
+        final DummyEventReportingService service = new DummyEventReportingService();
 
         for (int i = 0; i < args.length; i++) {
 
@@ -112,6 +117,30 @@ public class CounterSetHTTPDServer implements Runnable {
                     // set logging level on the service.
                     NanoHTTPD.log.setLevel(level);
                     
+                } else if( arg.equals("-events")) {
+                    
+                    final File file = new File(args[++i]);
+                    
+                    System.out.println("reading events file: "+file);
+                    
+                    BufferedReader reader = null;
+
+                    try {
+
+                        reader = new BufferedReader(new FileReader(file));
+
+                        service.readCSV(reader);
+
+                    } finally {
+
+                        if (reader != null) {
+
+                            reader.close();
+
+                        }
+                        
+                    }
+
                 } else {
                     
                     System.err.println("Unknown option: "+arg);
@@ -153,7 +182,7 @@ public class CounterSetHTTPDServer implements Runnable {
 
         // new server.
         CounterSetHTTPDServer server = new CounterSetHTTPDServer(port,
-                counterSet);
+                counterSet, service);
 
         // run server.
         server.run();
@@ -169,7 +198,8 @@ public class CounterSetHTTPDServer implements Runnable {
      * 
      * @throws IOException
      */
-    public CounterSetHTTPDServer(int port,CounterSet counterSet) throws Exception {
+    public CounterSetHTTPDServer(int port,CounterSet counterSet,
+            IEventReportingService service) throws Exception {
 
         /*
          * The runtime shutdown hook appears to be a robust way to handle ^C by
@@ -177,7 +207,7 @@ public class CounterSetHTTPDServer implements Runnable {
          */
         Runtime.getRuntime().addShutdownHook(new ShutdownThread(this));
 
-        httpd = new CounterSetHTTPD(port, counterSet);
+        httpd = new CounterSetHTTPD(port, counterSet, service);
 
     }
     

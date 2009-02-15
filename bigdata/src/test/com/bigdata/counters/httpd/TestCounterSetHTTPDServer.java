@@ -121,13 +121,15 @@ public class TestCounterSetHTTPDServer extends TestCase {
     public void test_server() throws Exception {
 
         CounterSet counterSet = new CounterSet();
+        
+        DummyEventReportingService service = new DummyEventReportingService();
 
         setUp(counterSet);
 
         final int port = 8080;
 
         CounterSetHTTPDServer server = new CounterSetHTTPDServer(port,
-                counterSet);
+                counterSet, service);
 
         server.run();
 

@@ -29,6 +29,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service;
 
 import java.io.Serializable;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.StringTokenizer;
 import java.util.UUID;
 
 import org.apache.log4j.Logger;
@@ -166,7 +169,7 @@ public class Event implements Serializable {
 
     public long getEndTime() {
 
-        return startTime;
+        return endTime;
 
     }
 
@@ -434,12 +437,152 @@ public class Event implements Serializable {
         }
         sb.append(complete); sb.append('\t'); 
         sb.append(hostname); sb.append('\t'); 
-        sb.append(serviceIface); sb.append('\t'); 
+        sb.append(serviceIface.getName()); sb.append('\t'); 
         sb.append(serviceName); sb.append('\t'); 
         sb.append(serviceUUID); sb.append('\t'); 
         sb.append(details); sb.append('\n');
         
         return sb.toString();
+        
+    }
+
+    /**
+     * Construct an event from the tab-delimited serialization produced from
+     * {@link #toString()}.
+     * 
+     * @param s the tab delimited serialization
+     * @throws ClassNotFoundException 
+     *          if any fields specify an invalid classname
+     */
+    protected Event(String s) throws ClassNotFoundException {
+//        System.err.println(s);
+        NonIdioticStringTokenizer st = new NonIdioticStringTokenizer(s, "\t");
+        this.eventUUID = UUID.fromString(st.nextToken());    
+//        System.err.println("eventUUID: <"+eventUUID+">");
+        String resourceIndexName = st.nextToken();
+//        System.err.println("resource.indexName: <"+resourceIndexName+">");
+        String resourcePartitionId = st.nextToken();
+//        System.err.println("resource.partitionId: <"+resourcePartitionId+">");
+        String resourceFile = st.nextToken();
+//        System.err.println("resource.file: <"+resourceFile+">");
+        this.resource = new EventResource(resourceIndexName, resourcePartitionId, resourceFile);
+        String majorEventClass = st.nextToken();
+//        System.err.println("majorEventClass: <"+majorEventClass+">");
+        if (majorEventClass != null) {
+            Class majorEventType = Class.forName(majorEventClass);  
+            String majorEventValue = st.nextToken();
+//            System.err.println("majorEventValue: <"+majorEventValue+">");
+            if (majorEventValue == null) {
+                majorEventValue = "";
+            }
+            if (majorEventType.equals(String.class)) {
+                this.majorEventType = majorEventValue;
+            } else if (majorEventType.isEnum()) {
+                this.majorEventType = Enum.valueOf(majorEventType, majorEventValue);
+            } else {
+                throw new UnsupportedOperationException();
+            }
+        } else {
+            this.majorEventType = "";
+        }
+        String minorEventClass = st.nextToken();
+//        System.err.println("minorEventClass: <"+minorEventClass+">");
+        if (minorEventClass != null) {
+            Class minorEventType = Class.forName(minorEventClass);  
+            String minorEventValue = st.nextToken();
+//            System.err.println("minorEventValue: <"+minorEventValue+">");
+            if (minorEventValue == null) {
+                minorEventValue = "";
+            }
+            if (minorEventType.equals(String.class)) {
+                this.minorEventType = minorEventValue;
+            } else if (minorEventType.isEnum()) {
+                this.minorEventType = Enum.valueOf(minorEventType, minorEventValue);
+            } else {
+                throw new UnsupportedOperationException();
+            }
+        } else {
+            this.minorEventType = "";
+        }
+        String startTime = st.nextToken();
+//        System.err.println("startTime: <"+startTime+">");
+        this.startTime = Long.valueOf(startTime);
+        String endTime = st.nextToken();
+//        System.err.println("endTime: <"+endTime+">");
+        this.endTime = Long.valueOf(endTime);
+        // do nothing with this one
+        String elapsed = st.nextToken();
+        this.complete = Boolean.valueOf(st.nextToken());    
+        this.hostname = st.nextToken();    
+        String serviceIfaceName = st.nextToken();
+        this.serviceIface = Class.forName(serviceIfaceName);    
+        this.serviceName = st.nextToken(); 
+        this.serviceUUID = UUID.fromString(st.nextToken()); 
+        if (st.hasMoreTokens()) {
+            this.details = st.nextToken();
+        }
+    }
+    
+    /**
+     * Reconstruct an event object from a string.  Useful for post-mortem
+     * analysis.
+     * 
+     * @param s the tab-delimited format create by {@link #toString()}.
+     * @return a new event object
+     * @throws ClassNotFoundException 
+     *          if any CSV fields specify an invalid classname
+     */
+    public static Event fromString(String s) throws ClassNotFoundException {
+        return new Event(s);
+    }
+    
+    /**
+     * Dissimilar from  the regular StringTokenizer, which is totally idiotic 
+     * and cannot handle empty fields.
+     * 
+     * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
+     */
+    private static class NonIdioticStringTokenizer {
+        
+        private final List<String> tokens;
+        
+        private final String delim;
+        
+        private int i;
+        
+        public NonIdioticStringTokenizer(String s, String delim) {
+            this.tokens = new LinkedList<String>();
+            StringTokenizer st = new StringTokenizer(s, delim, true);
+            while (st.hasMoreTokens()) {
+                tokens.add(st.nextToken());
+            }
+            this.delim = delim;
+            this.i = 0;
+        }
+        
+        public boolean hasMoreTokens() {
+            return i < tokens.size() &&
+                   !(i == tokens.size()-1 && tokens.get(tokens.size()-1).contains(delim));
+        }
+        
+        public String nextToken() {
+            String token = tokens.get(i++);
+            if (delim.contains(token)) {
+                token = tokens.get(i);
+                if (delim.contains(token)) {
+                    token = null;
+                } else {
+                    i++;
+                }
+            }
+            if (token != null) {
+                token = token.trim();
+                if (token.length() == 0) {
+                    token = null;
+                }
+            }
+            return token;
+        }
         
     }
     

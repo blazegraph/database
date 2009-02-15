@@ -1,0 +1,7 @@
+<div id="placeholder" style="width:800px;height:500px;"></div>
+        
+<div id="overview" style="margin-left:0px;margin-top:20px;width:800px;height:250px"></div>
+        
+<script id="source" language="javascript" type="text/javascript">
+        
+$(function () {

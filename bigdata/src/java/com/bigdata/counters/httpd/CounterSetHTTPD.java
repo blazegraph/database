@@ -7,11 +7,13 @@ import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.util.LinkedHashMap;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.Vector;
-
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.httpd.XHTMLRenderer.Model;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.service.Event;
+import com.bigdata.service.IEventReportingService;
 import com.bigdata.service.IService;
 import com.bigdata.util.httpd.AbstractHTTPD;
 
@@ -71,7 +73,21 @@ public class CounterSetHTTPD extends AbstractHTTPD {
         
         final String mimeType;
         
-        if (true) {
+        final InputStream is;
+
+        if (uri.contains("jquery.js")) {
+            
+            mimeType = MIME_TEXT_HTML;
+            
+            is = getClass().getResourceAsStream("jquery.js");
+            
+        } else if (uri.contains("jquery.flot.js")) {
+            
+            mimeType = MIME_TEXT_HTML;
+            
+            is = getClass().getResourceAsStream("jquery.flot.js");
+            
+        } else if (true) {
 
             // conneg HMTL
             
@@ -89,6 +105,8 @@ public class CounterSetHTTPD extends AbstractHTTPD {
 
             w.flush();
 
+            is = new ByteArrayInputStream(baos.toByteArray());
+            
         } else {
 
             // conneg XML
@@ -98,9 +116,9 @@ public class CounterSetHTTPD extends AbstractHTTPD {
             // send everything - client can apply XSLT as desired.            
             root.asXML(baos, charset, null/*filter*/);
 
+            is = new ByteArrayInputStream(baos.toByteArray());
+            
         }
-
-        final InputStream is = new ByteArrayInputStream(baos.toByteArray());
 
         final Response r = new Response(HTTP_OK, mimeType + "; charset='"
                 + charset + "'", is);

@@ -187,6 +187,16 @@ public class EventResource implements Serializable {
         this.file = file.toString();
 
     }
+    
+    public EventResource(String indexName, String partitionId, String file) {
+        
+        this.indexName = indexName;
+        
+        this.partitionId = partitionId;
+        
+        this.file = file;
+        
+    }
 
     private static transient final String BLANK = "";
     

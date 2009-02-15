@@ -1,6 +1,10 @@
 package com.bigdata.counters.httpd;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.net.URLEncoder;
@@ -11,18 +15,18 @@ import java.text.NumberFormat;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.Vector;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
 import org.apache.log4j.Logger;
-
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.History;
 import com.bigdata.counters.HistoryInstrument;
@@ -36,6 +40,9 @@ import com.bigdata.counters.PeriodEnum;
 import com.bigdata.counters.History.SampleIterator;
 import com.bigdata.counters.httpd.XHTMLRenderer.Model.ReportEnum;
 import com.bigdata.counters.httpd.XHTMLRenderer.Model.TimestampFormatEnum;
+import com.bigdata.service.Event;
+import com.bigdata.service.EventType;
+import com.bigdata.service.IEventReportingService;
 import com.bigdata.service.IService;
 import com.bigdata.util.HTMLUtility;
 
@@ -782,6 +789,8 @@ public class XHTMLRenderer {
         
         writeTitle(w);
         
+        writeScripts(w);
+        
         w.write("</head\n>");
     }
     
@@ -789,6 +798,14 @@ public class XHTMLRenderer {
         
         w.write("<title>bigdata(tm) telemetry : "+cdata(model.path)+"</title\n>");
         
+    }
+
+    protected void writeScripts(Writer w)  throws IOException {
+        
+        w.write("\n\n<script language=\"javascript\" type=\"text/javascript\" src=\"jquery.js\"></script>\n");
+        
+        w.write("<script language=\"javascript\" type=\"text/javascript\" src=\"jquery.flot.js\"></script>\n\n");
+
     }
     
     protected void writeBody(Writer w) throws IOException  {
@@ -855,6 +872,24 @@ public class XHTMLRenderer {
          */
 //        doctype.writeValid(w);
 
+        if (model.service != null) {
+            
+            if (model.service instanceof IEventReportingService) {
+                
+                LinkedHashMap<UUID,Event> events = 
+                    ((IEventReportingService) model.service).getEvents();
+                
+                if (events != null) { // && events.isEmpty() == false) {
+                    
+                    // render the time-series chart
+                    writeFlot(w, events);
+                    
+                }
+                
+            }
+            
+        }
+        
         w.write("</body\n>");
         
     }
@@ -2788,6 +2823,173 @@ public class XHTMLRenderer {
                 throw new AssertionError(model.period.toString());
             }
 
+        }
+        
+    }
+    
+    /**
+     * Write the html to render the Flot-based time-series chart, plotting the
+     * supplied events. 
+     */
+    protected void writeFlot(Writer w, LinkedHashMap<UUID, Event> events) 
+        throws IOException  {
+        
+        w.write("\n\n<p/><p/>\n");
+
+        writeResource(w, "flot-start.txt");
+        
+        w.write("\n");
+        
+        // writeResource(w, "flot-data.txt");
+        
+        StringWriter sw = new StringWriter();
+        
+        writeAsychOverflowEvents(sw, events);
+        
+//        System.err.println(sw.toString());
+        
+        w.write(sw.toString());
+        
+        w.write("\n");
+        
+        writeResource(w, "flot-end.txt");
+        
+        w.write("\n");
+        
+    }
+    
+    /**
+     * Demonstrates how to hook events into flot.  Hardcoded to output only
+     * {@link EventType#AsynchronousOverflow} events. 
+     */
+    protected void writeAsychOverflowEvents(Writer w, 
+            LinkedHashMap<UUID, Event> events) throws IOException {
+        
+        Map<String,StringBuilder> eventsByHost = new HashMap<String,StringBuilder>();
+        
+        StringBuilder data = new StringBuilder();
+        
+        data.append("var data = [ ");
+        
+        for (Map.Entry<UUID, Event> entry : events.entrySet()) {
+        
+            Event e = entry.getValue();
+            
+            if (!e.isComplete() || 
+                e.majorEventType != EventType.AsynchronousOverflow) {
+                
+                continue;
+                
+            }
+            
+            int i = e.hostname.indexOf('.');
+            
+            String hostyvar = e.hostname.substring(0, i) + "y"; 
+            
+            StringBuilder sb = eventsByHost.get(e.hostname);
+            
+            if (sb == null) {
+                
+                sb = new StringBuilder();
+                
+                eventsByHost.put(e.hostname, sb);
+                
+                int hostnum = Integer.valueOf(e.hostname.substring(5, i));
+                
+                String hostvar = e.hostname.substring(0, i);
+                
+                sb.append("var ");
+                
+                sb.append(hostyvar);
+                
+                sb.append(" = ");
+                
+                sb.append(hostnum);
+                
+                sb.append(";\nvar ");
+                
+                sb.append(hostvar);
+
+                sb.append(" = [\n");
+                
+                data.append(hostvar);
+                
+                data.append(", ");
+                
+            }
+            
+            sb.append("[ ");
+            
+            sb.append(e.getStartTime());
+            
+            sb.append(", ");
+            
+            sb.append(hostyvar);
+            
+            sb.append(" ], [ ");
+            
+            sb.append(e.getEndTime());
+            
+            sb.append(", ");
+            
+            sb.append(hostyvar);
+            
+            sb.append(" ], null,\n");
+            
+        }
+        
+        for (StringBuilder sb : eventsByHost.values()) {
+            
+            sb.setLength(sb.length() - ", null,\n".length());
+            
+            sb.append("\n];");
+            
+            w.write(sb.toString());
+            
+            w.write("\n");
+            
+        }
+        
+        if (data.charAt(data.length()-2) == ',') {
+            
+            data.setLength(data.length()-2);
+            
+        }
+        
+        data.append(" ];\n");
+        
+        w.write(data.toString());
+        
+    }
+    
+    /**
+     * Write a file into the html.  The supplied resource will be relative
+     * to this class.
+     */
+    protected void writeResource(Writer w, String resource) throws IOException {
+        
+        InputStream is = getClass().getResourceAsStream(resource);
+        
+        BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+        
+        try {
+            
+            String s;
+            
+            while ((s = reader.readLine()) != null) {
+                
+                // System.err.println(s);
+                
+                w.write(s);
+                
+                w.write("\n");
+                
+            }
+            
+        } finally {
+            
+            reader.close();
+            
         }
         
     }
