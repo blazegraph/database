@@ -1,0 +1,60 @@
+    var options = {
+        xaxis: {
+            mode: "time"
+        },
+        yaxis: {
+            ticks: 16,
+            min: 0,
+            max: 17
+        },
+        lines: { 
+            show: true, 
+            lineWidth: 10 
+        },
+        selection: { 
+            mode: "x" 
+        }
+    };
+
+    var overviewOptions = {
+        xaxis: {
+            ticks: [],
+            mode: "time"
+        },
+        yaxis: {
+            ticks: [],
+            min: 0,
+            max: 17
+        },
+        lines: { 
+            show: true, 
+            lineWidth: 2 
+        },
+        shadowsize: 0,
+        selection: { 
+            mode: "x" 
+        }
+    };
+
+    var plot = $.plot($("#placeholder"), data, options);
+    
+    var overview = $.plot($("#overview"), data, overviewOptions);
+
+    $("#placeholder").bind("plotselected", function (event, ranges) {
+        // do the zooming
+        plot = $.plot($("#placeholder"), data,
+                      $.extend(true, {}, options, {
+                          xaxis: { min: ranges.xaxis.from, max: ranges.xaxis.to }
+                      }));
+
+        // don't fire event on the overview to prevent eternal loop
+        overview.setSelection(ranges, true);
+    });
+    
+    $("#overview").bind("plotselected", function (event, ranges) {
+        plot.setSelection(ranges);
+    });
+
+});
+        
+</script>

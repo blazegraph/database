@@ -2752,4 +2752,12 @@ abstract public class LoadBalancerService extends AbstractService
         
     }
 
+    /**
+     * Implements {@link IEventReportingService}.
+     */
+    public LinkedHashMap<UUID,Event> getEvents() {
+        
+        return events;
+        
+    }
 }
