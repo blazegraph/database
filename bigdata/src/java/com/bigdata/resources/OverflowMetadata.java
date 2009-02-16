@@ -16,9 +16,7 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.ConcurrencyManager.ViewCounters;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.service.IDataService;
@@ -62,22 +60,11 @@ public class OverflowMetadata {
      */
     
     /**
-     * The total {@link BTreeCounters} reported for all unisolated and read-committed
-     * index views on the old journal.
+     * The raw write score computed based on the net change in the aggregated
+     * {@link BTreeCounters}s for each index partition since the last overflow.
      * 
-     * @see ConcurrencyManager#getAndClearIndexCounters(BTreeCounters)
+     * @see BTreeCounters#computeRawWriteScore()
      */
-    private final BTreeCounters totalCounters;
-
-    /**
-     * The per-index {@link BTreeCounters} for the unisolated and read-committed
-     * index views on the old journal.
-     * 
-     * @see ConcurrencyManager#getAndClearIndexCounters(BTreeCounters)
-     */
-    private final Map<String/* name */, ViewCounters> indexCounters;
-
-    /** Raw score computed for those aggregated counters. */
     private double totalRawStore;
 
     /**
@@ -270,6 +257,10 @@ public class OverflowMetadata {
     private final Map<OverflowActionEnum, AtomicInteger> actionCounts = new HashMap<OverflowActionEnum, AtomicInteger>();
     
     /**
+     * Note: This captures metadata which has low latency and does not force the
+     * materialization of the fused view of an index partition but may force the
+     * loading of the BTree from the old journal, which it itself a very light
+     * weight operation.
      * 
      * @param resourceManager
      */
@@ -281,10 +272,16 @@ public class OverflowMetadata {
         // note: assumes the live journal is the one that we want!
         final AbstractJournal oldJournal = resourceManager.getLiveJournal();
 
+        // timestamp of the last commit on the old journal.
         lastCommitTime = oldJournal.getRootBlockView().getLastCommitTime();
 
-        final ConcurrencyManager concurrencyManager = (ConcurrencyManager) resourceManager
-                .getConcurrencyManager();
+        /*
+         * This will be the aggregate of the net change in the btree performance
+         * counters since the last overflow operation (sum across [delta]).
+         * Together with the per-index partition performance counters, this is
+         * used to decide which indices are "hot" and which are not.
+         */
+        final BTreeCounters totalCounters = new BTreeCounters();
 
         /*
          * Generate the metadata summaries of the index partitions that we will
@@ -301,6 +298,9 @@ public class OverflowMetadata {
             // the name2addr view as of the last commit time.
             final ITupleIterator itr = oldJournal.getName2Addr(lastCommitTime)
                     .rangeIterator();
+            
+            final Map<String, BTreeCounters> delta = resourceManager
+                    .markAndGetDelta();
 
             while (itr.hasNext()) {
 
@@ -310,84 +310,58 @@ public class OverflowMetadata {
                         .deserialize(new DataInputBuffer(tuple.getValue()));
 
                 /*
-                 * Obtain the counters for this index.
-                 * 
-                 * Note: We must do this before we reset the counters (below).
+                 * Obtain the delta in the btree performance counters for this
+                 * index partition since the last overflow.
                  */
-                final ViewCounters viewCounters = concurrencyManager
-                        .getIndexCounters(entry.name);
+                BTreeCounters btreeCounters = delta.get(entry.name);
+                
+                if (btreeCounters == null) {
+                 
+                    // use empty counters if none were reported (paranoia).
+                    log.error("No performance counters? index=" + entry.name);
 
-                if (viewCounters == null) {
-
-                    /*
-                     * This will happen for a cold index (one that has not been
-                     * touched since the last synchronous overflow and which was
-                     * just copied over at that time).
-                     */
-
-                    //@todo log @ info
-                    log.warn("No performance counters: " + entry.name);
+                    btreeCounters = new BTreeCounters();
                     
                 }
+
+                totalCounters.add(btreeCounters);
                 
-                final BTreeCounters btreeCounters = viewCounters == null ? new BTreeCounters()
-                        : viewCounters.aggregate();
-
-                /*
-                 * Note: This captures metadata which has low latency and does
-                 * not force the materialization of the fused view of an index
-                 * partition but may force the loading of the BTree from the old
-                 * journal, which it itself a very light weight operation.
-                 */
-
-                final ViewMetadata vmd = new ViewMetadata(resourceManager,
-                        lastCommitTime, entry.name, btreeCounters);
-
-                views.put(entry.name, vmd);
+                views.put(entry.name, new ViewMetadata(resourceManager,
+                        lastCommitTime, entry.name, btreeCounters));
 
             }
 
         }
 
         /*
-         * Aggregate the statistics for the named indices and reset the various
-         * counters for those indices. These statistics are used to decide which
-         * indices are "hot" and which are not.
+         * Compute the "Score" for each index partition.
          */
         {
 
-            totalCounters = new BTreeCounters();
-
-            indexCounters = concurrencyManager.getAndClearIndexCounters(totalCounters);
-
-        }
-
-        {
-
-            final int nscores = indexCounters.size();
+            final int nscores = views.size();
 
             this.scores = new Score[nscores];
 
             this.scoreMap = new HashMap<String/* name */, Score>(nscores);
 
-            this.totalRawStore = totalCounters.computeRawScore();
+            this.totalRawStore = totalCounters.computeRawWriteScore();
 
             if (nscores > 0) {
 
-                final Iterator<Map.Entry<String, ViewCounters>> itr = indexCounters
+                final Iterator<Map.Entry<String, ViewMetadata>> itr = views
                         .entrySet().iterator();
 
                 int i = 0;
 
                 while (itr.hasNext()) {
 
-                    final Map.Entry<String, ViewCounters> entry = itr.next();
+                    final Map.Entry<String, ViewMetadata> entry = itr.next();
 
                     final String name = entry.getKey();
 
-                    final ViewCounters viewCounters = entry.getValue();
+                    final ViewMetadata vmd = entry.getValue();
 
-                    final BTreeCounters btreeCounters = viewCounters.aggregate();
+                    final BTreeCounters btreeCounters = vmd.btreeCounters;
                     
                     scores[i] = new Score(name, btreeCounters, totalRawStore);
 

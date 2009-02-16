@@ -178,8 +178,14 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
      *             if <i>child</i> is either this node or any parent of this
      *             node since a cycle would be formed.
      */
-    synchronized public void attach(ICounterNode src) {
+    synchronized public void attach(final ICounterNode src) {
         
+        attach(src, false/* replace */);
+        
+    }
+
+    synchronized public void attach(final ICounterNode src, final boolean replace) {
+            
         // FIXME detect cycles.
         
         if(src.isRoot()) {
@@ -192,20 +198,20 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
 
             while (itr.hasNext()) {
 
-                attach2(itr.next());
+                attach2(itr.next(), replace );
 
             }
 
         } else {
 
-            attach2(src);
+            attach2(src, replace);
             
         }
         
     }
 
     @SuppressWarnings("unchecked")
-    private void attach2(ICounterNode src) {
+    private void attach2(final ICounterNode src, final boolean replace) {
 
         if (src == null)
             throw new IllegalArgumentException();
@@ -219,9 +225,12 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
             // the existing node with the same path as [src].
             final ICounterNode existingChild = getChild(src.getName());
 
-            if(existingChild.isCounter()) {
+            if (existingChild.isCounter() && !replace) {
+
+                log.warn("Will not replace existing counter: "
+                        + existingChild.getPath());
                 
-                log.warn("Will not replace existing counter: "+existingChild.getPath());
+                return;
                 
             } else if (src.isCounterSet()) {
                 
@@ -235,21 +244,26 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
 
                 while (itr.hasNext()) {
 
-                    ((CounterSet) existingChild).attach2(itr.next());
+                    ((CounterSet) existingChild).attach2(itr.next(), replace);
 
                 }
 
+                return;
+                
             }
-
-            return;
+            
+            // fall through.
             
         }
-        
+
+        /*
+         * Attach or replace the counter.
+         */
         synchronized(src) {
 
             final String name = src.getName();
             
-            final CounterSet oldParent = (CounterSet)src.getParent();
+            final CounterSet oldParent = (CounterSet) src.getParent();
             
             assert oldParent != null;
             

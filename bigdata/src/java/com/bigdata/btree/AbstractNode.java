@@ -513,13 +513,13 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
 
                 newNode = new Node((Node) this, triggeredByChildId );
                 
-                btree.btreeCounters.nodesCopyOnWrite++;
+                btree.getBtreeCounters().nodesCopyOnWrite++;
 
             } else {
 
                 newNode = new Leaf((Leaf) this);
 
-                btree.btreeCounters.leavesCopyOnWrite++;
+                btree.getBtreeCounters().leavesCopyOnWrite++;
 
             }
 
@@ -970,11 +970,11 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
         
         if( this instanceof Leaf ) {
 
-            btree.btreeCounters.leavesJoined++;
+            btree.getBtreeCounters().leavesJoined++;
 
         } else {
             
-            btree.btreeCounters.nodesJoined++;
+            btree.getBtreeCounters().nodesJoined++;
 
         }
 

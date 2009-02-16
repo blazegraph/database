@@ -39,7 +39,7 @@ import java.util.concurrent.TimeoutException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ILoadBalancerService extends IEventReportingService {
+public interface ILoadBalancerService extends IService {
    
     /**
      * Sent an event.

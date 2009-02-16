@@ -50,6 +50,7 @@ import com.bigdata.btree.ResultSet;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.journal.AbstractLocalTransactionManager;
@@ -74,8 +75,10 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.IndexManager;
+import com.bigdata.resources.OverflowManager;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StoreManager;
+import com.bigdata.resources.IndexManager.IIndexManagerCounters;
 import com.bigdata.resources.ResourceManager.IResourceManagerCounters;
 import com.bigdata.resources.StoreManager.ManagedJournal;
 
@@ -504,8 +507,12 @@ abstract public class DataService extends AbstractService
          * Dynamically detach and attach the counters for the named indices
          * underneath of the {@link IndexManager}.
          * <p>
-         * Note: This method limits the frequency of update to no more than once per
-         * second.
+         * Note: This method limits the frequency of update to no more than once
+         * per second.
+         * <p>
+         * Note: {@link OverflowManager#overflow()} is responsible for
+         * reattaching the counters for the live {@link ManagedJournal} during
+         * synchronous overflow.
          */
         synchronized public void reattachDynamicCounters() {
 
@@ -516,49 +523,43 @@ abstract public class DataService extends AbstractService
             if (service.isOpen() && service.resourceManager.isRunning()
                     && elapsed > 1000/* ms */) {
 
-                {
-                    
-                    final CounterSet tmp = service.resourceManager
-                            .getIndexManagerCounters();
+                // The service's counter set hierarchy.
+                final CounterSet serviceRoot = service.getFederation()
+                        .getServiceCounterSet();
 
-                    assert tmp != null;
+                /*
+                 * The counters for the index manager within the service's
+                 * counter hierarchy.
+                 * 
+                 * Note: The indices are a direct child of this node.
+                 */ 
+                final CounterSet tmp = (CounterSet) serviceRoot
+                        .getPath(IDataServiceCounters.resourceManager
+                                + ICounterSet.pathSeparator
+                                + IResourceManagerCounters.IndexManager);
 
-                    synchronized (tmp) {
-
-                        tmp.detach("indices");
-
-                        tmp.makePath("indices").attach(
-                                service.concurrencyManager.getIndexCounters()
-                        // resourceManager.getLiveJournal().getNamedIndexCounters()
-                                );
-
-                    }
-                    
-                }
-                
-                {
+                synchronized (tmp) {
 
                     /*
-                     * @todo this is done redundently here and in the overflow()
-                     * because it seems like the logic in overflow() is not
-                     * doing the trick for me.  Look into this further.
+                     * Note: We detach and then attach since that wipes out any
+                     * counter set nodes for index partitions which no longer
+                     * exist. Otherwise the will build up forever.
                      */
-                    final CounterSet tmp = service.resourceManager
-                            .getCounters();
+                    final boolean exists = tmp
+                            .getPath(IIndexManagerCounters.Indices) != null;
 
-                    assert tmp != null;
+                    // detach the index partition counters.
+                     tmp.detach(IIndexManagerCounters.Indices);
 
-                    synchronized (tmp) {
+                    // attach the current index partition counters.
+                    ((CounterSet) tmp.getPath(IIndexManagerCounters.Indices))
+                            .attach(service.resourceManager.getIndexCounters());
 
-                        tmp.detach(IResourceManagerCounters.LiveJournal);
+                    if(INFO)
+                        log
+                                .info("Attached index partition counters: preexisting="
+                                        + exists + ", path=" + tmp.getPath());
 
-                        tmp.makePath(IResourceManagerCounters.LiveJournal)
-                                .attach(
-                                        service.getResourceManager()
-                                                .getLiveJournal().getCounters());
-
-                    }
-                    
                 }
 
                 lastReattachMillis = now;
@@ -566,6 +567,7 @@ abstract public class DataService extends AbstractService
             }
 
         }
+
         private long lastReattachMillis = 0L;
 
         public boolean isServiceReady() {

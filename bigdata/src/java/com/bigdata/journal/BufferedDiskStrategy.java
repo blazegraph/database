@@ -522,7 +522,7 @@ public class BufferedDiskStrategy extends AbstractBufferStrategy implements
 
         writeCache.flush();
         
-        counters.ncacheFlush++;
+        storeCounters.ncacheFlush++;
 
     }
     
@@ -558,7 +558,7 @@ public class BufferedDiskStrategy extends AbstractBufferStrategy implements
     /**
      * Counters on {@link IRawStore} and disk access.
      */
-    final public DiskOnlyStrategy.Counters counters = new DiskOnlyStrategy.Counters();
+    final public DiskOnlyStrategy.StoreCounters storeCounters = new DiskOnlyStrategy.StoreCounters();
     
     /**
      * Return interesting information about the write cache and file operations.
@@ -581,7 +581,7 @@ public class BufferedDiskStrategy extends AbstractBufferStrategy implements
                 }
             });
 
-            root.attach(counters.getCounters());
+            root.attach(storeCounters.getCounters());
             
             /*
              * The BUFFER_POOL.
@@ -799,7 +799,7 @@ public class BufferedDiskStrategy extends AbstractBufferStrategy implements
 
         }
         
-        counters.nforce++;
+        storeCounters.nforce++;
         
     }
 
@@ -1011,9 +1011,9 @@ public class BufferedDiskStrategy extends AbstractBufferStrategy implements
         synchronized (this) 
         {
 
-            if (nbytes > counters.maxReadSize) {
+            if (nbytes > storeCounters.maxReadSize) {
 
-                counters.maxReadSize = nbytes;
+                storeCounters.maxReadSize = nbytes;
 
             }
             
@@ -1042,17 +1042,17 @@ public class BufferedDiskStrategy extends AbstractBufferStrategy implements
                     /*
                      * Update counters while synchronized.
                      */
-                    counters.nreads++;
-                    counters.bytesRead+=nbytes;
-                    counters.ncacheRead++;
-                    counters.elapsedReadNanos+=(System.nanoTime()-begin);
+                    storeCounters.nreads++;
+                    storeCounters.bytesRead+=nbytes;
+                    storeCounters.ncacheRead++;
+                    storeCounters.elapsedReadNanos+=(System.nanoTime()-begin);
 
                     // return the new buffer.
                     return dst;
 
                 } else {
                     
-                    counters.elapsedCacheReadNanos+=(System.nanoTime()-beginCache);
+                    storeCounters.elapsedCacheReadNanos+=(System.nanoTime()-beginCache);
                     
                 }
                 
@@ -1069,7 +1069,7 @@ public class BufferedDiskStrategy extends AbstractBufferStrategy implements
 
             try {
 
-                counters.ndiskRead += FileChannelUtility.readAll(opener, dst,
+                storeCounters.ndiskRead += FileChannelUtility.readAll(opener, dst,
                         pos);
 
             } catch (IOException ex) {
@@ -1084,11 +1084,11 @@ public class BufferedDiskStrategy extends AbstractBufferStrategy implements
             /*
              * Update counters while synchronized.
              */
-            counters.nreads++;
-            counters.bytesRead+=nbytes;
-            counters.bytesReadFromDisk+=nbytes;
-            counters.elapsedReadNanos+=(System.nanoTime()-begin);
-            counters.elapsedDiskReadNanos+=(System.nanoTime()-beginDisk);
+            storeCounters.nreads++;
+            storeCounters.bytesRead+=nbytes;
+            storeCounters.bytesReadFromDisk+=nbytes;
+            storeCounters.elapsedReadNanos+=(System.nanoTime()-begin);
+            storeCounters.elapsedDiskReadNanos+=(System.nanoTime()-beginDisk);
             
             // return the buffer.
             return dst;
@@ -1190,7 +1190,7 @@ public class BufferedDiskStrategy extends AbstractBufferStrategy implements
 
         }
 
-        counters.nreopen++;
+        storeCounters.nreopen++;
         
         return raf.getChannel();
         
@@ -1311,7 +1311,7 @@ public class BufferedDiskStrategy extends AbstractBufferStrategy implements
                             view.put(data);
 
                             // count this as a cache write.
-                            counters.ncacheWrite++;
+                            storeCounters.ncacheWrite++;
 
                             // Done.
                             return;
@@ -1321,7 +1321,7 @@ public class BufferedDiskStrategy extends AbstractBufferStrategy implements
                     } finally {
 
                         // track the write cache time.
-                        counters.elapsedCacheWriteNanos += (System.nanoTime() - beginCache);
+                        storeCounters.elapsedCacheWriteNanos += (System.nanoTime() - beginCache);
 
                     }
 
@@ -1352,13 +1352,13 @@ public class BufferedDiskStrategy extends AbstractBufferStrategy implements
                  * rather than primitive longs.
                  */
 
-                counters.nwrites++;
-                counters.bytesWritten += nbytes;
-                counters.elapsedWriteNanos += (System.nanoTime() - begin);
+                storeCounters.nwrites++;
+                storeCounters.bytesWritten += nbytes;
+                storeCounters.elapsedWriteNanos += (System.nanoTime() - begin);
 
-                if(nbytes > counters.maxWriteSize) {
+                if(nbytes > storeCounters.maxWriteSize) {
                     
-                    counters.maxWriteSize = nbytes;
+                    storeCounters.maxWriteSize = nbytes;
                     
                 }
                 
@@ -1436,9 +1436,9 @@ public class BufferedDiskStrategy extends AbstractBufferStrategy implements
                     
                     writeCache.write(addr, data);
 
-                    counters.ncacheWrite++;
+                    storeCounters.ncacheWrite++;
 
-                    counters.elapsedCacheWriteNanos+=(System.nanoTime()-beginCache);
+                    storeCounters.elapsedCacheWriteNanos+=(System.nanoTime()-beginCache);
 
                 }
                 
@@ -1469,13 +1469,13 @@ public class BufferedDiskStrategy extends AbstractBufferStrategy implements
              * primitive longs.
              */
 
-            counters.nwrites++;
-            counters.bytesWritten+=nbytes;
-            counters.elapsedWriteNanos+=(System.nanoTime() - begin);
+            storeCounters.nwrites++;
+            storeCounters.bytesWritten+=nbytes;
+            storeCounters.elapsedWriteNanos+=(System.nanoTime() - begin);
 
-            if(nbytes > counters.maxWriteSize) {
+            if(nbytes > storeCounters.maxWriteSize) {
                 
-                counters.maxWriteSize = nbytes;
+                storeCounters.maxWriteSize = nbytes;
                 
             }
 
@@ -1567,7 +1567,7 @@ public class BufferedDiskStrategy extends AbstractBufferStrategy implements
              * closed while we are writing on it.
              */
 
-            counters.ndiskWrite += FileChannelUtility.writeAll(getChannel(),
+            storeCounters.ndiskWrite += FileChannelUtility.writeAll(getChannel(),
                     data, pos);
 
             if (offset + nbytes < bufferSize) {
@@ -1600,8 +1600,8 @@ public class BufferedDiskStrategy extends AbstractBufferStrategy implements
             
         }
 
-        counters.bytesWrittenOnDisk += nbytes;
-        counters.elapsedDiskWriteNanos += (System.nanoTime() - begin);
+        storeCounters.bytesWrittenOnDisk += nbytes;
+        storeCounters.elapsedDiskWriteNanos += (System.nanoTime() - begin);
 
     }
 
@@ -1695,7 +1695,7 @@ public class BufferedDiskStrategy extends AbstractBufferStrategy implements
         if (DEBUG)
             log.debug("wrote root block: "+rootBlock);
         
-        counters.nwriteRootBlock++;
+        storeCounters.nwriteRootBlock++;
         
     }
 
@@ -1733,7 +1733,7 @@ public class BufferedDiskStrategy extends AbstractBufferStrategy implements
             
             force(true);
 
-            counters.ntruncate++;
+            storeCounters.ntruncate++;
             
             if(WARN)
                 log.warn("newLength=" + cf.format(newExtent) + ", file="

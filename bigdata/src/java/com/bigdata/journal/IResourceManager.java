@@ -292,7 +292,7 @@ public interface IResourceManager extends IServiceShutdown {
      * failover chain for the logical {@link IDataService} whose resources are
      * under management by this class.
      * 
-     * @todo not used right now.  might go away.
+     * @deprecated This is not used right now and might go away.
      */
     public UUID[] getDataServiceUUIDs();
 

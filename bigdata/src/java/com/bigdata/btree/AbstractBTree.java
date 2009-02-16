@@ -67,6 +67,7 @@ import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.OverflowManager;
+import com.bigdata.service.DataService;
 import com.bigdata.service.Split;
 
 /**
@@ -172,8 +173,51 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
     /**
      * Counters tracking various aspects of the btree.
      */
-    /* protected */public final BTreeCounters btreeCounters = new BTreeCounters();
+    private BTreeCounters btreeCounters = new BTreeCounters();
 
+    /**
+     * Counters tracking various aspects of the btree.
+     */
+    final public BTreeCounters getBtreeCounters() {
+    
+        return btreeCounters;
+        
+    }
+
+    /**
+     * Replace the {@link BTreeCounters}.
+     * <p>
+     * Note: This is used by the {@link IndexManager} to ensure that an index
+     * loaded from its backing store uses the {@link BTreeCounters} associated
+     * with that index since the {@link DataService} was last (re-)started.
+     * 
+     * @param btreeCounters
+     *            The counters to be used.
+     * 
+     * @throws IllegalArgumentException
+     *             if the argument is <code>null</code>.
+     */
+    final public void setBTreeCounters(final BTreeCounters btreeCounters) {
+
+        if (btreeCounters == null)
+            throw new IllegalArgumentException();
+
+        synchronized (this) {
+
+            this.btreeCounters = btreeCounters; 
+
+            if (this.counterSet != null) {
+                
+                // reattach the counters.
+                this.counterSet
+                        .attach(btreeCounters.getCounters(), true/* replace */);
+
+            }
+            
+        }
+        
+    }
+    
     /**
      * The persistence store.
      */

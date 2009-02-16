@@ -404,7 +404,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
         
         btree.nnodes++;
 
-        btree.btreeCounters.rootsSplit++;
+        btree.getBtreeCounters().rootsSplit++;
 
         // Note: nnodes and nleaves might not reflect rightSibling yet.
         if (BTree.INFO) {
@@ -978,7 +978,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
         // cast to mutable implementation class.
         BTree btree = (BTree)this.btree;
 
-        btree.btreeCounters.nodesSplit++;
+        btree.getBtreeCounters().nodesSplit++;
 
         /*
          * The #of entries spanned by this node _before_ the split.
@@ -2032,7 +2032,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
                             + btree.height + ", newRoot=" + btree.root);
                 }
                 
-                btree.btreeCounters.rootsJoined++;
+                btree.getBtreeCounters().rootsJoined++;
 
             }
 

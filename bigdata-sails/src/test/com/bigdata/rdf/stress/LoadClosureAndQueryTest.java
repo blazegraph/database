@@ -393,14 +393,14 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
         
         final StringBuilder sb = new StringBuilder();
 
-        if (false && tripleStore instanceof LocalTripleStore) {
-
-            // show the disk access details.
-            
-            sb.append(((Journal) tripleStore.getIndexManager())
-                    .getBufferStrategy().getCounters().toString());
-            
-        }
+//        if (false && tripleStore instanceof LocalTripleStore) {
+//
+//            // show the disk access details.
+//            
+//            sb.append(((Journal) tripleStore.getIndexManager())
+//                    .getBufferStrategy().getCounters().toString());
+//            
+//        }
         
 //        if(true) return sb;// comment out to get detailed info.
         
