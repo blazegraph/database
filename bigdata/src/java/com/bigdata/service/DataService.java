@@ -552,7 +552,7 @@ abstract public class DataService extends AbstractService
                      tmp.detach(IIndexManagerCounters.Indices);
 
                     // attach the current index partition counters.
-                    ((CounterSet) tmp.getPath(IIndexManagerCounters.Indices))
+                    ((CounterSet) tmp.makePath(IIndexManagerCounters.Indices))
                             .attach(service.resourceManager.getIndexCounters());
 
                     if(INFO)
