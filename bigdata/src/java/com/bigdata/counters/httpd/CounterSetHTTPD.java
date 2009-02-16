@@ -7,13 +7,11 @@ import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.util.LinkedHashMap;
 import java.util.Properties;
-import java.util.UUID;
 import java.util.Vector;
+
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.httpd.XHTMLRenderer.Model;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.service.Event;
-import com.bigdata.service.IEventReportingService;
 import com.bigdata.service.IService;
 import com.bigdata.util.httpd.AbstractHTTPD;
 
@@ -75,18 +73,37 @@ public class CounterSetHTTPD extends AbstractHTTPD {
         
         final InputStream is;
 
+        /*
+         * Note: This hacks specific downloadable resources which are accessed
+         * using the classpath.
+         */
         if (uri.contains("jquery.js")) {
             
             mimeType = MIME_TEXT_HTML;
             
             is = getClass().getResourceAsStream("jquery.js");
             
+            if (INFO)
+                log.info("Serving: jquery");
+
         } else if (uri.contains("jquery.flot.js")) {
             
             mimeType = MIME_TEXT_HTML;
             
             is = getClass().getResourceAsStream("jquery.flot.js");
+
+            if (INFO)
+                log.info("Serving: flot");
+
+        } else if (uri.contains("excanvas.pack.js")) {
             
+            mimeType = MIME_TEXT_HTML;
+
+            is = getClass().getResourceAsStream("excanvas.pack.js");
+
+            if (INFO)
+                log.info("Serving: excanvas");
+
         } else if (true) {
 
             // conneg HMTL

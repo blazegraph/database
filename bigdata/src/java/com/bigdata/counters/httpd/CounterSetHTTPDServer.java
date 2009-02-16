@@ -62,14 +62,12 @@ public class CounterSetHTTPDServer implements Runnable {
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final protected static boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final protected static boolean DEBUG = log.isDebugEnabled();
 
     /**
      * Runs the httpd server. When the optional file(s) are given, they will be
@@ -81,7 +79,7 @@ public class CounterSetHTTPDServer implements Runnable {
      * 
      * @throws IOException
      */
-    public static void main(String[] args) throws Exception {
+    public static void main(final String[] args) throws Exception {
 
         // default port.
         int port = 8080;
@@ -195,11 +193,9 @@ public class CounterSetHTTPDServer implements Runnable {
     /**
      * 
      * @param port
-     * 
-     * @throws IOException
      */
-    public CounterSetHTTPDServer(int port,CounterSet counterSet,
-            IEventReportingService service) throws Exception {
+    public CounterSetHTTPDServer(final int port, final CounterSet counterSet,
+            final IEventReportingService service) throws Exception {
 
         /*
          * The runtime shutdown hook appears to be a robust way to handle ^C by
@@ -223,7 +219,8 @@ public class CounterSetHTTPDServer implements Runnable {
                 
             } catch (InterruptedException ex) {
                 
-                log.info(""+ex);
+                if(INFO)
+                    log.info(ex);
                 
             } finally {
 
@@ -239,7 +236,8 @@ public class CounterSetHTTPDServer implements Runnable {
 
     synchronized public void shutdownNow() {
 
-        log.info("begin");
+        if(INFO)
+            log.info("begin");
 
         if (httpd != null) {
 
@@ -249,7 +247,8 @@ public class CounterSetHTTPDServer implements Runnable {
         
         }
 
-        log.info("done");
+        if(INFO)
+            log.info("done");
 
     }
 
@@ -276,7 +275,8 @@ public class CounterSetHTTPDServer implements Runnable {
             
             try {
 
-                log.info("Running shutdown.");
+                if(INFO)
+                    log.info("Running shutdown.");
 
                 /*
                  * Note: This is the "server" shutdown.

@@ -802,9 +802,11 @@ public class XHTMLRenderer {
 
     protected void writeScripts(Writer w)  throws IOException {
         
-        w.write("\n\n<script language=\"javascript\" type=\"text/javascript\" src=\"jquery.js\"></script>\n");
+        w.write("<script\n language=\"javascript\" type=\"text/javascript\" src=\"jquery.js\"></script\n>");
         
-        w.write("<script language=\"javascript\" type=\"text/javascript\" src=\"jquery.flot.js\"></script>\n\n");
+        w.write("<script\n language=\"javascript\" type=\"text/javascript\" src=\"jquery.flot.js\"></script\n>");
+
+        w.write("<!--[if IE]><script language=\"javascript\" type=\"text/javascript\" src=\"excanvas.pack.js\"></script><![endif]-->");
 
     }
     
@@ -876,8 +878,8 @@ public class XHTMLRenderer {
             
             if (model.service instanceof IEventReportingService) {
                 
-                LinkedHashMap<UUID,Event> events = 
-                    ((IEventReportingService) model.service).getEvents();
+                final LinkedHashMap<UUID, Event> events = ((IEventReportingService) model.service)
+                        .getEvents();
                 
                 if (events != null) { // && events.isEmpty() == false) {
                     
@@ -2106,6 +2108,7 @@ public class XHTMLRenderer {
 //            }
             
             return "CSet{cats=" + Arrays.toString(cats) + //
+                    ", #counters="+counters.size()+//
                     // Note: This is just too much detail.
                     //",counters=[" + sb + "]" + //
                     "}";
@@ -2379,58 +2382,9 @@ public class XHTMLRenderer {
         if (timestampFormat == null)
             throw new IllegalArgumentException();
 
-        /*
-         * The ordered set of distinct counter names. The order of the selected
-         * counters is preserved here (minus duplicate counter names) due to the
-         * virtues of the linked hash set.
-         */
-        final LinkedHashSet<String> vcols = new LinkedHashSet<String>();
-        for (int i = 0; i < a.length; i++) {
-            
-            vcols.add(a[i].getName());
-            
-        }
-
-        if (INFO)
-            log.info("vnames: " + vcols);
-
-        // aggregate counters into sets sharing the same category values.
-        final List<CSet> csets = getCategoryValueSets(a);
-
-        if (INFO)
-            log.info("csets: " + csets);
-
-        // #of capturing groups in the pattern.
-        final int ngroups = model.pattern.matcher("").groupCount();
-
-        if (INFO)
-            log.info("ngroups=" + ngroups);
-
-        /*
-         * An array of category column names. The names can be specified using
-         * URL query parameters. When they are not specified or when there are
-         * not enough specified parameters then we use some generated names.
-         */
-        final String[] cnames = new String[ngroups];
-
-        for (int i = 0; i < ngroups; i++) {
-
-            if (model.category != null && model.category.length > i) {
-
-                cnames[i] = model.category[i];
-
-            } else {
-
-                cnames[i] = "group#" + i;
-
-            }
-
-        }
-
-        if (INFO)
-            log.info("category names=" + Arrays.toString(cnames));
-        
         final HistoryTable t = new HistoryTable(a, basePeriod);
+
+        final PivotTable pt = new PivotTable(t);
         
         /*
          * Figure out how we will format the timestamp (From:, To:, and the last
@@ -2483,11 +2437,11 @@ public class XHTMLRenderer {
             // timestamp column headers.
             w.write("  <th>" + cdata(t.units) + "</th\n>");
             w.write("  <th>" + cdata("timestamp") + "</th\n>");
-            for (String s : cnames) {
+            for (String s : pt.cnames) {
                 // category column headers.
                 w.write("  <th>" + cdata(s) + "</th\n>");
             }
-            for (String s : vcols) {
+            for (String s : pt.vcols) {
                 // performance counter column headers.
                 w.write("  <th>" + cdata(s) + "</th\n>");
             }
@@ -2496,9 +2450,8 @@ public class XHTMLRenderer {
         }
 
         /*
-         * FIXME refactor as PivotTable, similar to the HistoryTable. This
-         * should handle all the aggregation and leave this method with just the
-         * rendering choices.
+         * FIXME Refactor to use PivotTable and an iterator construct that
+         * visits rows.
          */
         
         // for each row in the HistoryTable.
@@ -2526,11 +2479,11 @@ public class XHTMLRenderer {
              * The set of distinct ordered matched category values in the
              * current row of the history table.
              */
-            for(CSet cset : csets) {
+            for(CSet cset : pt.csets) {
 
-                assert cset.cats.length == cnames.length : "cset categories="
+                assert cset.cats.length == pt.cnames.length : "cset categories="
                         + Arrays.toString(cset.cats) + " vs "
-                        + "category names: " + Arrays.toString(cnames);
+                        + "category names: " + Arrays.toString(pt.cnames);
                 
                 /*
                  * Aggregate values for counters in this cset having a value for
@@ -2544,7 +2497,7 @@ public class XHTMLRenderer {
                  * output for for their cset.
                  */
                 
-                final Double[] vals = new Double[vcols.size()];
+                final Double[] vals = new Double[pt.vcols.size()];
                 
                 // #of value columns having a value.
                 int ndefined = 0;
@@ -2553,7 +2506,7 @@ public class XHTMLRenderer {
                 int valueColumnIndex = 0;
                 
                 // for each value column.
-                for (String vcol : vcols) {
+                for (String vcol : pt.vcols) {
 
                     // #of values aggregated for this value column.
                     int valueCountForColumn = 0;
@@ -2641,7 +2594,7 @@ public class XHTMLRenderer {
 
                 w.write("  <td>" + timeStr + "</td\n>");
 
-                for (int j = 0; j < cnames.length; j++) {
+                for (int j = 0; j < pt.cnames.length; j++) {
 
                     w.write("  <td>" + cset.cats[j] + "</td\n>");
 
@@ -2666,7 +2619,323 @@ public class XHTMLRenderer {
         w.write("</table\n>");
 
     }
-    
+
+    /**
+     * Aggregates data from a table by grouping the cells in the table into sets ({@link CSet}s)
+     * of category columns. The values for cells belonging to the same
+     * {@link CSet} are aggregated for each distinct
+     * {@link ICounterNode#getName()}. 
+     */
+    class PivotTable {
+       
+        /**
+         * The HistoryTable (converts counter heirarchy into regular table).
+         */
+        public final HistoryTable src;
+        
+        /**
+         * The selected counters (redundent reference to {@link HistoryTable#a}.
+         */
+        final ICounter[] a;
+
+        /**
+         * The ordered set of distinct counter names. The order of the selected
+         * counters is preserved here (minus duplicate counter names) due to the
+         * virtues of the linked hash set.
+         */
+        final LinkedHashSet<String> vcols;
+        
+        /**
+         * Aggregation of the selected counters ({@link #a}) into sets sharing
+         * the same category values.
+         */
+        final List<CSet> csets;
+        
+        /**
+         * An array of category column names. The names can be specified using
+         * URL query parameters. When they are not specified or when there are
+         * not enough specified parameters then we use some generated names.
+         * 
+         * @see Model#CATEGORY
+         */
+        final String[] cnames;
+        
+        /**
+         * 
+         * @param t
+         *            The source data.
+         */
+        public PivotTable(final HistoryTable t) {
+
+            if(t == null)
+                throw new IllegalArgumentException();
+
+            // the HistoryTable (converts counter heirarchy into regular table).
+            this.src = t;
+
+            // the selected counters (used to derived the HistoryTable).
+            this.a = t.a;
+            
+            /*
+             * The ordered set of distinct counter names. The order of the selected
+             * counters is preserved here (minus duplicate counter names) due to the
+             * virtues of the linked hash set.
+             */
+            vcols = new LinkedHashSet<String>();
+            for (int i = 0; i < a.length; i++) {
+                
+                vcols.add(a[i].getName());
+                
+            }
+
+            if (INFO)
+                log.info("vnames: " + vcols);
+
+            // aggregate counters into sets sharing the same category values.
+            csets = getCategoryValueSets(a);
+
+            if (INFO)
+                log.info("csets: " + csets);
+
+            // #of capturing groups in the pattern.
+            final int ngroups = model.pattern.matcher("").groupCount();
+
+            if (INFO)
+                log.info("ngroups=" + ngroups);
+
+            /*
+             * An array of category column names. The names can be specified using
+             * URL query parameters. When they are not specified or when there are
+             * not enough specified parameters then we use some generated names.
+             */
+            cnames = new String[ngroups];
+
+            for (int i = 0; i < ngroups; i++) {
+
+                if (model.category != null && model.category.length > i) {
+
+                    cnames[i] = model.category[i];
+
+                } else {
+
+                    cnames[i] = "group#" + i;
+
+                }
+
+            }
+
+            if (INFO)
+                log.info("category names=" + Arrays.toString(cnames));
+            
+            // for each row in the HistoryTable.
+            for (int row = 0; row < t.nrows; row++) {
+
+                // The timestamp for the row.
+                final long timestamp = t.getTimestamp(row);
+                
+                /*
+                 * The set of distinct ordered matched category values in the
+                 * current row of the history table.
+                 */
+                for(CSet cset : csets) {
+
+                    assert cset.cats.length == cnames.length : "cset categories="
+                            + Arrays.toString(cset.cats) + " vs "
+                            + "category names: " + Arrays.toString(cnames);
+                    
+                    /*
+                     * Aggregate values for counters in this cset having a value for
+                     * each value column in turn.
+                     * 
+                     * If none of the counters in the cset have a value for the row
+                     * in the data table then we will not display a row in the
+                     * output table for this cset. However, there can still be other
+                     * csets which do select counters in the data table for which
+                     * there are samples and that would be displayed under the
+                     * output for for their cset.
+                     */
+                    
+                    final Double[] vals = new Double[vcols.size()];
+                    
+                    // #of value columns having a value.
+                    int ndefined = 0;
+                    
+                    // index of the current value column.
+                    int valueColumnIndex = 0;
+                    
+                    // for each value column.
+                    for (String vcol : vcols) {
+
+                        // #of values aggregated for this value column.
+                        int valueCountForColumn = 0;
+                        
+                        // The aggregated value for this value column.
+                        double val = 0d;
+
+                        // consider each counter in the cset for this output row.
+                        for (ICounter c : cset.counters) {
+
+                            if (!c.getName().equals(vcol)) {
+
+                                // not for this value column (skip over).
+                                continue;
+
+                            }
+
+                            // find the index for that counter in the data table.
+                            for (int col = 0; col < a.length; col++) {
+
+                                if (c != a[col])
+                                    continue;
+
+                                // get the sample from the data table.
+                                final IHistoryEntry e = t.data[row][col];
+
+                                if (e == null) {
+
+                                    // no sampled value.
+                                    continue;
+                                    
+                                }
+
+                                // @todo catch class cast problems and ignore
+                                // val.  @todo protected against overflow of
+                                // double.
+                                val += ((Number) e.getValue()).doubleValue();
+
+                                valueCountForColumn++;
+                                
+                                /*
+                                 * The counter appears just once in the data table
+                                 * so we can stop once we find its index.
+                                 */
+                                break;
+
+                            }
+
+                        } // next counter in CSet.
+
+                        if (valueCountForColumn > 0) {
+
+                            /*
+                             * There was at least one sample for the current value
+                             * column.
+                             */
+                            
+                            // save the value.
+                            vals[valueColumnIndex] = val;
+
+                            // #of non-empty values in this row.
+                            ndefined++;
+
+                        }
+
+                        if (DEBUG && valueCountForColumn > 0)
+                            log.debug("vcol=" + vcol + ", vcol#="
+                                    + valueColumnIndex + ", #values="
+                                    + valueCountForColumn + ", val=" + val);
+                        
+                        valueColumnIndex++;
+
+                    } // next value column.
+
+                    if (ndefined == 0) {
+                     
+                        // no data for this row.
+                        continue;
+                        
+                    }
+
+                    // @todo else output a PivotRow.
+//                    
+//                    new PivotRow(row, timestamp,cset,vals);
+                    
+                }
+
+            } // next row.
+
+        }
+
+        /**
+         * A row in a {@link PivotTable}.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+         *         Thompson</a>
+         * @version $Id$
+         */
+        class PivotRow {
+
+            /**
+             * The row of the source {@link HistoryTable} whose aggregated
+             * values are captured by the row of the pivot table.
+             */
+            final int row;
+            
+            /**
+             * The timestamp associated with the data in the row.
+             */
+            final long timestamp;
+
+            /**
+             * The category set for this row. The values for the category
+             * columns in the row are {@link CSet#cats}.
+             */
+            final CSet cset;
+
+            /**
+             * The value columns for the row. There is one element in the array
+             * for each element in {@link PivotTable#vcols}. The element MAY be
+             * <code>null</code> in which case there was no data for that
+             * counter for this row.
+             */
+            final Double[] values;
+
+            /**
+             * 
+             * @param row
+             *            The row of the source {@link HistoryTable} whose
+             *            aggregated values are captured by the row of the pivot
+             *            table.
+             * @param timestamp
+             *            The timestamp associated with the data in the row.
+             * @param cset
+             *            The category set for this row. The values for the
+             *            category columns in the row are {@link CSet#cats}.
+             * @param values
+             *            The value columns for the row. There is one element in
+             *            the array for each element in {@link PivotTable#vcols}.
+             *            The element MAY be <code>null</code> in which case
+             *            there was no data for that counter for this row.
+             */
+            PivotRow(final int row, final long timestamp, final CSet cset,
+                    final Double[] values) {
+
+                if (cset == null)
+                    throw new IllegalArgumentException();
+
+                if (cset.cats.length != PivotTable.this.cnames.length)
+                    throw new IllegalArgumentException();
+                
+                if (values == null)
+                    throw new IllegalArgumentException();
+
+                if (values.length != PivotTable.this.vcols.size())
+                    throw new IllegalArgumentException();
+
+                this.row = row;
+                
+                this.timestamp = timestamp;
+                
+                this.cset = cset;
+                
+                this.values = values;
+
+            }
+
+        }
+
+    }
+
     /**
      * Selects and returns all counters with history in the hierarchy starting
      * with the specified {@link CounterSet} up to the specified depth.
@@ -2831,8 +3100,8 @@ public class XHTMLRenderer {
      * Write the html to render the Flot-based time-series chart, plotting the
      * supplied events. 
      */
-    protected void writeFlot(Writer w, LinkedHashMap<UUID, Event> events) 
-        throws IOException  {
+    protected void writeFlot(final Writer w,
+            final LinkedHashMap<UUID, Event> events) throws IOException {
         
         w.write("\n\n<p/><p/>\n");
 
@@ -2842,7 +3111,7 @@ public class XHTMLRenderer {
         
         // writeResource(w, "flot-data.txt");
         
-        StringWriter sw = new StringWriter();
+        final StringWriter sw = new StringWriter();
         
         writeAsychOverflowEvents(sw, events);
         
@@ -2859,21 +3128,47 @@ public class XHTMLRenderer {
     }
     
     /**
-     * Demonstrates how to hook events into flot.  Hardcoded to output only
-     * {@link EventType#AsynchronousOverflow} events. 
+     * Demonstrates how to hook events into flot.
+     * 
+     * FIXME Hardcoded to output only {@link EventType#AsynchronousOverflow}
+     * events. Modify to use a selection mechanism similar to that already used
+     * for correlated table or pivot table views of performance counters. The
+     * view needs to be decoupled from "blade##" to allow any mixture of events
+     * to be selected for plotting.
+     * 
+     * FIXME Modify to allow visualization of a performance counter timeseries
+     * data.
+     * 
+     * FIXME Modify to allow linked viz of performance counter timeseries w/ an
+     * event timeseries and an overview that controls what is seen in both.
+     * 
+     * @todo when events are aggregated the data turns into a pivot table and
+     *       gets vizualized as column plots or the like.
+     * 
+     * @todo allow selection in both x and y so that we can focus on specific
+     *       event sequences? allow reordering of events into interesting
+     *       sequences?
+     * 
+     * @todo a form to set the various query parameters.
+     * 
+     * @todo a dashboard view of the federation as a jsp page incorporating
+     *       output from a variety of sources. basically a replacement for the
+     *       use of a worksheet to look at views of the data which we know to be
+     *       interesting. since I don't want to force the bundling of a servlet
+     *       engine with each service, this could be a standoff module.
      */
-    protected void writeAsychOverflowEvents(Writer w, 
-            LinkedHashMap<UUID, Event> events) throws IOException {
+    protected void writeAsychOverflowEvents(final Writer w,
+            final LinkedHashMap<UUID, Event> events) throws IOException {
         
-        Map<String,StringBuilder> eventsByHost = new HashMap<String,StringBuilder>();
+        final Map<String,StringBuilder> eventsByHost = new HashMap<String,StringBuilder>();
         
-        StringBuilder data = new StringBuilder();
+        final StringBuilder data = new StringBuilder();
         
         data.append("var data = [ ");
         
         for (Map.Entry<UUID, Event> entry : events.entrySet()) {
         
-            Event e = entry.getValue();
+            final Event e = entry.getValue();
             
             if (!e.isComplete() || 
                 e.majorEventType != EventType.AsynchronousOverflow) {
@@ -2884,7 +3179,7 @@ public class XHTMLRenderer {
             
             int i = e.hostname.indexOf('.');
             
-            String hostyvar = e.hostname.substring(0, i) + "y"; 
+            final String hostyvar = e.hostname.substring(0, i) + "y"; 
             
             StringBuilder sb = eventsByHost.get(e.hostname);
             
@@ -2894,9 +3189,9 @@ public class XHTMLRenderer {
                 
                 eventsByHost.put(e.hostname, sb);
                 
-                int hostnum = Integer.valueOf(e.hostname.substring(5, i));
+                final int hostnum = Integer.valueOf(e.hostname.substring(5, i));
                 
-                String hostvar = e.hostname.substring(0, i);
+                final String hostvar = e.hostname.substring(0, i);
                 
                 sb.append("var ");
                 
@@ -2963,14 +3258,15 @@ public class XHTMLRenderer {
     }
     
     /**
-     * Write a file into the html.  The supplied resource will be relative
+     * Write a text file into the html. The supplied resource will be relative
      * to this class.
      */
-    protected void writeResource(Writer w, String resource) throws IOException {
-        
-        InputStream is = getClass().getResourceAsStream(resource);
-        
-        BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+    protected void writeResource(final Writer w, final String resource)
+            throws IOException {
+
+        final InputStream is = getClass().getResourceAsStream(resource);
+
+        final BufferedReader reader = new BufferedReader(new InputStreamReader(is));
         
         try {
             
