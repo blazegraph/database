@@ -49,7 +49,7 @@ public class DummyEventReportingService implements IEventReportingService {
      * 
      * @param reader a reader for the CSV file
      */
-    public void readCSV(BufferedReader reader) throws IOException {
+    public void readCSV(final BufferedReader reader) throws IOException {
         String header = reader.readLine();
         if (header == null) {
             // no data
@@ -63,9 +63,11 @@ public class DummyEventReportingService implements IEventReportingService {
         }
         // create a temporary list in case the CSV rows are not ordered
         // correctly
-        List<Event> events = new LinkedList<Event>();
+        final List<Event> events = new LinkedList<Event>();
         String row;
+        int lineno = 0;
         while ((row = reader.readLine()) != null) {
+            lineno++;
             try {
                 Event e = Event.fromString(row);
 //                System.err.println(e.toString());
@@ -73,7 +75,7 @@ public class DummyEventReportingService implements IEventReportingService {
             } catch (Exception ex) {
                 ex.printStackTrace();
                 System.err.println("skipping bad row: " + row);
-                throw new IOException("bad row: " + row);
+                throw new IOException("bad row("+lineno+") : " + row);
             }
         }
         // sort into time order

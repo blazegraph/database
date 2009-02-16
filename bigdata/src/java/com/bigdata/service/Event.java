@@ -29,7 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service;
 
 import java.io.Serializable;
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.StringTokenizer;
 import java.util.UUID;
@@ -454,9 +454,10 @@ public class Event implements Serializable {
      * @throws ClassNotFoundException 
      *          if any fields specify an invalid classname
      */
-    protected Event(String s) throws ClassNotFoundException {
+    protected Event(final String s) throws ClassNotFoundException {
 //        System.err.println(s);
-        MyStringTokenizer st = new MyStringTokenizer(s, "\t");
+        final MyStringTokenizer st = new MyStringTokenizer(s, "\t");
+        try {
         this.eventUUID = UUID.fromString(st.nextToken());    
 //        System.err.println("eventUUID: <"+eventUUID+">");
         String resourceIndexName = st.nextToken();
@@ -521,6 +522,10 @@ public class Event implements Serializable {
         if (st.hasMoreTokens()) {
             this.details = st.nextToken();
         }
+        } catch(Throwable t) {
+            throw new RuntimeException("At field: " + st.getCurrentFieldIndex()
+                    + " of " + st.getFieldCount() + " : " + t, t);
+        }
     }
     
     /**
@@ -550,14 +555,32 @@ public class Event implements Serializable {
         
         private int i;
         
-        public MyStringTokenizer(String s, String delim) {
-            this.tokens = new LinkedList<String>();
-            StringTokenizer st = new StringTokenizer(s, delim, true);
+        public MyStringTokenizer(final String s, final String delim) {
+            this.tokens = new ArrayList<String>(20);
+            final StringTokenizer st = new StringTokenizer(s, delim, true);
             while (st.hasMoreTokens()) {
                 tokens.add(st.nextToken());
             }
             this.delim = delim;
             this.i = 0;
+        }
+
+        /**
+         * The #of fields that were extracted.
+         */
+        public int getFieldCount() {
+            
+            return tokens.size();
+            
+        }
+        
+        /**
+         * The index of the last field returned in [0:nfields-1]
+         */
+        public int getCurrentFieldIndex() {
+            
+            return i;
+            
         }
         
         public boolean hasMoreTokens() {

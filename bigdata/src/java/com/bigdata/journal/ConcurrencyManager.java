@@ -238,7 +238,6 @@ public class ConcurrencyManager implements IConcurrencyManager {
          * tasks will block the caller -or- ZERO (0) to use a queue with an
          * unlimited capacity.
          * 
-         * @see #WRITE_SERVICE_CORE_POOL_SIZE
          * @see #DEFAULT_WRITE_SERVICE_QUEUE_CAPACITY
          */
         String WRITE_SERVICE_QUEUE_CAPACITY = ConcurrencyManager.class
