@@ -31,10 +31,12 @@ package com.bigdata.resources;
 import java.io.File;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
@@ -43,6 +45,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
@@ -58,6 +61,8 @@ import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.concurrent.NamedLock;
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSet;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
@@ -218,6 +223,12 @@ abstract public class IndexManager extends StoreManager {
      */
     public static interface IIndexManagerCounters {
 
+        /**
+         * The parent under which the per-index partition performance counters
+         * are listed.
+         */
+        String Indices = "indices";
+        
         String StaleLocatorCacheCapacity = "Stale Locator Cache Capacity";
 
         String StaleLocatorCacheSize = "Stale Locator Cache Size";
@@ -273,8 +284,7 @@ abstract public class IndexManager extends StoreManager {
      *       definition (index segments in use) might have changed as well.
      */
 //    final private WeakValueCache<NT, IIndex> indexCache;
-    final public IndexCache indexCache; // FIXME make private
-//    final private IndexCache indexCache;
+    final private IndexCache indexCache;
 
     /**
      * The earliest timestamp that MUST be retained for the read-historical
@@ -628,8 +638,13 @@ abstract public class IndexManager extends StoreManager {
      *            The name of the index partition.
      * @param reason
      *            The reason (split, join, or move).
+     * 
+     * FIXME Should also include "deleted" and handle case where a scale-out
+     * index is deleted and then re-created so that we don't get the
+     * {@link StaleLocatorException} after the recreate.
      */
-    protected void setIndexPartitionGone(String name, StaleLocatorReason reason) {
+    protected void setIndexPartitionGone(final String name,
+            final StaleLocatorReason reason) {
         
         if (name == null)
             throw new IllegalArgumentException();
@@ -641,6 +656,9 @@ abstract public class IndexManager extends StoreManager {
             log.info("name=" + name + ", reason=" + reason);
 
         staleLocatorCache.put(name, reason, true);
+        
+        // clear from the index counters.
+        indexCounters.remove(name);
         
     }
 
@@ -738,6 +756,10 @@ abstract public class IndexManager extends StoreManager {
      * Return a reference to the named index as of the specified timestamp on
      * the identified resource.
      * <p>
+     * Note: {@link AbstractTask} handles the load of the {@link ITx#UNISOLATED}
+     * index from the live journal in such a manner as to provide ACID semantics
+     * for add/drop of indices.
+     * <p>
      * Note: The returned index is NOT isolated. Isolation is handled by the
      * {@link Tx}.
      * 
@@ -771,178 +793,204 @@ abstract public class IndexManager extends StoreManager {
 
         if (store instanceof IJournal) {
 
-            // the given journal.
-            final AbstractJournal journal = (AbstractJournal) store;
+            /*
+             * A BTree on this Journal.
+             */
 
-            if (timestamp == ITx.UNISOLATED) {
-
-                /*
-                 * Unisolated index.
-                 */
-
-                // MAY be null.
-                btree = (BTree) journal.getIndex(name);
-
-            } else if( timestamp == ITx.READ_COMMITTED ) {
-
-                /*
-                 * Read committed operation against the most recent commit point.
-                 * 
-                 * Note: This commit record is always defined, but that does not
-                 * mean that any indices have been registered.
-                 */
-
-                final ICommitRecord commitRecord = journal.getCommitRecord();
-
-                final long ts = commitRecord.getTimestamp();
-
-                if (ts == 0L) {
-
-                    log.warn("Nothing committed: read-committed operation.");
-
-                    return null;
-
-                }
-
-                // MAY be null.
-                btree = journal.getIndex(name, commitRecord);
-                
-                if (btree != null) {
-
-//                    /*
-//                     * Mark the B+Tree as read-only.
-//                     */
-//                    
-//                    ((BTree)btree).setReadOnly(true);
-                    
-                    assert ((BTree) btree).getLastCommitTime() != 0;
-//                    ((BTree)btree).setLastCommitTime(commitRecord.getTimestamp());
-                    
-                }
-
-            } else {
-
-                /*
-                 * A specified historical index commit point.
-                 */
-
-                // use absolute value in case timestamp is negative.
-                final long ts = Math.abs(timestamp);
-
-                // the corresponding commit record on the journal.
-                final ICommitRecord commitRecord = journal.getCommitRecord(ts);
-
-                if (commitRecord == null) {
-
-                    log.warn("Resource has no data for timestamp: name=" + name
-                            + ", timestamp=" + timestamp + ", resource="
-                            + store.getResourceMetadata());
-
-                    return null;
-                    
-                }
-
-                // open index on that journal (MAY be null).
-                btree = (BTree) journal.getIndex(name, commitRecord);
-
-                if (btree != null) {
-
-//                    /*
-//                     * Mark the B+Tree as read-only.
-//                     */
-//                    
-//                    ((BTree)btree).setReadOnly(true);
-                    
-                    assert ((BTree) btree).getLastCommitTime() != 0;
-//                    ((BTree)btree).setLastCommitTime(commitRecord.getTimestamp());
-                    
-                }
-
-            }
+            btree = getIndexOnJournal(name, timestamp, (AbstractJournal) store);
 
         } else {
 
             /*
              * An IndexSegmentStore containing a single IndexSegment.
              */
-            
-            final IndexSegmentStore segStore = ((IndexSegmentStore) store);
 
-            if (timestamp != ITx.READ_COMMITTED && timestamp != ITx.UNISOLATED) {
-            
-                // use absolute value in case timestamp is negative.
-                final long ts = Math.abs(timestamp);
+            btree = getIndexOnSegment(name, timestamp,
+                    (IndexSegmentStore) store);
 
-                if (segStore.getCheckpoint().commitTime > ts) {
+        }
 
-                    log.warn("Resource has no data for timestamp: name=" + name
-                            + ", timestamp=" + timestamp + ", store=" + store);
+        if (btree != null) {
 
-                    return null;
+            /*
+             * Make sure that it is using the canonical counters for that index.
+             * 
+             * Note: AbstractTask also does this for UNISOLATED indices which it
+             * loads by itself as part of providing ACID semantics for add/drop
+             * of indices.
+             */
 
-                }
-
-            }
-
-            {
-                
-                final IResourceMetadata resourceMetadata = store.getResourceMetadata();
-                
-                final UUID storeUUID = resourceMetadata.getUUID();
-
-                /*
-                 * Note: synchronization is required to have the semantics of an
-                 * atomic get/put against the WeakValueCache.
-                 * 
-                 * Note: The load of the index segment from the store can have
-                 * significant latency. The use of a per-UUID lock allows us to
-                 * load index segments for different index views concurrently.
-                 * 
-                 * Note: We DO NOT use a name+timestamp lock here because many
-                 * different timestamp values will be served by the same
-                 * IndexSegment.
-                 */
-                final Lock lock = segmentLock.acquireLock(storeUUID);
-                
-                try {
-
-                    // check the cache first.
-                    IndexSegment seg = indexSegmentCache.get(storeUUID);
-
-                    if (seg == null) {
-
-                        if (INFO)
-                            log.info("Loading index segment from store: name="
-                                    + name + ", file="
-                                    + resourceMetadata.getFile());
-
-                        // Open an index segment.
-                        seg = segStore.loadIndexSegment();
-
-                        indexSegmentCache.put(storeUUID, seg);
-//                        indexSegmentCache
-//                                .put(storeUUID, seg, false/* dirty */);
-
-                    }
-                    
-                    btree = seg;
-
-                } finally {
-                    
-                    lock.unlock();
-                    
-                }
-            
-            }
+            btree.setBTreeCounters(getIndexCounters(name));
 
         }
 
         if (INFO)
-            log.info("name=" + name + ", timestamp=" + timestamp + ", store="
-                    + store + " : " + btree);
+            log.info("name=" + name + ", timestamp=" + timestamp + ", found="
+                    + (btree != null) + ", store=" + store + " : " + btree);
 
         return btree;
 
+    }
+
+    final private AbstractBTree getIndexOnJournal(final String name,
+            final long timestamp, final AbstractJournal journal) {
+
+        final AbstractBTree btree;
+
+        if (timestamp == ITx.UNISOLATED) {
+
+            /*
+             * Unisolated index.
+             */
+
+            // MAY be null.
+            btree = (BTree) journal.getIndex(name);
+
+        } else if (timestamp == ITx.READ_COMMITTED) {
+
+            /*
+             * Read committed operation against the most recent commit point.
+             * 
+             * Note: This commit record is always defined, but that does not
+             * mean that any indices have been registered.
+             */
+
+            final ICommitRecord commitRecord = journal.getCommitRecord();
+
+            final long ts = commitRecord.getTimestamp();
+
+            if (ts == 0L) {
+
+                log.warn("Nothing committed: read-committed operation.");
+
+                return null;
+
+            }
+
+            // MAY be null.
+            btree = journal.getIndex(name, commitRecord);
+
+            if (btree != null) {
+
+                assert ((BTree) btree).getLastCommitTime() != 0;
+                
+            }
+
+        } else {
+
+            /*
+             * A specified historical index commit point.
+             */
+
+            // use absolute value in case timestamp is negative.
+            final long ts = Math.abs(timestamp);
+
+            // the corresponding commit record on the journal.
+            final ICommitRecord commitRecord = journal.getCommitRecord(ts);
+
+            if (commitRecord == null) {
+
+                log.warn("Resource has no data for timestamp: name=" + name
+                        + ", timestamp=" + timestamp + ", resource="
+                        + journal.getResourceMetadata());
+
+                return null;
+
+            }
+
+            // open index on that journal (MAY be null).
+            btree = (BTree) journal.getIndex(name, commitRecord);
+
+            if (btree != null) {
+
+                assert ((BTree) btree).getLastCommitTime() != 0;
+
+            }
+
+        }
+
+        // MAY be null.
+        return btree;
+
+    }
+    
+    final private IndexSegment getIndexOnSegment(final String name,
+            final long timestamp, IndexSegmentStore segStore) {
+
+        final IndexSegment btree;
+
+        if (timestamp != ITx.READ_COMMITTED && timestamp != ITx.UNISOLATED) {
+
+            // use absolute value in case timestamp is negative.
+            final long ts = Math.abs(timestamp);
+
+            if (segStore.getCheckpoint().commitTime > ts) {
+
+                log.warn("Resource has no data for timestamp: name=" + name
+                        + ", timestamp=" + timestamp + ", store=" + segStore);
+
+                return null;
+
+            }
+
+        }
+
+        {
+
+            final IResourceMetadata resourceMetadata = segStore
+                    .getResourceMetadata();
+
+            final UUID storeUUID = resourceMetadata.getUUID();
+
+            /*
+             * Note: synchronization is required to have the semantics of an
+             * atomic get/put against the WeakValueCache.
+             * 
+             * Note: The load of the index segment from the store can have
+             * significant latency. The use of a per-UUID lock allows us to load
+             * index segments for different index views concurrently.
+             * 
+             * Note: We DO NOT use a name+timestamp lock here because many
+             * different timestamp values will be served by the same
+             * IndexSegment.
+             */
+            final Lock lock = segmentLock.acquireLock(storeUUID);
+
+            try {
+
+                // check the cache first.
+                IndexSegment seg = indexSegmentCache.get(storeUUID);
+
+                if (seg == null) {
+
+                    if (INFO)
+                        log
+                                .info("Loading index segment from store: name="
+                                        + name + ", file="
+                                        + resourceMetadata.getFile());
+
+                    // Open an index segment.
+                    seg = segStore.loadIndexSegment();
+
+                    indexSegmentCache.put(storeUUID, seg);
+                    // indexSegmentCache
+                    // .put(storeUUID, seg, false/* dirty */);
+
+                }
+
+                btree = seg;
+
+            } finally {
+
+                lock.unlock();
+
+            }
+
+        }
+
+        // MAY be null.
+        return btree;
+        
     }
 
     public AbstractBTree[] getIndexSources(final String name,
@@ -1672,6 +1720,341 @@ abstract public class IndexManager extends StoreManager {
             e.end(moreDetails);
 
         }
+
+    }
+
+    /*
+     * Per index counters.
+     */
+
+    /**
+     * Canonical per-index partition {@link BTreeCounters}. These counters are
+     * set on each {@link AbstractBTree} that is materialized by
+     * {@link #getIndexOnStore(String, long, IRawStore)}. The same
+     * {@link BTreeCounters} object is used for the unisolated, read-committed,
+     * read-historical and isolated views of the index partition and for each
+     * source in the view regardless of whether the source is a mutable
+     * {@link BTree} on the live journal, a read-only {@link BTree} on a
+     * historical journal, or an {@link IndexSegment}.
+     * 
+     * FIXME An {@link IndexSegment} can be used by more than one view of an
+     * index partition. This is not a problem and no double counting,
+     * misassignment of credit, or lost counters will result. However, if an
+     * {@link IndexSegment} is used by different index partitions (which might
+     * well be allowed in a post-split scenario but is not possible for a post-
+     * move or post-join scenario, and those are the three ways in which a new
+     * index partition can be created (other than by registering a new scale-out
+     * index) then the {@link BTreeCounters} will only reflect all activity on
+     * an {@link IndexSegment} in the index partition which last (re-)opened
+     * that {@link IndexSegment}.
+     * 
+     * FIXME Index partitions which have been dropped should be cleared from the
+     * map at overflow unless they have been re-registered since. Use
+     * {@link #getIndexPartitionGone(String)} to figure out if each index
+     * partition has been dropped during synchronous overflow. Then cross check
+     * to verify that it does not still exist.
+     * <p>
+     * Slightly better would be to reset the index counters at the drop (except
+     * that they will immediately disappear) or best yet to always reset the
+     * index counters on add and to clear at overflow if split/moved/deleted or
+     * otherwise gone.
+     * <p>
+     * When a scale-out index is deleted clear out the entries in
+     * {@link #getIndexPartitionGone(String)} so that we do not run into trouble
+     * if the index is re-registered!
+     */
+    final private ConcurrentHashMap<String/* name */, BTreeCounters> indexCounters = new ConcurrentHashMap<String, BTreeCounters>();
+
+    /**
+     * The aggregated performance counters for each unisolated index partition
+     * view as of the time when the old journal was closed for writes. This is
+     * used to compute the delta for each unisolated index partition view at the
+     * end of the life cycle for the new live journal.
+     */
+    private Map<String/*name*/, BTreeCounters> mark = new HashMap<String, BTreeCounters>(); 
+
+    /**
+     * Return the {@link BTreeCounters} for the named index. If none exist, then
+     * a new instance is atomically created and returned to the caller.
+     * 
+     * @param name
+     *            The name of the index.
+     * 
+     * @return The counters for that index and never <code>null</code>.
+     */
+    public BTreeCounters getIndexCounters(final String name) {
+
+        if (name == null)
+            throw new IllegalArgumentException();
+
+        // first test for existence.
+        BTreeCounters t = indexCounters.get(name);
+
+        if (t == null) {
+
+            // not found.  create a new instance.
+            t = new BTreeCounters();
+
+            // put iff absent.
+            BTreeCounters oldval = indexCounters.putIfAbsent(name, t);
+
+            if (oldval != null) {
+
+                // someone else got there first so use their instance.
+                t = oldval;
+
+            } else {
+                
+                log.warn("New counters: indexPartitionName=" + name);
+                
+            }
+            
+        }
+        
+        return t;
+        
+    }
+    
+    /**
+     * Snapshots the index partition performance counters and returns a map
+     * containing the net change in the performance counters for each index
+     * partition since the last time this method was invoked (it is invoked by
+     * {@link #overflow()}).
+     * <p>
+     * Note: This method has a side effect of setting a new mark. It SHOULD NOT
+     * be used except at overflow since the "mark" is used to determine the net
+     * change in the per-index partition performance counters. If used other
+     * than at overflow the net change will be under-reported.
+     * 
+     * @return A map containing the net change in the index partition
+     *         performance counters for each index partition.
+     */
+    synchronized protected Map<String, BTreeCounters> markAndGetDelta() {
+
+        final Map<String/*name*/, BTreeCounters> newMark = new HashMap<String, BTreeCounters>(); 
+        
+        /*
+         * The net change in the performance counters for each unisolated index
+         * partition view over the life cycle of the old journal. This is used
+         * to determine the amount of activity on each index partition during
+         * the life cycle of the old journal. That is used to compute the
+         * {@link Score} for each index partition. Those {@link Score}s inform
+         * the choice of the index partition moves.
+         */
+        final Map<String/* name */, BTreeCounters> delta = new HashMap<String, BTreeCounters>();
+
+        final Iterator<Map.Entry<String,BTreeCounters>> itr = indexCounters.entrySet().iterator(); 
+
+        while(itr.hasNext()) {
+            
+            final Map.Entry<String, BTreeCounters> entry = itr.next();
+
+            // name of the index partition.
+            final String name = entry.getKey();
+            
+            // current counters (strictly increasing over time).
+            final BTreeCounters current = entry.getValue();
+
+            // the previous total for this index partition (if any).
+            final BTreeCounters prior = this.mark.get(name);
+
+            if (prior == null) {
+
+                // first total for this index partition.
+                delta.put(name, current);
+
+                log.warn("First time: " + name);
+
+            } else {
+
+                // compute the delta for this index partition.
+                delta.put(name, current.subtract(prior));
+
+                log.warn("Computed delta: " + name);
+
+            }
+            
+            // record the total for use in the new mark.
+            newMark.put(name, current);
+
+        }
+
+        // replace the old mark with the new one.
+        this.mark = newMark;
+
+        // return summary of the net change in activity for each index partition.
+        return delta;
+        
+    }
+
+    /**
+     * Return a {@link CounterSet} reflecting use of the named indices. Index
+     * partitions are in use their {@link CounterSet}s are reported under a
+     * path formed from name of the scale-out index and partition identifier.
+     * 
+     * @return A new {@link CounterSet} reflecting the use of the named indices.
+     */
+    public CounterSet getIndexCounters() {
+
+        final CounterSet tmp = new CounterSet();
+
+        final Iterator<Map.Entry<String, BTreeCounters>> itr = indexCounters
+                .entrySet().iterator();
+
+        while (itr.hasNext()) {
+
+            final Map.Entry<String, BTreeCounters> entry = itr.next();
+
+            final String name = entry.getKey();
+
+            final BTreeCounters btreeCounters = entry.getValue();
+
+            assert btreeCounters != null : "name=" + name;
+
+//            // non-null iff this is an index partition.
+//            final LocalPartitionMetadata pmd = viewCounters.pmd;
+
+            /*
+             * Note: this is a hack. We parse the index name in order to
+             * recognize whether or not it is an index partition since we want
+             * to know that even if the we get a StaleLocatorException from the
+             * ResourceManager. This will work fine as long as the the basename
+             * of the index does not use a '#' character.
+             */
+            final String path;
+            final int indexOf = name.lastIndexOf('#');
+            if (indexOf != -1) {
+
+                path = name.substring(0, indexOf) + ICounterSet.pathSeparator
+                        + name;
+
+            } else {
+
+                path = name;
+
+            }
+
+            /*
+             * Note: The code below works and avoids re-opening a closed index
+             * but it makes the presence of the additional counters dependent on
+             * recent state in a manner that I do not like.
+             */
+
+            // IIndex view = null;
+            // try {
+            // if (resourceManager instanceof ResourceManager) {
+            // /*
+            // * Get the live index object from the cache and [null]
+            // * if it is not in the cache. When the view is not in
+            // * the cache we simply do not update our counters from
+            // * the view.
+            // *
+            // * Note: Using the cache prevents a request for the
+            // * counters from forcing the index to be re-loaded.
+            // *
+            // * Note: This is the LIVE index object. We DO NOT hold
+            // * an exclusive lock. Therefore we MUST NOT use most of
+            // * its API, but we are only concerned with its counters
+            // * here and that is thread-safe.
+            // */
+            // final ResourceManager rmgr = ((ResourceManager) resourceManager);
+            // view = rmgr.indexCache.get(new NT(name, ITx.UNISOLATED));
+            // final StaleLocatorReason reason =
+            // rmgr.getIndexPartitionGone(name);
+            // if (reason != null) {
+            // // Note that the index partition is gone.
+            // t.addCounter("pmd" + ICounterSet.pathSeparator+"StaleLocator",
+            // new OneShotInstrument<String>(reason.toString()));
+            // }
+            // } else {
+            // /*
+            // * Get the live index object from Name2Addr's cache. It
+            // * will be [null] if the index is not in the cache. When
+            // * the index is not in the cache we simply do not update
+            // * our counters from the view.
+            // */
+            // final Journal jnl = ((Journal)resourceManager);
+            // synchronized(jnl.name2Addr) {
+            // view = jnl.name2Addr.getIndexCache(name);
+            // // view = jnl.getIndex(name, ITx.READ_COMMITTED);
+            // }
+            // }
+            // } catch (Throwable ex) {
+            // log.error("Could not update counters: name=" + name + " : "
+            // + ex, ex);
+            // // fall through - [view] will be null.
+            // }
+            //
+            // if (view == null) {
+            //
+            // /*
+            // * Note: the view can be unavailable either because the
+            // * index was concurrently registered and has not been
+            // * committed yet or because the index has been dropped.
+            // *
+            // * Note: an index partition that moved, split, or joined is
+            // * handled above.
+            // */
+            //
+            // // t.addCounter("No data", new OneShotInstrument<String>(
+            // // "Read committed view not available"));
+            //
+            // continue;
+            //
+            // }
+            // create counter set for this index / index partition.
+            final CounterSet t = tmp.makePath(path);
+
+            /*
+             * Attach the aggregated counters for the index / index partition.
+             */
+            t.attach(btreeCounters.getCounters());
+
+//            if (pmd != null) {
+//
+//                /*
+//                 * A partitioned index.
+//                 */
+//
+//                final CounterSet pmdcs = t.makePath("pmd");
+//
+//                pmdcs.addCounter("leftSeparatorKey",
+//                        new OneShotInstrument<String>(BytesUtil.toString(pmd
+//                                .getLeftSeparatorKey())));
+//
+//                pmdcs.addCounter("rightSeparatorKey",
+//                        new OneShotInstrument<String>(BytesUtil.toString(pmd
+//                                .getRightSeparatorKey())));
+//
+//                pmdcs.addCounter("history", new OneShotInstrument<String>(pmd
+//                        .getHistory()));
+//
+//                final IResourceMetadata[] resources = pmd.getResources();
+//
+//                for (int i = 0; i < resources.length; i++) {
+//
+//                    final IResourceMetadata resource = resources[i];
+//
+//                    final CounterSet rescs = pmdcs.makePath("resource[" + i
+//                            + "]");
+//
+//                    rescs.addCounter("file", new OneShotInstrument<String>(
+//                            resource.getFile()));
+//
+//                    rescs.addCounter("uuid", new OneShotInstrument<String>(
+//                            resource.getUUID().toString()));
+//
+//                    rescs.addCounter("createTime",
+//                            new OneShotInstrument<String>(Long
+//                                    .toString(resource.getCreateTime())));
+//
+//                }
+//
+//            }
+
+        }
+
+        return tmp;
 
     }
 

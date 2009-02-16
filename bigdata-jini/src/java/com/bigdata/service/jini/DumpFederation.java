@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service.jini;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.PrintWriter;
@@ -43,6 +44,8 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import net.jini.config.ConfigurationException;
@@ -246,6 +249,191 @@ public class DumpFederation {
         
     }
 
+    /**
+     * A task that produces dumps of the indices in the federation on a
+     * scheduled basis. Often you will want to use two or more schedules since
+     * much of the most interesting activity will occur when the application
+     * first creates its indices and begins to write heavily on those indices.
+     * <p>
+     * Assuming a steady application write load, you may want to see the dump
+     * for t0 (when the indices were first created so that you have a record of
+     * where they were placed) and then at t+1m, t+2m, ... t+5m, and then at
+     * t+10m, t+20m, ... t+50m, and then perhaps at t+1h, t+2h, ....
+     * <p>
+     * Schedules such as this are readily created by submitting one task for
+     * each of the desired delay periods using
+     * {@link ScheduledExecutorService#scheduleWithFixedDelay(Runnable, long, long, java.util.concurrent.TimeUnit)}
+     * and specifying the maximum #of times that each task should run.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class ScheduledDumpTask implements Runnable {
+       
+        final JiniFederation fed;
+        final String namespace;
+        final File path;
+        final String basename;
+        final int nruns;
+        final TimeUnit unit;
+        
+        final long startTime = System.nanoTime();
+        
+        /**
+         * The run counter. Initially zero. Increments by one after each run
+         * regardless of success.
+         */
+        private int run = 0;
+        
+        /**
+         * 
+         * @param fed
+         *            The connected federation.
+         * @param namespace
+         *            The namespace of the indices to be included in each
+         *            report.
+         * @param path
+         *            The path of the directory where the generated reports will
+         *            be written.
+         * @param nruns
+         *            The #of runs to make -or- zero to run until cancelled.
+         * @param basename
+         *            The basename of the file to be written for the generated
+         *            reports.
+         * @param unit
+         *            The reporting period. Use {@link TimeUnit#MINUTES},
+         *            {@link TimeUnit#HOURS} or {@link TimeUnit#DAYS} to have
+         *            the dumped files labelled with the appropriate unit.
+         */
+        public ScheduledDumpTask(final JiniFederation fed,
+                final String namespace, final int nruns, final File path,
+                final String basename, final TimeUnit unit) {
+
+            if (fed == null)
+                throw new IllegalArgumentException();
+
+            if (namespace == null)
+                throw new IllegalArgumentException();
+
+            if (path == null)
+                throw new IllegalArgumentException();
+
+            if (basename == null)
+                throw new IllegalArgumentException();
+
+            if (nruns < 0)
+                throw new IllegalArgumentException();
+
+            if (unit == null)
+                throw new IllegalArgumentException();
+            
+            this.fed = fed;
+            this.namespace = namespace;
+            this.path = path;
+            this.basename = basename;
+            this.nruns = nruns;
+            this.unit = unit;
+            
+        }
+        
+        /**
+         * Runs until {@link #nruns} and then throws an exception to prevent
+         * re-execution thereafter.
+         */
+        public void run() {
+
+            if (nruns != 0 && run >= nruns) {
+
+                /*
+                 * We have done all the runs that were requested so now we throw
+                 * an exception to prevent re-execution.
+                 */
+                throw new RuntimeException("Finished");
+                
+            }
+            
+            final long elapsed = System.nanoTime() - startTime;
+
+            // convert from nanos to the specified unit.
+            final long elapsedUnits = unit.convert(elapsed,
+                    TimeUnit.NANOSECONDS);
+
+            final File file = new File(path, basename + "-" + unit + "-t"
+                    + elapsedUnits + ".txt");
+
+            if(!path.exists()) {
+             
+                // make sure the parent directory exists.
+                path.mkdirs();
+                
+            }
+            
+            FileWriter w = null;
+
+            try {
+
+                w = new FileWriter(file);
+                
+                final FormatRecord formatter = new FormatTabTable(w);
+
+                formatter.writeHeaders();
+
+                /*
+                 * A read-only transaction from the last committed state of the
+                 * db.
+                 */
+                final long tx = fed.getTransactionService().newTx(
+                        ITx.READ_COMMITTED);
+
+                try {
+
+                    final DumpFederation dumper = new DumpFederation(fed, tx,
+                            formatter);
+
+                    dumper.dumpIndices(namespace);
+
+                } finally {
+
+                    // discard read-only transaction.
+                    fed.getTransactionService().abort(tx);
+
+                }
+                
+            } catch (InterruptedException t) {
+
+                return;
+
+            } catch (Throwable t) {
+
+                log.error(t, t);
+
+            } finally {
+                
+                run++;
+
+                if (w != null) {
+
+                    try {
+                        
+                        w.close();
+                        
+                    } catch (IOException e) {
+                        
+                        log.error(file, e);
+                        
+                    }
+                    
+                }
+                
+            }
+
+        }
+        
+    }
+    
+    /**
+     * The connected federation.
+     */
     private final JiniFederation fed;
 
     /**

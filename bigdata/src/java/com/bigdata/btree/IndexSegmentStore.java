@@ -523,7 +523,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
                      * and the IndexSegment loaded from that store.
                      */
 
-                    getCounters().attach(seg.btreeCounters.getCounters());
+                    getCounters().attach(seg.getBtreeCounters().getCounters());
 
                     // set the canonicalizing weak reference to the open seg.
                     ref = new WeakReference<IndexSegment>(seg);

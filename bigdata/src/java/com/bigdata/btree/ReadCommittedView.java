@@ -323,7 +323,7 @@ public class ReadCommittedView implements ILocalBTreeView {
 
     public final BTreeCounters getBTreeCounters() {
         
-        return getIndex().btreeCounters;
+        return getIndex().getBtreeCounters();
         
     }
 

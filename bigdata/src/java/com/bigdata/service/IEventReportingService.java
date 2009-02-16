@@ -9,7 +9,7 @@ import java.util.UUID;
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$
  */
-public interface IEventReportingService extends IService {
+public interface IEventReportingService {
     /**
      * Return the events from this event reporting service, such as the load
      * balancer.

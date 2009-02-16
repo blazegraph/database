@@ -41,7 +41,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.DefaultInstrumentFactory;
-import com.bigdata.service.IEventReportingService;
+import com.bigdata.service.IService;
 import com.bigdata.util.httpd.AbstractHTTPD;
 import com.bigdata.util.httpd.NanoHTTPD;
 
@@ -195,7 +195,7 @@ public class CounterSetHTTPDServer implements Runnable {
      * @param port
      */
     public CounterSetHTTPDServer(final int port, final CounterSet counterSet,
-            final IEventReportingService service) throws Exception {
+            final IService service) throws Exception {
 
         /*
          * The runtime shutdown hook appears to be a robust way to handle ^C by

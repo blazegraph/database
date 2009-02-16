@@ -36,6 +36,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Exchanger;
 import java.util.concurrent.Executors;
 
+import com.bigdata.btree.BTree.Counter;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
@@ -477,7 +478,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         writeCache.flush();
         
-        counters.ncacheFlush++;
+        storeCounters.ncacheFlush++;
 
     }
     
@@ -534,128 +535,224 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      *       concurrent <code>x++</code> operations failing to correctly
      *       increment <code>x</code> for each request.
      */
-    public static class Counters {
+    public static class StoreCounters {
         
         /**
          * #of read requests.
          */
-        long nreads;
+        public long nreads;
 
         /**
          * #of read requests that are satisified by our write cache (vs the
          * OS or disk level write cache).
          */
-        long ncacheRead;
+        public long ncacheRead;
 
         /**
          * #of read requests that read through to the backing file.
          */
-        long ndiskRead;
+        public long ndiskRead;
         
         /**
          * #of bytes read.
          */
-        long bytesRead;
+        public long bytesRead;
 
         /**
          * #of bytes that have been read from the disk.
          */
-        long bytesReadFromDisk;
+        public long bytesReadFromDisk;
         
         /**
          * The size of the largest record read.
          */
-        long maxReadSize;
+        public long maxReadSize;
         
         /**
          * Total elapsed time for reads.
          */
-        long elapsedReadNanos;
+        public long elapsedReadNanos;
 
         /**
          * Total elapsed time checking the disk write cache for records to be
          * read.
          */
-        long elapsedCacheReadNanos;
+        public long elapsedCacheReadNanos;
         
         /**
          * Total elapsed time for reading on the disk.
          */
-        long elapsedDiskReadNanos;
+        public long elapsedDiskReadNanos;
         
         /**
          * #of write requests.
          */
-        long nwrites;
+        public long nwrites;
 
         /**
          * #of write requests that are absorbed by our write cache (vs the OS or
          * disk level write cache).
          */
-        long ncacheWrite;
+        public long ncacheWrite;
         
         /**
          * #of times the write cache was flushed to disk.
          */
-        long ncacheFlush;
+        public long ncacheFlush;
         
         /**
          * #of write requests that write through to the backing file.
          */
-        long ndiskWrite;
+        public long ndiskWrite;
 
         /**
          * The size of the largest record written.
          */
-        long maxWriteSize;
+        public long maxWriteSize;
         
         /**
          * #of bytes written.
          */
-        long bytesWritten;
+        public long bytesWritten;
         
         /**
          * #of bytes that have been written on the disk.
          */
-        long bytesWrittenOnDisk;
+        public long bytesWrittenOnDisk;
         
         /**
          * Total elapsed time for writes.
          */
-        long elapsedWriteNanos;
+        public long elapsedWriteNanos;
         
         /**
          * Total elapsed time writing records into the cache (does not count
          * time to flush the cache when it is full or to write records that do
          * not fit in the cache directly to the disk).
          */
-        long elapsedCacheWriteNanos;
+        public long elapsedCacheWriteNanos;
         
         /**
          * Total elapsed time for writing on the disk.
          */
-        long elapsedDiskWriteNanos;
+        public long elapsedDiskWriteNanos;
         
         /**
          * #of times the data were forced to the disk.
          */
-        long nforce;
+        public long nforce;
         
         /**
          * #of times the length of the file was changed (typically, extended).
          */
-        long ntruncate;
+        public long ntruncate;
         
         /**
          * #of times the file has been reopened after it was closed by an
          * interrupt.
          */
-        long nreopen;
+        public long nreopen;
         
         /**
          * #of times one of the root blocks has been written.
          */
-        long nwriteRootBlock;
+        public long nwriteRootBlock;
+
+        /**
+         * Initialize a new set of counters.
+         */
+        public StoreCounters() {
+            
+        }
+        
+        /**
+         * Copy ctor.
+         * @param o
+         */
+        public StoreCounters(final StoreCounters o) {
+            
+            add( o );
+            
+        }
+        
+        /**
+         * Adds counters to the current counters.
+         * 
+         * @param o
+         */
+        public void add(final StoreCounters o) {
+
+            nreads += o.nreads;
+            ncacheRead += o.ncacheRead;
+            ndiskRead += o.ndiskRead;
+            bytesRead += o.bytesRead;
+            bytesReadFromDisk += o.bytesReadFromDisk;
+            maxReadSize += o.maxReadSize;
+            elapsedReadNanos += o.elapsedReadNanos;
+            elapsedCacheReadNanos += o.elapsedCacheReadNanos;
+            elapsedDiskReadNanos += o.elapsedDiskReadNanos;
+
+            nwrites += o.nwrites;
+            ncacheWrite += o.ncacheWrite;
+            ncacheFlush += o.ncacheFlush;
+            ndiskWrite += o.ndiskWrite;
+            maxWriteSize += o.maxWriteSize;
+            bytesWritten += o.bytesWritten;
+            bytesWrittenOnDisk += o.bytesWrittenOnDisk;
+            elapsedWriteNanos += o.elapsedWriteNanos;
+            elapsedCacheWriteNanos += o.elapsedCacheWriteNanos;
+            elapsedDiskWriteNanos += o.elapsedDiskWriteNanos;
+
+            nforce += o.nforce;
+            ntruncate += o.ntruncate;
+            nreopen += o.nreopen;
+            nwriteRootBlock += o.nwriteRootBlock;
+            
+        }
+
+        /**
+         * Returns a new {@link StoreCounters} containing the current counter values
+         * minus the given counter values.
+         * 
+         * @param o
+         * 
+         * @return
+         */
+        public StoreCounters subtract(final StoreCounters o) {
+
+            // make a copy of the current counters.
+            final StoreCounters t = new StoreCounters(this);
+            
+            // subtract out the given counters.
+            t.nreads -= o.nreads;
+            t.ncacheRead -= o.ncacheRead;
+            t.ndiskRead -= o.ndiskRead;
+            t.bytesRead -= o.bytesRead;
+            t.bytesReadFromDisk -= o.bytesReadFromDisk;
+            t.maxReadSize -= o.maxReadSize;
+            t.elapsedReadNanos -= o.elapsedReadNanos;
+            t.elapsedCacheReadNanos -= o.elapsedCacheReadNanos;
+            t.elapsedDiskReadNanos -= o.elapsedDiskReadNanos;
+
+            t.nwrites -= o.nwrites;
+            t.ncacheWrite -= o.ncacheWrite;
+            t.ncacheFlush -= o.ncacheFlush;
+            t.ndiskWrite -= o.ndiskWrite;
+            t.maxWriteSize -= o.maxWriteSize;
+            t.bytesWritten -= o.bytesWritten;
+            t.bytesWrittenOnDisk -= o.bytesWrittenOnDisk;
+            t.elapsedWriteNanos -= o.elapsedWriteNanos;
+            t.elapsedCacheWriteNanos -= o.elapsedCacheWriteNanos;
+            t.elapsedDiskWriteNanos -= o.elapsedDiskWriteNanos;
+
+            t.nforce -= o.nforce;
+            t.ntruncate -= o.ntruncate;
+            t.nreopen -= o.nreopen;
+            t.nwriteRootBlock -= o.nwriteRootBlock;
+
+            return t;
+            
+        }
         
         synchronized public CounterSet getCounters() {
 
@@ -971,19 +1068,76 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
     }
     
     /**
-     * Counters on {@link IRawStore} and disk access.
+     * Performance counters for this class.
      */
-    final public Counters counters = new Counters();
+    private StoreCounters storeCounters = new StoreCounters();
+
+    /**
+     * Returns the performance counters for the store.
+     */
+    public StoreCounters getStoreCounters() {
+
+        return storeCounters;
+
+    }
+
+    /**
+     * Replaces the {@link StoreCounters} object.
+     * 
+     * @param storeCounters
+     *            The new {@link Counter}s.
+     * 
+     * @throws IllegalArgumentException
+     *             if the argument is <code>null</code>.
+     */
+    public void setStoreCounters(final StoreCounters storeCounters) {
+
+        if (storeCounters == null)
+            throw new IllegalArgumentException();
+
+        synchronized (this) {
+
+            this.storeCounters = storeCounters;
+
+            if (root != null) {
+                
+                root.attach(storeCounters.getCounters(), true/* replace */);
+                
+            }
+            
+        }
+        
+    }
     
     /**
      * Return interesting information about the write cache and file operations.
+     * 
+     * @todo clean up the counter set reporting. it is a bit messed up since I
+     *       added
+     *       {@link #setStoreCounters(com.bigdata.journal.DiskOnlyStrategy.StoreCounters)}
+     *       in order to use a single {@link StoreCounters} instance for all
+     *       journals managed by a given data service.
+     * 
+     * @todo The outer counters for the read and write cache on the store
+     *       manager might not update after the 1st overflow as they are
+     *       generated once and not replaced when StoreCounters are replaced. On
+     *       the other hand, those counters are linked to the specific
+     *       DiskOnlyStrategy instance.
+     * 
+     * @todo nextOffset does update and reset when there is a new journal, which
+     *       is interesting.
+     * 
+     * @todo The file counter does not appear to update in either the LBS or the
+     *       DiskOnlYStrategy view. It is on the AbstractJournal's counters.
+     *       After a while it names a journal which has since been deleted!
      */
-    synchronized public CounterSet getCounters() {
+    synchronized 
+    public CounterSet getCounters() {
         
         if (root == null) {
             
             root = new CounterSet();
-
+            
             root.addCounter("nextOffset", new Instrument<Long>() {
                 public void sample() {
                     setValue(nextOffset);
@@ -996,7 +1150,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                 }
             });
 
-            root.attach(counters.getCounters());
+            root.attach(storeCounters.getCounters());
             
             /*
              * other.
@@ -1226,7 +1380,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         }
         
-        counters.nforce++;
+        storeCounters.nforce++;
         
     }
 
@@ -1408,9 +1562,9 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         synchronized (this) 
         {
 
-            if (nbytes > counters.maxReadSize) {
+            if (nbytes > storeCounters.maxReadSize) {
 
-                counters.maxReadSize = nbytes;
+                storeCounters.maxReadSize = nbytes;
 
             }
             
@@ -1439,17 +1593,17 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                     /*
                      * Update counters while synchronized.
                      */
-                    counters.nreads++;
-                    counters.bytesRead+=nbytes;
-                    counters.ncacheRead++;
-                    counters.elapsedReadNanos+=(System.nanoTime()-begin);
+                    storeCounters.nreads++;
+                    storeCounters.bytesRead+=nbytes;
+                    storeCounters.ncacheRead++;
+                    storeCounters.elapsedReadNanos+=(System.nanoTime()-begin);
 
                     // return the new buffer.
                     return dst;
 
                 } else {
                     
-                    counters.elapsedCacheReadNanos+=(System.nanoTime()-beginCache);
+                    storeCounters.elapsedCacheReadNanos+=(System.nanoTime()-beginCache);
                     
                 }
                 
@@ -1479,7 +1633,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                 
                 try {
 
-                    counters.ndiskRead += FileChannelUtility.readAll(opener, dst,
+                    storeCounters.ndiskRead += FileChannelUtility.readAll(opener, dst,
                         pos);
 
                     // successful read - exit the loop.
@@ -1532,11 +1686,11 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             /*
              * Update counters while synchronized.
              */
-            counters.nreads++;
-            counters.bytesRead+=nbytes;
-            counters.bytesReadFromDisk+=nbytes;
-            counters.elapsedReadNanos+=(System.nanoTime()-begin);
-            counters.elapsedDiskReadNanos+=(System.nanoTime()-beginDisk);
+            storeCounters.nreads++;
+            storeCounters.bytesRead+=nbytes;
+            storeCounters.bytesReadFromDisk+=nbytes;
+            storeCounters.elapsedReadNanos+=(System.nanoTime()-begin);
+            storeCounters.elapsedDiskReadNanos+=(System.nanoTime()-beginDisk);
 
             if (readCache != null && nbytes < readCacheMaxRecordSize) {
 
@@ -1684,7 +1838,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         }
 
-        counters.nreopen++;
+        storeCounters.nreopen++;
         
         return raf.getChannel();
         
@@ -1805,7 +1959,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                             view.put(data);
 
                             // count this as a cache write.
-                            counters.ncacheWrite++;
+                            storeCounters.ncacheWrite++;
 
                             // Done.
                             return;
@@ -1815,7 +1969,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                     } finally {
 
                         // track the write cache time.
-                        counters.elapsedCacheWriteNanos += (System.nanoTime() - beginCache);
+                        storeCounters.elapsedCacheWriteNanos += (System.nanoTime() - beginCache);
 
                     }
 
@@ -1846,13 +2000,13 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                  * rather than primitive longs.
                  */
 
-                counters.nwrites++;
-                counters.bytesWritten += nbytes;
-                counters.elapsedWriteNanos += (System.nanoTime() - begin);
+                storeCounters.nwrites++;
+                storeCounters.bytesWritten += nbytes;
+                storeCounters.elapsedWriteNanos += (System.nanoTime() - begin);
 
-                if(nbytes > counters.maxWriteSize) {
+                if(nbytes > storeCounters.maxWriteSize) {
                     
-                    counters.maxWriteSize = nbytes;
+                    storeCounters.maxWriteSize = nbytes;
                     
                 }
                 
@@ -1924,9 +2078,9 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                     
                     writeCache.write(addr, data);
 
-                    counters.ncacheWrite++;
+                    storeCounters.ncacheWrite++;
 
-                    counters.elapsedCacheWriteNanos+=(System.nanoTime()-beginCache);
+                    storeCounters.elapsedCacheWriteNanos+=(System.nanoTime()-beginCache);
 
                 }
                 
@@ -1957,13 +2111,13 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
              * primitive longs.
              */
 
-            counters.nwrites++;
-            counters.bytesWritten+=nbytes;
-            counters.elapsedWriteNanos+=(System.nanoTime() - begin);
+            storeCounters.nwrites++;
+            storeCounters.bytesWritten+=nbytes;
+            storeCounters.elapsedWriteNanos+=(System.nanoTime() - begin);
 
-            if(nbytes > counters.maxWriteSize) {
+            if(nbytes > storeCounters.maxWriteSize) {
                 
-                counters.maxWriteSize = nbytes;
+                storeCounters.maxWriteSize = nbytes;
                 
             }
 
@@ -2091,7 +2245,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
              * closed while we are writing on it.
              */
 
-            counters.ndiskWrite += FileChannelUtility.writeAll(getChannel(),
+            storeCounters.ndiskWrite += FileChannelUtility.writeAll(getChannel(),
                     data, pos);
 
         } catch (IOException ex) {
@@ -2107,8 +2261,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             
         }
 
-        counters.bytesWrittenOnDisk += nbytes;
-        counters.elapsedDiskWriteNanos += (System.nanoTime() - begin);
+        storeCounters.bytesWrittenOnDisk += nbytes;
+        storeCounters.elapsedDiskWriteNanos += (System.nanoTime() - begin);
 
     }
 
@@ -2202,7 +2356,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         if (DEBUG)
             log.debug("wrote root block: "+rootBlock);
         
-        counters.nwriteRootBlock++;
+        storeCounters.nwriteRootBlock++;
         
     }
 
@@ -2251,7 +2405,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                 
             }
 
-            counters.ntruncate++;
+            storeCounters.ntruncate++;
             
             if(WARN)
                 log.warn("newLength=" + cf.format(newExtent) + ", file="

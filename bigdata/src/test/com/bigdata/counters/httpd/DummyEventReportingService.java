@@ -8,9 +8,12 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
+
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
+
 import com.bigdata.service.Event;
 import com.bigdata.service.IEventReportingService;
+import com.bigdata.service.IService;
 
 /**
  * A dummy implementation of the {@link IEventReportingService} interface, used
@@ -19,7 +22,7 @@ import com.bigdata.service.IEventReportingService;
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$
  */
-public class DummyEventReportingService implements IEventReportingService {
+public class DummyEventReportingService implements IEventReportingService, IService {
 
     /**
      * The events for this simulated event reporting service.

@@ -421,7 +421,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
                      * Changing from a non-deleted to a deleted tuple (we don't
                      * count re-deletes of an already deleted tuple).
                      */
-                    btree.btreeCounters.ntupleUpdateDelete++;
+                    btree.getBtreeCounters().ntupleUpdateDelete++;
 
                 } else if(!delete) { 
                 
@@ -429,7 +429,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
                      * Either changing from a deleted to a non-deleted tuple or
                      * just overwriting an existing non-deleted tuple.
                      */
-                    btree.btreeCounters.ntupleUpdateValue++;
+                    btree.getBtreeCounters().ntupleUpdateValue++;
 
                 }
                 
@@ -441,7 +441,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
                  * Update value for existing tuple (delete markers are not in
                  * use).
                  */
-                btree.btreeCounters.ntupleUpdateValue++;
+                btree.getBtreeCounters().ntupleUpdateValue++;
                 
             }
 
@@ -495,15 +495,15 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
             if (deleteMarkers != null) {
                 if (delete) {
                     // Inserting a deleted tuple.
-                    btree.btreeCounters.ntupleInsertDelete++;
+                    btree.getBtreeCounters().ntupleInsertDelete++;
                 } else if (!delete) {
                     // Inserting a non-deleted tuple.
-                    btree.btreeCounters.ntupleInsertValue++;
+                    btree.getBtreeCounters().ntupleInsertValue++;
                 }
                 this.deleteMarkers[entryIndex] = delete;
             } else {
                 // Inserting a tuple (delete markers not in use).
-                btree.btreeCounters.ntupleInsertValue++;
+                btree.getBtreeCounters().ntupleInsertValue++;
             }
             if (versionTimestamps != null) {
                 versionTimestamps[entryIndex] = timestamp;
@@ -638,7 +638,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
         final BTree btree = (BTree)this.btree;
         
-        btree.btreeCounters.leavesSplit++;
+        btree.getBtreeCounters().leavesSplit++;
 
         // #of entries in the leaf before it is split.
         final int nentriesBeforeSplit = nkeys;
@@ -745,7 +745,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
                  * on the tail of the index.
                  */
 
-                btree.btreeCounters.tailSplit++;
+                btree.getBtreeCounters().tailSplit++;
                 
             } else if (p != btree.root && p.isLeftMostNode()) {
                 
@@ -763,7 +763,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
                  * on the head of the index.
                  */
 
-                btree.btreeCounters.headSplit++;
+                btree.getBtreeCounters().headSplit++;
                 
             }
             
@@ -1306,7 +1306,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         assert ((BTree)btree).nentries >= 0;
         
         // One more deleted tuple.
-        btree.btreeCounters.ntupleRemove++;
+        btree.getBtreeCounters().ntupleRemove++;
 
         // One less key in the leaf.
         nkeys--; keys.nkeys--;

@@ -34,6 +34,27 @@ import com.bigdata.counters.Instrument;
  * Holding an instance of this class WILL NOT force the {@link AbstractBTree} to
  * remain strongly reachable.
  * 
+ * @todo counters need to be atomic if we want to avoid the possibility of
+ *       concurrent <code>x++</code> operations failing to correctly increment
+ *       <code>x</code> for each request. I have not seen any problems
+ *       resulting from this.
+ * 
+ * @todo {@link #add(BTreeCounters)}, {@link #subtract(BTreeCounters)} and the
+ *       copy ctor are not atomic. I have not seen any problems resulting from
+ *       this.
+ * 
+ * @todo instrument the key search time
+ * 
+ * @todo instrument bloom filter time when the bloom filter is used (this should
+ *       be done separately on the bloom filter object).
+ * 
+ * @todo At present, deserialization is much slower than serialization,
+ *       primarily because of object creation. Changing to a raw record format
+ *       for nodes and leaves would likely reduce the deserialization costs
+ *       significantly. The time could also be reduced by lazy decompression of
+ *       the values and lazy deserialization of the values such that tuple scans
+ *       for keys only do not require value deserialization.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -63,6 +84,21 @@ final public class BTreeCounters {
         
     }
     
+//    /**
+//     * Returns a "mark". The mark is a copy of the counters taken at the moment
+//     * requested. You can compute the delta between the last mark or any mark
+//     * using {@link #subtract(BTreeCounters)}.
+//     */
+//    public BTreeCounters mark() {
+//       
+//        final BTreeCounters mark = new BTreeCounters();
+//        
+//        mark.add(this);
+//        
+//        return mark;
+//        
+//    }
+
     /**
      * Adds the values from another {@link BTreeCounters} object to this one.
      * 
@@ -70,10 +106,10 @@ final public class BTreeCounters {
      */
     public void add(final BTreeCounters o) {
         
+        if (o == null)
+            throw new IllegalArgumentException();
+        
         // IKeySearch
-//        nbloomTest += o.nbloomTest;
-//        nbloomRejects += o.nbloomRejects;
-//        nbloomFalsePos += o.nbloomFalsePos;
         nfinds += o.nfinds;
         ninserts += o.ninserts;
         nremoves += o.nremoves;
@@ -116,13 +152,69 @@ final public class BTreeCounters {
         
     }
     
-    // IKeySearch
-//    /** #of keys tested by the bloom filter in contains/lookup(key). */
-//    public int nbloomTest = 0;
-//    /** #of keys rejected by the bloom filter in contains/lookup(key). */
-//    public int nbloomRejects = 0;
-//    /** #of false positives from the bloom filter in contains/lookup(key). */
-//    public int nbloomFalsePos = 0;
+    /**
+     * Subtracts the given counters from the current counters, returning a new
+     * counter object containing their difference.
+     * 
+     * @param o
+     */
+    public BTreeCounters subtract(final BTreeCounters o) {
+        
+        if (o == null)
+            throw new IllegalArgumentException();
+        
+        // make a copy of the current counters.
+        final BTreeCounters t = new BTreeCounters(this);
+        
+        /*
+         * Subtract out the given counters.
+         */
+        
+        // IKeySearch
+        t.nfinds -= o.nfinds;
+        t.ninserts -= o.ninserts;
+        t.nremoves -= o.nremoves;
+        // ILinearList
+        t.nindexOf -= o.nindexOf; // Note: also does key search.
+        t.ngetKey  -= o.ngetKey;
+        t.ngetValue -= o.ngetValue;
+        // IRangeQuery
+        t.nrangeCount -= o.nrangeCount;
+        t.nrangeIterator -= o.nrangeIterator;
+        // Structural mutation.
+        t.rootsSplit -= o.rootsSplit;
+        t.rootsJoined -= o.rootsJoined;
+        t.nodesSplit -= o.nodesSplit;
+        t.nodesJoined -= o.nodesJoined;
+        t.leavesSplit -= o.leavesSplit;
+        t.leavesJoined -= o.leavesJoined;
+        t.headSplit -= o.headSplit;
+        t.tailSplit -= o.tailSplit;
+        t.nodesCopyOnWrite -= o.nodesCopyOnWrite;
+        t.leavesCopyOnWrite -= o.leavesCopyOnWrite;
+        // tuple mutation.
+        t.ntupleInsertValue -= o.ntupleInsertValue;
+        t.ntupleInsertDelete -= o.ntupleInsertDelete;
+        t.ntupleUpdateValue -= o.ntupleUpdateValue;
+        t.ntupleUpdateDelete -= o.ntupleUpdateDelete;
+        t.ntupleRemove -= o.ntupleRemove;
+        // IO
+        t.nodesRead -= o.nodesRead;
+        t.leavesRead -= o.leavesRead;
+        t.nodesWritten -= o.nodesWritten;
+        t.leavesWritten -= o.leavesWritten;
+        t.bytesRead -= o.bytesRead;
+        t.bytesWritten -= o.bytesWritten;
+        
+        t.serializeNanos -= o.serializeNanos;
+        t.deserializeNanos -= o.deserializeNanos;
+        t.writeNanos -= o.writeNanos;
+        t.readNanos -= o.readNanos;
+        
+        return t;
+        
+    }
+    
     /**
      * #of keys looked up in the tree by contains/lookup(key) (does not count
      * those rejected by the bloom filter before they are tested against the
@@ -218,9 +310,10 @@ final public class BTreeCounters {
     
     /**
      * Return a score whose increasing value is correlated with the amount of
-     * activity on an index as reflected in these {@link BTreeCounters}.
+     * read/write activity on an index as reflected in these
+     * {@link BTreeCounters}.
      * <p>
-     * The raw score is the serialization / deserialization time plus the read /
+     * The score is the serialization / deserialization time plus the read /
      * write time. Time was choosen since it is a common unit and since it
      * reflects the combination of CPU time, memory time (for allocations and
      * garbage collection - the latter can be quite significant), and the disk
@@ -238,26 +331,39 @@ final public class BTreeCounters {
      * materialize any given leaf.
      * 
      * @return The computed score.
-     * 
-     * @todo instrument the key search time
-     * 
-     * @todo instrument bloom filter time when the bloom filter is used (this
-     *       should be done separately on the bloom filter object).
-     * 
-     * @todo At present, deserialization is much slower than serialization,
-     *       primarily because of object creation. Changing to a raw record
-     *       format for nodes and leaves would likely reduce the deserialization
-     *       costs significantly. The time could also be reduced by lazy
-     *       decompression of the values and lazy deserialization of the values
-     *       such that tuple scans for keys only do not require value
-     *       deserialization.
      */
-    public double computeRawScore() {
+    public double computeRawReadWriteScore() {
         
         return //
             (serializeNanos + deserializeNanos) + //
             (writeNanos + readNanos)//
             ;
+        
+    }
+
+    /**
+     * Return a score whose increasing value is correlated with the amount of
+     * read activity on an index as reflected in these {@link BTreeCounters}.
+     * The score is {@link #deserializeNanos} + {@link #readNanos}.
+     * 
+     * @see #computeRawReadWriteScore()
+     */
+    public double computeRawReadScore() {
+        
+        return deserializeNanos + readNanos;
+        
+    }
+
+    /**
+     * Return a score whose increasing value is correlated with the amount of
+     * write activity on an index as reflected in these {@link BTreeCounters}.
+     * The score is {@link #serializeNanos} plus {@link #writeNanos}.
+     * 
+     * @see #computeRawReadWriteScore()
+     */
+    public double computeRawWriteScore() {
+        
+        return serializeNanos + writeNanos;
         
     }
     
@@ -268,7 +374,7 @@ final public class BTreeCounters {
      *            The raw score.
      * @param totalRawScore
      *            The raw score computed from the totals.
-     *            
+     * 
      * @return The normalized score.
      */
     static public double normalize(final double rawScore,

@@ -38,8 +38,8 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.journal.IConcurrencyManager;
-import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.Journal;
+import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IMetadataService;
@@ -84,7 +84,7 @@ import com.bigdata.service.MetadataService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class ResourceManager extends OverflowManager implements IResourceManager {
+abstract public class ResourceManager extends OverflowManager {
 
     /**
      * Logger.
@@ -144,7 +144,10 @@ abstract public class ResourceManager extends OverflowManager implements IResour
     }
 
     /**
-     * Return the {@link CounterSet}.
+     * <strong>WARNING: The {@link DataService} transfers all of the children
+     * from this object into the hierarchy reported by
+     * {@link AbstractFederation#getServiceCounterSet()} and this object will be
+     * empty thereafter.</strong>
      */
     synchronized public CounterSet getCounters() {
         
@@ -156,7 +159,34 @@ abstract public class ResourceManager extends OverflowManager implements IResour
             {
 
                 // ... nothing really - its all under other headings.
+
+            }
+            
+            // Live Journal
+            {
                 
+                /*
+                 * Note: these counters are detached and reattached to the new
+                 * live journal during overflow processing.
+                 * 
+                 * @todo This assumes that the StoreManager is running.
+                 * Normally, this will be true since the DataService does not
+                 * setup its counter set until the store manager is running and
+                 * the service UUID has been assigned. However, eagerly
+                 * requesting the counters set would violate that assumption and
+                 * cause an exception to be thrown here since the live journal
+                 * is not defined until the StoreManager is running.
+                 * 
+                 * It would be best to modify this to attach the live journal
+                 * counters when the StoreManager startup completes successfully
+                 * rather than assuming that it already has done so. However,
+                 * the counter set for the ResourceManager is not currently
+                 * defined until the StoreManager is running...
+                 */
+
+                root.makePath(IResourceManagerCounters.LiveJournal).attach(
+                        getLiveJournal().getCounters());
+
             }
             
             // OverflowManager
@@ -542,27 +572,6 @@ abstract public class ResourceManager extends OverflowManager implements IResour
                         });
 
             }
-
-            /*
-             * Note: these counters are detached and reattached to the new live
-             * journal during overflow processing.
-             * 
-             * @todo This assumes that the StoreManager is running. Normally,
-             * this will be true since the DataService does not setup its
-             * counter set until the store manager is running and the service
-             * UUID has been assigned. However, eagerly requesting the counters
-             * set would violate that assumption and cause an exception to be
-             * thrown here since the live journal is not defined until the
-             * StoreManager is running.
-             * 
-             * It would be best to modify this to attach the live journal
-             * counters when the StoreManager startup completes successfully
-             * rather than assuming that it already has done so. However, the
-             * counter set for the ResourceManager is not currently defined
-             * until the StoreManager is running...
-             */
-            root.makePath(IResourceManagerCounters.LiveJournal).attach(
-                    getLiveJournal().getCounters());
 
         }
 

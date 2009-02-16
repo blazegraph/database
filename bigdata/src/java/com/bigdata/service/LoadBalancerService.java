@@ -134,7 +134,7 @@ import com.bigdata.util.concurrent.QueueStatisticsTask.IQueueCounters;
  *       the operating system?
  */
 abstract public class LoadBalancerService extends AbstractService
-    implements ILoadBalancerService, IServiceShutdown {
+    implements ILoadBalancerService, IServiceShutdown, IEventReportingService {
 
     final static protected Logger log = Logger.getLogger(LoadBalancerService.class);
 

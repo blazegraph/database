@@ -2624,6 +2624,28 @@ abstract public class StoreManager extends ResourceEvents implements
                     // opened another journal.
                     journalReopenCount.incrementAndGet();
 
+                    /*
+                     * Make sure that the re-opened journal is using the same
+                     * performance counters instance as the live journal so that
+                     * we have a record of all activity on journals used by the
+                     * data service in a single location.
+                     * 
+                     * Note: This is also done at synchronous overflow.
+                     * 
+                     * FIXME We need to do this for other implementation classes
+                     * as well.
+                     */
+                    if (journal.getBufferStrategy() instanceof DiskOnlyStrategy
+                            && getLiveJournal().getBufferStrategy() instanceof DiskOnlyStrategy) {
+
+                        ((DiskOnlyStrategy) getLiveJournal()
+                                .getBufferStrategy())
+                                .setStoreCounters((((DiskOnlyStrategy) journal
+                                        .getBufferStrategy())
+                                        .getStoreCounters()));
+                        
+                    }
+                    
                 } else {
 
                     /*
@@ -2922,32 +2944,32 @@ abstract public class StoreManager extends ResourceEvents implements
 
         }
 
-        // debugging - writes out stores and indices in their respective caches.
-        if(false) {// @todo remove code.
-            int nstores = 0, nindices = 0;
-            {
-                Iterator<WeakReference<IRawStore>> itr = storeCache.iterator();
-                while (itr.hasNext()) {
-                    IRawStore store = itr.next().get();
-                    if (store != null) {
-                        log.warn("Store: " + store);
-                        nstores++;
-                    }
-                }
-            }
-            {
-                Iterator<WeakReference<ILocalBTreeView>> itr2 = ((IndexManager) this).indexCache
-                        .iterator();
-                while (itr2.hasNext()) {
-                    IIndex ndx = itr2.next().get();
-                    if (ndx != null) {
-                        log.warn("Index: " + ndx);
-                        nindices++;
-                    }
-                }
-            }
-            log.warn("nstores=" + nstores + ", nindices=" + nindices);
-        }
+//        // debugging - writes out stores and indices in their respective caches.
+//        if(false) {// @todo remove code.
+//            int nstores = 0, nindices = 0;
+//            {
+//                Iterator<WeakReference<IRawStore>> itr = storeCache.iterator();
+//                while (itr.hasNext()) {
+//                    IRawStore store = itr.next().get();
+//                    if (store != null) {
+//                        log.warn("Store: " + store);
+//                        nstores++;
+//                    }
+//                }
+//            }
+//            {
+//                Iterator<WeakReference<ILocalBTreeView>> itr2 = ((IndexManager) this).indexCache
+//                        .iterator();
+//                while (itr2.hasNext()) {
+//                    IIndex ndx = itr2.next().get();
+//                    if (ndx != null) {
+//                        log.warn("Index: " + ndx);
+//                        nindices++;
+//                    }
+//                }
+//            }
+//            log.warn("nstores=" + nstores + ", nindices=" + nindices);
+//        }
         
         /*
          * Prevent concurrent access to the index cache.

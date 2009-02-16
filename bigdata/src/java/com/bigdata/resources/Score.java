@@ -47,7 +47,7 @@ class Score implements Comparable<Score> {
     /** The counters collected for that index partition. */
     public final BTreeCounters bTreeCounters;
 
-    /** The raw score computed for that index partition. */
+    /** The raw (write) score computed for that index partition. */
     public final double rawScore;
 
     /** The normalized score computed for that index partition. */
@@ -77,7 +77,7 @@ class Score implements Comparable<Score> {
 
         this.bTreeCounters = bTreeCounters;
 
-        rawScore = bTreeCounters.computeRawScore();
+        rawScore = bTreeCounters.computeRawWriteScore();
 
         score = BTreeCounters.normalize(rawScore, totalRawScore);
 

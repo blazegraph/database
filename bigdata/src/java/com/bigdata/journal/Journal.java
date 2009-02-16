@@ -40,7 +40,6 @@ import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.bfs.GlobalFileSystemHelper;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;

@@ -1147,54 +1147,6 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         
     }
     
-//    /**
-//     * Statistics describing the journal including IO, registered indices, etc.
-//     * 
-//     * @todo Since this reports on the registered indices as of the current
-//     *       commit record it presents data which is not available via
-//     *       {@link #getCounters()}. Is there any meaningful way to add that
-//     *       data to {@link #getCounters()} since it is structurally dynamic?
-//     * 
-//     * @todo make this 100% XML by changing {@link BTree} to report counters as
-//     *       XML and placing the index counters under a path corresponding to
-//     *       the index name. indices are added and dropped, but the counter
-//     *       reporting should probably be "at the instant" rather than modifying
-//     *       the defined counter hierarchy as those indices are created and
-//     *       destroyed just to keep down the memory profile if there happens to
-//     *       be a large #of indices. the internal indices (name2addr and the
-//     *       commit record index) could also be reported on in this manner.
-//     */
-//    public String getStatistics() {
-//
-//        StringBuilder sb = new StringBuilder();
-//
-//        sb.append(_bufferStrategy.getCounters().toString());
-//        
-//        /*
-//         * Report on the registered indices.
-//         */
-//        synchronized(name2Addr) {
-//            
-//            ITupleIterator itr = name2Addr.entryIterator();
-//
-//            while (itr.hasNext()) {
-//
-//                ITuple tuple = itr.next();
-//                
-//                Entry entry = EntrySerializer.INSTANCE.deserialize(tuple.getValueStream());
-//                
-//                IIndex ndx = name2Addr.get(entry.name);
-//                
-//                sb.append("\nindex: name="+entry.name+" : "+ndx.getStatistics());
-//                
-//            }
-//            
-//        }
-//
-//        return sb.toString();
-//        
-//    }
-    
     /**
      * Return counters reporting on various aspects of the journal.
      */
@@ -1203,6 +1155,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         if (counters == null) {
 
             counters = CountersFactory.getCounters(this);
+            
         }
 
         return counters;
@@ -1210,15 +1163,15 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     }
     private CounterSet counters;
     
+    /**
+     * Note: A combination of a static inner class and a weak reference to
+     * the outer class are used to avoid the returned {@link CounterSet}
+     * having a hard reference to the outer class while retaining the
+     * ability to update the {@link CounterSet} dynamically as long as the
+     * referenced object exists.
+     */
     private static class CountersFactory {
 
-        /**
-         * Note: A combination of a static inner class and a weak reference to
-         * the outer class are used to avoid the returned {@link CounterSet}
-         * having a hard reference to the outer class while retaining the
-         * ability to update the {@link CounterSet} dynamically as long as the
-         * referenced object exists.
-         */
         static public CounterSet getCounters(final AbstractJournal jnl) {
         
             final CounterSet counters = new CounterSet();
@@ -1266,7 +1219,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
             counters.attach(jnl._bufferStrategy.getCounters());
 
-        return counters;
+            return counters;
 
         }
         

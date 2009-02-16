@@ -49,6 +49,7 @@ import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.BufferedDiskStrategy;
+import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
@@ -63,6 +64,7 @@ import com.bigdata.service.EventResource;
 import com.bigdata.service.EventType;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IServiceShutdown;
+import com.bigdata.service.DataService.IDataServiceCounters;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -1638,6 +1640,25 @@ abstract public class OverflowManager extends IndexManager {
             // note the lastCommitTime on the old journal.
             lastOverflowTime = lastCommitTime;
             
+            /*
+             * Set the performance counters from the old store on the new store
+             * so that we have a cumulative track of all activity on the "live"
+             * journals.
+             * 
+             * Note: This is also done when we re-open a read-only journal.
+             * 
+             * FIXME Must also roll the counters forward for the other journal
+             * buffer strategies!
+             */
+            if (newJournal.getBufferStrategy() instanceof DiskOnlyStrategy
+                    && oldJournal.getBufferStrategy() instanceof DiskOnlyStrategy) {
+
+                ((DiskOnlyStrategy) newJournal.getBufferStrategy())
+                        .setStoreCounters((((DiskOnlyStrategy) oldJournal
+                                .getBufferStrategy()).getStoreCounters()));
+                
+            }
+            
             if (INFO)
                 log.info("New live journal: " + newJournal.getFile());
 
@@ -1684,25 +1705,6 @@ abstract public class OverflowManager extends IndexManager {
                     + "\npre-condition views: overflowCounter="
                     + getOverflowCount() + "\n"
                     + listIndexPartitions(TimestampUtility.asHistoricalRead(lastCommitTime)));
-
-//            // using read-committed view of Name2Addr
-//            numIndices = (int) oldJournal.getName2Addr().rangeCount();
-
-//            // using read-committed view of Name2Addr
-//            final ITupleIterator itr = oldJournal.getName2Addr().rangeIterator();
-//
-//            while (itr.hasNext()) {
-//
-//                final ITuple tuple = itr.next();
-//
-//                final Entry entry = EntrySerializer.INSTANCE
-//                        .deserialize(new DataInputBuffer(tuple.getValue()));
-//
-//                // old index (just the mutable btree on the old journal, not the full view of that index).
-//                final BTree oldBTree = (BTree) oldJournal.getIndex(entry.checkpointAddr);
-//
-//                // #of index entries on the old index.
-//                final int entryCount = oldBTree.getEntryCount();
 
             final Iterator<ViewMetadata> itr = overflowMetadata.views();
             
@@ -2013,20 +2015,37 @@ abstract public class OverflowManager extends IndexManager {
          * Note: The spelling of the counter set names MUST be consistent with
          * their declarations!
          * 
-         * @todo this is done redundently here and in the DataService's
-         * reattachDynamicCounters() because it seems like the logic here is not
-         * doing the trick for me. Look into this further.
+         * Note: getCounters() on this class gets attached to thew serviceRoot
+         * by the DataService so that is where we need to go to detach and then
+         * re-attach the counters.
          */
         try {
 
-            final CounterSet tmp = (CounterSet) getCounters();
+            // The service's counter set hierarchy.
+            final CounterSet serviceRoot = getFederation()
+                    .getServiceCounterSet();
+
+            /*
+             * The counters for the resource manager within the service's
+             * counter hierarchy.
+             */ 
+            final CounterSet tmp = (CounterSet)serviceRoot
+                    .getPath(IDataServiceCounters.resourceManager);
 
             synchronized (tmp) {
 
-                tmp.detach(IResourceManagerCounters.LiveJournal);
+//                // the live journal is a child of the resource manager.
+//                tmp.detach(IResourceManagerCounters.LiveJournal);
 
-                tmp.makePath(IResourceManagerCounters.LiveJournal).attach(
-                        getLiveJournal().getCounters());
+//                tmp.makePath(IResourceManagerCounters.LiveJournal).attach(
+//                        getLiveJournal().getCounters());
+
+                ((CounterSet) tmp.getPath(IResourceManagerCounters.LiveJournal))
+                        .attach(getLiveJournal().getBufferStrategy()
+                                .getCounters(), true/* replace */);
+
+                log.warn("Re-attached live journal counters: path="
+                        + tmp.getPath());
 
             }
 

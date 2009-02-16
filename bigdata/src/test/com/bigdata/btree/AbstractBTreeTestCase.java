@@ -1323,7 +1323,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             throw ex;
         }
 
-        log.info(btree.btreeCounters.toString());
+        log.info(btree.getBtreeCounters().toString());
 
         return btree;
         
@@ -1386,7 +1386,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
         assertTrue(btree.dump(Level.ERROR,System.err));
         
-        log.info(btree.btreeCounters.toString());
+        log.info(btree.getBtreeCounters().toString());
 
     }
 
@@ -1491,7 +1491,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         assertTrue( btree.dump(System.err) );
         
-        log.info(btree.btreeCounters.toString());
+        log.info(btree.getBtreeCounters().toString());
     
     }
 
@@ -1585,7 +1585,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         assertEquals("#nodes", 0, btree.nnodes);
         assertEquals("#leaves", 1, btree.nleaves);
         assertEquals("height", 0, btree.height);
-        log.info(btree.btreeCounters.toString());
+        log.info(btree.getBtreeCounters().toString());
         
     }
     
@@ -1930,7 +1930,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         System.err.println(label + " : tested " + nentries
                 + " keys in " + elapsed + "ms");
         
-        System.err.println(label + " : " + btree.btreeCounters);
+        System.err.println(label + " : " + btree.getBtreeCounters());
          
     }
     

@@ -65,6 +65,7 @@ import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.QueueStatisticsTask;
+import com.bigdata.util.concurrent.ShutdownHelper;
 import com.bigdata.util.concurrent.TaskCounters;
 import com.bigdata.util.httpd.AbstractHTTPD;
 
@@ -126,46 +127,58 @@ abstract public class AbstractFederation implements IBigdataFederation {
         if (INFO)
             log.info("begin");
 
-        // allow client requests to finish normally.
-        threadPool.shutdown();
-
         try {
 
-            if (!threadPool.awaitTermination(5, TimeUnit.SECONDS)) {
+            // allow client requests to finish normally.
+            new ShutdownHelper(threadPool, 10L/*logTimeout*/, TimeUnit.SECONDS) {
+              
+                public void logTimeout() {
+                    
+                    log.warn("Awaiting thread pool termination: elapsed="
+                            + TimeUnit.NANOSECONDS.toMillis(elapsed()) + "ms");
 
-                log.warn("Timeout awaiting thread pool termination.");
+                }
+
+            };
+
+            if (statisticsCollector != null) {
+
+                statisticsCollector.stop();
+
+                statisticsCollector = null;
 
             }
+
+            // terminate sampling and reporting tasks.
+            new ShutdownHelper(sampleService, 10L/*logTimeout*/, TimeUnit.SECONDS) {
+
+                public void logTimeout() {
+
+                    log.warn("Awaiting sample service termination: elapsed="
+                            + TimeUnit.NANOSECONDS.toMillis(elapsed()) + "ms");
+
+                }
+
+            };
 
         } catch (InterruptedException e) {
 
             log.warn("Interrupted awaiting thread pool termination.", e);
 
         }
-        
-        if (statisticsCollector != null) {
-
-            statisticsCollector.stop();
-
-            statisticsCollector = null;
-
-        }
-
-        // terminate sampling and reporting tasks.
-        sampleService.shutdown();
 
         // drain any events in one last report.
         new SendEventsTask().run();
-        
-        // optional httpd service for the local counters. 
-        if( httpd != null) {
-            
+
+        // optional httpd service for the local counters.
+        if (httpd != null) {
+
             httpd.shutdown();
-            
+
             httpd = null;
-            
+
             httpdURL = null;
-            
+
         }
         
         if (INFO)

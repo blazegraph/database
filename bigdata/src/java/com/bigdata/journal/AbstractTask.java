@@ -34,7 +34,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
@@ -401,7 +400,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             
         }
 
-        DirtyListener(String name, BTree ndx) {
+        DirtyListener(final String name, final BTree ndx) {
             
             assert name!=null;
             
@@ -419,7 +418,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * @param btree
          *            The {@link BTree} reporting that it is dirty.
          */
-        public void dirtyEvent(BTree btree) {
+        public void dirtyEvent(final BTree btree) {
 
             assert btree == this.btree;
 
@@ -443,34 +442,20 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             log.info("Clearing hard reference cache: " + indexCache.size()
                     + " indices accessed");
         
-//        if (timestamp == ITx.UNISOLATED || timestamp == ITx.READ_COMMITTED) {
-//            
-//            /*
-//             * Report counters for unisolated and read-committed indices.
-//             */
-        /*
-         * @todo should probably report the unisolated and read-historical
-         * counters separately since the unisolated counters reflects the write
-         * workload while the read-historical counters reflect query.
-         */
-
-            final Iterator<Map.Entry<String, ILocalBTreeView>> itr = indexCache
-                    .entrySet().iterator();
-
-            while (itr.hasNext()) {
-
-                final Map.Entry<String, ILocalBTreeView> entry = itr.next();
-
-                final String name = entry.getKey();
-
-                final ILocalBTreeView ndx = entry.getValue();
-
-                ((ConcurrencyManager) concurrencyManager).addIndexCounters(
-                        name, timestamp, ndx);
-                
-//            }
-        
-        }
+//        final Iterator<Map.Entry<String, ILocalBTreeView>> itr = indexCache
+//                    .entrySet().iterator();
+//
+//        while (itr.hasNext()) {
+//
+//                final Map.Entry<String, ILocalBTreeView> entry = itr.next();
+//
+//                final String name = entry.getKey();
+//
+//                final ILocalBTreeView ndx = entry.getValue();
+//
+//                resourceManager.addIndexCounters(name, timestamp, ndx);
+//        
+//        }
         
         indexCache.clear();
         
@@ -519,7 +504,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * @todo modify to return <code>null</code> if the index is not
      *       registered?
      */
-    synchronized final public IIndex getIndex(String name) {
+    synchronized final public IIndex getIndex(final String name) {
 
         if (name == null) {
 
@@ -601,6 +586,14 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                     // add to the unisolated index cache (must not exist).
                     name2Addr.putIndexCache(name, btree, false/* replace */);
 
+                    if(resourceManager instanceof ResourceManager) {
+                        
+                        btree
+                                .setBTreeCounters(((ResourceManager) resourceManager)
+                                        .getIndexCounters(name));
+                        
+                    }
+                    
                 }
 
             }
@@ -648,7 +641,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * 
      * @return The view.
      */
-    private IIndex getUnisolatedIndexView(String name, BTree btree) {
+    private IIndex getUnisolatedIndexView(final String name, final BTree btree) {
         
         // setup the task as the listener for dirty notices.
         btree.setDirtyListener(new DirtyListener(name,btree));
@@ -702,7 +695,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * 
      * @see IBTreeManager#registerIndex(String, BTree)
      */
-    synchronized public IIndex registerIndex(String name, BTree btree) {
+    synchronized public IIndex registerIndex(final String name, final BTree btree) {
         
         if (name == null)
             throw new IllegalArgumentException();
@@ -756,7 +749,21 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * Add entry to our isolated view (can replace an old [droppedIndex]
          * entry).
          */
+
         n2a.put(name, entry);
+
+        /*
+         * Make sure that the BTree is associated with the correct performance
+         * counters.
+         */
+
+        if(resourceManager instanceof ResourceManager) {
+            
+            btree
+                    .setBTreeCounters(((ResourceManager) resourceManager)
+                            .getIndexCounters(name));
+            
+        }
 
         /*
          * Note: delegate logic to materialize the view in case BTree is an
@@ -2064,36 +2071,37 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * Note: This is the core implementation for registering an index - it
          * delegates to the {@link AbstractTask}.
          */
-        public IIndex registerIndex(String name, BTree btree) {
-            
-            return AbstractTask.this.registerIndex(name,btree);
-            
+        public IIndex registerIndex(final String name, final BTree btree) {
+
+            return AbstractTask.this.registerIndex(name, btree);
+
         }
 
-        public void registerIndex(IndexMetadata indexMetadata) {
-         
+        public void registerIndex(final IndexMetadata indexMetadata) {
+
             // delegate to core impl.
             registerIndex(indexMetadata.getName(), indexMetadata);
-            
+
         }
 
-        public IIndex registerIndex(String name, IndexMetadata indexMetadata) {
-            
+        public IIndex registerIndex(final String name,
+                final IndexMetadata indexMetadata) {
+
             // Note: handles constraints and defaults for index partitions.
             delegate.validateIndexMetadata(name, indexMetadata);
-            
+
             // Note: create on the _delegate_.
             final BTree btree = BTree.create(delegate, indexMetadata);
 
             // delegate to core impl.
             return registerIndex(name, btree);
-            
+
         }
 
         /**
          * Note: access to an unisolated index is governed by the AbstractTask.
          */
-        public IIndex getIndex(String name) {
+        public IIndex getIndex(final String name) {
 
             try {
 
