@@ -29,6 +29,12 @@
 			<src path="${bigdata.dir}/src/test" />
 			-->
 		</javac>
+    	<!-- copy resources. -->
+        <copy toDir="${build.dir}">
+            <fileset dir="${bigdata.dir}/src/java">
+                <exclude name="**/*.java"/>
+            </fileset>
+        </copy>
 	</target>
 
 	<!-- build the main jar.
