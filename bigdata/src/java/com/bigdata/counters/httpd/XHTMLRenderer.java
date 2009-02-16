@@ -3266,6 +3266,9 @@ public class XHTMLRenderer {
 
         final InputStream is = getClass().getResourceAsStream(resource);
 
+        if (is == null)
+            throw new IOException("Resource not on classpath: " + resource);
+        
         final BufferedReader reader = new BufferedReader(new InputStreamReader(is));
         
         try {
