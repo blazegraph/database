@@ -50,7 +50,7 @@
             <src path="${bigdata.sails.dir}/src/test"/>
         </javac>
     	<!-- copy resources. -->
-        <copy toDir="${build.dir}/classes">
+        <copy toDir="${build.dir}">
             <fileset dir="${bigdata.dir}/src/java">
                 <exclude name="**/*.java"/>
             </fileset>
