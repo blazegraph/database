@@ -9,8 +9,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
-
+import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.service.Event;
 import com.bigdata.service.IEventReportingService;
 import com.bigdata.service.IService;
@@ -105,42 +104,35 @@ public class DummyEventReportingService implements IEventReportingService, IServ
      * @return the events
      */
     public LinkedHashMap<UUID, Event> getEvents() {
+        
         return events;
+        
     }
 
-    /**
-     * Not implemented.
-     * 
-     * @throws NotImplementedException
-     */
     public String getHostname() throws IOException {
-        throw new NotImplementedException();
+        
+        return AbstractStatisticsCollector.fullyQualifiedHostName;
+        
     }
 
-    /**
-     * Not implemented.
-     * 
-     * @throws NotImplementedException
-     */
     public Class getServiceIface() throws IOException {
-        throw new NotImplementedException();
+        
+        return getClass();
+        
     }
 
-    /**
-     * Not implemented.
-     * 
-     * @throws NotImplementedException
-     */
     public String getServiceName() throws IOException {
-        throw new NotImplementedException();
+        
+        return getClass().getName()+"#"+hashCode();
+        
     }
 
-    /**
-     * Not implemented.
-     * 
-     * @throws NotImplementedException
-     */
     public UUID getServiceUUID() throws IOException {
-        throw new NotImplementedException();
+    
+        return serviceUUID;
+        
     }
+
+    final UUID serviceUUID = UUID.randomUUID();
+    
 }
