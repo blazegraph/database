@@ -3540,7 +3540,7 @@ public class XHTMLRenderer {
 
 //            final double offset = Math.sin(e
 //                    .getEndTime()/100d) / 4d;
-            final double offset = (Math.random() - .5);// / 1d;
+            final double offset = (Math.random()*.85d)+.05;// - .5);// / 1d;
             
             final String hostyvar = series + "y";
             
@@ -3598,7 +3598,7 @@ public class XHTMLRenderer {
  
         for (int i = 0; i < keys.length; i++) {
 
-            final int hosty = i + 1;
+            final int hosty = i;
             
             final String key = keys[i];
             
