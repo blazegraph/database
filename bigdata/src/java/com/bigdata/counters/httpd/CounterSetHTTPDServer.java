@@ -119,7 +119,7 @@ public class CounterSetHTTPDServer implements Runnable {
                     
                     final File file = new File(args[++i]);
                     
-                    System.out.println("reading events file: "+file);
+                    System.out.println("reading events file: " + file);
                     
                     BufferedReader reader = null;
 
@@ -129,6 +129,8 @@ public class CounterSetHTTPDServer implements Runnable {
 
                         service.readCSV(reader);
 
+                        System.out.println("read "+service.getEvents().size()+" events from file: " + file);
+                        
                     } finally {
 
                         if (reader != null) {

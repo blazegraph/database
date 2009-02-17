@@ -4,9 +4,9 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
+import java.lang.reflect.Field;
 import java.net.URLEncoder;
 import java.text.DateFormat;
 import java.text.DecimalFormat;
@@ -26,7 +26,9 @@ import java.util.UUID;
 import java.util.Vector;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 import org.apache.log4j.Logger;
+
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.History;
 import com.bigdata.counters.HistoryInstrument;
@@ -41,7 +43,6 @@ import com.bigdata.counters.History.SampleIterator;
 import com.bigdata.counters.httpd.XHTMLRenderer.Model.ReportEnum;
 import com.bigdata.counters.httpd.XHTMLRenderer.Model.TimestampFormatEnum;
 import com.bigdata.service.Event;
-import com.bigdata.service.EventType;
 import com.bigdata.service.IEventReportingService;
 import com.bigdata.service.IService;
 import com.bigdata.util.HTMLUtility;
@@ -70,26 +71,6 @@ public class XHTMLRenderer {
     final static protected boolean DEBUG = log.isDebugEnabled();
 
     public static class Model {
-
-//        static enum SourceEnum {
-//            
-//            /**
-//             * Shows the performance counter data.
-//             */
-//            Counters,
-//            
-//            /**
-//             * Shows the index partition data.
-//             */
-//            IndexPartitions;
-//            
-//        }
-//        
-//        /**
-//         * A choice of various kinds of data. The default source is the
-//         * performance counters.
-//         */
-//        static final String SOURCE = "source";
         
         /**
          * Name of the URL query parameter specifying the starting path for the page
@@ -117,7 +98,7 @@ public class XHTMLRenderer {
          * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
          * @version $Id$
          */
-        static enum ReportEnum {
+        public static enum ReportEnum {
            
             /**
              * This is the navigational view of the performance counter
@@ -137,7 +118,12 @@ public class XHTMLRenderer {
              * This is a pivot table ready view, which is useful for aggregating
              * the performance counter data in a variety of ways.
              */
-            pivot;
+            pivot,
+            
+            /**
+             * Plot a timeline of events.
+             */
+            events;
             
         }
         
@@ -190,6 +176,53 @@ public class XHTMLRenderer {
          * will be reported. The value may be any {@link PeriodEnum}.
          */
         static final String PERIOD = "period";
+        
+        /**
+         * A collection of event filters. Each filter is a regular expression.
+         * The key is the {@link Event} {@link Field} to which the filter will
+         * be applied. The events filters are specified using URL query
+         * parameters having the general form: <code>events.column=regex</code>.
+         * For example,
+         * 
+         * <pre>
+         * events.majorType = AsynchronousOverflow
+         * </pre>
+         * 
+         * would select just the asynchronous overflow events and
+         * 
+         * <pre>
+         * events.hostname=blade12.*
+         * </pre>
+         * 
+         * would select events reported for blade12.
+         */
+        public final HashMap<Field,Pattern> eventFilters = new HashMap<Field, Pattern>();
+
+        /**
+         * The <code>eventOrderBy=fld</code> URL query parameters specifies
+         * the sequence in which events should be grouped. The value of the
+         * query parameter is an ordered list of the names of {@link Event}
+         * {@link Field}s. For example:
+         * 
+         * <pre>
+         * eventOrderBy=majorEventType &amp; eventOrderOrderBy=hostname
+         * </pre>
+         * 
+         * would group the events first by the major event type and then by the
+         * hostname. All events for the same {@link Event#majorEventType} and
+         * the same {@link Event#hostname} would appear on the same Y value.
+         * <p>
+         * If no value is specified for this URL query parameter then the
+         * default is as if {@link Event#hostname} was specified.
+         */
+        static final String EVENT_ORDER_BY = "eventOrderBy";
+        
+        /**
+         * The order in which the events will be grouped.
+         * 
+         * @see #EVENT_ORDER_BY
+         */
+        public final Field[] eventOrderBy;
         
         /**
          * Type-safe enum for the options used to render the timestamp of the
@@ -249,16 +282,6 @@ public class XHTMLRenderer {
         final public int depth;
         
         /**
-         * When <code>true</code> a correlated view will be generated for the
-         * spanned counters showing all samples for each counter in a column
-         * where the rows are all for the same sample period. Counters without
-         * history are elided in this view.
-         * 
-         * @deprecated by #reportType
-         */
-//        final public boolean correlated;
-        
-        /**
          * The kind of report to generate.
          * 
          * @see #REPORT
@@ -292,6 +315,19 @@ public class XHTMLRenderer {
          * query parameters.
          */
         final public Pattern pattern;
+
+        /**
+         * The events iff they are available from the service.
+         * 
+         * @see IEventReportingService
+         */
+        final LinkedHashMap<UUID, Event> events;
+        
+        /**
+         * <code>true</code> iff we need to output the scripts to support
+         * flot.
+         */
+        final boolean flot;
         
         /**
          * Used to format double and float counter values.
@@ -432,6 +468,18 @@ public class XHTMLRenderer {
 
             }
 
+            if (service != null && service instanceof IEventReportingService) {
+
+                // events are available.
+                events = ((IEventReportingService) service).getEvents();
+
+            } else {
+
+                // events are not available.
+                events = null;
+                
+            }
+            
             if (params.containsKey(REPORT) && params.containsKey(CORRELATED)) {
 
                 throw new IllegalArgumentException("Please use either '"
@@ -457,7 +505,146 @@ public class XHTMLRenderer {
 
                 this.reportType = correlated ? ReportEnum.correlated
                         : ReportEnum.hierarchy;
+
+            }
+
+            if (events != null) {
                 
+                final Iterator<Map.Entry<String, Vector<String>>> itr = params
+                        .entrySet().iterator();
+                
+                while(itr.hasNext()) {
+                    
+                    final Map.Entry<String, Vector<String>> entry = itr.next();
+                    
+                    final String name = entry.getKey();
+                    
+                    if (!name.startsWith("events."))
+                        continue;
+                    
+                    final int pos = name.indexOf('.');
+
+                    if (pos == -1) {
+
+                        throw new IllegalArgumentException(
+                                "Missing event column name: " + name);
+                        
+                    }
+                    
+                    // the name of the event column.
+                    final String col = name.substring(pos + 1, name.length());
+                    
+                    final Field fld;
+                    try {
+                        
+                        fld = Event.class.getField(col);
+                        
+                    } catch(NoSuchFieldException ex) {
+
+                        throw new IllegalArgumentException("Unknown event field: "+col);
+                        
+                    }
+
+                    final Vector<String> patterns = entry.getValue();
+                    
+                    if (patterns.size() == 0)
+                        continue;
+
+                    if (patterns.size() > 1)
+                        throw new IllegalArgumentException(
+                                "Only one pattern per field: " + name);
+                    
+                    /*
+                     * compile the pattern
+                     * 
+                     * Note: Throws PatternSyntaxException if the pattern can
+                     * not be compiled.
+                     */
+                    final Pattern pattern = Pattern.compile(patterns.firstElement());
+                    
+                    eventFilters.put(fld, pattern);
+                    
+                }
+
+//                if (INFO)
+//                    log.info
+                {
+                    final StringBuilder sb = new StringBuilder();
+                    for (Field f : eventFilters.keySet()) {
+                        sb.append(f.getName() + "=" + eventFilters.get(f));
+                    }
+                    log.warn("eventFilters={" + sb + "}");
+                }
+                
+            }
+            
+            // eventOrderBy
+            {
+                
+                final Vector<String> v = params.get(EVENT_ORDER_BY);
+
+                if (v == null) {
+
+                    /*
+                     * Use a default for eventOrderBy.
+                     */
+
+                    try {
+
+                        eventOrderBy = new Field[] { Event.class
+                                .getField("hostname") };
+
+                    } catch (Throwable t) {
+
+                        throw new RuntimeException(t);
+
+                    }
+
+                } else {
+
+                    final Vector<Field> fields = new Vector<Field>();
+
+                    for (String s : v) {
+
+                        try {
+
+                            fields.add(Event.class.getField(s));
+
+                        } catch (Throwable t) {
+
+                            throw new RuntimeException(t);
+
+                        }
+
+                    }
+
+                    eventOrderBy = fields.toArray(new Field[0]);
+
+                }
+               
+//                if (INFO)
+//                    log.info
+                    log.warn(EVENT_ORDER_BY + "=" + Arrays.toString(eventOrderBy));
+
+            }
+            
+            switch (reportType) {
+            case events:
+                if (events == null) {
+
+                    /*
+                     * Throw exception since the report type requires events but
+                     * they are not available.
+                     */
+
+                    throw new IllegalStateException("Events are not available.");
+
+                }
+                flot = true;
+                break;
+            default:
+                flot = false;
+                break;
             }
             
             this.category = params.containsKey(CATEGORY) ? params.get(CATEGORY)
@@ -802,12 +989,16 @@ public class XHTMLRenderer {
 
     protected void writeScripts(Writer w)  throws IOException {
         
-        w.write("<script\n language=\"javascript\" type=\"text/javascript\" src=\"jquery.js\"></script\n>");
+        if (model.flot) {
+
+            w.write("<script\n language=\"javascript\" type=\"text/javascript\" src=\"jquery.js\"></script\n>");
+
+            w.write("<script\n language=\"javascript\" type=\"text/javascript\" src=\"jquery.flot.js\"></script\n>");
+
+            w.write("<!--[if IE]><script language=\"javascript\" type=\"text/javascript\" src=\"excanvas.pack.js\"></script><![endif]-->");
+
+        }
         
-        w.write("<script\n language=\"javascript\" type=\"text/javascript\" src=\"jquery.flot.js\"></script\n>");
-
-        w.write("<!--[if IE]><script language=\"javascript\" type=\"text/javascript\" src=\"excanvas.pack.js\"></script><![endif]-->");
-
     }
     
     protected void writeBody(Writer w) throws IOException  {
@@ -864,6 +1055,13 @@ public class XHTMLRenderer {
                 
                 break;
                 
+            case events:
+                
+                // render the time-series chart
+                writeFlot(w, model.events);
+
+                break;
+                
             }
 
         }
@@ -874,24 +1072,6 @@ public class XHTMLRenderer {
          */
 //        doctype.writeValid(w);
 
-        if (model.service != null) {
-            
-            if (model.service instanceof IEventReportingService) {
-                
-                final LinkedHashMap<UUID, Event> events = ((IEventReportingService) model.service)
-                        .getEvents();
-                
-                if (events != null) { // && events.isEmpty() == false) {
-                    
-                    // render the time-series chart
-                    writeFlot(w, events);
-                    
-                }
-                
-            }
-            
-        }
-        
         w.write("</body\n>");
         
     }
@@ -3103,38 +3283,78 @@ public class XHTMLRenderer {
     protected void writeFlot(final Writer w,
             final LinkedHashMap<UUID, Event> events) throws IOException {
         
-        w.write("\n\n<p/><p/>\n");
-
         writeResource(w, "flot-start.txt");
         
-        w.write("\n");
-        
-//        writeResource(w, "flot-data.txt");
-        
-        final StringWriter sw = new StringWriter();
-        
-        writeAsychOverflowEvents(sw, events);
-        
-        w.write(sw.toString());
-        
-//        System.err.println(sw.toString());
-        
-        w.write("\n");
+        writeEvents(w, events);
         
         writeResource(w, "flot-end.txt");
         
-        w.write("\n");
+    }
+    
+    /**
+     * Applies the {@link Model#eventFilters} to the event.
+     * 
+     * @param e
+     *            The event.
+     * @return <code>true</code> if the filters accept the event.
+     */
+    protected boolean acceptEvent(final Event e) {
         
+        final Iterator<Map.Entry<Field, Pattern>> itr = model.eventFilters
+                .entrySet().iterator();
+
+        while (itr.hasNext()) {
+
+            final Map.Entry<Field, Pattern> filterEntry = itr.next();
+
+            final Field fld = filterEntry.getKey();
+
+            final Pattern pattern = filterEntry.getValue();
+
+            final String val;
+            try {
+             
+                val = "" + fld.get(e);
+                
+            } catch (Throwable t) {
+                
+                throw new RuntimeException("Could not access field: " + fld);
+                
+            }
+
+            if (!pattern.matcher(val).matches()) {
+
+                if (DEBUG)
+                    log.debug("Rejected event: fld=" + fld.getName()
+                            + " : val=" + val);
+                
+                return false;
+
+            }
+
+        }
+
+        return true;
+
     }
     
     /**
      * Demonstrates how to hook events into flot.
      * 
-     * FIXME Hardcoded to output only {@link EventType#AsynchronousOverflow}
-     * events. Modify to use a selection mechanism similar to that already used
-     * for correlated table or pivot table views of performance counters. The
-     * view needs to be decoupled from "blade##" to allow any mixture of events
-     * to be selected for plotting.
+     * FIXME Allow URL query parameters to specify the order in which events are
+     * grouped. Any event can overlap with any other event. If we put two
+     * different events onto the same Y value then we potentially loose the
+     * ability to see them as distinct events. However, if we plot each event on
+     * its own Y axis value then we might have difficulties visually aggregating
+     * the events. See {@link Model#EVENT_ORDER_BY} and
+     * {@link Model#eventOrderBy}.
+     * <p>
+     * I think that the set of {@link StringBuilder}s should be built up first.
+     * These have a variable name that stands in for the Y axis value for the
+     * series. Once we know all the distinct combinations event values selected
+     * for the eventOrderBy[] then we can sort that array lexically and assign
+     * the Y axis values based on the lexical sort order. We can then write the
+     * variables for those Y values.
      * 
      * FIXME Modify to allow visualization of a performance counter timeseries
      * data.
@@ -3142,12 +3362,17 @@ public class XHTMLRenderer {
      * FIXME Modify to allow linked viz of performance counter timeseries w/ an
      * event timeseries and an overview that controls what is seen in both.
      * 
-     * @todo when events are aggregated the data turns into a pivot table and
-     *       gets vizualized as column plots or the like.
+     * @todo flyovers seem to not appear when zoomed in.
+     * 
+     * @todo can't tell how many events are overlaid on one another.
+     * 
+     * @todo clicking on the overview should reset to the total view.
+     * 
+     * @todo allow aggregation of elapsed time for events and plot as a bar
+     *       graph.
      * 
      * @todo allow selection in both x and y so that we can focus on specific
-     *       event sequences? allow reordering of events into interesting
-     *       sequences?
+     *       event series.
      * 
      * @todo a form to set the various query parameters.
      * 
@@ -3157,7 +3382,7 @@ public class XHTMLRenderer {
      *       interesting. since I don't want to force the bundling of a servlet
      *       engine with each service, this could be a standoff module.
      */
-    protected void writeAsychOverflowEvents(final Writer w,
+    protected void writeEvents(final Writer w,
             final LinkedHashMap<UUID, Event> events) throws IOException {
         
         final Map<String,StringBuilder> eventsByHost = new HashMap<String,StringBuilder>();
@@ -3173,32 +3398,43 @@ public class XHTMLRenderer {
         tooltips.append("var tooltips = [\n");
         
         int y = 1;
+
+        int naccepted = 0;
         
         for (Map.Entry<UUID, Event> entry : events.entrySet()) {
         
             final Event e = entry.getValue();
             
-            if (!e.isComplete() || 
-                e.majorEventType != EventType.AsynchronousOverflow) {
+            // apply the event filters.
+            if (!e.isComplete() || !acceptEvent(e)) {
                 
                 continue;
                 
             }
+
+            naccepted++;
             
-            // trim the hostname down if necessary
-            
-            String hostname = e.hostname;
-            
-            int i = hostname.indexOf('.');
-            
-            if (i >= 0) {
-                
-                hostname = hostname.substring(0, i);
+            // trim the hostname down if necessary @todo if hostname is IP then this will be ugly.
+            final String hostname;
+            {
+
+                final int i = e.hostname.indexOf('.');
+
+                if (i >= 0) {
+
+                    hostname = e.hostname.substring(0, i);
+
+                } else {
+
+                    hostname = e.hostname;
+
+                }
                 
             }
-            
+
             final String hostyvar = hostname + "y"; 
-            
+
+            // per host events buffer @todo should be per CSet.
             StringBuilder eventsSB = eventsByHost.get(e.hostname);
             
             if (eventsSB == null) {
@@ -3241,7 +3477,7 @@ public class XHTMLRenderer {
                 
                 tooltips.append(",\n");
                 
-                StringBuilder tooltipsSB = new StringBuilder();
+                final StringBuilder tooltipsSB = new StringBuilder();
                 
                 tooltipsByHost.put(e.hostname, tooltipsSB);
                 
@@ -3263,32 +3499,36 @@ public class XHTMLRenderer {
             
             eventsSB.append(" ], [ ");
             
-            eventsSB.append((e.getEndTime()+e.getStartTime())/2);
-            
+            eventsSB.append((e.getEndTime() + e.getStartTime()) / 2);
+
             eventsSB.append(", ");
-            
+
             eventsSB.append(hostyvar);
-            
+
             eventsSB.append(" ], [ ");
-            
+
             eventsSB.append(e.getEndTime());
-            
+
             eventsSB.append(", ");
-            
+
             eventsSB.append(hostyvar);
-            
+
             eventsSB.append(" ], null,\n");
             
-            StringBuilder tooltipsSB = tooltipsByHost.get(e.hostname);
+            final StringBuilder tooltipsSB = tooltipsByHost.get(e.hostname);
             
             tooltipsSB.append("null, ");
             
-            String tooltip = e.eventUUID.toString();
+            /*
+             * use the tab-delimited format, but remove the trailing newline.
+             */
+            final String tooltip = e.toString().replace("\n", "");
             
+            // @todo does this need to escape embedded quotes for javascript?
             if (tooltip != null && !tooltip.startsWith("\"")) {
-                
+
                 tooltipsSB.append("\"");
-                
+
             }
             
             tooltipsSB.append(tooltip);
@@ -3302,6 +3542,9 @@ public class XHTMLRenderer {
             tooltipsSB.append(", null, null,\n");
             
         }
+
+        log.warn("accepted: " + naccepted + " out of " + events.size()
+                + " events");
         
         for (StringBuilder sb : eventsByHost.values()) {
             
@@ -3316,31 +3559,31 @@ public class XHTMLRenderer {
         }
         
         for (StringBuilder sb : tooltipsByHost.values()) {
-            
+
             sb.setLength(sb.length() - 2);
-            
+
             sb.append("\n];");
-            
+
             w.write(sb.toString());
-            
+
             w.write("\n");
-            
+
         }
-        
-        if (data.charAt(data.length()-2) == ',') {
-            
-            data.setLength(data.length()-2);
-            
+
+        if (data.charAt(data.length() - 2) == ',') {
+
+            data.setLength(data.length() - 2);
+
         }
-        
+
         data.append("\n];\n");
-        
+
         w.write(data.toString());
-        
-        if (tooltips.charAt(tooltips.length()-2) == ',') {
-            
-            tooltips.setLength(tooltips.length()-2);
-            
+
+        if (tooltips.charAt(tooltips.length() - 2) == ',') {
+
+            tooltips.setLength(tooltips.length() - 2);
+
         }
         
         tooltips.append("\n];\n");
@@ -3361,25 +3604,33 @@ public class XHTMLRenderer {
         if (is == null)
             throw new IOException("Resource not on classpath: " + resource);
         
-        final BufferedReader reader = new BufferedReader(new InputStreamReader(is));
-        
         try {
             
-            String s;
+            final BufferedReader reader = new BufferedReader(new InputStreamReader(is));
             
+            String s = null;
+            
+            boolean first = true;
+            
+            // read each line (note: chops off newline).
             while ((s = reader.readLine()) != null) {
                 
-                // System.err.println(s);
+                if(!first) {
+
+                    // write out the chopped off newline.
+                    w.write("\n");
+                    
+                }
                 
                 w.write(s);
                 
-                w.write("\n");
+                first = false;
                 
             }
             
         } finally {
-            
-            reader.close();
+
+            is.close();
             
         }
         
