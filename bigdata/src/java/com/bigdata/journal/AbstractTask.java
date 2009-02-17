@@ -345,6 +345,20 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         
         // the unisolated name2Addr object.
         final Name2Addr name2Addr = resourceManager.getLiveJournal().name2Addr;
+
+        if (name2Addr == null) {
+            
+            /*
+             * Note: I have seen name2Addr be [null] here on a system with too
+             * many files open which caused a cascade of failures. I added this
+             * thrown exception so that we could have a referant if the problem
+             * shows up again.
+             */
+
+            throw new AssertionError("Name2Addr not loaded? : "
+                    + resourceManager.getLiveJournal());
+            
+        }
         
         /*
          * Copy entries to provide an isolated view of name2Addr as of
