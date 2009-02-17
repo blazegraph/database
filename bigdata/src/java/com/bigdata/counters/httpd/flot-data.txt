@@ -107,4 +107,48 @@ var blade10 =
 [ 1234392058878, blade10y ], [ 1234392087498, blade10y ]
 ];
 
-var data = [ blade8, blade9, blade10 ];
+var blade10tooltips = [
+"blade10: 1 start", "blade10: 1 end", null,
+"blade10: 2 start", "blade10: 2 end", null,
+"blade10: 3 start", "blade10: 3 end", null,
+"blade10: 4 start", "blade10: 4 end", null,
+"blade10: 5 start", "blade10: 5 end", null,
+"blade10: 6 start", "blade10: 6 end", null,
+"blade10: 7 start", "blade10: 7 end", null,
+"blade10: 8 start", "blade10: 8 end", null,
+"blade10: 9 start", "blade10: 9 end", null,
+"blade10: 10 start", "blade10: 10 end", null,
+"blade10: 11 start", "blade10: 11 end", null,
+"blade10: 12 start", "blade10: 12 end", null,
+"blade10: 13 start", "blade10: 13 end", null,
+"blade10: 14 start", "blade10: 14 end", null,
+"blade10: 15 start", "blade10: 15 end", null,
+"blade10: 16 start", "blade10: 16 end", null,
+"blade10: 17 start", "blade10: 17 end", null,
+"blade10: 18 start", "blade10: 18 end", null,
+"blade10: 19 start", "blade10: 19 end", null,
+"blade10: 20 start", "blade10: 20 end", null,
+"blade10: 21 start", "blade10: 21 end", null,
+"blade10: 22 start", "blade10: 22 end", null,
+"blade10: 23 start", "blade10: 23 end", null,
+"blade10: 24 start", "blade10: 24 end", null,
+"blade10: 25 start", "blade10: 25 end", null
+];
+var tooltips = [
+null,
+null,
+null,
+null,
+null,
+null,
+null,
+null,
+null,
+blade10tooltips
+];
+
+var data = [ 
+{ label: "blade8", data: blade8 }, 
+{ label: "blade9", data: blade9 }, 
+{ label: "blade10", data: blade10 }
+];

@@ -1,11 +1,29 @@
+    function showTooltip(x, y, contents) {
+        $('<div id="tooltip">' + contents + '</div>').css( {
+            position: 'absolute',
+            display: 'none',
+            top: y + 5,
+            left: x + 5,
+            border: '1px solid #fdd',
+            padding: '2px',
+            'background-color': '#fee',
+            opacity: 0.80
+        }).appendTo("body").fadeIn(200);
+    }
+    
+    function getTooltip(item) {
+    
+        return tooltips[item.seriesIndex][item.dataIndex];
+    
+    }
+
     var options = {
         xaxis: {
             mode: "time"
         },
         yaxis: {
-            ticks: 16,
-            min: 0,
-            max: 17
+            ticks: [],
+            min: 0
         },
         lines: { 
             show: true, 
@@ -13,6 +31,11 @@
         },
         selection: { 
             mode: "x" 
+        },
+        grid: { 
+            hoverable: true, 
+            clickable: false,
+            autoHighlight: false
         }
     };
 
@@ -23,8 +46,7 @@
         },
         yaxis: {
             ticks: [],
-            min: 0,
-            max: 17
+            min: 0
         },
         lines: { 
             show: true, 
@@ -33,6 +55,9 @@
         shadowsize: 0,
         selection: { 
             mode: "x" 
+        },
+        legend: {
+            show: false
         }
     };
 
@@ -51,6 +76,31 @@
         overview.setSelection(ranges, true);
     });
     
+    var previousPoint = null;
+    
+    $("#placeholder").bind("plothover", function (event, pos, item) {
+        if (item) {
+            if (previousPoint != item.datapoint) {
+                previousPoint = item.datapoint;
+                
+                $("#tooltip").remove();
+                var x = item.datapoint[0],
+                    y = item.datapoint[1];
+         
+                var next = item.series.data[item.dataIndex+1],
+                    prev = item.series.data[item.dataIndex-1];
+
+                if (next != null && prev != null) {
+                    showTooltip(item.pageX, item.pageY, getTooltip(item));
+                }
+            }
+        }
+        else {
+            $("#tooltip").remove();
+            previousPoint = null;            
+        }
+    });
+
     $("#overview").bind("plotselected", function (event, ranges) {
         plot.setSelection(ranges);
     });

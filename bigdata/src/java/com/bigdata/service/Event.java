@@ -585,7 +585,7 @@ public class Event implements Serializable {
         
         public boolean hasMoreTokens() {
             return i < tokens.size() &&
-                   !(i == tokens.size()-1 && tokens.get(tokens.size()-1).contains(delim));
+                   !(i == tokens.size()-1 && delim.contains(tokens.get(tokens.size()-1)));
         }
         
         public String nextToken() {
