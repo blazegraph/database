@@ -991,11 +991,11 @@ public class XHTMLRenderer {
         
         if (model.flot) {
 
-            w.write("<script\n language=\"javascript\" type=\"text/javascript\" src=\"jquery.js\"></script\n>");
+            w.write("<script\n type=\"text/javascript\" src=\"jquery.js\"></script\n>");
 
-            w.write("<script\n language=\"javascript\" type=\"text/javascript\" src=\"jquery.flot.js\"></script\n>");
+            w.write("<script\n type=\"text/javascript\" src=\"jquery.flot.js\"></script\n>");
 
-            w.write("<!--[if IE]><script language=\"javascript\" type=\"text/javascript\" src=\"excanvas.pack.js\"></script><![endif]-->");
+            w.write("<!--[if IE]><script type=\"text/javascript\" src=\"excanvas.pack.js\"></script><![endif]-->");
 
         }
         
@@ -3372,23 +3372,23 @@ public class XHTMLRenderer {
         
     }
     
+    // FIXME format the event as an HTML table and link into the code.
+    protected String getEventTable(final Event e) {
+        
+        final StringBuilder sb = new StringBuilder();
+        
+        sb.append(e.toString());
+        
+        return sb.toString();
+        
+    }
+    
     /**
-     * Demonstrates how to hook events into flot.
+     * Plots events using <code>flot</code>.
      * 
-     * FIXME Allow URL query parameters to specify the order in which events are
-     * grouped. Any event can overlap with any other event. If we put two
-     * different events onto the same Y value then we potentially loose the
-     * ability to see them as distinct events. However, if we plot each event on
-     * its own Y axis value then we might have difficulties visually aggregating
-     * the events. See {@link Model#EVENT_ORDER_BY} and
-     * {@link Model#eventOrderBy}.
-     * <p>
-     * I think that the set of {@link StringBuilder}s should be built up first.
-     * These have a variable name that stands in for the Y axis value for the
-     * series. Once we know all the distinct combinations event values selected
-     * for the eventOrderBy[] then we can sort that array lexically and assign
-     * the Y axis values based on the lexical sort order. We can then write the
-     * variables for those Y values.
+     * @see ReportEnum#events
+     * @see Model#eventFilters
+     * @see Model#eventOrderBy
      * 
      * FIXME Modify to allow visualization of a performance counter timeseries
      * data.

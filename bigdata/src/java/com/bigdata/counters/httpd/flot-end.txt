@@ -98,7 +98,7 @@
                 var next = item.series.data[item.dataIndex+1],
                     prev = item.series.data[item.dataIndex-1];
 
-                if (next != null) { //&& prev != null) {
+                if (next != null) {
                     showTooltip(item.pageX, item.pageY, getTooltip(item));
                 }
             }
