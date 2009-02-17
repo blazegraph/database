@@ -17,15 +17,14 @@
     
     }
 
-	
-
     var options = {
         xaxis: {
             mode: "time"
         },
         yaxis: {
             tickFormatter: function formatter(val, axis) {return "";},
-            min: 0
+            min: 0,
+            tickSize: 1
         },
         points: {
         	show: true,
