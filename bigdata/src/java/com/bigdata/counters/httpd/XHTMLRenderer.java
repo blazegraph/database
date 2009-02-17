@@ -3109,15 +3109,15 @@ public class XHTMLRenderer {
         
         w.write("\n");
         
-        // writeResource(w, "flot-data.txt");
+//        writeResource(w, "flot-data.txt");
         
         final StringWriter sw = new StringWriter();
         
         writeAsychOverflowEvents(sw, events);
         
-//        System.err.println(sw.toString());
-        
         w.write(sw.toString());
+        
+//        System.err.println(sw.toString());
         
         w.write("\n");
         
@@ -3162,9 +3162,17 @@ public class XHTMLRenderer {
         
         final Map<String,StringBuilder> eventsByHost = new HashMap<String,StringBuilder>();
         
+        final Map<String,StringBuilder> tooltipsByHost = new HashMap<String,StringBuilder>();
+        
         final StringBuilder data = new StringBuilder();
         
-        data.append("var data = [ ");
+        final StringBuilder tooltips = new StringBuilder();
+        
+        data.append("var data = [\n");
+        
+        tooltips.append("var tooltips = [\n");
+        
+        int y = 1;
         
         for (Map.Entry<UUID, Event> entry : events.entrySet()) {
         
@@ -3177,59 +3185,121 @@ public class XHTMLRenderer {
                 
             }
             
-            int i = e.hostname.indexOf('.');
+            // trim the hostname down if necessary
             
-            final String hostyvar = e.hostname.substring(0, i) + "y"; 
+            String hostname = e.hostname;
             
-            StringBuilder sb = eventsByHost.get(e.hostname);
+            int i = hostname.indexOf('.');
             
-            if (sb == null) {
+            if (i >= 0) {
                 
-                sb = new StringBuilder();
-                
-                eventsByHost.put(e.hostname, sb);
-                
-                final int hostnum = Integer.valueOf(e.hostname.substring(5, i));
-                
-                final String hostvar = e.hostname.substring(0, i);
-                
-                sb.append("var ");
-                
-                sb.append(hostyvar);
-                
-                sb.append(" = ");
-                
-                sb.append(hostnum);
-                
-                sb.append(";\nvar ");
-                
-                sb.append(hostvar);
-
-                sb.append(" = [\n");
-                
-                data.append(hostvar);
-                
-                data.append(", ");
+                hostname = hostname.substring(0, i);
                 
             }
             
-            sb.append("[ ");
+            final String hostyvar = hostname + "y"; 
             
-            sb.append(e.getStartTime());
+            StringBuilder eventsSB = eventsByHost.get(e.hostname);
             
-            sb.append(", ");
+            if (eventsSB == null) {
+                
+                eventsSB = new StringBuilder();
+                
+                eventsByHost.put(e.hostname, eventsSB);
+                
+                final int hosty = y++; //Integer.valueOf(e.hostname.substring(5, i));
+                
+                final String hostvar = hostname;
+                
+                final String tooltipvar = hostname + "tooltips";
+                
+                eventsSB.append("var ");
+                
+                eventsSB.append(hostyvar);
+                
+                eventsSB.append(" = ");
+                
+                eventsSB.append(hosty);
+                
+                eventsSB.append(";\nvar ");
+                
+                eventsSB.append(hostvar);
+
+                eventsSB.append(" = [\n");
+                
+                data.append("{ label: \"");
+                
+                data.append(hostvar);
+                
+                data.append("\", data: ");
+                
+                data.append(hostvar);
+                
+                data.append(" },\n");
+                
+                tooltips.append(tooltipvar);
+                
+                tooltips.append(",\n");
+                
+                StringBuilder tooltipsSB = new StringBuilder();
+                
+                tooltipsByHost.put(e.hostname, tooltipsSB);
+                
+                tooltipsSB.append("var ");
+                
+                tooltipsSB.append(tooltipvar);
+                
+                tooltipsSB.append(" = [\n");
+                
+            }
             
-            sb.append(hostyvar);
+            eventsSB.append("[ ");
             
-            sb.append(" ], [ ");
+            eventsSB.append(e.getStartTime());
             
-            sb.append(e.getEndTime());
+            eventsSB.append(", ");
             
-            sb.append(", ");
+            eventsSB.append(hostyvar);
             
-            sb.append(hostyvar);
+            eventsSB.append(" ], [ ");
             
-            sb.append(" ], null,\n");
+            eventsSB.append((e.getEndTime()+e.getStartTime())/2);
+            
+            eventsSB.append(", ");
+            
+            eventsSB.append(hostyvar);
+            
+            eventsSB.append(" ], [ ");
+            
+            eventsSB.append(e.getEndTime());
+            
+            eventsSB.append(", ");
+            
+            eventsSB.append(hostyvar);
+            
+            eventsSB.append(" ], null,\n");
+            
+            StringBuilder tooltipsSB = tooltipsByHost.get(e.hostname);
+            
+            tooltipsSB.append("null, ");
+            
+            String tooltip = e.eventUUID.toString();
+            
+            if (tooltip != null && !tooltip.startsWith("\"")) {
+                
+                tooltipsSB.append("\"");
+                
+            }
+            
+            tooltipsSB.append(tooltip);
+            
+            if (tooltip != null && !tooltip.endsWith("\"")) {
+                
+                tooltipsSB.append("\"");
+                
+            }
+            
+            tooltipsSB.append(", null, null,\n");
             
         }
         
@@ -3245,15 +3315,37 @@ public class XHTMLRenderer {
             
         }
         
+        for (StringBuilder sb : tooltipsByHost.values()) {
+            
+            sb.setLength(sb.length() - 2);
+            
+            sb.append("\n];");
+            
+            w.write(sb.toString());
+            
+            w.write("\n");
+            
+        }
+        
         if (data.charAt(data.length()-2) == ',') {
             
             data.setLength(data.length()-2);
             
         }
         
-        data.append(" ];\n");
+        data.append("\n];\n");
         
         w.write(data.toString());
+        
+        if (tooltips.charAt(tooltips.length()-2) == ',') {
+            
+            tooltips.setLength(tooltips.length()-2);
+            
+        }
+        
+        tooltips.append("\n];\n");
+        
+        w.write(tooltips.toString());
         
     }
     
