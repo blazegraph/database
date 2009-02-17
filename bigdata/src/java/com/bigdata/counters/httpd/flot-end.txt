@@ -25,12 +25,18 @@
             ticks: [],
             min: 0
         },
+        points: {
+        	show: true,
+        	radius: 3,
+        	lineWidth: 1 
+        },
+        shadowSize: 0,
         lines: { 
             show: true, 
-            lineWidth: 10 
+            lineWidth: 2
         },
         selection: { 
-            mode: "x" 
+            mode: "xy" 
         },
         grid: { 
             hoverable: true, 
@@ -52,9 +58,9 @@
             show: true, 
             lineWidth: 2 
         },
-        shadowsize: 0,
+        shadowSize: 0,
         selection: { 
-            mode: "x" 
+            mode: "xy" 
         },
         legend: {
             show: false
@@ -69,7 +75,8 @@
         // do the zooming
         plot = $.plot($("#placeholder"), data,
                       $.extend(true, {}, options, {
-                          xaxis: { min: ranges.xaxis.from, max: ranges.xaxis.to }
+                          xaxis: { min: ranges.xaxis.from, max: ranges.xaxis.to },
+                          yaxis: { min: ranges.yaxis.from, max: ranges.yaxis.to }
                       }));
 
         // don't fire event on the overview to prevent eternal loop
@@ -90,7 +97,7 @@
                 var next = item.series.data[item.dataIndex+1],
                     prev = item.series.data[item.dataIndex-1];
 
-                if (next != null && prev != null) {
+                if (next != null) { //&& prev != null) {
                     showTooltip(item.pageX, item.pageY, getTooltip(item));
                 }
             }
