@@ -3337,6 +3337,40 @@ public class XHTMLRenderer {
         return true;
 
     }
+
+    /**
+     * The key for an event group is formed by combining the String value of the
+     * fields of the event identified by the orderEventBy[] in order and using a
+     * ":" when combining two or more event fields together.
+     */
+    protected String getEventKey(final Event e) {
+
+        final StringBuilder sb = new StringBuilder();
+
+        int n = 0;
+
+        for (Field f : model.eventOrderBy) {
+
+            if (n > 0)
+                sb.append(":");
+
+            try {
+
+                sb.append("" + f.get(e));
+                
+            } catch (Exception ex) {
+                
+                throw new RuntimeException(ex);
+                
+            }
+            
+            n++;
+            
+        }
+        
+        return sb.toString();
+        
+    }
     
     /**
      * Demonstrates how to hook events into flot.
@@ -3362,17 +3396,13 @@ public class XHTMLRenderer {
      * FIXME Modify to allow linked viz of performance counter timeseries w/ an
      * event timeseries and an overview that controls what is seen in both.
      * 
-     * @todo flyovers seem to not appear when zoomed in.
-     * 
-     * @todo can't tell how many events are overlaid on one another.
+     * @todo allow a data label for the start point to be specified as a query
+     *       parameter. E.g., the indexName+partitionId or the hostname.
      * 
      * @todo clicking on the overview should reset to the total view.
      * 
-     * @todo allow aggregation of elapsed time for events and plot as a bar
-     *       graph.
-     * 
-     * @todo allow selection in both x and y so that we can focus on specific
-     *       event series.
+     * @todo allow aggregation of elapsed time for events and have click through
+     *       to the individual events broken out using eventOrderBy=uuid.
      * 
      * @todo a form to set the various query parameters.
      * 
@@ -3384,20 +3414,30 @@ public class XHTMLRenderer {
      */
     protected void writeEvents(final Writer w,
             final LinkedHashMap<UUID, Event> events) throws IOException {
-        
+
+        /*
+         * Map from the key for the event group to the basename of the variables
+         * for that event group.
+         */
+        final Map<String,String> seriesByGroup = new HashMap<String, String>();
+
+        /*
+         * Map from the key for the event group to the StringBuilder whose
+         * contents are rendered into the page and provide the visualization of
+         * the timeseries for that event group. The events are grouped together
+         * in this manner so that they will be assigned the same color by the
+         * legend.
+         */
         final Map<String,StringBuilder> eventsByHost = new HashMap<String,StringBuilder>();
-        
+
+        /*
+         * Map from the key for the event group to the StringBuilder whose
+         * contents are rendered into the page and provide the tooltip for each
+         * event in that event group.
+         */
         final Map<String,StringBuilder> tooltipsByHost = new HashMap<String,StringBuilder>();
         
-        final StringBuilder data = new StringBuilder();
-        
-        final StringBuilder tooltips = new StringBuilder();
-        
-        data.append("var data = [\n");
-        
-        tooltips.append("var tooltips = [\n");
-        
-        int y = 1;
+//        int y = 1;
 
         int naccepted = 0;
         
@@ -3413,79 +3453,74 @@ public class XHTMLRenderer {
             }
 
             naccepted++;
+
+            final String key = getEventKey(e);
             
-            // trim the hostname down if necessary @todo if hostname is IP then this will be ugly.
-            final String hostname;
-            {
+//            {
+//
+//                final int i = e.hostname.indexOf('.');
+//
+//                if (i >= 0) {
+//
+//                    hostname = e.hostname.substring(0, i);
+//
+//                } else {
+//
+//                    hostname = e.hostname;
+//
+//                }
+//                
+//            }
 
-                final int i = e.hostname.indexOf('.');
+            // basename for the variables for this data series.
+            final String series;
 
-                if (i >= 0) {
-
-                    hostname = e.hostname.substring(0, i);
-
-                } else {
-
-                    hostname = e.hostname;
-
-                }
-                
-            }
-
-            final String hostyvar = hostname + "y"; 
-
-            // per host events buffer @todo should be per CSet.
-            StringBuilder eventsSB = eventsByHost.get(e.hostname);
+            // per event-group buffer
+            StringBuilder eventsSB = eventsByHost.get(key);
             
             if (eventsSB == null) {
                 
                 eventsSB = new StringBuilder();
                 
-                eventsByHost.put(e.hostname, eventsSB);
+                series = "series_" + seriesByGroup.size();
+
+                seriesByGroup.put(key, series);
+
+                eventsByHost.put(key, eventsSB);
                 
-                final int hosty = y++; //Integer.valueOf(e.hostname.substring(5, i));
+//                final int hosty = y++; //Integer.valueOf(e.hostname.substring(5, i));
                 
-                final String hostvar = hostname;
+//                final String hostvar = series;
                 
-                final String tooltipvar = hostname + "tooltips";
+//                eventsSB.append("var " + series + "y;\n"); // declare hostyvar
+                
+//                eventsSB.append(" = ");
+//                
+//                eventsSB.append(hosty);
+                
+//                eventsSB.append(";\n");
                 
                 eventsSB.append("var ");
                 
-                eventsSB.append(hostyvar);
-                
-                eventsSB.append(" = ");
-                
-                eventsSB.append(hosty);
-                
-                eventsSB.append(";\nvar ");
-                
-                eventsSB.append(hostvar);
+                eventsSB.append(series);
 
                 eventsSB.append(" = [\n");
                 
-                data.append("{ label: \"");
-                
-                data.append(hostvar);
-                
-                data.append("\", data: ");
-                
-                data.append(hostvar);
-                
-                data.append(" },\n");
-                
-                tooltips.append(tooltipvar);
-                
-                tooltips.append(",\n");
-                
                 final StringBuilder tooltipsSB = new StringBuilder();
                 
-                tooltipsByHost.put(e.hostname, tooltipsSB);
+                final String tooltipvar = series + "tooltips";
+
+                tooltipsByHost.put(key, tooltipsSB);
                 
                 tooltipsSB.append("var ");
                 
                 tooltipsSB.append(tooltipvar);
                 
                 tooltipsSB.append(" = [\n");
+                
+            } else {
+                
+                series = seriesByGroup.get(key);
                 
             }
             
@@ -3495,17 +3530,23 @@ public class XHTMLRenderer {
             
             eventsSB.append(", ");
             
-            eventsSB.append(hostyvar);
+//            eventsSB.append(hostyvar);
+//            
+//            eventsSB.append(" ], [ ");
+//            
+//            eventsSB.append((e.getEndTime() + e.getStartTime()) / 2);
+//
+            // eventsSB.append(", ");
+
+//            final double offset = Math.sin(e
+//                    .getEndTime()/100d) / 4d;
+            final double offset = (Math.random() - .5);// / 1d;
             
-            eventsSB.append(" ], [ ");
+            final String hostyvar = series + "y";
             
-            eventsSB.append((e.getEndTime() + e.getStartTime()) / 2);
-
-            eventsSB.append(", ");
-
             eventsSB.append(hostyvar);
 
-            eventsSB.append(" ], [ ");
+            eventsSB.append((offset < 0 ? "" : "+") + offset+" ], [ ");
 
             eventsSB.append(e.getEndTime());
 
@@ -3513,11 +3554,11 @@ public class XHTMLRenderer {
 
             eventsSB.append(hostyvar);
 
-            eventsSB.append(" ], null,\n");
+            eventsSB.append((offset < 0 ? "" : "+") +offset+" ], null,\n");
             
-            final StringBuilder tooltipsSB = tooltipsByHost.get(e.hostname);
+            final StringBuilder tooltipsSB = tooltipsByHost.get(key);
             
-            tooltipsSB.append("null, ");
+//            tooltipsSB.append("null, ");
             
             /*
              * use the tab-delimited format, but remove the trailing newline.
@@ -3539,6 +3580,7 @@ public class XHTMLRenderer {
                 
             }
             
+//            tooltipsSB.append(", null,\n");
             tooltipsSB.append(", null, null,\n");
             
         }
@@ -3546,7 +3588,37 @@ public class XHTMLRenderer {
         log.warn("accepted: " + naccepted + " out of " + events.size()
                 + " events");
         
-        for (StringBuilder sb : eventsByHost.values()) {
+        // all series.
+        final String[] keys = eventsByHost.keySet().toArray(new String[0]);
+        
+        // put into lexical order.
+        Arrays.sort(keys);
+        
+//        for (StringBuilder sb : eventsByHost.values()) {
+ 
+        for (int i = 0; i < keys.length; i++) {
+
+            final int hosty = i + 1;
+            
+            final String key = keys[i];
+            
+            final StringBuilder eventsSB = new StringBuilder();
+
+            final String series = seriesByGroup.get(key);
+            
+            final String hostyvar = series + "y";
+            
+            eventsSB.append("var ");
+
+            eventsSB.append(hostyvar);
+
+            eventsSB.append(" = ");
+
+            eventsSB.append(hosty);
+
+            eventsSB.append(";\n");
+
+            final StringBuilder sb = eventsSB.append(eventsByHost.get(key));
             
             sb.setLength(sb.length() - ", null,\n".length());
             
@@ -3557,8 +3629,13 @@ public class XHTMLRenderer {
             w.write("\n");
             
         }
-        
-        for (StringBuilder sb : tooltipsByHost.values()) {
+
+        /*
+         * Output the variables containing the tooltips for each series.
+         */
+        for (int i = 0; i < keys.length; i++) {
+
+            final StringBuilder sb = tooltipsByHost.get(keys[i]);
 
             sb.setLength(sb.length() - 2);
 
@@ -3567,6 +3644,36 @@ public class XHTMLRenderer {
             w.write(sb.toString());
 
             w.write("\n");
+
+        }
+
+        /*
+         * data[].
+         * 
+         * Note: The data[] and the tooltips[] MUST be correlated. They are
+         * taken in reverse of the generated series order to put the legend
+         * in the same order (its just a little trick).
+         */
+        
+        final StringBuilder data = new StringBuilder();
+
+        data.append("var data = [\n");
+
+        for (int i = keys.length - 1; i >= 0; i--) {
+
+            final String key = keys[i];
+
+            final String series = seriesByGroup.get(key);
+            
+            data.append("{ label: \"");
+
+            data.append(key);
+
+            data.append("\", data: ");
+
+            data.append(series);
+
+            data.append(" },\n");
 
         }
 
@@ -3580,18 +3687,38 @@ public class XHTMLRenderer {
 
         w.write(data.toString());
 
+        /*
+         * tooltips[]
+         */
+        final StringBuilder tooltips = new StringBuilder();
+
+        tooltips.append("var tooltips = [\n");
+
+        for (int i = keys.length - 1; i >= 0; i--) {
+
+            final String key = keys[i];
+
+            final String series = seriesByGroup.get(key);
+
+            final String tooltipvar = series + "tooltips";
+
+            tooltips.append(tooltipvar);
+
+            tooltips.append(",\n");
+        }
+
         if (tooltips.charAt(tooltips.length() - 2) == ',') {
 
             tooltips.setLength(tooltips.length() - 2);
 
         }
-        
+
         tooltips.append("\n];\n");
-        
+
         w.write(tooltips.toString());
-        
+
     }
-    
+
     /**
      * Write a text file into the html. The supplied resource will be relative
      * to this class.
