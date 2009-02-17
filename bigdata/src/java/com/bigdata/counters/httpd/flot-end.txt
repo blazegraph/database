@@ -8,7 +8,7 @@
             padding: '2px',
             'background-color': '#fee',
             opacity: 0.80
-        }).appendTo("body").fadeIn(200);
+        }).appendTo("body").fadeIn(100);
     }
     
     function getTooltip(item) {
@@ -17,18 +17,20 @@
     
     }
 
+	
+
     var options = {
         xaxis: {
             mode: "time"
         },
         yaxis: {
-            ticks: [],
+            tickFormatter: function formatter(val, axis) {return "";},
             min: 0
         },
         points: {
         	show: true,
         	radius: 3,
-        	lineWidth: 1 
+        	lineWidth: 2 
         },
         shadowSize: 0,
         lines: { 
@@ -41,7 +43,7 @@
         grid: { 
             hoverable: true, 
             clickable: false,
-            autoHighlight: false
+            autoHighlight: true
         }
     };
 
