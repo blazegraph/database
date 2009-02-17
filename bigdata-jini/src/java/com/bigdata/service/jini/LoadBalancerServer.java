@@ -715,7 +715,7 @@ public class LoadBalancerServer extends AbstractServer {
          */
         public void logCounters() throws IOException {
 
-            final File file = File.createTempFile("counters", ".xml", logDir);
+            final File file = File.createTempFile("counters-hup", ".xml", logDir);
 
             super.logCounters(file);
 
