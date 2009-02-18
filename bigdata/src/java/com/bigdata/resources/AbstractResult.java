@@ -1,6 +1,7 @@
 package com.bigdata.resources;
 
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.IndexSegment;
 import com.bigdata.service.DataService;
 
 /**
@@ -12,6 +13,24 @@ import com.bigdata.service.DataService;
  */
 public abstract class AbstractResult {
 
+    /**
+     * Hash code is based on the {@link #name}.
+     */
+    public int hashCode() {
+       
+        return name.hashCode();
+        
+    }
+
+    /**
+     * Equal iff the same instance.
+     */
+    public boolean equals(Object o) {
+        
+        return this == o;
+        
+    }
+    
     /**
      * The source index partition for the operation.
      * 

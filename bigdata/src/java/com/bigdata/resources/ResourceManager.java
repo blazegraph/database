@@ -571,6 +571,14 @@ abstract public class ResourceManager extends OverflowManager {
                             }
                         });
 
+                /*
+                 * Performance counters for the service used to let other data
+                 * services read index segments or journals from this service.
+                 */
+                final CounterSet tmp2 = tmp.makePath("resourceService");
+
+                tmp2.attach(resourceService.counters.getCounters());
+                
             }
 
         }
@@ -623,7 +631,8 @@ abstract public class ResourceManager extends OverflowManager {
         
     }
 
-    public void setConcurrencyManager(IConcurrencyManager concurrencyManager) {
+    public void setConcurrencyManager(
+            final IConcurrencyManager concurrencyManager) {
 
         if (concurrencyManager == null)
             throw new IllegalArgumentException();

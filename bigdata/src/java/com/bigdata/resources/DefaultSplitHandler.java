@@ -9,7 +9,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILinearList;
 import com.bigdata.btree.ILocalBTreeView;
@@ -51,6 +50,11 @@ import com.bigdata.service.Split;
  *       belongs to the mutable {@link BTree} and then count the #of bytes in
  *       the index segments (which is only accurate after a compacting merge).
  * 
+ * @todo Make the twiddling of the split point to respect application
+ *       constraints on atomic logical row operations separable from the
+ *       {@link ISplitHandler} so it can be just another property on the
+ *       {@link DefaultSplitHandler}.
+ *       
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -530,10 +534,7 @@ public class DefaultSplitHandler implements ISplitHandler {
      * 
      * @param ndx
      *            The source index partition.
-     * @param btreeCounters
-     *            The performance counters (optional, but tail splits will not
-     *            be choosen when <code>null</code>).
-     * 
+     *            
      * @return A {@link Split}[] array contains everything that we need to
      *         define the new index partitions <em>except</em> the partition
      *         identifiers.
@@ -552,8 +553,12 @@ public class DefaultSplitHandler implements ISplitHandler {
      *       from the set of recommended splits but that is hugely unlikely
      *       except when the target index partition size is quite small.
      */
+//    * @param btreeCounters
+//    *            The performance counters (optional, but tail splits will not
+//    *            be choosen when <code>null</code>).
+//    * 
     public Split[] getSplits(final ResourceManager resourceManager,
-            final ILocalBTreeView ndx, final BTreeCounters btreeCounters) {
+            final ILocalBTreeView ndx) {//, final BTreeCounters btreeCounters) {
 
         // Sample the index for tuples used to split into key-ranges.
         final AtomicLong nvisited = new AtomicLong();

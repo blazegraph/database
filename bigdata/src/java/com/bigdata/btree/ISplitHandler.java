@@ -103,9 +103,6 @@ public interface ISplitHandler extends Serializable {
      * 
      * @param ndx
      *            The source index partition.
-     * @param btreeCounters
-     *            Performance counters for the index partition view collected
-     *            since the last overflow.
      * 
      * @return A {@link Split}[] array contains everything that we need to
      *         define the new index partitions <em>except</em> the partition
@@ -113,7 +110,10 @@ public interface ISplitHandler extends Serializable {
      *         examination reveals that the index SHOULD NOT be split at this
      *         time.
      */
+//    * @param btreeCounters
+//    *            Performance counters for the index partition view collected
+//    *            since the last overflow.
     public Split[] getSplits(ResourceManager resourceManager,
-            ILocalBTreeView ndx, BTreeCounters btreeCounters);
+            ILocalBTreeView ndx);//, BTreeCounters btreeCounters);
 
 }

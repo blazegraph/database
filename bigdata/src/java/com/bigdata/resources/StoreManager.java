@@ -60,8 +60,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
-import com.bigdata.btree.IIndex;
-import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -107,6 +105,7 @@ import com.bigdata.service.EventResource;
 import com.bigdata.service.EventType;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.MetadataService;
+import com.bigdata.service.ResourceService;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -534,6 +533,27 @@ abstract public class StoreManager extends ResourceEvents implements
      */
     private final AtomicBoolean starting = new AtomicBoolean(true);
 
+    protected ResourceService resourceService;
+    
+    /**
+     * The port at which you can connect to the {@link ResourceService}. This
+     * service provides remote access to resources hosted by the owning
+     * {@link DataService}. This is used for moving resources to other data
+     * services in the federation, including supporting service failover.
+     * 
+     * @return The port used to connect to that service.
+     * 
+     * @todo this could also be used for remote backup. however, note that you
+     *       can not read the live journal using this object.
+     */
+    public int getResourceServicePort() {
+        
+        assertRunning();
+        
+        return resourceService.port;
+        
+    }
+    
     /**
      * @see Options#IGNORE_BAD_FILES
      */
@@ -1341,6 +1361,33 @@ abstract public class StoreManager extends ResourceEvents implements
 
             }
             
+
+            try {
+
+                resourceService = new ResourceService() {
+
+                    @Override
+                    protected File getResource(UUID uuid) throws Exception {
+
+                        if (!isRunning()) {
+
+                            throw new Exception("Not running.");
+
+                        }
+
+                        return resourceFiles.get(uuid);
+
+                    }
+
+                };
+
+            } catch (IOException ex) {
+
+                throw new RuntimeException("Could not start: "
+                        + resourceService, ex);
+
+            }
+
         }
 
         /**
@@ -1673,6 +1720,11 @@ abstract public class StoreManager extends ResourceEvents implements
             log.warn(ex.getMessage(), ex);
         }
 
+        if (resourceService != null) {
+            resourceService.shutdown();
+            resourceService = null;
+        }
+
 //        try {
 //            tmpStore.destroy();
 //        } catch (Exception ex) {
@@ -1709,6 +1761,11 @@ abstract public class StoreManager extends ResourceEvents implements
             closeStores();
         } catch (Exception ex) {
             log.warn(ex.getMessage(), ex);
+        }
+
+        if (resourceService != null) {
+            resourceService.shutdownNow();
+            resourceService = null;
         }
 
 //        try {
@@ -3629,41 +3686,6 @@ abstract public class StoreManager extends ResourceEvents implements
         }
 
     }
-
-//    /**
-//     * The effective release time is the minimum timestamp for which resources
-//     * may be safely released (aka deleted). The upper bound on the release time
-//     * is the current time reported by {@link #nextTimestampRobust()} minus the
-//     * {@link #getMinReleaseAge()}. When the {@link #getReleaseTime()} is
-//     * non-zero, the lower bound on the release time is computed using
-//     * {@link #getEarliestDependencyTimestamp(long)}. The effective release
-//     * time is the minimum of these two timestamps. Resources whose createTime
-//     * is LTE that effective release time MAY be safely deleted.
-//     * 
-//     * @return The effective release time.
-//     * 
-//     * @see Options#MIN_RELEASE_AGE
-//     * @see IResourceManager#setReleaseTime(long)
-//     */
-//    protected long getEffectiveReleaseTime() {
-//
-//        assertOpen();
-//
-//
-//        final long effectiveReleaseTime = Math.min(maxReleaseTime, earliestDependencyTime);
-//
-//        log.info("effectiveReleaseTime(" + effectiveReleaseTime
-//                + ") := Min(maxReleaseTime=" + maxReleaseTime
-//                + ", earliestDependencyTime=" + earliestDependencyTime + ")");
-//
-//        assert effectiveReleaseTime <= maxReleaseTime : "effectiveReleaseTime="
-//                + effectiveReleaseTime + ", maxReleaseTime=" + maxReleaseTime;
-//
-//        lastEffectiveReleaseTime = effectiveReleaseTime;
-//
-//        return effectiveReleaseTime;
-//
-//    }
 
     /**
      * Finds the journal spanning the first {@link ICommitRecord} that is

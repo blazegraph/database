@@ -120,7 +120,6 @@ public class TestAddDeleteResource extends AbstractResourceManagerTestCase {
 
         assertEquals(0, resourceManager.getManagedSegmentCount());
 
-        final File outFile;
         final BuildResult buildResult;
         {
 
@@ -138,16 +137,14 @@ public class TestAddDeleteResource extends AbstractResourceManagerTestCase {
             // insert a tuple.
             btree.insert("abc", "def");
             
-            outFile = resourceManager.getIndexSegmentFile(btree.getIndexMetadata());
-            
             final long createTime = resourceManager.nextTimestamp();
 
             // build an index segment from that btree.
             buildResult = resourceManager.buildIndexSegment(INDEX_NAME, btree,
-                    outFile, true/* compactingMerge */, createTime,
-                    null/* fromKey */, null /* toKey */, new Event(
-                            resourceManager.getFederation(), new EventResource(
-                                    INDEX_NAME), "test", ""/* details */));
+                    true/* compactingMerge */, createTime, null/* fromKey */,
+                    null /* toKey */, new Event(resourceManager
+                            .getFederation(), new EventResource(INDEX_NAME),
+                            "test", ""/* details */));
 
         }
 
@@ -164,7 +161,11 @@ public class TestAddDeleteResource extends AbstractResourceManagerTestCase {
 
         } finally {
 
-            outFile.delete();
+            if (buildResult != null) {
+
+                buildResult.builder.outFile.delete();
+
+            }
 
         }
 

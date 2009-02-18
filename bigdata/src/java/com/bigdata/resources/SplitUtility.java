@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.resources;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -497,6 +496,8 @@ public class SplitUtility {
         private final Event parentEvent;
 
         /**
+         * Builds an {@link IndexSegment} from the lastCommitTime of the old
+         * journal.
          * 
          * @param vmd
          * @param split
@@ -520,10 +521,6 @@ public class SplitUtility {
 
         @Override
         protected BuildResult doTask() throws Exception {
-
-            // The file on which the index segment is being written.
-            final File outFile = vmd.resourceManager
-                    .getIndexSegmentFile(vmd.indexMetadata);
 
             if (resourceManager.isOverflowAllowed())
                 throw new IllegalStateException();
@@ -560,19 +557,11 @@ public class SplitUtility {
                 
             }
             
-            if (INFO)
-                log.info("begin: name=" + name + ", outFile=" + outFile
-                        + ", pmd=" + pmd);
-            
             // build the index segment from the key range.
             final BuildResult result = resourceManager.buildIndexSegment(name,
-                    src, outFile, true/* compactingMerge */, vmd.commitTime,
+                    src, true/* compactingMerge */, vmd.commitTime,
                     fromKey, toKey, parentEvent);
 
-            if (INFO)
-                log.info("done: name=" + name + ", outFile=" + outFile
-                        + ", pmd=" + pmd);
-            
             return result;
             
         }
