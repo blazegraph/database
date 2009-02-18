@@ -60,7 +60,7 @@ public class BuildResult extends AbstractResult {
      * interesting information about the build.
      */
     public final IndexSegmentBuilder builder;
-    
+
     /**
      * 
      * @param name

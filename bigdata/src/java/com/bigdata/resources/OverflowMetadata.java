@@ -36,6 +36,11 @@ public class OverflowMetadata {
     protected static final boolean DEBUG = log.isDebugEnabled();
     
     /**
+     * The resource manager.
+     */
+    public final ResourceManager resourceManager;
+    
+    /**
      * The last commit time on the old journal. This identifies the commit point
      * on which synchronous and asynchronous overflow will read.
      */
@@ -269,6 +274,8 @@ public class OverflowMetadata {
         if (resourceManager == null)
             throw new IllegalArgumentException();
 
+        this.resourceManager = resourceManager;
+        
         // note: assumes the live journal is the one that we want!
         final AbstractJournal oldJournal = resourceManager.getLiveJournal();
 

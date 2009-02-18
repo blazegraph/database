@@ -28,6 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.resources;
 
+import com.bigdata.btree.IndexSegment;
+import com.bigdata.service.ResourceService;
+
 /**
  * Various kinds of subtasks for asynchronous index partition overflow tasks.
  * 
@@ -54,6 +57,11 @@ public enum OverflowSubtaskEnum {
     /**
      * Registering a new index partition.
      */
-    RegisterIndex;
+    RegisterIndex,
+    /**
+     * Operation copying an {@link IndexSegment} using the
+     * {@link ResourceService}.
+     */
+    SendSegment;
 
 }

@@ -35,7 +35,6 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
@@ -110,44 +109,50 @@ import com.bigdata.resources.StoreManager.ManagedJournal;
  *       bidirectional. Can that rate be sustained with a fully connected
  *       bi-directional transfer?
  * 
- * @todo RPC requests are currently made via RPC using JERI. While you can elect
- *       to use the TCP/NIO server via configuration options (see
- *       http://java.sun.com/products/jini/2.0.1/doc/api/net/jini/jeri/tcp/package-summary.html),
- *       there will still be a thread allocated per concurrent RPC and no
- *       throttling will be imposed by JERI.
- *       <p>
- *       The present design of the {@link IDataService} API requires that a
- *       server thread be dedicated to each request against that interface - in
- *       this way it exactly matches the RPC semantics supported by JERI. The
- *       underlying reason is that the RPC calls are all translated into
- *       {@link Future}s when the are submitted via
- *       {@link ConcurrencyManager#submit(AbstractTask)}. The
- *       {@link DataService} itself then invokes {@link Future#get()} in order
- *       to await the completion of the request and return the response (object
- *       or thrown exception).
- *       <p>
- *       A re-design based on an asynchronous response from the server could
- *       remove this requirement, thereby allowing a handful of server threads
- *       to handle a large volume of concurrent client requests. The design
- *       would use asynchronous callback to the client via JERI RPC calls to
- *       return results, indications that the operation was complete, or
- *       exception information. A single worker thread on the server could
- *       monitor the various futures and RPC clients when responses become
- *       available or on request timeout.
- *       <p>
- *       See {@link NIODataService}, which contains some old code that can be
- *       refactored for an NIO interface to the data service.
- *       <p>
- *       Another option to throttle requests is to use a blocking queue to
- *       throttle the #of tasks that are submitted to the data service. Latency
- *       should be imposed on threads submitting tasks as the queue grows in
- *       order to throttle clients. If the queue becomes full
- *       {@link RejectedExecutionException} will be thrown, and the client will
- *       have to handle that. In contrast, if the queue never blocks and never
- *       imposes latency on clients then it is possible to flood the data
- *       service with requests, even through they will be processed by no more
- *       than {@link ConcurrentManager.Options#WRITE_SERVICE_MAXIMUM_POOL_SIZE}
- *       threads.
+ * FIXME LockManager and FutureCompletionService
+ * <p>
+ * I have figured out the cause of the concurrency bottleneck. We can patch it
+ * by increasing the thread pool size, but the cause is the lock manager which
+ * requires a thread for a task to await a lock rather than being purely state
+ * based. E.g., it is based on a queue of threads executing tasks awaiting
+ * access to resources rather than a queue of tasks. I can refactor to fix this
+ * issue, but I think that we can defer that for now. There is a similar thread
+ * consumption issue arising in the RMI interface. Even through RMI is using NIO
+ * for communications, each remote request is attached to a worker thread. So
+ * each task submitted to a data service is immediately attached to a thread and
+ * then to another thread if it needs to await a resource lock. The way to fix
+ * this is to change the API to always return a Future for the operation
+ * immediately (so we don't have as many threads awaiting RMI outcomes) and then
+ * use a future completion service on the bigdata federation class that accepts
+ * asynchronous outcomes for the submitted events. This will correspond nicely
+ * to the Java ExecutorService and Future APIs, will simplify the API, will
+ * consume fewer resources on the services, and will allow greater concurrency.
+ * <p>
+ * The following notes in fact describe very much the same problem:
+ * <p>
+ * RPC requests are currently made via RPC using JERI. While you can elect to
+ * use the TCP/NIO server via configuration options (see
+ * http://java.sun.com/products/jini/2.0.1/doc/api/net/jini/jeri/tcp/package-summary.html),
+ * there will still be a thread allocated per concurrent RPC and no throttling
+ * will be imposed by JERI.
+ * <p>
+ * The present design of the {@link IDataService} API requires that a server
+ * thread be dedicated to each request against that interface - in this way it
+ * exactly matches the RPC semantics supported by JERI. The underlying reason is
+ * that the RPC calls are all translated into {@link Future}s when the are
+ * submitted via {@link ConcurrencyManager#submit(AbstractTask)}. The
+ * {@link DataService} itself then invokes {@link Future#get()} in order to
+ * await the completion of the request and return the response (object or thrown
+ * exception).
+ * <p>
+ * A re-design based on an asynchronous response from the server could remove
+ * this requirement, thereby allowing a handful of server threads to handle a
+ * large volume of concurrent client requests. The design would use asynchronous
+ * callback to the client via JERI RPC calls to return results, indications that
+ * the operation was complete, or exception information. A single worker thread
+ * on the server could monitor the various futures and RPC clients when
+ * responses become available or on request timeout. (This would be the
+ * FutureCompletionService).
  * 
  * @todo Review JERI options to support secure RMI protocols. For example, using
  *       SSL or an SSH tunnel. For most purposes I expect bigdata to operate on
@@ -208,8 +213,20 @@ abstract public class DataService extends AbstractService
      */
     final private ReadBlockCounters readBlockApiCounters = new ReadBlockCounters();
 
+    /**
+     * Object manages the resources hosted by this {@link DataService}.
+     */
     private ResourceManager resourceManager;
+
+    /**
+     * Object provides concurrency control for the named resources (indices).
+     */
     private ConcurrencyManager concurrencyManager;
+
+    /**
+     * Object supports local transactions and does handshaking with the
+     * {@link DistributedTransactionService}.
+     */
     private DataServiceTransactionManager localTransactionManager;
     
     /**
@@ -363,30 +380,6 @@ abstract public class DataService extends AbstractService
         
     }
     
-//    /**
-//     * Invoked periodically to clear stale entries from a variety of LRU caches.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    protected class ClearStaleCacheEntries implements Runnable {
-//
-//        public void run() {
-//
-//            if (!resourceManager.isRunning()) {
-//
-//                log.warn("Halting task : resource manager is not running.");
-//                
-//                throw new RuntimeException();
-//                
-//            }
-//            
-//            resourceManager.clearStaleCacheEntries();
-//            
-//        }
-//        
-//    }
-    
     /**
      * Concrete implementation manages the local state of transactions executing
      * on a {@link DataService}.
@@ -422,53 +415,19 @@ abstract public class DataService extends AbstractService
      */
     @Override
     synchronized public DataService start() {
-        
-        if(isOpen()) {
-            
-            throw new IllegalStateException(); 
-            
-        }
-        
-        resourceManager = (ResourceManager) newResourceManager(properties);
 
-//        /*
-//         * Schedule tasks that will clear stale references from the index cache,
-//         * the index segment cache, and the store cache. This ensures that the
-//         * LRU references in these caches will become weakly reachable after a
-//         * timeout even in the event that there are no touched on the cache.
-//         * 
-//         * @todo config params for initialDelay and delay.
-//         * 
-//         * @todo do we need to do this for the Journal as well? Probably else
-//         * these indices will still be strongly references. Also the resource
-//         * locator cache, etc. All instances of ConcurrentWeakReferenceCache.
-//         * 
-//         * @todo one consequence of this is that you can shutdown heavily
-//         * buffered indices, which you might not want to do.  In that case
-//         * the delay should be ZERO and the task should not be run.
-//         */
-//        {
-//
-//            final long initialDelay = 5000;
-//            
-//            final long delay = 5000;
-//            
-//            /*
-//             * Note: The task will self-cancel by throwing an exception once the
-//             * resource manager is no longer running.
-//             */
-//
-//            getFederation().addScheduledTask(new ClearStaleCacheEntries(),
-//                    initialDelay, delay, TimeUnit.MILLISECONDS);
-//            
-//        }
-        
+        if (isOpen()) {
+
+            throw new IllegalStateException();
+
+        }
+
+        resourceManager = (ResourceManager) newResourceManager(properties);
+       
         localTransactionManager = new DataServiceTransactionManager();
         
         concurrencyManager = new ConcurrencyManager(properties,
                 localTransactionManager, resourceManager);
-
-//        localTransactionManager.setConcurrencyManager(concurrencyManager);
 
         if (resourceManager instanceof ResourceManager) {
 
@@ -620,9 +579,6 @@ abstract public class DataService extends AbstractService
         /**
          * Sets up {@link DataService} specific counters.
          * 
-         * @todo Add some counters providing a histogram of the index partitions
-         *       that have touched or that are "hot"?
-         * 
          * @see IDataServiceCounters
          */
         protected void setupCounters() {
@@ -709,8 +665,9 @@ abstract public class DataService extends AbstractService
      */
     synchronized public void shutdown() {
 
-        if(!isOpen()) return;
-        
+        if (!isOpen())
+            return;
+
         if (concurrencyManager != null) {
             concurrencyManager.shutdown();
             concurrencyManager = null;
@@ -1828,7 +1785,7 @@ abstract public class DataService extends AbstractService
     }
 
     /*
-     * overflow processing API 
+     * Overflow processing API 
      */
 
     public void forceOverflow(final boolean immediate,
@@ -2011,5 +1968,5 @@ abstract public class DataService extends AbstractService
         }
         
     }
-    
+   
 }

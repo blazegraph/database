@@ -518,7 +518,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * @todo modify to return <code>null</code> if the index is not
      *       registered?
      */
-    synchronized final public IIndex getIndex(final String name) {
+    synchronized final public ILocalBTreeView getIndex(final String name) {
 
         if (name == null) {
 
@@ -538,7 +538,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          */
         {
 
-            final IIndex index = indexCache.get(name);
+            final ILocalBTreeView index = indexCache.get(name);
 
             if (index != null) {
 
@@ -655,7 +655,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * 
      * @return The view.
      */
-    private IIndex getUnisolatedIndexView(final String name, final BTree btree) {
+    private ILocalBTreeView getUnisolatedIndexView(final String name, final BTree btree) {
         
         // setup the task as the listener for dirty notices.
         btree.setDirtyListener(new DirtyListener(name,btree));

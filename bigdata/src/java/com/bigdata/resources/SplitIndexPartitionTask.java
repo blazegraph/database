@@ -175,8 +175,7 @@ public class SplitIndexPartitionTask extends
                 Split[] splits;
                 try {
 
-                    splits = splitHandler.getSplits(resourceManager, src,
-                            vmd.btreeCounters);
+                    splits = splitHandler.getSplits(resourceManager, src);
 
                 } catch (Throwable t) {
 

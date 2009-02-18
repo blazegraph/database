@@ -1,6 +1,5 @@
 package com.bigdata.resources;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedList;
@@ -62,10 +61,10 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
 
     final protected ViewMetadata vmd;
 
-    /**
-     * The file on which the {@link IndexSegment} will be written.
-     */
-    final protected File outFile;
+//    /**
+//     * The file on which the {@link IndexSegment} will be written.
+//     */
+//    final protected File outFile;
     
     /**
      * The source view.
@@ -83,8 +82,8 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
 
         this.vmd = vmd;
 
-        // the file to be generated.
-        this.outFile = resourceManager.getIndexSegmentFile(vmd.indexMetadata);
+//        // the file to be generated.
+//        this.outFile = resourceManager.getIndexSegmentFile(vmd.indexMetadata);
 
         /*
          * Put a hard reference hold on the btree.
@@ -214,7 +213,7 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
                 final boolean compactingMerge = accepted.size() == sources.length;
 
                 // Build the index segment.
-                result = resourceManager.buildIndexSegment(name, src, outFile,
+                result = resourceManager.buildIndexSegment(name, src, 
                         compactingMerge, vmd.commitTime, null/* fromKey */,
                         null/* toKey */, e);
 

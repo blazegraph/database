@@ -421,9 +421,9 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      *            and deleted index entries will therefore be propagated to the
      *            new {@link IndexSegment} (aka an incremental build).
      * @param createTime
-     *            The timestamp of the view. This is typically the
-     *            <code>lastCommitTime</code> of the old journal after an
-     *            overflow operation.
+     *            The commit time associated with the view from which the
+     *            {@link IndexSegment} is being generated. This value is written
+     *            into {@link IndexSegmentCheckpoint#commitTime}.
      * @param fromKey
      *            The lowest key that will be included (inclusive). When
      *            <code>null</code> there is no lower bound.

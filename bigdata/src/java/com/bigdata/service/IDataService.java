@@ -457,7 +457,7 @@ public interface IDataService extends ITxCommitProtocol, IService {
      */
     public Future<? extends Object> submit(Callable<? extends Object> proc)
             throws InterruptedException, ExecutionException, IOException;
-    
+
     /**
      * Read a low-level record from the described {@link IRawStore} described by
      * the {@link IResourceMetadata}.

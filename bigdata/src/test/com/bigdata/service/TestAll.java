@@ -63,31 +63,33 @@ public class TestAll extends TestCase {
      * 
      * FIXME Make the unit tests in this package into proxy unit tests and run
      * all of the tests in this suite against both the
-     * {@link LocalDataServiceClient} and the {@link EmbeddedClient}.  Ideally
+     * {@link LocalDataServiceClient} and the {@link EmbeddedClient}. Ideally
      * the jini module can then re-run the same unit tests.
      */
-    public static Test suite()
-    {
+    public static Test suite() {
 
         TestSuite suite = new TestSuite("bigdata services");
 
         // tests of the round-robin aspects of the LBS (isolated behaviors).
         suite.addTestSuite(TestLoadBalancerRoundRobin.class);
+
+        // test utility to read index segments using NIO.
+        suite.addTestSuite(TestResourceService.class);
         
         // tests of the metadata index.
-        suite.addTestSuite( TestMetadataIndex.class );
-        
+        suite.addTestSuite(TestMetadataIndex.class);
+
         // client basics, including static partitioning of indices.
-        suite.addTestSuite( TestEmbeddedClient.class );
-        
+        suite.addTestSuite(TestEmbeddedClient.class);
+
         // test basic index operations.
-        suite.addTestSuite( TestBasicIndexStuff.class);
-        
+        suite.addTestSuite(TestBasicIndexStuff.class);
+
         // test range iterators (within and across index partitions).
-        suite.addTestSuite( TestRangeQuery.class );
-        
+        suite.addTestSuite(TestRangeQuery.class);
+
         // test ability to re-open an embedded federation.
-        suite.addTestSuite( TestRestartSafe.class );
+        suite.addTestSuite(TestRestartSafe.class);
 
         // unit tests for the distributed transaction service's snapshots.
         suite.addTestSuite(TestSnapshotHelper.class);

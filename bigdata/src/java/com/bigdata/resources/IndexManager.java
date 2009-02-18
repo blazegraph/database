@@ -54,6 +54,7 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
+import com.bigdata.btree.IndexSegmentCheckpoint;
 import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.btree.ReadCommittedView;
 import com.bigdata.cache.ConcurrentWeakValueCache;
@@ -1557,9 +1558,6 @@ abstract public class IndexManager extends StoreManager {
      *            index).
      * @param src
      *            A view of the index partition as of the <i>createTime</i>.
-     * @param outFile
-     *            The file on which the {@link IndexSegment} will be written.
-     *            The file MAY exist, but if it exists then it MUST be empty.
      * @param compactingMerge
      *            When <code>true</code> the caller asserts that <i>src</i>
      *            is a {@link FusedView} and deleted index entries WILL NOT be
@@ -1568,10 +1566,10 @@ abstract public class IndexManager extends StoreManager {
      *            partition view are being exported onto an {@link IndexSegment}
      *            and deleted index entries will therefore be propagated to the
      *            new {@link IndexSegment}.
-     * @param createTime
-     *            The timestamp of the view. This is typically the
-     *            lastCommitTime of the old journal after an
-     *            {@link #overflow(boolean, boolean)} operation.
+     * @param commitTime
+     *            The commit time associated with the view from which the
+     *            {@link IndexSegment} is being generated. This value is written
+     *            into {@link IndexSegmentCheckpoint#commitTime}.
      * @param fromKey
      *            The lowest key that will be included (inclusive). When
      *            <code>null</code> there is no lower bound.
@@ -1587,9 +1585,12 @@ abstract public class IndexManager extends StoreManager {
      *             will be deleted as a side-effect before returning control to
      *             the caller.
      */
+//    * @param outFile
+//    *            The file on which the {@link IndexSegment} will be written.
+//    *            The file MAY exist, but if it exists then it MUST be empty.
     public BuildResult buildIndexSegment(final String name,
-            final ILocalBTreeView src, final File outFile,
-            final boolean compactingMerge, final long createTime,
+            final ILocalBTreeView src, //final File outFile,
+            final boolean compactingMerge, final long commitTime,
             final byte[] fromKey, final byte[] toKey, final Event parentEvent)
             throws Exception {
 
@@ -1599,8 +1600,8 @@ abstract public class IndexManager extends StoreManager {
         if (src == null)
             throw new IllegalArgumentException();
         
-        if (outFile == null)
-            throw new IllegalArgumentException();
+//        if (outFile == null)
+//            throw new IllegalArgumentException();
         
         if (parentEvent == null)
             throw new IllegalArgumentException();
@@ -1611,6 +1612,7 @@ abstract public class IndexManager extends StoreManager {
         final Event e = parentEvent.newSubEvent(EventType.IndexSegmentBuild,
                 details).start();
 
+        File outFile = null;
         String moreDetails = null;
         try {
             final IndexMetadata indexMetadata;
@@ -1619,12 +1621,15 @@ abstract public class IndexManager extends StoreManager {
             final IndexSegmentBuilder builder;
             try {
 
-                // new builder.
-                builder = IndexSegmentBuilder.newInstance(name, src, outFile,
-                        tmpDir, compactingMerge, createTime, fromKey, toKey);
-
                 // metadata for that index / index partition.
                 indexMetadata = src.getIndexMetadata();
+
+                // the file to be generated.
+                outFile = getIndexSegmentFile(indexMetadata);
+
+                // new builder.
+                builder = IndexSegmentBuilder.newInstance(name, src, outFile,
+                        tmpDir, compactingMerge, commitTime, fromKey, toKey);
 
                 // build the index segment.
                 builder.call();
@@ -1635,7 +1640,7 @@ abstract public class IndexManager extends StoreManager {
                 {
 
                     final int nentries = builder.plan.nentries;
-                    final long commitTime = builder.getCheckpoint().commitTime;
+//                    final long commitTime = builder.getCheckpoint().commitTime;
                     final long nbytes = builder.getCheckpoint().length;
                     
                     // data rate in MB/sec.
@@ -1653,7 +1658,7 @@ abstract public class IndexManager extends StoreManager {
                 segmentMetadata = new SegmentMetadata(//
                         outFile, //
                         builder.segmentUUID, //
-                        createTime //
+                        commitTime //
                 );
 
                 // Notify the resource manager so that it can find this file.

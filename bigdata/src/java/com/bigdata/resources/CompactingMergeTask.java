@@ -1,6 +1,5 @@
 package com.bigdata.resources;
 
-import java.io.File;
 import java.util.Arrays;
 import java.util.UUID;
 
@@ -89,13 +88,9 @@ public class CompactingMergeTask extends AbstractPrepareTask<BuildResult> {
                  * the post-condition view will include those writes.
                  */
 
-                // the file to be generated.
-                final File outFile = resourceManager
-                        .getIndexSegmentFile(vmd.indexMetadata);
-
                 // build the index segment.
                 result = resourceManager
-                        .buildIndexSegment(vmd.name, vmd.getView(), outFile,
+                        .buildIndexSegment(vmd.name, vmd.getView(),
                                 true/* compactingMerge */, vmd.commitTime,
                                 null/* fromKey */, null/* toKey */, e);
 
