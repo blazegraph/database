@@ -441,13 +441,13 @@ public class SPO implements ISPO, Comparable<SPO> {
 
             // compute and cache.
 
-            long[] a = new long[]{s,p,o};
+            final long[] a = new long[]{s,p,o};
             
             int result = 1;
             
             for (long element : a) {
             
-                int elementHash = (int) (element ^ (element >>> 32));
+                final int elementHash = (int) (element ^ (element >>> 32));
                 
                 result = 31 * result + elementHash;
                 

@@ -56,6 +56,20 @@ public class Split {
     public final int ntuples;
 
     /**
+     * Create a representation of a split point without specifying the from/to
+     * tuple index.
+     * 
+     * @param pmd
+     *            The metadata for the index partition within which the keys in
+     *            this split lie.
+     */
+    public Split(final IPartitionMetadata pmd) {
+
+        this(pmd, 0/* fromIndexIgnored */, 0/* toIndexIgnored */);
+
+    }
+    
+    /**
      * Create a representation of a split point.
      * 
      * @param pmd
@@ -73,7 +87,7 @@ public class Split {
      *       Perhaps the help when building an {@link IndexSegment} from the
      *       {@link Split}?
      */
-    public Split(IPartitionMetadata pmd, int fromIndex, int toIndex) {
+    public Split(final IPartitionMetadata pmd, final int fromIndex, final int toIndex) {
 
 //        assert pmd != null;
 

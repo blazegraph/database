@@ -30,6 +30,7 @@ package com.bigdata.btree;
 
 import java.io.Serializable;
 
+import com.bigdata.resources.IPartitionIdFactory;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.Split;
 import com.bigdata.sparse.SparseRowStore;
@@ -99,7 +100,7 @@ public interface ISplitHandler extends Serializable {
      * view as its rightSeparator. The #of splits SHOULD be choosen such that
      * the resulting index partitions are each at least 50% full.
      * 
-     * @param resourceManager
+     * @param partitionIdFactory
      * 
      * @param ndx
      *            The source index partition.
@@ -113,7 +114,7 @@ public interface ISplitHandler extends Serializable {
 //    * @param btreeCounters
 //    *            Performance counters for the index partition view collected
 //    *            since the last overflow.
-    public Split[] getSplits(ResourceManager resourceManager,
+    public Split[] getSplits(IPartitionIdFactory partitionIdFactory,
             ILocalBTreeView ndx);//, BTreeCounters btreeCounters);
 
 }

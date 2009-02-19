@@ -19,12 +19,10 @@ import com.bigdata.btree.ITupleCursor;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexMetadata.Options;
-import com.bigdata.journal.IResourceManager;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.resources.SplitIndexPartitionTask.AtomicUpdateSplitIndexPartitionTask;
 import com.bigdata.service.IMetadataService;
-import com.bigdata.service.MetadataService;
 import com.bigdata.service.Split;
 
 /**
@@ -209,7 +207,7 @@ public class DefaultSplitHandler implements ISplitHandler {
     static void assertSplitJoinStable(final int minimumEntryCount,
             final int entryCountPerSplit, final double underCapacityMultiplier) {
 
-        if (minimumEntryCount >= underCapacityMultiplier * entryCountPerSplit) {
+        if (minimumEntryCount > underCapacityMultiplier * entryCountPerSplit) {
             
             throw new IllegalArgumentException("minimumEntryCount("
                     + minimumEntryCount + ") exceeds underCapacityMultiplier("
@@ -250,9 +248,13 @@ public class DefaultSplitHandler implements ISplitHandler {
 
     public void setEntryCountPerSplit(final int entryCountPerSplit) {
 
-        if (entryCountPerSplit <= Options.MIN_BRANCHING_FACTOR) {
+        if (entryCountPerSplit < Options.MIN_BRANCHING_FACTOR) {
 
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException(
+                    "entryCountPerSplit must be GTE the minimum branching factor: entryCountPerSplit="
+                            + entryCountPerSplit
+                            + ", minBranchingFactor="
+                            + Options.MIN_BRANCHING_FACTOR);
 
         }
 
@@ -458,10 +460,12 @@ public class DefaultSplitHandler implements ISplitHandler {
         // Compute the #of samples to take (the sample rate is the #of samples per split).
         final int numSamplesEstimate = numSplitsEstimate * getSampleRate();
         
-        final int sampleEveryNTuples = rangeCount / numSamplesEstimate;
+        // Note: Minimum value is to sample every tuple.
+        final int sampleEveryNTuples = Math.max(1, rangeCount
+                / numSamplesEstimate);
         
         if(INFO)
-        log.info("Estimating " + numSplitsEstimate + " with sampleRate="
+        log.info("Estimating " + numSplitsEstimate + " splits with sampleRate="
                 + getSampleRate() + " yeilding ~ " + numSamplesEstimate
                 + " samples with one sample every " + sampleEveryNTuples
                 + " tuples");
@@ -495,8 +499,8 @@ public class DefaultSplitHandler implements ISplitHandler {
 
                 final Sample sample = new Sample(tuple.getKey(), (int) offset);
 
-                if(INFO)
-                log.info("samples[" + samples.size() + "] = " + sample);
+                if (DEBUG)
+                    log.debug("samples[" + samples.size() + "] = " + sample);
 
                 samples.add(sample);
 
@@ -557,7 +561,7 @@ public class DefaultSplitHandler implements ISplitHandler {
 //    *            The performance counters (optional, but tail splits will not
 //    *            be choosen when <code>null</code>).
 //    * 
-    public Split[] getSplits(final ResourceManager resourceManager,
+    public Split[] getSplits(final IPartitionIdFactory partitionIdFactory,
             final ILocalBTreeView ndx) {//, final BTreeCounters btreeCounters) {
 
         // Sample the index for tuples used to split into key-ranges.
@@ -649,7 +653,7 @@ public class DefaultSplitHandler implements ISplitHandler {
 
         }
 
-        return getSplits(resourceManager, ndx, nsplits, samples, rangeCount);
+        return getSplits(partitionIdFactory, ndx, nsplits, samples, rangeCount);
 
     }
 
@@ -694,7 +698,7 @@ public class DefaultSplitHandler implements ISplitHandler {
      * 
      * @todo there are a lot of edge conditions in this -- write tests!
      */
-    protected Split[] getSplits(final IResourceManager resourceManager,
+    protected Split[] getSplits(final IPartitionIdFactory partitionIdFactory,
             final IIndex ndx, final int nsplits, final Sample[] samples,
             final long nvisited) {
 
@@ -805,8 +809,8 @@ public class DefaultSplitHandler implements ISplitHandler {
             }
 
             // Get the next partition identifier for the named scale-out index.
-            final int partitionId = nextPartitionId(resourceManager,
-                    indexMetadata.getName());
+            final int partitionId = partitionIdFactory
+                    .nextPartitionId(indexMetadata.getName());
 
             final LocalPartitionMetadata pmd = new LocalPartitionMetadata(
                     partitionId,//
@@ -846,38 +850,140 @@ public class DefaultSplitHandler implements ISplitHandler {
     }
 
     /**
-     * Requests a new index partition identifier from the
-     * {@link MetadataService} for the specified scale-out index (RMI).
+     * Return an adjusted split handler. The split handler will be adjusted to
+     * be heavily biased in favor of splitting an index partition when the #of
+     * index partitions for a scale-out index is small. This adjustment is
+     * designed to very rapidly (re-)distribute a new scale-out index until
+     * there are at least 10 index partitions and rapidly (re-)distribute a
+     * scale-out index until they are at least 100 index partitions. Thereafter
+     * the as configured behavior will be observed.
+     * <p>
+     * Note: The potential parallelism of a data service is limited by the #of
+     * index partitions on that data service as well as by the workload of the
+     * application. By partitioning new and young indices aggressively we ensure
+     * that the index is broken into multiple index partitions on the initial
+     * data service. Those index partitions will be re-distributed across the
+     * available data services based on recommendations made by the load
+     * balancer. Both breaking an index into multiple partitions on a single
+     * data service and re-distributing those index partitions among the hosts
+     * of a cluster will increase the resources (CPU, DISK, RAM) which can be
+     * brought to bear on the index. In particular, there is a constraint of a
+     * single core per index partition (for writes). Therefore breaking a new
+     * index into 2 pieces doubles the potential concurrency for a data service
+     * on a host with at least 2 cores. This can be readily extrapolated to a
+     * cluster with 8 cores x 16 machines, etc.
+     * <p>
+     * Note: The adjustment is proportional to the #of existing index partitions
+     * and is adjusted using a floating point discount factor. This should
+     * prevent a split triggering a subsequent join on the next overflow.
      * 
-     * @return The new index partition identifier.
+     * @param accelerateSplitThreshold
+     *            The #of index partitions below which we will accelerate the
+     *            decision to split an index partition.
+     * @param npartitions
+     *            The #of index partitions (pre-split) for the scale-out index.
      * 
-     * @throws RuntimeException
-     *             if something goes wrong.
+     * @return The adjusted split handler.
+     * 
+     * @see OverflowManager.Options#ACCELERATE_SPLIT_THRESHOLD
      */
-    protected int nextPartitionId(IResourceManager resourceManager,
-            final String scaleOutIndexName) {
+    public DefaultSplitHandler getAdjustedSplitHandler(
+            final int accelerateSplitThreshold, final long npartitions) {
 
-        final IMetadataService mds = resourceManager.getFederation()
-                .getMetadataService();
+        if (npartitions >= accelerateSplitThreshold) {
 
-        if (mds == null) {
+            /*
+             * There are plenty of index partitions. Use the original split
+             * handler.
+             * 
+             * Note: This also prevents our "discount" from becoming an
+             * "inflation" factor!
+             */
 
-            throw new RuntimeException("Metadata service not discovered.");
+            return this;
 
         }
+
+        // the split handler as configured.
+        final DefaultSplitHandler s = (DefaultSplitHandler) this;
+
+        // discount: given T=100, will be 1 when N=100; 10 when N=10, and
+        // 100 when N=1.
+        final double d = (double) npartitions / accelerateSplitThreshold;
 
         try {
 
-            // obtain new partition identifier from the metadata service (RMI)
-            final int newPartitionId = mds.nextPartitionId(scaleOutIndexName);
+            // adjusted split handler.
+            final DefaultSplitHandler t = new DefaultSplitHandler(//
+                    (int) (s.getMinimumEntryCount() * d), //
+                    (int) (s.getEntryCountPerSplit() * d), //
+                    s.getOverCapacityMultiplier(), // unchanged 
+                    s.getUnderCapacityMultiplier(), // unchanged
+                    s.getSampleRate() // unchanged
+            );
 
-            return newPartitionId;
+            if (INFO)
+                log.info("npartitions=" + npartitions + ", discount=" + d
+                        + ", threshold=" + accelerateSplitThreshold
+                        + ", adjustedSplitHandler=" + t);
 
-        } catch (Throwable t) {
+            return t;
 
-            throw new RuntimeException(t);
+        } catch (IllegalArgumentException ex) {
+
+            /*
+             * The adjustment violated some constraint. Log a warning and
+             * use the original splitHandler since it was at least valid.
+             */
+
+            log.warn("Adjustment failed" + ": npartitions=" + npartitions
+                    + ", discount=" + d + ", splitHandler=" + this, ex);
+
+            return this;
 
         }
+
+    }
+
+    /**
+     * Tweaks the split handler so that it will generate N more or less equal
+     * splits given an index with the specified rangeCount.
+     * 
+     * @param nsplits
+     *            The desired number of splits.
+     * @param rangeCount
+     *            The range count of the index to be split.
+     * 
+     * @return
+     */
+    public DefaultSplitHandler getAdjustedSplitHandlerForEqualSplits(
+            final int nsplits, final long rangeCount) {
+
+        final DefaultSplitHandler s = this;
+
+        final int adjustedEntryCountPerSplit = (int) (rangeCount / nsplits);
+
+        final double ratio = adjustedEntryCountPerSplit
+                / s.getEntryCountPerSplit();
+
+        final int adjustedMinEntryCount = (int) (s.getMinimumEntryCount() * ratio);
+        
+        // adjusted split handler.
+        final DefaultSplitHandler t = new DefaultSplitHandler(//
+                adjustedMinEntryCount,//
+                adjustedEntryCountPerSplit,//
+                s.getOverCapacityMultiplier(), // unchanged 
+//                s.getUnderCapacityMultiplier(), // unchanged
+                .99, // we want each split to be full.
+                s.getSampleRate() // unchanged
+        );
+
+        if (INFO)
+            log.info("nsplits=" + nsplits + ", rangeCount=" + rangeCount
+                    + ", unadjustedSplitHandler=" + this
+                    +", adjustedSplitHandler=" + t);
+
+        return t;
 
     }
 

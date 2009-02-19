@@ -531,7 +531,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * 
          * @see #DEFAULT_INDEX_SEGMENT_BUFFER_NODES
          * 
-         * @todo should be on by default?
+         * @todo should be on by default? (but verify that the unit tests do
+         * not run out of memory when it is enabled by default).
          */
         String INDEX_SEGMENT_BUFFER_NODES = IndexSegment.class.getName()
                 + ".bufferNodes";

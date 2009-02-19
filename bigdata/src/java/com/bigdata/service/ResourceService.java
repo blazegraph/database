@@ -41,6 +41,7 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.SocketChannel;
@@ -64,7 +65,6 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ShutdownHelper;
-import com.ibm.icu.impl.ByteBuffer;
 
 /**
  * A class which permits resources (files) identified by a {@link UUID} to be

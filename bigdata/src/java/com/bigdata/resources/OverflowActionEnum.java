@@ -1,8 +1,8 @@
 package com.bigdata.resources;
 
 /**
- * The different actions that we can take to handle an index partition
- * during overflow processing.
+ * The different actions that we can take to handle an index partition during
+ * overflow processing.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
