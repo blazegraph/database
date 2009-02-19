@@ -34,8 +34,10 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -65,6 +67,7 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.lexicon.ITermIdFilter;
 import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.load.AssignedSplits;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.WriteJustificationsProc.WriteJustificationsProcConstructor;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -246,14 +249,31 @@ public class SPORelation extends AbstractRelation<ISPO> {
         
     }
     
-    /*
-     * @todo create missing indices rather than throwing an exception if an
-     * index does not exist? (if a statement index is missing, then it really
-     * needs to be rebuilt from one of the other statement indics. if you loose
-     * the justifications index then you need to re-compute the database at once
-     * closure of the store).
-     */
+
     public void create() {
+        
+        create( null );
+        
+    }
+    
+    /**
+     * 
+     * @param assignedSplits
+     *            An map providing pre-assigned separator keys describing index
+     *            partitions and optionally the data service {@link UUID}s on
+     *            which to register the index partitions. The keys of the map
+     *            identify the index whose index partitions are described by the
+     *            corresponding value. You may specify one or all of the
+     *            indices. This parameter is optional and when <code>null</code>,
+     *            the default assignments will be used.
+     *            
+     * @todo create missing indices rather than throwing an exception if an
+     *       index does not exist? (if a statement index is missing, then it
+     *       really needs to be rebuilt from one of the other statement indics.
+     *       if you loose the justifications index then you need to re-compute
+     *       the database at once closure of the store).
+     */
+    public void create(final Map<IKeyOrder, AssignedSplits> assignedSplits) {
 
         final IResourceLock resourceLock = acquireExclusiveLock();
 
@@ -266,67 +286,100 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
             if (oneAccessPath) {
 
-                final IndexMetadata spoMetadata = getStatementIndexMetadata(SPOKeyOrder.SPO);
+                {
 
-                // register the index.
-                indexManager.registerIndex(spoMetadata);
+                    final IndexMetadata spoMetadata = getStatementIndexMetadata(SPOKeyOrder.SPO);
+
+                    final AssignedSplits splits = assignedSplits == null ? null
+                            : assignedSplits.get(SPOKeyOrder.SPO);
+
+                    if (splits != null) {
+
+                        splits.registerIndex(indexManager, spoMetadata);
+
+                    } else {
+
+                        indexManager.registerIndex(spoMetadata);
+
+                    }
+
+                }
 
                 // resolve the index and set the index reference.
                 spo = super.getIndex(SPOKeyOrder.SPO);
 
+                assert spo != null;
+
             } else {
 
-                final IndexMetadata spoMetadata = getStatementIndexMetadata(SPOKeyOrder.SPO);
+                {
 
-                final IndexMetadata posMetadata = getStatementIndexMetadata(SPOKeyOrder.POS);
+                    final IndexMetadata spoMetadata = getStatementIndexMetadata(SPOKeyOrder.SPO);
 
-                final IndexMetadata ospMetadata = getStatementIndexMetadata(SPOKeyOrder.OSP);
+                    final AssignedSplits splits = assignedSplits == null ? null
+                            : assignedSplits.get(SPOKeyOrder.SPO);
 
-//                final Properties p = getProperties();
-//                
-//                if (indexManager instanceof IBigdataFederation
-//                        && ((IBigdataFederation) indexManager).isScaleOut() &&
-//                        p.getProperty(Options.SPO_RELATION_DATA_SERVICE_UUID)!=null
-//                        ) {
-//
-//                    // register the indices on the same data service.
-//                    
-//                    final IBigdataFederation fed = (IBigdataFederation)indexManager;
-//                    
-//                    final UUID dataServiceUUID = UUID.fromString(p
-//                            .getProperty(Options.SPO_RELATION_DATA_SERVICE_UUID));
-//
-//                    if (INFO) {
-//
-//                        log.info("Allocating SPORelation on dataService="
-//                                + dataServiceUUID);
-//
-//                    }
-//
-//                    fed.registerIndex(spoMetadata, dataServiceUUID);
-//
-//                    fed.registerIndex(posMetadata, dataServiceUUID);
-//
-//                    fed.registerIndex(ospMetadata, dataServiceUUID);
-//                    
-//                } else {
+                    if (splits != null) {
 
-                    // register the indices.
-                    
-                    indexManager.registerIndex(spoMetadata);
+                        splits.registerIndex(indexManager, spoMetadata);
 
-                    indexManager.registerIndex(posMetadata);
+                    } else {
 
-                    indexManager.registerIndex(ospMetadata);
+                        indexManager.registerIndex(spoMetadata);
 
-//                }
+                    }
 
+                }
+
+                {
+
+                    final IndexMetadata posMetadata = getStatementIndexMetadata(SPOKeyOrder.POS);
+
+                    final AssignedSplits splits = assignedSplits == null ? null
+                            : assignedSplits.get(SPOKeyOrder.POS);
+
+                    if (splits != null) {
+
+                        splits.registerIndex(indexManager, posMetadata);
+
+                    } else {
+
+                        indexManager.registerIndex(posMetadata);
+
+                    }
+
+                }
+
+                {
+
+                    final IndexMetadata ospMetadata = assignedSplits == null ? null
+                            : getStatementIndexMetadata(SPOKeyOrder.OSP);
+
+                    final AssignedSplits splits = assignedSplits
+                            .get(SPOKeyOrder.OSP);
+
+                    if (splits != null) {
+
+                        splits.registerIndex(indexManager, ospMetadata);
+
+                    } else {
+
+                        indexManager.registerIndex(ospMetadata);
+
+                    }
+
+                }
+                
                 // resolve the index and set the index reference.
                 spo = super.getIndex(SPOKeyOrder.SPO);
 
                 pos = super.getIndex(SPOKeyOrder.POS);
 
                 osp = super.getIndex(SPOKeyOrder.OSP);
+                
+                assert spo != null;
+                assert pos != null;
+                assert osp != null;
 
             }
 

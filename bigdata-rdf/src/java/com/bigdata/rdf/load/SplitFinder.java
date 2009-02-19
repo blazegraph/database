@@ -37,9 +37,11 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -64,6 +66,7 @@ import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.lexicon.Term2IdTupleSerializer;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.LocalTripleStore;
@@ -77,6 +80,7 @@ import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.IKeyOrder;
 import com.bigdata.util.NV;
 
 /**
@@ -165,8 +169,10 @@ import com.bigdata.util.NV;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo handle the full text index.
- * 
+ * @todo there is no support for pre-partitioning the full text index at this
+ *       time. it needs to be supported both here and in
+ *       {@link LexiconRelation#create(Map)}.
+ *       
  * @todo I rather doubt that the justifications mechanism can scale-out. Instead
  *       do a magic sets integration which will eliminate the requirement for
  *       the justifications index and allow an option for eager, incremental, or
@@ -660,6 +666,9 @@ public class SplitFinder {
         if (splits.length == 0)
             throw new IllegalArgumentException();
 
+        System.err.println("Entering: lastIndex=" + lastIndex + ", key="
+                + BytesUtil.toString(key));
+        
         for (int i = lastIndex; i < splits.length; i++) {
             
             final IPartitionMetadata pmd = splits[i].pmd;
@@ -708,10 +717,16 @@ public class SplitFinder {
 
                 if (INFO)
                     log.info("Advancing splitIndex=" + (i + 1));
+
+                System.err.println("Not in this split: splitIndex=" + i
+                        + ", key=" + BytesUtil.toString(key) + ", pmd=" + pmd);
                 
                 continue;
                 
             }
+            
+            System.err.println("Found: splitIndex=" + i + ", key="
+                    + BytesUtil.toString(key) + ", pmd=" + pmd);
             
             return i;
             
@@ -881,22 +896,23 @@ public class SplitFinder {
 
             int lastSplitIndex = 0;
             
-            for(PredStat t : a) {
-                
-                final int splitIndex = find(t.sortKey, term2IdSplits, lastSplitIndex);
-                
+            for (PredStat t : a) {
+
+                final int splitIndex = find(t.sortKey, term2IdSplits,
+                        lastSplitIndex);
+
                 t.partId = term2IdSplits[splitIndex].pmd.getPartitionId();
-                
+
                 lastSplitIndex = splitIndex;
-                
+
             }
-            
+
             if (INFO) {
 
                 /*
                  * Show in the current order (sort key order).
                  */
-                
+
                 for (int i = 0; i < a.length; i++) {
 
                     log.info(a[i]);
@@ -992,7 +1008,9 @@ public class SplitFinder {
                 }
 
                 if (DEBUG)
-                    log.debug("predCount=" + predCount + ", i=" + i + ", last="
+                    log.debug
+//                System.err.println
+                    ("predCount=" + predCount + ", i=" + i + ", last="
                             + last + ", rangeCount=" + rangeCount
                             + ", nextRangeCount=" + nextRangeCount
                             + ", wouldOverflow=" + wouldOverflow
@@ -1157,10 +1175,16 @@ public class SplitFinder {
      * Create a triple store using the computed splits for the various indices.
      * 
      * @return The new triple store.
+     * 
+     * @todo choose data services using the LBS? That is a better choice when
+     *       the federation has been running for a while. However, choosing the
+     *       discovered data services may be a simpler choice when the
+     *       federation is new. this could be a configuration parameter.
      */
     public AbstractTripleStore createTripleStore(
-            final AbstractScaleOutFederation fed, 
-            final Properties properties, final String namespace, final Splits splits) {
+            final AbstractScaleOutFederation fed, final Properties properties,
+            final String namespace, final Splits splits,
+            final int nservices) {
 
         if (INFO)
             log.info("Creating tripleStore: " + namespace);
@@ -1168,8 +1192,27 @@ public class SplitFinder {
         final AbstractTripleStore tripleStore = new ScaleOutTripleStore(fed,
                 namespace, ITx.UNISOLATED, properties);
 
+        final UUID[] uuids = fed.getDataServiceUUIDs(nservices);
+        
+        final Map<IKeyOrder, AssignedSplits> assignedSplits = new HashMap<IKeyOrder, AssignedSplits>();
+
+        assignedSplits.put(LexiconKeyOrder.TERM2ID, newSplitAssignment(
+                splits.term2IdSplits, uuids));
+
+        assignedSplits.put(LexiconKeyOrder.ID2TERM, newSplitAssignment(
+                splits.id2TermSplits, uuids));
+
+        assignedSplits.put(SPOKeyOrder.SPO, newSplitAssignment(
+                splits.spoSplits, uuids));
+
+        assignedSplits.put(SPOKeyOrder.OSP, newSplitAssignment(
+                splits.ospSplits, uuids));
+
+        assignedSplits.put(SPOKeyOrder.POS, newSplitAssignment(
+                splits.posSplits, uuids));
+        
         // create the triple store.
-        tripleStore.create();
+        tripleStore.create(assignedSplits);
 
         // show #of axioms.
         System.out.println("axiomCount=" + tripleStore.getStatementCount());
@@ -1178,6 +1221,31 @@ public class SplitFinder {
             log.info("Created tripleStore: " + namespace);
 
         return tripleStore;
+
+    }
+
+    private AssignedSplits newSplitAssignment(final Split[] splits,
+            final UUID[] uuids) {
+
+        final int nsplits = splits.length;
+
+        final byte[][] separatorKeys = new byte[nsplits][];
+
+        final UUID[] dataServiceUUIDs = new UUID[nsplits];
+
+        separatorKeys[0] = new byte[0];
+
+        for (int i = 1; i < nsplits; i++) {
+
+            final Split split = splits[i];
+
+            separatorKeys[i] = split.pmd.getLeftSeparatorKey();
+
+            dataServiceUUIDs[i] = uuids[i % uuids.length];
+
+        }
+
+        return new AssignedSplits(separatorKeys, uuids);
 
     }
     
@@ -1323,7 +1391,7 @@ public class SplitFinder {
 
             if (create) {
 
-                s.createTripleStore(fed, properties, namespace, splits);
+                s.createTripleStore(fed, properties, namespace, splits, nservices);
                 
             }
 
