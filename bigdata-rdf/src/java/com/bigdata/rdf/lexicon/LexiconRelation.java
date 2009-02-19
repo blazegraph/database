@@ -20,6 +20,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
@@ -57,6 +58,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.lexicon.Id2TermWriteProc.Id2TermWriteProcConstructor;
 import com.bigdata.rdf.lexicon.Term2IdTupleSerializer.LexiconKeyBuilder;
 import com.bigdata.rdf.lexicon.Term2IdWriteProc.Term2IdWriteProcConstructor;
+import com.bigdata.rdf.load.AssignedSplits;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataValue;
@@ -222,6 +224,23 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
     }
 
     public void create() {
+        
+        create( null );
+        
+    }
+    
+    /**
+     * 
+     * @param assignedSplits
+     *            An map providing pre-assigned separator keys describing index
+     *            partitions and optionally the data service {@link UUID}s on
+     *            which to register the index partitions. The keys of the map
+     *            identify the index whose index partitions are described by the
+     *            corresponding value. You may specify one or all of the
+     *            indices. This parameter is optional and when <code>null</code>,
+     *            the default assignments will be used.
+     */
+    public void create(final Map<IKeyOrder, AssignedSplits> assignedSplits) {
 
         final IResourceLock resourceLock = acquireExclusiveLock();
         
@@ -235,44 +254,41 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
             final IIndexManager indexManager = getIndexManager();
 
-//            final Properties p = getProperties();
-//            
-//            if (indexManager instanceof IBigdataFederation
-//                    && ((IBigdataFederation) indexManager).isScaleOut() &&
-//                    p.getProperty(Options.LEXICON_RELATION_DATA_SERVICE_UUID)!=null
-//                    ) {
-//
-//                // register the indices on the same data service.
-//                
-//                final IBigdataFederation fed = (IBigdataFederation)indexManager;
-//                
-//                final UUID dataServiceUUID = UUID.fromString(p
-//                        .getProperty(Options.LEXICON_RELATION_DATA_SERVICE_UUID));
-//
-//                if (INFO) {
-//
-//                    log.info("Allocating LexiconRelation on dataService="
-//                            + dataServiceUUID);
-//
-//                }
-//
-//                fed.registerIndex(term2IdMetadata, dataServiceUUID);
-//
-//                fed.registerIndex(id2TermMetadata, dataServiceUUID);
-//
-//            } else {
+            // register the indices.
 
-                // register the indices.
-                
-                indexManager.registerIndex(term2IdMetadata);
+            {
+                final AssignedSplits splits = assignedSplits == null ? null
+                        : assignedSplits.get(LexiconKeyOrder.TERM2ID);
 
-                indexManager.registerIndex(id2TermMetadata);
+                if (splits != null) {
 
-//            }
+                    splits.registerIndex(indexManager, term2IdMetadata);
+
+                } else {
+
+                    indexManager.registerIndex(term2IdMetadata);
+
+                }
+            }
+
+            {
+                final AssignedSplits splits = assignedSplits == null ? null
+                        : assignedSplits.get(LexiconKeyOrder.ID2TERM);
+
+                if (splits != null) {
+
+                    splits.registerIndex(indexManager, id2TermMetadata);
+
+                } else {
+
+                    indexManager.registerIndex(id2TermMetadata);
+
+                }
+            }
 
             if (textIndex) {
 
-                // create the full text index.
+                // create the full text index
                 
                 final FullTextIndex tmp = getSearchEngine();
 
@@ -283,7 +299,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
             term2id = super.getIndex(LexiconKeyOrder.TERM2ID);
 
             id2term = super.getIndex(LexiconKeyOrder.ID2TERM);
-            
+
+            assert term2id != null;
+
+            assert id2term != null;
+
         } finally {
 
             unlock(resourceLock);

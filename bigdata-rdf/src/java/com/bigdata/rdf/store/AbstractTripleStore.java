@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -83,6 +84,7 @@ import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.inf.JustificationIterator;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
 import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.load.AssignedSplits;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
@@ -891,6 +893,23 @@ abstract public class AbstractTripleStore extends
     
     public void create() {
 
+        create( null );
+        
+    }
+
+    /**
+     * 
+     * @param assignedSplits
+     *            An map providing pre-assigned separator keys describing index
+     *            partitions and optionally the data service {@link UUID}s on
+     *            which to register the index partitions. The keys of the map
+     *            identify the index whose index partitions are described by the
+     *            corresponding value. You may specify one or all of the
+     *            indices. This parameter is optional and when <code>null</code>,
+     *            the default assignments will be used.
+     */
+    public void create(final Map<IKeyOrder, AssignedSplits> assignedSplits) {
+    
         assertWritable();
         
         final Properties tmp = getProperties();
@@ -910,7 +929,7 @@ abstract public class AbstractTripleStore extends
                         getNamespace() + "."+LexiconRelation.NAME_LEXICON_RELATION, getTimestamp(),
                         tmp);
 
-                lexiconRelation.create();
+                lexiconRelation.create(assignedSplits);
                 
                 valueFactory = lexiconRelation.getValueFactory();
 
@@ -919,7 +938,7 @@ abstract public class AbstractTripleStore extends
             spoRelation = new SPORelation(getIndexManager(), getNamespace()
                     + "." + SPORelation.NAME_SPO_RELATION, getTimestamp(), tmp);
 
-            spoRelation.create();
+            spoRelation.create(assignedSplits);
 
             /*
              * The axioms and the vocabulary both require the lexicon to

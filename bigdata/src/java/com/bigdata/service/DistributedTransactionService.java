@@ -785,7 +785,7 @@ public abstract class DistributedTransactionService extends
      * Return the proxies for the services participating in a distributed
      * transaction commit or abort.
      * <p>
-     * Note: This method is here so that it may be readily override for unit
+     * Note: This method is here so that it may be readily overriden for unit
      * tests.
      * 
      * @param uuids
