@@ -980,7 +980,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     false/* readOnly */, ForceEnum.No/* forceWrites */,
                     offsetBits, readCacheCapacity, readCacheMaxRecordSize,
                     writeCache, false/* validateChecksum */, createTime,
-                    null/* checker */, alternateRootBlock);
+                    checker, alternateRootBlock);
 
             _bufferStrategy = new DiskOnlyStrategy(
                     0L/* soft limit for maximumExtent */, fileMetadata);

@@ -20,50 +20,58 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-
 */
 /*
- * Created on Feb 8, 2009
+ * Created on Feb 19, 2009
  */
 
-package com.bigdata.resources;
+package com.bigdata.jini.util;
 
-import com.bigdata.btree.IndexSegment;
-import com.bigdata.service.ResourceService;
+import net.jini.config.Configuration;
 
 /**
- * Various kinds of subtasks for asynchronous index partition overflow tasks.
- * 
- * @see OverflowActionEnum
+ * A utility class to help with {@link Configuration}s.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public enum OverflowSubtaskEnum {
+public class ConfigMath {
+
+    public static int add(int a, int b) {
+        return a + b;
+    }
+
+    public static long add(long a, long b) {
+        return a + b;
+    }
+    
+    public static double add(double a, double b) {
+        return a + b;
+    }
+
+    public static int multiply(int a, int b) {
+        return a * b;
+    }
+
+    public static long multiply(long a, long b) {
+        return a * b;
+    }
+
+    public static double multiply(double a, double b) {
+        return a * b;
+    }
 
     /**
-     * Corresponds to the total overflow task for an index partition.
-     */
-    Total,
-    /**
-     * Operation responsible for the atomic update of the index partition view
-     * as part of any of the asynchronous overflow tasks
+     * Useful for enums which can't be handled otherwise.
      * 
-     * @see OverflowActionEnum
+     * @param o
+     * 
+     * @return
      */
-    AtomicUpdate,
-    /**
-     * Copying historical data from the old journal.
-     */
-    CopyHistory,
-    /**
-     * Registering a new index partition.
-     */
-    RegisterIndex,
-    /**
-     * Operation copying an {@link IndexSegment} using the
-     * {@link ResourceService}.
-     */
-    SendSegment;
-
+    public static String toString(Object o) {
+        
+        return o.toString();
+        
+    }
+    
 }

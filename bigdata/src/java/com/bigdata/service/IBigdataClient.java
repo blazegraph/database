@@ -480,37 +480,6 @@ public interface IBigdataClient {
          */
         String DEFAULT_HTTPD_PORT = "0";
         
-        /*
-         * note: something that might be re-purpose for perf counter reporting
-         * or perhaps the LBS should register with joined services and request
-         * specific counters.
-         */
-//      /**
-//      * An optional regular expression that will be used to filter the
-//      * performance counters reported by the {@link StatusTask}. Some
-//      * examples are:
-//      * <dl>
-//      * <dt>.*Unisolated.*</dt>
-//      * <dd>All counters dealing with unisolated operations.</dd>
-//      * <dt>.*Unisolated Write Service/#.*</dt>
-//      * <dd>All counters for the unisolated write service.</dd>
-//      * </dl>
-//      * <p>
-//      * Note: if the regular expression can not be compiled then an error
-//      * message will be logged and ALL counters will be logged by the
-//      * {@link StatusTask} (the filter will default to <code>null</code> in
-//      * the case of an error).
-//      * 
-//      * @see #DEFAULT_STATUS_FILTER
-//      */
-//     String STATUS_FILTER = "statusFilter";
-//     
-//     /**
-//      * ... work up a more interesting default filter.
-//      */
-//     // String DEFAULT_STATUS_FILTER = ".*Unisolated.*";
-//     String DEFAULT_STATUS_FILTER = ".*Unisolated Write Service/(#.*|averageQueueLength)";        
-        
     };
 
 }

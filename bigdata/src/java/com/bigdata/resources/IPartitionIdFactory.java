@@ -23,47 +23,34 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Feb 8, 2009
+ * Created on Feb 19, 2009
  */
 
 package com.bigdata.resources;
 
-import com.bigdata.btree.IndexSegment;
-import com.bigdata.service.ResourceService;
+import com.bigdata.service.IMetadataService;
 
 /**
- * Various kinds of subtasks for asynchronous index partition overflow tasks.
- * 
- * @see OverflowActionEnum
+ * An interface which shields callers from handling RMI exceptions and which
+ * allows the use of mock implementations when you do not really want to assign
+ * partition identifiers using the
+ * {@link IMetadataService#nextPartitionId(String)}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @see IMetadataService#nextPartitionId(String)
  */
-public enum OverflowSubtaskEnum {
+public interface IPartitionIdFactory {
 
     /**
-     * Corresponds to the total overflow task for an index partition.
-     */
-    Total,
-    /**
-     * Operation responsible for the atomic update of the index partition view
-     * as part of any of the asynchronous overflow tasks
+     * Return the next index partition identifier for the given scale-out index.
      * 
-     * @see OverflowActionEnum
+     * @param scaleOutIndexName
+     *            The name of the scale-out index.
+     *            
+     * @return The next partition identifier for that scale-out index.
      */
-    AtomicUpdate,
-    /**
-     * Copying historical data from the old journal.
-     */
-    CopyHistory,
-    /**
-     * Registering a new index partition.
-     */
-    RegisterIndex,
-    /**
-     * Operation copying an {@link IndexSegment} using the
-     * {@link ResourceService}.
-     */
-    SendSegment;
+    public int nextPartitionId(final String scaleOutIndexName);
 
 }

@@ -84,7 +84,8 @@ import com.bigdata.service.MetadataService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class ResourceManager extends OverflowManager {
+abstract public class ResourceManager extends OverflowManager implements
+        IPartitionIdFactory {
 
     /**
      * Logger.
@@ -672,7 +673,7 @@ abstract public class ResourceManager extends OverflowManager {
      * @throws RuntimeException
      *             if something goes wrong.
      */
-    protected int nextPartitionId(final String scaleOutIndexName) {
+    public int nextPartitionId(final String scaleOutIndexName) {
 
         final IMetadataService mds = getFederation().getMetadataService();
 

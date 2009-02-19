@@ -48,6 +48,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.proc.IIndexProcedure;
+import com.bigdata.concurrent.LockManager;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
@@ -153,6 +154,21 @@ import com.bigdata.resources.StoreManager.ManagedJournal;
  * on the server could monitor the various futures and RPC clients when
  * responses become available or on request timeout. (This would be the
  * FutureCompletionService).
+ * 
+ * FIXME It is possible that a deadlock could arise due to the current design of
+ * the {@link LockManager} as outlined above. The deadlock situation would occur
+ * when a running task (A) needs to run an unisolated operation (B) on another
+ * index partition on the same data service. If all threads in the write service
+ * for the target data service are blocked awaiting access to a resource that is
+ * being created by (A) then (A) will block since (B) will not be executed
+ * because the thread pool is already saturated by tasks awaiting access to (A).
+ * A variant across data services might also be possible.
+ * <p>
+ * This situation is only likely to arise for asynchronous overflow tasks since
+ * they can introduce this kind of dependency during their atomic update phase.
+ * The workaround is to increase the core thread pool size for the
+ * {@link ConcurrencyManager}. The issue will be resolved by a re-design of the
+ * {@link LockManager}.
  * 
  * @todo Review JERI options to support secure RMI protocols. For example, using
  *       SSL or an SSH tunnel. For most purposes I expect bigdata to operate on

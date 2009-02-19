@@ -2211,8 +2211,8 @@ public class ClientIndexView implements IClientIndex {
      * @param keys
      * @return
      */
-    private boolean validSplit(PartitionLocator locator, int fromIndex,
-            int toIndex, byte[][] keys) {
+    private boolean validSplit(final PartitionLocator locator,
+            final int fromIndex, final int toIndex, final byte[][] keys) {
 
         assert fromIndex <= toIndex : "fromIndex=" + fromIndex + ", toIndex="
                 + toIndex;
