@@ -1387,7 +1387,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
     /**
      * Closes the file immediately (without flushing any pending writes).
      */
-    public void close() {
+    synchronized public void close() {
 
         /*
          * Note: this clears the [open] flag. It is important to do this first
@@ -1428,6 +1428,16 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         }
 
+        if (!bufferMode.isStable() && file.exists()) {
+
+            if (!file.delete()) {
+
+                log.warn("Unable to delete temporary file: " + file);
+                
+            }
+            
+        }
+        
     }
 
     public void deleteResources() {
