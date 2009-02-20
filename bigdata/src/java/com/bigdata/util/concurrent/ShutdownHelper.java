@@ -122,7 +122,7 @@ public class ShutdownHelper {
         // timeout awaitiong the service terminate each time through the loop.
         final long awaitTimeout = 100; // ms
         
-        while (true) {
+        while (!executorService.isTerminated()) {
 
             if (executorService.awaitTermination(awaitTimeout,
                     TimeUnit.MILLISECONDS)) {

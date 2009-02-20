@@ -73,6 +73,7 @@ import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.resources.DefaultSplitHandler;
 import com.bigdata.resources.IPartitionIdFactory;
+import com.bigdata.resources.SplitUtility;
 import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Split;
@@ -272,8 +273,14 @@ public class SplitFinder {
             tempStore = new LocalTripleStore( p );
             
         }
-        
+
+        mockDefaultPartitionMetadata = newMockPartitionMetadata(0, new byte[0],
+                null);
+
     }
+
+    private final LocalPartitionMetadata mockDefaultPartitionMetadata;
+
 
     /**
      * Encapsulates the set of {@link Split}s choosen for each index.
@@ -282,13 +289,37 @@ public class SplitFinder {
      * @version $Id$
      */
     public static class Splits {
-       
-        public Split[] term2IdSplits;
-        public Split[] id2TermSplits;
-        public Split[] spoSplits;
-        public Split[] ospSplits;
-        public Split[] posSplits;
-        
+
+        public final Split[] term2IdSplits;
+
+        public final Split[] id2TermSplits;
+
+        public final Split[] spoSplits;
+
+        public final Split[] ospSplits;
+
+        public final Split[] posSplits;
+
+        public Splits(//
+                final Split[] term2IdSplits, //
+                final Split[] id2TermSplits, //
+                final Split[] spoSplits, //
+                final Split[] posSplits, //
+                final Split[] ospSplits 
+                ) {
+
+            this.term2IdSplits = term2IdSplits;
+
+            this.id2TermSplits = id2TermSplits;
+
+            this.spoSplits = spoSplits;
+
+            this.posSplits = posSplits;
+            
+            this.ospSplits = ospSplits;
+
+        }
+
     }
     
     /**
@@ -296,29 +327,27 @@ public class SplitFinder {
      */
     public Splits findSplits() {
 
-        final Splits splits = new Splits();
-        
-        splits.term2IdSplits = findSplitsTerm2ID();
+        final Split[] term2IdSplits = findSplitsTerm2ID();
         if (INFO) {
-            for (Split split : splits.term2IdSplits) {
+            for (Split split : term2IdSplits) {
 
                 log.info(split.toString());
 
             }
         }
         
-        splits.id2TermSplits = findSplitsID2Term(splits.term2IdSplits);
+        final Split[] id2TermSplits = findSplitsID2Term(term2IdSplits);
         if (INFO) {
-            for (Split split : splits.id2TermSplits) {
+            for (Split split : id2TermSplits) {
 
                 log.info(split.toString());
 
             }
         }
         
-        splits.spoSplits = findSplitsSPO(splits.term2IdSplits);
+        final Split[] spoSplits = findSplitsSPO(term2IdSplits);
         if (INFO) {
-            for (Split split : splits.spoSplits) {
+            for (Split split : spoSplits) {
 
                 log.info(split.toString());
 
@@ -326,21 +355,35 @@ public class SplitFinder {
         }
         
         // The OSP splits are exactly the same as the SPO splits.
-        splits.ospSplits = splits.spoSplits;
+        final Split[] ospSplits = spoSplits;
         
-        splits.posSplits = findSplitsPOS(splits.term2IdSplits);
+        final Split[] posSplits = findSplitsPOS(term2IdSplits);
         if (INFO) {
-            for (Split split : splits.posSplits) {
+            for (Split split : posSplits) {
 
                 log.info(split.toString());
 
             }
         }
 
-        return splits;
+        return new Splits(term2IdSplits, id2TermSplits, spoSplits, posSplits,
+                ospSplits);
         
     }
 
+    /**
+     * 
+     * @return
+     * 
+     * FIXME resolve the first/last term which enters into each index partition
+     * and log it so I can figure out if all the predicates really are in the
+     * last index partition. In fact, they probably are since they all start
+     * with
+     * 
+     * <pre>
+     * http://www.lehigh.edu/&tilde;zhp2/2004/0401/univ-bench.owl
+     * </pre>
+     */
     protected Split[] findSplitsTerm2ID() {
 
         /*
@@ -369,9 +412,178 @@ public class SplitFinder {
                 .getIndexMetadata().getSplitHandler())
                 .getAdjustedSplitHandlerForEqualSplits(nsplits, rangeCount);
 
-        return adjustedSplitHandler
+        final Split[] splits = adjustedSplitHandler
                 .getSplits(new MockPartitionIdFactory(), ndx);
         
+        /*
+         * @todo this utility on the one hand requires an index to verify and on
+         * the other hand verifies the fromIndex and toIndex, neither of which
+         * is used by this class.
+         */
+//        SplitUtility.
+        validateSplits(ndx.getIndexMetadata().getPartitionMetadata(), splits,
+                false/* checkFromToIndex */);
+
+        return splits;
+        
+    }
+
+    /**
+     * Validate splits, including: that the separator keys are strictly
+     * ascending, that the separator keys perfectly cover the source key range
+     * without overlap, that the rightSeparator for each split is the
+     * leftSeparator for the prior split, that the fromIndex offsets are
+     * strictly ascending, etc.
+     * 
+     * @param splits
+     *            The recommended split points.
+     * 
+     * @todo refactor back to {@link SplitUtility}.
+     */
+    static public void validateSplits(
+            final LocalPartitionMetadata originalPartitionMetadata,
+            final Split[] splits,
+            final boolean checkFromToIndex) {
+
+        if (originalPartitionMetadata == null)
+            throw new IllegalArgumentException();
+
+        if (splits == null)
+            throw new IllegalArgumentException();
+
+        final int nsplits = splits.length;
+
+        if (nsplits <= 1)
+            throw new AssertionError(
+                    "Expecting at least two splits, but found " + nsplits);
+
+        // verify splits obey index order constraints.
+        int lastToIndex = -1;
+
+        // Note: the first leftSeparator must be this value.
+        byte[] fromKey = originalPartitionMetadata.getLeftSeparatorKey();
+
+        for (int i = 0; i < nsplits; i++) {
+
+            final Split split = splits[i];
+
+            if (split == null)
+                throw new AssertionError();
+
+            if(split.pmd == null)
+                throw new AssertionError();
+
+            if(!(split.pmd instanceof LocalPartitionMetadata))
+                throw new AssertionError();
+
+            final LocalPartitionMetadata pmd = (LocalPartitionMetadata) split.pmd;
+
+            // check the leftSeparator key.
+            if(pmd.getLeftSeparatorKey() == null)
+                throw new AssertionError();
+            if(!BytesUtil.bytesEqual(fromKey, pmd.getLeftSeparatorKey()))
+                throw new AssertionError();
+
+            // verify rightSeparator is ordered after the left
+            // separator.
+            if(pmd.getRightSeparatorKey() != null) {
+                if(BytesUtil.compareBytes(fromKey, pmd
+                            .getRightSeparatorKey()) >= 0)
+                    throw new AssertionError();
+            }
+
+            // next expected leftSeparatorKey.
+            fromKey = pmd.getRightSeparatorKey();
+
+            if (checkFromToIndex) {
+            
+                if (i == 0) {
+
+                    if (split.fromIndex != 0)
+                        throw new AssertionError();
+
+                    if (split.toIndex <= split.fromIndex)
+                        throw new AssertionError();
+
+                } else {
+
+                    if (split.fromIndex != lastToIndex)
+                        throw new AssertionError();
+
+                }
+
+                if (i + 1 == nsplits && split.toIndex == 0) {
+
+                    /*
+                     * Note: This is allowed in case the index partition has
+                     * more than int32 entries in which case the toIndex of the
+                     * last split can not be defined and will be zero.
+                     */
+
+                    if (split.ntuples != 0)
+                        throw new AssertionError();
+
+                    log.warn("Last split has no definate tuple count");
+
+                } else {
+
+                    if (split.toIndex - split.fromIndex != split.ntuples)
+                        throw new AssertionError();
+
+                }
+
+            }
+            
+            lastToIndex = split.toIndex;
+
+        }
+
+        /*
+         * verify left separator key for 1st partition is equal to the left
+         * separator key of the source (this condition is also checked
+         * above).
+         */
+        if (!BytesUtil.bytesEqual(originalPartitionMetadata
+                .getLeftSeparatorKey(), splits[0].pmd.getLeftSeparatorKey())) {
+
+            throw new AssertionError("leftSeparator[0]"
+                    + //
+                    ": expected="
+                    + BytesUtil.toString(originalPartitionMetadata
+                            .getLeftSeparatorKey())
+                    + //
+                    ", actual="
+                    + BytesUtil.toString(splits[0].pmd.getLeftSeparatorKey()));
+            
+        }
+
+        /*
+         * verify right separator key for last partition is equal to the
+         * right separator key of the source.
+         */
+        {
+            
+            // right separator for the last split.
+            final byte[] rightSeparator = ((LocalPartitionMetadata) splits[splits.length - 1].pmd)
+                    .getRightSeparatorKey();
+            
+            if(rightSeparator == null ) {
+                
+                // if null then the source right separator must have been null.
+                if (originalPartitionMetadata.getRightSeparatorKey() != null)
+                    throw new AssertionError();
+                
+            } else {
+                
+                // otherwise must compare as equals byte-by-byte.
+                if (!rightSeparator.equals(originalPartitionMetadata
+                        .getRightSeparatorKey()))
+                    throw new AssertionError();
+                
+            }
+            
+        }
+
     }
 
     /**
@@ -379,8 +591,9 @@ public class SplitFinder {
      * solely to define the split points - this IS NOT used when we create the
      * partition metadata to register the scale-out indices.
      */
-    LocalPartitionMetadata newMockPartitionMetadata(final int partitionId,
-            final byte[] leftSeparator, final byte[] rightSeparator) {
+    protected LocalPartitionMetadata newMockPartitionMetadata(
+            final int partitionId, final byte[] leftSeparator,
+            final byte[] rightSeparator) {
 
         return new LocalPartitionMetadata(//
                 partitionId,
@@ -390,7 +603,7 @@ public class SplitFinder {
                 new IResourceMetadata[]{
                         tempStore.getIndexManager().getResourceMetadata()
                 },
-                "{NoHistory}"
+                "" // history
                 );
         
     }
@@ -444,11 +657,13 @@ public class SplitFinder {
         // the last index partition.
         splits[term2IdSplits.length - 1] = new Split(newMockPartitionMetadata(
                 ++partitionId, leftSeparator, null/* rightSeparator */));
-        
+
+        validateSplits(mockDefaultPartitionMetadata, splits, false/* checkFromToIndex */);
+
         return splits;
         
     }
-
+    
     /**
      * Note: This is very similar to {@link #findSplitsID2Term(Split[])}.
      * <p>
@@ -497,7 +712,9 @@ public class SplitFinder {
         // the last index partition.
         splits[term2IdSplits.length - 1] = new Split(newMockPartitionMetadata(
                 ++partitionId, leftSeparator, null/* rightSeparator */));
-        
+
+        validateSplits(mockDefaultPartitionMetadata, splits, false/* checkFromToIndex */);
+
         return splits;
 
     }
@@ -666,8 +883,9 @@ public class SplitFinder {
         if (splits.length == 0)
             throw new IllegalArgumentException();
 
-        System.err.println("Entering: lastIndex=" + lastIndex + ", key="
-                + BytesUtil.toString(key));
+        if(DEBUG)
+            log.debug("Entering: lastIndex=" + lastIndex + ", key="
+                    + BytesUtil.toString(key));
         
         for (int i = lastIndex; i < splits.length; i++) {
             
@@ -703,6 +921,11 @@ public class SplitFinder {
 
                 }
 
+                if (DEBUG)
+                    log.debug("Accepted in last split: splitIndex=" + i
+                            + ", key=" + BytesUtil.toString(key) + ", pmd="
+                            + pmd);
+                
                 // accept the key.
                 return i;
 
@@ -715,17 +938,18 @@ public class SplitFinder {
                  * partition so we need to look in the next index partition.
                  */
 
-                if (INFO)
-                    log.info("Advancing splitIndex=" + (i + 1));
-
-                System.err.println("Not in this split: splitIndex=" + i
+                if(DEBUG)
+                    log.debug("Not in this split: splitIndex=" + i
                         + ", key=" + BytesUtil.toString(key) + ", pmd=" + pmd);
+                else if (INFO)
+                    log.info("Advancing splitIndex=" + (i + 1));
                 
                 continue;
                 
             }
-            
-            System.err.println("Found: splitIndex=" + i + ", key="
+
+            if(DEBUG)
+                log.debug("Found: splitIndex=" + i + ", key="
                     + BytesUtil.toString(key) + ", pmd=" + pmd);
             
             return i;
@@ -767,7 +991,11 @@ public class SplitFinder {
 
         final int nsplits = term2IdSplits.length;
         
-        // @todo configure capacity
+        /*
+         * @todo configure capacity for #distinct preds. this would be easy if
+         * we maintained the POS index, but that is more cost then having the
+         * hash map size wrong.
+         */
         final Long2ObjectMap<PredStat> preds = new Long2ObjectOpenHashMap<PredStat>(
                 500000/* initialCapacity */);
 
@@ -1078,8 +1306,12 @@ public class SplitFinder {
             if (INFO)
                 log.info("The predicates index will have " + splits.size()
                         + " partitions");
+
+            final Split[] tmp = splits.toArray(new Split[0]);
             
-            return splits.toArray(new Split[0]);
+            validateSplits(mockDefaultPartitionMetadata, tmp, false/* checkFromToIndex */);
+
+            return tmp;
 
         }
 
@@ -1235,6 +1467,8 @@ public class SplitFinder {
 
         separatorKeys[0] = new byte[0];
 
+        dataServiceUUIDs[0] = uuids[0];
+
         for (int i = 1; i < nsplits; i++) {
 
             final Split split = splits[i];
@@ -1245,7 +1479,7 @@ public class SplitFinder {
 
         }
 
-        return new AssignedSplits(separatorKeys, uuids);
+        return new AssignedSplits(separatorKeys, dataServiceUUIDs);
 
     }
     
@@ -1334,8 +1568,10 @@ public class SplitFinder {
      * 
      * @see ConfigurationOptions
      */
-    static public void main(final String[] args) throws ConfigurationException,
-            IOException {
+    static public void main(final String[] args)
+//    throws Throwable
+    throws ConfigurationException, IOException
+    {
 
         final JiniFederation fed = new JiniClient(args).connect();
 
@@ -1372,32 +1608,49 @@ public class SplitFinder {
                     ConfigurationOptions.COMPONENT,
                     ConfigurationOptions.DATA_DIR, File.class);
 
-            // @todo configure
+            // @todo configure fallback for RDFFormat.
             final RDFFormat rdfFormat = RDFFormat.RDFXML;
 
             properties.list(System.out);
 
             final SplitFinder s = new SplitFinder(properties, nsplits);
+            try {
 
-            if (ontology != null) {
+                if (ontology != null) {
 
-                s.loadSingleThreaded(ontology, rdfFormat, filenameFilter);
+                    s.loadSingleThreaded(ontology, rdfFormat, filenameFilter);
 
-            }
+                }
 
-            s.loadSingleThreaded(dataDir, rdfFormat, filenameFilter);
+                s.loadSingleThreaded(dataDir, rdfFormat, filenameFilter);
 
-            final Splits splits = s.findSplits();
+                final Splits splits = s.findSplits();
 
-            if (create) {
+                if (create) {
 
-                s.createTripleStore(fed, properties, namespace, splits, nservices);
+                    s.createTripleStore(fed, properties, namespace, splits,
+                            nservices);
+
+                    System.out.println("Created: " + namespace);
+                    
+                }
+
+            } finally {
+                
+                // make sure that the temporary store is deleted.
+                s.tempStore.close();
                 
             }
+            
+//        } catch(Throwable t) {
+//            
+//            log.error(t, t);
+//            
+//            throw t;
 
         } finally {
-
-            fed.shutdown();
+            
+            fed.shutdownNow();
 
         }
 

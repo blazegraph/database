@@ -1810,7 +1810,8 @@ abstract public class IndexManager extends StoreManager {
 
             } else {
                 
-                log.warn("New counters: indexPartitionName=" + name);
+                if (INFO)
+                    log.info("New counters: indexPartitionName=" + name);
                 
             }
             

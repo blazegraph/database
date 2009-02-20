@@ -82,8 +82,9 @@ public class SplitUtility {
 
         final int nsplits = splits.length;
 
-        assert nsplits > 1 : "Expecting at least two splits, but found "
-                + nsplits;
+        if (nsplits <= 1)
+            throw new AssertionError(
+                    "Expecting at least two splits, but found " + nsplits);
 
         // verify splits obey index order constraints.
         int lastToIndex = -1;
@@ -96,36 +97,43 @@ public class SplitUtility {
 
             final Split split = splits[i];
 
-            assert split != null;
+            if (split == null)
+                throw new AssertionError();
 
-            assert split.pmd != null;
+            if(split.pmd == null)
+                throw new AssertionError();
 
-            assert split.pmd instanceof LocalPartitionMetadata;
+            if(!(split.pmd instanceof LocalPartitionMetadata))
+                throw new AssertionError();
 
             final LocalPartitionMetadata pmd = (LocalPartitionMetadata) split.pmd;
 
             // check the leftSeparator key.
-            assert pmd.getLeftSeparatorKey() != null;
-            assert BytesUtil.bytesEqual(fromKey, pmd.getLeftSeparatorKey());
+            if(pmd.getLeftSeparatorKey() == null)
+                throw new AssertionError();
+            if(!BytesUtil.bytesEqual(fromKey, pmd.getLeftSeparatorKey()))
+                throw new AssertionError();
 
             // verify rightSeparator is ordered after the left
             // separator.
-            assert pmd.getRightSeparatorKey() == null
-                    || BytesUtil.compareBytes(fromKey, pmd
-                            .getRightSeparatorKey()) < 0;
+            if(pmd.getRightSeparatorKey() != null) {
+                if(BytesUtil.compareBytes(fromKey, pmd
+                            .getRightSeparatorKey()) >= 0)
+                    throw new AssertionError();
+            }
 
             // next expected leftSeparatorKey.
             fromKey = pmd.getRightSeparatorKey();
 
             if (i == 0) {
 
-                assert split.fromIndex == 0;
+                if(split.fromIndex != 0) throw new AssertionError();
 
-                assert split.toIndex > split.fromIndex;
+                if(split.toIndex <= split.fromIndex) throw new AssertionError();
 
             } else {
 
-                assert split.fromIndex == lastToIndex;
+                if(split.fromIndex != lastToIndex) throw new AssertionError();
 
             }
 
@@ -137,13 +145,13 @@ public class SplitUtility {
                  * last split can not be defined and will be zero.
                  */
 
-                assert split.ntuples == 0;
+                if(split.ntuples != 0) throw new AssertionError();
 
                 log.warn("Last split has no definate tuple count");
 
             } else {
 
-                assert split.toIndex - split.fromIndex == split.ntuples;
+                if(split.toIndex - split.fromIndex != split.ntuples) throw new AssertionError();
 
             }
 
@@ -156,10 +164,11 @@ public class SplitUtility {
          * separator key of the source (this condition is also checked
          * above).
          */
-        assert ((LocalPartitionMetadata) splits[0].pmd)
+        if(! ((LocalPartitionMetadata) splits[0].pmd)
                 .getLeftSeparatorKey().equals(
                         indexMetadata.getPartitionMetadata()
-                                .getLeftSeparatorKey());
+                                .getLeftSeparatorKey()))
+            throw new AssertionError();
 
         /*
          * verify right separator key for last partition is equal to the
@@ -174,15 +183,17 @@ public class SplitUtility {
             if(rightSeparator == null ) {
                 
                 // if null then the source right separator must have been null.
-                assert indexMetadata.getPartitionMetadata()
-                        .getRightSeparatorKey() == null;
+                if( indexMetadata.getPartitionMetadata()
+                        .getRightSeparatorKey() != null)
+                    throw new AssertionError();
                 
             } else {
                 
                 // otherwise must compare as equals byte-by-byte.
-                assert rightSeparator.equals(
+                if(!rightSeparator.equals(
                         indexMetadata.getPartitionMetadata()
-                                .getRightSeparatorKey());
+                                .getRightSeparatorKey()))
+                    throw new AssertionError();
                 
             }
             
