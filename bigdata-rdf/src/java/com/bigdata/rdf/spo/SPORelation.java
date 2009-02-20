@@ -352,11 +352,10 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
                 {
 
-                    final IndexMetadata ospMetadata = assignedSplits == null ? null
-                            : getStatementIndexMetadata(SPOKeyOrder.OSP);
+                    final IndexMetadata ospMetadata = getStatementIndexMetadata(SPOKeyOrder.OSP);
 
-                    final AssignedSplits splits = assignedSplits
-                            .get(SPOKeyOrder.OSP);
+                    final AssignedSplits splits = assignedSplits == null ? null
+                            : assignedSplits.get(SPOKeyOrder.OSP);
 
                     if (splits != null) {
 

@@ -622,9 +622,9 @@ public class XHTMLRenderer {
 
                 }
                
-//                if (INFO)
-//                    log.info
-                    log.warn(EVENT_ORDER_BY + "=" + Arrays.toString(eventOrderBy));
+                if (INFO)
+                    log.info(EVENT_ORDER_BY + "="
+                            + Arrays.toString(eventOrderBy));
 
             }
             

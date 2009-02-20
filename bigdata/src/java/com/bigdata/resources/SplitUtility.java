@@ -75,45 +75,93 @@ public class SplitUtility {
      *            The source index.
      * @param splits
      *            The recommended split points.
+     * 
+     * @throws IllegalArgumentException
+     *             if either argument is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if the source index is not an index partition (if
+     *             {@link IndexMetadata#getPartitionMetadata() returns <code>null</code>).
      */
     static public void validateSplits(final IIndex src, final Split[] splits) {
 
-        final IndexMetadata indexMetadata = src.getIndexMetadata();
+        if (src == null)
+            throw new IllegalArgumentException();
 
+        if (splits == null)
+            throw new IllegalArgumentException();
+
+        final LocalPartitionMetadata pmd = src.getIndexMetadata()
+                .getPartitionMetadata();
+
+        if (pmd == null)
+            throw new IllegalArgumentException();
+        
+        validateSplits(pmd, splits, true/* checkFromToIndex */);
+        
+    }
+
+    /**
+     * Validate splits, including: that the separator keys are strictly
+     * ascending, that the separator keys perfectly cover the source key range
+     * without overlap, that the rightSeparator for each split is the
+     * leftSeparator for the prior split, that the fromIndex offsets are
+     * strictly ascending, etc.
+     * 
+     * @param originalPartitionMetadata
+     *            The description of the key range of the index partition.
+     * @param splits
+     *            The recommended split points.
+     * @param checkFromToIndex
+     *            If the {@link Split#fromIndex}, {@link Split#toIndex} and
+     *            {@link Split#ntuples} fields should be validated.
+     *            
+     * @throws IllegalArgumentException
+     *             if any argument is <code>null</code>.
+     */
+    static public void validateSplits(
+            final LocalPartitionMetadata originalPartitionMetadata,
+            final Split[] splits,
+            final boolean checkFromToIndex) {
+    
+        if (originalPartitionMetadata == null)
+            throw new IllegalArgumentException();
+    
+        if (splits == null)
+            throw new IllegalArgumentException();
+    
         final int nsplits = splits.length;
-
+    
         if (nsplits <= 1)
             throw new AssertionError(
                     "Expecting at least two splits, but found " + nsplits);
-
+    
         // verify splits obey index order constraints.
         int lastToIndex = -1;
-
+    
         // Note: the first leftSeparator must be this value.
-        byte[] fromKey = indexMetadata.getPartitionMetadata()
-                .getLeftSeparatorKey();
-
+        byte[] fromKey = originalPartitionMetadata.getLeftSeparatorKey();
+    
         for (int i = 0; i < nsplits; i++) {
-
+    
             final Split split = splits[i];
-
+    
             if (split == null)
                 throw new AssertionError();
-
+    
             if(split.pmd == null)
                 throw new AssertionError();
-
+    
             if(!(split.pmd instanceof LocalPartitionMetadata))
                 throw new AssertionError();
-
+    
             final LocalPartitionMetadata pmd = (LocalPartitionMetadata) split.pmd;
-
+    
             // check the leftSeparator key.
             if(pmd.getLeftSeparatorKey() == null)
                 throw new AssertionError();
             if(!BytesUtil.bytesEqual(fromKey, pmd.getLeftSeparatorKey()))
                 throw new AssertionError();
-
+    
             // verify rightSeparator is ordered after the left
             // separator.
             if(pmd.getRightSeparatorKey() != null) {
@@ -121,55 +169,72 @@ public class SplitUtility {
                             .getRightSeparatorKey()) >= 0)
                     throw new AssertionError();
             }
-
+    
             // next expected leftSeparatorKey.
             fromKey = pmd.getRightSeparatorKey();
-
-            if (i == 0) {
-
-                if(split.fromIndex != 0) throw new AssertionError();
-
-                if(split.toIndex <= split.fromIndex) throw new AssertionError();
-
-            } else {
-
-                if(split.fromIndex != lastToIndex) throw new AssertionError();
-
+    
+            if (checkFromToIndex) {
+            
+                if (i == 0) {
+    
+                    if (split.fromIndex != 0)
+                        throw new AssertionError();
+    
+                    if (split.toIndex <= split.fromIndex)
+                        throw new AssertionError();
+    
+                } else {
+    
+                    if (split.fromIndex != lastToIndex)
+                        throw new AssertionError();
+    
+                }
+    
+                if (i + 1 == nsplits && split.toIndex == 0) {
+    
+                    /*
+                     * Note: This is allowed in case the index partition has
+                     * more than int32 entries in which case the toIndex of the
+                     * last split can not be defined and will be zero.
+                     */
+    
+                    if (split.ntuples != 0)
+                        throw new AssertionError();
+    
+                    log.warn("Last split has no definate tuple count");
+    
+                } else {
+    
+                    if (split.toIndex - split.fromIndex != split.ntuples)
+                        throw new AssertionError();
+    
+                }
+    
             }
-
-            if (i + 1 == nsplits && split.toIndex == 0) {
-
-                /*
-                 * Note: This is allowed in case the index partition has
-                 * more than int32 entries in which case the toIndex of the
-                 * last split can not be defined and will be zero.
-                 */
-
-                if(split.ntuples != 0) throw new AssertionError();
-
-                log.warn("Last split has no definate tuple count");
-
-            } else {
-
-                if(split.toIndex - split.fromIndex != split.ntuples) throw new AssertionError();
-
-            }
-
+            
             lastToIndex = split.toIndex;
-
+    
         }
-
+    
         /*
          * verify left separator key for 1st partition is equal to the left
          * separator key of the source (this condition is also checked
          * above).
          */
-        if(! ((LocalPartitionMetadata) splits[0].pmd)
-                .getLeftSeparatorKey().equals(
-                        indexMetadata.getPartitionMetadata()
-                                .getLeftSeparatorKey()))
-            throw new AssertionError();
-
+        if (!BytesUtil.bytesEqual(originalPartitionMetadata
+                .getLeftSeparatorKey(), splits[0].pmd.getLeftSeparatorKey())) {
+    
+            throw new AssertionError("leftSeparator[0]"
+                    + //
+                    ": expected="
+                    + BytesUtil.toString(originalPartitionMetadata
+                            .getLeftSeparatorKey())
+                    + //
+                    ", actual="
+                    + BytesUtil.toString(splits[0].pmd.getLeftSeparatorKey()));
+            
+        }
+    
         /*
          * verify right separator key for last partition is equal to the
          * right separator key of the source.
@@ -183,22 +248,20 @@ public class SplitUtility {
             if(rightSeparator == null ) {
                 
                 // if null then the source right separator must have been null.
-                if( indexMetadata.getPartitionMetadata()
-                        .getRightSeparatorKey() != null)
+                if (originalPartitionMetadata.getRightSeparatorKey() != null)
                     throw new AssertionError();
                 
             } else {
                 
                 // otherwise must compare as equals byte-by-byte.
-                if(!rightSeparator.equals(
-                        indexMetadata.getPartitionMetadata()
-                                .getRightSeparatorKey()))
+                if (!rightSeparator.equals(originalPartitionMetadata
+                        .getRightSeparatorKey()))
                     throw new AssertionError();
                 
             }
             
         }
-
+    
     }
 
     /**

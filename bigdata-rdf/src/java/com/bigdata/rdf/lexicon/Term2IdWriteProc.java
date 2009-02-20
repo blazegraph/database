@@ -72,7 +72,7 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * successful {@link Term2IdWriteProc} followed by a successful
  * {@link Id2TermWriteProc} before inserting statements using term identifiers
  * into the statement indices. In particular, a client MUST NOT treat lookup
- * against the terms index as satisifactory evidence that the term also exists
+ * against the terms index as satisfactory evidence that the term also exists
  * in the reverse mapping.
  * <p>
  * Note that it is perfectly possible that a concurrent client will overlap in
@@ -83,7 +83,7 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * consistent with the assignments made/discovered by the forward mapping.
  * <p>
  * Note: The {@link Term2IdWriteProc} and {@link Id2TermWriteProc} operations
- * may be analyzed as a batch and variant of the following pseudocode.
+ * may be analyzed as a batch variant of the following pseudocode.
  * 
  * <pre>
  *  
@@ -312,7 +312,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
                 } else {
                     
                     // assign a term identifier.
-                    termId = assignTermId(counter, code);
+                    termId = assignTermId(counter.incrementAndGet(), code);
                 }
                 
             } else {
@@ -334,7 +334,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
                     } else {
 
                         // assign a term identifier.
-                        termId = assignTermId(counter, code);
+                        termId = assignTermId(counter.incrementAndGet(), code);
 
                         if (DEBUG && enableGroundTruth) {
 
@@ -438,9 +438,9 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
      *       termId in a manner that does not allow negative integers. a
      *       different pack routine would allow us all bits.
      */
-    protected long assignTermId(ICounter counter, byte code) {
+    static public long assignTermId(final long id0, final byte code) {
         
-        final long id0 = counter.incrementAndGet();
+//        final long id0 = counter.incrementAndGet();
         
         // 0L is never used as a counter value.
         assert id0 != IRawTripleStore.NULL;

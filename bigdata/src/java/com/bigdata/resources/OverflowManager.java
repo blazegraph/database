@@ -2025,30 +2025,39 @@ abstract public class OverflowManager extends IndexManager {
             final CounterSet serviceRoot = getFederation()
                     .getServiceCounterSet();
 
-            /*
-             * The counters for the resource manager within the service's
-             * counter hierarchy.
-             */ 
-            final CounterSet tmp = (CounterSet)serviceRoot
-                    .getPath(IDataServiceCounters.resourceManager);
+            if (serviceRoot != null) {
 
-            synchronized (tmp) {
+                /*
+                 * The counters for the resource manager within the service's
+                 * counter hierarchy.
+                 * 
+                 * Note: The [serviceRoot] is not defined by the MockFederation
+                 * used by some unit tests, so we test against != null above.
+                 */
 
-//                // the live journal is a child of the resource manager.
-//                tmp.detach(IResourceManagerCounters.LiveJournal);
+                final CounterSet tmp = (CounterSet) serviceRoot
+                        .getPath(IDataServiceCounters.resourceManager);
 
-//                tmp.makePath(IResourceManagerCounters.LiveJournal).attach(
-//                        getLiveJournal().getCounters());
+                synchronized (tmp) {
 
-                ((CounterSet) tmp.getPath(IResourceManagerCounters.LiveJournal))
-                        .attach(getLiveJournal().getBufferStrategy()
-                                .getCounters(), true/* replace */);
+                    // // the live journal is a child of the resource manager.
+                    // tmp.detach(IResourceManagerCounters.LiveJournal);
 
-                log.warn("Re-attached live journal counters: path="
-                        + tmp.getPath());
+                    // tmp.makePath(IResourceManagerCounters.LiveJournal).attach(
+                    // getLiveJournal().getCounters());
+
+                    ((CounterSet) tmp
+                            .getPath(IResourceManagerCounters.LiveJournal))
+                            .attach(getLiveJournal().getBufferStrategy()
+                                    .getCounters(), true/* replace */);
+
+                    log.warn("Re-attached live journal counters: path="
+                            + tmp.getPath());
+
+                }
 
             }
-
+            
         } catch(Throwable t) {
             
             log.warn("Problem updating counters: "+t, t);

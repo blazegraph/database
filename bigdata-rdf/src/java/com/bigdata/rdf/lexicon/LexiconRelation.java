@@ -248,40 +248,41 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
             super.create();
 
-            final IndexMetadata id2TermMetadata = getId2TermIndexMetadata(getFQN(LexiconKeyOrder.ID2TERM));
-
-            final IndexMetadata term2IdMetadata = getTerm2IdIndexMetadata(getFQN(LexiconKeyOrder.TERM2ID));
-
             final IIndexManager indexManager = getIndexManager();
 
             // register the indices.
 
             {
+                final IndexMetadata md = getTerm2IdIndexMetadata(getFQN(LexiconKeyOrder.TERM2ID));
+
                 final AssignedSplits splits = assignedSplits == null ? null
                         : assignedSplits.get(LexiconKeyOrder.TERM2ID);
 
                 if (splits != null) {
 
-                    splits.registerIndex(indexManager, term2IdMetadata);
+                    splits.registerIndex(indexManager, md);
 
                 } else {
 
-                    indexManager.registerIndex(term2IdMetadata);
+                    indexManager.registerIndex(md);
 
                 }
             }
 
             {
+
+                final IndexMetadata md = getId2TermIndexMetadata(getFQN(LexiconKeyOrder.ID2TERM));
+
                 final AssignedSplits splits = assignedSplits == null ? null
                         : assignedSplits.get(LexiconKeyOrder.ID2TERM);
 
                 if (splits != null) {
 
-                    splits.registerIndex(indexManager, id2TermMetadata);
+                    splits.registerIndex(indexManager, md);
 
                 } else {
 
-                    indexManager.registerIndex(id2TermMetadata);
+                    indexManager.registerIndex(md);
 
                 }
             }

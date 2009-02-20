@@ -8,6 +8,7 @@ import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
+import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.util.InnerCause;
 
@@ -342,8 +343,20 @@ class ViewMetadata extends BTreeMetadata {
              * heavily cached by the client.
              */
 
-            npartitions = resourceManager.getFederation().getMetadataIndex(
-                    indexMetadata.getName(), commitTime).rangeCount();
+            final IMetadataIndex mdi = resourceManager.getFederation()
+                    .getMetadataIndex(indexMetadata.getName(), commitTime);
+            
+            if (mdi == null) {
+                
+                log.warn("No metadata index: running in test harness?");
+                
+                npartitions = 1L;
+                
+            } else {
+            
+                npartitions = mdi.rangeCount();
+                
+            }
 
         } catch (Throwable t) {
 
