@@ -358,14 +358,18 @@ public class SplitFinder {
         // The OSP splits are exactly the same as the SPO splits.
         final Split[] ospSplits = spoSplits;
         
-        final Split[] posSplits = findSplitsPOS(term2IdSplits);
-        if (INFO) {
-            for (Split split : posSplits) {
-
-                log.info(split.toString());
-
-            }
-        }
+        /*
+         * FIXME I have not figured out a way to split the POS index yet.
+         */
+        final Split[] posSplits = null;
+//        final Split[] posSplits = findSplitsPOS(term2IdSplits);
+//        if (INFO) {
+//            for (Split split : posSplits) {
+//
+//                log.info(split.toString());
+//
+//            }
+//        }
 
         return new Splits(term2IdSplits, id2TermSplits, spoSplits, posSplits,
                 ospSplits);
@@ -524,12 +528,29 @@ public class SplitFinder {
      *         zero (0) for that partitionId.
      */
     protected static long mockTermId(final int partitionId) {
-
+        
         /*
          * The unchanging value for the low word of the term identifiers.
          */
         final int localCounter = 0;
+
+        return mockTermId(partitionId, localCounter);
         
+    }
+
+    /**
+     * There are some additional twists. See {@link BTree.PartitionedCounter}
+     * and {@link Term2IdWriteProc#assignTermId(long, byte)} for how we actually
+     * form the term identifier before we build the unsigned byte[] key.
+     * 
+     * @param partitionId
+     * @param localCounter
+     * 
+     * @return The term identifier corresponding to a local counter value of
+     *         zero (0) for that partitionId.
+     */
+    protected static long mockTermId(final int partitionId, final int localCounter) {
+
         /*
          * Place the partition identifier into the high int32 word and place
          * the truncated counter value into the low int32 word.
@@ -743,6 +764,34 @@ public class SplitFinder {
         public int compare(PredStat arg0, PredStat arg1) {
 
             return BytesUtil.compareBytes(arg0.sortKey, arg1.sortKey);
+            
+        }
+        
+    }
+
+    /**
+     * Places {@link PredStat}s into order first by the TERM2ID partition
+     * identifier and then by the low word of the predicate's term identifier as
+     * assigned by the temporary database.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private static class PartIdTermIdComparator implements Comparator<PredStat> {
+
+        public int compare(PredStat arg0, PredStat arg1) {
+
+            final long mid0 = mockTermId(arg0.partId, (int)arg0.termId);
+
+            final long mid1 = mockTermId(arg1.partId, (int)arg1.termId);
+            
+            if (mid0 > mid1) {
+                return -1;
+            } else if (mid0 < mid1) {
+                return 1;
+            } else {
+                return 0;
+            }
             
         }
         
@@ -1049,7 +1098,12 @@ public class SplitFinder {
          */
         final IKeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG * 3);
         {
-            
+
+//            /*
+//             * Put into [pred.partId, pred.termId] order.
+//             */
+//            Arrays.sort(a, new PartIdTermIdComparator());
+
             // it will in fact be an int32 value since it is a BTree.
             final int entryCount = (int) tempStore.getStatementCount();
 
@@ -1204,33 +1258,63 @@ public class SplitFinder {
 
                     } else {
 
+//                        /*
+//                         * The key is the {p,o,s}. The separator is formed by
+//                         * combining the partitionId for the next TERM2ID index
+//                         * partition with a local counter value of ZERO (0) and
+//                         * then appending ZERO (0L) for each of the other two
+//                         * long values in the key.
+//                         * 
+//                         * FIXME javadoc. This depends on the strict order in
+//                         * which the terms are entered into the lexicon. First
+//                         * the axioms are loaded. Then the ontology. IF the same
+//                         * axioms and the same ontology are loaded for the
+//                         * scale-out database (and we can enforce that in
+//                         * create()) AND IF all predicates are assigned by the
+//                         * same TERM2ID index THEN the low word of the term
+//                         * identifier for the predicate SHOULD be identical in
+//                         * the scale-out index. However, this also requires that
+//                         * we process the predicates within each TERM2ID index
+//                         * partition in their term identifier order rather than
+//                         * the total sort key order for their terms.
+//                         * 
+//                         * @todo this might work but I am not having success
+//                         * with it yet.
+//                         */
+//
+//                        final long p = mockTermId(nextPred.partId,
+//                                (int) nextPred.termId);
+
                         /*
-                         * The key is the {p,o,s}. The separator is formed by
-                         * combining the partitionId for the next TERM2ID index
-                         * partition with a local counter value of ZERO (0) and
-                         * then appending ZERO (0L) for each of the other two
-                         * long values in the key.
+                         * FIXME Note: This is the same for all predicate for
+                         * LUBM so we wind up with everything going into a
+                         * single split.
                          */
-
                         final long p = mockTermId(nextPred.partId);
-
+                        
                         /*
-                         * Note: This is a hack that allows us to generate more
-                         * than one split of POS per TERM2ID index partition.
-                         * The sumRangeCount is a good estimate of the #of
-                         * assertions that will go into this POS split, so we
-                         * use that to generate the [o] term identifier. We hack
-                         * this further by dividing through by an expected #of
-                         * distinct subjects per object. We add in the running
-                         * sum of sumRangeCount since we last changed TERM2ID
-                         * index partitions so that [o] is strictly increasing
-                         * until we start consuming predicates whose term
-                         * identifier was assigned by the next TERM2ID index
+                         * Note: this does not work because all the [p] are the
+                         * same so all the {p,o,s} tuples wind up in one index
                          * partition.
                          */
-                        final long o = changedTerm2IdPartitions ? 0L
-                                : mockTermId((int) (Math.min(1L,
-                                        (sumRangeCount / 3L)) + sumRangeCountSinceLastReset));
+//                        /*
+//                         * Note: This is a hack that allows us to generate more
+//                         * than one split of POS per TERM2ID index partition.
+//                         * The sumRangeCount is a good estimate of the #of
+//                         * assertions that will go into this POS split, so we
+//                         * use that to generate the [o] term identifier. We hack
+//                         * this further by dividing through by an expected #of
+//                         * distinct subjects per object. We add in the running
+//                         * sum of sumRangeCount since we last changed TERM2ID
+//                         * index partitions so that [o] is strictly increasing
+//                         * until we start consuming predicates whose term
+//                         * identifier was assigned by the next TERM2ID index
+//                         * partition.
+//                         */
+//                        final long o = changedTerm2IdPartitions ? 0L
+//                                : mockTermId((int) (Math.min(1L,
+//                                        (sumRangeCount / 3L)) + sumRangeCountSinceLastReset));
+                        final long o = 0L;
 
                         rightSeparator = keyBuilder.reset().append(p/* p */)
                                 .append(o).append(0L/* s */).getKey();
@@ -1416,8 +1500,16 @@ public class SplitFinder {
         assignedSplits.put(SPOKeyOrder.OSP, newSplitAssignment(
                 splits.ospSplits, uuids));
 
-        assignedSplits.put(SPOKeyOrder.POS, newSplitAssignment(
-                splits.posSplits, uuids));
+        if (splits.posSplits != null) {
+        
+            /*
+             * FIXME I have not figured out a way to split the POS index yet.
+             */
+            
+            assignedSplits.put(SPOKeyOrder.POS, newSplitAssignment(
+                    splits.posSplits, uuids));
+            
+        }
         
         // create the triple store.
         tripleStore.create(assignedSplits);
@@ -1524,6 +1616,20 @@ public class SplitFinder {
          */
         String ONTOLOGY = "ontology";
 
+        /**
+         * When <code>true</code> the closure of the sample data will be
+         * computed before the splits are computed. While this gives an estimate
+         * which includes the distribution of the entailed triples, if the data
+         * to be loaded is significantly larger than the sample data and if
+         * dynamic index partitioning is enabled, then you are unlikely to
+         * benefit as much from split points based on the closure. Further, if
+         * JOINs are enabled, those splits may simply be reabsorbed before they
+         * can be applied.
+         * 
+         * FIXME [support closure option].
+         */
+        String CLOSURE = "closure";
+        
         /**
          * An additional file or directory whose data will be loaded into the KB
          * when it is created. If it is a directory, then all data in that
