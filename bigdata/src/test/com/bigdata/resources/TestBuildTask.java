@@ -171,6 +171,7 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
         // createTime of the old journal.
         final long createTime0 = resourceManager.getLiveJournal()
                 .getRootBlockView().getCreateTime();
+
         // uuid of the old journal.
         final UUID uuid0 = resourceManager.getLiveJournal().getRootBlockView()
                 .getUUID();
@@ -202,9 +203,9 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
              * from a fused view of all data as of the final commit state of the
              * old journal.
              */
-            final OverflowMetadata omd = new OverflowMetadata(resourceManager);
+//            final OverflowMetadata omd = new OverflowMetadata(resourceManager);
             
-            final ViewMetadata vmd = omd.getViewMetadata(name);
+            final ViewMetadata vmd = overflowMetadata.getViewMetadata(name);
             
             // task to run.
             final AbstractTask task = new CompactingMergeTask(vmd);
@@ -229,7 +230,8 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
 
             final IResourceMetadata segmentMetadata = result.segmentMetadata;
 
-            System.err.println(segmentMetadata.toString());
+            if (log.isInfoEnabled())
+                log.info(segmentMetadata.toString());
 
             // verify index segment can be opened.
             resourceManager.openStore(segmentMetadata.getUUID());

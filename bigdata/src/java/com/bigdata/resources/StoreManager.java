@@ -103,6 +103,7 @@ import com.bigdata.service.DataService;
 import com.bigdata.service.Event;
 import com.bigdata.service.EventResource;
 import com.bigdata.service.EventType;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.service.ResourceService;
@@ -2952,32 +2953,49 @@ abstract public class StoreManager extends ResourceEvents implements
          * about to make a decision based on the releaseTime concerning which
          * resources to release.
          */
-        try {
+        {
 
-            final ITransactionService txService = getFederation()
-                    .getTransactionService();
+            final IBigdataFederation fed;
+            try {
 
-            if (txService != null) {
+                fed = getFederation();
 
-                this.releaseTime = txService.getReleaseTime();
+            } catch (UnsupportedOperationException ex) {
 
-            } else {
+                log.warn("Federation not available: Running in test harness?");
 
-                log
-                        .warn("Could not discover txService - Proceeding with current release time.");
+                return null;
 
             }
 
-        } catch (IOException ex) {
+            try {
 
-            /*
-             * Since the releaseTime is monotonically increasing, if there is an
-             * RMI problem then we use the last release time that was pushed to
-             * us by the txService.
-             */
+                final ITransactionService txService = fed
+                        .getTransactionService();
 
-            log.warn("Proceeding with current release time: " + ex);
-            
+                if (txService != null) {
+
+                    this.releaseTime = txService.getReleaseTime();
+
+                } else {
+
+                    log
+                            .warn("Could not discover txService - Proceeding with current release time.");
+
+                }
+
+            } catch (IOException ex) {
+
+                /*
+                 * Since the releaseTime is monotonically increasing, if there
+                 * is an RMI problem then we use the last release time that was
+                 * pushed to us by the txService.
+                 */
+
+                log.warn("Proceeding with current release time: " + ex);
+
+            }
+
         }
 
         if (this.releaseTime == 0L) {
@@ -2994,14 +3012,14 @@ abstract public class StoreManager extends ResourceEvents implements
              * actions taken based on those decisions.
              */
 
-            if (INFO)
-                log.info("releaseTime not set.");
-            
+            log.warn("releaseTime not set.");
+
             return null;
 
         }
 
-//        // debugging - writes out stores and indices in their respective caches.
+        // // debugging - writes out stores and indices in their respective
+        // caches.
 //        if(false) {// @todo remove code.
 //            int nstores = 0, nindices = 0;
 //            {

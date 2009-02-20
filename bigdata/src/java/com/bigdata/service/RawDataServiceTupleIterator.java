@@ -31,8 +31,6 @@ package com.bigdata.service;
 import java.io.IOException;
 import java.util.Iterator;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.btree.AbstractChunkedTupleIterator;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ResultSet;
@@ -90,7 +88,8 @@ public class RawDataServiceTupleIterator<E> extends AbstractChunkedTupleIterator
     protected final IDataService dataService;
     
     /**
-     * The index on which the range query is being performed.
+     * The name of the index partition on which the range query is being
+     * performed.
      */
     protected final String name;
     

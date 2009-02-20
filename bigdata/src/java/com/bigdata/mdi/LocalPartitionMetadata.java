@@ -240,10 +240,13 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
 
         if (rightSeparatorKey != null) {
 
-            if (BytesUtil.compareBytes(leftSeparatorKey, rightSeparatorKey) >= 0) {
+            final int cmp = BytesUtil.compareBytes(leftSeparatorKey,
+                    rightSeparatorKey);
 
-                throw new IllegalArgumentException(
-                        "Separator keys are out of order: " + this);
+            if (cmp >= 0) {
+
+                throw new IllegalArgumentException("Separator keys are "
+                        + (cmp == 0 ? "equal" : "out of order") + " : " + this);
 
             }
 

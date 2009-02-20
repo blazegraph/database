@@ -64,6 +64,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.lexicon.Term2IdTupleSerializer;
+import com.bigdata.rdf.lexicon.Term2IdWriteProc;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
@@ -421,169 +422,11 @@ public class SplitFinder {
          * is used by this class.
          */
 //        SplitUtility.
-        validateSplits(ndx.getIndexMetadata().getPartitionMetadata(), splits,
+        SplitUtility.validateSplits(ndx.getIndexMetadata().getPartitionMetadata(), splits,
                 false/* checkFromToIndex */);
 
         return splits;
         
-    }
-
-    /**
-     * Validate splits, including: that the separator keys are strictly
-     * ascending, that the separator keys perfectly cover the source key range
-     * without overlap, that the rightSeparator for each split is the
-     * leftSeparator for the prior split, that the fromIndex offsets are
-     * strictly ascending, etc.
-     * 
-     * @param splits
-     *            The recommended split points.
-     * 
-     * @todo refactor back to {@link SplitUtility}.
-     */
-    static public void validateSplits(
-            final LocalPartitionMetadata originalPartitionMetadata,
-            final Split[] splits,
-            final boolean checkFromToIndex) {
-
-        if (originalPartitionMetadata == null)
-            throw new IllegalArgumentException();
-
-        if (splits == null)
-            throw new IllegalArgumentException();
-
-        final int nsplits = splits.length;
-
-        if (nsplits <= 1)
-            throw new AssertionError(
-                    "Expecting at least two splits, but found " + nsplits);
-
-        // verify splits obey index order constraints.
-        int lastToIndex = -1;
-
-        // Note: the first leftSeparator must be this value.
-        byte[] fromKey = originalPartitionMetadata.getLeftSeparatorKey();
-
-        for (int i = 0; i < nsplits; i++) {
-
-            final Split split = splits[i];
-
-            if (split == null)
-                throw new AssertionError();
-
-            if(split.pmd == null)
-                throw new AssertionError();
-
-            if(!(split.pmd instanceof LocalPartitionMetadata))
-                throw new AssertionError();
-
-            final LocalPartitionMetadata pmd = (LocalPartitionMetadata) split.pmd;
-
-            // check the leftSeparator key.
-            if(pmd.getLeftSeparatorKey() == null)
-                throw new AssertionError();
-            if(!BytesUtil.bytesEqual(fromKey, pmd.getLeftSeparatorKey()))
-                throw new AssertionError();
-
-            // verify rightSeparator is ordered after the left
-            // separator.
-            if(pmd.getRightSeparatorKey() != null) {
-                if(BytesUtil.compareBytes(fromKey, pmd
-                            .getRightSeparatorKey()) >= 0)
-                    throw new AssertionError();
-            }
-
-            // next expected leftSeparatorKey.
-            fromKey = pmd.getRightSeparatorKey();
-
-            if (checkFromToIndex) {
-            
-                if (i == 0) {
-
-                    if (split.fromIndex != 0)
-                        throw new AssertionError();
-
-                    if (split.toIndex <= split.fromIndex)
-                        throw new AssertionError();
-
-                } else {
-
-                    if (split.fromIndex != lastToIndex)
-                        throw new AssertionError();
-
-                }
-
-                if (i + 1 == nsplits && split.toIndex == 0) {
-
-                    /*
-                     * Note: This is allowed in case the index partition has
-                     * more than int32 entries in which case the toIndex of the
-                     * last split can not be defined and will be zero.
-                     */
-
-                    if (split.ntuples != 0)
-                        throw new AssertionError();
-
-                    log.warn("Last split has no definate tuple count");
-
-                } else {
-
-                    if (split.toIndex - split.fromIndex != split.ntuples)
-                        throw new AssertionError();
-
-                }
-
-            }
-            
-            lastToIndex = split.toIndex;
-
-        }
-
-        /*
-         * verify left separator key for 1st partition is equal to the left
-         * separator key of the source (this condition is also checked
-         * above).
-         */
-        if (!BytesUtil.bytesEqual(originalPartitionMetadata
-                .getLeftSeparatorKey(), splits[0].pmd.getLeftSeparatorKey())) {
-
-            throw new AssertionError("leftSeparator[0]"
-                    + //
-                    ": expected="
-                    + BytesUtil.toString(originalPartitionMetadata
-                            .getLeftSeparatorKey())
-                    + //
-                    ", actual="
-                    + BytesUtil.toString(splits[0].pmd.getLeftSeparatorKey()));
-            
-        }
-
-        /*
-         * verify right separator key for last partition is equal to the
-         * right separator key of the source.
-         */
-        {
-            
-            // right separator for the last split.
-            final byte[] rightSeparator = ((LocalPartitionMetadata) splits[splits.length - 1].pmd)
-                    .getRightSeparatorKey();
-            
-            if(rightSeparator == null ) {
-                
-                // if null then the source right separator must have been null.
-                if (originalPartitionMetadata.getRightSeparatorKey() != null)
-                    throw new AssertionError();
-                
-            } else {
-                
-                // otherwise must compare as equals byte-by-byte.
-                if (!rightSeparator.equals(originalPartitionMetadata
-                        .getRightSeparatorKey()))
-                    throw new AssertionError();
-                
-            }
-            
-        }
-
     }
 
     /**
@@ -595,7 +438,7 @@ public class SplitFinder {
             final int partitionId, final byte[] leftSeparator,
             final byte[] rightSeparator) {
 
-        return new LocalPartitionMetadata(//
+        final LocalPartitionMetadata pmd = new LocalPartitionMetadata(//
                 partitionId,
                 -1, // sourcePartitionId (iff move)
                 leftSeparator,
@@ -605,6 +448,11 @@ public class SplitFinder {
                 },
                 "" // history
                 );
+
+        if(DEBUG)
+            log.debug(pmd.toString());
+        
+        return pmd;
         
     }
     
@@ -637,14 +485,15 @@ public class SplitFinder {
             final int nextPartitionId = term2IdSplits[i + 1].pmd
                     .getPartitionId();
 
+            final long id = mockTermId(nextPartitionId);
+            
             /*
              * The key is just the term identifier. The high word of the term
              * identifier is the partition identifier of the TERM2ID index
              * partition which assigned that term identifier. The low word is a
              * 32-bit index partition local counter.
              */
-            final byte[] rightSeparator = keyBuilder.reset().append(
-                    nextPartitionId).append(0/* partitionLocalCounter */)
+            final byte[] rightSeparator = keyBuilder.reset().append(id)
                     .getKey();
 
             splits[i] = new Split(newMockPartitionMetadata(partitionId++,
@@ -658,10 +507,49 @@ public class SplitFinder {
         splits[term2IdSplits.length - 1] = new Split(newMockPartitionMetadata(
                 ++partitionId, leftSeparator, null/* rightSeparator */));
 
-        validateSplits(mockDefaultPartitionMetadata, splits, false/* checkFromToIndex */);
+        SplitUtility.validateSplits(mockDefaultPartitionMetadata, splits, false/* checkFromToIndex */);
 
         return splits;
         
+    }
+
+    /**
+     * There are some additional twists. See {@link BTree.PartitionedCounter}
+     * and {@link Term2IdWriteProc#assignTermId(long, byte)} for how we actually
+     * form the term identifier before we build the unsigned byte[] key.
+     * 
+     * @param partitionId
+     * 
+     * @return The term identifier corresponding to a local counter value of
+     *         zero (0) for that partitionId.
+     */
+    protected static long mockTermId(final int partitionId) {
+
+        /*
+         * The unchanging value for the low word of the term identifiers.
+         */
+        final int localCounter = 0;
+        
+        /*
+         * Place the partition identifier into the high int32 word and place
+         * the truncated counter value into the low int32 word.
+         * 
+         * Note: You MUST cast [partitionId] to a long or left-shifting
+         * 32-bits will always clear it to zero.
+         * 
+         * @see BTree#PartitionedCounter
+         */
+        final long id0 = (((long)partitionId) << 32) | (int) localCounter;
+
+        /*
+         * Left shift two bits to make room for term type coding.
+         * 
+         * @see Term2IdWriteProc#assignTermId()
+         */
+        final long id = id0 << 2;
+        
+        return id;
+
     }
     
     /**
@@ -679,7 +567,7 @@ public class SplitFinder {
 
         int partitionId = 0;
         
-        final IKeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG);
+        final IKeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG * 3);
 
         final Split[] splits = new Split[term2IdSplits.length];
 
@@ -691,6 +579,8 @@ public class SplitFinder {
             final int nextPartitionId = term2IdSplits[i + 1].pmd
                     .getPartitionId();
 
+            final long id = mockTermId(nextPartitionId);
+
             /*
              * The key is the {s,p,o} (or the {o,s,p} for the OSP index). The
              * separator is formed by combining the partitionId for the next
@@ -698,9 +588,8 @@ public class SplitFinder {
              * and then appending ZERO (0L) for each of the other two long
              * values in the key.
              */
-            final byte[] rightSeparator = keyBuilder.reset().append(
-                    nextPartitionId).append(0/* partitionLocalCounter */)
-                    .append(0L/* p */).append(0L/* o */).getKey();
+            final byte[] rightSeparator = keyBuilder.reset().append(id).append(
+                    0L/* p */).append(0L/* o */).getKey();
 
             splits[i] = new Split(newMockPartitionMetadata(++partitionId,
                     leftSeparator, rightSeparator));
@@ -713,7 +602,7 @@ public class SplitFinder {
         splits[term2IdSplits.length - 1] = new Split(newMockPartitionMetadata(
                 ++partitionId, leftSeparator, null/* rightSeparator */));
 
-        validateSplits(mockDefaultPartitionMetadata, splits, false/* checkFromToIndex */);
+        SplitUtility.validateSplits(mockDefaultPartitionMetadata, splits, false/* checkFromToIndex */);
 
         return splits;
 
@@ -1158,6 +1047,7 @@ public class SplitFinder {
          * count then we generate N-1 separator keys instead.  This is similar
          * to the DefaultSplitHandler.
          */
+        final IKeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG * 3);
         {
             
             // it will in fact be an int32 value since it is a BTree.
@@ -1183,39 +1073,69 @@ public class SplitFinder {
             // #of predicates in the current partition.
             int predCount = 0;
             // #of instances of those predicates in the current partition.
-            long rangeCount = 0;
+            long sumRangeCount = 0;
             // the left separator of the current partition.
             byte[] leftSeparator = new byte[0];
             // the first predicate which enters the current partition.
             PredStat firstPred = null;
             // the partition identifier for the current partition.
             int partitionId = 0;
+            /*
+             * The partition identifier of the TERM2ID partition used to
+             * generate the last split. Note that the POS splits (as generated
+             * here based on the information available, which is just the
+             * TERM2ID partition identifier) are fully determined by the TERM2ID
+             * partition identifier. Therefore a POS split MUST extend across at
+             * least one TERM2ID partition. Regardless of we have otherwise
+             * satisified the minimum, nominal, or even the maximum estimated
+             * range count for the split, we CAN NOT generate a POS split until
+             * we have reached the next TERM2ID partition. If we do not obey
+             * this rule we will wind up with the leftSeparator equal to the
+             * rightSeparator for the generated POS split, which is an error.
+             */
+            int term2IdPartitionIdUsedByLastSplit = -1;
+            long sumRangeCountSinceLastReset = 0L;
 
             for (int i = 0; i < a.length; i++) {
 
                 // iff the last predicate.
                 final boolean last = (i + 1) == a.length;
 
-                final PredStat t = a[i];
+                final PredStat pred = a[i];
                 final PredStat nextPred = last ? null : a[i + 1];
 
                 if (firstPred == null) {
 
-                    firstPred = t;
+                    firstPred = pred;
                     
                 }
                 
                 // accept this predicate into the split.
                 predCount++;
-                rangeCount += t.rangeCount;
+                sumRangeCount += pred.rangeCount;
+                sumRangeCountSinceLastReset += sumRangeCount;
 
                 // iff rangeCount is enough to qualify for a split.
-                final boolean sufficient = rangeCount > minEntryCountPerSplit;
+                final boolean sufficient = sumRangeCount > minEntryCountPerSplit;
 
                 // iff adding the next predicate to this split would make it too
                 // large.
                 final boolean wouldOverflow;
-                long nextRangeCount = -1;
+                // if the next predicate is sufficient for its own index partition
+                final boolean nextMayStandByItself;
+                /*
+                 * iff the TERM2ID partition identifier has changed.
+                 * 
+                 * Note: if
+                 * this is the last predicate then we have to choose an
+                 * arbitrary truth value since we have reached the end of the
+                 * TERM2ID index partitions.
+                 */
+                final boolean changedTerm2IdPartitions = last ? false
+                        : nextPred.partId != term2IdPartitionIdUsedByLastSplit;
+                // the sum of range counts for this split IF we added in the
+                // next predicate.
+                long nextSumRangeCount = -1;
                 if (last) {
 
                     /*
@@ -1226,81 +1146,136 @@ public class SplitFinder {
                      * [null].
                      */
                     wouldOverflow = true;
+                    
+                    nextMayStandByItself = false;
 
                 } else {
 
-                    nextRangeCount = (rangeCount + nextPred.rangeCount);
-                    
-                    wouldOverflow = nextRangeCount > maxEntryCountPerSplit;
-                    
+                    nextSumRangeCount = (sumRangeCount + nextPred.rangeCount);
+
+                    wouldOverflow = nextSumRangeCount > maxEntryCountPerSplit;
+
+                    nextMayStandByItself = nextPred.rangeCount >= minEntryCountPerSplit;
+
                 }
 
                 if (DEBUG)
                     log.debug
-//                System.err.println
+// System.err.println
                     ("predCount=" + predCount + ", i=" + i + ", last="
-                            + last + ", rangeCount=" + rangeCount
-                            + ", nextRangeCount=" + nextRangeCount
-                            + ", wouldOverflow=" + wouldOverflow
-                            + ", firstPred=" + firstPred.term + ", thisPred="
-                            + t.term);
-                
-                if ((!sufficient && !last) || (sufficient && !wouldOverflow)) {
+                                    + last + ", thisRangeCount="
+                                    + pred.rangeCount + ", sumRangeCount="
+                                    + sumRangeCount + ", nextSumRangeCount="
+                                    + nextSumRangeCount
+                                    + ", term2IdPartitionIdUsedByLastSplit="
+                                    + term2IdPartitionIdUsedByLastSplit
+                                    + ", changedTerm2IdPartitions="
+                                    + changedTerm2IdPartitions
+                                    + ", sumRangeCountsSinceLastReset="
+                                    + sumRangeCountSinceLastReset
+                                    + ", sufficient=" + sufficient
+                                    + ", wouldOverflow=" + wouldOverflow
+                                    + ", nextMayStandByItself="
+                                    + nextMayStandByItself + ", firstPred="
+                                    + firstPred.term + ", thisPred="
+                                    + pred.term);
+
+                /*
+                 * If we have enough for a split and adding one more predicate
+                 * would cause the split to overflow OR if this is the last
+                 * predicate, then generate a split.
+                 * 
+                 * Otherwise we will just execute the loop again and the next
+                 * predicate will become part of the same split as this one.
+                 */
+                if ((sufficient && wouldOverflow) || (nextMayStandByItself)
+                        || last) {
 
                     /*
-                     * Allow the next predicate into this split (but not if this
-                     * is is the last predicate!)
-                     * 
-                     * @todo this can result in the last index partition for POS
-                     * holding no more than a single predicate. It would be
-                     * better in such cases to put the predicate into the
-                     * previous split. We should do that as a touch up on the
-                     * last index partition below. This is relatively important
-                     * since the load on the host which gets that index
-                     * partition can otherwise be quite unbalanced.
+                     * Generate a split.
                      */
-                    
-                    continue;
-                    
+
+                    final byte[] rightSeparator;
+                    if (last) {
+
+                        // the last index partition always has a [null]
+                        // rightSeparator.
+                        rightSeparator = null;
+
+                    } else {
+
+                        /*
+                         * The key is the {p,o,s}. The separator is formed by
+                         * combining the partitionId for the next TERM2ID index
+                         * partition with a local counter value of ZERO (0) and
+                         * then appending ZERO (0L) for each of the other two
+                         * long values in the key.
+                         */
+
+                        final long p = mockTermId(nextPred.partId);
+
+                        /*
+                         * Note: This is a hack that allows us to generate more
+                         * than one split of POS per TERM2ID index partition.
+                         * The sumRangeCount is a good estimate of the #of
+                         * assertions that will go into this POS split, so we
+                         * use that to generate the [o] term identifier. We hack
+                         * this further by dividing through by an expected #of
+                         * distinct subjects per object. We add in the running
+                         * sum of sumRangeCount since we last changed TERM2ID
+                         * index partitions so that [o] is strictly increasing
+                         * until we start consuming predicates whose term
+                         * identifier was assigned by the next TERM2ID index
+                         * partition.
+                         */
+                        final long o = changedTerm2IdPartitions ? 0L
+                                : mockTermId((int) (Math.min(1L,
+                                        (sumRangeCount / 3L)) + sumRangeCountSinceLastReset));
+
+                        rightSeparator = keyBuilder.reset().append(p/* p */)
+                                .append(o).append(0L/* s */).getKey();
+
+                    }
+
+                    splits.add(new Split(newMockPartitionMetadata(partitionId,
+                            leftSeparator, rightSeparator)));
+
+                    if (INFO) {
+
+                        log.info("Placed " + predCount
+                                + " predicates: sumRangeCount=" + sumRangeCount
+                                + " into partitionId=" + partitionId
+                                + ", leftSeperatorPred=" + firstPred.term
+                                + ", rightSeparatorPred=" + pred.term);
+
+                    }
+
+                    // start another split.
+                    leftSeparator = rightSeparator;
+                    predCount = 0;
+                    sumRangeCount = 0;
+                    firstPred = null;
+                    partitionId++;
+                    if (!last)
+                        term2IdPartitionIdUsedByLastSplit = nextPred.partId;
+                    if(changedTerm2IdPartitions)
+                        sumRangeCountSinceLastReset = 0;
+
                 }
 
                 /*
-                 * Generate a split.
+                 * Allow the next predicate into this split (but not if this is
+                 * is the last predicate!)
+                 * 
+                 * @todo this can result in the last index partition for POS
+                 * holding no more than a single predicate. It would be better
+                 * in such cases to put the predicate into the previous split.
+                 * We should do that as a touch up on the last index partition
+                 * below. This is relatively important since the load on the
+                 * host which gets that index partition can otherwise be quite
+                 * unbalanced.
                  */
-                
-                final byte[] rightSeparator;
-                if (last) {
 
-                    // the last index partition always has a [null]
-                    // rightSeparator.
-                    rightSeparator = null;
-
-                } else {
-
-                    rightSeparator = t.sortKey;
-                    
-                }
-                
-                splits.add(new Split(newMockPartitionMetadata(partitionId,
-                        leftSeparator, rightSeparator)));
-
-                if (INFO) {
-
-                    log.info("Placed " + predCount
-                            + " predicates with rangeCount=" + rangeCount
-                            + " into partitionId=" + partitionId
-                            + ", leftSeperatorPred=" + firstPred.term
-                            + ", rightSeparatorPred=" + t.term);
-                    
-                }
-                
-                // start another split.
-                leftSeparator = rightSeparator;
-                predCount = 0;
-                rangeCount = 0;
-                firstPred = null;
-                partitionId++;
-                
             }
         
             if (INFO)
@@ -1309,7 +1284,7 @@ public class SplitFinder {
 
             final Split[] tmp = splits.toArray(new Split[0]);
             
-            validateSplits(mockDefaultPartitionMetadata, tmp, false/* checkFromToIndex */);
+            SplitUtility.validateSplits(mockDefaultPartitionMetadata, tmp, false/* checkFromToIndex */);
 
             return tmp;
 
@@ -1357,18 +1332,19 @@ public class SplitFinder {
      * @param dir
      *            The directory containing the files.
      */
-    public void loadSingleThreaded(final File dir, final RDFFormat rdfFormat,
+    public void loadSingleThreaded(final AbstractTripleStore tripleStore,
+            final File dir, final RDFFormat rdfFormat,
             final FilenameFilter filter) {
 
         System.out.println("Will load files: dir=" + dir);
 
-        final long statementCountBefore = tempStore.getStatementCount();
+        final long statementCountBefore = tripleStore.getStatementCount();
 
-        final long termCountBefore = tempStore.getTermCount();
+        final long termCountBefore = tripleStore.getTermCount();
 
         final long begin = System.currentTimeMillis();
 
-        final DataLoader dataLoader = tempStore.getDataLoader();
+        final DataLoader dataLoader = tripleStore.getDataLoader();
 
         // load data files (loads subdirs too).
         try {
@@ -1386,9 +1362,9 @@ public class SplitFinder {
 
         final long elapsed1 = System.currentTimeMillis() - begin;
         
-        final long statementCountAfter = tempStore.getStatementCount();
+        final long statementCountAfter = tripleStore.getStatementCount();
         
-        final long termCountAfter = tempStore.getTermCount();
+        final long termCountAfter = tripleStore.getTermCount();
 
         final long statementsLoaded = statementCountAfter
                 - statementCountBefore;
@@ -1542,14 +1518,24 @@ public class SplitFinder {
         String DATA_DIR = "dataDir";
 
         /**
+         * An additional file or directory whose data will be loaded before we
+         * compute the split points. If it is a directory, then all data in that
+         * directory will be loaded.
+         */
+        String ONTOLOGY = "ontology";
+
+        /**
          * An additional file or directory whose data will be loaded into the KB
          * when it is created. If it is a directory, then all data in that
          * directory will be loaded.
          * <p>
          * Note: This is intended to load ontologies pertaining to the data to
-         * be loaded.
+         * be loaded. A separate option is provided since you may generate the
+         * split points based one setup of sample data and its ontology but
+         * choose to pre-load the create triple store using a different
+         * ontology.
          */
-        String ONTOLOGY = "ontology";
+        String POST_CREATE_ONTOLOGY = "postCreateOntology";
         
     }
     
@@ -1568,9 +1554,8 @@ public class SplitFinder {
      * 
      * @see ConfigurationOptions
      */
-    static public void main(final String[] args)
-//    throws Throwable
-    throws ConfigurationException, IOException
+    static public void main(final String[] args) throws ConfigurationException,
+            IOException
     {
 
         final JiniFederation fed = new JiniClient(args).connect();
@@ -1599,6 +1584,12 @@ public class SplitFinder {
                     ConfigurationOptions.CREATE, Boolean.TYPE);
 
             // optional.
+            final File postCreateOntology = (File) config
+                    .getEntry(ConfigurationOptions.COMPONENT,
+                            ConfigurationOptions.POST_CREATE_ONTOLOGY,
+                            File.class, null);
+            
+            // optional.
             final File ontology = (File) config.getEntry(
                     ConfigurationOptions.COMPONENT,
                     ConfigurationOptions.ONTOLOGY, File.class, null);
@@ -1618,19 +1609,28 @@ public class SplitFinder {
 
                 if (ontology != null) {
 
-                    s.loadSingleThreaded(ontology, rdfFormat, filenameFilter);
+                    s.loadSingleThreaded(s.tempStore, ontology, rdfFormat, filenameFilter);
 
                 }
 
-                s.loadSingleThreaded(dataDir, rdfFormat, filenameFilter);
+                s.loadSingleThreaded(s.tempStore, dataDir, rdfFormat,
+                        filenameFilter);
 
                 final Splits splits = s.findSplits();
 
                 if (create) {
 
-                    s.createTripleStore(fed, properties, namespace, splits,
-                            nservices);
+                    final AbstractTripleStore scaleOutTripleStore = s
+                            .createTripleStore(fed, properties, namespace,
+                                    splits, nservices);
 
+                    if (postCreateOntology != null) {
+
+                        s.loadSingleThreaded(scaleOutTripleStore,
+                                postCreateOntology, rdfFormat, filenameFilter);
+
+                    }
+                    
                     System.out.println("Created: " + namespace);
                     
                 }
@@ -1641,12 +1641,6 @@ public class SplitFinder {
                 s.tempStore.close();
                 
             }
-            
-//        } catch(Throwable t) {
-//            
-//            log.error(t, t);
-//            
-//            throw t;
 
         } finally {
             

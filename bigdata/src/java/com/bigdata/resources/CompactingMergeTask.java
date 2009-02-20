@@ -495,7 +495,10 @@ public class CompactingMergeTask extends AbstractPrepareTask<BuildResult> {
                     // new index segment build from a view that did not include
                     // data from the live journal.
                     assert segmentMetadata.getCreateTime() < getJournal()
-                            .getRootBlockView().getFirstCommitTime();
+                            .getRootBlockView().getFirstCommitTime() : "segment createTime LT journal 1st commit time"
+                            + ": segmentMetadata="
+                            + segmentMetadata
+                            + ", journal: " + getJournal().getRootBlockView();
 
                     // if (oldResources.length == 3) {
                     //

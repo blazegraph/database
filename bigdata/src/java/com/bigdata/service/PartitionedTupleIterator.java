@@ -654,6 +654,12 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
                 
             }
             
+            public String toString() {
+                
+                return super.toString()+" : partition="+src.name;
+                
+            }
+            
         };
         
     }

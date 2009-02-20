@@ -3060,7 +3060,8 @@ Commit notes:
 
     http://code.google.com/p/flot/, http://solutoire.com/flotr/
 
-    http://flare.prefuse.org/ (also has a treemap)
+    http://flare.prefuse.org/ (also has a treemap) and
+    http://prefuse.org/ (its predecessor).
 
     treemaps: http://www.cs.umd.edu/hcil/treemap-history/,
     http://treemap.sourceforge.net/ (MIT),
@@ -3071,6 +3072,12 @@ Commit notes:
     flash: http://osflash.org/, http://osflash.org/open_source_flash_projects
 
     hypertree: http://hypertree.sourceforge.net/
+
+    commercial visualization tools (visual analytics, visual analysis)
+
+       http://www.macrofocus.com/
+
+       http://www.labescape.com/info/articles/what-is-a-heat-map.html
 
 - Performance testing on DP for U100, U1500, U8000 with split / join /
   move / build / merge.
@@ -3165,45 +3172,8 @@ Commit notes:
       this much faster.  E.g., take a compacting merge and then blast
       it across to another data service on a raw socket.
 
-    - Hold hard references to the index partitions for which we will
-      do split, move or join operations and make sure that we do not
-      let the probable candidates get flushed off of the LRU when we
-      are making those decisions.  E.g., start with the active indices
-      first and then scan Name2Addr (or just stuff the active indices
-      into a hard reference collection).  Potentially identify the
-      index partitions during synchronous overflow (how long does this
-      take?) since that would make it easier to hold the hard
-      references and even stuff them into the move, split, join, etc
-      tasks.
-
     - Pointless having a MOVE during the initial round robin period.
       Should detect that and avoid moves until we have real scores.
-
-    - Consider a "tail split" for indices which are entirely (or
-      mostly) experiencing appends.  For example, the SPO and OSP (but
-      not the POS) indices have this behavior.  A "tail split" would
-      either just re-define the view to include a new index partition
-      accepting all keys beyond the last key in the source index
-      partition (this would have to issue new index partition
-      identifiers for both the source and the new index partition) or
-      split the data with a split that keeps most of the tuples in the
-      source index partition (which still gets assigned a new
-      partition identifier).  The purpose is (a) a faster split; and
-      (b) if we are in a tail append mode, then the source index
-      partition will receive few to no writes and the new rightSibling
-      will receive most to all writes, so it can be empty to start
-      with.
-
-    - Partly done. Clear stale references on the hard reference queues
-      for the live index, historical index, index view, index segment,
-      and locator caches. (I still need to do this for locators, for
-      the open journals, etc.)
-
-    - Clearing the references for the lastCommitTime of the old
-      journal could cause performance problems during asynchronous
-      overflow.  It might be best to decide on those indices that have
-      priority during synchronous overflow and pass hard references to
-      those indices to the asynchronous overflow task.
 
     - Make sure that atomic update tasks notice when the primary task
       is cancelled (liveness).

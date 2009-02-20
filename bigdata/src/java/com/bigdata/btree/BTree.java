@@ -1476,7 +1476,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter,
         private final int partitionId;
         private final ICounter src;
         
-        public PartitionedCounter(int partitionId, ICounter src) {
+        public PartitionedCounter(final int partitionId, final ICounter src) {
 
             if (src == null)
                 throw new IllegalArgumentException();
@@ -1499,7 +1499,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter,
          * @throws RuntimeException
          *             if the source counter has overflowed.
          */
-        private long wrap(long tmp) {
+        private long wrap(final long tmp) {
             
             if (tmp > Integer.MAX_VALUE) {
 
@@ -1511,7 +1511,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter,
              * Place the partition identifier into the high int32 word and place
              * the truncated counter value into the low int32 word.
              * 
-             * Note: You MUST case [partitionId] to a long or left-shifting
+             * Note: You MUST cast [partitionId] to a long or left-shifting
              * 32-bits will always clear it to zero.
              */
             

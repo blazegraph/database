@@ -482,7 +482,8 @@ public class AbstractResourceManagerTestCase extends
 
         public ITransactionService getTransactionService() {
 
-            return null;
+            return txService;
+        
         }
 
         public boolean isDistributed() {
