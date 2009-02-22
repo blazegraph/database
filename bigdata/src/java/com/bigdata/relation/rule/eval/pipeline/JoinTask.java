@@ -385,7 +385,7 @@ abstract public class JoinTask implements Callable<Void> {
 
         return getClass().getName() + "{ orderIndex=" + orderIndex
                 + ", partitionId=" + partitionId + ", lastJoin=" + lastJoin
-                + "}";
+                + ", masterUUID=" + masterUUID + "}";
 
     }
 
@@ -489,6 +489,12 @@ abstract public class JoinTask implements Callable<Void> {
 
         } catch (Throwable t) {
 
+            try {
+                logCallError(t);
+            } catch (Throwable t2) {
+                log.error(t2.getLocalizedMessage(), t2);
+            }
+            
             /*
              * This is used for processing errors and also if this task is
              * interrupted (because a SLICE has been satisified).
@@ -549,6 +555,22 @@ abstract public class JoinTask implements Callable<Void> {
 
         }
 
+    }
+
+    /**
+     * Method is used to log the primary exception thrown by {@link #call()}.
+     * The default implementation does nothing and the exception will be logged
+     * by the {@link JoinMasterTask}. However, this method is overridden by
+     * {@link DistributedJoinTask} so that the exception can be logged on the
+     * host and {@link DataService} where it originates. This appears to be
+     * necessary in order to trace back the cause of an exception which can
+     * otherwise be obscured (or even lost?) in a deeply nested RMI stack trace.
+     * 
+     * @param o
+     * @param t
+     */
+    protected void logCallError(Throwable t) {
+        
     }
 
     /**
