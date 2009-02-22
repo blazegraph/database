@@ -566,14 +566,12 @@ public class XHTMLRenderer {
                     
                 }
 
-//                if (INFO)
-//                    log.info
-                {
+                if (INFO) {
                     final StringBuilder sb = new StringBuilder();
                     for (Field f : eventFilters.keySet()) {
                         sb.append(f.getName() + "=" + eventFilters.get(f));
                     }
-                    log.warn("eventFilters={" + sb + "}");
+                    log.info("eventFilters={" + sb + "}");
                 }
                 
             }
