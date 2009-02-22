@@ -211,15 +211,15 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
      */
     private final IndexSegmentStoreCounters counters = new IndexSegmentStoreCounters();
     
-    final protected void assertOpen() {
-
-        if (!open) {
-            
-            throw new IllegalStateException();
-            
-        }
-
-    }
+//    final protected void assertOpen() {
+//
+//        if (!open) {
+//            
+//            throw new IllegalStateException();
+//            
+//        }
+//
+//    }
     
     /**
      * Used to correct decode region-based addresses. The
@@ -613,9 +613,13 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     }
     
     /**
-     * Closes the file and releases the internal buffers and metadata records.
-     * This operation may be reversed by {@link #reopen()} as long as the
-     * backing file remains available.
+     * Closes the file and releases the internal buffers. This operation will
+     * quitely succeed if the {@link IndexSegmentStore} is already closed. This
+     * operation may be reversed by {@link #reopen()} as long as the backing
+     * file remains available. A read on a closed {@link IndexSegmentStore} will
+     * transparently {@link #reopen()} the store as long as the backing file
+     * remains available. {@link #destroy()} provides an atomic "close and
+     * delete" operation.
      */
     public void close() {
 
@@ -626,9 +630,13 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             if (INFO)
                 log.info(file.toString());
 
-            assertOpen();
+//          assertOpen();
 
-            _close();
+            if(isOpen()) {
+
+                _close();
+                
+            }
             
         } finally {
             
@@ -739,6 +747,9 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
 
     }
 
+    /**
+     * Atomically closes the store (iff open) and then deletes the backing file.
+     */
     synchronized public void destroy() {
 
         lock.lock();
@@ -889,7 +900,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
      */
     public ByteBuffer read(final long addr) {
 
-        assertOpen();
+//        assertOpen();
         
         /*
          * True IFF the starting address lies entirely within the region
@@ -1054,15 +1065,21 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
      * 
      * @return The {@link FileChannel}.
      * 
-     * @throws IllegalStateException
-     *             if the store is closed.
-     * 
      * @throws IOException
      *             if the backing file can not be locked.
      */
     final synchronized private FileChannel reopenChannel() throws IOException {
-        
-        assertOpen();
+
+        /*
+         * Note: closing an IndexSegmentStore DOES NOT prevent it from being
+         * transparently reopened.
+         */
+//      assertOpen();
+        if(!open) {
+            
+            reopen();
+            
+        }
         
         if (raf != null && raf.getChannel().isOpen()) {
             
