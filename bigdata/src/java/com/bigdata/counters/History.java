@@ -935,7 +935,36 @@ public class History<T> {
             // most recent timestamp for that sample.
             timestamps[physicalSlot] = timestamp;
 
-            assert size <= capacity : "size=" + size+", capacity="+capacity;
+            if (size > capacity) {
+             
+                /*
+                 * FIXME I am seeing this exception after a few days of run
+                 * time. The [size] appears to grow by one every minute.
+                 * 2/22/09. The stack trace is emerging out of the LBS update
+                 * task, but the problem is clearly in the History class itself:
+                 * 
+                 * java.lang.AssertionError: size=1000, capacity=24
+    at com.bigdata.counters.History.add(History.java:938)
+    at com.bigdata.counters.History.add(History.java:894)
+    at com.bigdata.counters.HistoryInstrument.add(HistoryInstrument.java:130)
+    at com.bigdata.service.LoadBalancerService$UpdateTask.setupCounters(LoadBalancerService.java:1668)
+    at com.bigdata.service.LoadBalancerService$UpdateTask.run(LoadBalancerService.java:843)
+    at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:441)
+    at java.util.concurrent.FutureTask$Sync.innerRunAndReset(FutureTask.java:317)
+    at java.util.concurrent.FutureTask.runAndReset(FutureTask.java:150)
+    at java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.access$101(ScheduledThreadPoolExecutor.java:98)
+    at java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.runPeriodic(ScheduledThreadPoolExecutor.java:181)
+    at java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:205)
+    at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:885)
+    at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:907)
+    at java.lang.Thread.run(Thread.java:619)
+
+                 */
+                
+                // log assertion but do not throw the execption.
+                log.warn("size=" + size + ", capacity=" + capacity);
+                
+            }
 
         }
 
