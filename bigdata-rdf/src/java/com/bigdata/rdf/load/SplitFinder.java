@@ -1741,6 +1741,8 @@ public class SplitFinder {
                     
                 }
 
+                System.out.println("Done.");
+                
             } finally {
                 
                 // make sure that the temporary store is deleted.
