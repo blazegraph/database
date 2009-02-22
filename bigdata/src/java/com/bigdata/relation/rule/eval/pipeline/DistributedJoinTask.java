@@ -1137,4 +1137,21 @@ public class DistributedJoinTask extends JoinTask {
 
     }
 
+    /**
+     * Logs an error in {@link JoinTask#call()} on the local log file and adds
+     * some metadata about the operation which was being executed. This does not
+     * imply that the error originates with this join task. You have to inspect
+     * the error messages, the order in which the joins were being evaluated,
+     * and even correlate the {@link JoinTask#masterUUID} in order to figure out
+     * what really happened.
+     */
+    @Override
+    protected void logCallError(final Throwable t) {
+
+        log.error("hostname=" + dataService.getHostname() + ", serviceName="
+                + dataService.getServiceName() + ", joinTask=" + toString()
+                + ", rule=" + rule, t);
+        
+    }
+    
 }
