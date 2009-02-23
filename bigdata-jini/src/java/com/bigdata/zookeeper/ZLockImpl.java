@@ -139,7 +139,7 @@ public class ZLockImpl implements ZLock {
     private final ReentrantLock lock = new ReentrantLock();
 
     /**
-     * The watcher that manages the participating of the process in the
+     * The watcher that manages the participation of the process in the
      * contention for the lock. This is set by {@link #lock(long, TimeUnit)}.
      * It is used by {@link #unlock()} to release the lock.
      */

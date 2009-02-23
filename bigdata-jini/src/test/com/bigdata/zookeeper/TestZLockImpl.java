@@ -94,13 +94,13 @@ public class TestZLockImpl extends AbstractZooTestCase {
         // instances that can contend for the lock.
         final ZLockImpl lock1 = ZLockImpl.getLock(zookeeper, zpath, acl);
         
-        // queue is empty (node created when ZLock object was requested).
-        assertEquals(0, zookeeper.getChildren(zpath, false).size());
+        // znode not created during ctor (more robust this way).
+        assertNull(zookeeper.exists(zpath, false));
         
         final ZLockImpl lock2 = ZLockImpl.getLock(zookeeper, zpath, acl);
         
-        // queue is still empty since noone has tried to acquire the lock.
-        assertEquals(0, zookeeper.getChildren(zpath, false).size());
+        // znode not created during ctor (more robust this way).
+        assertNull(zookeeper.exists(zpath, false));
         
         // obtain the lock.
         lock1.lock();
@@ -236,14 +236,14 @@ public class TestZLockImpl extends AbstractZooTestCase {
         // instances that can contend for the lock.
         final ZLockImpl lock1 = ZLockImpl.getLock(zookeeper, zpath, acl);
         
-        // queue is empty (node created when ZLock object was requested).
-        assertEquals(0, zookeeper.getChildren(zpath, false).size());
-        
+        // znode not created during ctor (more robust this way).
+        assertNull(zookeeper.exists(zpath, false));
+                
         final ZLockImpl lock2 = ZLockImpl.getLock(zookeeper, zpath, acl);
         
-        // queue is still empty since noone has tried to acquire the lock.
-        assertEquals(0, zookeeper.getChildren(zpath, false).size());
-
+        // znode not created during ctor (more robust this way).
+        assertNull(zookeeper.exists(zpath, false));
+        
         // obtain the lock.
         lock1.lock();
 

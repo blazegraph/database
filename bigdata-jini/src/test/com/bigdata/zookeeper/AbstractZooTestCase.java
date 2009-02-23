@@ -197,25 +197,34 @@ public abstract class AbstractZooTestCase extends TestCase2 {
 
     public void tearDown() throws Exception {
 
-        log.info(getName());
-        
-        if (zookeeper != null) {
+        try {
 
-            zookeeper.close();
+            if (log.isInfoEnabled())
+                log.info(getName());
 
-        }
-        
-        for(ProcessHelper h : listener.running) {
-            
-            // destroy zookeeper service iff we started it.
-            h.kill(true/*immediateShutdown*/);
+            if (zookeeper != null) {
 
-        }
+                zookeeper.close();
 
-        if (dataDir != null) {
+            }
 
-            // clean out the zookeeper data dir.
-            recursiveDelete(dataDir);
+            for (ProcessHelper h : listener.running) {
+
+                // destroy zookeeper service iff we started it.
+                h.kill(true/* immediateShutdown */);
+
+            }
+
+            if (dataDir != null) {
+
+                // clean out the zookeeper data dir.
+                recursiveDelete(dataDir);
+
+            }
+
+        } catch (Throwable t) {
+
+            log.error(t, t);
 
         }
         
