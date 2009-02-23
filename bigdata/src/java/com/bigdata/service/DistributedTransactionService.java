@@ -1848,37 +1848,61 @@ public abstract class DistributedTransactionService extends
      *       when there is also a lot of contention for reading on the desired
      *       timestamp since otherwise the commitTime itself may be used as a
      *       transaction start time.
+     * 
+     * @todo depending on the latency involved and the issue described
+     *       immediately above, it might be possible to simply queue these
+     *       notices and consume them in an async thread. some operations (such
+     *       as a distributed commit) might require that we catch up on the
+     *       commit time notices in the queue. just thinking out loud here.
      */
     final public void notifyCommit(final long commitTime) {
 
-        synchronized(commitTimeIndex) {
+        /*
+         * Note: In order to avoid a deadlock, this must obtain the lock before
+         * synchronizing on the commitTimeIndex since the method in the super
+         * class will request that lock as well.
+         */
+        lock.lock();
 
-            /*
-             * Add all commit times
-             */
-            commitTimeIndex.add(commitTime);
-            
-            /*
-             * Note: commit time notifications can be overlap such that they
-             * appear out of sequence with respect to their values. This is Ok.
-             * We just ignore any older commit times. However we do need to be
-             * synchronized here such that the commit time notices themselves
-             * are serialized so that we do not miss any.
-             */
-            
-            if (DEBUG)
-                log.debug("commitTime=" + commitTime + ", lastKnownCommitTime="
-                        + lastCommitTime
-                        + (lastCommitTime < commitTime ? " WILL UPDATE" : ""));
-            
-            if (lastCommitTime < commitTime) {
+        try {
 
-                lastCommitTime = commitTime;
-                
-                super.notifyCommit(commitTime);
-                
+            synchronized (commitTimeIndex) {
+
+                /*
+                 * Add all commit times
+                 */
+                commitTimeIndex.add(commitTime);
+
+                /*
+                 * Note: commit time notifications can be overlap such that they
+                 * appear out of sequence with respect to their values. This is
+                 * Ok. We just ignore any older commit times. However we do need
+                 * to be synchronized here such that the commit time notices
+                 * themselves are serialized so that we do not miss any.
+                 */
+
+                if (DEBUG)
+                    log.debug("commitTime="
+                            + commitTime
+                            + ", lastKnownCommitTime="
+                            + lastCommitTime
+                            + (lastCommitTime < commitTime ? " WILL UPDATE"
+                                    : ""));
+
+                if (lastCommitTime < commitTime) {
+
+                    lastCommitTime = commitTime;
+
+                    super.notifyCommit(commitTime);
+
+                }
+
             }
-            
+
+        } finally {
+
+            lock.unlock();
+
         }
         
     }
