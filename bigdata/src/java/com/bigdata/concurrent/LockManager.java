@@ -45,35 +45,36 @@ import com.bigdata.counters.Instrument;
  * This class coordinates a schedule among concurrent operations requiring
  * exclusive access to shared resources. Whenever possible, the result is a
  * concurrent schedule - that is, operations having non-overlapping lock
- * requirements run concurrently while operations that have lock contentions
- * are queued behind operations that currently have locks on the relevant
- * resources. A {@link ResourceQueue} is created for each resource and used
- * to block operations that are awaiting a lock. When locks are not being
- * pre-declared, a {@link TxDag WAITS_FOR} graph is additionally used to
- * detect deadlocks.
+ * requirements run concurrently while operations that have lock contentions are
+ * queued behind operations that currently have locks on the relevant resources.
+ * A {@link ResourceQueue} is created for each resource and used to block
+ * operations that are awaiting a lock. When locks are not being pre-declared, a
+ * {@link TxDag WAITS_FOR} graph is additionally used to detect deadlocks.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
  * @param R
- *            The type of the object that identifies a resource for the
- *            purposes of the locking system. This is typically the name of
- *            an index.
+ *            The type of the object that identifies a resource for the purposes
+ *            of the locking system. This is typically the name of an index.
  * 
- * @todo Support escalation of operation priority based on time and
- *       scheduling of higher priority operations. the latter is done by
- *       queueing lock requests in front of pending requests for each
- *       resource on which an operation attempt to gain a lock. The former
- *       is just a dynamic adjustment of the position of the operation in
- *       the resource queue where it is awaiting a lock (an operation never
- *       awaits more than one lock at a time). This facility could be used
- *       to give priority to distributed transactions over local unisolated
- *       operations and to priviledge certain operations that have low
- *       latency requirements. This is not quite a "real-time" guarentee
- *       since the VM is not (normally) providing real-time guarentees and
- *       since we are not otherwise attempting to ensure anything except
- *       lower latency when compared to other operations awaiting their own
- *       locks.
+ * @todo Support escalation of operation priority based on time and scheduling
+ *       of higher priority operations. the latter is done by queueing lock
+ *       requests in front of pending requests for each resource on which an
+ *       operation attempt to gain a lock. The former is just a dynamic
+ *       adjustment of the position of the operation in the resource queue where
+ *       it is awaiting a lock (an operation never awaits more than one lock at
+ *       a time). This facility could be used to give priority to distributed
+ *       transactions over local unisolated operations and to priviledge certain
+ *       operations that have low latency requirements. This is not quite a
+ *       "real-time" guarentee since the VM is not (normally) providing
+ *       real-time guarentees and since we are not otherwise attempting to
+ *       ensure anything except lower latency when compared to other operations
+ *       awaiting their own locks.
+ * 
+ * @deprecated This implementation manages locks in terms of threads. A thread
+ *             is required in order for a task to contend for its locks. This
+ *             places a strain on the thread scheduler.
  */
 public class LockManager</*T,*/R extends Comparable<R>> {
 

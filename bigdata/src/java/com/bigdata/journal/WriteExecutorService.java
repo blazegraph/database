@@ -50,6 +50,7 @@ import org.apache.log4j.MDC;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.concurrent.LockManager;
+import com.bigdata.concurrent.NonBlockingLockManager;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.OverflowManager;
 import com.bigdata.resources.ResourceManager;
@@ -176,12 +177,12 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     /**
      * The object that coordinates exclusive access to the resources.
      */
-    public LockManager<String> getLockManager() {
+    public NonBlockingLockManager<String> getLockManager() {
         
         return lockManager;
         
     }
-    private final LockManager<String> lockManager;
+    private final NonBlockingLockManager<String> lockManager;
 
     /**
      * The time in milliseconds that a group commit will await currently running
@@ -242,9 +243,10 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * AbstractTask API.
              */
 
-            lockManager = new LockManager<String>(//
+            lockManager = new NonBlockingLockManager<String>(//
                     maximumPoolSize, // capacity
-                    true // predeclareLocks
+                    true, // predeclareLocks,
+                    this // delegate
             );
             
         }

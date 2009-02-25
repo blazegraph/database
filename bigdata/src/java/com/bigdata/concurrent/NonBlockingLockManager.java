@@ -56,9 +56,8 @@ import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.journal.AbstractTask;
-import com.bigdata.journal.ConcurrencyManager;
-import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.concurrent.QueueStatisticsTask;
 
 /**
  * This class coordinates a schedule among concurrent operations requiring
@@ -82,13 +81,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @param R
  *            The type of the object that identifies a resource for the purposes
  *            of the locking system. This is typically the name of an index.
- * 
- * FIXME The {@link ConcurrencyManager} will need to explicitly use this class
- * to buffer unisolated operations such that they are only submitted to the
- * {@link WriteExecutorService} once they already have their locks.
- * <p>
- * {@link AbstractTask} needs to be refactored as well since I believe it
- * currently takes responsibility for acquiring the locks and it should not.
  * 
  * @todo a fair option? What constraints or freedoms would it provide?
  * 
@@ -140,6 +132,101 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
     final private ConcurrentWeakValueCache<R, ResourceQueue<LockFutureTask<? extends Object>>> resourceQueues = new ConcurrentWeakValueCache<R, ResourceQueue<LockFutureTask<? extends Object>>>(
             1000/* nresources */);
 
+    /**
+     * Release all locks held by the {@link LockFutureTask} currently holding a
+     * lock on the specified resource.
+     * 
+     * @param resource[]
+     *            The declared locks for the task.
+     * 
+     * FIXME This is an integration hack for {@link AbstractTask}.
+     * {@link AbstractTask} needs to be able to release the locks as soon as the
+     * work of an unisolated task is done (when it is waiting for a group
+     * commit) so that other tasks can gain access to the same indices and make
+     * it into the same group commit. It is using this method to obtain the
+     * {@link LockFutureTask} and then release its locks.
+     * <p>
+     * {@link AbstractTask} really needs a refactor.
+     */
+    public final void releaseLocksForTaskWithLockOnResource(final R[] resource) {
+
+        if (resource == null)
+            throw new IllegalArgumentException();
+        
+        if(resource.length == 0) {
+            
+            // No declared locks.
+            return;
+            
+        }
+        
+        lock.lock();
+        try {
+            
+            LockFutureTask<? extends Object> task = null;
+
+            for (R r : resource) {
+
+                final ResourceQueue<LockFutureTask<? extends Object>> resourceQueue = resourceQueues
+                        .get(r);
+
+                if (task == null) {
+
+                    /*
+                     * find the task by checking the resource queue for any of
+                     * its declared locks.
+                     */
+                    task = resourceQueue.queue.peek();
+
+                    if (task == null)
+                        throw new IllegalArgumentException(
+                                "Task does not hold declared lock: " + r);
+
+                } else {
+
+                    /*
+                     * verify that the task holds the rest of its declared
+                     * locks.
+                     */
+                    if (task != resourceQueue.queue.peek()) {
+
+                        throw new IllegalArgumentException(
+                                "Task does not hold declared lock: " + r);
+
+                    }
+                    
+                }
+
+            }
+
+            if(task == null) {
+                
+                throw new AssertionError();
+                
+            }
+            
+            /*
+             * At this point we have verified that there is a task which holds
+             * all of the locks specified by the caller.
+             */
+
+            /*
+             * The task will be running since that is the presumption for the
+             * context in which this method is invoked within AbstractTask.
+             */
+            final boolean waiting = false;
+            
+            // release the locks for the task.
+            releaseLocks(task, waiting);
+            
+        } finally {
+            
+            lock.unlock();
+            
+        }
+        
+    }
+    
     /**
      * True iff locks MUST be predeclared by the operation - this is a special
      * case of 2PL (two-phrase locking) that allows significant optimizations
@@ -654,6 +741,8 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
 
         }
 
+        private final Object task;
+        
         public String toString() {
 
             return super.toString() + //
@@ -676,6 +765,8 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
 
             this.maxLockTries = maxLockTries;
 
+            this.task = task;
+            
         }
 
         public LockFutureTask(final R[] resources, final Runnable task,
@@ -688,6 +779,8 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
             this.lockTimeout = timeout;
 
             this.maxLockTries = maxLockTries;
+            
+            this.task = task;
 
         }
 
@@ -798,10 +891,29 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
         @Override
         public void run() {
 
+            /*
+             * Increment by the amount of time that the task was waiting to
+             * acquire its lock(s).
+             * 
+             * Note: This is being measured from the time when the task was
+             * accepted by submit() on the outer class and counts all time until
+             * the task begins to execute with its locks held.
+             */
+            if (task instanceof AbstractTask) {
+                
+                final long lockWaitingTime = System.nanoTime() - acceptTime;
+
+                ((AbstractTask) task).getTaskCounters().lockWaitingTime
+                        .addAndGet(lockWaitingTime);
+
+            }
+
             synchronized (counters) {
 
                 counters.nstarted++;
 
+                counters.nwaiting--;
+                
                 counters.nrunning++;
 
                 if (counters.nrunning > counters.maxRunning) {
@@ -917,11 +1029,11 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
 
     }
 
-    public <T> Future<T> submit(final LockCallable<R, T> task) {
-
-        return submit(task.getResource(), task);
-
-    }
+//    public <T> Future<T> submit(final LockCallable<R, T> task) {
+//
+//        return submit(task.getResource(), task);
+//
+//    }
 
     public <T> Future<T> submit(final R[] resource, final Callable<T> task,
             final TimeUnit unit, final long lockTimeout, final int maxLockTries) {
@@ -1014,8 +1126,9 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
     /**
      * Used to run the {@link AcceptTask} and the {@link MonitorTask}.
      * 
-     * @todo Monitor this service. Convert {@link Counters#nrunning} and
-     *       {@link Counters#nwaiting} into moving averages.
+     * FIXME Monitor this service using a {@link QueueStatisticsTask} to convert
+     * {@link Counters#nrunning} and {@link Counters#nwaiting} into moving
+     * averages.
      */
     private final ExecutorService service = Executors
             .newSingleThreadExecutor(new DaemonThreadFactory(getClass()
@@ -1096,7 +1209,8 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
                              * There is no more work to be performed so we can
                              * change the runState.
                              */
-                            log.warn("No more work.");
+                            if(INFO)
+                                log.info("No more work.");
                             if (runState.val < RunState.ShutdownNow.val) {
                                 setRunState(RunState.ShutdownNow);
                                 break;
@@ -1114,7 +1228,8 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
                      * tasks which are on [runningTasks] need to be interrupted
                      * as tasks on the other queues are NOT running.
                      */
-                    log.warn(runState);
+                    if(INFO)
+                        log.info(runState);
                     cancelTasks(acceptedTasks.iterator(), false/* mayInterruptIfRunning */);
                     cancelTasks(waitingTasks.iterator(), false/* mayInterruptIfRunning */);
                     lock.lock();
@@ -1128,7 +1243,8 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
                     // fall through.
                 }
                 case Halted: {
-                    log.warn(runState);
+                    if (INFO)
+                        log.info(runState);
                     // Done.
                     return;
                 }
@@ -1165,9 +1281,11 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
                     // Some work can be done.
                     return;
                 }
-                log.warn("Waiting...");
+                if (INFO)
+                    log.info("Waiting...");
                 stateChanged.await();
-                log.warn("Woke up...");
+                if (INFO)
+                    log.info("Woke up...");
             } catch (InterruptedException ex) {
                 // someone woke us up.
             } finally {
@@ -1888,53 +2006,42 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
 
         } finally {
 
-            /*
-             * At this point there are edges in the WAITS_FOR graph and the no
-             * longer on any of the resource queues. Since we know that it is
-             * not waiting we can just clear its edges the easy way.
-             * 
-             * @todo The [waiting] flag is not being used to optimize the
-             * removal of edges from the WAITS_FOR graph. Fixing this will
-             * require us to remove the operation from each
-             * {@link ResourceQueue} without updating the {@link TxDag} and then
-             * update the {@link TxDag} using
-             * {@link TxDag#removeEdges(Object, boolean)} and specifying "false"
-             * for "waiting". Since this operation cuts across multiple queues
-             * at once additional synchronization MAY be required.
-             */
             if (waitsFor != null) {
 
+                /*
+                 * At this point there are edges in the WAITS_FOR graph and the
+                 * task is no longer on any of the resource queues.
+                 */
                 synchronized (waitsFor) {
 
                     try {
-                        
+
                         waitsFor.removeEdges(t, waiting);
-                        
+
+                        /*
+                         * Release the vertex (if any) in the WAITS_FOR graph.
+                         * 
+                         * Note: Since we always declare a vertex before we
+                         * request the locks for a task this method SHOULD NOT
+                         * return [false].
+                         */
+
+                        if (waitsFor.releaseVertex(t)) {
+
+                            log.error("No vertex? " + t);
+
+                        }
+
                     } catch (Throwable t2) {
-                        
-                        log.warn(t2);
-                        
+
+                        log.error(this, t2);
+
                     }
 
                 }
 
             }
 
-            /*
-             * Release the vertex (if any) in the WAITS_FOR graph.
-             * 
-             * Note: A vertex is created iff a dependency chain is established.
-             * Therefore it is possible for a transaction to obtain a lock
-             * without a vertex begin created for that tranasaction. Hence it is
-             * Ok if this method returns [false].
-             */
-
-            if (waitsFor != null) {
-
-                waitsFor.releaseVertex(t);
-
-            }
-            
         } 
 
     }

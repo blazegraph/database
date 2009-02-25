@@ -110,7 +110,10 @@ public class TestAll extends TestCase {
 
         suite.addTest( TestDiskJournal.suite() );
 
-        suite.addTest( TestBufferedDiskJournal.suite() );
+        /*
+         * FIXME enable this test suite once the journal mode is ready.
+         */
+//        suite.addTest( TestBufferedDiskJournal.suite() );
 
         return suite;
 

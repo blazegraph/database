@@ -22,7 +22,7 @@ import java.util.concurrent.TimeoutException;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.concurrent.LockManager;
+import com.bigdata.concurrent.NonBlockingLockManager;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
@@ -36,9 +36,10 @@ import com.bigdata.util.concurrent.TaskCounters;
 /**
  * Supports concurrent operations against named indices. Historical read and
  * read-committed tasks run with full concurrency. For unisolated tasks, the
- * {@link ConcurrencyManager} uses a {@link LockManager} to identify a schedule
- * of operations such that access to an unisolated named index is always single
- * threaded while access to distinct unisolated named indices MAY be concurrent.
+ * {@link ConcurrencyManager} uses a {@link NonBlockingLockManager} to identify
+ * a schedule of operations such that access to an unisolated named index is
+ * always single threaded while access to distinct unisolated named indices MAY
+ * be concurrent.
  * <p>
  * There are several thread pools that facilitate concurrency. They are:
  * <dl>
@@ -223,6 +224,11 @@ public class ConcurrencyManager implements IConcurrencyManager {
          * The maximum depth of the write service queue before newly submitted
          * tasks will block the caller -or- ZERO (0) to use a queue with an
          * unlimited capacity.
+         * <p>
+         * Note: the corePoolSize will never increase for an unbounded queue so
+         * the value specified for maximumPoolSize will essentially be ignored
+         * in this case. See {@link ThreadPoolExecutor}'s discussion on queues
+         * for more information on this issue.
          * 
          * @see #DEFAULT_WRITE_SERVICE_QUEUE_CAPACITY
          */
@@ -893,8 +899,8 @@ public class ConcurrencyManager implements IConcurrencyManager {
         String writeService = "Unisolated Write Service";
 
         /**
-         * The {@link LockManager} that manages the resource locks for the
-         * {@link #writeService}.
+         * The performance counters for the object which manages the resource
+         * locks for the {@link #writeService}.
          */
         String WriteServiceLockManager = writeService + ICounterSet.pathSeparator + "LockManager";
         
@@ -1189,9 +1195,21 @@ public class ConcurrencyManager implements IConcurrencyManager {
             
         }
 
-        return service.submit(task);
+        if (service == writeService) {
+
+            final NonBlockingLockManager<String> lockManager = writeService
+                    .getLockManager();
+
+            return lockManager.submit(task.getResource(), task);
+
+        } else {
+
+            return service.submit(task);
+
+        }
 
     }
+
     /**
      * When <code>true</code> imposes dynamic latency on ariving tasks in
      * {@link #submitWithDynamicLatency(AbstractTask, ExecutorService, TaskCounters)}.
