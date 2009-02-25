@@ -811,20 +811,5 @@ public class LockManager</*T,*/R extends Comparable<R>> {
         return getCounters().toString();
 
     }
-
-    /**
-     * Thrown by some unit tests.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class HorridTaskDeath extends RuntimeException {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = 6798406260395237402L;
-        
-    }
     
 }
