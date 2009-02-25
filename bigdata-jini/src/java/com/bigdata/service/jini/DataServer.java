@@ -42,6 +42,7 @@ import net.jini.lookup.entry.Name;
 
 import org.apache.log4j.MDC;
 
+import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.service.DataService;
 import com.bigdata.service.DataService.DataServiceFederationDelegate;
@@ -282,7 +283,19 @@ public class DataServer extends AbstractServer {
         }
 
         /**
-         * Extends the base behavior to return an RMI compatible proxy.
+         * Extends the base behavior to return an RMI compatible proxy for the
+         * {@link Future}.
+         */
+        public Future submit(final long tx, final String name,
+                final IIndexProcedure proc) {
+
+            return getFederation().getProxy(super.submit(tx, name, proc));
+
+        }
+
+        /**
+         * Extends the base behavior to return an RMI compatible proxy for the
+         * {@link Future}.
          */
         public Future<? extends Object> submit(
                 final Callable<? extends Object> task) {
