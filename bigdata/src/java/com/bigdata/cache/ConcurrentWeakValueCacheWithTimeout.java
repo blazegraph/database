@@ -47,6 +47,8 @@ public class ConcurrentWeakValueCacheWithTimeout<K, V> extends
     /**
      * Ctor variant using a {@link SynchronizedHardReferenceQueueWithTimeout}
      * with the specified capacity and timeout for stale references.
+     * 
+     * @param timeout The timeout in nanoseconds.
      */
     public ConcurrentWeakValueCacheWithTimeout(final int queueCapacity,
             final long timeout) {
@@ -61,6 +63,8 @@ public class ConcurrentWeakValueCacheWithTimeout<K, V> extends
      * with the specified capacity, timeout for stale references, and the
      * specified concurrency level for the inner {@link ConcurrentHashMap} used
      * by this class.
+     * 
+     * @param timeout The timeout in nanoseconds.
      */
     public ConcurrentWeakValueCacheWithTimeout(final int queueCapacity,
             final float loadFactor, final int concurrencyLevel,
