@@ -408,7 +408,7 @@ public class DataServiceIndex implements IClientIndex {
 
         try {
 
-            rangeCount = (Long) dataService.submit(timestamp, name, proc);
+            rangeCount = (Long) dataService.submit(timestamp, name, proc).get();
 
         } catch (Exception ex) {
 
@@ -429,7 +429,7 @@ public class DataServiceIndex implements IClientIndex {
 
         try {
 
-            rangeCount = (Long) dataService.submit(timestamp, name, proc);
+            rangeCount = (Long) dataService.submit(timestamp, name, proc).get();
 
         } catch (Exception ex) {
 
@@ -496,7 +496,7 @@ public class DataServiceIndex implements IClientIndex {
 
         try {
 
-            return dataService.submit(timestamp, name, proc);
+            return dataService.submit(timestamp, name, proc).get();
 
         } catch (Exception ex) {
 
@@ -515,7 +515,7 @@ public class DataServiceIndex implements IClientIndex {
 
         try {
             
-            Object result = dataService.submit(timestamp, name, proc);
+            Object result = dataService.submit(timestamp, name, proc).get();
 
             if(handler!=null) {
                 
@@ -538,7 +538,7 @@ public class DataServiceIndex implements IClientIndex {
         try {
 
             Object result = dataService.submit(timestamp, name, ctor
-                    .newInstance(this,fromIndex, toIndex, keys, vals));
+                    .newInstance(this,fromIndex, toIndex, keys, vals)).get();
             
             if(aggregator != null) {
 

@@ -125,7 +125,7 @@ public class TestBasicIndexStuff extends
         try {
 
             dataService0.submit(ITx.UNISOLATED, name, new RangeCountProcedure(
-                    false/* exact */, null, null));
+                    false/* exact */, null, null)).get();
             
         } catch (Exception ex) {
 
@@ -300,7 +300,7 @@ public class TestBasicIndexStuff extends
                         1,// toIndex
                         new byte[][] { new byte[] { 1 } },// keys
                         null //vals
-                ))).getResult(0));
+                )).get()).getResult(0));
         //
         assertEquals(new byte[] { 5 }, ((ResultBuffer) dataService1.submit(
                 ITx.UNISOLATED,//
@@ -311,7 +311,7 @@ public class TestBasicIndexStuff extends
                         1,// toIndex
                         new byte[][] { new byte[] { 5 } },// keys
                         null//vals
-                ))).getResult(0));
+                )).get()).getResult(0));
 
         // verify some range counts.
         assertEquals(0,ndx.rangeCount(new byte[]{}, new byte[]{1}));

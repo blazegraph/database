@@ -124,8 +124,7 @@ abstract public class MetadataService extends DataService implements
      * @throws InterruptedException 
      */
     @Override
-    public Future<? extends Object> submit(Callable<? extends Object> task)
-            throws InterruptedException, ExecutionException {
+    public Future<? extends Object> submit(Callable<? extends Object> task) {
 
         // throw new UnsupportedOperationException();
         return super.submit(task);

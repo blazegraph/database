@@ -31,7 +31,6 @@ import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.counters.httpd.CounterSetHTTPDServer;
 import com.bigdata.journal.ITx;
 import com.bigdata.service.DefaultServiceFederationDelegate;
-import com.bigdata.service.Event;
 import com.bigdata.service.IFederationDelegate;
 import com.bigdata.service.IService;
 import com.bigdata.service.LoadBalancerService;
@@ -341,38 +340,6 @@ public class LoadBalancerServer extends AbstractServer {
             return new CounterSetHTTPD(httpdPort, counterSet, service) {
 
                 /**
-                 * Handlers provides access to the current {@link Event}s
-                 * within the {@link LoadBalancerService}.
-                 * 
-                 * @author <a
-                 *         href="mailto:thompsonbry@users.sourceforge.net">Bryan
-                 *         Thompson</a>
-                 * @version $Id$
-                 * 
-                 * FIXME Not implemented yet. Should provide for filter by any
-                 * of the various event properties, perhaps using
-                 * "?filter=property:value". Certainly one of the common filters
-                 * is to only see the completed events. Also nice to have things
-                 * sorted by one or more columns. E.g., elapsed (dsc) or
-                 * startTime(asc) + resource (asc). There should also be a
-                 * derived column for the index name (everything up to the "#"
-                 * when the resource has "#" within it).
-                 */
-                class EventsHandler implements HTTPGetHandler {
-
-                    public Response doGet(String uri, String method, Properties header,
-                            LinkedHashMap<String, Vector<String>> parms)
-                            throws Exception {
-
-                        return new Response(NanoHTTPD.HTTP_OK,
-                                NanoHTTPD.MIME_TEXT_PLAIN,
-                                "Not implemented yet!");
-                        
-                    }
-
-                }
-
-                /**
                  * Handler provides dump of index partitions for either all
                  * indices or each index namespace identified by a
                  * <code>namespace</code> URL query parameter.
@@ -482,19 +449,13 @@ public class LoadBalancerServer extends AbstractServer {
                     
                 }
 
-                final EventsHandler eventsHandler = new EventsHandler();
-
                 final IndicesHandler indicesHandler = new IndicesHandler();
                 
                 public Response doGet(String uri, String method, Properties header,
                         LinkedHashMap<String, Vector<String>> parms)
                         throws Exception {
 
-                    if(uri.equals("/events")) {
-                        
-                        return eventsHandler.doGet(uri, method, header, parms);
-                        
-                    } else if(uri.equals("/indices")) {
+                    if(uri.equals("/indices")) {
                         
                         return indicesHandler.doGet(uri, method, header, parms);
                         

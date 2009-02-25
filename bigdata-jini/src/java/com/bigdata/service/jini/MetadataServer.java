@@ -33,7 +33,6 @@ import java.rmi.RemoteException;
 import java.rmi.server.ServerNotActiveException;
 import java.util.Properties;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 import net.jini.config.Configuration;
@@ -273,8 +272,7 @@ public class MetadataServer extends DataServer {
         /**
          * Extends the base behavior to return an RMI compatible proxy.
          */
-        public Future<? extends Object> submit(Callable<? extends Object> task)
-                throws InterruptedException, ExecutionException {
+        public Future<? extends Object> submit(Callable<? extends Object> task) {
 
             return getFederation().getProxy(super.submit(task));
             

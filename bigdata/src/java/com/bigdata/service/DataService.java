@@ -170,6 +170,11 @@ import com.bigdata.resources.StoreManager.ManagedJournal;
  * {@link ConcurrencyManager}. The issue will be resolved by a re-design of the
  * {@link LockManager}.
  * 
+ * FIXME Probably ALL of the methods {@link IDataService} should be subsumed
+ * under {@link #submit(Callable)} or
+ * {@link #submit(long, String, IIndexProcedure)} so they do not block on the
+ * {@link DataService} and thereby absorb a thread.
+ * 
  * @todo Review JERI options to support secure RMI protocols. For example, using
  *       SSL or an SSH tunnel. For most purposes I expect bigdata to operate on
  *       a private network, but replicate across gateways is also a common use
@@ -1460,9 +1465,12 @@ abstract public class DataService extends AbstractService
      * read-only operation. This provides better concurrency on the
      * {@link DataService} by moving read-only operations off of the
      * {@link WriteExecutorService}.
+     * <p>
+     * Note: When the {@link DataService} is accessed via RMI the {@link Future}
+     * MUST be a proxy. This gets handled by the concrete server implementation.
      */
-    public Object submit(long tx, String name, IIndexProcedure proc)
-            throws InterruptedException, ExecutionException {
+    public Future submit(final long tx, final String name,
+            final IIndexProcedure proc) {
 
         setupLoggingContext();
 
@@ -1497,7 +1505,7 @@ abstract public class DataService extends AbstractService
             }
             
             // submit the procedure and await its completion.
-            return concurrencyManager.submit(task).get();
+            return concurrencyManager.submit(task);
         
         } finally {
             
@@ -1508,16 +1516,8 @@ abstract public class DataService extends AbstractService
     }
 
     /**
-     * The task will be run on the
-     * {@link IBigdataFederation#getExecutorService()}.
-     * <p>
-     * The {@link Callable} MAY implement {@link IDataServiceAwareProcedure} to
-     * obtain the {@link DataService} reference, which can be used to obtain a
-     * local {@link IBigdataClient} reference or to submit additional tasks to
-     * the {@link ConcurrencyManager}.
-     * <p>
      * Note: When the {@link DataService} is accessed via RMI the {@link Future}
-     * MUST be a proxy.
+     * MUST be a proxy. This gets handled by the concrete server implementation.
      * 
      * @see AbstractDistributedFederation#getProxy(Future)
      * 
@@ -1538,38 +1538,45 @@ abstract public class DataService extends AbstractService
      *       for example, if they use {@link AbstractFederation#shutdownNow()}
      *       then the {@link DataService} itself would be shutdown.
      */
-    public Future<? extends Object> submit(Callable<? extends Object> task)
-            throws InterruptedException, ExecutionException {
-     
+    public Future<? extends Object> submit(final Callable<? extends Object> task) {
+
         setupLoggingContext();
 
         try {
-    
+
             if (task == null)
                 throw new IllegalArgumentException();
-            
-            if(task instanceof IDataServiceAwareProcedure) {
-         
-                if(log.isInfoEnabled()) {
-                    
-                    log.info("Data service aware procedure: "+task.getClass().getName());
-                    
+
+            /*
+             * Submit to the ExecutorService for the DataService's federation
+             * object. This is used for tasks which are not associated with a
+             * timestamp and hence not linked to any specific view of the named
+             * indices.
+             */
+
+            if (task instanceof IDataServiceAwareProcedure) {
+
+                if (log.isInfoEnabled()) {
+
+                    log.info("Data service aware procedure: "
+                            + task.getClass().getName());
+
                 }
-                
+
                 // set the data service on the task.
-                ((IDataServiceAwareProcedure)task).setDataService( this );
-                
+                ((IDataServiceAwareProcedure) task).setDataService(this);
+
             }
-            
+
             // submit the task and await its completion.
             return getFederation().getExecutorService().submit(task);
-        
+
         } finally {
-            
+
             clearLoggingContext();
-            
+
         }
-        
+
     }
     
     /**

@@ -232,7 +232,7 @@ public class RawDataServiceTupleIterator<E> extends AbstractChunkedTupleIterator
             dataService.submit(timestamp, name,
                     BatchRemoveConstructor.RETURN_NO_VALUES
                             .newInstance(0/* fromIndex */, n/* toIndex */, keys,
-                                    null/*vals*/));
+                                    null/*vals*/)).get();
 
         } catch (Exception e) {
             
@@ -243,7 +243,7 @@ public class RawDataServiceTupleIterator<E> extends AbstractChunkedTupleIterator
     }
 
     @Override
-    protected void deleteLast(byte[] key) {
+    protected void deleteLast(final byte[] key) {
 
         try {
             
@@ -251,7 +251,7 @@ public class RawDataServiceTupleIterator<E> extends AbstractChunkedTupleIterator
             dataService.submit(timestamp, name,
                     BatchRemoveConstructor.RETURN_NO_VALUES.newInstance(
                             0/* fromIndex */, 1/* toIndex */,
-                            new byte[][] { key }, null/*vals*/));
+                            new byte[][] { key }, null/*vals*/)).get();
 
         } catch (Exception e) {
             
@@ -262,7 +262,7 @@ public class RawDataServiceTupleIterator<E> extends AbstractChunkedTupleIterator
     }
 
     @Override
-    protected IBlock readBlock(final int sourceIndex, long addr) {
+    protected IBlock readBlock(final int sourceIndex, final long addr) {
         
         final IResourceMetadata resource = rset.getSources()[sourceIndex];
         

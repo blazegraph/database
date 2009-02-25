@@ -315,7 +315,7 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
                     targetDataService.submit(ITx.UNISOLATED, targetIndexName,
                             new CopyIndexPartitionProcedure(resourceManager
                                     .getDataServiceUUID(), vmd.name,
-                                    vmd.commitTime));
+                                    vmd.commitTime)).get();
                     
                 } finally {
 
@@ -975,7 +975,7 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
                  * partition MUST be on the target data service.
                  */
                 targetDataService.submit(ITx.UNISOLATED, targetIndexName,
-                        new CopyBufferedWritesProcedure(rset));
+                        new CopyBufferedWritesProcedure(rset)).get();
 
                 // #of tuples copied.
                 ncopied += rset.getNumTuples();
