@@ -272,11 +272,11 @@ public class AbstractResourceManagerTestCase extends
             throw new UnsupportedOperationException();
         }
 
-        public Object submit(long tx, String name, IIndexProcedure proc) throws InterruptedException, ExecutionException, IOException {
+        public Future submit(long tx, String name, IIndexProcedure proc) {
             throw new UnsupportedOperationException();
         }
 
-        public IBlock readBlock(IResourceMetadata resource, long addr) throws IOException {
+        public IBlock readBlock(IResourceMetadata resource, long addr) {
             throw new UnsupportedOperationException();
         }
 
@@ -339,8 +339,7 @@ public class AbstractResourceManagerTestCase extends
 
         }
 
-       public Future<? extends Object> submit(Callable<? extends Object> proc)
-                throws InterruptedException, ExecutionException, IOException {
+       public Future<? extends Object> submit(Callable<? extends Object> proc) {
 
             return null;
         }

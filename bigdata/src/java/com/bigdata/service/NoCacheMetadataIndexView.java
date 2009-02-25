@@ -120,7 +120,7 @@ public class NoCacheMetadataIndexView implements IMetadataIndex {
         try {
 
             rangeCount = (Long) getMetadataService().submit(timestamp,
-                    MetadataService.getMetadataIndexName(name), proc);
+                    MetadataService.getMetadataIndexName(name), proc).get();
 
         } catch (Exception e) {
 
@@ -141,7 +141,7 @@ public class NoCacheMetadataIndexView implements IMetadataIndex {
         try {
 
             rangeCount = (Long) getMetadataService().submit(timestamp,
-                    MetadataService.getMetadataIndexName(name), proc);
+                    MetadataService.getMetadataIndexName(name), proc).get();
 
         } catch (Exception e) {
 

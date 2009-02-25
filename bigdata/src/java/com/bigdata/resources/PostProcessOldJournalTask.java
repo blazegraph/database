@@ -562,7 +562,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                                     TimestampUtility.asHistoricalRead(lastCommitTime),
                                     MetadataService
                                             .getMetadataIndexName(scaleOutIndexName),
-                                    op);
+                                    op).get();
                 } catch (Exception e) {
                     
                     log.error("Could not locate rightSiblings: index="

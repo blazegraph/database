@@ -320,7 +320,7 @@ abstract public class MapService
                     .newInstance(0/* fromIndex */, ntuples/* toIndex */, keys,
                             vals);
 
-            ds.submit(ITx.UNISOLATED, name/*unpartitioned*/, proc);
+            ds.submit(ITx.UNISOLATED, name/*unpartitioned*/, proc).get();
             
 //            ds.batchInsert(ITx.UNISOLATED, name/*unpartitioned*/, ntuples, keys, vals,
 //                            false /* returnOldValues */);

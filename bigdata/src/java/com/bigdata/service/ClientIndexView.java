@@ -1728,7 +1728,7 @@ public class ClientIndexView implements IClientIndex {
              * federation for the procedure.
              */
 
-            final Object result = dataService.submit(ts, name, proc);
+            final Object result = dataService.submit(ts, name, proc).get();
 
             if (resultHandler != null) {
 

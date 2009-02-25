@@ -1486,6 +1486,12 @@ public class SplitFinder {
 
         final UUID[] uuids = fed.getDataServiceUUIDs(nservices);
         
+        if (uuids.length == 0) {
+            
+            throw new RuntimeException("No data services were discovered.");
+            
+        }
+            
         final Map<IKeyOrder, AssignedSplits> assignedSplits = new HashMap<IKeyOrder, AssignedSplits>();
 
         assignedSplits.put(LexiconKeyOrder.TERM2ID, newSplitAssignment(
@@ -1503,7 +1509,8 @@ public class SplitFinder {
         if (splits.posSplits != null) {
         
             /*
-             * FIXME I have not figured out a way to split the POS index yet.
+             * FIXME I have not figured out a way to (pre-)split the POS index
+             * yet.
              */
             
             assignedSplits.put(SPOKeyOrder.POS, newSplitAssignment(

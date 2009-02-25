@@ -2082,7 +2082,6 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
                  * 
                  * Note: throws DeadlockException.
                  */
-
                 waitsFor.addEdges(tx/* src */, predecessors);
 
             }

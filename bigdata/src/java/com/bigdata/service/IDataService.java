@@ -24,10 +24,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service;
 
 import java.io.IOException;
-import java.io.Serializable;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.IIndex;
@@ -36,6 +36,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.proc.IIndexProcedure;
+import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
@@ -53,13 +54,12 @@ import com.bigdata.sparse.SparseRowStore;
  * <p>
  * The data service interface provides remote access to named indices, provides
  * for both unisolated and isolated operations on those indices, and exposes the
- * {@link ITxCommitProtocol} interface to the
- * {@link ITransactionManagerService} service for the coordination of
- * distributed transactions. Clients normally write to the {@link IIndex}
- * interface. The {@link ClientIndexView} provides an implementation of that
- * interface supporting range partitioned scale-out indices which transparently
- * handles lookup of data services in the metadata index and mapping of
- * operations across the appropriate data services.
+ * {@link ITxCommitProtocol} interface to the {@link ITransactionManagerService}
+ * service for the coordination of distributed transactions. Clients normally
+ * write to the {@link IIndex} interface. The {@link ClientIndexView} provides
+ * an implementation of that interface supporting range partitioned scale-out
+ * indices which transparently handles lookup of data services in the metadata
+ * index and mapping of operations across the appropriate data services.
  * </p>
  * <p>
  * Indices are identified by name. Scale-out indices are broken into index
@@ -418,45 +418,47 @@ public interface IDataService extends ITxCommitProtocol, IService {
      * </p>
      * 
      * @param tx
-     *            The transaction identifier -or- {@link ITx#UNISOLATED} IFF the
-     *            operation is NOT isolated by a transaction -or-
-     *            <code> - tx </code> to read from the most recent commit point
-     *            not later than the absolute value of <i>tx</i> (a fully
-     *            isolated read-only transaction using a historical start time).
+     *            The transaction identifier, {@link ITx#UNISOLATED} for an ACID
+     *            operation NOT isolated by a transaction,
+     *            {@link ITx#READ_COMMITTED} for a read-committed operation not
+     *            protected by a transaction (no global read lock), or any valid
+     *            commit time for a read-historical operation not protected by a
+     *            transaction (no global read lock).
      * @param name
-     *            The name of the scale-out index.
+     *            The name of the index partition.
      * @param proc
-     *            The procedure to be executed. This MUST be a serializable
-     *            object with downloadable code if it will be executed on a
-     *            remote {@link DataService}.
+     *            The procedure to be executed.
      * 
-     * @return The result, which is entirely defined by the procedure
-     *         implementation and which MAY be null. In general, this MUST be
-     *         {@link Serializable} since it may have to pass across a network
-     *         interface.
+     * @return The {@link Future} from which the outcome of the procedure may be
+     *         obtained.
      * 
+     * @throws RejectedExecutionException
+     *             if the task can not be accepted for execution.
      * @throws IOException
-     * @throws InterruptedException
-     * @throws ExecutionException
+     *             if there is an RMI problem.
      */
-    public Object submit(long tx, String name, IIndexProcedure proc)
-            throws InterruptedException, ExecutionException, IOException;
+    public Future submit(long tx, String name, IIndexProcedure proc)
+            throws IOException;
 
     /**
      * Execute an arbitrary {@link Callable} on the {@link IDataService}.
      * <p>
-     * The task can implement {@link IDataServiceAwareProcedure} in order to
-     * gain access to the {@link IDataService} instance. It can use that access
-     * in order to submit tasks to the {@link IConcurrencyManager}, etc.
+     * The task can implement {@link IRemoteIndexProcedure} in which case it
+     * will be run against the {@link ConcurrencyManager}. Otherwise it will be
+     * run against the {@link IBigdataFederation#getExecutorService()} for the
+     * {@link IDataService}. The task can implement
+     * {@link IDataServiceAwareProcedure} in order to gain access to the
+     * {@link IDataService} instance.
      * 
      * @return The {@link Future} for that task.
      * 
-     * @throws InterruptedException
-     * @throws ExecutionException
+     * @throws RejectedExecutionException
+     *             if the task can not be accepted for execution.
      * @throws IOException
+     *             if there is an RMI problem.
      */
     public Future<? extends Object> submit(Callable<? extends Object> proc)
-            throws InterruptedException, ExecutionException, IOException;
+            throws IOException;
 
     /**
      * Read a low-level record from the described {@link IRawStore} described by

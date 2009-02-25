@@ -300,7 +300,7 @@ public class StressTestNonBlockingLockManagerWithTxDag extends
      * <p>
      * Note: This condition provides the basis for deadlocks.
      * 
-     * FIXME postcondition tests.
+     * FIXME postcondition tests : this test is failing.
      */
     public void test_multipleResourceLocking_resources3_waitsFor_locktries3() throws Exception {
 
@@ -326,7 +326,7 @@ public class StressTestNonBlockingLockManagerWithTxDag extends
      * have 10 resource locks for each operation and only 100 operations the
      * chances of a deadlock on any given operation are extremely high.
      * 
-     * FIXME postcondition tests.
+     * FIXME postcondition tests : this test is failing.
      */
     public void test_multipleResourceLocking_resources10_waitsFor_locktries10() throws Exception {
 

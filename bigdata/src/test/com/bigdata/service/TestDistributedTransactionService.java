@@ -147,7 +147,7 @@ public class TestDistributedTransactionService extends
 
             public boolean isReadOnly() {
                 return false;// read-write.
-            }});
+            }}).get();
         
         // verify write not visible to unisolated operation.
         dataService1.submit(ITx.UNISOLATED, name1, new IIndexProcedure(){
@@ -162,7 +162,7 @@ public class TestDistributedTransactionService extends
 
             public boolean isReadOnly() {
                 return false;// read-write.
-            }});
+            }}).get();
 
         // abort the tx.
         fed.getTransactionService().abort(tx);
@@ -180,7 +180,7 @@ public class TestDistributedTransactionService extends
 
             public boolean isReadOnly() {
                 return false;// read-write.
-            }});
+            }}).get();
 
         // verify operation rejected for aborted read-write tx.
         try {
@@ -193,7 +193,7 @@ public class TestDistributedTransactionService extends
 
             public boolean isReadOnly() {
                 return false;// read-write.
-            }});
+            }}).get();
         fail("Expecting exception");
         } catch(Throwable t) {
             log.info("Ignoring expected error: "+t);
@@ -238,7 +238,7 @@ public class TestDistributedTransactionService extends
 
             public boolean isReadOnly() {
                 return false;// read-write.
-            }});
+            }}).get();
         
         // verify write not visible to unisolated operation.
         dataService1.submit(ITx.UNISOLATED, name1, new IIndexProcedure(){
@@ -253,7 +253,7 @@ public class TestDistributedTransactionService extends
 
             public boolean isReadOnly() {
                 return false;// read-write.
-            }});
+            }}).get();
 
         // commit the tx.
         final long commitTime = fed.getTransactionService().commit(tx);
@@ -271,7 +271,7 @@ public class TestDistributedTransactionService extends
 
             public boolean isReadOnly() {
                 return true;// read-only.
-            }});
+            }}).get();
 
         // verify operation rejected for committed read-write tx.
         try {
@@ -284,7 +284,7 @@ public class TestDistributedTransactionService extends
 
             public boolean isReadOnly() {
                 return false;// read-write.
-            }});
+            }}).get();
         fail("Expecting exception");
         } catch(Throwable t) {
             log.info("Ignoring expected error: "+t);
