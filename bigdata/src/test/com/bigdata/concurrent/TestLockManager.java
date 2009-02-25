@@ -78,11 +78,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * @todo test to verify that we can interrupt running tasks.
  * 
- * @todo refactor to have Thread != Tx using thread local variables ala
- *       {@link LockContext}. Change the {@link #lockedResources} to be a
- *       {@link ThreadLocal} variable. Borrow the test suite for the
- *       {@link LockContext}.
- * 
  * @todo verify more necessary outcomes of the different tests using assertions.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

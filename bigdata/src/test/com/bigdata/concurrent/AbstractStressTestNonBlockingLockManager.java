@@ -168,45 +168,6 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
     }
 
     /**
-     * Bundles the resources identifying the required locks with the
-     * task to be executed once it holds those locks.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     * @version $Id$
-     * @param <R>
-     * @param <T>
-     */
-    static class ResourceCallable<R extends Comparable, T> {
-
-        final R[] resource;
-
-        final Callable<T> task;
-
-        final TimeUnit unit;
-        
-        final long timeout;
-        
-        final int maxtries;
-        
-        public ResourceCallable(final R[] resource, final Callable<T> task,
-                final TimeUnit unit, final long timeout, final int maxtries) {
-           
-            this.resource = resource;
-            
-            this.task = task;
-            
-            this.unit = unit;
-            
-            this.timeout = timeout;
-            
-            this.maxtries = maxtries;
-            
-        }
-    
-    }
-
-    /**
      * Test driver. 
      * <p>
      * Note: A "resource" is a named index (partition), so set nresources based
@@ -302,7 +263,7 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
 
         try {
 
-            final Collection<ResourceCallable<String, Object>> tasks = new ArrayList<ResourceCallable<String, Object>>(
+            final Collection<LockCallableImpl<String, Object>> tasks = new ArrayList<LockCallableImpl<String, Object>>(
                     ntasks);
 
             // distinct resource names. references are reused by reach task.
@@ -370,17 +331,17 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
                  * Create all tasks.  They will be submitted below.
                  */
 
-                final ResourceCallable<String, Object> task;
+                final LockCallableImpl<String, Object> task;
 
                 if (r.nextDouble() < percentTaskDeath) {
 
-                    task = new ResourceCallable<String, Object>(resource,
+                    task = new LockCallableImpl<String, Object>(resource,
                             new DeathResourceTask<Object>(),
                             TimeUnit.NANOSECONDS, lockTimeout, maxLockTries);
 
                 } else {
 
-                    task = new ResourceCallable<String, Object>(resource,
+                    task = new LockCallableImpl<String, Object>(resource,
                             new Wait10ResourceTask<Object>(),
                             TimeUnit.NANOSECONDS, lockTimeout, maxLockTries);
 
@@ -402,13 +363,13 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
                 long elapsed;
                 {
 
-                    final Iterator<ResourceCallable<String, Object>> itr = tasks
+                    final Iterator<LockCallableImpl<String, Object>> itr = tasks
                             .iterator();
 
                     while ((elapsed = (System.nanoTime() - begin)) < testTimeout
                             && itr.hasNext()) {
 
-                        final ResourceCallable<String, Object> task = itr
+                        final LockCallableImpl<String, Object> task = itr
                                 .next();
 
                         futures.add(lockManager.submit(task.resource,
@@ -584,11 +545,11 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
         /**
          * When true, operations MUST pre-declare their locks (default true).
          * <p>
-         * Note: The {@link LockManager} uses this information to avoid
-         * deadlocks by the simple expediency of sorting the resources in each
-         * lock request into a common order. With this option deadlocks are NOT
-         * possible but all locks MUST be pre-declared by the operation before
-         * it begins to execute.
+         * Note: The {@link NonBlockingLockManager} uses this information to
+         * avoid deadlocks by the simple expediency of sorting the resources in
+         * each lock request into a common order. With this option deadlocks are
+         * NOT possible but all locks MUST be pre-declared by the operation
+         * before it begins to execute.
          */
         public static final String PREDECLARE_LOCKS = "predeclareLocks";
         

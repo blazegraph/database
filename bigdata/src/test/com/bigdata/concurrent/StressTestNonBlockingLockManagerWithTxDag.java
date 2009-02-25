@@ -74,12 +74,17 @@ public class StressTestNonBlockingLockManagerWithTxDag extends
         
         final Result result = doComparisonTest(properties);
 
+        // Deadlocks should not be possible with only one resource.
+        assertEquals("ndeadlock", 0, Integer.parseInt(result.get("ndeadlock")));
+
         // all tasks completed successfully.
-        assertEquals(ntasks,Integer.parseInt(result.get("nsuccess")));
+        assertEquals("nsuccess", ntasks, Integer.parseInt(result
+                .get("nsuccess")));
 
         // tasks were run in parallel.
-        assertEquals(nthreads, Integer.parseInt(result.get("maxrunning")));
-
+        assertEquals("maxrunning", nthreads, Integer.parseInt(result
+                .get("maxrunning")));
+        
     }
     
     /**
@@ -105,12 +110,17 @@ public class StressTestNonBlockingLockManagerWithTxDag extends
         properties.setProperty(TestOptions.SORT_LOCK_REQUESTS,"false");
         
         final Result result = doComparisonTest(properties);
-        
+
+        // Deadlocks should not be possible with only one resource.
+        assertEquals("ndeadlock", 0, Integer.parseInt(result.get("ndeadlock")));
+
         // all tasks complete successfully.
-        assertEquals(ntasks, Integer.parseInt(result.get("nsuccess")));
+        assertEquals("nsuccess", ntasks, Integer.parseInt(result
+                .get("nsuccess")));
 
         // tasks were run in parallel.
-        assertEquals(nthreads, Integer.parseInt(result.get("maxrunning")));
+        assertEquals("maxrunning", nthreads, Integer.parseInt(result
+                .get("maxrunning")));
 
     }
     
@@ -134,7 +144,10 @@ public class StressTestNonBlockingLockManagerWithTxDag extends
         properties.setProperty(TestOptions.SORT_LOCK_REQUESTS,"false");
         
         final Result result = doComparisonTest(properties);
-        
+
+        // Deadlocks should not be possible with only one resource.
+        assertEquals("ndeadlock", 0, Integer.parseInt(result.get("ndeadlock")));
+
         // all tasks complete successfully.
         assertEquals(ntasks, Integer.parseInt(result.get("nsuccess")));
 
@@ -152,72 +165,131 @@ public class StressTestNonBlockingLockManagerWithTxDag extends
     /**
      * Test where each operation locks only a single resource and there is only one
      * resource to be locked so that all operations MUST be serialized.
-     * 
-     * FIXME postcondition tests.
      */
     public void test_singleResourceLocking_serialized_waitsFor_lowConcurrency2() throws Exception {
 
-        Properties properties = new Properties();
+        final Properties properties = new Properties();
         
-        properties.setProperty(TestOptions.NTHREADS,"2");
-        properties.setProperty(TestOptions.NTASKS,"1000");
+        final int nthreads = 2;
+        final int ntasks = 1000;
+        
+        properties.setProperty(TestOptions.NTHREADS,""+nthreads);
+        properties.setProperty(TestOptions.NTASKS,""+ntasks);
         properties.setProperty(TestOptions.NRESOURCES,"1");
         properties.setProperty(TestOptions.MIN_LOCKS,"1");
         properties.setProperty(TestOptions.MAX_LOCKS,"1");
         properties.setProperty(TestOptions.PREDECLARE_LOCKS,"false");
         properties.setProperty(TestOptions.SORT_LOCK_REQUESTS,"false");
         
-        doComparisonTest(properties);
+        final Result result = doComparisonTest(properties);
+
+        // Deadlocks should not be possible with only one resource.
+        assertEquals("ndeadlock", 0, Integer.parseInt(result.get("ndeadlock")));
+
+        // all tasks completed successfully.
+        assertEquals("nsuccess", ntasks, Integer.parseInt(result
+                .get("nsuccess")));
+
+        // tasks were serialized.
+        assertEquals("maxrunning", 1, Integer
+                .parseInt(result.get("maxrunning")));
         
     }
 
     /**
      * Test where each operation locks only a single resource and there is only
      * one resource to be locked so that all operations MUST be serialized.
-     * 
-     * FIXME postcondition tests.
      */
-    public void test_singleResourceLocking_serialized_waitsFor_lowConcurrency5() throws Exception {
+    public void test_singleResourceLocking_serialized_waitsFor_lowConcurrency5()
+            throws Exception {
 
-        Properties properties = new Properties();
+        final Properties properties = new Properties();
         
-        properties.setProperty(TestOptions.NTHREADS,"3");
         // Note: Small ntasks since this case otherwise is slow.
-        properties.setProperty(TestOptions.NTASKS,"100");
+        final int nthreads = 3;
+        final int ntasks = 100;
+        
+        properties.setProperty(TestOptions.NTHREADS,""+nthreads);
+        properties.setProperty(TestOptions.NTASKS,""+ntasks);
         properties.setProperty(TestOptions.NRESOURCES,"1");
         properties.setProperty(TestOptions.MIN_LOCKS,"1");
         properties.setProperty(TestOptions.MAX_LOCKS,"1");
 //        properties.setProperty(TestOptions.LOCK_TIMEOUT,"0"); // Note: timeout==0 when debugging.
         properties.setProperty(TestOptions.PREDECLARE_LOCKS,"false");
         properties.setProperty(TestOptions.SORT_LOCK_REQUESTS,"false");
-        
-        doComparisonTest(properties);
-        
+
+        final Result result = doComparisonTest(properties);
+
+        // Deadlocks should not be possible with only one resource.
+        assertEquals("ndeadlock", 0, Integer.parseInt(result.get("ndeadlock")));
+
+        // all tasks completed successfully.
+        assertEquals("nsuccess", ntasks, Integer.parseInt(result
+                .get("nsuccess")));
+
+        // tasks were serialized.
+        assertEquals("maxrunning", 1, Integer
+                .parseInt(result.get("maxrunning")));
+               
     }
 
     /**
      * Test where each operation locks only a single resource and there is only
      * one resource to be locked so that all operations MUST be serialized and
      * where 10% of all tasks die a horrid death.
-     * 
-     * FIXME postcondition tests.
      */
-    public void test_singleResourceLocking_serialized_waitsFor_lowConcurrency5_withTaskDeath() throws Exception {
+    public void test_singleResourceLocking_serialized_waitsFor_lowConcurrency5_withTaskDeath()
+            throws Exception {
 
-        Properties properties = new Properties();
-        
-        properties.setProperty(TestOptions.NTHREADS,"3");
+        final Properties properties = new Properties();
+
         // Note: Small ntasks since this case otherwise is slow.
-        properties.setProperty(TestOptions.NTASKS,"100");
-        properties.setProperty(TestOptions.NRESOURCES,"1");
-        properties.setProperty(TestOptions.MIN_LOCKS,"1");
-        properties.setProperty(TestOptions.MAX_LOCKS,"1");
-//        properties.setProperty(TestOptions.LOCK_TIMEOUT,"0"); // Note: timeout==0 when debugging.
-        properties.setProperty(TestOptions.PREDECLARE_LOCKS,"false");
-        properties.setProperty(TestOptions.SORT_LOCK_REQUESTS,"false");
-        properties.setProperty(TestOptions.PERCENT_TASK_DEATH,".10");
+        final int nthreads = 3;
+        final int ntasks = 100;
+        final double percentTaskDeath = .1d;
+        final double expectedErrorRate = percentTaskDeath;
         
-        doComparisonTest(properties);
+        properties.setProperty(TestOptions.NTHREADS, ""+nthreads);
+        properties.setProperty(TestOptions.NTASKS, ""+ntasks);
+        properties.setProperty(TestOptions.NRESOURCES, "1");
+        properties.setProperty(TestOptions.MIN_LOCKS, "1");
+        properties.setProperty(TestOptions.MAX_LOCKS, "1");
+        // properties.setProperty(TestOptions.LOCK_TIMEOUT,"0"); // Note:
+        // timeout==0 when debugging.
+        properties.setProperty(TestOptions.PREDECLARE_LOCKS, "false");
+        properties.setProperty(TestOptions.SORT_LOCK_REQUESTS, "false");
+        properties.setProperty(TestOptions.PERCENT_TASK_DEATH, ""+percentTaskDeath);
+
+        final Result result = doComparisonTest(properties);
+        
+        // tasks were serialized.
+        assertEquals("maxrunning", 1, Integer
+                .parseInt(result.get("maxrunning")));
+
+        // Deadlocks should not be possible with only one resource.
+        assertEquals("ndeadlock", 0, Integer.parseInt(result.get("ndeadlock")));
+
+        final int nsuccess = Integer.parseInt(result.get("nsuccess"));
+        
+        final int nhorriddeath = Integer.parseInt(result.get("nhorriddeath"));
+
+        // all tasks were either successfull or a died a horrid death.
+        assertEquals(ntasks, nsuccess + nhorriddeath);
+
+        /*
+         * Verify that the observed error rate corresponds closely to the
+         * specified error rate. It need not be exact since the actual #of tasks
+         * scheduled to die is random.
+         */
+        final double actualErrorRate = nhorriddeath / (double) ntasks;
+        
+        if ((actualErrorRate < expectedErrorRate - .05)
+                || (actualErrorRate > expectedErrorRate + .05)) {
+
+            fail("error rate: expected=" + expectedErrorRate + ", actual="
+                    + actualErrorRate);
+            
+        }
         
     }
 
@@ -225,15 +297,16 @@ public class StressTestNonBlockingLockManagerWithTxDag extends
      * Test where each operation locks only a single resource and there is only
      * one resource to be locked so that all operations MUST be serialized.
      */
-    public void test_singleResourceLocking_serialized_waitsFor_highConcurrency() throws Exception {
+    public void test_singleResourceLocking_serialized_waitsFor_highConcurrency()
+            throws Exception {
 
         final Properties properties = new Properties();
         
+        // Note: Small ntasks since otherwise this case takes very long.
         final int nthreads = 100;
         final int ntasks = 100;
         
         properties.setProperty(TestOptions.NTHREADS,""+nthreads);
-        // Note: Small ntasks since otherwise this case takes very long.
         properties.setProperty(TestOptions.NTASKS,""+ntasks);
         properties.setProperty(TestOptions.NRESOURCES,"1");
         properties.setProperty(TestOptions.MIN_LOCKS,"1");
@@ -267,27 +340,28 @@ public class StressTestNonBlockingLockManagerWithTxDag extends
 
         final Properties properties = new Properties();
         
+        // Note: Small ntasks since otherwise this case takes very long.
         final int nthreads = 100;
         final int ntasks = 100;
-        
-        properties.setProperty(TestOptions.NTHREADS,""+nthreads);
-        // Note: Small ntasks since otherwise this case takes very long.
-        properties.setProperty(TestOptions.NTASKS,""+ntasks);
-        properties.setProperty(TestOptions.NRESOURCES,"1");
-        properties.setProperty(TestOptions.MIN_LOCKS,"1");
-        properties.setProperty(TestOptions.MAX_LOCKS,"1");
-        properties.setProperty(TestOptions.LOCK_TIMEOUT,"1000");
-        properties.setProperty(TestOptions.PREDECLARE_LOCKS,"false");
-        properties.setProperty(TestOptions.SORT_LOCK_REQUESTS,"false");
-        
+
+        properties.setProperty(TestOptions.NTHREADS, "" + nthreads);
+        properties.setProperty(TestOptions.NTASKS, "" + ntasks);
+        properties.setProperty(TestOptions.NRESOURCES, "1");
+        properties.setProperty(TestOptions.MIN_LOCKS, "1");
+        properties.setProperty(TestOptions.MAX_LOCKS, "1");
+        properties.setProperty(TestOptions.LOCK_TIMEOUT, "1000");
+        properties.setProperty(TestOptions.PREDECLARE_LOCKS, "false");
+        properties.setProperty(TestOptions.SORT_LOCK_REQUESTS, "false");
+
         final Result result = doComparisonTest(properties);
-        
+
         // Deadlocks should not be possible with only one resource.
         assertEquals("ndeadlock", 0, Integer.parseInt(result.get("ndeadlock")));
 
         // Should have been serialized.
-        assertEquals("maxrunning",1, Integer.parseInt(result.get("maxrunning")));
-        
+        assertEquals("maxrunning", 1, Integer
+                .parseInt(result.get("maxrunning")));
+
         // Note: Timeouts should be expected. They will show up as cancelled
         // tasks.
         final int ntimeout = Integer.parseInt(result.get("ntimeout"));
@@ -300,47 +374,67 @@ public class StressTestNonBlockingLockManagerWithTxDag extends
      * <p>
      * Note: This condition provides the basis for deadlocks.
      * 
-     * FIXME postcondition tests : this test is failing.
+     * FIXME postcondition tests
+     * 
+     * FIXME In fact, predeclaring locks appears sufficient to avoid deadlocks
+     * as long as we make issue the lock requests atomically for each task. This
+     * means that TxDag would only be useful for 2PL, and this class
+     * (NonBlockingLockManager) currently does not support 2PL (because it
+     * couples the concepts of the task and the transaction together).
      */
-    public void test_multipleResourceLocking_resources3_waitsFor_locktries3() throws Exception {
+    public void test_multipleResourceLocking_resources3_waitsFor_deadlocks_locktries3()
+            throws Exception {
 
-        Properties properties = new Properties();
+        final Properties properties = new Properties();
+
+        final int nthreads = 20;
+        final int ntasks = 1000;
         
-        properties.setProperty(TestOptions.NTHREADS,"20");
-        properties.setProperty(TestOptions.NTASKS,"1000");
-        properties.setProperty(TestOptions.NRESOURCES,"100");
-        properties.setProperty(TestOptions.MIN_LOCKS,"3");
-        properties.setProperty(TestOptions.MAX_LOCKS,"3");
-        properties.setProperty(TestOptions.MAX_LOCK_TRIES,"3");
-        properties.setProperty(TestOptions.PREDECLARE_LOCKS,"false");
-        properties.setProperty(TestOptions.SORT_LOCK_REQUESTS,"false");
-        
+        properties.setProperty(TestOptions.NTHREADS, ""+nthreads);
+        properties.setProperty(TestOptions.NTASKS, ""+ntasks);
+        properties.setProperty(TestOptions.NRESOURCES, "100");
+        properties.setProperty(TestOptions.MIN_LOCKS, "3");
+        properties.setProperty(TestOptions.MAX_LOCKS, "3");
+        properties.setProperty(TestOptions.MAX_LOCK_TRIES, "3");
+        properties.setProperty(TestOptions.PREDECLARE_LOCKS, "false");
+        properties.setProperty(TestOptions.SORT_LOCK_REQUESTS, "false");
+
         doComparisonTest(properties);
-        
+
     }
 
     /**
      * Test where each operation locks one or more resources.
      * <p>
      * Note: This condition provides the basis for deadlocks. In fact, since we
-     * have 10 resource locks for each operation and only 100 operations the
+     * have 10 resource locks for each operation and only 100 resources the
      * chances of a deadlock on any given operation are extremely high.
      * 
-     * FIXME postcondition tests : this test is failing.
+     * FIXME postcondition tests
+     * 
+     * FIXME In fact, predeclaring locks appears sufficient to avoid deadlocks
+     * as long as we make issue the lock requests atomically for each task. This
+     * means that TxDag would only be useful for 2PL, and this class
+     * (NonBlockingLockManager) currently does not support 2PL (because it
+     * couples the concepts of the task and the transaction together).
      */
-    public void test_multipleResourceLocking_resources10_waitsFor_locktries10() throws Exception {
+    public void test_multipleResourceLocking_resources10_waitsFor_deadlocks_locktries10()
+            throws Exception {
 
-        Properties properties = new Properties();
+        final Properties properties = new Properties();
+
+        final int nthreads = 20;
+        final int ntasks = 1000;
         
-        properties.setProperty(TestOptions.NTHREADS,"20");
-        properties.setProperty(TestOptions.NTASKS,"1000");
-        properties.setProperty(TestOptions.NRESOURCES,"100");
-        properties.setProperty(TestOptions.MIN_LOCKS,"10");
-        properties.setProperty(TestOptions.MAX_LOCKS,"10");
-        properties.setProperty(TestOptions.MAX_LOCK_TRIES,"10");
-        properties.setProperty(TestOptions.PREDECLARE_LOCKS,"false");
-        properties.setProperty(TestOptions.SORT_LOCK_REQUESTS,"false");
-                
+        properties.setProperty(TestOptions.NTHREADS, ""+nthreads);
+        properties.setProperty(TestOptions.NTASKS, ""+ntasks);
+        properties.setProperty(TestOptions.NRESOURCES, "100");
+        properties.setProperty(TestOptions.MIN_LOCKS, "10");
+        properties.setProperty(TestOptions.MAX_LOCKS, "10");
+        properties.setProperty(TestOptions.MAX_LOCK_TRIES, "10");
+        properties.setProperty(TestOptions.PREDECLARE_LOCKS, "false");
+        properties.setProperty(TestOptions.SORT_LOCK_REQUESTS, "false");
+
         doComparisonTest(properties);
         
     }

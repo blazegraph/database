@@ -69,6 +69,12 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * A {@link ResourceQueue} is created for each resource and used to block
  * operations that are awaiting a lock. When locks are not being pre-declared, a
  * {@link TxDag WAITS_FOR} graph is additionally used to detect deadlocks.
+ * <p>
+ * This implementation uses a single {@link AcceptTask} thread to accept tasks,
+ * update the requests in the {@link ResourceQueue}s, and in general perform
+ * housekeeping for the internal state. Tasks submitted to this class ARE NOT
+ * bound to a worker thread until they are executed by the delegate
+ * {@link Executor}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -83,6 +89,10 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * <p>
  * {@link AbstractTask} needs to be refactored as well since I believe it
  * currently takes responsibility for acquiring the locks and it should not.
+ * 
+ * @todo a fair option? What constraints or freedoms would it provide?
+ * 
+ * @todo a {@link SynchronousQueue} for the {@link #acceptedTasks}?
  * 
  * FIXME In order to support 2PL we need to decouple the {@link LockFutureTask}
  * from the transaction with which it is associated. Otherwise each
@@ -624,6 +634,13 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
         /**
          * The set of {@link ResourceQueue}s for which this task owns a lock
          * (is a member of the granted group) (NOT THREAD SAFE).
+         * <p>
+         * Note: This collection is required in order for the
+         * {@link ResourceQueue}s for which the task has asserted a lock
+         * request to remain strongly reachable. Without such hard references
+         * the {@link ResourceQueue}s would be asynchronously cleared from the
+         * {@link NonBlockingLockManager#resourceQueues} collection by the
+         * garbage collector.
          */
         private final LinkedHashSet<ResourceQueue<LockFutureTask<? extends Object>>> lockedResources = new LinkedHashSet<ResourceQueue<LockFutureTask<? extends Object>>>();
 
@@ -900,6 +917,12 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
 
     }
 
+    public <T> Future<T> submit(final LockCallable<R, T> task) {
+
+        return submit(task.getResource(), task);
+
+    }
+
     public <T> Future<T> submit(final R[] resource, final Callable<T> task,
             final TimeUnit unit, final long lockTimeout, final int maxLockTries) {
 
@@ -1020,11 +1043,6 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
      * the caller from {@link DeadlockException}s or periods when the system is
      * at the maximum multi-programming level and can not accept another lock
      * request.
-     * 
-     * @todo it might be better to use a {@link SynchronousQueue} here so we
-     *       don't have accepted tasks piling up if the {@link AcceptTask} gets
-     *       behind because the running tasks are taking longer to complete,
-     *       because there are a lot of deadlocks, etc.
      */
     final private BlockingQueue<LockFutureTask<? extends Object>> acceptedTasks = new LinkedBlockingQueue<LockFutureTask<? extends Object>>();
 
@@ -1295,7 +1313,8 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
                         waitsFor.lookup(t, true/* insert */);
                         
                     }
-                    
+
+//                    log.warn("Requesting locks: "+t);
                     requestLocks(t);
 
                 } catch (Throwable t2) {
@@ -1614,9 +1633,11 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
     }
 
     /**
-     * Update the {@link ResourceQueue} to reflect the lock requests for the
-     * task. If any exception is thrown, then the caller MUST make sure that all
-     * locks are released for the task.
+     * Update the {@link ResourceQueue}s and the optional {@link TxDag} to
+     * reflect the lock requests for the task. The operation is atomic and
+     * succeeds iff the lock requests could be issued without deadlock. If an
+     * error occurs then the lock requests will not have been registered on the
+     * {@link TxDag}.
      * 
      * @param task
      *            The task.
@@ -1669,29 +1690,117 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
         if (DEBUG)
             log.debug("Acquiring lock(s): " + Arrays.toString(task.resource));
 
-        for (R r : (R[]) task.resource) {
-
-            // make sure queue exists for this resource.
-            final ResourceQueue<LockFutureTask<? extends Object>> resourceQueue = declareResource(r);
+        if (waitsFor != null) {
 
             /*
-             * Add a lock request for this resource. If the operation succeeds
-             * then task is in the resouce queue and the TxDag (if used) has
-             * been updated. If the operation fails, the task WAS NOT added to
-             * the resource queue and the TxDag state IS NOT changed.
+             * Detect deadlocks using TxDag.
              * 
-             * Note: throws DeadlockException
+             * We take this in three stages.
+             * 
+             * 1. Collect the set of distinct tasks which are already in the
+             * resource queues for the lock requests declared by this task.
+             * 
+             * 2. If that set is NOT empty, then add edges to TxDag for each
+             * element of that set. If a DeadlockException is thrown then we can
+             * not issue those lock requests at this time.
+             * 
+             * 3. Add the task to each of the resource queues.
              */
-            resourceQueue.add(task);
+            
+            /*
+             * Collect the set of tasks on which this task must wait.
+             */
+            final LinkedHashSet<LockFutureTask<? extends Object>> predecessors = new LinkedHashSet<LockFutureTask<? extends Object>>();
+            for (R r : (R[]) task.resource) {
+            
+                // make sure queue exists for this resource.
+                final ResourceQueue<LockFutureTask<? extends Object>> resourceQueue = declareResource(r);
+
+                if (!resourceQueue.queue.isEmpty()) {
+
+                    predecessors.addAll(resourceQueue.queue);
+
+                }
+                
+            }
+
+            if(!predecessors.isEmpty()) {
+                
+                /*
+                 * Add edges to the WAITS_FOR graph for each task on which this
+                 * task must wait.
+                 * 
+                 * Note: throws DeadlockException if the lock requests would
+                 * cause a deadlock.
+                 * 
+                 * Note: If an exception is thrown then the state of the TxDag
+                 * is unchanged (the operation either succeeds or fails
+                 * atomically).
+                 * 
+                 * FIXME In fact, predeclaring locks appears sufficient to avoid
+                 * deadlocks as long as we make issue the lock requests
+                 * atomically for each task. This means that TxDag would only be
+                 * useful for 2PL, and this class (NonBlockingLockManager)
+                 * currently does not support 2PL (because it couples the
+                 * concepts of the task and the transaction together).
+                 */
+                waitsFor.addEdges(task, predecessors.toArray());
+                
+            }
+            
+            /*
+             * Now that we have updated TxDag and know that the lock requests do
+             * not cause a deadlock, we register those requests on the
+             * ResourceQueues.
+             */
+            
+            for (R r : (R[]) task.resource) {
+
+                // make sure queue exists for this resource.
+                final ResourceQueue<LockFutureTask<? extends Object>> resourceQueue = declareResource(r);
+
+                /*
+                 * Add a lock request for this resource.
+                 */
+                resourceQueue.queue.add(task);
+
+                /*
+                 * Add the resource queue to the set of queues whose locks are
+                 * held by this task.
+                 */
+                task.lockedResources.add(resourceQueue);
+
+            }
+
+        } else {
 
             /*
-             * Add the resource queue to the set of queues whose locks are held
-             * by this task.
+             * When we are not using the WAITS_FOR graph all we have to do is
+             * add the task to each of the resource queues. It will run once it
+             * is at the head of each resource queue into which it is placed by
+             * its lock requests.
              */
-            task.lockedResources.add(resourceQueue);
+
+            for (R r : (R[]) task.resource) {
+
+                // make sure queue exists for this resource.
+                final ResourceQueue<LockFutureTask<? extends Object>> resourceQueue = declareResource(r);
+
+                /*
+                 * Add a lock request for this resource.
+                 */
+                resourceQueue.queue.add(task);
+
+                /*
+                 * Add the resource queue to the set of queues whose locks are held
+                 * by this task.
+                 */
+                task.lockedResources.add(resourceQueue);
+
+            }
 
         }
-
+    
     }
 
     /**
@@ -1762,89 +1871,54 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
                 final ResourceQueue<LockFutureTask<? extends Object>> resourceQueue = itr
                         .next();
 
-                final R resource = resourceQueue.getResource();
+                /*
+                 * Remove lock request from resource queue
+                 */
+                if (!resourceQueue.queue.remove(t)) {
 
-                if (!resourceQueues.containsKey(resource)) {
-
-                    /*
-                     * Note: This would indicate a failure of the mechanisms
-                     * which keep the resource queues around while there are
-                     * tasks seeking or holding locks for those queues.
-                     */
-
-                    throw new IllegalStateException("No queue for resource: "
-                            + resource);
-
-                }
-
-                try {
-
-                    /*
-                     * Remove lock request from resource queue
-                     * 
-                     * @todo BUT DO NOT update WAITS_FOR graph so that we
-                     * can optimize that out.
-                     */
-                    resourceQueue.remove(t);
-//                    resourceQueue.queue.remove(t);
-
-                } catch (Throwable ex) {
-
-                    log.warn("Could not release lock", ex);
-
-                    // Note: release the rest of the locks anyway.
-
-                    continue;
-
+                    log.error("Lock request not found: resource="
+                            + resourceQueue.getResource() + ", task=" + t);
+                    
                 }
 
                 // remove lock from collection since no longer held by task.
                 itr.remove();
-                
-            }
-            
-            // no locks are held by this task.
-            assert t.lockedResources.isEmpty() : "lockedResources="
-                    + t.lockedResources + ", task=" + t;
 
-//        } catch (Throwable ex) {
-//
-//            log.error("Could not release locks: " + ex, ex);
+            }
 
         } finally {
 
-            // @todo this is an optimization - not yet working.
-//            /*
-//             * At this point there are edges in the WAITS_FOR graph and the no
-//             * longer on any of the resource queues. Since we know that it is
-//             * not waiting we can just clear its edges the easy way.
-//             * 
-//             * @todo The [waiting] flag is not being used to optimize the
-//             * removal of edges from the WAITS_FOR graph. Fixing this will
-//             * require us to remove the operation from each
-//             * {@link ResourceQueue} without updating the {@link TxDag} and then
-//             * update the {@link TxDag} using
-//             * {@link TxDag#removeEdges(Object, boolean)} and specifying "false"
-//             * for "waiting". Since this operation cuts across multiple queues
-//             * at once additional synchronization MAY be required.
-//             */
-//            if (waitsFor != null) {
-//
-//                synchronized (waitsFor) {
-//
-//                    try {
-//                        
-//                        waitsFor.removeEdges(t, waiting);
-//                        
-//                    } catch (Throwable t2) {
-//                        
-//                        log.warn(t2);
-//                        
-//                    }
-//
-//                }
-//
-//            }
+            /*
+             * At this point there are edges in the WAITS_FOR graph and the no
+             * longer on any of the resource queues. Since we know that it is
+             * not waiting we can just clear its edges the easy way.
+             * 
+             * @todo The [waiting] flag is not being used to optimize the
+             * removal of edges from the WAITS_FOR graph. Fixing this will
+             * require us to remove the operation from each
+             * {@link ResourceQueue} without updating the {@link TxDag} and then
+             * update the {@link TxDag} using
+             * {@link TxDag#removeEdges(Object, boolean)} and specifying "false"
+             * for "waiting". Since this operation cuts across multiple queues
+             * at once additional synchronization MAY be required.
+             */
+            if (waitsFor != null) {
+
+                synchronized (waitsFor) {
+
+                    try {
+                        
+                        waitsFor.removeEdges(t, waiting);
+                        
+                    } catch (Throwable t2) {
+                        
+                        log.warn(t2);
+                        
+                    }
+
+                }
+
+            }
 
             /*
              * Release the vertex (if any) in the WAITS_FOR graph.
@@ -1904,7 +1978,7 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
      * @see LockManager
      * @see TxDag
      */
-    protected class ResourceQueue<T> {
+    protected class ResourceQueue<T extends LockFutureTask<? extends Object>> {
 
         /**
          * The resource whose access is controlled by this object.
@@ -2007,168 +2081,198 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
 //
 //        }
 
-        /**
-         * Request a lock on the resource. If the queue is empty or if the task
-         * already owns the lock then return immediately. Otherwise, update the
-         * optional {@link TxDag} to determine if the a deadlock would result.
-         * If no deadlock would result, then add the task to the queue.
-         * 
-         * @param tx
-         *            The transaction.
-         * 
-         * @return <code>true</code> if the lock is granted for that
-         *         transaction (either it already owns the lock or the resource
-         *         queue is empty so it is immediately granted the lock).
-         * 
-         * @throws DeadlockException
-         *             if the request would cause a deadlock among the running
-         *             transactions.
-         */
-        public void add(final T tx) throws DeadlockException {
-
-            if (tx == null)
-                throw new IllegalArgumentException();
-
-            if(!lock.isHeldByCurrentThread())
-                throw new IllegalMonitorStateException();
-
-            if (DEBUG)
-                log.debug("enter: tx=" + tx + ", queue=" + this);
-
-            // already locked.
-            if (queue.peek() == tx) {
-
-                if (INFO)
-                    log.info("Already owns lock: tx=" + tx + ", queue=" + this);
-
-                // no change.
-                return;
-
-            }
-
-            if (queue.isEmpty()) {
-
-                // the queue is empty so immediately grant the lock.
-                queue.add(tx);
-
-                if (INFO)
-                    log.info("Granted lock with empty queue: tx=" + tx
-                            + ", queue=" + this);
-
-                // TxDag is not updated since task is not waiting.
-                return;
-
-            }
-
-            /*
-             * Update the WAITS_FOR graph since we are now going to wait on the
-             * tx that currently holds this lock.
-             * 
-             * We need to add an edge from this transaction to the transaction
-             * that currently holds the lock for this resource. This indicates
-             * that [tx] WAITS_FOR the operation that holds the lock.
-             * 
-             * We need to do this for each predecessor in the queue so that the
-             * correct WAITS_FOR edges remain when a predecessor is granted the
-             * lock.
-             */
-            if (waitsFor != null) {
-
-                final Object[] predecessors = queue.toArray();
-
-                /*
-                 * Note: this operation is atomic. If it fails, then none of
-                 * the edges were added.
-                 * 
-                 * Note: throws DeadlockException.
-                 */
-                waitsFor.addEdges(tx/* src */, predecessors);
-
-            }
-
-            /*
-             * Now that we know that the request does not directly cause a
-             * deadlock we add the request to the queue. The task will not
-             * execute until it maeks it to the head of the queue.
-             */
-            queue.add(tx);
-
-        }
-
-        /**
-         * Remove the tx from the {@link ResourceQueue}.
-         * 
-         * @param tx
-         *            The transaction.
-         * 
-         * @deprecated This should be optimized out.
-         */
-        public void remove(final T tx) {
-
-            if (tx == null)
-                throw new IllegalArgumentException();
-            
-            if(!lock.isHeldByCurrentThread())
-                throw new IllegalMonitorStateException();
-            
-            if (queue.peek() != tx) {
-
-                /*
-                 * Removing some tx which does not own the lock.
-                 */
-
-                if (!queue.remove(tx)) {
-
-                    throw new AssertionError("Not in queue? tx=" + tx
-                            + ", queue=" + Arrays.toString(queue.toArray()));
-                
-                }
-                
-                return;
-
-            }
-
-            /*
-             * Removing the tx that owns the lock.
-             */
-            if (tx != queue.remove()) {
-
-                throw new AssertionError("Removed wrong tx?");
-                
-            }
-
-            /*
-             * We just removed the granted lock. Now we have to update the
-             * WAITS_FOR graph to remove all edges whose source is a pending
-             * transaction (for this resource) since those transactions are
-             * waiting on the transaction that just released the lock.
-             */
-
-            if (DEBUG)
-                log.debug("removed lock owner from queue: " + tx);
-
-            if (waitsFor != null) {
-
-                final Iterator<T> itr = queue.iterator();
-
-                synchronized (waitsFor) {
-
-                    while (itr.hasNext()) {
-
-                        final T pendingTx = itr.next();
-
-                        if (DEBUG)
-                            log.debug("Removing edge: pendingTx=" + pendingTx);
-
-                        waitsFor.removeEdge(pendingTx, tx);
-
-                    }
-
-                }
-
-            }
-
-        }
+//        /**
+//         * Request a lock on the resource. If the queue is empty or if the task
+//         * already owns the lock then return immediately. Otherwise, update the
+//         * optional {@link TxDag} to determine if the a deadlock would result.
+//         * If no deadlock would result, then add the task to the queue.
+//         * 
+//         * @param tx
+//         *            The transaction.
+//         * 
+//         * @return <code>true</code> if the lock is granted for that
+//         *         transaction (either it already owns the lock or the resource
+//         *         queue is empty so it is immediately granted the lock).
+//         * 
+//         * @throws DeadlockException
+//         *             if the request would cause a deadlock among the running
+//         *             transactions.
+//         */
+//        public void add(final T tx) throws DeadlockException {
+//
+//            if (tx == null)
+//                throw new IllegalArgumentException();
+//
+//            if(!lock.isHeldByCurrentThread())
+//                throw new IllegalMonitorStateException();
+//
+//            if (DEBUG)
+//                log.debug("enter: tx=" + tx + ", queue=" + this);
+//
+//            // already locked.
+//            if (queue.peek() == tx) {
+//
+//                /*
+//                 * Note: This is being disallowed since we are not supporting
+//                 * 2PL here and it should not be possible for the tx to already
+//                 * own the lock. If you want to support 2PL then you would allow
+//                 * this case.
+//                 */
+//                throw new IllegalStateException("Already owns lock: tx=" + tx
+//                        + ", queue=" + this);
+//
+//            }
+//
+//            if (queue.isEmpty()) {
+//
+//                // the queue is empty so immediately grant the lock.
+//                queue.add(tx);
+//
+//                if (INFO)
+//                    log.info("Granted lock with empty queue: tx=" + tx
+//                            + ", queue=" + this);
+//
+//                // lock can be granted immediately.
+//                return;
+//
+//            }
+//
+//            /*
+//             * Update the WAITS_FOR graph since we are now going to wait on the
+//             * tx that currently holds this lock.
+//             * 
+//             * We need to add an edge from this transaction to the transaction
+//             * that currently holds the lock for this resource. This indicates
+//             * that [tx] WAITS_FOR the operation that holds the lock.
+//             * 
+//             * We need to do this for each predecessor in the queue so that the
+//             * correct WAITS_FOR edges remain when a predecessor is granted the
+//             * lock.
+//             * 
+//             * FIXME The problem here is when there are two transactions share
+//             * two or more locks requests. If one transaction is already running
+//             * then the other transaction will wind up asserting one WAITS_FOR
+//             * edge for each of the shared lock requests. TxDag does not allow
+//             * more than a single WAITS_FOR edge count for the same source and
+//             * target and throws an IllegalStateException.
+//             * 
+//             * This was not a problem in the old LockManager because we
+//             * incrementally grew the lock requests as they were granted. It is
+//             * a problem now because we issue all requests at once.
+//             * 
+//             * One way to solve this is to add to each of the queues, receiving
+//             * back a Set of the predecessors. Merge those sets. That gives the
+//             * set of transactions on which the current task must wait. Then
+//             * create those edges. If any edge would cause a deadlock rollback
+//             * the changes to each of the resource queues (the TxDag request is
+//             * atomic so it will not have been modified).
+//             */
+//            if (waitsFor != null) {
+//
+//                final Object[] predecessors = queue.toArray();
+//
+//                /*
+//                 * Note: this operation is atomic. If it fails, then none of
+//                 * the edges were added.
+//                 * 
+//                 * Note: throws DeadlockException.
+//                 */
+//                try {
+//                waitsFor.addEdges(tx/* src */, predecessors);
+//                } catch(IllegalStateException ex) {
+//                    System.err.println("task: "+tx);
+//                    System.err.println("predecessors: "+Arrays.toString(predecessors));
+//                    System.err.println("queue:"+toString());
+//                    System.err.println(waitsFor.toString());
+//                    waitsFor.addEdges(tx/* src */, predecessors);
+//                    System.exit(1);
+//                }
+//
+//            }
+//
+//            /*
+//             * Now that we know that the request does not directly cause a
+//             * deadlock we add the request to the queue. The task will not
+//             * execute until it maeks it to the head of the queue.
+//             */
+//            queue.add(tx);
+//
+//        }
+//
+//        /**
+//         * Remove the tx from the {@link ResourceQueue}.
+//         * 
+//         * @param tx
+//         *            The transaction.
+//         * 
+//         * @deprecated This should be optimized out.
+//         */
+//        public void remove(final T tx) {
+//
+//            if (tx == null)
+//                throw new IllegalArgumentException();
+//            
+//            if(!lock.isHeldByCurrentThread())
+//                throw new IllegalMonitorStateException();
+//            
+//            if (queue.peek() != tx) {
+//
+//                /*
+//                 * Removing some tx which does not own the lock.
+//                 */
+//
+//                if (!queue.remove(tx)) {
+//
+//                    throw new AssertionError("Not in queue? tx=" + tx
+//                            + ", queue=" + Arrays.toString(queue.toArray()));
+//                
+//                }
+//                
+//                return;
+//
+//            }
+//
+//            /*
+//             * Removing the tx that owns the lock.
+//             */
+//            if (tx != queue.remove()) {
+//
+//                throw new AssertionError("Removed wrong tx?");
+//                
+//            }
+//
+//            /*
+//             * We just removed the granted lock. Now we have to update the
+//             * WAITS_FOR graph to remove all edges whose source is a pending
+//             * transaction (for this resource) since those transactions are
+//             * waiting on the transaction that just released the lock.
+//             */
+//
+//            if (DEBUG)
+//                log.debug("removed lock owner from queue: " + tx);
+//
+//            if (waitsFor != null) {
+//
+//                final Iterator<T> itr = queue.iterator();
+//
+//                synchronized (waitsFor) {
+//
+//                    while (itr.hasNext()) {
+//
+//                        final T pendingTx = itr.next();
+//
+//                        if (DEBUG)
+//                            log.debug("Removing edge: pendingTx=" + pendingTx);
+//
+//                        waitsFor.removeEdge(pendingTx, tx);
+//
+//                    }
+//
+//                }
+//
+//            }
+//
+//        }
 
     } // ResourceQueue
 
