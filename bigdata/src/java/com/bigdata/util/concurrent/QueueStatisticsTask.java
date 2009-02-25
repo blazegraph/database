@@ -6,6 +6,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.concurrent.NonBlockingLockManager;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterHierarchy;
 import com.bigdata.counters.Instrument;
@@ -962,6 +963,10 @@ public class QueueStatisticsTask implements Runnable {
          * (moving average) (this is only reported for the
          * {@link WriteExecutorService} as that is the only service where tasks
          * must acquire locks in order to execute).
+         * 
+         * @deprecated This will go away since all tasks on the write service
+         *             are now holding their locks. The tasks waiting for locks
+         *             are on the {@link NonBlockingLockManager}.
          */
         String AverageActiveCountWithLocksHeld = "Average Active Count With Locks Held";
 

@@ -59,6 +59,7 @@ import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.concurrent.LockManagerTask;
+import com.bigdata.concurrent.NonBlockingLockManager;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.relation.locator.DefaultResourceLocator;
@@ -1680,16 +1681,15 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
     
     /**
      * Call {@link #doTask()} for an unisolated write task.
-     * <p>
-     * Note: This coordinates with {@link IConcurrencyManager#getResourceLockService()}
-     * to force a schedule on tasks that write on unisolated indices.
      * 
      * @throws Exception
+     * 
+     * FIXME update javadoc to reflect the change in how the locks are acquired.
      */
     private T doUnisolatedReadWriteTask() throws Exception {
         
-        // lock manager.
-        final LockManager<String> lockManager = concurrencyManager.getWriteService().getLockManager();
+//        // lock manager.
+//        final LockManager<String> lockManager = concurrencyManager.getWriteService().getLockManager();
 
         final Thread t = Thread.currentThread();
         
@@ -1698,10 +1698,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
 //        // declare resource(s) to lock (exclusive locks are used).
 //        lockManager.addResource(resource);
+//
+//        // delegate will handle lock acquisition and invoke doTask().
+//        final LockManagerTask<String,T> delegate = new LockManagerTask<String,T>(lockManager,
+//                resource, new InnerWriteServiceCallable(this));
 
-        // delegate will handle lock acquisition and invoke doTask().
-        final LockManagerTask<String,T> delegate = new LockManagerTask<String,T>(lockManager,
-                resource, new InnerWriteServiceCallable(this));
+        final Callable<T> delegate = new InnerWriteServiceCallable(this);
         
         final WriteExecutorService writeService = concurrencyManager.getWriteService();
 
@@ -1714,30 +1716,32 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             final T ret;
             
             /*
-             * Note: The lock(s) are only held during this call. By the time the
-             * call returns any lock(s) have been released. Locks MUST be
-             * released as soon as the task is done writing so that it does NOT
-             * hold locks while it is awaiting commit. This make it possible for
-             * other operations to write on the same index in the same commit
-             * group.
+             * @todo verify: By the time the call returns any lock(s) have been
+             * released. Locks MUST be released as soon as the task is done
+             * writing so that it does NOT hold locks while it is awaiting
+             * commit. This make it possible for other operations to write on
+             * the same index in the same commit group.
              */
-
-            try {
+//            try {
 
                 ret = delegate.call();
                 
-            } finally {
-                
-                /*
-                 * Increment by the amount of time that the task was waiting to
-                 * acquire its lock(s).
-                 */
-
-                taskCounters.lockWaitingTime.addAndGet( delegate.getLockLatency() );
-                
-            }
+//            } finally {
+//                
+//                /*
+//                 * Increment by the amount of time that the task was waiting to
+//                 * acquire its lock(s).
+//                 */
+//
+//                taskCounters.lockWaitingTime.addAndGet( delegate.getLockLatency() );
+//                
+//            }
 
             if (Thread.interrupted()) {
+            
+                /*
+                 * @todo why test after return? if the task ran, it ran, right?
+                 */
 
                 throw new InterruptedException();
 
@@ -1925,6 +1929,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * prevent tasks from progressing. If there is strong lock contention then
      * writers will be more or less serialized.
      * 
+     * FIXME javadoc update to reflect the {@link NonBlockingLockManager}
+     * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
@@ -1975,6 +1981,18 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                 delegate.nanoTime_finishedWork = System.nanoTime();
                 
                 writeService.activeTaskCountWithLocksHeld.decrementAndGet();
+                
+                /*
+                 * Release the locks held by the task.
+                 */
+                try {
+                    writeService.getLockManager()
+                            .releaseLocksForTaskWithLockOnResource(
+                                    delegate.resource);
+                } catch (Throwable t) {
+                    // log an error but do not abort the task.
+                    log.error(delegate, t);
+                }
                 
             }
             
