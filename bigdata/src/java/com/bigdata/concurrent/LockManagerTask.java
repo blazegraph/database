@@ -32,7 +32,6 @@ import java.util.concurrent.Callable;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.concurrent.LockManager.HorridTaskDeath;
 
 /**
  * Class encapsulates handshaking with the {@link LockManager} for an operation

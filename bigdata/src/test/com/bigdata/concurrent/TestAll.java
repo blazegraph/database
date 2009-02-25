@@ -67,6 +67,11 @@ public class TestAll extends TestCase {
         // Test suite for the lock manager.
         suite.addTestSuite(TestLockManager.class);
 
+        // Test suite for the non-blocking lock manager.
+        suite.addTestSuite(TestNonBlockingLockManager.class);
+        suite.addTestSuite(StressTestNonBlockingLockManagerWithTxDag.class);
+        suite.addTestSuite(StressTestNonBlockingLockManagerWithPredeclaredLocks.class);
+
         return suite;
         
     }

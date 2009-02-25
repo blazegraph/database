@@ -46,7 +46,6 @@ import junit.framework.TestCase;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.concurrent.LockManager.HorridTaskDeath;
 import com.bigdata.service.DataService;
 import com.bigdata.test.ExperimentDriver;
 import com.bigdata.test.ExperimentDriver.IComparisonTest;
@@ -535,7 +534,8 @@ public class TestLockManager extends TestCase implements IComparisonTest {
     }
     
     /**
-     * Test where each operation locks only a single resource (low concurrency).
+     * Test where each operation locks only a single resource (low concurrency
+     * condition w/ 5 threads).
      */
     public void test_singleResourceLocking_lowConcurrency5() throws Exception {
 
@@ -560,7 +560,7 @@ public class TestLockManager extends TestCase implements IComparisonTest {
 
         Properties properties = new Properties();
         
-        properties.setProperty(TestOptions.NTHREADS,"5");
+        properties.setProperty(TestOptions.NTHREADS,"20"); // whoops! was 5
         properties.setProperty(TestOptions.NTASKS,"1000");
         properties.setProperty(TestOptions.NRESOURCES,"100");
         properties.setProperty(TestOptions.MIN_LOCKS,"1");

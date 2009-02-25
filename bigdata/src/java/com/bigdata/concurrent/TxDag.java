@@ -32,7 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Vector;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 /**
@@ -44,10 +43,10 @@ import org.apache.log4j.Logger;
  * boolean matrix W to code the edges in the WAITS_FOR graph and an integer
  * matrix M to code the the number of different paths between two vertices.
  * Operations that insert one or more edges are atomic -- if a deadlock would
- * result, then the state of the DAG is NOT changed (a deadlock is detected
- * when there is a non-zero path count in the diagonal of W). The cost of the
- * algorithm is less than <code>O(n^^2)</code> and is suitable for systems with
- * a multi-programming level of 100s of concurrent transactions.
+ * result, then the state of the DAG is NOT changed (a deadlock is detected when
+ * there is a non-zero path count in the diagonal of W). The cost of the
+ * algorithm is less than <code>O(n^^2)</code> and is suitable for systems
+ * with a multi-programming level of 100s of concurrent transactions.
  * </p>
  * <p>
  * This implementation is based on the online algorithm for deadlock detection
@@ -108,11 +107,11 @@ import org.apache.log4j.Logger;
  * <h4>Usage notes</h4>
  * <p>
  * This class is designed to be used internally by a class modeling a
- * {@link ResourceQueue}. Edges are added when a transaction must
- * <em>wait</em> for a resource on one or more transactions in the granted
- * group for that resource queue. Transactions are implicitly declared as they
- * are referenced when adding edges. The general case is that there are N
- * transactions in the granted group for some resource, so
+ * {@link ResourceQueue}. Edges are added when a transaction must <em>wait</em>
+ * for a resource on one or more transactions in the granted group for that
+ * resource queue. Transactions are implicitly declared as they are referenced
+ * when adding edges. The general case is that there are N transactions in the
+ * granted group for some resource, so
  * {@link #addEdges(Object blocked, Object[] running)} would be used to indicate
  * that a transaction must wait on the granted group.
  * </p>
@@ -157,6 +156,9 @@ import org.apache.log4j.Logger;
  *       parallel to the requirement for explicitly removal of transactions
  *       using {@link #removeEdges(Object, boolean).
  * 
+ * @todo This class should probably be unsynchronized and should place the
+ *       burden for synchronization on the caller.
+ * 
  * @version $Id$
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
@@ -166,16 +168,11 @@ public class TxDag {
 	/**
 	 * Logger for this class.
 	 */
-    public static final Logger log = Logger.getLogger
-	( TxDag.class
-	  );
+    protected static final Logger log = Logger.getLogger(TxDag.class);
 
-	/**
-	 * True iff the {@link #log} level is DEBUG.  This is used to minimize the
-	 * runtime cost of debug-level logging in methods.
-	 */
-	private final boolean debug = log.getEffectiveLevel().toInt() <= Level.DEBUG
-			.toInt();
+    protected static final boolean INFO = log.isInfoEnabled();
+    
+    protected static final boolean DEBUG = log.isDebugEnabled();
 
     /**
      * The maximum multi-programming level supported (from the constructor).
@@ -297,10 +294,20 @@ public class TxDag {
     synchronized public int size() {
         return mapping.size();
     }
+
+    /**
+     * Return <code>true</code> iff adding another transaction would exceed
+     * the configured multi-programming capacity.
+     */
+    synchronized public boolean isFull() {
+
+        return size() == _capacity;
+
+    }
     
     /**
      * Constructor.
-     *  
+     * 
      * @param capacity
      *            The multi-programming level. This is the maximum number of
      *            concurrent transactions permitted by the application.
@@ -356,7 +363,7 @@ public class TxDag {
      *                DAG, <code>insert == true</code>, and the capacity
      *                would be exceeded if this transaction was added.
      */
-    synchronized int lookup( Object tx, boolean insert )
+    synchronized int lookup( final Object tx, final boolean insert )
     {
         
         if( tx == null ) {
@@ -377,10 +384,8 @@ public class TxDag {
             	
                 if( nvertices == capacity ) {
 
-                    throw new IllegalStateException(
-							"maximum concurrency exceeded: capacity="
-									+ capacity + ", nvertices=" + nvertices
-                            );
+                    throw new MultiprogrammingCapacityExceededException(
+                            "capacity=" + capacity + ", nvertices=" + nvertices);
 
                 }
 
@@ -440,15 +445,16 @@ public class TxDag {
      * uncleared edges will remainin in the WAITS_FOR graph and will interfere
      * with reuse of the recycled index?
      */
-    synchronized public boolean releaseVertex( Object tx )
+    synchronized public boolean releaseVertex( final Object tx )
     {
     	
-    	Integer index = (Integer) mapping.remove( tx );
+    	final Integer index = (Integer) mapping.remove( tx );
     	
     	if( index == null ) {
     	
 //    		throw new IllegalArgumentException("tx="+tx);
-            log.info("Not a vertex");
+    	    if (INFO)
+                log.info("Not a vertex: " + tx);
             
             return false;
     		
@@ -483,7 +489,7 @@ public class TxDag {
      * @return The #of different paths from u to v.
      */
     
-    final synchronized int getPathCount( int u, int v )
+    final synchronized int getPathCount( final int u, final int v )
     {
         
         return M[ u ][ v ];
@@ -529,7 +535,7 @@ public class TxDag {
 	 *                If adding the edge to the DAG would result in a cycle. The
 	 *                state of the DAG is unchanged if this exception is thrown.
 	 */
-    synchronized public void addEdge( Object blocked, Object running )
+    synchronized public void addEdge( final Object blocked, final Object running )
     	throws DeadlockException
     {
         // verify arguments some more.
@@ -549,7 +555,7 @@ public class TxDag {
 		 * If a deadlock results, then restore M from the back.  (This approach
 		 * presumes that deadlocks are less likely than success.)
 		 */
-        if( debug ) {
+        if( DEBUG ) {
         	log.debug(toString());
         }
         final int[] order = getOrder();
@@ -561,7 +567,7 @@ public class TxDag {
 				 */
                 log.warn("Deadlock");
 				restore(order);
-				if( debug ) {
+				if( DEBUG ) {
 					log.debug(toString());
 				}
 				throw new DeadlockException("deadlock");
@@ -590,7 +596,7 @@ public class TxDag {
 		if( outbound[src] == 1 || inbound[dst] == 1 ) {
 			resetOrder();
 		}
-		if( debug ) {
+		if( DEBUG ) {
 			log.debug(toString());
 		}
     }
@@ -689,7 +695,7 @@ public class TxDag {
 		 */
     	final int[] order = ( insert ? getOrder(t,u) : getOrder() );
     	final int n = order.length;
-        if( debug ) {
+        if( DEBUG ) {
         	log.debug("W:: t("+t+") -> u("+u+"), insert="+insert+", size="+n);
         }
         final int max = Integer.MAX_VALUE;
@@ -700,7 +706,7 @@ public class TxDag {
                 final int ov = order[ v ];
                 if( ov == u ) continue;
                 // M[s,v] := M[s,v] +/- M[s,t] . M[u,v]; s!=t; u!=v
-                if( debug ) {
+                if( DEBUG ) {
                 	log.debug("M[s="+os+",v="+ov+"] := "+
                 			  "M[s="+os+",v="+ov+"]("+M[os][ov]+") +/- "+
                 			  "M[s="+os+",t="+t+"]("+M[os][t]+") . "+
@@ -716,7 +722,7 @@ public class TxDag {
                 }
             }
             // M[s,u] := M[s,u] +/- M[s,t]; s!=t
-            if( debug ) {
+            if( DEBUG ) {
             log.debug("M[s="+os+",u="+u+"] := "+
                       "M[s="+os+",u="+u+"]("+M[os][u]+") +/- "+
                       "M[s="+os+",t="+t+"]("+M[os][t]+")"
@@ -734,7 +740,7 @@ public class TxDag {
             final int ov = order[ v ];
             if( ov == u ) continue;
             // M[t,v] := M[t,v] +/- M[u,v]; u!=v
-            if( debug ) {
+            if( DEBUG ) {
             log.debug("M[t="+t+",v="+ov+"] := "+
                       "M[t="+t+",v="+ov+"]("+M[t][ov]+") +/- "+
                       "M[u="+u+",v="+ov+"]("+M[t][ov]+")"
@@ -749,7 +755,7 @@ public class TxDag {
             }
         }
         // M[t,u] := M[t,u] +/- 1
-        if( debug ) {
+        if( DEBUG ) {
         log.debug("M[t="+t+",u="+u+"] := "+
                   "M[t="+t+",u="+u+"]("+M[t][u]+") +/- 1"
         	  );
@@ -764,7 +770,7 @@ public class TxDag {
         for( int s=0; s<n; s++ ) {
         	final int os = order[s];
             if( M[os][os] > 0 ) {
-            	if( debug ) {
+            	if( DEBUG ) {
             		log.debug("deadlock: M["+os+","+os+"]="+M[os][os]);
             	}
                 return false;
@@ -1052,7 +1058,7 @@ public class TxDag {
 	 *                is thrown.
 	 */
 
-    synchronized public void addEdges( Object blocked, Object[] running )
+    synchronized public void addEdges( final Object blocked, final Object[] running )
 		throws DeadlockException
     {
         if( running == blocked ) {
@@ -1082,7 +1088,7 @@ public class TxDag {
 		 * If a deadlock results, then restore M from the back.  (This approach
 		 * presumes that deadlocks are less likely than success.)
 		 */
-        if( debug ) {
+        if( DEBUG ) {
         	log.debug(toString());
         }
         final int[] order = getOrder();
@@ -1091,7 +1097,7 @@ public class TxDag {
 			for (int i = 0; i < dst.length; i++) {
 				if( ! updateClosure( src, dst[i], true ) ) {
                     log.warn("deadlock");
-					if( debug ) {
+					if( DEBUG ) {
 						log.debug(toString());
 					}
 //                    System.err.println(toString());
@@ -1136,7 +1142,7 @@ public class TxDag {
 		if( reset ) {
 			resetOrder();
 		}
-        if( debug ) {
+        if( DEBUG ) {
         	log.debug(toString());
         }
     }
@@ -1156,7 +1162,7 @@ public class TxDag {
 	 * 
 	 * @return true iff the edge exists.
 	 */
-    synchronized public boolean hasEdge( Object blocked, Object running )
+    synchronized public boolean hasEdge( final Object blocked, final Object running )
     {
         if( running == blocked ) {
             throw new IllegalArgumentException("transaction may not wait for itself");
@@ -1204,7 +1210,7 @@ public class TxDag {
 	 * @see Edge
 	 */
     
-    synchronized public Edge[] getEdges( boolean closure )
+    synchronized public Edge[] getEdges( final boolean closure )
     {
         final int[] order = getOrder();
         final int n = order.length;
@@ -1317,7 +1323,7 @@ public class TxDag {
 	 *                If the described edge does not exist.
 	 */
 
-    synchronized public void removeEdge( Object blocked, Object running )
+    synchronized public void removeEdge( final Object blocked, final Object running )
     {
         final int src, tgt;
         if( ( src = lookup( blocked, false ) ) == -1 ) {
@@ -1341,7 +1347,7 @@ public class TxDag {
 		 * an edge, and that causes too much overhead for something which "should
 		 * not" happen.
 		 */
-        if( debug ) {
+        if( DEBUG ) {
         	log.debug(toString());
         }
         // update the closure.
@@ -1359,7 +1365,7 @@ public class TxDag {
         if( inbound[tgt] <0 ) {
         	throw new AssertionError();
         }
-        if( debug ) {
+        if( DEBUG ) {
         	log.debug(toString());
         }
     }
@@ -1375,7 +1381,7 @@ public class TxDag {
 	 *            The target vertex.
 	 */
     
-    private synchronized void removeEdge( int src, int tgt )
+    private synchronized void removeEdge( final int src, final int tgt )
     {
         if( src == tgt ) {
             throw new IllegalArgumentException();
@@ -1427,7 +1433,7 @@ public class TxDag {
      *       of {@link #removeEdge(Object, Object)} and therefore must be
      *       evaluated separately.
      */
-    synchronized public void removeEdges( Object tx, boolean waiting )
+    synchronized public void removeEdges( final Object tx, final boolean waiting )
     {
         final int tgt;
         if( ( tgt = lookup( tx, false ) ) == -1 ) {
@@ -1435,7 +1441,7 @@ public class TxDag {
         	return;
 //            throw new IllegalStateException("unknown transaction: tx1="+tx);
         }
-        if( debug ) {
+        if( DEBUG ) {
         	log.debug(toString());
         }
     	if( ! waiting ) {
@@ -1494,7 +1500,7 @@ public class TxDag {
     	if(!releaseVertex( tx )) {
     	    throw new AssertionError("Unknown vertex="+tx);   
         }
-        if( debug ) {
+        if( DEBUG ) {
         	log.debug(toString());
         }
     }
