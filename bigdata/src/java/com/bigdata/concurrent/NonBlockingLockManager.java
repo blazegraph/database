@@ -33,9 +33,12 @@ import static com.bigdata.concurrent.NonBlockingLockManager.RunState.Shutdown;
 import static com.bigdata.concurrent.NonBlockingLockManager.RunState.ShutdownNow;
 import static com.bigdata.concurrent.NonBlockingLockManager.RunState.Starting;
 
+import java.lang.ref.WeakReference;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
+import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
@@ -52,7 +55,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.cache.ConcurrentWeakValueCache;
+import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.journal.AbstractTask;
@@ -85,6 +88,8 @@ import com.bigdata.util.concurrent.QueueStatisticsTask;
  * @todo a fair option? What constraints or freedoms would it provide?
  * 
  * @todo a {@link SynchronousQueue} for the {@link #acceptedTasks}?
+ * 
+ * @todo a {@link SynchronousQueue} for the writeService workQueue?
  * 
  * FIXME In order to support 2PL we need to decouple the {@link LockFutureTask}
  * from the transaction with which it is associated. Otherwise each
@@ -125,12 +130,10 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
      * {@link ResourceQueue}s are purged after they become only weakly
      * reachable.
      * 
-     * @todo could also use timeout to purge stale resource queues, but it
-     *       should not matter since the {@link ResourceQueue} does not have a
-     *       reference to the resource itself - just to its name.
+     * @todo reconsider the timeout.  it is set to one LBS period right now.
      */
-    final private ConcurrentWeakValueCache<R, ResourceQueue<LockFutureTask<? extends Object>>> resourceQueues = new ConcurrentWeakValueCache<R, ResourceQueue<LockFutureTask<? extends Object>>>(
-            1000/* nresources */);
+    final private ConcurrentWeakValueCacheWithTimeout<R, ResourceQueue<LockFutureTask<? extends Object>>> resourceQueues = new ConcurrentWeakValueCacheWithTimeout<R, ResourceQueue<LockFutureTask<? extends Object>>>(
+            1000/* nresources */, TimeUnit.SECONDS.toNanos(60));
 
     /**
      * Release all locks held by the {@link LockFutureTask} currently holding a
@@ -437,6 +440,40 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
                 }
             });
 
+            /*
+             * Displays the #of tasks waiting on each resource queue for the
+             * lock (does not count the task at the head of the queue).
+             * 
+             * @todo this could also be handled by dynamic reattachment of the
+             * counters.
+             */
+            root.addCounter("queues", new Instrument<String>() {
+                public void sample() {
+                    final Iterator<Map.Entry<R, WeakReference<ResourceQueue<LockFutureTask<? extends Object>>>>> itr = resourceQueues
+                            .entryIterator();
+                    final LinkedList<ResourceQueueSize> list = new LinkedList<ResourceQueueSize>();
+                    while (itr.hasNext()) {
+                        final Map.Entry<R, WeakReference<ResourceQueue<LockFutureTask<? extends Object>>>> entry = itr
+                                .next();
+                        final WeakReference<ResourceQueue<LockFutureTask<? extends Object>>> queueRef = entry
+                                .getValue();
+                        final ResourceQueue<LockFutureTask<? extends Object>> queue = queueRef
+                                .get();
+                        if (queue == null)
+                            continue;
+                        list.add(new ResourceQueueSize(queue));
+                    }
+                    final Object[] a = list.toArray();
+                    Arrays.sort(a);
+                    final StringBuilder sb = new StringBuilder();
+                    for (Object t : a) {
+                        sb.append(t.toString());
+                        sb.append(" ");
+                    }
+                    setValue(sb.toString());
+                }
+            });
+            
         }
 
         return root;
@@ -445,6 +482,31 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
 
     private CounterSet root;
 
+    /**
+     * Helper class pairs up the resource with its sampled queue size and allows
+     * ordering of the samples.  E.g., by size or by resource.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private class ResourceQueueSize implements Comparable<ResourceQueueSize> {
+        final R resource;
+        int size;
+        public ResourceQueueSize(ResourceQueue<LockFutureTask<? extends Object>> queue){
+            resource = queue.getResource();
+            size = queue.getQueueSize();
+        }
+        public int compareTo(ResourceQueueSize arg0) {
+            // resource name order.
+//            return resource.compareTo(arg0.resource);
+            // descending queue size order.
+            return arg0.size - size;
+        }
+        public String toString() {
+            return "(" + resource + "," + size + ")";
+        }
+    }
+    
     /**
      * Counters for the {@link NonBlockingLockManager}.
      * 
@@ -507,6 +569,14 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
          * queue length of the {@link NonBlockingLockManager}. To get the
          * actual queue length you need to add this to the length of the queue
          * for the delegate {@link Executor}.
+         * 
+         * FIXME This counter can be off since a task does not "know" when it is
+         * placed onto the [waitingTasks] queue and therefore can not decrement
+         * the counter conditionally if the task is cancelled or if an exception
+         * is set. Right now the counter is only decremented if the task begins
+         * to execute. This is a problem since this is the primary indication of
+         * the total size of the {@link NonBlockingLockManager} as a queue
+         * feeding its delegate {@link Executor}.
          */
         public int nwaiting;
 
@@ -1320,12 +1390,16 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
          * <ul>
          * <li> If requesting locks for a task would exceed the configured
          * multi-programming level then we do not issue the request and return
-         * immediately</li>
-         * <li>If the lock requests for a task would cause a deadlock then set
-         * the {@link DeadlockException} on the {@link Future} and drop the task</li>
+         * immediately. The task is left on the accepted queue and will be
+         * retried later.</li>
+         * <li>If the lock requests for a task would cause a deadlock and the
+         * #of retries has been exceeded, then set the {@link DeadlockException}
+         * on the {@link Future} and drop the task. Otherwise ntries was
+         * incremented and we just ignore the task for now and will retry it
+         * again later.</li>
          * <li>If the timeout for the lock requests has already expired, then
          * set set {@link TimeoutException} on the {@link Future} and drop the
-         * task</li>
+         * task.</li>
          * </ul>
          * 
          * @return true iff any tasks were moved to the waiting queue.
@@ -1511,6 +1585,16 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
                     lock.unlock();
                    
                 }
+                
+                /*
+                 * FIXME if the task is holding all of its locks then start it
+                 * immediately. Note also that we are grabbing and releasing the
+                 * #lock quite in the AcceptTask's thread. And presumably in
+                 * run() as well.
+                 */
+//                if(holdsAllLocks(t)) {
+//                    
+//                }
 
                 waitingTasks.add(t);
 
