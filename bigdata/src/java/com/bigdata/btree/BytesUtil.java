@@ -131,7 +131,7 @@ public class BytesUtil {
 
                 System.loadLibrary("BytesUtil");
 
-                log.info("BytesUtil JNI linked");
+                if(log.isInfoEnabled()) log.info("BytesUtil JNI linked");
 
                 linked = true;
 
