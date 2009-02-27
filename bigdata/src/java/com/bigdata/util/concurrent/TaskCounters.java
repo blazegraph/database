@@ -15,7 +15,7 @@ import com.bigdata.service.IDataService;
  * different services on which the tasks are run.
  * <p>
  * Note: The field names here are consistent with those in the
- * {@link QueueStatisticsTask}.
+ * {@link ThreadPoolExecutorStatisticsTask}.
  * <p>
  * Note: The various counters are {@link AtomicLong}s since we need them to be
  * thread-safe. (<code>counter++</code> and <code>counter+=foo</code> are
@@ -29,10 +29,26 @@ import com.bigdata.service.IDataService;
  * @todo for the client add counters for retry's as follow ups to a
  *       {@link StaleLocatorException}.
  * 
- * @see QueueStatisticsTask
+ * @see ThreadPoolExecutorStatisticsTask
  */
 public class TaskCounters {
 
+    public String toString() {
+        return getClass().getSimpleName()+//
+        "{#submit="+taskSubmitCount+//
+        ",#complete="+taskCompleteCount+//
+        ",#fail="+taskFailCount+//
+        ",#success="+taskSuccessCount+//
+        ",#queueWaitingTime="+queueWaitingNanoTime+//
+        ",#lockWaitingTime="+lockWaitingNanoTime+//
+        ",#serviceTime="+serviceNanoTime+//
+        ",#commitWaitingTime="+commitWaitingNanoTime+//
+        ",#commitServiceTime="+commitServiceNanoTime+//
+        ",#queuingTime="+queuingNanoTime+//
+        "}"
+        ;
+    }
+    
     /** #of tasks that have been submitted. */
     final public AtomicLong taskSubmitCount = new AtomicLong();
     
@@ -46,24 +62,25 @@ public class TaskCounters {
     final public AtomicLong taskSuccessCount = new AtomicLong();
 
     /**
-     * Cumulative elapsed time waiting on the queue pending service.
+     * Cumulative elapsed time in nanoseconds waiting on the queue pending
+     * service.
      */
-    final public AtomicLong queueWaitingTime = new AtomicLong();
+    final public AtomicLong queueWaitingNanoTime = new AtomicLong();
     
     /**
-     * Cumulative elapsed time consumed by tasks while waiting for an resource
-     * lock.
+     * Cumulative elapsed time in nanoseconds consumed by tasks while waiting
+     * for an resource lock.
      * <p>
      * Note: this value will only be non-zero for {@link ITx#UNISOLATED} tasks
      * since they are the only tasks that wait for locks and then only when
      * measuring the times on the {@link IDataService} rather than the client's
      * thread pool.
      */
-    final public AtomicLong lockWaitingTime = new AtomicLong();
+    final public AtomicLong lockWaitingNanoTime = new AtomicLong();
 
     /**
-     * Cumulative elapsed time consumed by tasks while assigned to a worker
-     * thread.
+     * Cumulative elapsed time in nanoseconds consumed by tasks while assigned
+     * to a worker thread.
      * <p>
      * Note: Since this is aggregated over concurrent tasks the reported elapsed
      * time MAY exceed the actual elapsed time during which those tasks were
@@ -72,22 +89,22 @@ public class TaskCounters {
     final public AtomicLong serviceNanoTime = new AtomicLong();
 
     /**
-     * Cumulative elapsed time consumed by tasks from when they are submitted
-     * until they are complete.
+     * Cumulative elapsed time in nanoseconds consumed by tasks from when they
+     * are submitted until they are complete.
      */
     final public AtomicLong queuingNanoTime = new AtomicLong();
     
     /**
-     * Cumulative elapsed time consumed by tasks awaiting group commit (iff the
-     * task is run on the {@link WriteExecutorService}).
+     * Cumulative elapsed time in nanoseconds consumed by tasks awaiting group
+     * commit (iff the task is run on the {@link WriteExecutorService}).
      */
-    final public AtomicLong commitWaitingTime = new AtomicLong();
+    final public AtomicLong commitWaitingNanoTime = new AtomicLong();
     
     /**
-     * Cumulative elapsed time servicing group commit (iff the task is run on
-     * the {@link WriteExecutorService}).
+     * Cumulative elapsed time in nanoseconds servicing group commit (iff the
+     * task is run on the {@link WriteExecutorService}).
      */
-    final public AtomicLong commitServiceTime = new AtomicLong();
+    final public AtomicLong commitServiceNanoTime = new AtomicLong();
     
     /** Ctor */
     public TaskCounters() {
@@ -107,9 +124,9 @@ public class TaskCounters {
 
         taskSuccessCount.addAndGet( c.taskSuccessCount.get() );
 
-        queueWaitingTime.addAndGet( c.queueWaitingTime.get() );
+        queueWaitingNanoTime.addAndGet( c.queueWaitingNanoTime.get() );
 
-        lockWaitingTime.addAndGet( c.lockWaitingTime.get() );
+        lockWaitingNanoTime.addAndGet( c.lockWaitingNanoTime.get() );
         
         serviceNanoTime.addAndGet( c.serviceNanoTime.get() );
 

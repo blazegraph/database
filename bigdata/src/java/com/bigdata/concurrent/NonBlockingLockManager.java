@@ -60,7 +60,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
-import com.bigdata.util.concurrent.QueueStatisticsTask;
+import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
 
 /**
  * This class coordinates a schedule among concurrent operations requiring
@@ -151,7 +151,7 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
      * <p>
      * {@link AbstractTask} really needs a refactor.
      */
-    public final void releaseLocksForTaskWithLockOnResource(final R[] resource) {
+    public final void releaseLocksForTask(final R[] resource) {
 
         if (resource == null)
             throw new IllegalArgumentException();
@@ -973,7 +973,7 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
                 
                 final long lockWaitingTime = System.nanoTime() - acceptTime;
 
-                ((AbstractTask) task).getTaskCounters().lockWaitingTime
+                ((AbstractTask) task).getTaskCounters().lockWaitingNanoTime
                         .addAndGet(lockWaitingTime);
 
             }
@@ -1196,7 +1196,7 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
     /**
      * Used to run the {@link AcceptTask} and the {@link MonitorTask}.
      * 
-     * FIXME Monitor this service using a {@link QueueStatisticsTask} to convert
+     * FIXME Monitor this service using a {@link ThreadPoolExecutorStatisticsTask} to convert
      * {@link Counters#nrunning} and {@link Counters#nwaiting} into moving
      * averages.
      */

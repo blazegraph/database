@@ -60,13 +60,13 @@ public class StressTestNonBlockingLockManagerWithPredeclaredLocks extends
      * 
      * @throws Exception
      */
-    public void test_noResourcesDoesNotWait_predeclareLocks() throws Exception {
+    public void test_noResourcesDoesNotWait_predeclareLocks_unboundedQueue() throws Exception {
         
         final Properties properties = new Properties();
         
         final int nthreads = 5;
         final int ntasks = 1000;
-        properties.setProperty(TestOptions.NTHREADS, "" + nthreads);
+        properties.setProperty(TestOptions.CORE_POOL_SIZE, "" + nthreads);
         properties.setProperty(TestOptions.NTASKS, "" + ntasks);
         properties.setProperty(TestOptions.NRESOURCES, "10");
         properties.setProperty(TestOptions.MIN_LOCKS, "0");
@@ -90,6 +90,43 @@ public class StressTestNonBlockingLockManagerWithPredeclaredLocks extends
     }
     
     /**
+     * Test where no locks are declared. This should run all tasks with the
+     * maximum concurrency. Since there is no timeout, all tasks should complete
+     * successfully.
+     * 
+     * @throws Exception
+     */
+    public void test_noResourcesDoesNotWait_predeclareLocks_synchronousQueue() throws Exception {
+        
+        final Properties properties = new Properties();
+        
+        final int ntasks = 1000;
+        final int corePoolSize = 5;
+        final int maxPoolSize = ntasks;
+        properties.setProperty(TestOptions.SYNCHRONOUS_QUEUE,"true");
+        properties.setProperty(TestOptions.CORE_POOL_SIZE, "" + corePoolSize);
+        properties.setProperty(TestOptions.MAX_POOL_SIZE, "" + maxPoolSize);
+        properties.setProperty(TestOptions.NTASKS, "" + ntasks);
+        properties.setProperty(TestOptions.NRESOURCES, "10");
+        properties.setProperty(TestOptions.MIN_LOCKS, "0");
+        properties.setProperty(TestOptions.MAX_LOCKS, "0");
+        properties.setProperty(TestOptions.PREDECLARE_LOCKS, "true");
+        properties.setProperty(TestOptions.SORT_LOCK_REQUESTS, "true");
+        
+        final Result result = doComparisonTest(properties);
+
+        // all tasks completed successfully.
+        assertEquals("nsuccess", ntasks, Integer.parseInt(result
+                .get("nsuccess")));
+
+        // tasks ran with high concurrency using at least all core pool threads.
+        final int maxrunning = Integer.parseInt(result.get("maxrunning"));
+
+        assertTrue("maxrunning=" + maxrunning, corePoolSize <= maxrunning);
+
+    }
+    
+    /**
      * Test where each operation locks one or more resources.
      * <p>
      * Note: This condition provides the basis for deadlocks. In fact, since we
@@ -103,14 +140,14 @@ public class StressTestNonBlockingLockManagerWithPredeclaredLocks extends
      * for tasks to have non-overlapping lock requests and therefore there can
      * be more than one task executing concurrently.
      */
-    public void test_multipleResourceLocking_resources10_predeclareLocks_locktries10()
+    public void test_multipleResourceLocking_resources10_predeclareLocks_unboundedQueue_locktries10()
             throws Exception {
 
         final Properties properties = new Properties();
 
         final int nthreads = 20;
         final int ntasks = 1000;
-        properties.setProperty(TestOptions.NTHREADS, "" + nthreads);
+        properties.setProperty(TestOptions.CORE_POOL_SIZE, "" + nthreads);
         properties.setProperty(TestOptions.NTASKS, "" + ntasks);
         properties.setProperty(TestOptions.NRESOURCES, "100");
         properties.setProperty(TestOptions.MIN_LOCKS, "10");
@@ -120,6 +157,52 @@ public class StressTestNonBlockingLockManagerWithPredeclaredLocks extends
         properties.setProperty(TestOptions.SORT_LOCK_REQUESTS,"true");
                 
         Result result = doComparisonTest(properties);
+        
+        /*
+         * Deadlocks should not be possible when we predeclare and sort locks.
+         */
+        assertEquals("ndeadlock", 0, Integer.parseInt(result.get("ndeadlock")));
+
+        // all tasks completed successfully.
+        assertEquals("nsuccess", ntasks, Integer.parseInt(result
+                .get("nsuccess")));
+
+    }
+
+    /**
+     * Test where each operation locks one or more resources.
+     * <p>
+     * Note: This condition provides the basis for deadlocks. In fact, since we
+     * have 10 resource locks for each operation and only 100 operations the
+     * chances of a deadlock on any given operation are extremely high. However,
+     * since we are predeclaring our locks and the lock requests are being
+     * sorted NO deadlocks should result.
+     * <p>
+     * Note: Tasks are not necessarily serialized for this case since there are
+     * 100 resources, so even though each task obtains 10 locks it is possible
+     * for tasks to have non-overlapping lock requests and therefore there can
+     * be more than one task executing concurrently.
+     */
+    public void test_multipleResourceLocking_resources10_predeclareLocks_synchronousQueue_locktries10()
+            throws Exception {
+
+        final Properties properties = new Properties();
+
+        final int ntasks = 1000;
+        final int corePoolSize = 20;
+        final int maxPoolSize = ntasks;
+        properties.setProperty(TestOptions.SYNCHRONOUS_QUEUE, "true");
+        properties.setProperty(TestOptions.CORE_POOL_SIZE, "" + corePoolSize);
+        properties.setProperty(TestOptions.MAX_POOL_SIZE, "" + maxPoolSize);
+        properties.setProperty(TestOptions.NTASKS, "" + ntasks);
+        properties.setProperty(TestOptions.NRESOURCES, "100");
+        properties.setProperty(TestOptions.MIN_LOCKS, "10");
+        properties.setProperty(TestOptions.MAX_LOCKS, "10");
+        properties.setProperty(TestOptions.MAX_LOCK_TRIES, "10");
+        properties.setProperty(TestOptions.PREDECLARE_LOCKS,"true");
+        properties.setProperty(TestOptions.SORT_LOCK_REQUESTS,"true");
+                
+        final Result result = doComparisonTest(properties);
         
         /*
          * Deadlocks should not be possible when we predeclare and sort locks.

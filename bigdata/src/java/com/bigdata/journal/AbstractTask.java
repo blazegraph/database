@@ -1541,7 +1541,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             
             final long waitingTime = (System.nanoTime() - nanoTime_submitTask);
             
-            taskCounters.queueWaitingTime.addAndGet(waitingTime);
+            taskCounters.queueWaitingNanoTime.addAndGet(waitingTime);
             
             setupLoggingContext();
             
@@ -1986,9 +1986,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                  * Release the locks held by the task.
                  */
                 try {
-                    writeService.getLockManager()
-                            .releaseLocksForTaskWithLockOnResource(
-                                    delegate.resource);
+                    writeService.getLockManager().releaseLocksForTask(
+                            delegate.resource);
                 } catch (Throwable t) {
                     // log an error but do not abort the task.
                     log.error(delegate, t);

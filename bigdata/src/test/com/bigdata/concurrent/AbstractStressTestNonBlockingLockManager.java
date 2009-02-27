@@ -37,12 +37,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -51,10 +53,13 @@ import junit.framework.TestCase;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.counters.CounterSet;
 import com.bigdata.service.DataService;
 import com.bigdata.test.ExperimentDriver;
 import com.bigdata.test.ExperimentDriver.Result;
 import com.bigdata.util.NV;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
 
 /**
  * Suite of stress tests of the concurrency control mechanisms (without the
@@ -193,8 +198,31 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
                         .getProperty(TestOptions.TIMEOUT,
                                 TestOptions.DEFAULT_TIMEOUT)));
 
-        final int nthreads = Integer.parseInt(properties
-                .getProperty(TestOptions.NTHREADS));
+        final int corePoolSize = Integer.parseInt(properties
+                .getProperty(TestOptions.CORE_POOL_SIZE));
+
+        final int maxPoolSize = (properties
+                .getProperty(TestOptions.MAX_POOL_SIZE) == null ? corePoolSize
+                : Integer.parseInt(properties
+                        .getProperty(TestOptions.MAX_POOL_SIZE)));
+
+        if (maxPoolSize < corePoolSize) {
+            throw new IllegalArgumentException(TestOptions.MAX_POOL_SIZE + "="
+                    + maxPoolSize + ", but " + TestOptions.CORE_POOL_SIZE + "="
+                    + corePoolSize);
+        }
+
+        final boolean prestartCoreThreads = Boolean.parseBoolean(properties
+                .getProperty(TestOptions.PRESTART_CORE_THREADS,
+                        TestOptions.DEFAULT_PRESTART_CORE_THREADS));
+
+        final boolean synchronousQueue = Boolean.parseBoolean(properties
+                .getProperty(TestOptions.SYNCHRONOUS_QUEUE,
+                        TestOptions.DEFAULT_SYNCHRONOUS_QUEUE));
+
+        final boolean synchronousQueueFair = Boolean.parseBoolean(properties
+                .getProperty(TestOptions.SYNCHRONOUS_QUEUE_FAIR,
+                        TestOptions.DEFAULT_SYNCHRONOUS_QUEUE_FAIR));
 
         final int ntasks = Integer.parseInt(properties
                 .getProperty(TestOptions.NTASKS));
@@ -243,26 +271,90 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
         assert maxLockTries >= 1;
         
         // used to execute the tasks.
-        final ExecutorService delegateService;
-        
-        // fixed size thread pool w/ an unbounded queue.
-//        delegateService = Executors.newFixedThreadPool(
-//                nthreads, DaemonThreadFactory.defaultThreadFactory());
-        
-        // fixed size thread pool w/ zero capacity queue.
-//        final BlockingQueue<Runnable> workQueue = new SynchronousQueue<Runnable>(
-//                true/*fair*/);
-        final BlockingQueue<Runnable> workQueue = new LinkedBlockingQueue<Runnable>(1);
-        delegateService = new ThreadPoolExecutor(nthreads/* corePoolSize */,
-                nthreads/* maximumPoolSize */, Long.MAX_VALUE/* keepAliveTime */,
-                TimeUnit.SECONDS/*keepAliveUnit*/, workQueue);
+        final ThreadPoolExecutor delegateService;
 
-        final NonBlockingLockManager<String> lockManager = new NonBlockingLockManager<String>(
-                nthreads/* multi-programming level */, predeclareLocks,
-                sortLockRequests, delegateService);
+        if (synchronousQueue) {
+            /*
+             * zero capacity queue w/ (ideally) unbounded thread pool.
+             * 
+             * Note: when maxPoolSize is less than [ntasks] then it is possible
+             * for the delegate to be overrun which will result in rejected
+             * execution exceptions.
+             */
+            delegateService = new ThreadPoolExecutor(
+                    corePoolSize,//
+                    Integer.MAX_VALUE, //maxPoolSize,//
+                    Long.MAX_VALUE/* keepAliveTime */,
+                    TimeUnit.SECONDS/* keepAliveUnit */,
+                    new SynchronousQueue<Runnable>(synchronousQueueFair));
+        } else {
+            /*
+             * fixed size thread pool w/ an unbounded queue.
+             * 
+             * @todo could optionally specify a bound for the queue to see the
+             * effect of overrunning it, which would result in rejected
+             * execution exceptions from the delegate.
+             */ 
+            delegateService = new ThreadPoolExecutor(
+                    corePoolSize,//
+                    maxPoolSize,//
+                    Long.MAX_VALUE/* keepAliveTime */,
+                    TimeUnit.SECONDS/*keepAliveUnit*/,
+                    new LinkedBlockingQueue<Runnable>());
+        }
+        if (prestartCoreThreads) {
 
+            delegateService.prestartAllCoreThreads();
+
+        }
+
+        final NonBlockingLockManagerWithNewDesign<String> lockManager = new NonBlockingLockManagerWithNewDesign<String>(
+                maxPoolSize/* multi-programming level */, maxLockTries, predeclareLocks,
+                sortLockRequests) {
+          
+            protected void ready(Runnable r) {
+                
+                delegateService.execute(r);
+                
+            }
+            
+        };
+
+        /*
+         * Sample stuff at a once-per-second rate.
+         */
+        final CounterSet delegateCounterSet = new CounterSet();
+        final ScheduledExecutorService sampleService;
+        {
+
+            final double w = ThreadPoolExecutorStatisticsTask.DEFAULT_WEIGHT;
+            final long initialDelay = 0; // initial delay in ms.
+            final long delay = 1000; // delay in ms.
+            final TimeUnit unit = TimeUnit.MILLISECONDS;
+
+            sampleService = Executors
+                    .newSingleThreadScheduledExecutor(new DaemonThreadFactory(
+                            getClass().getName() + ".sampleService"));
+
+            // sample the delegate executor.
+            final ThreadPoolExecutorStatisticsTask delegateQueueStatisticsTask = new ThreadPoolExecutorStatisticsTask(
+                    "delegateService", delegateService,
+                    null/* delegateServiceCounters */, w);
+            
+            delegateQueueStatisticsTask.addCounters(delegateCounterSet
+                    .makePath("delegate"));
+
+            sampleService.scheduleWithFixedDelay(delegateQueueStatisticsTask,
+                    initialDelay, delay, unit);
+
+            // sample the lock service.
+            sampleService.scheduleWithFixedDelay(lockManager.statisticsTask,
+                    initialDelay, delay, unit);
+
+        }
+        
         try {
-
+        
             final Collection<LockCallableImpl<String, Object>> tasks = new ArrayList<LockCallableImpl<String, Object>>(
                     ntasks);
 
@@ -273,15 +365,14 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
 
                 resources[i] = "resource" + i;
 
-                // assertTrue(db.addResource(resources[i]));
-
             }
 
-            Random r = new Random();
+            final Random r = new Random();
 
-            // create tasks; each will use between minLocks and maxLocks
-            // distinct
-            // resources.
+            /*
+             * Create tasks; each will use between minLocks and maxLocks
+             * distinct resources.
+             */
             for (int i = 0; i < ntasks; i++) {
 
                 // #of locks that this task will seek to acquire.
@@ -336,14 +427,12 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
                 if (r.nextDouble() < percentTaskDeath) {
 
                     task = new LockCallableImpl<String, Object>(resource,
-                            new DeathResourceTask<Object>(),
-                            TimeUnit.NANOSECONDS, taskTimeout, maxLockTries);
+                            new DeathResourceTask<Object>());
 
                 } else {
 
                     task = new LockCallableImpl<String, Object>(resource,
-                            new Wait10ResourceTask<Object>(),
-                            TimeUnit.NANOSECONDS, taskTimeout, maxLockTries);
+                            new Wait10ResourceTask<Object>());
 
                 }
 
@@ -372,9 +461,8 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
                         final LockCallableImpl<String, Object> task = itr
                                 .next();
 
-                        futures.add(lockManager.submit(task.resource,
-                                task.task, task.unit, task.timeout,
-                                task.maxtries));
+                        futures.add(lockManager.submit( task.resource,
+                                task.task));
 
                         nsubmitted++;
 
@@ -407,53 +495,46 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
             final Iterator<Future<Object>> itr = futures.iterator();
             while (itr.hasNext()) {
                 final Future<Object> future = itr.next();
-                if (future.isCancelled()) {
-                    ncancel++;
-                } else {
-                    ncomplete++;
-                    try {
-                        while (true) {
+                while (true) {
+                    if (future.isCancelled()) {
+                        ncancel++;
+                        break; // future is done.
+                    } else {
+                        try {
                             final long elapsed = System.nanoTime() - begin;
                             if (elapsed > taskTimeout) {
-                                /*
-                                 * task timeout.
-                                 * 
-                                 * @todo This is measured from when we start to
-                                 * submit the tasks so they will all be
-                                 * cancelled at once. Alternatively, we could
-                                 * tunnel into the LockTaskFuture and compute
-                                 * the timeout from the time the task was
-                                 * accepted by the lock service, but that will
-                                 * be different iff the lock service is using a
-                                 * SynchronousQueue to accept tasks for
-                                 * execution.
-                                 */
                                 future.cancel(true/* mayInterruptIfRunning */);
                                 ntimeout++;
-                                break;
+                                // fall through.
                             }
                             try {
                                 future.get(1, TimeUnit.SECONDS);
+                                nsuccess++;
+                                break;
+                            } catch(CancellationException ex) {
+                                ncancel++;
                                 break;
                             } catch (TimeoutException ex) {
                                 log.warn("Future not ready yet: task=" + future
                                         + ", service=" + lockManager);
+                                continue; // keep waiting.
                             }
-                        }
-                        nsuccess++;
-                    } catch (ExecutionException ex) {
-                        if (ex.getCause() instanceof DeadlockException) {
-                            ndeadlock++;
-//                        } else if (ex.getCause() instanceof TimeoutException) {
-//                            ntimeout++;
-                        } else if (ex.getCause() instanceof HorridTaskDeath) {
-                            nhorriddeath++;
-                        } else {
-                            nerrors++;
-                            log.error("Task threw: " + ex, ex);
-                        }
+                        } catch (ExecutionException ex) {
+                            if (ex.getCause() instanceof DeadlockException) {
+                                // fatal deadlock (exceeded the retry count).
+                                ndeadlock++;
+                            } else if (ex.getCause() instanceof HorridTaskDeath) {
+                                nhorriddeath++;
+                            } else {
+                                // some other error.
+                                nerrors++;
+                                log.error("Task threw: " + ex, ex);
+                            }
+                            break; // future is done.
+                        } // catch
                     }
                 }
+                ncomplete++; // another future is done.
             }
             if (nerrors > 0) {
                 log.warn("There were " + nerrors + " errors and " + ndeadlock
@@ -461,7 +542,10 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
             }
 
             // Done.
+            System.out.println("\n-----------"+getName()+"-------------");
             System.out.println(lockManager.toString());
+            System.out.println(delegateCounterSet);
+            System.out.println(lockManager.getCounters().toString());
 
             final Result result = new Result();
 
@@ -478,30 +562,30 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
             result.put("nsuccess", "" + nsuccess);
             result.put("ncomplete", "" + ncomplete);
             result.put("ncancel", "" + ncancel);
+            result.put("ntimeout", "" + ntimeout);
             result.put("ndeadlock", "" + ndeadlock);
             result.put("nhorriddeath", "" + nhorriddeath); // Note: This is an expected error.
             
-            // these are reporting from the lock manager.
+            // reporting from the lock manager.
             result.put("maxrunning", "" + lockManager.counters.maxRunning);
-//            result.put("nstarted", "" + lockManager.counters.nstarted);
-//            result.put("nended", "" + lockManager.counters.nended);
-//            result.put("nerror", "" + lockManager.counters.nerror);
-//            result.put("ndeadlock", "" + lockManager.counters.ndeadlock);
-            result.put("ntimeout", "" + lockManager.counters.ntimeout);
 
             // throughput metrics.
             result.put("perSec", "" + perSec);
             result.put("elapsed", "" + elapsedMillis);
 
-            System.err.println(result.toString(true/* newline */));
+            System.out.println(result.toString(true/* newline */));
 
             return result;
 
         } finally {
 
+            sampleService.shutdownNow();
+
             lockManager.shutdownNow();
 
             delegateService.shutdownNow();
+            
+//            System.out.println("-------------------\n");
 
         }
 
@@ -522,9 +606,47 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
          */
         public static final String TIMEOUT = "testTimeout";
         /**
-         * The #of concurrent threads (multi-programming level).
+         * Boolean option determines whether a {@link SynchronousQueue} or an
+         * unbounded queue will be used for the work queue of the
+         * {@link ThreadPoolExecutor} consuming the ready tasks (default is
+         * {@value #DEFAULT_SYNCHRONOUS_QUEUE}).
+         * <p>
+         * Note: The {@link ThreadPoolExecutor} must not block when we submit a
+         * {@link Runnable} to it from
+         * {@link NonBlockingLockManagerWithNewDesign#ready(Runnable)}. This
+         * goal can be achieved either by having a {@link SynchronousQueue} and
+         * an unbounded {@link #MAX_POOL_SIZE} -or- by using an unbounded work
+         * queue. In the former case new {@link Thread}s will be created on
+         * demand. In the latter can tasks will be queued until the
+         * {@link #CORE_POOL_SIZE} threads can process them.
+         * 
+         * @see ThreadPoolExecutor
          */
-        public static final String NTHREADS = "nthreads";
+        public static final String SYNCHRONOUS_QUEUE = "synchronousQueue";
+        /**
+         * When using a {@link SynchronousQueue} for the
+         * {@link ThreadPoolExecutor}'s work queue, this boolean property
+         * specifies whether or not the {@link SynchronousQueue} will be fair,
+         * which is a ctor property for {@link SynchronousQueue}.
+         */
+        public static final String SYNCHRONOUS_QUEUE_FAIR = "synchronousQueueFair";
+        /**
+         * The core thread pool size.
+         */
+        public static final String CORE_POOL_SIZE = "nthreads";
+        /**
+         * The #of concurrent threads (multi-programming level). This must be
+         * GTE to {@link #CORE_POOL_SIZE}. The default value is whatever was
+         * specified for {@link #CORE_POOL_SIZE}. The value is ignored if you
+         * specify {@link #SYNCHRONOUS_QUEUE} as <code>true</code> and an
+         * unbounded thread pool is used instead.
+         */
+        public static final String MAX_POOL_SIZE = "maxPoolThreads";
+        /**
+         * When <code>true</code> the core thread pool will be prestarted when
+         * the {@link ThreadPoolExecutor} is created.
+         */
+        public static final String PRESTART_CORE_THREADS = "prestartCoreThreads";
         /**
          * Total #of tasks to execute.
          */
@@ -586,6 +708,12 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
          * The default is no timeout for the test.
          */
         public static final String DEFAULT_TIMEOUT = "0";
+
+        public static final String DEFAULT_SYNCHRONOUS_QUEUE = "false";
+        
+        public static final String DEFAULT_SYNCHRONOUS_QUEUE_FAIR = "false";
+
+        public static final String DEFAULT_PRESTART_CORE_THREADS = "false";
 
         /**
          * The default is 1 try for locks.
@@ -657,7 +785,7 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
              */
             
             defaultProperties.put(TestOptions.TIMEOUT,"30"); // secs.
-            defaultProperties.put(TestOptions.NTHREADS,"20");
+            defaultProperties.put(TestOptions.CORE_POOL_SIZE,"20");
             defaultProperties.put(TestOptions.NTASKS,"1000");
             defaultProperties.put(TestOptions.NRESOURCES,"100");
             defaultProperties.put(TestOptions.MIN_LOCKS,"1");
@@ -671,11 +799,11 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
 
             // low concurrency.
             conditions.add(getCondition(
-                    defaultProperties, new NV[] { new NV(TestOptions.NTHREADS,
+                    defaultProperties, new NV[] { new NV(TestOptions.CORE_POOL_SIZE,
                             "2") }));
             // and with a non-zero lock timeout.
             conditions.add(getCondition(defaultProperties, new NV[] {
-                    new NV(TestOptions.NTHREADS, "2"),
+                    new NV(TestOptions.CORE_POOL_SIZE, "2"),
                     new NV(TestOptions.TASK_TIMEOUT, "1000") }));
 
             // default concurrency.
@@ -697,20 +825,20 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
 
             // high concurrency.
             conditions.add(getCondition(
-                    defaultProperties, new NV[] { new NV(TestOptions.NTHREADS,
+                    defaultProperties, new NV[] { new NV(TestOptions.CORE_POOL_SIZE,
                             "100") }));
             // and with a non-zero lock timeout
             conditions.add(getCondition(defaultProperties, new NV[] {
-                    new NV(TestOptions.NTHREADS, "100"),
+                    new NV(TestOptions.CORE_POOL_SIZE, "100"),
                     new NV(TestOptions.TASK_TIMEOUT, "1000") }));
 
             // high concurrency with 10% task death.
             conditions.add(getCondition(defaultProperties, new NV[] {
-                    new NV(TestOptions.NTHREADS, "100"),
+                    new NV(TestOptions.CORE_POOL_SIZE, "100"),
                     new NV(TestOptions.PERCENT_TASK_DEATH, ".10") }));
             // and with a non-zero lock timeout.
             conditions.add(getCondition(defaultProperties, new NV[] {
-                    new NV(TestOptions.NTHREADS, "100"),
+                    new NV(TestOptions.CORE_POOL_SIZE, "100"),
                     new NV(TestOptions.PERCENT_TASK_DEATH, ".10"),
                     new NV(TestOptions.TASK_TIMEOUT, "1000") }));
 

@@ -64,7 +64,7 @@ import com.bigdata.service.IBigdataClient.Options;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
-import com.bigdata.util.concurrent.QueueStatisticsTask;
+import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
 import com.bigdata.util.concurrent.ShutdownHelper;
 import com.bigdata.util.concurrent.TaskCounters;
 import com.bigdata.util.httpd.AbstractHTTPD;
@@ -310,7 +310,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
     /**
      * Counters that aggregate across all tasks submitted by the client against
      * the connected federation. Those counters are sampled by a
-     * {@link QueueStatisticsTask} and reported by the client to the
+     * {@link ThreadPoolExecutorStatisticsTask} and reported by the client to the
      * {@link ILoadBalancerService}.
      */
     private final TaskCounters taskCounters = new TaskCounters();
@@ -318,7 +318,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
     /**
      * Returns the {@link TaskCounters}s that aggregate across all operations
      * performed by the client against the connected federation. The
-     * {@link TaskCounters} will be sampled by a {@link QueueStatisticsTask} and
+     * {@link TaskCounters} will be sampled by a {@link ThreadPoolExecutorStatisticsTask} and
      * the sampled data reported by the client to the
      * {@link ILoadBalancerService}.
      */
@@ -1014,12 +1014,12 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
             final String relpath = "Thread Pool";
 
-            final QueueStatisticsTask queueStatisticsTask = new QueueStatisticsTask(
+            final ThreadPoolExecutorStatisticsTask threadPoolExecutorStatisticsTask = new ThreadPoolExecutorStatisticsTask(
                     relpath, threadPool, taskCounters);
 
-            queueStatisticsTask.addCounters(getServiceCounterSet().makePath(relpath));
+            threadPoolExecutorStatisticsTask.addCounters(getServiceCounterSet().makePath(relpath));
 
-            addScheduledTask(queueStatisticsTask, initialDelay,
+            addScheduledTask(threadPoolExecutorStatisticsTask, initialDelay,
                     delay, unit);
 
         }

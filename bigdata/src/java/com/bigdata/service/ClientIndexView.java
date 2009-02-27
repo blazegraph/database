@@ -1591,7 +1591,7 @@ public class ClientIndexView implements IClientIndex {
 
             nanoTime_beginWork = System.nanoTime();
             final long queueWaitingTime = nanoTime_beginWork - nanoTime_submitTask;
-            taskCounters.queueWaitingTime.addAndGet(queueWaitingTime);
+            taskCounters.queueWaitingNanoTime.addAndGet(queueWaitingTime);
 //            taskCountersByProc.queueWaitingTime.addAndGet(queueWaitingTime);
 //            taskCountersByIndex.queueWaitingTime.addAndGet(queueWaitingTime);
             

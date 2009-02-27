@@ -23,6 +23,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.concurrent.NonBlockingLockManager;
+import com.bigdata.concurrent.NonBlockingLockManagerWithNewDesign;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
@@ -30,8 +31,8 @@ import com.bigdata.resources.StoreManager;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
-import com.bigdata.util.concurrent.QueueStatisticsTask;
 import com.bigdata.util.concurrent.TaskCounters;
+import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
 
 /**
  * Supports concurrent operations against named indices. Historical read and
@@ -175,12 +176,11 @@ public class ConcurrencyManager implements IConcurrencyManager {
         /**
          * The maximum #of threads allowed in the pool handling concurrent
          * unisolated write on named indices (default is
-         * {@value #DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE}). Since each task
-         * that completes processing will block until the next group commit,
-         * this value places an absolute upper bound on the number of tasks in a
-         * commit group. However, many other factors (client concurrency, index
-         * locks, task latency, CPU and IO utilization, etc.) can reduce the
-         * actual group commit size.
+         * {@value #DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE}.
+         * <p>
+         * Note: This property is <strong>ignored</strong> if the
+         * {@link #WRITE_SERVICE_QUEUE_CAPACITY} is ZERO (0) or
+         * {@link Integer#MAX_VALUE}!
          * 
          * @see #DEFAULT_WRITE_SERVICE_MAXIMUM_POOL_SIZE
          */
@@ -221,15 +221,29 @@ public class ConcurrencyManager implements IConcurrencyManager {
         String DEFAULT_WRITE_SERVICE_PRESTART_ALL_CORE_THREADS = "false";
 
         /**
-         * The maximum depth of the write service queue before newly submitted
-         * tasks will block the caller -or- ZERO (0) to use a queue with an
-         * unlimited capacity.
+         * The maximum capacity of the write service queue before newly
+         * submitted tasks will be rejected -or- ZERO (0) to use a
+         * {@link SynchronousQueue} (default
+         * {@value.#DEFAULT_WRITE_SERVICE_SYNCHRONOUS_QUEUE_CAPACITY}).
          * <p>
-         * Note: the corePoolSize will never increase for an unbounded queue so
-         * the value specified for maximumPoolSize will essentially be ignored
-         * in this case. See {@link ThreadPoolExecutor}'s discussion on queues
-         * for more information on this issue.
+         * Note: When the {@link #WRITE_SERVICE_QUEUE_CAPACITY} is ZERO (0), a
+         * {@link SynchronousQueue} is used, the maximumPoolSize is ignored, and
+         * new {@link Thread}s will be created on demand. This allow the #of
+         * threads to change in response to demand while ensuring that tasks are
+         * never rejected.
+         * <p>
+         * Note: A {@link LinkedBlockingQueue} will be used if the queue
+         * capacity is {@link Integer#MAX_VALUE}. The corePoolSize will never
+         * increase for an unbounded queue so the value specified for
+         * maximumPoolSize will be ignored and tasks will never be rejected. See
+         * {@link ThreadPoolExecutor}'s discussion on queues for more
+         * information on this issue.
+         * <p>
+         * Note: When a bounded queue capacity is specified, tasks will be
+         * rejected if the the corePoolThreads are busy and the work queue is
+         * full.
          * 
+         * @see ThreadPoolExecutor
          * @see #DEFAULT_WRITE_SERVICE_QUEUE_CAPACITY
          */
         String WRITE_SERVICE_QUEUE_CAPACITY = ConcurrencyManager.class
@@ -237,9 +251,9 @@ public class ConcurrencyManager implements IConcurrencyManager {
                 + ".writeService.queueCapacity";
 
         /**
-         * The default maximum depth of the write service queue (1000).
+         * The default maximum depth of the write service queue (0).
          */
-        String DEFAULT_WRITE_SERVICE_QUEUE_CAPACITY = "1000";
+        String DEFAULT_WRITE_SERVICE_QUEUE_CAPACITY = "0";
 
         /**
          * The timeout in milliseconds that the the {@link WriteExecutorService}
@@ -333,7 +347,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
     /**
      * When <code>true</code> the {@link #sampleService} will be used run
-     * {@link QueueStatisticsTask}s that collect statistics on the
+     * {@link ThreadPoolExecutorStatisticsTask}s that collect statistics on the
      * {@link #readService}, {@link #writeService}, and the
      * {@link #txWriteService}.
      */
@@ -769,16 +783,21 @@ public class ConcurrencyManager implements IConcurrencyManager {
                         .info(ConcurrencyManager.Options.WRITE_SERVICE_KEEP_ALIVE_TIME
                                 + "=" + keepAliveTime);
             
-            final BlockingQueue<Runnable> queue =
-                ((writeServiceQueueCapacity == 0 || writeServiceQueueCapacity > 5000)
-                        ? new LinkedBlockingQueue<Runnable>()
-                        : new ArrayBlockingQueue<Runnable>(writeServiceQueueCapacity)
-                        );
-            
+            final boolean synchronousQueue = writeServiceQueueCapacity == 0;
+            final BlockingQueue<Runnable> queue;
+            if (synchronousQueue) {
+                queue = new SynchronousQueue<Runnable>();
+            } else if (writeServiceQueueCapacity == Integer.MAX_VALUE) {
+                queue = new LinkedBlockingQueue<Runnable>(
+                        writeServiceQueueCapacity);
+            } else {
+                queue = new ArrayBlockingQueue<Runnable>(
+                        writeServiceQueueCapacity);
+            }
             writeService = new WriteExecutorService(//
                     resourceManager,//
                     writeServiceCorePoolSize,//
-                    writeServiceMaximumPoolSize,//
+                    synchronousQueue?Integer.MAX_VALUE:writeServiceMaximumPoolSize,//
                     keepAliveTime, TimeUnit.MILLISECONDS, // keepAliveTime
                     queue, //
                     new DaemonThreadFactory(getClass().getName()+".writeService"), //
@@ -814,29 +833,36 @@ public class ConcurrencyManager implements IConcurrencyManager {
              */
 
             // @todo config.
-            final double w = QueueStatisticsTask.DEFAULT_WEIGHT;
+            final double w = ThreadPoolExecutorStatisticsTask.DEFAULT_WEIGHT;
             final long initialDelay = 0; // initial delay in ms.
             final long delay = 1000; // delay in ms.
             final TimeUnit unit = TimeUnit.MILLISECONDS;
             
-            writeServiceQueueStatisticsTask = new QueueStatisticsTask("writeService",
+            writeServiceQueueStatisticsTask = new ThreadPoolExecutorStatisticsTask("writeService",
                     writeService, countersUN, w);
 
-            txWriteServiceQueueStatisticsTask = new QueueStatisticsTask("txWriteService",
+            txWriteServiceQueueStatisticsTask = new ThreadPoolExecutorStatisticsTask("txWriteService",
                     txWriteService, countersTX, w);
 
-            readServiceQueueStatisticsTask = new QueueStatisticsTask("readService",
+            readServiceQueueStatisticsTask = new ThreadPoolExecutorStatisticsTask("readService",
                     readService, countersHR, w);
 
             sampleService = Executors.newSingleThreadScheduledExecutor(new DaemonThreadFactory
                     (getClass().getName()+".sampleService"));
-                    
+
+            // the write service.
             sampleService.scheduleWithFixedDelay(writeServiceQueueStatisticsTask,
                     initialDelay, delay, unit);
             
+            // the lock service for the write service.
+            sampleService.scheduleWithFixedDelay(writeService.getLockManager().statisticsTask,
+                    initialDelay, delay, unit);
+            
+            // the tx write service.
             sampleService.scheduleWithFixedDelay(txWriteServiceQueueStatisticsTask,
                     initialDelay, delay, unit);
 
+            // the read service.
             sampleService.scheduleWithFixedDelay(readServiceQueueStatisticsTask,
                     initialDelay, delay, unit);
 
@@ -867,9 +893,9 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * Sampling instruments for the various queues giving us the moving average
      * of the queue length.
      */
-    private final QueueStatisticsTask writeServiceQueueStatisticsTask;
-    private final QueueStatisticsTask txWriteServiceQueueStatisticsTask;
-    private final QueueStatisticsTask readServiceQueueStatisticsTask;
+    private final ThreadPoolExecutorStatisticsTask writeServiceQueueStatisticsTask;
+    private final ThreadPoolExecutorStatisticsTask txWriteServiceQueueStatisticsTask;
+    private final ThreadPoolExecutorStatisticsTask readServiceQueueStatisticsTask;
     
     /**
      * Interface defines and documents the counters and counter namespaces for
@@ -900,9 +926,10 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
         /**
          * The performance counters for the object which manages the resource
-         * locks for the {@link #writeService}.
+         * locks a {@link WriteExecutorService}. These counters are reported as
+         * children of the {@link WriteExecutorService}'s counters.
          */
-        String WriteServiceLockManager = writeService + ICounterSet.pathSeparator + "LockManager";
+        String LockManager = "LockManager";
         
     }
     
@@ -971,10 +998,11 @@ public class ConcurrencyManager implements IConcurrencyManager {
                     /*
                      * The lock manager for the write service.
                      */
-
                     countersRoot
                             .makePath(
-                                    IConcurrencyManagerCounters.WriteServiceLockManager)
+                                    IConcurrencyManagerCounters.writeService
+                                            + ICounterSet.pathSeparator
+                                            + IConcurrencyManagerCounters.LockManager)
                             .attach(writeService.getLockManager().getCounters());
 
                 }
@@ -1197,7 +1225,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
         if (service == writeService) {
 
-            final NonBlockingLockManager<String> lockManager = writeService
+            final NonBlockingLockManagerWithNewDesign<String> lockManager = writeService
                     .getLockManager();
 
             return lockManager.submit(task.getResource(), task);
