@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.service.IBigdataClient;
-import com.bigdata.util.concurrent.QueueStatisticsTask;
+import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
 import com.bigdata.util.concurrent.TaskCounters;
 
 /**
@@ -19,7 +19,7 @@ import com.bigdata.util.concurrent.TaskCounters;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo extract a common interface or impl for the {@link QueueStatisticsTask}
+ * @todo extract a common interface or impl for the {@link ThreadPoolExecutorStatisticsTask}
  *       so that we can report the response times here.
  */
 public class WorkflowTaskCounters extends TaskCounters {

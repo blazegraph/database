@@ -53,7 +53,7 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
-import com.bigdata.util.concurrent.QueueStatisticsTask;
+import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
 
 /**
  * This is a utility class designed for concurrent load of recursively processed
@@ -285,7 +285,7 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
          */
         final CounterSet tmp = getCounters();
 
-        final QueueStatisticsTask loadServiceStatisticsTask = new QueueStatisticsTask(
+        final ThreadPoolExecutorStatisticsTask loadServiceStatisticsTask = new ThreadPoolExecutorStatisticsTask(
                 "Load Service", loadService, counters);
 
         // setup sampling for the [loadService]

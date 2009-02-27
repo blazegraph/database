@@ -285,7 +285,7 @@ public class WorkflowTask<T extends Runnable, F> implements Runnable {
             log.info("Running task=" + target + " : " + counters);
 
         nanoTime_beginWork = System.nanoTime();
-        counters.queueWaitingTime.addAndGet(nanoTime_beginWork
+        counters.queueWaitingNanoTime.addAndGet(nanoTime_beginWork
                 - nanoTime_submitTask);
 
         try {

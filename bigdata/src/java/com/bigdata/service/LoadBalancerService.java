@@ -41,8 +41,9 @@ import com.bigdata.resources.StoreManager.IStoreManagerCounters;
 import com.bigdata.service.DataService.IDataServiceCounters;
 import com.bigdata.service.mapred.IMapService;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
-import com.bigdata.util.concurrent.QueueStatisticsTask;
-import com.bigdata.util.concurrent.QueueStatisticsTask.IQueueCounters;
+import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
+import com.bigdata.util.concurrent.IQueueCounters.IThreadPoolExecutorCounters;
+import com.bigdata.util.concurrent.IQueueCounters.IThreadPoolExecutorTaskCounters;
 
 /**
  * The {@link LoadBalancerService} collects a variety of performance counters
@@ -394,7 +395,7 @@ abstract public class LoadBalancerService extends AbstractService
          * {@link UpdateTask} updates the {@link HostScore}s and the
          * {@link ServiceScore}s (default {@value #DEFAULT_HISTORY_MINUTES}).
          * 
-         * @see QueueStatisticsTask
+         * @see ThreadPoolExecutorStatisticsTask
          */
         String HISTORY_MINUTES = LoadBalancerService.class.getName()
                 + ".historyMinutes"; 
@@ -1393,13 +1394,13 @@ abstract public class LoadBalancerService extends AbstractService
             final double averageQueueLength = getAverageValueForMinutes(
                     serviceCounterSet, IDataServiceCounters.concurrencyManager
                             + ps + IConcurrencyManagerCounters.writeService
-                            + ps + IQueueCounters.AverageQueueLength,
+                            + ps + IThreadPoolExecutorCounters.AverageQueueLength,
                     0d/* default (queueLength) */, historyMinutes);
 
             final double averageQueueingTime = getAverageValueForMinutes(
                     serviceCounterSet, IDataServiceCounters.concurrencyManager
                             + ps + IConcurrencyManagerCounters.writeService
-                            + ps + IQueueCounters.AverageQueuingTime,
+                            + ps + IThreadPoolExecutorTaskCounters.AverageQueuingTime,
                     100d/* default (ms) */, historyMinutes);
 
             final double dataDirBytesAvailable = getAverageValueForMinutes(

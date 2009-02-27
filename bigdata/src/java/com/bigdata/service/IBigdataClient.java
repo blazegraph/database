@@ -44,7 +44,7 @@ import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.eval.NestedSubqueryWithJoinThreadsTask;
 import com.bigdata.relation.rule.eval.ProgramTask;
 import com.bigdata.resources.StaleLocatorException;
-import com.bigdata.util.concurrent.QueueStatisticsTask;
+import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
 
 /**
  * Interface for clients of a {@link IBigdataFederation}.
@@ -438,7 +438,7 @@ public interface IBigdataClient {
          * queues using to run tasks (default
          * {@link #DEFAULT_COLLECT_QUEUE_STATISTICS}).
          * 
-         * @see QueueStatisticsTask
+         * @see ThreadPoolExecutorStatisticsTask
          */
         String COLLECT_QUEUE_STATISTICS = IBigdataClient.class.getName()
                 + ".collectQueueStatistics";

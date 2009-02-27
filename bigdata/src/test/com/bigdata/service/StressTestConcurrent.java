@@ -73,7 +73,7 @@ import com.bigdata.test.ExperimentDriver.IComparisonTest;
 import com.bigdata.test.ExperimentDriver.Result;
 import com.bigdata.util.NV;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
-import com.bigdata.util.concurrent.QueueStatisticsTask;
+import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
 
 /**
  * Test suite for concurrent operations on a {@link DataService}. A federation
@@ -402,7 +402,7 @@ public class StressTestConcurrent extends
             final long delay = 1000; // delay in ms.
             final TimeUnit unit = TimeUnit.MILLISECONDS;
 
-            QueueStatisticsTask queueLengthTask = new QueueStatisticsTask(
+            ThreadPoolExecutorStatisticsTask queueLengthTask = new ThreadPoolExecutorStatisticsTask(
                     "testExecutorService", executorService);
 
             sampleService.scheduleWithFixedDelay(queueLengthTask, initialDelay,

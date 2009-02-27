@@ -2,7 +2,6 @@ package com.bigdata.concurrent;
 
 import java.util.Arrays;
 import java.util.concurrent.Callable;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Bundles the resources identifying the required locks with the task to be
@@ -22,20 +21,7 @@ public class LockCallableImpl<R extends Comparable, T> implements
 
     final Callable<T> task;
 
-    final TimeUnit unit;
-    
-    final long timeout;
-    
-    final int maxtries;
-    
     public LockCallableImpl(final R[] resource, final Callable<T> task) {
-        
-        this(resource, task, TimeUnit.SECONDS, Long.MAX_VALUE, 1/* maxtries */);
-        
-    }
-
-    public LockCallableImpl(final R[] resource, final Callable<T> task,
-            final TimeUnit unit, final long timeout, final int maxtries) {
 
         if (resource == null)
             throw new IllegalArgumentException();
@@ -46,22 +32,10 @@ public class LockCallableImpl<R extends Comparable, T> implements
 
         if (task == null)
             throw new IllegalArgumentException();
-
-        if (unit == null)
-            throw new IllegalArgumentException();
-
-        if (maxtries <= 0)
-            throw new IllegalArgumentException();
         
         this.resource = resource;
 
         this.task = task;
-
-        this.unit = unit;
-
-        this.timeout = timeout;
-
-        this.maxtries = maxtries;
 
     }
 

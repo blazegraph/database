@@ -49,8 +49,8 @@ import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.concurrent.LockManager;
 import com.bigdata.concurrent.NonBlockingLockManager;
+import com.bigdata.concurrent.NonBlockingLockManagerWithNewDesign;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.OverflowManager;
 import com.bigdata.resources.ResourceManager;
@@ -177,12 +177,12 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     /**
      * The object that coordinates exclusive access to the resources.
      */
-    public NonBlockingLockManager<String> getLockManager() {
+    public NonBlockingLockManagerWithNewDesign<String> getLockManager() {
         
         return lockManager;
         
     }
-    private final NonBlockingLockManager<String> lockManager;
+    private final NonBlockingLockManagerWithNewDesign<String> lockManager;
 
     /**
      * The time in milliseconds that a group commit will await currently running
@@ -243,11 +243,19 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * AbstractTask API.
              */
 
-            lockManager = new NonBlockingLockManager<String>(//
+            lockManager = new NonBlockingLockManagerWithNewDesign<String>(//
                     maximumPoolSize, // capacity
-                    true, // predeclareLocks,
-                    this // delegate
-            );
+                    3, // @todo config maxLockTries
+                    true // predeclareLocks
+            ) {
+                
+                protected void ready(Runnable r) {
+                    
+                    WriteExecutorService.this.execute(r);
+                    
+                }
+                
+            };
             
         }
 
@@ -1229,7 +1237,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * commit processing until we are ready to delegate the commit to
              * the journal is the elapsed time awaiting the group commit.
              */
-            taskCounters.commitWaitingTime.addAndGet(System.nanoTime()
+            taskCounters.commitWaitingNanoTime.addAndGet(System.nanoTime()
                     - nanoTime_beginWait);
 
             final long nanoTime_beginCommit = System.nanoTime();
@@ -1246,7 +1254,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 
             } finally {
 
-                taskCounters.commitServiceTime.addAndGet(System.nanoTime()
+                taskCounters.commitServiceNanoTime.addAndGet(System.nanoTime()
                         - nanoTime_beginCommit);
                 
             }

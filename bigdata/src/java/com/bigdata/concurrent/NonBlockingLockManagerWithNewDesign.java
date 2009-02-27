@@ -49,6 +49,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -62,6 +63,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.concurrent.MovingAverageTask;
 import com.bigdata.util.concurrent.QueueStatisticsTask;
 
 /**
@@ -71,23 +73,13 @@ import com.bigdata.util.concurrent.QueueStatisticsTask;
  * requirements run concurrently while operations that have lock contentions are
  * queued behind operations that currently have locks on the relevant resources.
  * A {@link ResourceQueue} is created for each resource and used to block
- * operations that are awaiting a lock. When locks are not being pre-declared
- * (and hence deadlocks are possible), a {@link TxDag WAITS_FOR} graph is used
- * to detect deadlocks.
+ * operations that are awaiting a lock. When those locks become available,
+ * {@link #ready(Runnable)} will be invoked with the task.
  * <p>
- * This implementation uses a single {@link AcceptTask} thread to accept tasks,
- * update the requests in the {@link ResourceQueue}s, and in general perform
- * housekeeping for the internal state. Tasks submitted to this class ARE NOT
- * bound to a worker thread until they are executed by the delegate
- * {@link Executor}.
- * <p>
- * When a task is removed from the {@link #acceptedTasks} queue it is passed to
- * {@link #ready(Runnable)} (if no locks were requested or if all locks could be
- * granted immediately) or placed into one or more {@link ResourceQueue}s to
- * await its locks. When those locks become available, {@link #ready(Runnable)}
- * will be invoked with the task. Whenever a task releases its locks, we note
- * the {@link ResourceQueue}s in which it held the lock.
- *  
+ * The class will use an optional {@link TxDag WAITS_FOR} graph to detect
+ * deadlocks if locks are not being pre-declared (and hence deadlocks are
+ * possible).
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
@@ -99,13 +91,17 @@ import com.bigdata.util.concurrent.QueueStatisticsTask;
  * 
  * @todo a fair option? What constraints or freedoms would it provide?
  * 
- * @todo a {@link SynchronousQueue} for the {@link #acceptedTasks}?
- * 
- * FIXME In order to support 2PL we need to decouple the {@link LockFutureTask}
- * from the transaction with which it is associated and use the latter in the
- * {@link TxDag}. Otherwise each {@link #submit(Comparable[], Callable)} will
- * always look like a new transaction (2PL is impossible unless you can execute
- * multiple tasks for the same transaction).
+ * @todo In order to support 2PL we need to decouple the {@link LockFutureTask}
+ *       from the transaction with which it is associated and use the latter in
+ *       the {@link TxDag}. Otherwise each
+ *       {@link #submit(Comparable[], Callable)} will always look like a new
+ *       transaction (2PL is impossible unless you can execute multiple tasks
+ *       for the same transaction).
+ *       <p>
+ *       Note: It is not really possible to have deadlocks without 2PL. Instead,
+ *       what happens is that the maximum multi-programming capacity of the
+ *       {@link TxDag} is temporarily exceeded. Review the unit tests again when
+ *       supporting 2PL and verify that the deadlock handling logic works.
  * 
  * @todo Support escalation of operation priority based on time and scheduling
  *       of higher priority operations. the latter is done by queueing lock
@@ -121,7 +117,7 @@ import com.bigdata.util.concurrent.QueueStatisticsTask;
  *       ensure anything except lower latency when compared to other operations
  *       awaiting their own locks.
  */
-abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<R>> {
+public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<R>> {
 
     final protected static Logger log = Logger
             .getLogger(NonBlockingLockManagerWithNewDesign.class);
@@ -136,10 +132,9 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
      * while concurrent operations resolve resources to their queues. Stale
      * {@link ResourceQueue}s are purged after they become only weakly
      * reachable.
-     * 
-     * @todo reconsider the timeout. it is set to one LBS period right now. this
-     *       is just so you can see which resource queues had activity in the
-     *       last reporting period.
+     * <p>
+     * Note: The timeout is set to one LBS reporting period so you can see which
+     * resource queues had activity in the last reporting period.
      */
     final private ConcurrentWeakValueCacheWithTimeout<R, ResourceQueue<LockFutureTask<? extends Object>>> resourceQueues = new ConcurrentWeakValueCacheWithTimeout<R, ResourceQueue<LockFutureTask<? extends Object>>>(
             1000/* nresources */, TimeUnit.SECONDS.toNanos(60));
@@ -174,16 +169,20 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
     final private TxDag waitsFor;
 
     /**
-     * Used to run the {@link AcceptTask} and the {@link MonitorTask}.
-     * 
-     * FIXME Monitor this service using a {@link QueueStatisticsTask} to convert
-     * {@link Counters#nrunning} and {@link Counters#nwaiting} into moving
-     * averages.
+     * Used to run the {@link AcceptTask}.
      */
     private final ExecutorService service = Executors
             .newSingleThreadExecutor(new DaemonThreadFactory(getClass()
                     .getName()));
 
+    /**
+     * This {@link Runnable} should be submitted to a
+     * {@link ScheduledExecutorService} in order to track the average queue size
+     * for each active {@link ResourceQueue} and various moving averages
+     * pertaining to the lock service as a whole.
+     */
+    public final StatisticsTask statisticsTask = new StatisticsTask();
+    
     /**
      * The service run state.
      */
@@ -201,18 +200,22 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
     private final Condition stateChanged = lock.newCondition();
 
     /**
-     * Tasks accepted for eventual execution but not yet waiting on their locks.
-     * Tasks are removed from this queue once they have posted their lock
-     * requests. The queue is cleared if the lock service is halted.
-     * 
-     * @todo review the use of this queue carefully before trying to replace it
-     *       with a {@link SynchronousQueue} as things like isEmpty() will
-     *       always report <code>true</code>.
-     * 
-     * @todo this could be renamed the deadlockQueue and
-     *       {@link TaskRunState#Accepted} could be renamed "Deadlock".
+     * A queue of tasks (a) whose lock requests would have resulted in a
+     * deadlock when they were first submitted; -or- (b) which would have
+     * exceeded the maximum multi-programming capacity of the {@link TxDag}.
+     * These tasks are NOT waiting on their locks.
+     * <p>
+     * For deadlock, up {@link #maxLockTries} will be made to post the lock
+     * requests for a task, including the initial try which is made when the
+     * task is accepted by this service. Tasks which are enqueued because the
+     * {@link TxDag} was at its multi-programming capacity are retried until
+     * they can post their lock requests.
+     * <p>
+     * Tasks are removed from this queue if their lock requests can be posted
+     * without creating a deadlock or if {@link #maxLockTries} would be exceeded
+     * for that task. The queue is cleared if the lock service is halted.
      */
-    final private BlockingQueue<LockFutureTask<? extends Object>> acceptedTasks = new LinkedBlockingQueue<LockFutureTask<? extends Object>>();
+    final private BlockingQueue<LockFutureTask<? extends Object>> retryQueue = new LinkedBlockingQueue<LockFutureTask<? extends Object>>();
 
     /**
      * Run states for the {@link NonBlockingLockManagerWithNewDesign}.
@@ -362,148 +365,205 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
      * counters
      */
 
-    synchronized public CounterSet getCounters() {
+    /**
+     * Note: You MUST submit {@link #statisticsTask} to a
+     * {@link ScheduledExecutorService} in order counter values which report
+     * moving averages to be maintained.
+     * <p>
+     * Note: A new instance is returned every time. This makes the pattern where
+     * the counters are "attached" to a hierarchy work since that has the
+     * side-effect of "detaching" them from the returned object.
+     */
+//    synchronized 
+    public CounterSet getCounters() {
 
-        if (root == null) {
+//        if (root == null) {
 
-            root = new CounterSet();
+        final CounterSet root = new CounterSet();
 
-            root.addCounter("nrejected", new Instrument<Long>() {
-                public void sample() {
-                    setValue(counters.nrejected);
-                }
-            });
+        root.addCounter("nrejected", new Instrument<Long>() {
+            public void sample() {
+                setValue(counters.nrejected);
+            }
+        });
 
-            root.addCounter("naccepted", new Instrument<Long>() {
-                public void sample() {
-                    setValue(counters.naccepted);
-                }
-            });
+        root.addCounter("ncancel", new Instrument<Long>() {
+            public void sample() {
+                setValue(counters.ncancel);
+            }
+        });
 
-            root.addCounter("ncancel", new Instrument<Long>() {
-                public void sample() {
-                    setValue(counters.ncancel);
-                }
-            });
+        root.addCounter("nerror", new Instrument<Long>() {
+            public void sample() {
+                setValue(counters.nerror);
+            }
+        });
 
-            root.addCounter("nerror", new Instrument<Long>() {
-                public void sample() {
-                    setValue(counters.nerror);
-                }
-            });
+        /*
+         * #of tasks waiting to retry after a deadlock was detected -or- when
+         * the maximum multi-programming capacity of the TxDag would have been
+         * exceeded (the size of the retry queue, moving average).
+         */
+        root.addCounter("averageRetryCount", new Instrument<Double>() {
+            public void sample() {
+                setValue(statisticsTask.nretryAverageTask.getMovingAverage());
+            }
+        });
 
-            // #of deadlocks (can be incremented more than once for the same task).
-            root.addCounter("ndeadlock", new Instrument<Long>() {
-                public void sample() {
-                    setValue(counters.ndeadlock);
-                }
-            });
+        // #of tasks waiting on locks (moving average).
+        root.addCounter("averageWaitingCount", new Instrument<Double>() {
+            public void sample() {
+                setValue(statisticsTask.nwaitingAverageTask.getMovingAverage());
+            }
+        });
 
-            // #of tasks waiting on locks.
-            root.addCounter("nwaiting", new Instrument<Integer>() {
-                public void sample() {
-                    setValue(counters.nwaiting);
-                }
-            });
+        // #of tasks ready to be executed (on the readyQueue, moving average).
+        root.addCounter("averageReadyCount", new Instrument<Double>() {
+            public void sample() {
+                setValue(statisticsTask.nreadyAverageTask.getMovingAverage());
+            }
+        });
 
-            // #of tasks ready to be executed (on the readyQueue).
-            root.addCounter("nready", new Instrument<Integer>() {
-                public void sample() {
-                    setValue(counters.nready);
-                }
-            });
+        // #of tasks that are executing (in run(), moving average).
+        root.addCounter("averageRunningCount", new Instrument<Double>() {
+            public void sample() {
+                setValue(statisticsTask.nrunningAverageTask.getMovingAverage());
+            }
+        });
 
-            // #of tasks that are actually executing (in run()).
-            root.addCounter("nrunning", new Instrument<Integer>() {
-                public void sample() {
-                    setValue(counters.nrunning);
-                }
-            });
+        // the maximum observed value for [nrunning].
+        root.addCounter("maxRunning", new Instrument<Integer>() {
+            public void sample() {
+                setValue(counters.maxRunning);
+            }
+        });
 
-            // the maximum observed value for [nrunning].
-            root.addCounter("maxRunning", new Instrument<Integer>() {
-                public void sample() {
-                    setValue(counters.maxRunning);
-                }
-            });
+        // #of resource queues
+        root.addCounter("nresourceQueues", new Instrument<Integer>() {
+            public void sample() {
+                setValue(resourceQueues.size());
+            }
+        });
 
-            // #of resource queues
-            root.addCounter("nresourceQueues", new Instrument<Integer>() {
-                public void sample() {
-                    setValue(resourceQueues.size());
-                }
-            });
+        // the current run state.
+        root.addCounter("runState", new Instrument<String>() {
+            public void sample() {
+                setValue(serviceRunState.toString());
+            }
+        });
+
+        /*
+         * Adds an instrument reporting the moving average of each resourceQueue
+         * defined at the moment that the caller requested these counters.
+         */
+        {
             
-            root.addCounter("runState", new Instrument<String>() {
-                public void sample() {
-                    setValue(serviceRunState.toString());
-                }
-            });
+            final CounterSet tmp = root.makePath("queues");
 
-            /*
-             * Displays the #of tasks waiting on each resource queue for the
-             * lock (does not count the task at the head of the queue).
-             * 
-             * @todo this could also be handled by dynamic reattachment of the
-             * counters.
-             */
-            root.addCounter("queues", new Instrument<String>() {
-                public void sample() {
-                    final Iterator<Map.Entry<R, WeakReference<ResourceQueue<LockFutureTask<? extends Object>>>>> itr = resourceQueues
-                            .entryIterator();
-                    final LinkedList<ResourceQueueSize> list = new LinkedList<ResourceQueueSize>();
-                    while (itr.hasNext()) {
-                        final Map.Entry<R, WeakReference<ResourceQueue<LockFutureTask<? extends Object>>>> entry = itr
-                                .next();
-                        final WeakReference<ResourceQueue<LockFutureTask<? extends Object>>> queueRef = entry
-                                .getValue();
-                        final ResourceQueue<LockFutureTask<? extends Object>> queue = queueRef
-                                .get();
-                        if (queue == null)
-                            continue;
-                        list.add(new ResourceQueueSize(queue));
-                    }
-                    final Object[] a = list.toArray();
-                    Arrays.sort(a);
-                    final StringBuilder sb = new StringBuilder();
-                    for (Object t : a) {
-                        sb.append(t.toString());
-                        sb.append(" ");
-                    }
-                    setValue(sb.toString());
-                }
-            });
-            
+            final Iterator<Map.Entry<R, WeakReference<ResourceQueue<LockFutureTask<? extends Object>>>>> itr = resourceQueues
+                    .entryIterator();
+
+            while (itr.hasNext()) {
+
+                final Map.Entry<R, WeakReference<ResourceQueue<LockFutureTask<? extends Object>>>> entry = itr
+                        .next();
+
+                final WeakReference<ResourceQueue<LockFutureTask<? extends Object>>> queueRef = entry
+                        .getValue();
+
+                final ResourceQueue<LockFutureTask<? extends Object>> queue = queueRef
+                        .get();
+
+                if (queue == null)
+                    continue;
+
+                tmp.addCounter(queue.resource.toString(),
+                        new WeakRefResourceQueueInstrument(queue.resource));
+                
+            }
+
         }
+
+        // }
 
         return root;
 
     }
 
-    private CounterSet root;
+// private CounterSet root;
+    
+    /**
+     * A class that dynamically resolves the {@link ResourceQueue} by its
+     * resource from {@link NonBlockingLockManagerWithNewDesign#resourceQueues}.
+     * If there is a {@link ResourceQueue} for that resource then the moving
+     * average of its queue size is reported. Otherwise, ZERO (0d) is reported
+     * as the moving average of its queue size.
+     */
+    private class WeakRefResourceQueueInstrument extends Instrument<Double> {
+
+        private final R resource;
+    
+        public WeakRefResourceQueueInstrument(final R resource) {
+
+            if (resource == null)
+                throw new IllegalArgumentException();
+
+            this.resource = resource;
+
+        }
+
+        public void sample() {
+
+            final ResourceQueue<LockFutureTask<? extends Object>> queue = resourceQueues
+                    .get(resource);
+            
+            if (queue == null) {
+            
+                setValue(0d);
+                
+            } else {
+                
+                final double averageQueueSize = queue.statisticsTask
+                        .getAverageQueueSize();
+
+                setValue(averageQueueSize);
+           
+            }
+            
+        }
+        
+    }
 
     /**
-     * Helper class pairs up the resource with its sampled queue size and allows
-     * ordering of the samples.  E.g., by size or by resource.
+     * Helper class pairs up the resource with the moving average of its queue
+     * size. The natural order of this class places is by decreasing average
+     * queue size and by resource when the average queue sizes are equal (to
+     * break ties).
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
     private class ResourceQueueSize implements Comparable<ResourceQueueSize> {
         final R resource;
-        int size;
-        public ResourceQueueSize(ResourceQueue<LockFutureTask<? extends Object>> queue){
-            resource = queue.getResource();
-            size = queue.getQueueSize();
+        final double averageQueueSize;
+        public ResourceQueueSize(R resource,double averageQueueSize){
+            this.resource = resource;
+            this.averageQueueSize = averageQueueSize;
         }
         public int compareTo(ResourceQueueSize arg0) {
             // resource name order.
-//            return resource.compareTo(arg0.resource);
+            // return resource.compareTo(arg0.resource);
             // descending queue size order.
-            return arg0.size - size;
+            if (averageQueueSize < arg0.averageQueueSize) {
+                return 1;
+            } else if (averageQueueSize > arg0.averageQueueSize) {
+                return -1;
+            } else
+                return resource.compareTo(arg0.resource);
         }
         public String toString() {
-            return "(" + resource + "," + size + ")";
+            return "(" + resource + "," + ((int) (averageQueueSize * 100) / 100d)
+                    + ")";
         }
     }
     
@@ -521,11 +581,6 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
         public long nrejected;
 
         /**
-         * The #of tasks that were accepted by the service (running total).
-         */
-        public long naccepted;
-
-        /**
          * The #of tasks that were cancelled (running total).
          */
         public long ncancel;
@@ -536,21 +591,20 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
         public long nerror;
 
         /**
-         * The #of tasks that deadlocked when they attempted to acquire their
-         * locks (running total). Note that a task MAY retry lock acquisition
-         * and this counter will be incremented each time it does so and then
-         * deadlocks.
+         * The #of tasks that are currently on the retry queue awaiting an
+         * opportunity to post their lock requests that does not result in a
+         * deadlock or exceed the multi-programming capacity of the optional
+         * {@link TxDag}.
          */
-        public long ndeadlock;
+        public int nretry;
 
         /**
-         * #of tasks that are waiting on one or more locks.
+         * #of tasks that are currently waiting on one or more locks.
          */
         public int nwaiting;
 
         /**
-         * The #of tasks that have acquired their locks but not yet begun to
-         * execute.
+         * The #of tasks that currently hold their locks but are not executing.
          */
         public int nready;
         
@@ -1126,11 +1180,9 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
         New(0, false/* lockRequestsPosted */, false/* running */),
         /**
          * Task has been accepted but has not yet successfully issued its lock
-         * requests. {@link LockFutureTask#ntries} gives the #of times the locks
-         * have been requested. If the lock requests can not be issued after
-         * {@link LockFutureTask#maxLockTries} then the task will be cancelled.
+         * requests.
          */
-        Accepted(0, false/* lockRequestsPosted */, false/* running */),
+        Retry(0, false/* lockRequestsPosted */, false/* running */),
         /**
          * Task has issued its lock requests and is awaiting its locks.
          */
@@ -1168,8 +1220,9 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
 
             if (this == New) {
 
-                // transition when the lock requests would deadlock.
-                if (newval == Accepted)
+                // transition when the lock requests would deadlock or
+                // exceed the multi-programming capacity of the TxDag.
+                if (newval == Retry)
                     return true;
 
                 // allows task to directly request locks.
@@ -1183,7 +1236,7 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
                 if (newval == Halted)
                     return true;
 
-            } else if (this == Accepted) {
+            } else if (this == Retry) {
 
                 if (newval == LocksRequested)
                     return true;
@@ -1302,11 +1355,14 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
      */
     protected class LockFutureTask<T> extends FutureTask<T> {
 
+        /**
+         * The locks which the task needs to run.
+         */
         private final R[] resource;
 
         /**
          * Incremented each time a deadlock is detected. We will not retry if
-         * {@link #maxLockTries} is exceeded.
+         * {@link #maxLockTries} would be exceeded.
          */
         private int ntries = 0;
         
@@ -1403,16 +1459,20 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
 
                 this.taskRunState = newval;
 
-                /*
-                 * @todo There may not be any reason do to this here. The
-                 * AcceptTask only needs to handle the acceptQueue and notice
-                 * when the runState of the service changes. Since each task
-                 * which releases its locks is itself responsible for seeing if
-                 * another task is ready to run, the acceptTask does not need to
-                 * be woken up for that purpose any more.
-                 */
-                
-                stateChanged.signal();
+                if (!retryQueue.isEmpty()) {
+
+                    /*
+                     * The purpose of the retryQueue is to automatically retry
+                     * tasks which would have created a deadlock -or- which
+                     * would have exceeded the maximum multi-programming
+                     * capacity of the TxDag when the task was first submitted.
+                     * In order to do that we need to wake up the AcceptTask if
+                     * there are tasks on the retryQueue.
+                     */
+
+                    stateChanged.signal();
+                    
+                }
 
             }
             
@@ -1491,12 +1551,6 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
                 // fall through.
             case Running:
                 /*
-                 * Note: it is assumed that this code block will succeed. This
-                 * is not an outrageous assumption.
-                 * 
-                 * Note: Since this thread holds the [lock] the acceptedTasks
-                 * queue MUST NOT block (it would deadlock the service).
-                 * 
                  * As an optimization, we immediately request the locks. If they
                  * can be granted then the new run state was already set for the
                  * task. Otherwise we verify that the task was not cancelled and
@@ -1520,14 +1574,14 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
                     return this;
                 }
                 /*
-                 * Put the task onto the accepted queue.
-                 * 
-                 * Note: this case should only arise if there is a deadlock
-                 * since the lock requests had to be backed out.
+                 * Note: this case can arise if there is a deadlock (in which
+                 * case the lock requests were already backed out) -or- if the
+                 * maximum multi-programming capacity of the TxDag would be
+                 * exceeded.
                  */
-                setTaskRunState(TaskRunState.Accepted);
-                acceptedTasks.add(this); // Note: MUST NOT block!
-                counters.naccepted++;
+                setTaskRunState(TaskRunState.Retry);
+                retryQueue.add(this); // Note: MUST NOT block!
+                counters.nretry++; // #on the retry queue.
                 return this;
             default:
                     throw new IllegalStateException(serviceRunState.toString());
@@ -1539,7 +1593,7 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
          * then submit the task for execution immediately.
          * 
          * @return <code>true</code> if the task should be removed from
-         *         {@link NonBlockingLockManagerWithNewDesign#acceptedTasks} by
+         *         {@link NonBlockingLockManagerWithNewDesign#retryQueue} by
          *         the caller.
          */
         private boolean requestLocks() {
@@ -1593,17 +1647,7 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
                     return false;
                 
                 }
-                
-                /*
-                 * Modify the state of the ResourceQueue(s) and the optional
-                 * TxDag to reflect the lock requests. The method will
-                 * release the lock requests if a deadlock would arise.
-                 * 
-                 * Note: Can thrown DeadlockException.
-                 */
 
-                ntries++;
-                
                 if (waitsFor != null) {
 
                     /*
@@ -1655,7 +1699,7 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
 
             } catch (Throwable t2) {
 
-                if ((t2 instanceof DeadlockException)) {
+                if (t2 instanceof DeadlockException) {
 
                     /*
                      * Note: DeadlockException is the ONLY expected exception
@@ -1663,21 +1707,24 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
                      * use. Anything else is an internal error.
                      */
                     
-                    log.warn("Deadlock: " + this + ", task=" + this /* , ex */);
+                    if (INFO)
+                        log
+                                .info("Deadlock: " + this + ", task=" + this /* , ex */);
 
-                    counters.ndeadlock++;
-
-                    if ((ntries < maxLockTries)) {
-
-                        log.warn("Will retry task: " + this);
+                    if (++ntries < maxLockTries) {
 
                         // leave on queue to permit retry.
+
+                        if(INFO)
+                            log.info("Will retry task: " + this);
+
                         return false;
 
                     }
                     
                 } else {
                     
+                    // any other exception is an internal error.
                     log.error("Internal error: " + this, t2);
                     
                 }
@@ -1709,8 +1756,6 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
          * an exception is set on it. When the task is pulled from the queue by
          * an executor service, the task will be marked as cancelled and its
          * run() method will be a NOP.
-         * 
-         * @todo verify with unit test.
          */
         @Override
         protected void setException(final Throwable t) {
@@ -1721,6 +1766,9 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
                     if (DEBUG)
                         log.debug("Exception: " + this + ", cause=" + t, t);
                     counters.nerror++;
+                    if (taskRunState.isRunning()) {
+                        counters.nrunning--;
+                    }
                     setTaskRunState(TaskRunState.Halted);
                 }
             } finally {
@@ -1743,6 +1791,9 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
                     if (DEBUG)
                         log.debug("Cancelled: " + this);
                     counters.ncancel++;
+                    if (taskRunState.isRunning()) {
+                        counters.nrunning--;
+                    }
                     setTaskRunState(TaskRunState.Halted);
                 }
                 return ret;
@@ -1766,7 +1817,7 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
                 
                 final long lockWaitingTime = System.nanoTime() - acceptTime;
 
-                ((AbstractTask) callersTask).getTaskCounters().lockWaitingTime
+                ((AbstractTask) callersTask).getTaskCounters().lockWaitingNanoTime
                         .addAndGet(lockWaitingTime);
 
             }
@@ -1831,11 +1882,8 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
     }
 
     /**
-     * {@link Runnable} drains the {@link #acceptedTasks} queue and manages
-     * state changes in the {@link ResourceQueue}s. Once a task is holding all
-     * necessary locks, the task is submitted to the delegate {@link Executor}
-     * for execution. This thread is also responsible for monitoring the
-     * {@link Future}s and releasing locks for a {@link Future} it is complete.
+     * {@link Runnable} drains the {@link #retryQueue} queue and manages
+     * service state changes.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -1852,7 +1900,7 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
                 case Running: {
                     lock.lock();
                     try {
-                        while (processAcceptedTasks()) {
+                        while (processRetryQueue()) {
                             // do work
                         }
                         awaitStateChange(Running);
@@ -1864,7 +1912,7 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
                 case Shutdown: {
                     lock.lock();
                     try {
-                        while (processAcceptedTasks()) {
+                        while (processRetryQueue()) {
                             /*
                              * Do work.
                              * 
@@ -1874,7 +1922,7 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
                              * which it has already accepted.
                              */
                         }
-                        if (acceptedTasks.isEmpty()) {
+                        if (retryQueue.isEmpty()) {
                             /*
                              * There is no more work to be performed so we can
                              * change the runState.
@@ -1902,7 +1950,11 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
                     try {
                         if (INFO)
                             log.info(serviceRunState);
-                        cancelTasks(acceptedTasks.iterator(), false/* mayInterruptIfRunning */);
+                        // clear retry queue (tasks will not be run).
+                        cancelTasks(retryQueue.iterator(), false/* mayInterruptIfRunning */);
+                        // nothing on the retry queue.
+                        counters.nretry = 0;
+                        // change the run state?
                         if (serviceRunState.val < ServiceRunState.Halted.val) {
                             setServiceRunState(ServiceRunState.Halted);
                             if (INFO)
@@ -1947,7 +1999,7 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
                     // In a different run state.
                     return;
                 }
-                if (!acceptedTasks.isEmpty()) {
+                if (!retryQueue.isEmpty()) {
                     // Some work can be done.
                     return;
                 }
@@ -1986,16 +2038,23 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
         }
 
         /**
-         * Processes accepted tasks.
+         * Processes tasks on the retry queue.
          * 
          * @return <code>true</code> iff any tasks were removed from this
          *         queue.
          */
-        private boolean processAcceptedTasks() {
+        private boolean processRetryQueue() {
 
+            if (waitsFor != null && waitsFor.isFull()) {
+
+                // Nothing to do until some tasks releases its locks.
+                return false;
+                
+            }
+            
             int nchanged = 0;
 
-            final Iterator<LockFutureTask<? extends Object>> itr = acceptedTasks
+            final Iterator<LockFutureTask<? extends Object>> itr = retryQueue
                     .iterator();
 
             while (itr.hasNext()) {
@@ -2003,18 +2062,26 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
                 final LockFutureTask<? extends Object> t = itr.next();
 
                 if (t.requestLocks()) {
-
                     /*
                      * Note: a [true] return means that we will remove the task
-                     * from the [acceptedTasks] queue. It does NOT mean that the
-                     * task was granted its locks.
+                     * from the [retryQueue]. It does NOT mean that the task was
+                     * granted its locks.
                      */
-                    
                     itr.remove();
-
+                    counters.nretry--; // was removed from retryQueue.
                     nchanged++;
-                    
+                    continue;
                 }
+                /*
+                 * Note: Merely stopping as soon as we find a task that can not
+                 * run provides a HUGE (order of magnitude) improvement in
+                 * throughput when retries are common.
+                 * 
+                 * @todo review this choice when real deadlocks are occurring
+                 * rather than just running into the multi-programming capacity
+                 * limit on TxDag.
+                 */
+                break;
 
             }
 
@@ -2024,108 +2091,6 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
             return nchanged > 0;
             
         }
-
-//        /**
-//         * For each task waiting to run:
-//         * <ul>
-//         * <li>if the task has been cancelled, then remove it from the waiting
-//         * tasks queue</li>
-//         * <li>if the lock timeout has expired, then set an exception on the
-//         * task and remove it from the waiting task queue and remove its lock
-//         * requests from the various {@link ResourceQueue}s</li>
-//         * <li>if the lock requests for that task have been granted then submit
-//         * the task to execute on the delegate and move it to the running tasks
-//         * queue</li>
-//         * <li>if the delegate rejects the task, then it is NOT removed from
-//         * the waiting tasks queue and this method returns immediately</li>
-//         * </ul>
-//         * 
-//         * @return <code>true</code> if any tasks were moved to the running
-//         *         tasks list.
-//         */
-//        private boolean processWaitingTasks() {
-//
-//            final Iterator<LockFutureTask<? extends Object>> itr = waitingTasks
-//                    .iterator();
-//
-//            int nstarted = 0;
-//            
-//            while (itr.hasNext()) {
-//
-//                final LockFutureTask<? extends Object> t = itr.next();
-//
-//                if (t.isCancelled()) {
-//
-//                    // cancelled while awaiting locks.
-//                    itr.remove();
-//
-//                    continue;
-//
-//                }
-//                
-//                final boolean holdsLocks;
-//                lock.lock();
-//                try {
-//                    holdsLocks = holdsAllLocks(t);
-//                } finally {
-//                    lock.unlock();
-//                }
-//                
-//                if (holdsLocks) {
-//
-//                    // holding locks, so execute the task.
-//
-//                    if (INFO)
-//                        log.info("Executing: " + t);
-//
-//                    try {
-//
-//                        /*
-//                         * Note: FutureTask will take can of updating its state
-//                         * before/after the runnable target.
-//                         * 
-//                         * Note: If delegate.execute() blocks then the acceptor
-//                         * thread will also block and this class will be
-//                         * non-responsive until the delegate had accepted each
-//                         * [waitingTask] for execution.  Some executors can cause
-//                         * the task to be run in the caller's thread, which would
-//                         * be the AcceptTask itself.
-//                         */
-//
-//                        assert !lock.isHeldByCurrentThread();
-//                        
-//                        delegate.execute(t);
-//
-//                    } catch (RejectedExecutionException t2) {
-//
-//                        /*
-//                         * We can't queue this task now so we stop processing
-//                         * the waiting tasks. We will pick up on those tasks
-//                         * again the next time this method is invoked.
-//                         */
-//                        if(INFO)
-//                            log.info("Delegate is busy.");
-//
-//                        return nstarted > 0;
-//                        
-//                    }
-//
-//                    itr.remove();
-//
-//                    nstarted++;
-//                    
-//                    continue;
-//
-//                }
-//
-//            }
-//
-//            if (INFO && nstarted > 0)
-//                log.info("#started=" + nstarted);
-//
-//            return nstarted > 0;
-//
-//        }
 
     } // AcceptTask
 
@@ -2274,13 +2239,6 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
                  * Note: If an exception is thrown then the state of the TxDag
                  * is unchanged (the operation either succeeds or fails
                  * atomically).
-                 * 
-                 * FIXME In fact, predeclaring locks appears sufficient to avoid
-                 * deadlocks as long as we make issue the lock requests
-                 * atomically for each task. This means that TxDag would only be
-                 * useful for 2PL, and this class (NonBlockingLockManager)
-                 * currently does not support 2PL (because it couples the
-                 * concepts of the task and the transaction together).
                  */
                 
                 waitsFor.addEdges(task, predecessors.toArray());
@@ -2493,13 +2451,16 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
                 final LockFutureTask<? extends Object> task = resourceQueue.queue
                         .peek();
 
-                if (task != null && holdsAllLocks(task)) {
+                if (task != null
+                        && task.taskRunState == TaskRunState.LocksRequested
+                        && holdsAllLocks(task)) {
 
                     if (INFO)
                         log.info("Task is ready to run: " + task);
                     
                     // add to queue of tasks ready to execute.
                     task.setTaskRunState(TaskRunState.LocksReady);
+                    counters.nwaiting--;
                     counters.nready++;
                     ready(task);
 
@@ -2574,15 +2535,14 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
 
         return getClass().getName() + //
                 "{ #rejected=" + counters.nrejected + //
-                ", #accepted=" + counters.naccepted + //
-                ", #cancel=" + counters.ncancel + //
                 ", #error=" + counters.nerror + //
-                ", #deadlock=" + counters.ndeadlock + //
-                ", #waiting=" + counters.nwaiting+ //
-                ", #ready=" + counters.nready + //
-                ", #nrunning=" + counters.nrunning+ //
+                ", #cancel=" + counters.ncancel + //
+                ", averageDeadlock=" + ((int)(10*statisticsTask.nretryAverageTask.getMovingAverage())/10d)+ //
+                ", averageWaiting=" + ((int)(10*statisticsTask.nwaitingAverageTask.getMovingAverage())/10d)+ //
+                ", averageReady=" + ((int)(10*statisticsTask.nreadyAverageTask.getMovingAverage())/10d)+ //
+                ", averageRunning=" + ((int)(10*statisticsTask.nrunningAverageTask.getMovingAverage())/10d)+ //
                 ", #maxrunning=" + counters.maxRunning + //
-                (waitsFor != null ? ", vertices=" + waitsFor.size() : "") + //
+//                (waitsFor != null ? ", vertices=" + waitsFor.size() : "") + //
                 "}";
 
     }
@@ -2612,8 +2572,13 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
          * The object at the head of the queue is the transaction with the lock
          * on the resource.
          */
-        final BlockingQueue<T/* tx */> queue = new LinkedBlockingQueue<T>(/* unbounded */);
+        final private BlockingQueue<T/* tx */> queue;
 
+        /**
+         * Used to track statistics for this queue while it exists.
+         */
+        final QueueStatisticsTask statisticsTask;
+        
         /**
          * The resource whose locks are administeded by this object.
          */
@@ -2685,8 +2650,102 @@ abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<
 
             this.resource = resource;
 
+            this.queue = new LinkedBlockingQueue<T>(/* unbounded */);
+            
+            this.statisticsTask = new QueueStatisticsTask(resource.toString(), queue);
+            
         }
 
     } // ResourceQueue
+
+    /**
+     * Class for tracking the average queue size of each {@link ResourceQueue}
+     * and various other moving averages for the service as a whole.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @see NonBlockingLockManagerWithNewDesign#statisticsTask
+     */
+    protected class StatisticsTask implements Runnable {
+        
+        final MovingAverageTask nretryAverageTask = new MovingAverageTask(
+                "nretry", new Callable<Integer>() {
+                    public Integer call() {
+                        return counters.nretry;
+                    }
+                });
+        
+        final MovingAverageTask nwaitingAverageTask = new MovingAverageTask(
+                "nwaiting", new Callable<Integer>() {
+                    public Integer call() {
+                        return counters.nwaiting;
+                    }
+                });
+        
+        final MovingAverageTask nreadyAverageTask = new MovingAverageTask(
+                "nready", new Callable<Integer>() {
+                    public Integer call() {
+                        return counters.nready;
+                    }
+                });
+        
+        final MovingAverageTask nrunningAverageTask = new MovingAverageTask(
+                "nrunning", new Callable<Integer>() {
+                    public Integer call() {
+                        return counters.nrunning;
+                    }
+                });
+        
+        private StatisticsTask() {
+            
+        }
+
+        /**
+         * This method updates the {@link QueueStatisticsTask} for each
+         * {@link ResourceQueue} each time it is run.
+         * <p>
+         * Note: This is written so as to not cause hard references to be
+         * retained to the {@link ResourceQueue}s. The
+         * {@link QueueStatisticsTask} is a member field for the
+         * {@link ResourceQueue} for the same reason. This way the statistics
+         * for active {@link ResourceQueue}s are tracked and may be reported
+         * but {@link ResourceQueue}s will remain strongly reachable only if
+         * there are tasks holding their locks.
+         */
+        public void run() {
+
+            nretryAverageTask.run();
+            
+            nwaitingAverageTask.run();
+            
+            nreadyAverageTask.run();
+            
+            nrunningAverageTask.run();
+            
+            final Iterator<Map.Entry<R, WeakReference<ResourceQueue<LockFutureTask<? extends Object>>>>> itr = resourceQueues
+                    .entryIterator();
+         
+            while (itr.hasNext()) {
+            
+                final Map.Entry<R, WeakReference<ResourceQueue<LockFutureTask<? extends Object>>>> entry = itr
+                        .next();
+                
+                final WeakReference<ResourceQueue<LockFutureTask<? extends Object>>> queueRef = entry
+                        .getValue();
+                
+                final ResourceQueue<LockFutureTask<? extends Object>> queue = queueRef
+                        .get();
+                
+                if (queue == null)
+                    continue;
+                
+                queue.statisticsTask.run();
+                
+            }
+
+        }
+
+    }
 
 }
