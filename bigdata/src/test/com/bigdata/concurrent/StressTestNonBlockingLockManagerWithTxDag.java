@@ -331,9 +331,11 @@ public class StressTestNonBlockingLockManagerWithTxDag extends
 
     /**
      * Test where each operation locks only a single resource and there is only
-     * one resource to be locked so that all operations MUST be serialized with
-     * a non-zero lock timeout. This test stresses the logic in lock() that is
-     * responsible for backing out a lock request on timeout.
+     * one resource to be locked so that all operations MUST be serialized. The
+     * task timeout is non-zero, so long-running tasks will be cancelled. This
+     * test stresses the logic in lock() that is responsible for backing out a
+     * lock requests when a task is cancelled either while awaiting its locks or
+     * while running.
      */
     public void test_singleResourceLocking_serialized_waitsFor_highConcurrency_lockTimeout()
             throws Exception {
@@ -349,7 +351,7 @@ public class StressTestNonBlockingLockManagerWithTxDag extends
         properties.setProperty(TestOptions.NRESOURCES, "1");
         properties.setProperty(TestOptions.MIN_LOCKS, "1");
         properties.setProperty(TestOptions.MAX_LOCKS, "1");
-        properties.setProperty(TestOptions.LOCK_TIMEOUT, "1000");
+        properties.setProperty(TestOptions.TASK_TIMEOUT, "1000");
         properties.setProperty(TestOptions.PREDECLARE_LOCKS, "false");
         properties.setProperty(TestOptions.SORT_LOCK_REQUESTS, "false");
 
