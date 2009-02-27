@@ -213,11 +213,11 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
                 .getProperty(TestOptions.MAX_LOCKS));
 
         // if 0L use Long.MAX_VALUE else convert milliseconds to nanoseconds.
-        final long lockTimeout = (Long.parseLong(properties.getProperty(
-                TestOptions.LOCK_TIMEOUT, TestOptions.DEFAULT_LOCK_TIMEOUT)) == 0L) ? Long.MAX_VALUE
+        final long taskTimeout = (Long.parseLong(properties.getProperty(
+                TestOptions.TASK_TIMEOUT, TestOptions.DEFAULT_TASK_TIMEOUT)) == 0L) ? Long.MAX_VALUE
                 : TimeUnit.MILLISECONDS.toNanos(Long.parseLong(properties
-                        .getProperty(TestOptions.LOCK_TIMEOUT,
-                                TestOptions.DEFAULT_LOCK_TIMEOUT)));
+                        .getProperty(TestOptions.TASK_TIMEOUT,
+                                TestOptions.DEFAULT_TASK_TIMEOUT)));
 
         final int maxLockTries = Integer
                 .parseInt(properties.getProperty(TestOptions.MAX_LOCK_TRIES,
@@ -337,13 +337,13 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
 
                     task = new LockCallableImpl<String, Object>(resource,
                             new DeathResourceTask<Object>(),
-                            TimeUnit.NANOSECONDS, lockTimeout, maxLockTries);
+                            TimeUnit.NANOSECONDS, taskTimeout, maxLockTries);
 
                 } else {
 
                     task = new LockCallableImpl<String, Object>(resource,
                             new Wait10ResourceTask<Object>(),
-                            TimeUnit.NANOSECONDS, lockTimeout, maxLockTries);
+                            TimeUnit.NANOSECONDS, taskTimeout, maxLockTries);
 
                 }
 
@@ -413,6 +413,25 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
                     ncomplete++;
                     try {
                         while (true) {
+                            final long elapsed = System.nanoTime() - begin;
+                            if (elapsed > taskTimeout) {
+                                /*
+                                 * task timeout.
+                                 * 
+                                 * @todo This is measured from when we start to
+                                 * submit the tasks so they will all be
+                                 * cancelled at once. Alternatively, we could
+                                 * tunnel into the LockTaskFuture and compute
+                                 * the timeout from the time the task was
+                                 * accepted by the lock service, but that will
+                                 * be different iff the lock service is using a
+                                 * SynchronousQueue to accept tasks for
+                                 * execution.
+                                 */
+                                future.cancel(true/* mayInterruptIfRunning */);
+                                ntimeout++;
+                                break;
+                            }
                             try {
                                 future.get(1, TimeUnit.SECONDS);
                                 break;
@@ -425,8 +444,8 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
                     } catch (ExecutionException ex) {
                         if (ex.getCause() instanceof DeadlockException) {
                             ndeadlock++;
-                        } else if (ex.getCause() instanceof TimeoutException) {
-                            ntimeout++;
+//                        } else if (ex.getCause() instanceof TimeoutException) {
+//                            ntimeout++;
                         } else if (ex.getCause() instanceof HorridTaskDeath) {
                             nhorriddeath++;
                         } else {
@@ -529,10 +548,10 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
          */
         public static final String MAX_LOCKS = "maxLocks";
         /**
-         * The timeout when attempting to acquire a lock (milliseconds) -or-
-         * <code>0</code> iff no timeout will be used.
+         * The timeout for the task in (milliseconds) -or- <code>0</code> iff
+         * no timeout will be used.
          */
-        public static final String LOCK_TIMEOUT = "lockTimeout";
+        public static final String TASK_TIMEOUT = "lockTimeout";
         /**
          * The maximum #of times that a task will attempt to acquire its locks
          * before failing. Temporary failures may occur due to deadlock or
@@ -574,9 +593,9 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
         public static final String DEFAULT_MAX_LOCK_TRIES = "1";
 
         /**
-         * The default is no timeout for locks.
+         * The default is no timeout for tasks.
          */
-        public static final String DEFAULT_LOCK_TIMEOUT = "0";
+        public static final String DEFAULT_TASK_TIMEOUT = "0";
 
         /**
          * By default we do not force any tasks to die.
@@ -646,7 +665,7 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
             defaultProperties.put(TestOptions.MAX_LOCK_TRIES,"1");
             defaultProperties.put(TestOptions.PREDECLARE_LOCKS,"false");
             defaultProperties.put(TestOptions.SORT_LOCK_REQUESTS,"false");
-            defaultProperties.put(TestOptions.LOCK_TIMEOUT,"1000"); // ms
+            defaultProperties.put(TestOptions.TASK_TIMEOUT,"1000"); // ms
 
             List<Condition>conditions = new ArrayList<Condition>();
 
@@ -657,14 +676,14 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
             // and with a non-zero lock timeout.
             conditions.add(getCondition(defaultProperties, new NV[] {
                     new NV(TestOptions.NTHREADS, "2"),
-                    new NV(TestOptions.LOCK_TIMEOUT, "1000") }));
+                    new NV(TestOptions.TASK_TIMEOUT, "1000") }));
 
             // default concurrency.
             conditions.add(getCondition(
                     defaultProperties, new NV[] {}));
             // and with a non-zero lock timeout.
             conditions.add(getCondition(defaultProperties, new NV[] { new NV(
-                    TestOptions.LOCK_TIMEOUT, "1000") }));
+                    TestOptions.TASK_TIMEOUT, "1000") }));
 
             // default concurrency with 10% task death.
             conditions.add(getCondition(
@@ -674,7 +693,7 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
             conditions.add(getCondition(
                     defaultProperties, new NV[] {
                     new NV(TestOptions.PERCENT_TASK_DEATH, ".10"),
-                    new NV(TestOptions.LOCK_TIMEOUT, "1000") }));
+                    new NV(TestOptions.TASK_TIMEOUT, "1000") }));
 
             // high concurrency.
             conditions.add(getCondition(
@@ -683,7 +702,7 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
             // and with a non-zero lock timeout
             conditions.add(getCondition(defaultProperties, new NV[] {
                     new NV(TestOptions.NTHREADS, "100"),
-                    new NV(TestOptions.LOCK_TIMEOUT, "1000") }));
+                    new NV(TestOptions.TASK_TIMEOUT, "1000") }));
 
             // high concurrency with 10% task death.
             conditions.add(getCondition(defaultProperties, new NV[] {
@@ -693,7 +712,7 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
             conditions.add(getCondition(defaultProperties, new NV[] {
                     new NV(TestOptions.NTHREADS, "100"),
                     new NV(TestOptions.PERCENT_TASK_DEATH, ".10"),
-                    new NV(TestOptions.LOCK_TIMEOUT, "1000") }));
+                    new NV(TestOptions.TASK_TIMEOUT, "1000") }));
 
             // force sequential execution by limiting
             // nresources==minlocks==maxlocks.
@@ -707,7 +726,7 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
                     defaultProperties, new NV[] { new NV(TestOptions.NRESOURCES,
                             "1"), new NV(TestOptions.MIN_LOCKS,
                             "1"), new NV(TestOptions.MAX_LOCKS,
-                            "1"), new NV(TestOptions.LOCK_TIMEOUT,"1000") }));
+                            "1"), new NV(TestOptions.TASK_TIMEOUT,"1000") }));
             
             // force sequential execution by limiting nresources==minlocks==maxlocks.
             conditions.add(getCondition(
@@ -720,7 +739,7 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
                     defaultProperties, new NV[] { new NV(TestOptions.NRESOURCES,
                             "3"), new NV(TestOptions.MIN_LOCKS,
                             "3"), new NV(TestOptions.MAX_LOCKS,
-                            "3"), new NV(TestOptions.LOCK_TIMEOUT,"1000") }));
+                            "3"), new NV(TestOptions.TASK_TIMEOUT,"1000") }));
 
             Experiment exp = new Experiment(className,defaultProperties,conditions);
 
