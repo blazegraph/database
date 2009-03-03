@@ -28,7 +28,6 @@
 
 package com.bigdata.relation;
 
-import java.io.IOException;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
@@ -540,8 +539,6 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
     /**
      * Return the object used to locate indices, relations, and relation
      * containers and to execute operations on those resources.
-     * <p> 
-     * Note: Return type SHOULD be strengthen by concrete impls.
      * 
      * @return The {@link IIndexManager}.
      */
@@ -610,7 +607,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
      */
     public void create() {
         
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info(toString());
     
         /*
@@ -661,18 +658,20 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
          * cache this instance.
          */
         
-        ((DefaultResourceLocator)getIndexManager().getResourceLocator()).putInstance(this);
-        
+        ((DefaultResourceLocator) getIndexManager().getResourceLocator())
+                .putInstance(this);
+
     }
 
     public void destroy() {
-    
+
         if (INFO)
             log.info(toString());
-    
+
         // Delete the entry for this relation from the row store.
-        indexManager.getGlobalRowStore().delete(RelationSchema.INSTANCE, namespace);
-        
+        indexManager.getGlobalRowStore().delete(RelationSchema.INSTANCE,
+                namespace);
+
     }
 
     /**
@@ -684,59 +683,10 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
      *             if anything goes wrong.
      * 
      * @see IResourceLockService
-     * 
-     * FIXME The caller MUST be using a full tx for create/destroy of a resource
-     * to be atomic. See {@link IResourceLockService}.
      */
     protected IResourceLock acquireExclusiveLock() {
 
         return indexManager.getResourceLockService().acquireLock(getNamespace());
-
-//        final int maxtries = 3;
-//        
-//        int ntries = 0;
-//        
-//        final long millis = 10;
-//        
-//        IResourceLockService lockService;
-//        
-//        while ((lockService = indexManager.getResourceLockService()) == null
-//                && ntries < maxtries) {
-//            
-//            if(INFO) {
-//                
-//                log.info("Will retry");
-//                
-//            }
-//            
-//            ntries++;
-//            
-//            try {
-//                
-//                Thread.sleep(millis);
-//                
-//            } catch (InterruptedException ex) {
-//             
-//                throw new RuntimeException(ex);
-//                
-//            }
-//            
-//        }
-//        
-//        if (lockService == null) {
-//            
-//            throw new RuntimeException("Could not locate lock service");
-//            
-//        }
-//        
-//        try {
-//
-//
-//        } catch (IOException ex) {
-//
-//            throw new RuntimeException(ex);
-//
-//        }
 
     }
 

@@ -541,8 +541,9 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
      * 
      * @return A new instance of the identifed resource.
      */
-    protected T newInstance(Class<? extends T> cls, IIndexManager indexManager,
-            String namespace, long timestamp, Properties properties) {
+    protected T newInstance(final Class<? extends T> cls,
+            final IIndexManager indexManager, final String namespace,
+            final long timestamp, final Properties properties) {
 
         if (cls == null)
             throw new IllegalArgumentException();

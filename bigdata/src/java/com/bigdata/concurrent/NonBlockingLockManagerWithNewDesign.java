@@ -53,6 +53,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -89,19 +90,32 @@ import com.bigdata.util.concurrent.QueueStatisticsTask;
  * 
  * @see #ready(Runnable)
  * 
- * @todo a fair option? What constraints or freedoms would it provide?
- * 
- * @todo In order to support 2PL we need to decouple the {@link LockFutureTask}
+ * @todo 2PL
+ *       <p>
+ *       Note: It is not really possible to have deadlocks without 2PL. Instead,
+ *       what happens is that the maximum multi-programming capacity of the
+ *       {@link TxDag} is temporarily exceeded. Review the unit tests again when
+ *       supporting 2PL and verify that the deadlock handling logic works.
+ *       <p>
+ *       In order to support 2PL we need to decouple the {@link LockFutureTask}
  *       from the transaction with which it is associated and use the latter in
  *       the {@link TxDag}. Otherwise each
  *       {@link #submit(Comparable[], Callable)} will always look like a new
  *       transaction (2PL is impossible unless you can execute multiple tasks
  *       for the same transaction).
  *       <p>
- *       Note: It is not really possible to have deadlocks without 2PL. Instead,
- *       what happens is that the maximum multi-programming capacity of the
- *       {@link TxDag} is temporarily exceeded. Review the unit tests again when
- *       supporting 2PL and verify that the deadlock handling logic works.
+ *       To introduce 2PL I need to create interfaces which extend
+ *       {@link Callable} which are understood by this class. One such interface
+ *       should provide a method by which a task can release its locks. For 2PL,
+ *       either that interface or an extension of the interface would need to
+ *       have a method by which a task could post new lock requests. Such a
+ *       callable could be submitted directly. It would wait if it declared any
+ *       precondition locks and otherwise pass through to
+ *       {@link #ready(Runnable)} immediately. We can't really just pass the
+ *       task through again when it requests additional locks, so maybe the Tx
+ *       would submit a task to the lock service each time it wanted to gain
+ *       more or more locks and {@link #ready(Runnable)} would change its run
+ *       state...
  * 
  * @todo Support escalation of operation priority based on time and scheduling
  *       of higher priority operations. the latter is done by queueing lock
@@ -424,6 +438,17 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
             }
         });
 
+        /*
+         * #of queues that have at least one task (moving average). Each queue
+         * corresponds to a resource for which at least one task had declared
+         * and posted a lock during the last sample.
+         */
+        root.addCounter("averageQueueBusyCount", new Instrument<Double>() {
+            public void sample() {
+                setValue(statisticsTask.nqueueBusyAverageTask.getMovingAverage());
+            }
+        });
+
         // #of tasks that are executing (in run(), moving average).
         root.addCounter("averageRunningCount", new Instrument<Double>() {
             public void sample() {
@@ -534,39 +559,6 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
         
     }
 
-    /**
-     * Helper class pairs up the resource with the moving average of its queue
-     * size. The natural order of this class places is by decreasing average
-     * queue size and by resource when the average queue sizes are equal (to
-     * break ties).
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    private class ResourceQueueSize implements Comparable<ResourceQueueSize> {
-        final R resource;
-        final double averageQueueSize;
-        public ResourceQueueSize(R resource,double averageQueueSize){
-            this.resource = resource;
-            this.averageQueueSize = averageQueueSize;
-        }
-        public int compareTo(ResourceQueueSize arg0) {
-            // resource name order.
-            // return resource.compareTo(arg0.resource);
-            // descending queue size order.
-            if (averageQueueSize < arg0.averageQueueSize) {
-                return 1;
-            } else if (averageQueueSize > arg0.averageQueueSize) {
-                return -1;
-            } else
-                return resource.compareTo(arg0.resource);
-        }
-        public String toString() {
-            return "(" + resource + "," + ((int) (averageQueueSize * 100) / 100d)
-                    + ")";
-        }
-    }
-    
     /**
      * Counters for the {@link NonBlockingLockManagerWithNewDesign}.
      * 
@@ -1848,13 +1840,16 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
             } finally {
                 /*
                  * Note: FutureTask asynchronously reports the result back to
-                 * get() when super.run() completes.
+                 * get() when super.run() completes. Therefore the locks and the
+                 * run state MIGHT NOT have been updated before the Future#get()
+                 * returns to the caller (in fact, this is quite common).
                  * 
                  * @todo I have tried overriding both set(T) and done(), but
                  * neither appears to be invoked synchronously on this class
-                 * during super.run(). Therefore the locks and the run state
-                 * MIGHT NOT have been updated before the Future#get() returns
-                 * to the caller!
+                 * during super.run(). This is especially difficult to
+                 * understand for set(T). I think that it delegates to an inner
+                 * class and when the inner run() exits the outer set(T) does
+                 * not get invoked.  Perhaps post this as an issue?
                  */
                 lock.lock();
                 try {
@@ -2657,7 +2652,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
         }
 
     } // ResourceQueue
-
+    
     /**
      * Class for tracking the average queue size of each {@link ResourceQueue}
      * and various other moving averages for the service as a whole.
@@ -2696,9 +2691,25 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
                         return counters.nrunning;
                     }
                 });
-        
+
+        /**
+         * Used to stuff the datum to be incorporated into the average into
+         * {@link #nqueueBusyAverageTask}.  This is set by {@link #run()}
+         */
+        final private AtomicInteger queueCountWithNonZeroTasks = new AtomicInteger();
+
+        /**
+         * #of queues with at least one task.
+         */
+        final MovingAverageTask nqueueBusyAverageTask = new MovingAverageTask(
+                "nbusy", new Callable<Integer>() {
+                    public Integer call() {
+                        return queueCountWithNonZeroTasks.get();
+                    }
+                });
+
         private StatisticsTask() {
-            
+
         }
 
         /**
@@ -2723,6 +2734,8 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
             
             nrunningAverageTask.run();
             
+            int nbusy = 0;
+            
             final Iterator<Map.Entry<R, WeakReference<ResourceQueue<LockFutureTask<? extends Object>>>>> itr = resourceQueues
                     .entryIterator();
          
@@ -2742,7 +2755,19 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
                 
                 queue.statisticsTask.run();
                 
+                final int size = queue.queue.size();
+
+                if (size == 1) {
+                
+                    nbusy++;
+                    
+                }
+                
             }
+            
+            this.queueCountWithNonZeroTasks.set(nbusy);
+
+            nqueueBusyAverageTask.run();
 
         }
 
