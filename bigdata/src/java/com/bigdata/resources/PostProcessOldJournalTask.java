@@ -260,6 +260,97 @@ public class PostProcessOldJournalTask implements Callable<Object> {
     }
 
     /**
+     * Choose index partitions for scatter split operations. The scatter split
+     * divides an index partition into N index partitions, one per data service,
+     * and then moves N-1 of the generated index partitions to other data
+     * services leaving one index partition in place on this data service.
+     */
+    protected List<AbstractTask> chooseScatterSplits() {
+        
+        // set of tasks created.
+        final List<AbstractTask> tasks = new LinkedList<AbstractTask>();
+
+        // set of index partition views to consider.
+        final Iterator<ViewMetadata> itr = overflowMetadata.views();
+
+        while(itr.hasNext()) {
+
+            final ViewMetadata vmd = itr.next();
+            
+            final String name = vmd.name;
+            
+            /*
+             * The index partition has already been handled.
+             */
+            if (isUsed(name)|| overflowMetadata.isCopied(name)) {
+
+                continue;
+                
+            }
+            
+            // the adjusted split handler.
+            final ISplitHandler splitHandler = vmd.getAdjustedSplitHandler();
+            
+            /*
+             * Scatter split.
+             * 
+             * Note: Split is NOT allowed if the index is currently being moved
+             * onto this data service. Split, join, and move are all disallowed
+             * until the index partition move is complete since each of them
+             * would cause the index partition to become invalidated.
+             */
+            if ( // only a single index partitions?
+                (vmd.getIndexPartitionCount() == 1L)//
+                // move not in progress
+                && vmd.pmd.getSourcePartitionId() == -1//
+                // looks like a split candidate.
+                && splitHandler.shouldSplit(vmd.getRangeCount())//
+            ) {
+
+                /*
+                 * Do a scatter split task.
+                 * 
+                 * @todo parameterize the trigger conditions and the maximum #of
+                 * data services onto which the index partitions will be
+                 * scattered. Note that when maxCount is ZERO (0) ALL joined
+                 * data services will be reported.
+                 * 
+                 * @todo For a system which has been up and running for a while
+                 * we would be better off using the LBS reported move targets
+                 * rather than all discovered data services. However, for a new
+                 * federation we are better off with all discovered data
+                 * services since there is less uncertainity about which
+                 * services will be reported.
+                 */
+                final int maxCount = 0;
+                final UUID[] uuids = resourceManager.getFederation()
+                        .getDataServiceUUIDs(maxCount);
+
+                overflowMetadata.setAction(vmd.name, OverflowActionEnum.Split);
+
+                // scatter split onto the specified data services.
+                final AbstractTask task = new SplitIndexPartitionTask(vmd,
+                        uuids);
+
+                // add to set of tasks to be run.
+                tasks.add(task);
+
+                putUsed(name, "willScatter(name=" + vmd + ")");
+
+                if (INFO)
+                    log.info("will scatter: " + vmd);
+
+                continue;
+
+            }
+            
+        } // itr.hasNext()
+    
+        return tasks;
+        
+    }
+    
+    /**
      * Scans the registered named indices and decides which ones (if any) are
      * undercapacity and should be joined.
      * <p>
@@ -1448,23 +1539,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * 
      * @todo document tailSplits.
      * 
-     * @todo Move, Split, and Join could run immediately as UNISOLATED tasks
-     *       without a historical catchup period. Each of these operations must
-     *       produce a new coherent index partition view. The historical read
-     *       from the last committed view on the old journal provides a catch up
-     *       period which does not block writers on the unisolated indices on
-     *       the live journal. However, by the same token it permits additional
-     *       writes to accumulate so the task must do more work. Even if writers
-     *       obey the rules for relations (do not overwrite a tuple with an
-     *       identical tuple), we will still wind up with two versions of
-     *       updated tuples (including tuples that have been deleted). Since an
-     *       application can block if any of its indices becomes unavailable for
-     *       write, we might be as well off doing operations which define new
-     *       index partitions concurrently and locking out the application until
-     *       those tasks are done. This could be tested both ways. [In fact, I
-     *       used to run with synchronous overflow and it was slow but this does
-     *       bear re-examination.]
-     * 
      * FIXME implement suggestions for handling cases when we are nearing DISK
      * exhaustion.
      * 
@@ -1474,9 +1548,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * fact, we can just create a read-historical transaction when we start data
      * service overflow and then pass it into the rest of the process, aborting
      * that tx when overflow is complete.
-     * 
-     * FIXME consider move as post-compact action using socket to blast the data
-     * to the target data service.
      * 
      * FIXME make the atomic update tasks truely atomic using full transactions
      * and/or distributed locks and correcting actions.
@@ -1513,12 +1584,21 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              */
             
             /*
-             * First, identify any index partitions that have underflowed and
-             * will either be joined or moved. When an index partition is joined
-             * its rightSibling is also processed. This is why we identify the
-             * index partition joins first - so that we can avoid attempts to
-             * process the rightSibling now that we know it is being used by the
-             * join operation.
+             * Choose index partitions for scatter split operations. The scatter
+             * split divides an index partition into N index partitions, one per
+             * data service, and then moves N-1 of the generated index
+             * partitions to other data services leaving one index partition in
+             * place on this data service.
+             */
+            tasks.addAll(chooseScatterSplits());
+            
+            /*
+             * Identify any index partitions that have underflowed and will
+             * either be joined or moved. When an index partition is joined its
+             * rightSibling is also processed. This is why we identify the index
+             * partition joins first - so that we can avoid attempts to process
+             * the rightSibling now that we know it is being used by the join
+             * operation.
              */
 
             tasks.addAll(chooseIndexPartitionJoins());
@@ -1747,17 +1827,11 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * until the index partition move is complete since each of them
              * would cause the index partition to become invalidated.
              * 
-             * Note: A split does a key-range constrained index segment build
-             * for each split identified for the index partition. Each new view
-             * will have all of the sources of the per-split view except the old
-             * journal as of the last overflow event. Split DOES NOT release
-             * older journals and index segments which might be in the view.
-             * Therefore we DO NOT take splits if the index partition triggers
-             * any of the requirements for a manditory compacting merge.
+             * Note: [Split performs a compacting merge so it is allowed when
+             * compactingMerge is true].
              */
-            if (!compactingMerge //
-                    // move not in progress
-                    && vmd.pmd.getSourcePartitionId() == -1//
+            if (    // move not in progress
+                    vmd.pmd.getSourcePartitionId() == -1//
                     // looks like a split candidate.
                     && splitHandler.shouldSplit(vmd.getRangeCount())//
             ) {
@@ -1768,7 +1842,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                 overflowMetadata.setAction(vmd.name, OverflowActionEnum.Split);
 
-                final AbstractTask task = new SplitIndexPartitionTask(vmd, null/* moveTarget */);
+                final AbstractTask task = new SplitIndexPartitionTask(vmd,
+                        (UUID) null/* moveTarget */);
 
                 // add to set of tasks to be run.
                 tasks.add(task);

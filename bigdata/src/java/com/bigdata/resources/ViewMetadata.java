@@ -41,6 +41,11 @@ class ViewMetadata extends BTreeMetadata {
     private long rangeCount;
     
     /**
+     * Cached index partition count once initialized from the view.
+     */
+    private long npartitions;
+    
+    /**
      * Cached adjusted split handler once initialized from view.
      */
     private ISplitHandler adjustedSplitHandler;
@@ -129,15 +134,15 @@ class ViewMetadata extends BTreeMetadata {
     }
 
     /**
-     * Initialize additional data with higher latency (range count and the
-     * adjusted split handler).
+     * Initialize additional data with higher latency (range count, #of index
+     * partitions, the adjusted split handler, etc.).
      * 
      * @param view
      *            The view.
      */
     synchronized private void initView(final ILocalBTreeView view) {
 
-        if(view == null) {
+        if (view == null) {
             
             throw new AssertionError("View not found? " + this);
             
@@ -168,6 +173,66 @@ class ViewMetadata extends BTreeMetadata {
          * of the index segment key range).
          */
         this.rangeCount = view.rangeCount();
+
+        /*
+         * Obtain the #of index partitions for this scale-out index.
+         * 
+         * Note: This may require RMI, but the metadata index is also heavily
+         * cached by the {@link AbstractFederation}.
+         */
+        {
+            long npartitions;
+            try {
+
+                final IMetadataIndex mdi = resourceManager.getFederation()
+                        .getMetadataIndex(indexMetadata.getName(), commitTime);
+
+                if (mdi == null) {
+
+                    log.warn("No metadata index: running in test harness?");
+
+                    npartitions = 1L;
+
+                } else {
+
+                    npartitions = mdi.rangeCount();
+
+                    if (npartitions == 0) {
+
+                        /*
+                         * There must always be at least one index partition for
+                         * a scale-out index so this is an error condition.
+                         */
+                        log.error("No partitions? name="
+                                + indexMetadata.getName());
+
+                    }
+
+                }
+
+            } catch (Throwable t) {
+
+                if (InnerCause.isInnerCause(t, InterruptedException.class)) {
+
+                    // don't trap interrupts.
+                    throw new RuntimeException(t);
+
+                }
+
+                /*
+                 * Traps any RMI failures (or anything else), logs a warning,
+                 * and reports npartitions as -1L.
+                 */
+
+                log.error("name=" + indexMetadata.getName(), t);
+
+                npartitions = -1L;
+
+            }
+
+            this.npartitions = npartitions;
+
+        }
 
         this.percentOfSplit = adjustedSplitHandler.percentOfSplit(rangeCount);
 
@@ -205,6 +270,23 @@ class ViewMetadata extends BTreeMetadata {
 
         return rangeCount;
 
+    }
+
+    /**
+     * Return the #of index partitions for this scale-out index. The value is
+     * computed once per overflow event and then cached.
+     */
+    public long getIndexPartitionCount() {
+        
+        if(!initView) {
+            
+            // materialize iff never initialized.
+            getView();
+            
+        }
+        
+        return npartitions;
+        
     }
 
     /**
@@ -333,63 +415,6 @@ class ViewMetadata extends BTreeMetadata {
             
         }
         
-        final long npartitions;
-        try {
-
-            /*
-             * The #of index partitions for this scale-out index.
-             * 
-             * Note: This may require RMI, but the metadata index is also
-             * heavily cached by the client.
-             */
-
-            final IMetadataIndex mdi = resourceManager.getFederation()
-                    .getMetadataIndex(indexMetadata.getName(), commitTime);
-            
-            if (mdi == null) {
-                
-                log.warn("No metadata index: running in test harness?");
-                
-                npartitions = 1L;
-                
-            } else {
-            
-                npartitions = mdi.rangeCount();
-                
-            }
-
-        } catch (Throwable t) {
-
-            if (InnerCause.isInnerCause(t, InterruptedException.class)) {
-
-                // don't trap interrupts.
-                throw new RuntimeException(t);
-
-            }
-
-            /*
-             * Traps any RMI failures (or anything else), logs a warning,
-             * and returns the default splitHandler instead.
-             */
-
-            log.warn("name=" + indexMetadata.getName(), t);
-
-            return splitHandler;
-
-        }
-
-        if (npartitions == 0) {
-
-            /*
-             * There must always be at least one index partition for a
-             * scale-out index so this is an error condition.
-             */
-            log.error("No partitions? name=" + indexMetadata.getName());
-
-            return splitHandler;
-
-        }
-
         return ((DefaultSplitHandler) splitHandler).getAdjustedSplitHandler(
                 accelerateSplitThreshold, npartitions);
         
