@@ -29,7 +29,6 @@ import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.relation.IRelation;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.sparse.GlobalRowStoreSchema;
 import com.bigdata.sparse.SparseRowStore;
