@@ -359,7 +359,9 @@ public class SplitFinder {
         final Split[] ospSplits = spoSplits;
         
         /*
-         * FIXME I have not figured out a way to split the POS index yet.
+         * FIXME I have not figured out a way to pre-split the POS index yet
+         * based on the sample data. It seems that the best way to handle this
+         * is a scatter split after loading 1M triples or so.
          */
         final Split[] posSplits = null;
 //        final Split[] posSplits = findSplitsPOS(term2IdSplits);
@@ -377,17 +379,7 @@ public class SplitFinder {
     }
 
     /**
-     * 
-     * @return
-     * 
-     * FIXME resolve the first/last term which enters into each index partition
-     * and log it so I can figure out if all the predicates really are in the
-     * last index partition. In fact, they probably are since they all start
-     * with
-     * 
-     * <pre>
-     * http://www.lehigh.edu/&tilde;zhp2/2004/0401/univ-bench.owl
-     * </pre>
+     * Find the split points for the TERM2ID index based on the sample data.
      */
     protected Split[] findSplitsTerm2ID() {
 

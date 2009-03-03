@@ -524,7 +524,8 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
     /**
      * Copy any writes buffered by the live journal for the index partition that
      * is being moved to the new index partition on the target data service and
-     * cutover to the new index partition.
+     * cutover to the new index partition. If the operation fails then this
+     * cleans up before rethrowing the exception.
      * 
      * @param resourceManager
      * @param moveResult
