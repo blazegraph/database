@@ -150,7 +150,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
      * Note: The timeout is set to one LBS reporting period so you can see which
      * resource queues had activity in the last reporting period.
      */
-    final private ConcurrentWeakValueCacheWithTimeout<R, ResourceQueue<LockFutureTask<? extends Object>>> resourceQueues = new ConcurrentWeakValueCacheWithTimeout<R, ResourceQueue<LockFutureTask<? extends Object>>>(
+    final private ConcurrentWeakValueCacheWithTimeout<R, ResourceQueue<R, LockFutureTask<R, ? extends Object>>> resourceQueues = new ConcurrentWeakValueCacheWithTimeout<R, ResourceQueue<R, LockFutureTask<R, ? extends Object>>>(
             1000/* nresources */, TimeUnit.SECONDS.toNanos(60));
 
     /**
@@ -229,7 +229,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
      * without creating a deadlock or if {@link #maxLockTries} would be exceeded
      * for that task. The queue is cleared if the lock service is halted.
      */
-    final private BlockingQueue<LockFutureTask<? extends Object>> retryQueue = new LinkedBlockingQueue<LockFutureTask<? extends Object>>();
+    final private BlockingQueue<LockFutureTask<R, ? extends Object>> retryQueue = new LinkedBlockingQueue<LockFutureTask<R, ? extends Object>>();
 
     /**
      * Run states for the {@link NonBlockingLockManagerWithNewDesign}.
@@ -485,18 +485,18 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
             
             final CounterSet tmp = root.makePath("queues");
 
-            final Iterator<Map.Entry<R, WeakReference<ResourceQueue<LockFutureTask<? extends Object>>>>> itr = resourceQueues
+            final Iterator<Map.Entry<R, WeakReference<ResourceQueue<R,LockFutureTask<R,? extends Object>>>>> itr = resourceQueues
                     .entryIterator();
 
             while (itr.hasNext()) {
 
-                final Map.Entry<R, WeakReference<ResourceQueue<LockFutureTask<? extends Object>>>> entry = itr
+                final Map.Entry<R, WeakReference<ResourceQueue<R,LockFutureTask<R,? extends Object>>>> entry = itr
                         .next();
 
-                final WeakReference<ResourceQueue<LockFutureTask<? extends Object>>> queueRef = entry
+                final WeakReference<ResourceQueue<R,LockFutureTask<R,? extends Object>>> queueRef = entry
                         .getValue();
 
-                final ResourceQueue<LockFutureTask<? extends Object>> queue = queueRef
+                final ResourceQueue<R,LockFutureTask<R,? extends Object>> queue = queueRef
                         .get();
 
                 if (queue == null)
@@ -539,7 +539,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
 
         public void sample() {
 
-            final ResourceQueue<LockFutureTask<? extends Object>> queue = resourceQueues
+            final ResourceQueue<R, LockFutureTask<R, ? extends Object>> queue = resourceQueues
                     .get(resource);
             
             if (queue == null) {
@@ -963,7 +963,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
 
             }
 
-            return new LockFutureTask<T>(a, task).acceptTask();
+            return new LockFutureTask<R,T>(this, a, task).acceptTask();
 
         } finally {
 
@@ -1056,7 +1056,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
 
             }
 
-            return new LockFutureTask<T>(a, task, val).acceptTask();
+            return new LockFutureTask<R,T>(this, a, task, val).acceptTask();
 
         } finally {
 
@@ -1091,12 +1091,12 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
         
         lock.lock();
         try {
-            
-            LockFutureTask<? extends Object> task = null;
+
+            LockFutureTask<R, ? extends Object> task = null;
 
             for (R r : resource) {
 
-                final ResourceQueue<LockFutureTask<? extends Object>> resourceQueue = resourceQueues
+                final ResourceQueue<R, LockFutureTask<R, ? extends Object>> resourceQueue = resourceQueues
                         .get(r);
 
                 if (task == null) {
@@ -1345,8 +1345,17 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
      * @param <T>
      *            The generic type of the outcome for the {@link Future}.
      */
-    protected class LockFutureTask<T> extends FutureTask<T> {
+    static protected class LockFutureTask<R extends Comparable<R>, T> extends FutureTask<T> {
 
+        /**
+         * The instance of the outer class.
+         * <p>
+         * Note: I ran into compilation errors on 64-bit systems when making
+         * references to non-static inner classes so this is now an explicit
+         * ctor parameter.
+         */
+        final NonBlockingLockManagerWithNewDesign<R> lockService;
+        
         /**
          * The locks which the task needs to run.
          */
@@ -1375,7 +1384,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
          * {@link NonBlockingLockManagerWithNewDesign#resourceQueues} collection by the
          * garbage collector.
          */
-        private final LinkedHashSet<ResourceQueue<LockFutureTask<? extends Object>>> lockedResources = new LinkedHashSet<ResourceQueue<LockFutureTask<? extends Object>>>();
+        private final LinkedHashSet<ResourceQueue<R, LockFutureTask<R, ? extends Object>>> lockedResources = new LinkedHashSet<ResourceQueue<R, LockFutureTask<R, ? extends Object>>>();
 
         /**
          * Either a {@link Callable} or a {@link Runnable}.
@@ -1407,7 +1416,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
          */
         private void setTaskRunState(final TaskRunState newval) {
 
-            if(!lock.isHeldByCurrentThread())
+            if(!lockService.lock.isHeldByCurrentThread())
                 throw new IllegalMonitorStateException();
 
             if (newval == null)
@@ -1443,7 +1452,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
 
                     final boolean waiting = !oldval.isRunning();
 
-                    releaseLocksForTask(this, waiting);
+                    lockService.releaseLocksForTask(this, waiting);
 
                 }
 
@@ -1451,7 +1460,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
 
                 this.taskRunState = newval;
 
-                if (!retryQueue.isEmpty()) {
+                if (!lockService.retryQueue.isEmpty()) {
 
                     /*
                      * The purpose of the retryQueue is to automatically retry
@@ -1462,7 +1471,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
                      * there are tasks on the retryQueue.
                      */
 
-                    stateChanged.signal();
+                    lockService.stateChanged.signal();
                     
                 }
 
@@ -1502,9 +1511,16 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
 
         }
 
-        public LockFutureTask(final R[] resource, final Callable<T> task) {
+        private LockFutureTask(
+                final NonBlockingLockManagerWithNewDesign<R> lockService,
+                final R[] resource, final Callable<T> task) {
 
             super(task);
+
+            if (lockService == null)
+                throw new IllegalArgumentException();
+
+            this.lockService = lockService;
 
             this.resource = resource;
 
@@ -1514,10 +1530,16 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
 
         }
 
-        public LockFutureTask(final R[] resources, final Runnable task,
-                final T val) {
+        private LockFutureTask(
+                final NonBlockingLockManagerWithNewDesign<R> lockService,
+                final R[] resources, final Runnable task, final T val) {
 
             super(task, val);
+
+            if (lockService == null)
+                throw new IllegalArgumentException();
+            
+            this.lockService = lockService;
 
             this.resource = resources;
             
@@ -1530,12 +1552,12 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
         /**
          * Accept the task for eventual execution.
          */
-        private LockFutureTask<T> acceptTask() {
+        protected LockFutureTask<R, T> acceptTask() {
 
-            if (!lock.isHeldByCurrentThread())
+            if (!lockService.lock.isHeldByCurrentThread())
                 throw new IllegalMonitorStateException();
 
-            switch (serviceRunState) {
+            switch (lockService.serviceRunState) {
             case Shutdown:
                 /*
                  * Any task that has been accepted will be eventually run.
@@ -1572,11 +1594,11 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
                  * exceeded.
                  */
                 setTaskRunState(TaskRunState.Retry);
-                retryQueue.add(this); // Note: MUST NOT block!
-                counters.nretry++; // #on the retry queue.
+                lockService.retryQueue.add(this); // Note: MUST NOT block!
+                lockService.counters.nretry++; // #on the retry queue.
                 return this;
             default:
-                    throw new IllegalStateException(serviceRunState.toString());
+                    throw new IllegalStateException(lockService.serviceRunState.toString());
             }
         }
 
@@ -1590,7 +1612,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
          */
         private boolean requestLocks() {
 
-            if (!lock.isHeldByCurrentThread())
+            if (!lockService.lock.isHeldByCurrentThread())
                 throw new IllegalMonitorStateException();
             
             if (isCancelled()) {
@@ -1600,7 +1622,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
 
             }
 
-            if (serviceRunState.tasksCancelled()) {
+            if (lockService.serviceRunState.tasksCancelled()) {
 
                 // tasks are cancelled in this run state.
 
@@ -1614,10 +1636,10 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
             try {
 
                 // #of vertices before we request the locks.
-                if (waitsFor != null)
-                    nvertices = waitsFor.size();
+                if (lockService.waitsFor != null)
+                    nvertices = lockService.waitsFor.size();
                 
-                if (waitsFor != null && waitsFor.isFull()) {
+                if (lockService.waitsFor != null && lockService.waitsFor.isFull()) {
                 
                     /*
                      * Note: When TxDag is used we MUST NOT add the lock
@@ -1640,7 +1662,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
                 
                 }
 
-                if (waitsFor != null) {
+                if (lockService.waitsFor != null) {
 
                     /*
                      * Declare the vertex.
@@ -1664,7 +1686,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
                      * already do). That way adding an edge will never cause
                      * a new vertex to be defined automagically.
                      */
-                    waitsFor.lookup(this, true/* insert */);
+                    lockService.waitsFor.lookup(this, true/* insert */);
                     
                 }
 
@@ -1673,17 +1695,17 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
                  * 
                  * Note: This method has no side-effects if it fails.
                  */
-                if(postLockRequests(this)) {
+                if(lockService.postLockRequests(this)) {
                     // run now.
                     if (INFO)
                         log.info("Task is ready to run: " + this);
                     setTaskRunState(TaskRunState.LocksReady);
-                    counters.nready++;
-                    ready(this);
+                    lockService.counters.nready++;
+                    lockService.ready(this);
                 } else {
                     // must wait for locks.
                     setTaskRunState(TaskRunState.LocksRequested);
-                    counters.nwaiting++;
+                    lockService.counters.nwaiting++;
                 }
                 
                 // either way, the task was handled.
@@ -1703,7 +1725,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
                         log
                                 .info("Deadlock: " + this + ", task=" + this /* , ex */);
 
-                    if (++ntries < maxLockTries) {
+                    if (++ntries < lockService.maxLockTries) {
 
                         // leave on queue to permit retry.
 
@@ -1724,12 +1746,12 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
                 // set exception on the task (clears locks)
                 setException(t2);
 
-                if (waitsFor != null) {
+                if (lockService.waitsFor != null) {
                     /*
                      * Paranoia check to make sure that we did not leave
                      * anything in the WAITS_FOR graph.
                      */
-                    final int nafter = waitsFor.size();
+                    final int nafter = lockService.waitsFor.size();
                     if (nvertices != nafter) {
                         throw new AssertionError("#vertices: before="
                                 + nvertices + ", after=" + nafter);
@@ -1751,20 +1773,20 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
          */
         @Override
         protected void setException(final Throwable t) {
-            lock.lock();
+            lockService.lock.lock();
             try {
                 super.setException(t);
                 if (taskRunState != TaskRunState.Halted) {
                     if (DEBUG)
                         log.debug("Exception: " + this + ", cause=" + t, t);
-                    counters.nerror++;
+                    lockService.counters.nerror++;
                     if (taskRunState.isRunning()) {
-                        counters.nrunning--;
+                        lockService.counters.nrunning--;
                     }
                     setTaskRunState(TaskRunState.Halted);
                 }
             } finally {
-                lock.unlock();
+                lockService.lock.unlock();
             }
         }
 
@@ -1776,21 +1798,21 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
          */
         @Override
         public boolean cancel(final boolean mayInterruptIfRunning) {
-            lock.lock();
+            lockService.lock.lock();
             try {
                 final boolean ret = super.cancel(mayInterruptIfRunning);
                 if (taskRunState != TaskRunState.Halted) {
                     if (DEBUG)
                         log.debug("Cancelled: " + this);
-                    counters.ncancel++;
+                    lockService.counters.ncancel++;
                     if (taskRunState.isRunning()) {
-                        counters.nrunning--;
+                        lockService.counters.nrunning--;
                     }
                     setTaskRunState(TaskRunState.Halted);
                 }
                 return ret;
             } finally {
-                lock.unlock();
+                lockService.lock.unlock();
             }
         }
 
@@ -1814,7 +1836,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
 
             }
 
-            lock.lock();
+            lockService.lock.lock();
             try {
                 if (taskRunState == TaskRunState.LocksReady) {
                     /*
@@ -1822,14 +1844,14 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
                      * cancelled so we don't want to do this for those tasks.
                      */
                     setTaskRunState(TaskRunState.RunningWithLocks);
-                    counters.nready--;
-                    counters.nrunning++;
-                    if (counters.nrunning > counters.maxRunning) {
-                        counters.maxRunning = counters.nrunning;
+                    lockService.counters.nready--;
+                    lockService.counters.nrunning++;
+                    if (lockService.counters.nrunning > lockService.counters.maxRunning) {
+                        lockService.counters.maxRunning = lockService.counters.nrunning;
                     }
                 }
             } finally {
-                lock.unlock();
+                lockService.lock.unlock();
             }
 
             if (DEBUG)
@@ -1851,16 +1873,16 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
                  * class and when the inner run() exits the outer set(T) does
                  * not get invoked.  Perhaps post this as an issue?
                  */
-                lock.lock();
+                lockService.lock.lock();
                 try {
                     if (taskRunState.isRunning()) {
                         if (DEBUG)
                             log.debug("Did run: " + this);
-                        counters.nrunning--;
+                        lockService.counters.nrunning--;
                         setTaskRunState(TaskRunState.Halted);
                     }
                 } finally {
-                    lock.unlock();
+                    lockService.lock.unlock();
                 }
             }
 
@@ -2017,12 +2039,12 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
          *            The tasks.
          */
         private void cancelTasks(
-                final Iterator<LockFutureTask<? extends Object>> itr,
+                final Iterator<LockFutureTask<R, ? extends Object>> itr,
                 final boolean mayInterruptIfRunning) {
 
             while (itr.hasNext()) {
 
-                final LockFutureTask<? extends Object> t = itr.next();
+                final LockFutureTask<R, ? extends Object> t = itr.next();
 
                 t.cancel(mayInterruptIfRunning);
 
@@ -2049,12 +2071,12 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
             
             int nchanged = 0;
 
-            final Iterator<LockFutureTask<? extends Object>> itr = retryQueue
+            final Iterator<LockFutureTask<R, ? extends Object>> itr = retryQueue
                     .iterator();
 
             while (itr.hasNext()) {
 
-                final LockFutureTask<? extends Object> t = itr.next();
+                final LockFutureTask<R, ? extends Object> t = itr.next();
 
                 if (t.requestLocks()) {
                     /*
@@ -2097,17 +2119,18 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
      * 
      * @return The {@link ResourceQueue}.
      */
-    private ResourceQueue<LockFutureTask<? extends Object>> declareResource(final R resource) {
+    private ResourceQueue<R,LockFutureTask<R,? extends Object>> declareResource(final R resource) {
 
         // test 1st to avoid creating a new ResourceQueue if it already exists.
-        ResourceQueue<LockFutureTask<?extends Object>> resourceQueue = resourceQueues
+        ResourceQueue<R, LockFutureTask<R, ? extends Object>> resourceQueue = resourceQueues
                 .get(resource);
 
         // not found, so create a new ResourceQueue for that resource.
-        resourceQueue = new ResourceQueue<LockFutureTask<?extends Object>>(resource);
+        resourceQueue = new ResourceQueue<R, LockFutureTask<R, ? extends Object>>(
+                this, resource);
 
         // put if absent.
-        final ResourceQueue<LockFutureTask<?extends Object>> oldval = resourceQueues
+        final ResourceQueue<R, LockFutureTask<R, ? extends Object>> oldval = resourceQueues
                 .putIfAbsent(resource, resourceQueue);
 
         if (oldval != null) {
@@ -2142,7 +2165,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
      *             If locks are being predeclared and there are already locks
      *             held by the operation.
      */
-    private <T> boolean postLockRequests(final LockFutureTask<T> task)
+    private <T> boolean postLockRequests(final LockFutureTask<R,T> task)
             throws DeadlockException {
 
         if (task == null)
@@ -2208,11 +2231,11 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
             /*
              * Collect the set of tasks on which this task must wait.
              */
-            final LinkedHashSet<LockFutureTask<? extends Object>> predecessors = new LinkedHashSet<LockFutureTask<? extends Object>>();
+            final LinkedHashSet<LockFutureTask<R,? extends Object>> predecessors = new LinkedHashSet<LockFutureTask<R,? extends Object>>();
             for (R r : (R[]) task.resource) {
             
                 // make sure queue exists for this resource.
-                final ResourceQueue<LockFutureTask<? extends Object>> resourceQueue = declareResource(r);
+                final ResourceQueue<R,LockFutureTask<R,? extends Object>> resourceQueue = declareResource(r);
 
                 if (!resourceQueue.queue.isEmpty()) {
 
@@ -2249,7 +2272,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
             for (R r : (R[]) task.resource) {
 
                 // make sure queue exists for this resource.
-                final ResourceQueue<LockFutureTask<? extends Object>> resourceQueue = declareResource(r);
+                final ResourceQueue<R, LockFutureTask<R, ? extends Object>> resourceQueue = declareResource(r);
 
                 /*
                  * Add a lock request for this resource.
@@ -2285,7 +2308,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
             for (R r : (R[]) task.resource) {
 
                 // make sure queue exists for this resource.
-                final ResourceQueue<LockFutureTask<? extends Object>> resourceQueue = declareResource(r);
+                final ResourceQueue<R, LockFutureTask<R, ? extends Object>> resourceQueue = declareResource(r);
                 
                 /*
                  * Add a lock request for this resource.
@@ -2333,7 +2356,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
      *            that the transaction is NOT waiting. In general, this
      *            knowledge is available to the 2PL locking package.
      */
-    private <T> void releaseLocksForTask(final LockFutureTask<T> t,
+    private <T> void releaseLocksForTask(final LockFutureTask<R,T> t,
             final boolean waiting) {
 
         if (!lock.isHeldByCurrentThread())
@@ -2346,16 +2369,16 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
          * The set of resource queues for which this task was holding a lock (at
          * the head of the queue).
          */
-        final List<ResourceQueue<LockFutureTask<? extends Object>>> resourceQueues = new LinkedList<ResourceQueue<LockFutureTask<? extends Object>>>();
+        final List<ResourceQueue<R, LockFutureTask<R, ? extends Object>>> resourceQueues = new LinkedList<ResourceQueue<R, LockFutureTask<R, ? extends Object>>>();
 
         try {
 
-            final Iterator<ResourceQueue<LockFutureTask<? extends Object>>> itr = t.lockedResources
+            final Iterator<ResourceQueue<R, LockFutureTask<R, ? extends Object>>> itr = t.lockedResources
                     .iterator();
 
             while (itr.hasNext()) {
 
-                final ResourceQueue<LockFutureTask<? extends Object>> resourceQueue = itr
+                final ResourceQueue<R, LockFutureTask<R, ? extends Object>> resourceQueue = itr
                         .next();
 
                 if (resourceQueue.queue.peek() == t) {
@@ -2435,15 +2458,15 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
          */
         {
          
-            final Iterator<ResourceQueue<LockFutureTask<? extends Object>>> itr = resourceQueues
+            final Iterator<ResourceQueue<R, LockFutureTask<R, ? extends Object>>> itr = resourceQueues
                     .iterator();
 
             while (itr.hasNext()) {
 
-                final ResourceQueue<LockFutureTask<? extends Object>> resourceQueue = itr
+                final ResourceQueue<R, LockFutureTask<R, ? extends Object>> resourceQueue = itr
                         .next();
 
-                final LockFutureTask<? extends Object> task = resourceQueue.queue
+                final LockFutureTask<R, ? extends Object> task = resourceQueue.queue
                         .peek();
 
                 if (task != null
@@ -2479,7 +2502,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
      */
     public boolean isLockHeldByTask(final R lock, final Runnable task) {
 
-        final ResourceQueue<LockFutureTask<? extends Object>> resourceQueue = resourceQueues
+        final ResourceQueue<R, LockFutureTask<R, ? extends Object>> resourceQueue = resourceQueues
                 .get(lock);
 
         if (resourceQueues != null && resourceQueue.queue.peek() == task) {
@@ -2500,14 +2523,14 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
      * 
      * @return <code>true</code> iff it holds its locks.
      */
-    private boolean holdsAllLocks(final LockFutureTask<? extends Object> task) {
+    private boolean holdsAllLocks(final LockFutureTask<R, ? extends Object> task) {
 
         if (!lock.isHeldByCurrentThread())
             throw new IllegalMonitorStateException();
 
         for (R r : (R[]) task.resource) {
 
-            final ResourceQueue<LockFutureTask<? extends Object>> resourceQueue = resourceQueues
+            final ResourceQueue<R, LockFutureTask<R, ? extends Object>> resourceQueue = resourceQueues
                     .get(r);
 
             assert resourceQueue != null : "resource=" + r;
@@ -2555,8 +2578,17 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
      * @see LockManager
      * @see TxDag
      */
-    protected class ResourceQueue<T extends LockFutureTask<? extends Object>> {
+    static protected class ResourceQueue<R extends Comparable<R>, T extends LockFutureTask<R, ? extends Object>> {
 
+        /**
+         * The outer class.
+         * <p>
+         * Note: I ran into compilation errors on 64-bit systems when making
+         * references to non-static inner classes so this is now an explicit
+         * ctor parameter.
+         */
+        final private NonBlockingLockManagerWithNewDesign<R> lockService;
+        
         /**
          * The resource whose access is controlled by this object.
          */
@@ -2638,11 +2670,18 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
          * @param resource
          *            The resource.
          */
-        public ResourceQueue(final R resource) {
+        public ResourceQueue(
+                final NonBlockingLockManagerWithNewDesign<R> lockService,
+                final R resource) {
 
+            if(lockService == null)
+                throw new IllegalArgumentException();
+            
             if (resource == null)
                 throw new IllegalArgumentException();
 
+            this.lockService = lockService;
+            
             this.resource = resource;
 
             this.queue = new LinkedBlockingQueue<T>(/* unbounded */);
@@ -2736,20 +2775,20 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
             
             int nbusy = 0;
             
-            final Iterator<Map.Entry<R, WeakReference<ResourceQueue<LockFutureTask<? extends Object>>>>> itr = resourceQueues
+            final Iterator<Map.Entry<R, WeakReference<ResourceQueue<R, LockFutureTask<R, ? extends Object>>>>> itr = resourceQueues
                     .entryIterator();
-         
+
             while (itr.hasNext()) {
-            
-                final Map.Entry<R, WeakReference<ResourceQueue<LockFutureTask<? extends Object>>>> entry = itr
+
+                final Map.Entry<R, WeakReference<ResourceQueue<R, LockFutureTask<R, ? extends Object>>>> entry = itr
                         .next();
-                
-                final WeakReference<ResourceQueue<LockFutureTask<? extends Object>>> queueRef = entry
+
+                final WeakReference<ResourceQueue<R, LockFutureTask<R, ? extends Object>>> queueRef = entry
                         .getValue();
-                
-                final ResourceQueue<LockFutureTask<? extends Object>> queue = queueRef
+
+                final ResourceQueue<R, LockFutureTask<R, ? extends Object>> queue = queueRef
                         .get();
-                
+
                 if (queue == null)
                     continue;
                 

@@ -44,6 +44,7 @@ import junit.framework.TestCase;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.concurrent.NonBlockingLockManagerWithNewDesign.LockFutureTask;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -252,7 +253,7 @@ public class TestNonBlockingLockManagerWithNewDesign extends TestCase {
             
             final String expected = "a";
             
-            final NonBlockingLockManagerWithNewDesign<String>.LockFutureTask<String> f = (NonBlockingLockManagerWithNewDesign<String>.LockFutureTask<String>) service
+            final LockFutureTask<String,String> f = (LockFutureTask<String,String>) service
                     .submit(new String[0], new Callable<String>() {
                         public String call() throws Exception {
                             return expected;
@@ -329,7 +330,7 @@ public class TestNonBlockingLockManagerWithNewDesign extends TestCase {
 
             final String expected = "a";
 
-            final NonBlockingLockManagerWithNewDesign<String>.LockFutureTask<String> f = (NonBlockingLockManagerWithNewDesign<String>.LockFutureTask<String>) service
+            final LockFutureTask<String, String> f = (LockFutureTask<String, String>) service
                     .submit(new String[0], new Callable<String>() {
                         public String call() throws Exception {
                             return expected;
@@ -389,7 +390,7 @@ public class TestNonBlockingLockManagerWithNewDesign extends TestCase {
 
         try {
 
-            final NonBlockingLockManagerWithNewDesign<String>.LockFutureTask<String> f = (NonBlockingLockManagerWithNewDesign<String>.LockFutureTask<String>) service
+            final LockFutureTask<String, String> f = (LockFutureTask<String, String>) service
                     .submit(new String[0], new Callable<String>() {
                         public String call() throws Exception {
                             // task throws exception.
@@ -434,8 +435,8 @@ public class TestNonBlockingLockManagerWithNewDesign extends TestCase {
      * @param task
      */
     protected <R extends Comparable<R>, T> void assertLocksHeld(
-            NonBlockingLockManagerWithNewDesign<R> service,
-            NonBlockingLockManagerWithNewDesign<R>.LockFutureTask<T> task) {
+            final NonBlockingLockManagerWithNewDesign<R> service,
+            final LockFutureTask<R, T> task) {
 
         for (R r : task.getResource()) {
 
@@ -457,8 +458,8 @@ public class TestNonBlockingLockManagerWithNewDesign extends TestCase {
      * @param task
      */
     protected <R extends Comparable<R>, T> void assertLocksNotHeld(
-            NonBlockingLockManagerWithNewDesign<R> service,
-            NonBlockingLockManagerWithNewDesign<R>.LockFutureTask<T> task) {
+            final NonBlockingLockManagerWithNewDesign<R> service,
+            final LockFutureTask<R, T> task) {
         
         for(R r : task.getResource()) {
             
@@ -500,7 +501,7 @@ public class TestNonBlockingLockManagerWithNewDesign extends TestCase {
 
             final String expected = "a";
 
-            final NonBlockingLockManagerWithNewDesign<String>.LockFutureTask<String> f = (NonBlockingLockManagerWithNewDesign<String>.LockFutureTask<String>) service
+            final LockFutureTask<String, String> f = (LockFutureTask<String, String>) service
                     .submit(new String[] { "test" }, new Callable<String>() {
                         public String call() throws Exception {
                             return expected;
@@ -549,9 +550,7 @@ public class TestNonBlockingLockManagerWithNewDesign extends TestCase {
             protected void ready(Runnable r) {
 
                 // verify locks are held.
-                assertLocksHeld(
-                        this,
-                        (NonBlockingLockManagerWithNewDesign<String>.LockFutureTask<String>) r);
+                assertLocksHeld(this, (LockFutureTask<String, String>) r);
 
                 delegate.execute(r);
 
@@ -563,7 +562,7 @@ public class TestNonBlockingLockManagerWithNewDesign extends TestCase {
 
             final String expected = "a";
 
-            final NonBlockingLockManagerWithNewDesign<String>.LockFutureTask<String> f = (NonBlockingLockManagerWithNewDesign<String>.LockFutureTask<String>) service
+            final LockFutureTask<String, String> f = (LockFutureTask<String, String>) service
                     .submit(new String[] { "test" }, new Callable<String>() {
                         public String call() throws Exception {
                             // release locks.
