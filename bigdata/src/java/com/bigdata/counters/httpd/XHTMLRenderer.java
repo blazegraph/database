@@ -1056,7 +1056,11 @@ public class XHTMLRenderer {
             case events:
                 
                 // render the time-series chart
-                writeFlot(w, model.events);
+                synchronized(model.events) {
+                    
+                    writeFlot(w, model.events);
+                    
+                }
 
                 break;
                 
