@@ -7,11 +7,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -322,15 +324,39 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * services since there is less uncertainity about which
                  * services will be reported.
                  */
-                final int maxCount = 0;
-                final UUID[] uuids = resourceManager.getFederation()
-                        .getDataServiceUUIDs(maxCount);
+                // Don't divide into more than 20 index partitions @todo config
+                final int maxScatterSplitFanOut = 20;
+                // Target data services for the new index partitions.
+                final UUID[] moveTargets;
+                {
+                    /*
+                     * Identify the target data services for the new index
+                     * partitions.
+                     * 
+                     * Note: This makes sure that _this_ data service is
+                     * included in the array so that we will leave at least one
+                     * of the post-split index partitions on this data service.
+                     */
+
+                    final UUID[] a = resourceManager.getFederation()
+                            .getDataServiceUUIDs(maxScatterSplitFanOut);
+
+                    final Set<UUID> tmp = new HashSet<UUID>(Arrays.asList(a));
+
+                    tmp.add(resourceManager.getDataServiceUUID());
+                    
+                    moveTargets = tmp.toArray(new UUID[tmp.size()]);
+                    
+                }
+
+                final int nsplits = Math.max(maxScatterSplitFanOut,
+                        moveTargets.length);
 
                 overflowMetadata.setAction(vmd.name, OverflowActionEnum.Split);
 
-                // scatter split onto the specified data services.
-                final AbstractTask task = new SplitIndexPartitionTask(vmd,
-                        uuids);
+                // scatter split task.
+                final AbstractTask task = new ScatterSplitTask(vmd, nsplits,
+                        moveTargets);
 
                 // add to set of tasks to be run.
                 tasks.add(task);
