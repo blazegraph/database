@@ -131,12 +131,15 @@ public interface IQueueCounters extends ICounterHierarchy {
          * (moving average) (this is only reported for the
          * {@link WriteExecutorService} as that is the only service where tasks
          * must acquire locks in order to execute).
-         * 
-         * @deprecated This will go away since all tasks on the write service
-         *             are now holding their locks. The tasks waiting for locks
-         *             are on the {@link NonBlockingLockManager}.
          */
         String AverageActiveCountWithLocksHeld = "Average Active Count With Locks Held";
+        /**
+         * The #of tasks that are waiting to run on the internal lock used by
+         * the {@link WriteExecutorService} to coordinate the start and end of
+         * tasks and the group commit. This counter indicates how much potential
+         * concurrency is being wasted by the {@link WriteExecutorService}.
+         */
+        String AverageReadyCount = "Average Ready Count";
         /**
          * Moving average in milliseconds of the time that a task is waiting for
          * resource locks (zero unless the task is unisolated).
