@@ -659,7 +659,11 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
                         }
 
                     }
-                    
+
+                    // moving average of the size nready. 
+                    averageReadyCount = getMovingAverage(
+                            averageReadyCount, tmp.getReadyCount(), w);
+
                     // moving average of the size of the commit groups. 
                     averageCommitGroupSize = getMovingAverage(
                             averageCommitGroupSize, tmp.getCommitGroupSize(), w);

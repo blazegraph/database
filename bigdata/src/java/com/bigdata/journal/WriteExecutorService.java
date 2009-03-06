@@ -553,6 +553,19 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     }
     
     /**
+     * #of tasks that are waiting to run but are blocked on the #lock. This
+     * value represents the #of tasks which have been starved from concurrent
+     * execution. The main culprit for a high value here is group commit and the
+     * occasional synchronous overflow or purge resources (when someone has an
+     * exclusive lock on the write service).
+     */
+    public int getReadyCount() {
+    
+        return nready.get();
+        
+    }
+    
+    /**
      * <code>true</code> iff the pause flag is set such that the write service
      * will queue up new tasks without allowing them to execute.
      * <p>
