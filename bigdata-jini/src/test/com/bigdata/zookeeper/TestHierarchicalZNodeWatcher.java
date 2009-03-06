@@ -90,7 +90,7 @@ public class TestHierarchicalZNodeWatcher extends AbstractZooTestCase implements
 
         if (zroot != null) {
 
-            destroyZNodes(zroot);
+            destroyZNodes(zookeeperAccessor.getZookeeper(), zroot);
             
         }
         

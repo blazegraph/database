@@ -72,6 +72,13 @@ import org.apache.zookeeper.Watcher.Event.KeeperState;
  * which case the application MUST request a new {@link ZooKeeper} client from
  * this interface.
  * </p>
+ * <p>
+ * A ZooKeeper ensemble will sometimes drop the ball on your client, causing it
+ * to receive a {@link SessionExpiredException}. This can happen because your
+ * client was temporarily partitioned, but it can also happen under heavy load -
+ * presumably because the client fails to maintain its lease with the ZooKeeper
+ * ensemble when under load.
+ * </p>
  * </li>
  * 
  * <li>When {@link SessionExpiredException} is thrown or the state for a
@@ -112,9 +119,15 @@ public class ZooKeeperAccessor {
     
     private volatile ZooKeeper zookeeper;
 
-    private final String host;
+    /**
+     * The hosts parameter.
+     */
+    public final String hosts;
 
-    private final int sessionTimeout;
+    /**
+     * The session timeout parameter.
+     */
+    public final int sessionTimeout;
     
     public ZooKeeperAccessor(final String hosts, final int sessionTimeout)
             throws InterruptedException {
@@ -122,7 +135,7 @@ public class ZooKeeperAccessor {
         if (hosts == null)
             throw new IllegalArgumentException();
 
-        this.host = hosts;
+        this.hosts = hosts;
 
         this.sessionTimeout = sessionTimeout;
 
@@ -141,7 +154,7 @@ public class ZooKeeperAccessor {
      *             client.
      * @throws IllegalStateException
      *             if this class is closed.
-     *             
+     * 
      * @todo variant with timeout, perhaps running on an executor service.
      */
     public synchronized ZooKeeper getZookeeper() throws InterruptedException {
@@ -177,7 +190,7 @@ public class ZooKeeperAccessor {
 
                     log.warn("Creating new client");
 
-                    zookeeper = new ZooKeeper(host, sessionTimeout,
+                    zookeeper = new ZooKeeper(hosts, sessionTimeout,
                             new ZooAliveWatcher());
 
                     // new client counts as an "event".
@@ -214,6 +227,9 @@ public class ZooKeeperAccessor {
     }
 
     /**
+     * If the accessor is open, then it is closed. If there is a
+     * {@link Zookeeper} instance, then it is closed to release the session with
+     * which it is associated.
      * 
      * @throws InterruptedException
      *             if interrupted before {@link ZooKeeper#close()} was finished.
@@ -227,9 +243,13 @@ public class ZooKeeperAccessor {
         lock.lockInterruptibly();
         try {
 
-            zookeeper.close();
+            if (zookeeper != null) {
 
-            zookeeper = null;
+                zookeeper.close();
+
+                zookeeper = null;
+
+            }
 
             open = false;
             

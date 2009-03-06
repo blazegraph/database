@@ -31,9 +31,14 @@ public interface ZLock {
     public void lock() throws KeeperException, InterruptedException;
 
     /**
+     * Creates a new lock request (an EPHEMERAL SEQUENTIAL znode that is a child
+     * of the lock node) and awaits up to the timeout for the {@link ZLock} to
+     * be granted.
      * 
      * @param timeout
+     *            The timeout.
      * @param unit
+     *            The unit in which that timeout is expressed.
      * 
      * @throws KeeperException
      * @throws InterruptedException

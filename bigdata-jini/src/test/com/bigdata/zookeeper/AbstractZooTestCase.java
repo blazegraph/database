@@ -33,6 +33,7 @@ import java.net.BindException;
 import java.net.ServerSocket;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
 import junit.framework.TestCase2;
@@ -45,6 +46,7 @@ import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
+import org.apache.zookeeper.KeeperException.SessionExpiredException;
 import org.apache.zookeeper.ZooDefs.Ids;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.server.quorum.QuorumPeerMain;
@@ -109,9 +111,29 @@ public abstract class AbstractZooTestCase extends TestCase2 {
      */
     protected final String configFile = "file:src/test/com/bigdata/zookeeper/testzoo.config";
 
-    final int sessionTimeout = 2000;// ms
+    /**
+     * Note: The sessionTimeout is computed as 2x the tickTime as read out of
+     * the configuration file by {@link #setUp()}. This corresponds to the
+     * actual sessionTimeout for the client rather than a requested value.
+     */
+    int sessionTimeout;
 
+    /**
+     * The initial {@link ZooKeeper} instance obtained from the
+     * {@link #zookeeperAccessor} when the test was setup.
+     * <p>
+     * Note: Some unit tests use {@link #expireSession(ZooKeeper)} to expire the
+     * session associated with this {@link ZooKeeper} instance.
+     * 
+     * @see ZooKeeperAccessor
+     */
     protected ZooKeeper zookeeper;
+
+    /**
+     * Factory for {@link ZooKeeper} instances using the configured hosts and
+     * session timeout.
+     */
+    protected ZooKeeperAccessor zookeeperAccessor;
 
     /**
      * ACL used by the unit tests.
@@ -127,7 +149,8 @@ public abstract class AbstractZooTestCase extends TestCase2 {
     
     public void setUp() throws Exception {
 
-        log.info(getName());
+        if (log.isInfoEnabled())
+            log.info(getName());
         
         // find ports that are not in use.
         clientPort = getPort(2181/* suggestedPort */);
@@ -141,7 +164,7 @@ public abstract class AbstractZooTestCase extends TestCase2 {
         dataDir.delete();
         // recreate the file as a directory.
         dataDir.mkdirs();
-        
+
         final String[] args = new String[] {
         // The configuration file (overrides follow).
                 configFile,
@@ -163,21 +186,24 @@ public abstract class AbstractZooTestCase extends TestCase2 {
         System.err.println("args=" + Arrays.toString(args));
 
         final Configuration config = ConfigurationProvider.getInstance(args);
+        
+        final int tickTime = (Integer) config.getEntry(QuorumPeerMain.class
+                .getName(), ZookeeperServerConfiguration.Options.TICK_TIME,
+                Integer.TYPE);
+
+        /*
+         * Note: This is the actual session timeout that the zookeeper service
+         * will impose on the client.
+         */
+        this.sessionTimeout = tickTime * 2;
 
         // if necessary, start zookeeper (a server instance).
         ZookeeperProcessHelper.startZookeeper(config, listener);
 
-        zookeeper = new ZooKeeper("localhost:" + clientPort, sessionTimeout,
-
-                new Watcher() {
-
-                    public void process(WatchedEvent event) {
-
-                        log.info(event.toString());
-
-                    }
-                });
-     
+        zookeeperAccessor = new ZooKeeperAccessor("localhost:" + clientPort, sessionTimeout);
+        
+        zookeeper = zookeeperAccessor.getZookeeper();
+        
         try {
             
             /*
@@ -189,7 +215,8 @@ public abstract class AbstractZooTestCase extends TestCase2 {
 
         } catch (NodeExistsException ex) {
 
-            log.info("/test already exits.");
+            if (log.isInfoEnabled())
+                log.info("/test already exits.");
 
         }
 
@@ -202,9 +229,9 @@ public abstract class AbstractZooTestCase extends TestCase2 {
             if (log.isInfoEnabled())
                 log.info(getName());
 
-            if (zookeeper != null) {
+            if (zookeeperAccessor != null) {
 
-                zookeeper.close();
+                zookeeperAccessor.close();
 
             }
 
@@ -225,6 +252,203 @@ public abstract class AbstractZooTestCase extends TestCase2 {
         } catch (Throwable t) {
 
             log.error(t, t);
+
+        }
+        
+    }
+    
+    /**
+     * Return a new {@link Zookeeper} instance that is connected to the same
+     * zookeeper ensemble but which has a distinct session.
+     * 
+     * @return
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    protected ZooKeeper getDistinctZooKeeperWithDistinctSession()
+            throws IOException, InterruptedException {
+
+        final ZooKeeper zookeeper2 = new ZooKeeper(zookeeperAccessor.hosts,
+                zookeeperAccessor.sessionTimeout, new Watcher() {
+                    public void process(WatchedEvent e) {
+
+                    }
+                });
+        
+        /*
+         * Wait until this instance is connected.
+         */
+        final long timeout = TimeUnit.MILLISECONDS.toNanos(1000/* ms */);
+
+        final long begin = System.nanoTime();
+
+        while (zookeeper2.getState() != ZooKeeper.States.CONNECTED
+                && zookeeper2.getState().isAlive()) {
+
+            final long elapsed = System.nanoTime() - begin;
+
+            if (elapsed > timeout) {
+
+                fail("ZooKeeper session did not connect? elapsed="
+                        + TimeUnit.NANOSECONDS.toMillis(elapsed));
+
+            }
+
+            if (log.isInfoEnabled()) {
+
+                log.info("Awaiting connected.");
+
+            }
+
+            Thread.sleep(100/* ms */);
+
+        }
+
+        if (!zookeeper2.getState().isAlive()) {
+
+            fail("Zookeeper died?");
+
+        }
+
+        if(log.isInfoEnabled())
+            log.info("Zookeeper connected.");
+        
+        return zookeeper2;
+
+    }
+    
+    /**
+     * Return a new {@link ZooKeeper} instance that is connected to the same
+     * zookeeper ensemble as the given instance and is using the same session
+     * but is nevertheless a distinct instance.
+     * <p>
+     * Note: This is used by some unit tests to force the given
+     * {@link ZooKeeper} to report a {@link SessionExpiredException} by closing
+     * the returned instance.
+     * 
+     * @param zookeeper
+     *            A zookeeper instance.
+     * 
+     * @return A distinct instance associated with the same session.
+     * 
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    protected ZooKeeper getDistinctZooKeeperForSameSession(ZooKeeper zookeeper1)
+            throws IOException, InterruptedException {
+
+        final ZooKeeper zookeeper2 = new ZooKeeper(zookeeperAccessor.hosts,
+                zookeeperAccessor.sessionTimeout, new Watcher() {
+                    public void process(WatchedEvent e) {
+
+                    }
+                }, zookeeper1.getSessionId(), zookeeper1.getSessionPasswd());
+        
+        /*
+         * Wait until this instance is connected.
+         */
+        final long timeout = TimeUnit.MILLISECONDS.toNanos(1000/* ms */);
+
+        final long begin = System.nanoTime();
+
+        while (zookeeper2.getState() != ZooKeeper.States.CONNECTED
+                && zookeeper2.getState().isAlive()) {
+
+            final long elapsed = System.nanoTime() - begin;
+
+            if (elapsed > timeout) {
+
+                fail("ZooKeeper session did not connect? elapsed="
+                        + TimeUnit.NANOSECONDS.toMillis(elapsed));
+
+            }
+
+            if (log.isInfoEnabled()) {
+
+                log.info("Awaiting connected.");
+
+            }
+
+            Thread.sleep(100/* ms */);
+
+        }
+
+        if (!zookeeper2.getState().isAlive()) {
+
+            fail("Zookeeper died?");
+
+        }
+
+        if(log.isInfoEnabled())
+            log.info("Zookeeper connected.");
+        
+        return zookeeper2;
+
+    }
+
+    /**
+     * Expires the session associated with the {@link Zookeeper} client
+     * instance.
+     * 
+     * @param zookeeper
+     * 
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    protected void expireSession(ZooKeeper zookeeper) throws IOException,
+            InterruptedException {
+
+        /*
+         * Obtain a distinct ZooKeeper instance associated with the _same_
+         * session.
+         */
+        final ZooKeeper zookeeper2 = getDistinctZooKeeperForSameSession(zookeeper);
+
+        /*
+         * Close this instance, forcing the original instance to report a
+         * SessionExpiredException. Note that this is not synchronous so we need
+         * to wait until the original ZooKeeper instance notices that its
+         * session is expired.
+         */
+        zookeeper2.close();
+        
+        /*
+         * Wait up to the session timeout and then wait some more so that the
+         * events triggered by that timeout have time to propagate.
+         */
+        final long timeout = TimeUnit.MILLISECONDS.toNanos(sessionTimeout * 2);
+
+        final long begin = System.nanoTime();
+
+        while (zookeeper.getState().isAlive()) {
+
+            final long elapsed = System.nanoTime() - begin;
+
+            if (elapsed > timeout) {
+
+                fail("ZooKeeper session did not expire? elapsed="
+                        + TimeUnit.NANOSECONDS.toMillis(elapsed)
+                        + ", sessionTimeout=" + sessionTimeout);
+
+            }
+
+            if(log.isInfoEnabled()) {
+                
+                log.info("Awaiting session expired.");
+                
+            }
+            
+            Thread.sleep(500/* ms */);
+
+        }
+
+        if (log.isInfoEnabled()) {
+
+            final long elapsed = System.nanoTime() - begin;
+
+            log.info("Session was expired: elapsed="
+                    + TimeUnit.NANOSECONDS.toMillis(elapsed)
+                    + ", sessionTimeout=" + sessionTimeout);
 
         }
         
@@ -311,7 +535,8 @@ public abstract class AbstractZooTestCase extends TestCase2 {
 
         }
 
-        log.info("Removing: " + f);
+        if(log.isInfoEnabled())
+            log.info("Removing: " + f);
 
         if (f.exists() && !f.delete()) {
 
@@ -329,8 +554,8 @@ public abstract class AbstractZooTestCase extends TestCase2 {
      * @throws KeeperException
      * @throws InterruptedException
      */
-    protected void destroyZNodes(final String zpath) throws KeeperException,
-            InterruptedException {
+    protected void destroyZNodes(final ZooKeeper zookeeper, final String zpath)
+            throws KeeperException, InterruptedException {
 
         // System.err.println("enter : " + zpath);
 
@@ -338,11 +563,12 @@ public abstract class AbstractZooTestCase extends TestCase2 {
 
         for (String child : children) {
 
-            destroyZNodes(zpath + "/" + child);
+            destroyZNodes(zookeeper, zpath + "/" + child);
 
         }
 
-        log.info("delete: " + zpath);
+        if(log.isInfoEnabled())
+            log.info("delete: " + zpath);
 
         zookeeper.delete(zpath, -1/* version */);
 

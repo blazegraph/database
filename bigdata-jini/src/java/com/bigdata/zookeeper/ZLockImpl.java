@@ -63,6 +63,26 @@ import org.apache.zookeeper.data.ACL;
  * will also be lost if the {@link ZooKeeper} client is timed out by the
  * zookeeper server ensemble. You can use {@link #isLockHeld()} to determine if
  * the {@link ZLock} has been broken asynchronously.
+ * <p>
+ * This class handles the {@link SessionExpiredException} by noting that the
+ * {@link ZooKeeper} client's lock (if it held one) has been lost since their
+ * ephemeral znode will have been destroyed by the zookeeper ensemble. The
+ * application MUST acquire a new {@link ZLockImpl} instance if they wish to
+ * contend for the lock again. A {@link SessionExpiredException} will be thrown
+ * from {@link #lock()} or {@link #lock(long, TimeUnit)} if the session expired
+ * while contending for the lock.
+ * <p>
+ * Since the zlock MAY be lost asynchronously (due to an expired session or even
+ * someone stomping on the lock), the application SHOULD test the lock using
+ * periodically using {@link #isLockHeld()}. {@link #isLockHeld()} will throw a
+ * {@link SessionExpiredException} if the session associated with the
+ * {@link ZooKeeper} instance is expired. Otherwise it reports <code>true</code>
+ * if the lock is still held and <code>false</code> if the lock was lost to
+ * some other cause, e.g. {@link #unlock()} or someone stomping on the lock. The
+ * application SHOULD handle an expired session using its own semantics for the
+ * operation for which it obtained the lock and MAY choose to obtain a new
+ * {@link ZLockImpl} using a new {@link ZooKeeper} client and its associated
+ * session and contend for the zlock again.
  * 
  * @see #getLock(ZooKeeper, String, List)
  * 
@@ -102,18 +122,18 @@ public class ZLockImpl implements ZLock {
      * synchronous lock.
      * 
      * @param zookeeper
-     *            The zookeeper client.
+     *            The {@link Zookeeper} client instance that will be used to
+     *            request the lock.
      * @param zpath
      *            The path identifying the lock node.
      * @param acl
      *            The ACL to be used.
      * 
-     * @return
+     * @return A {@link ZLockImpl} which may be used to request a global
+     *         synchronous lock.
      * 
-     * @throws KeeperException
-     * @throws InterruptedException
-     * @throws ZLockNodeInvalidatedException
-     *             if the lock node has been invalidated but not yet destroyed.
+     * @throws IllegalArgumentException
+     *             if any argument is <code>null</code>.
      */
     public static ZLockImpl getLock(final ZooKeeper zookeeper,
             final String zpath, final List<ACL> acl) {
@@ -122,8 +142,11 @@ public class ZLockImpl implements ZLock {
 
     }
 
+    /**
+     * The {@link ZooKeeper} instance that will be used to request the lock.
+     */
     final protected ZooKeeper zookeeper;
-
+      
     /**
      * The zpath of the lock node (the parent node whose ephemeral sequential
      * children represent the queue of processes contending for the lock).
@@ -168,14 +191,21 @@ public class ZLockImpl implements ZLock {
     }
 
     /**
+     * The ctor merely validates the arguments. No action is taken until the
+     * lock is requested.
      * 
      * @param zookeeper
+     *            The {@link ZooKeeper} client instance that will be used to
+     *            request the lock.
      * @param zpath
      *            The zpath of the lock node.
      * @param acl
+     * 
+     * @throws IllegalArgumentException
+     *             if any argument is <code>null</code>.
      */
-    protected ZLockImpl(final ZooKeeper zookeeper, final String zpath,
-            final List<ACL> acl) {
+    protected ZLockImpl(final ZooKeeper zookeeper,
+            final String zpath, final List<ACL> acl) {
 
         if (zookeeper == null)
             throw new IllegalArgumentException();
@@ -201,8 +231,8 @@ public class ZLockImpl implements ZLock {
      * @throws InterruptedException
      * @throws KeeperException
      */
-    private void validateLockNode() throws InterruptedException,
-            KeeperException {
+    private void validateLockNode()
+            throws InterruptedException, KeeperException {
 
         if (zookeeper.exists(zpath + INVALID, false) != null) {
 
@@ -287,10 +317,24 @@ public class ZLockImpl implements ZLock {
         private volatile boolean knownDeleted = false;
 
         /**
-         * Set to true anytime we are disconnected from the zookeeper ensemble.
+         * Set to <code>true</code> anytime we are disconnected from the
+         * zookeeper ensemble. Disconnects are transient. The {@link ZooKeeper}
+         * client can either become reconnected or can transition to an
+         * {@link #expired} state, which is absorbing.
          */
         private volatile boolean disconnected = false;
 
+        /**
+         * Set to <code>true</code> iff the session for the {@link ZooKeeper}
+         * client is expired. This is an absorbing state. An expired session
+         * will never become reconnected. {@link #expired} implies
+         * {@link #disconnected}, {@link #cancelled}, and
+         * {@link #knownDeleted} (since the EPHEMERAL znode for the lock request
+         * will have been destroyed by the zookeeper ensemble when the client's
+         * session is expired.)
+         */
+        private volatile boolean expired = false;
+        
 //        /**
 //         * The lock count is incremented when the lock is acquired and
 //         * decremented when it is released. It is local to the watcher since it
@@ -311,6 +355,7 @@ public class ZLockImpl implements ZLock {
             sb.append("{ zpath=" + zpath);
             sb.append(", conditionSatisified=" + zlockGranted);
             sb.append(", disconnected=" + disconnected);
+            sb.append(", expired=" + expired);
             sb.append(", knownDeleted=" + knownDeleted);
             sb.append(", cancelled=" + cancelled);
 //            sb.append(", lockCount=" + lockCount);
@@ -326,7 +371,7 @@ public class ZLockImpl implements ZLock {
 
             if (zchild == null)
                 throw new IllegalArgumentException();
-
+            
             this.zchild = zchild;
 
         }
@@ -338,6 +383,14 @@ public class ZLockImpl implements ZLock {
 
             switch (event.getState()) {
             
+            case Expired: {
+                expired = true;
+                disconnected = true;
+                knownDeleted = true;
+                cancelled = true;
+                log.error("Session expired: "+event);
+                return;
+            }
             case Disconnected: {
                 /*
                  * There is nothing to do until we are reconnected.
@@ -501,9 +554,14 @@ public class ZLockImpl implements ZLock {
          * 
          * @throws TimeoutException
          * @throws InterruptedException
+         * @throws SessionExpiredException
+         *             if the zookeeper session was expired while waiting for
+         *             the zlock. This is a non-recoverable error for the
+         *             {@link ZooKeeper} client, but it can be handled at the
+         *             application layer in a number of ways.
          */
         protected boolean awaitZLockNanos(long nanos)
-                throws InterruptedException {
+                throws InterruptedException, SessionExpiredException {
 
             final long begin = System.nanoTime();
 
@@ -534,7 +592,20 @@ public class ZLockImpl implements ZLock {
                             break;
                         
                         }
-                        
+                    
+                    } catch (SessionExpiredException ex) {
+
+                        /*
+                         * This is a non-recoverable exception for the the lock
+                         * request. Since the session was expired, the EPHEMERAL
+                         * znode was deleted by the zookeeper ensemble and it is
+                         * NOT possible for the caller to gain the lock without
+                         * obtaining a new ZooKeeper instance and placing a new
+                         * EPHEMERAL znode into the queue for the lock.
+                         */
+
+                        throw ex;
+
                     } catch (KeeperException ex) {
 
                         log.warn(this, ex);
@@ -547,9 +618,9 @@ public class ZLockImpl implements ZLock {
                          * made their request or where a node does not yet
                          * exist, etc.
                          */
-
+                        
                     }
-
+                    
                     /*
                      * Note: awaitNanos() can return spuriously so we have a
                      * separate [zlockGranted] field that is set IFF the zlock
@@ -787,7 +858,9 @@ public class ZLockImpl implements ZLock {
      * As an optimization, we do not test zookeeper if we have already been
      * informed that the {@link ZLock} has been lost.
      * 
-     * @throws KeeperException 
+     * @throws KeeperException
+     * @throws SessionExpiredException
+     *             IFF the lock was lost because the zookeeper session expired.
      */
     public boolean isLockHeld() throws InterruptedException, KeeperException {
 
@@ -797,7 +870,15 @@ public class ZLockImpl implements ZLock {
         lock.lockInterruptibly(); 
         try {
 
-            if (watcher == null || !watcher.zlockGranted || watcher.cancelled) {
+            if (watcher != null && watcher.expired) {
+
+                log.error("Caller's ZooKeeper session has expired.");
+
+                throw new SessionExpiredException();
+                
+            }
+            
+            if (watcher == null|| !watcher.zlockGranted || watcher.cancelled) {
 
                 if(INFO)
                     log.info("Caller does not hold lock.");
@@ -852,14 +933,6 @@ public class ZLockImpl implements ZLock {
 
     }
 
-    /**
-     * Creates a new lock request (an EPHEMERAL SEQUENTIAL znode that is a child
-     * of the lock node) and awaits up to the timeout for the {@link ZLock} to
-     * be granted.
-     * 
-     * @param timeout
-     * @parma unit
-     */
     public void lock(final long timeout, final TimeUnit unit)
             throws KeeperException, InterruptedException, TimeoutException {
 
@@ -891,7 +964,8 @@ public class ZLockImpl implements ZLock {
              * Ensure that the lock node exists.
              * 
              * Note: Throws an InterruptedException if the lock node has been
-             * invalidated.
+             * invalidated.  Throws SessionExpiredException if the ZooKeeper
+             * client is associated with an expired session.
              */
             validateLockNode();
 
@@ -936,7 +1010,7 @@ public class ZLockImpl implements ZLock {
                             + zchild);
 
                 return;
-
+                
             } catch (Throwable t) {
 
                 /*
@@ -948,6 +1022,10 @@ public class ZLockImpl implements ZLock {
 
                     if (!watcher.knownDeleted) {
 
+                        /*
+                         * Note: If timeout on getZooKeeper() then warning is
+                         * logged.
+                         */
                         zookeeper
                                 .delete(zpath + "/" + zchild, -1/* version */);
 
@@ -1013,14 +1091,22 @@ public class ZLockImpl implements ZLock {
 //
 //                throw new AssertionError("Lock counter is zero:" + toString());
 //
-//            }
+            // }
 
-            if (watcher.cancelled) {
+            if (watcher.expired) {
+
+                log
+                        .warn("Lock has been asynchronously cancelled (session expired)");
+
+                // nothing left to do.
+                return;
+                
+            } else if (watcher.cancelled) {
 
                 log.warn("Lock has been asynchronously cancelled.");
-                
+
             }
-            
+
 //            // decrement the lock counter.
 //            watcher.lockCount--;
 //
@@ -1082,11 +1168,16 @@ public class ZLockImpl implements ZLock {
             } catch (SessionExpiredException ex) {
 
                 /*
-                 * See notes on ConnectionLossException below.
+                 * In this case we KNOW that the znode was deleted by the
+                 * zookeeper ensemble since it deletes all ephemeral znodes for
+                 * a client when before when it decides that the session for
+                 * that client has expired.
                  */
 
-                log.warn("Not connected: zpath=" + zpath + ", child=" + zchild
-                        + " : " + ex);
+                log.warn("Session expired: zpath=" + zpath + ", child="
+                        + zchild + " : " + ex);
+
+                watcher.knownDeleted = true;
 
             } catch (ConnectionLossException ex) {
 
@@ -1119,7 +1210,7 @@ public class ZLockImpl implements ZLock {
      * children from being added to the queue and then deletes all children in
      * the queue in reverse lexical order so as to not trigger cascades of
      * watchers and finally deletes the lock node itself and then the marker
-     * node.
+     * node. If we get a {@link SessionExpiredException} then we abort.
      */
     public void destroyLock() throws KeeperException, InterruptedException {
 
@@ -1129,62 +1220,203 @@ public class ZLockImpl implements ZLock {
             if (!isLockHeld())
                 throw new IllegalStateException("Lock not held.");
 
-            /*
-             * Create a marker prevent any new child from entering the queue for
-             * the lock node. This agreement is necessary in order for us to
-             * have a guarentee that the queue will be empty when we try to
-             * delete the lock node. Without this protocol any concurrent
-             * request for the lock could cause the queue to be non-empty when
-             * our delete request for the lock node is processed by zookeeper.
-             * 
-             * Note: The marker CAN NOT be a child since we can't make that
-             * atomic. We could locate it somewhere completely different in the
-             * tree, but it is easy enough to make it a sibling
-             * 
-             * locknode_INVALID
-             * 
-             * The marker is ephemeral in case this process dies while trying to
-             * destroy the queue.
-             */
-            zookeeper.create(zpath + INVALID, new byte[0], acl,
-                    CreateMode.EPHEMERAL);
+            // true once created and until deleted or session is expired.
+            boolean markerZNodeExists = false;
+            try {
 
-            List<String> children;
+                /*
+                 * Create a marker prevent any new child from entering the queue for
+                 * the lock node. This agreement is necessary in order for us to
+                 * have a guarentee that the queue will be empty when we try to
+                 * delete the lock node. Without this protocol any concurrent
+                 * request for the lock could cause the queue to be non-empty when
+                 * our delete request for the lock node is processed by zookeeper.
+                 * 
+                 * Note: The marker CAN NOT be a child since we can't make that
+                 * atomic. We could locate it somewhere completely different in the
+                 * tree, but it is easy enough to make it a sibling
+                 * 
+                 * locknode_INVALID
+                 * 
+                 * The marker is ephemeral in case this process dies while trying to
+                 * destroy the queue.
+                 */
 
-            // until empty.
-            while (!(children = zookeeper.getChildren(zpath, false)).isEmpty()) {
+                zookeeper.create(zpath + INVALID, new byte[0], acl,
+                        CreateMode.EPHEMERAL);
+                
+                markerZNodeExists = true;
 
-                final String[] a = children.toArray(new String[] {});
+                boolean queueEmpty = false;
 
-                // sort
-                Arrays.sort(a);
-
-                // process in reverse order to avoid cascades of watchers.
-                for (int i = a.length - 1; i >= 0; i--) {
-
-                    final String child = a[i];
+                while (!queueEmpty) {
 
                     try {
-                        zookeeper.delete(zpath + "/" + child, -1/* version */);
-                    } catch (NoNodeException ex) {
-                        // ignore - child is already gone.
+                        
+                        final List<String> children = zookeeper.getChildren(
+                                zpath, false);
+
+                        queueEmpty = children.isEmpty();
+
+                        if (queueEmpty)
+                            break;
+
+                        final String[] a = children.toArray(new String[] {});
+
+                        // sort
+                        Arrays.sort(a);
+
+                        /*
+                         * process in reverse order to avoid cascades of
+                         * watchers.
+                         */
+                        for (int i = a.length - 1; i >= 0; i--) {
+
+                            final String child = a[i];
+
+                            try {
+                                zookeeper
+                                        .delete(zpath + "/" + child, -1/* version */);
+                            } catch (NoNodeException ex) {
+                                // ignore - child is already gone.
+                            }
+
+                        }
+                        
+                    } catch (ConnectionLossException ex) {
+
+                        /*
+                         * Retry until re-connected or lost connection turns
+                         * into an expired session.
+                         */
+                        
+                        // sleep a bit to avoid a tight loop.
+                        Thread.sleep(100/* ms */);
+
+                        continue;
+                        
                     }
 
                 }
 
+                while (true) {
+                    try {
+                        // delete the lock node.
+                        zookeeper.delete(zpath, -1/* version */);
+                        break;
+                    } catch (NoNodeException ex) {
+                        // ignore - znode is already gone.
+                        break;
+                    } catch (ConnectionLossException ex) {
+                        /*
+                         * Retry until re-connected or lost connection turns
+                         * into an expired session.
+                         */
+                        // sleep a bit to avoid a tight loop.
+                        Thread.sleep(100/* ms */);
+                        continue;
+                    }
+                }
+
+            } finally {
+
+                while (markerZNodeExists) {
+
+                    try {
+                        /*
+                         * Delete the marker node that was used to invalidate
+                         * the lock node.
+                         */
+                        zookeeper.delete(zpath + INVALID, -1/* version */);
+
+                        // gone.
+                        markerZNodeExists = false;
+
+                    } catch(NoNodeException ex) {
+
+                        /*
+                         * A prior delete request could have succeeded even
+                         * though we got an exception such as ConnectionLoss.
+                         */
+
+                        // gone.
+                        markerZNodeExists = false;
+
+                    } catch (SessionExpiredException ex) {
+
+                        /*
+                         * The marker znode is ephemeral so it the session was
+                         * expired then we know that it has been deleted.
+                         */
+                        
+                        // gone.
+                        markerZNodeExists = false;
+
+                        log.error("While trying to delete marker znode: "
+                                + this, ex);
+
+                    } catch (ConnectionLossException ex) {
+
+                        /*
+                         * Note: Retry until a ConnectionLoss turns into a
+                         * SessionExpired, until something else gets thrown, or
+                         * until it succeeds.
+                         */
+
+                        log.warn(
+                                "While trying to delete marker znode: " + this,
+                                ex);
+
+                        try {
+                            // Wait a smidge to avoid a tight loop.
+                            Thread.sleep(100/* ms */);
+                        } catch (InterruptedException t) {
+                            /*
+                             * Note: can throw InterruptedException, in which
+                             * case the marker znode will not get deleted.
+                             */
+                            log.error("Giving up: will not delete marker znode"
+                                    + this, t);
+                            break;
+                        }
+
+                        continue;
+
+                    } catch (Throwable t) {
+
+                        log.error("Giving up: will not delete marker znode"
+                                + this, t);
+                        
+                    }
+
+                }
+                
             }
-
-            // delete the lock node.
-            zookeeper.delete(zpath, -1/* version */);
-
-            // delete the marker node that was used to invalidate the lock node.
-            zookeeper.delete(zpath + INVALID, -1/* version */);
-
+            
         } finally {
 
             lock.unlock();
 
         }
+
+    }
+
+    /**
+     * Returns the ordered queue.
+     * @return
+     * @throws KeeperException
+     * @throws InterruptedException
+     */
+    public String[] getQueue() throws KeeperException, InterruptedException {
+
+        final List<String> children = zookeeper.getChildren(zpath, false);
+
+        final String[] a = children.toArray(new String[] {});
+
+        // sort
+        Arrays.sort(a);
+
+        return a;
 
     }
 
