@@ -145,8 +145,17 @@ public class ZLockImpl implements ZLock {
     /**
      * The {@link ZooKeeper} instance that will be used to request the lock.
      */
-    final protected ZooKeeper zookeeper;
-      
+    final private ZooKeeper zookeeper;
+    
+    /**
+     * The {@link ZooKeeper} instance specified to the ctor.
+     */
+    public ZooKeeper getZooKeeper() {
+        
+        return zookeeper;
+        
+    }
+    
     /**
      * The zpath of the lock node (the parent node whose ephemeral sequential
      * children represent the queue of processes contending for the lock).

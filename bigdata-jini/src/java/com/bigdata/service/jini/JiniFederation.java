@@ -139,10 +139,16 @@ public class JiniFederation extends AbstractDistributedFederation implements
     
     /**
      * Return a {@link ZooKeeper} client.
+     * <p>
+     * Note: This is a shorthand for obtaining a valid {@link ZooKeeper} client
+     * from the {@link ZooKeeperAccessor}. If the session associated with the
+     * current {@link ZooKeeper} client is expired, then a distinct
+     * {@link ZooKeeper} client associated with a distinct session will be
+     * returned. See {@link #getZookeeperAccessor()} which lets you explictly
+     * handle a {@link SessionExpiredException} or the {@link ZooKeeper}
+     * {@link ZooKeeper.States#CLOSED} state.
      * 
-     * @deprecated by {@link #getZookeeperAccessor()} which lets you handle a
-     *             {@link SessionExpiredException} or the zookeeper
-     *             {@link ZooKeeper.States#CLOSED} state.
+     * @see #getZookeeperAccessor()
      */
     public ZooKeeper getZookeeper() {
 
