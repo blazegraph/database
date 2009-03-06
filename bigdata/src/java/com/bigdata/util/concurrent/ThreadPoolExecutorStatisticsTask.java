@@ -135,12 +135,27 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
         @Override
         protected void sample() {
 
-            setValue( averageQueueLength );
+            setValue(averageQueueLength);
+
+        }
+
+    };
+
+    /**
+     * The #of tasks waiting to execute on the internal lock on the
+     * {@link WriteExecutorService}.
+     */
+    public final Instrument<Double> averageReadyCountInst = new Instrument<Double>() {
+
+        @Override
+        protected void sample() {
+
+            setValue(averageReadyCount);
             
         }
         
     };
-    
+
     /**
      * Data collected about {@link AbstractTask}s run on a service (optional).
      */
@@ -177,6 +192,8 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
 
     private long commitWaitingTime = 0L;
     private long commitServiceTime = 0L;
+    
+    private double averageReadyCount;
 
     /**
      * Moving average in milliseconds of the time a task waits on a queue
@@ -922,6 +939,10 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
                 counterSet.addCounter(
                         IWriteServiceExecutorCounters.AverageActiveCountWithLocksHeld,
                         averageActiveCountWithLocksHeldInst);
+
+                counterSet.addCounter(
+                        IWriteServiceExecutorCounters.AverageReadyCount,
+                        averageReadyCountInst);
 
                 counterSet.addCounter(IWriteServiceExecutorCounters.AverageCommitGroupSize,
                         averageCommitGroupSizeInst);

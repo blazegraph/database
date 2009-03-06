@@ -124,11 +124,11 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
          * {@link DataService}s in the federation will be made to undergo
          * asynchronous overflow processing and the live journals will be
          * truncated so that the total size on disk of the federation is at its
-         * minimum footprint for the given history retention policy. The master
-         * will block during this operation so you can readily tell when it is
-         * finished. Note that this option only makes sense in benchmark
-         * environments where you can contol the total system otherwise
-         * asynchronous writes may continue.
+         * minimum footprint for the given history retention policy (default
+         * <code>false</code>). The master will block during this operation
+         * so you can readily tell when it is finished. Note that this option
+         * only makes sense in benchmark environments where you can contol the
+         * total system otherwise asynchronous writes may continue.
          * 
          * @see AbstractScaleOutFederation#forceOverflow(boolean)
          */
@@ -350,13 +350,15 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
              */
             
             forceOverflow = (Boolean) config.getEntry(component,
-                    ConfigurationOptions.FORCE_OVERFLOW, Boolean.TYPE);
+                    ConfigurationOptions.FORCE_OVERFLOW, Boolean.TYPE,
+                    Boolean.FALSE);
 
             indexDumpDir = (File) config.getEntry(component,
                     ConfigurationOptions.INDEX_DUMP_DIR, File.class, null);
 
             indexDumpNamespace = (String) config.getEntry(component,
-                    ConfigurationOptions.INDEX_DUMP_NAMESPACE, String.class);
+                    ConfigurationOptions.INDEX_DUMP_NAMESPACE, String.class,
+                    null);
 
         }
 

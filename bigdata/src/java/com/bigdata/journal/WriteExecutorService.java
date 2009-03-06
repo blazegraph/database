@@ -49,7 +49,6 @@ import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.concurrent.NonBlockingLockManager;
 import com.bigdata.concurrent.NonBlockingLockManagerWithNewDesign;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.OverflowManager;
@@ -326,6 +325,15 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     final private AtomicInteger nrunning = new AtomicInteger(0);
 
     /**
+     * #of tasks that are waiting to run but are blocked on the #lock. This
+     * value represents the #of tasks which have been starved from concurrent
+     * execution. The main culprit for a high value here is group commit and the
+     * occasional synchronous overflow or purge resources (when someone has an
+     * exclusive lock on the write service).
+     */
+    final private AtomicInteger nready = new AtomicInteger(0);
+
+    /**
      * The threads that are running our tasks (so that we can interrupt them
      * if necessary).
      */
@@ -419,6 +427,19 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         
     }
 
+    /**
+     * The #of threads queued on the internal {@link #lock}. These are (for the
+     * most part) threads waiting to start or stop during a group commit.
+     * However, you can not use this measure to infer whether there are threads
+     * waiting to run which are being starved during a group commit or simply
+     * threads waiting to do their post-processing.
+     */
+    public int getInternalLockQueueLength() {
+
+        return lock.getQueueLength();
+        
+    }
+    
     /**
      * The #of tasks in the most recent commit group. In order to be useful
      * information this must be sampled and turned into a moving average.
@@ -662,9 +683,13 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
         if (r == null)
             throw new NullPointerException();
-        
-        lock.lock();
 
+        nready.incrementAndGet();
+        try {
+            lock.lock();
+        } finally {
+            nready.decrementAndGet();
+        }
         try {
         
             // Increment the #of running tasks.
@@ -998,7 +1023,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * method. If there are concurrent writers running, then the {@link Thread}
      * executing the {@link #groupCommit()} will wait a bit for them to complete
      * and join the commit group. Otherwise it will immediately start the commit
-     * with itself as the role member of the commit group.
+     * with itself as the sole member of the commit group.
      * <p>
      * After the commit and while this {@link Thread} still holds the lock, it
      * invokes {@link #overflow()} which will decide whether or not to do
@@ -1592,6 +1617,10 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 //             */
 //            log.info("active="+active.entrySet());
             
+            /*
+             * Note: This returns a Future. We could use that to cancel
+             * asynchronous overflow processing if there were a reason to do so.
+             */
             resourceManager.overflow();
         
             noverflow++;
