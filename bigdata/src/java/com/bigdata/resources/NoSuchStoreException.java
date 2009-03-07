@@ -36,6 +36,12 @@ public class NoSuchStoreException extends RuntimeException {
      */
     private static final long serialVersionUID = -4200720776469568430L;
 
+    public NoSuchStoreException(String msg, Throwable cause) {
+
+        super(msg, cause);
+        
+    }
+
     public NoSuchStoreException(String msg) {
         
         super(msg);

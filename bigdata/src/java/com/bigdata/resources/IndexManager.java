@@ -1105,11 +1105,13 @@ abstract public class IndexManager extends StoreManager {
                      * (a ManagedJournal or IndexSegment) that is no longer
                      * available.
                      */
-                    
-                    throw new RuntimeException("Could not load index: name="
-                            + name + ", timestamp=" + timestamp + ", resource="
-                            + resource.getFile() + ", pmd=" + pmd + " : " + ex,
-                            ex);
+                    // add some more information to the error message.
+                    throw new NoSuchStoreException(
+                            "Could not load index: name=" + name
+                                    + ", timestamp=" + timestamp
+                                    + ", storeUUID=" + resource.getUUID()
+                                    + ", storeFile=" + resource.getFile()
+                                    + ", pmd=" + pmd + " : " + ex, ex);
                     
                 }
 
