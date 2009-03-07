@@ -698,26 +698,24 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             throw new NullPointerException();
 
         nready.incrementAndGet();
-        try {
-            lock.lock();
-        } finally {
-            nready.decrementAndGet();
-        }
+        
+        lock.lock();
+        
         try {
         
             // Increment the #of running tasks.
             final int nrunning = this.nrunning.incrementAndGet();
 
             // Update max# of tasks concurrently running.
-            maxRunning = (nrunning>maxRunning?nrunning:maxRunning);
+            maxRunning = (nrunning > maxRunning ? nrunning : maxRunning);
 
             // Update max# of threads in the thread pool.
             final int poolSize = getPoolSize();
-            
-            maxPoolSize = (poolSize>maxPoolSize?poolSize:maxPoolSize);
+
+            maxPoolSize = (poolSize > maxPoolSize ? poolSize : maxPoolSize);
             
             // Note the thread running the task.
-            active.put(t,r);
+            active.put(t, r);
         
             if (trackActiveSetInMDC) {
 
@@ -741,6 +739,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         } finally {
             
             lock.unlock();
+            
+            nready.decrementAndGet();
             
         }
     
