@@ -159,26 +159,13 @@ class ViewMetadata extends BTreeMetadata {
         }
 
         /*
-         * Handler decides when and where to split an index partition.
-         * 
-         * Note: This is deferred since it requires RMI to the metadata service.
-         * Even though that RMI is heavily cached it still makes sense to do
-         * this outside of synchronous overflow.
-         */
-        this.adjustedSplitHandler = getSplitHandler();
-
-        /*
-         * range count for the view (fast, but slower when an index segment is
-         * used by more than one index since the partition bounds are a subset
-         * of the index segment key range).
-         */
-        this.rangeCount = view.rangeCount();
-
-        /*
          * Obtain the #of index partitions for this scale-out index.
          * 
          * Note: This may require RMI, but the metadata index is also heavily
          * cached by the {@link AbstractFederation}.
+         * 
+         * Note: This must be done before we obtain the adjusted split handler
+         * as [npartitions] is an input to that process.
          */
         {
             long npartitions;
@@ -233,6 +220,22 @@ class ViewMetadata extends BTreeMetadata {
             this.npartitions = npartitions;
 
         }
+
+        /*
+         * Handler decides when and where to split an index partition.
+         * 
+         * Note: This is deferred since it requires RMI to the metadata service.
+         * Even though that RMI is heavily cached it still makes sense to do
+         * this outside of synchronous overflow.
+         */
+        this.adjustedSplitHandler = getSplitHandler();
+
+        /*
+         * range count for the view (fast, but slower when an index segment is
+         * used by more than one index since the partition bounds are a subset
+         * of the index segment key range).
+         */
+        this.rangeCount = view.rangeCount();
 
         this.percentOfSplit = adjustedSplitHandler.percentOfSplit(rangeCount);
 
