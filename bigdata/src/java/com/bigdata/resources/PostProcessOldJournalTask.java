@@ -290,9 +290,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 
             }
             
-            // the adjusted split handler.
-            final ISplitHandler splitHandler = vmd.getAdjustedSplitHandler();
-            
             /*
              * Scatter split.
              * 
@@ -305,19 +302,14 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 (vmd.getIndexPartitionCount() == 1L)//
                 // move not in progress
                 && vmd.pmd.getSourcePartitionId() == -1//
+                // enough output index partiions to qualify as "scatter".
+                && (resourceManager.scatterSplitMaxSplits >= 2 || resourceManager.scatterSplitMaxSplits == 0)
                 // trigger scatter split before too much data builds up in one place.
-                && vmd.getPercentOfSplit() >= .5
-                // looks like a split candidate.
-//                && splitHandler.shouldSplit(vmd.getRangeCount())//
+                && vmd.getPercentOfSplit() >= resourceManager.scatterSplitPercentOfSplitThreshold
             ) {
 
                 /*
                  * Do a scatter split task.
-                 * 
-                 * @todo parameterize the trigger conditions and the maximum #of
-                 * data services onto which the index partitions will be
-                 * scattered. Note that when maxCount is ZERO (0) ALL joined
-                 * data services will be reported.
                  * 
                  * @todo For a system which has been up and running for a while
                  * we would be better off using the LBS reported move targets
@@ -326,8 +318,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * services since there is less uncertainity about which
                  * services will be reported.
                  */
-                // Don't divide into more than N index partitions @todo config
-                final int maxScatterSplitFanOut = 40;
                 // Target data services for the new index partitions.
                 final UUID[] moveTargets;
                 {
@@ -335,23 +325,29 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                      * Identify the target data services for the new index
                      * partitions.
                      * 
+                     * Note that when maxCount is ZERO (0) ALL joined data
+                     * services will be reported.
+                     * 
                      * Note: This makes sure that _this_ data service is
                      * included in the array so that we will leave at least one
                      * of the post-split index partitions on this data service.
                      */
 
-                    final UUID[] a = resourceManager.getFederation()
-                            .getDataServiceUUIDs(maxScatterSplitFanOut);
+                    final UUID[] a = resourceManager
+                            .getFederation()
+                            .getDataServiceUUIDs(
+                                    resourceManager.scatterSplitMaxSplits/*maxCount*/);
 
                     final Set<UUID> tmp = new HashSet<UUID>(Arrays.asList(a));
 
                     tmp.add(resourceManager.getDataServiceUUID());
-                    
+
                     moveTargets = tmp.toArray(new UUID[tmp.size()]);
-                    
+
                 }
 
-                final int nsplits = Math.max(maxScatterSplitFanOut,
+                final int nsplits = Math.max(
+                        resourceManager.scatterSplitMaxSplits,
                         moveTargets.length);
 
                 overflowMetadata.setAction(vmd.name, OverflowActionEnum.Split);
