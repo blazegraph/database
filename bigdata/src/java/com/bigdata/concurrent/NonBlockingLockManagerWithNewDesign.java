@@ -456,6 +456,18 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
             }
         });
 
+        /*
+         * #of tasks that are executing and are holding their locks (in run()
+         * with locks not yet released, moving average).
+         */
+        root.addCounter("averageRunningWithLocksHeldCount",
+                new Instrument<Double>() {
+                    public void sample() {
+                        setValue(statisticsTask.nrunningWithLocksHeldAverageTask
+                                .getMovingAverage());
+                    }
+        });
+
         // the maximum observed value for [nrunning].
         root.addCounter("maxRunning", new Instrument<Integer>() {
             public void sample() {
@@ -604,6 +616,12 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
          * #of tasks are currently executing (in {@link LockFutureTask#run()}).
          */
         public int nrunning;
+
+        /**
+         * #of tasks are currently executing (in {@link LockFutureTask#run()})
+         * AND are holding their locks.
+         */
+        public int nrunningWithLocksHeld;
 
         /**
          * The maximum observed value of {@link #nrunning}.
@@ -1452,6 +1470,12 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
 
                     final boolean waiting = !oldval.isRunning();
 
+                    if(oldval.isRunning()) {
+                        
+                        lockService.counters.nrunningWithLocksHeld--;
+                        
+                    }
+                    
                     lockService.releaseLocksForTask(this, waiting);
 
                 }
@@ -1846,6 +1870,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
                     setTaskRunState(TaskRunState.RunningWithLocks);
                     lockService.counters.nready--;
                     lockService.counters.nrunning++;
+                    lockService.counters.nrunningWithLocksHeld++;
                     if (lockService.counters.nrunning > lockService.counters.maxRunning) {
                         lockService.counters.maxRunning = lockService.counters.nrunning;
                     }
@@ -2559,6 +2584,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
                 ", averageWaiting=" + ((int)(10*statisticsTask.nwaitingAverageTask.getMovingAverage())/10d)+ //
                 ", averageReady=" + ((int)(10*statisticsTask.nreadyAverageTask.getMovingAverage())/10d)+ //
                 ", averageRunning=" + ((int)(10*statisticsTask.nrunningAverageTask.getMovingAverage())/10d)+ //
+                ", averageRunningWithLocksHeld=" + ((int)(10*statisticsTask.nrunningWithLocksHeldAverageTask.getMovingAverage())/10d)+ //
                 ", #maxrunning=" + counters.maxRunning + //
 //                (waitsFor != null ? ", vertices=" + waitsFor.size() : "") + //
                 "}";
@@ -2731,6 +2757,13 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
                     }
                 });
 
+        final MovingAverageTask nrunningWithLocksHeldAverageTask = new MovingAverageTask(
+                "nrunningWithLocksHeld", new Callable<Integer>() {
+                    public Integer call() {
+                        return counters.nrunningWithLocksHeld;
+                    }
+                });
+
         /**
          * Used to stuff the datum to be incorporated into the average into
          * {@link #nqueueBusyAverageTask}.  This is set by {@link #run()}
@@ -2772,6 +2805,8 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
             nreadyAverageTask.run();
             
             nrunningAverageTask.run();
+            
+            nrunningWithLocksHeldAverageTask.run();
             
             int nbusy = 0;
             
