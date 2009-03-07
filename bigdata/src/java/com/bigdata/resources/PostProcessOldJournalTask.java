@@ -326,8 +326,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * services since there is less uncertainity about which
                  * services will be reported.
                  */
-                // Don't divide into more than 20 index partitions @todo config
-                final int maxScatterSplitFanOut = 20;
+                // Don't divide into more than N index partitions @todo config
+                final int maxScatterSplitFanOut = 40;
                 // Target data services for the new index partitions.
                 final UUID[] moveTargets;
                 {
