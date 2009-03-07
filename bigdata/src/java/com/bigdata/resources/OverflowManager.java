@@ -131,6 +131,16 @@ abstract public class OverflowManager extends IndexManager {
     final protected double tailSplitThreshold;
     
     /**
+     * @see Options#SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD
+     */
+    final protected double scatterSplitPercentOfSplitThreshold;
+
+    /**
+     * @see Options#SCATTER_SPLIT_MAX_SPLITS
+     */
+    final protected int scatterSplitMaxSplits;
+    
+    /**
      * @see Options#JOINS_ENABLED
      */
     final protected boolean joinsEnabled;
@@ -424,6 +434,32 @@ abstract public class OverflowManager extends IndexManager {
         
         String DEFAULT_TAIL_SPLIT_THRESHOLD = ".4";
         
+        /**
+         * The percentage of the nominal index partition size at which a scatter
+         * split is triggered when there is only a single index partition for a
+         * given scale-out index (default
+         * {@link #DEFAULT_SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD}). The
+         * scatter split will break the index into multiple partitions and
+         * distribute those index partitions across the federation in order to
+         * allow more resources to be brought to bear on the scale-out index. A
+         * value of TWO (2.0) MAY be used to effectively disable scatter splits
+         * as normal index splits will take precedence.
+         */
+        String SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD = "scatterSplitPercentOfSplitThreshold";
+        
+        String DEFAULT_SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD = ".25";
+        
+        /**
+         * The maximum #of data services onto which the initial index partition
+         * will be distributed by a scatter split (default
+         * {@value #DEFAULT_SCATTER_SPLIT_MAX_SPLITS}). When ZERO (0), the
+         * index will be scattered to ALL discovered data services. A value of
+         * ONE (1) may be used to disable scatter splits (it implies NO splits).
+         */
+        String SCATTER_SPLIT_MAX_SPLITS = "scatterSplitMaxSplits";
+
+        String DEFAULT_SCATTER_SPLIT_MAX_SPLITS = "50";
+
         /**
          * Option may be used to disable index partition joins.
          * 
@@ -952,6 +988,49 @@ abstract public class OverflowManager extends IndexManager {
 
             }
 
+        }
+        
+        // scatterSplitPercentOfSplitThreshold
+        {
+
+            scatterSplitPercentOfSplitThreshold = Double
+                    .parseDouble(properties
+                            .getProperty(
+                                    Options.SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD,
+                                    Options.DEFAULT_SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD));
+
+            if (INFO)
+                log.info(Options.SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD + "="
+                        + scatterSplitPercentOfSplitThreshold);
+
+            if (scatterSplitPercentOfSplitThreshold < 0
+                    || scatterSplitPercentOfSplitThreshold > 2) {
+
+                throw new RuntimeException(
+                        Options.SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD
+                                + " must be in [0:2]");
+
+            }
+
+        }
+
+        {
+
+            scatterSplitMaxSplits = Integer.parseInt(properties.getProperty(
+                    Options.SCATTER_SPLIT_MAX_SPLITS,
+                    Options.DEFAULT_SCATTER_SPLIT_MAX_SPLITS));
+
+            if (INFO)
+                log.info(Options.SCATTER_SPLIT_MAX_SPLITS + "="
+                        + scatterSplitMaxSplits);
+
+            if (scatterSplitMaxSplits < 0) {
+
+                throw new RuntimeException(Options.SCATTER_SPLIT_MAX_SPLITS
+                        + " must be non-negative");
+
+            }
+            
         }
         
         // joinsEnabled
