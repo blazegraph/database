@@ -305,8 +305,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 (vmd.getIndexPartitionCount() == 1L)//
                 // move not in progress
                 && vmd.pmd.getSourcePartitionId() == -1//
+                // trigger scatter split before too much data builds up in one place.
+                && vmd.getPercentOfSplit() >= .5
                 // looks like a split candidate.
-                && splitHandler.shouldSplit(vmd.getRangeCount())//
+//                && splitHandler.shouldSplit(vmd.getRangeCount())//
             ) {
 
                 /*
