@@ -943,7 +943,16 @@ public class MoveIndexPartitionTask extends AbstractPrepareTask<MoveResult> {
             byte[] fromKey = null; // updated after each pass.
             final byte[] toKey = null; // upper bound is fixed.
             final int flags = IRangeQuery.ALL;
-            final int capacity = 10000; // chunk size.
+            /*
+             * FIXME It is critical to move the buffered writes as quickly as
+             * possible. This constant controls how many tuples are included in
+             * each result set. However, the amount of data will of course vary
+             * depending on the data being stored in the scale-out index.
+             * Another problem is that each result set is queued up with all
+             * other tasks on the target data service, which adds latency to the
+             * process of getting the buffered writes from here to there.
+             */
+            final int capacity = 100000; // chunk size.
             
             while (true) {
                 

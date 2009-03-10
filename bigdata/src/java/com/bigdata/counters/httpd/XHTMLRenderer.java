@@ -54,7 +54,7 @@ import com.bigdata.util.HTMLUtility;
  * 
  * @todo parameterize for expand/collapse of paths, perhaps in session (need
  *       more support on the server to do that) or else just in the URL query
- *       parameters.
+ *       paramoeters.
  * 
  * @todo make documentation available on the counters via click through on their
  *       name.
@@ -3438,8 +3438,6 @@ public class XHTMLRenderer {
          * event in that event group.
          */
         final Map<String,StringBuilder> tooltipsByHost = new HashMap<String,StringBuilder>();
-        
-//        int y = 1;
 
         int naccepted = 0;
         
@@ -3458,22 +3456,6 @@ public class XHTMLRenderer {
 
             final String key = getEventKey(e);
             
-//            {
-//
-//                final int i = e.hostname.indexOf('.');
-//
-//                if (i >= 0) {
-//
-//                    hostname = e.hostname.substring(0, i);
-//
-//                } else {
-//
-//                    hostname = e.hostname;
-//
-//                }
-//                
-//            }
-
             // basename for the variables for this data series.
             final String series;
 
@@ -3489,18 +3471,6 @@ public class XHTMLRenderer {
                 seriesByGroup.put(key, series);
 
                 eventsByHost.put(key, eventsSB);
-                
-//                final int hosty = y++; //Integer.valueOf(e.hostname.substring(5, i));
-                
-//                final String hostvar = series;
-                
-//                eventsSB.append("var " + series + "y;\n"); // declare hostyvar
-                
-//                eventsSB.append(" = ");
-//                
-//                eventsSB.append(hosty);
-                
-//                eventsSB.append(";\n");
                 
                 eventsSB.append("var ");
                 
@@ -3531,14 +3501,6 @@ public class XHTMLRenderer {
             eventsSB.append(e.getStartTime());
             
             eventsSB.append(", ");
-            
-//            eventsSB.append(hostyvar);
-//            
-//            eventsSB.append(" ], [ ");
-//            
-//            eventsSB.append((e.getEndTime() + e.getStartTime()) / 2);
-//
-            // eventsSB.append(", ");
 
 //            final double offset = Math.sin(e
 //                    .getEndTime()/100d) / 4d;
@@ -3559,8 +3521,6 @@ public class XHTMLRenderer {
             eventsSB.append((offset < 0 ? "" : "+") +offset+" ], null,\n");
             
             final StringBuilder tooltipsSB = tooltipsByHost.get(key);
-            
-//            tooltipsSB.append("null, ");
             
             /*
              * use the tab-delimited format, but remove the trailing newline.
@@ -3595,8 +3555,6 @@ public class XHTMLRenderer {
         
         // put into lexical order.
         Arrays.sort(keys);
-        
-//        for (StringBuilder sb : eventsByHost.values()) {
  
         for (int i = 0; i < keys.length; i++) {
 
