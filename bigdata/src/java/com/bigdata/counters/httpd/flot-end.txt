@@ -43,6 +43,13 @@
             hoverable: true, 
             clickable: false,
             autoHighlight: true
+        },
+        legend: {
+ 			 /* This option controls the legend on the main event plot.
+ 			  *
+ 			  * @todo this should be controlled by a URL query parameter.
+ 			  */
+             show: true
         }
     };
 

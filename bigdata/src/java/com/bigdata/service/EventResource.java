@@ -68,6 +68,47 @@ public class EventResource implements Serializable {
     public final String file;
 
     /**
+     * Formats the resource (indexName, partitionId, and file) in a manner
+     * designed to give pleasing results when aggregating {@link Event}s by
+     * {@link EventResource}.
+     */
+    public String toString() {
+
+        final StringBuilder sb = new StringBuilder();
+
+        if (indexName != null && indexName.length() != 0) {
+
+            sb.append(indexName);
+
+            if (partitionId != null && partitionId.length() != 0) {
+
+                sb.append("#" + partitionId);
+
+            }
+
+        } else if (partitionId != null && partitionId.length() != 0) {
+
+            sb.append(partitionId);
+
+        }
+
+        if (file != null && file.length() != 0) {
+
+            if (sb.length() != 0) {
+
+                sb.append(":");
+
+            }
+
+            sb.append(file);
+            
+        }
+        
+        return sb.toString();
+        
+    }
+    
+    /**
      * Ctor when there is no index resource for the event (the service on which
      * the event is generated is always supplied).
      */
