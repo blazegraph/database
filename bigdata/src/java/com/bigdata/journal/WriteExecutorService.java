@@ -306,7 +306,13 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
     /**
      * The thread running {@link #groupCommit()} is signaled each time a task
-     * has completed and will await the {@link #commit} signal.
+     * has completed processing. The task will await the {@link #commit} signal
+     * before it resumes.
+     * <p>
+     * Note: This {@link Condition} is also used by {@link #quiesce(long, TimeUnit)}
+     * so {@link Condition#signalAll()} is required rather than {@link Condition#signal()}
+     * to ensure that {@link #quiesce(long, TimeUnit)} does not "steal" the signal from
+     * {@link #groupCommit()} or {@link #abort()}.
      */
     final private Condition waiting = lock.newCondition();
     
@@ -1089,7 +1095,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             if(INFO) log.info("Abort in progress.");
         
             // signal so that abort() will no longer await this task's completion.
-            waiting.signal();
+            waiting.signalAll();
             
             throw new RuntimeException("Aborted.");
             
@@ -1126,7 +1132,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * since we currently hold the [lock].
              */
 
-            waiting.signal();
+            waiting.signalAll();
 
             try {
 

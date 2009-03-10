@@ -2578,28 +2578,28 @@ abstract public class AbstractTripleStore extends
 
     }
 
-    /**
-     * Writes out some usage information on the named index. More information is
-     * available for local indices. Information for scale-out indices is both
-     * less detailed and more approximate.
-     * 
-     * @param name
-     *            The index name.
-     * 
-     * @param ndx
-     *            The index.
-     */
-    final public String usage(String name, IIndex ndx) {
-
-        if (ndx == null) {
-
-            return name + " : not used";
-
-        }
-
-        return name + " : " + ndx.getCounters().asXML(null/*filter*/);
-
-    }
+//    /**
+//     * Writes out some usage information on the named index. More information is
+//     * available for local indices. Information for scale-out indices is both
+//     * less detailed and more approximate.
+//     * 
+//     * @param name
+//     *            The index name.
+//     * 
+//     * @param ndx
+//     *            The index.
+//     */
+//    final public String usage(String name, IIndex ndx) {
+//
+//        if (ndx == null) {
+//
+//            return name + " : not used";
+//
+//        }
+//
+//        return name + " : " + ndx.getCounters().asXML(null/*filter*/);
+//
+//    }
 
     /*
      * IRawTripleStore

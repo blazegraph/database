@@ -1874,7 +1874,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         System.err.println(label + " : tested " + nentries
                 + " keys order in " + elapsed + "ms");
         
-        System.err.println(label + " : " + btree.getCounters().asXML(null/*filter*/));
+//        System.err.println(label + " : " + btree.getCounters().asXML(null/*filter*/));
          
     }
 

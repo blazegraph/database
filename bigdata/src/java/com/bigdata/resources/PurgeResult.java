@@ -2,6 +2,7 @@ package com.bigdata.resources;
 
 import java.io.Serializable;
 
+import com.bigdata.journal.CommitRecordIndex;
 import com.bigdata.journal.ITransactionService;
 
 /**
@@ -87,7 +88,27 @@ public class PurgeResult implements Serializable {
      * The #of bytes under management after the purge.
      */
     final public long bytesAfterCount;
-    
+
+    /**
+     * Elapsed time in milliseconds required to scan the
+     * {@link CommitRecordIndex} for each historical journal in order to
+     * identify the set of resources "in use" resources.
+     */
+    final long elapsedScanCommitIndicesTime;
+
+    /**
+     * Elapsed time in milliseconds required to delete the resources which have
+     * been identified as being no longer required.
+     */
+    final long elapsedDeleteResourcesTime;
+
+    /**
+     * Total elapsed time in milliseconds for the purge resources operation.
+     * This includes both the {@link #elapsedScanCommitIndicesTime} and the
+     * {@link #elapsedDeleteResourcesTime}.
+     */
+    final long elapsedPurgeResourcesTime;
+
     public PurgeResult(//
             final long firstCommitTime,
             final long lastCommitTime,
@@ -101,7 +122,10 @@ public class PurgeResult implements Serializable {
             final int segmentBeforeCount,
             final int segmentAfterCount,
             final long bytesBeforeCount,
-            final long bytesAfterCount
+            final long bytesAfterCount,
+            final long elapsedScanCommitIndicesTime,
+            final long elapsedDeleteResourcesTime,
+            final long elapsedPurgeResourcesTime
             ) {
 
         this.firstCommitTime = firstCommitTime;
@@ -117,6 +141,9 @@ public class PurgeResult implements Serializable {
         this.segmentAfterCount = segmentAfterCount;
         this.bytesBeforeCount = bytesBeforeCount;
         this.bytesAfterCount = bytesAfterCount;
+        this.elapsedScanCommitIndicesTime = elapsedScanCommitIndicesTime;
+        this.elapsedDeleteResourcesTime = elapsedDeleteResourcesTime;
+        this.elapsedPurgeResourcesTime = elapsedPurgeResourcesTime;
         
     }
     
@@ -138,6 +165,9 @@ public class PurgeResult implements Serializable {
         sb.append(", segmentAfterCount=" + segmentAfterCount);
         sb.append(", bytesBeforeCount=" + bytesBeforeCount);
         sb.append(", bytesAfterCount=" + bytesAfterCount);
+        sb.append(", elapsedScanCommitIndicesTime=" + elapsedScanCommitIndicesTime);
+        sb.append(", elapsedDeleteResourcesTime=" + elapsedDeleteResourcesTime);
+        sb.append(", elapsedPurgeResourcesTime=" + elapsedPurgeResourcesTime);
         sb.append("}");
         
         return sb.toString();
