@@ -40,7 +40,6 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.journal.Journal;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.resources.MoveIndexPartitionTask;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Event;
@@ -69,8 +68,10 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
      * Note: The history is written each time the {@link IndexMetadata} is
      * written and is read each time it is read so this can be the main driver
      * of the size of the {@link IndexMetadata} record.
+     * 
+     * @deprecated
      */
-    protected final static transient int MAX_HISTORY_LENGTH = 4 * Bytes.kilobyte32;
+    protected final static transient int MAX_HISTORY_LENGTH = 0;//4 * Bytes.kilobyte32;
     
     /**
      * The unique partition identifier.
@@ -110,6 +111,8 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
      * E.g., register(timestamp), copyOnOverflow(timestamp), split(timestamp),
      * join(partitionId,partitionId,timestamp), etc. This is truncated when
      * serialized to keep it from growing without bound.
+     * 
+     * @deprecated See {@link #history}
      */
     private String history;
     
@@ -118,8 +121,13 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
      * truncates it to the last {@link #MAX_HISTORY_LENGTH}-3 characters,
      * prepends "...", and returns the result. Otherwise returns the entire
      * history string.
+     * 
+     * @deprecated See {@link #history}
      */
     protected String getTruncatedHistory() {
+        
+        if (MAX_HISTORY_LENGTH == 0)
+            return "";
         
         String history = this.history;
         
@@ -150,19 +158,6 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
     public LocalPartitionMetadata() {
         
     }
-    
-//    public LocalPartitionMetadata(//
-//            final int partitionId,//
-//            final byte[] leftSeparatorKey,//
-//            final byte[] rightSeparatorKey,// 
-//            final IResourceMetadata[] resources,//
-//            final String history
-//            ) {
-//        
-//        this(partitionId, -1/* sourcePartitionId */, leftSeparatorKey,
-//                rightSeparatorKey, resources, history);
-//        
-//    }
     
     /**
      * 
@@ -397,12 +392,16 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
     }
 
     /**
+     * A history of the changes to the index partition.
      * 
-     * @return
-     * 
-     * @todo I am not convince that the history is worth keeping. It definately
-     *       swell the size of the {@link IndexMetadata} record and is MUST less
-     *       useful than an analysis of the {@link Event} log.
+     * @deprecated I've essentially disabled the history (it is always empty
+     *             when it is persisted). I found it nearly impossible to read.
+     *             There are much saner ways to track what is going on in the
+     *             federation. An analysis of the {@link Event} log is much more
+     *             useful. If nothing else, you could examine the index
+     *             partition in the metadata index by scanning the commit points
+     *             and reading its state in each commit and reporting all state
+     *             changes.
      */
     final public String getHistory() {
         

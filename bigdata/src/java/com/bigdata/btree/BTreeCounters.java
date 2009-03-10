@@ -430,11 +430,12 @@ final public class BTreeCounters {
      * Return a {@link CounterSet} reporting on the various counters tracked in
      * the instance fields of this class.
      */
-    synchronized public ICounterSet getCounters() {
+//    synchronized 
+    public ICounterSet getCounters() {
         
-        if(counterSet == null) {
+//        if(counterSet == null) {
             
-            counterSet = new CounterSet();
+        final CounterSet counterSet = new CounterSet();
 
             /*
              * ISimpleBTree
@@ -754,17 +755,17 @@ final public class BTreeCounters {
                 
             }
 
-        }
+//        }
         
         return counterSet;
         
     }
-    private CounterSet counterSet;
+//    private CounterSet counterSet;
     
     public String toString() {
 
         // in XML.
-        return getCounters().asXML(null/*filter*/);
+        return getCounters().asXML(null/* filter */);
         
     }
 

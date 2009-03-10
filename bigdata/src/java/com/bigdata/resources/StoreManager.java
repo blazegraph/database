@@ -2873,20 +2873,6 @@ abstract public class StoreManager extends ResourceEvents implements
 
     }
 
-//    /**
-//     * Return the minimum age of a resource before it may become a candidate for
-//     * release. This is a configuration time constant. The purpose of this value
-//     * is to guarentee that resources will remain available for at least this
-//     * many milliseconds. This places an upper bound on the release time.
-//     * 
-//     * @see Options#MIN_RELEASE_AGE
-//     */
-//    public long getMinReleaseAge() {
-//
-//        return minReleaseAge;
-//
-//    }
-
     /**
      * @see IndexManager#getIndexRetentionTime()
      */
@@ -2924,8 +2910,12 @@ abstract public class StoreManager extends ResourceEvents implements
      * 
      * @return A summary of the work done -or- <code>null</code> if the
      *         pre-conditions for the purge operation were not satisified.
+     * 
+     * @see src/architecture/purgeResourceDecisionsMatrix.xls
      */
     final private PurgeResult purgeOldResources() {
+
+        final long beginPurgeTime = System.currentTimeMillis();
         
         /*
          * The last commit time on record in the live journal.
@@ -3135,8 +3125,7 @@ abstract public class StoreManager extends ResourceEvents implements
                 /*
                  * If the computed [releaseTime] is before the first commit
                  * record on the earliest available journal then there was
-                 * nothing that could be deleted in this case and that we could
-                 * just return immediately.
+                 * nothing that could be deleted and we just return immediately.
                  */
 
                 if (INFO)
@@ -3175,9 +3164,11 @@ abstract public class StoreManager extends ResourceEvents implements
                 commitTimeToPreserve = getCommitTimeStrictlyGreaterThan(choosenReleaseTime);
 
                 if (INFO)
-                    log.info("commitTimeToPreserve := " + commitTimeToPreserve
-                            + " (this is the first commitTime GT the releaseTime=" + choosenReleaseTime
-                            + ")");
+                    log
+                            .info("commitTimeToPreserve := "
+                                    + commitTimeToPreserve
+                                    + " (this is the first commitTime GT the releaseTime="
+                                    + choosenReleaseTime + ")");
 
             }
 
@@ -3189,7 +3180,24 @@ abstract public class StoreManager extends ResourceEvents implements
             /*
              * Find resources that were in use as of that commitTime.
              */
-            final Set<UUID> resourcesInUse = getResourcesForTimestamp(commitTimeToPreserve);
+            final Set<UUID> resourcesInUse;
+            final long elapsedScanCommitIndicesTime;
+            {
+                final long begin = System.currentTimeMillis();
+
+                resourcesInUse = getResourcesForTimestamp(commitTimeToPreserve);
+
+                elapsedScanCommitIndicesTime = System.currentTimeMillis()
+                        - begin;
+            }
+            if (true) {
+                // log the in use resources (resources that MUST NOT be
+                // deleted).
+                for (UUID uuid : resourcesInUse) {
+                    log.warn("In use: file=" + resourceFiles.get(uuid)
+                            + ", uuid=" + uuid);
+                }
+            }
 
             final int journalBeforeCount = getManagedJournalCount();
             final int segmentBeforeCount = getManagedSegmentCount();
@@ -3200,17 +3208,28 @@ abstract public class StoreManager extends ResourceEvents implements
              * 
              * AND ( createTime < commitTimeToPreserve )
              */
-            deleteUnusedResources(commitTimeToPreserve, resourcesInUse);
+            final long elapsedDeleteResourcesTime;
+            {
+                final long begin = System.currentTimeMillis();
+
+                deleteUnusedResources(commitTimeToPreserve, resourcesInUse);
+                
+                elapsedDeleteResourcesTime = System.currentTimeMillis() - begin;
+            }
 
             final int journalAfterCount = getManagedJournalCount();
             final int segmentAfterCount = getManagedSegmentCount();
             final long bytesAfterCount = getBytesUnderManagement();
             
+            final long elapsedPurgeResourcesTime = System.currentTimeMillis() - beginPurgeTime;
+            
             return new PurgeResult(firstCommitTime, lastCommitTime,
                     this.releaseTime, indexRetentionTime, choosenReleaseTime,
                     commitTimeToPreserve, resourcesInUse.size(),
                     journalBeforeCount, journalAfterCount, segmentBeforeCount,
-                    segmentAfterCount, bytesBeforeCount, bytesAfterCount);
+                    segmentAfterCount, bytesBeforeCount, bytesAfterCount,
+                    elapsedScanCommitIndicesTime, elapsedDeleteResourcesTime,
+                    elapsedPurgeResourcesTime);
 
         } finally {
 
@@ -3249,16 +3268,10 @@ abstract public class StoreManager extends ResourceEvents implements
         /*
          * Delete old journals.
          */
+        
         // #of journals deleted.
         int njournals = 0;
         {
-
-            /*
-             * Note: used to bulk delete the entries for deleted journals from
-             * the journalIndex since the iterator does not support removal.
-             */
-//            final Set<byte[]> keys = new TreeSet<byte[]>(
-//                    UnsignedByteArrayComparator.INSTANCE);
 
             /*
              * Note: This iterator supports traversal with concurrent
@@ -3308,12 +3321,9 @@ abstract public class StoreManager extends ResourceEvents implements
 
                 }
 
-                if (INFO)
-                    log.info("Will delete: " + resourceMetadata);
-
                 try {
 
-                    deleteResource(uuid, true/* isJournal */, true/* callerWillRemoveFromIndex */);
+                    deleteUnusedResource(resourceMetadata);
 
                 } catch (Throwable t) {
 
@@ -3323,9 +3333,6 @@ abstract public class StoreManager extends ResourceEvents implements
                     
                 }
 
-//                // add to set for batch remove.
-//                keys.add(journalIndex.getKey(resourceMetadata.getCreateTime()));
-
                 // remove from the [journalIndex].
                 itr.remove();
                 
@@ -3333,35 +3340,16 @@ abstract public class StoreManager extends ResourceEvents implements
                 
             }
 
-//            // remove entries from the journalIndex.
-//            for (byte[] key : keys) {
-//
-//                if (journalIndex.remove(key) == null) {
-//
-//                    throw new AssertionError();
-//
-//                }
-//
-//            }
-
         }
 
         /*
          * Delete old index segments.
          */
+        
         // #of segments deleted.
         int nsegments = 0;
         {
 
-//            /*
-//             * Note: used to bulk delete the entries for deleted segments from
-//             * the segmentIndex since the iterator does not support removal.
-//             */
-//            final Set<byte[]> keys = new TreeSet<byte[]>(
-//                    UnsignedByteArrayComparator.INSTANCE);
-//
-//            final ITupleIterator itr = segmentIndex.rangeIterator();
-            
             /*
              * Note: This iterator supports traversal with concurrent
              * modification (by a single thread). If we decide to delete a
@@ -3410,13 +3398,10 @@ abstract public class StoreManager extends ResourceEvents implements
                     
                 }
 
-                if (INFO)
-                    log.info("Will delete: " + resourceMetadata);
-
                 try {
 
                     // delete the backing file.
-                    deleteResource(uuid, false/* isJournal */, true/* callerWillRemoveFromIndex */);
+                    deleteUnusedResource(resourceMetadata);
 
                 } catch (Throwable t) {
 
@@ -3426,26 +3411,12 @@ abstract public class StoreManager extends ResourceEvents implements
 
                 }
 
-                // // add to set for batch remove.
-// keys.add(segmentIndex.getKey(resourceMetadata.getCreateTime(), uuid));
-              
                 // remove from the [segmentIndex]
                 itr.remove();
 
                 nsegments++;
                 
             }
-
-//            // remove entries from the journalIndex.
-//            for (byte[] key : keys) {
-//
-//                if (segmentIndex.remove(key) == null) {
-//
-//                    throw new AssertionError();
-//
-//                }
-//
-//            }
 
         }
 
@@ -3472,6 +3443,26 @@ abstract public class StoreManager extends ResourceEvents implements
      * imposes that constraint on the caller that they are responsible for
      * synchronization and is generally invoked during synchronous overflow
      * since we know that there are no active writers at that time.
+     * <p>
+     * Pre-conditions:
+     * <ul>
+     * <li>The resource identified by that {@link UUID} exists and is not the
+     * live journal.</li>
+     * <li>The resource is not in use (not checked).</li>
+     * <li>The resource is found in {@link #resourceFiles}.</li>
+     * </ul>
+     * Post-conditions:
+     * <ul>
+     * <li>The resource is closed if it was open and is no longer found in the
+     * {@link #storeCache}.</li>
+     * <li>The resource is no longer found in {@link #resourceFiles}. </li>
+     * <li>The backing file for the resource has been deleted (the backing file
+     * is obtain from {@link #resourceFiles}).</li>
+     * <li>Various counters maintained by the {@link StoreManager} have been
+     * updated (bytes delete, bytes under management, etc).</li>
+     * <li>The file has been removed from either the {@link #journalIndex} or
+     * the {@link #segmentIndex} as appropriate.</li>
+     * </ul>
      * 
      * @param uuid
      *            The {@link UUID} which identifies the resource.
@@ -3481,27 +3472,12 @@ abstract public class StoreManager extends ResourceEvents implements
     protected void deleteResource(final UUID uuid, final boolean isJournal)
             throws NoSuchStoreException {
 
-        deleteResource(uuid, isJournal, false/* callerWillRemoveFromIndex */);
-
-    }
-    
-    /**
-     * 
-     * @param uuid
-     * @param isJournal
-     * @param callerWillRemoveFromIndex
-     *            Used when the caller can more efficiently remove the store
-     *            from the {@link #journalIndex} or {@link #segmentIndex}. When
-     *            <code>false</code>, we have to scan the index for the
-     *            desired entry and then remove it.
-     */
-    private void deleteResource(final UUID uuid, final boolean isJournal,
-            boolean callerWillRemoveFromIndex) throws NoSuchStoreException {
-
         if (INFO)
             log.info("deleteResource: uuid=" + uuid + ", isJournal="
-                    + isJournal + ", callerWillRemoveFromIndex="
-                    + callerWillRemoveFromIndex);
+                    + isJournal);
+        
+        if (uuid == null)
+            throw new IllegalArgumentException();
         
         if (uuid == liveJournalRef.get().getRootBlockView().getUUID()) {
 
@@ -3620,13 +3596,19 @@ abstract public class StoreManager extends ResourceEvents implements
             
             if(isJournal) {
                 journalBytesUnderManagement.addAndGet(-length);
+                journalDeleteCount.incrementAndGet();
             } else {
                 segmentBytesUnderManagement.addAndGet(-length);
+                segmentStoreDeleteCount.incrementAndGet();
             }
 
         }
 
-        if (!callerWillRemoveFromIndex) {
+        /*
+         * Remove the resource from either journalIndex or segmentIndex as
+         * appropriate.
+         */
+        {
 
             boolean found = false;
             
@@ -3634,6 +3616,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
                 synchronized (journalIndex) {
 
+                    @SuppressWarnings("unchecked")
                     final ITupleIterator<JournalMetadata> itr = journalIndex
                             .rangeIterator(null/* fromKey */,
                                     null/* toKey */, 0/* capacity */,
@@ -3662,6 +3645,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
                 synchronized (segmentIndex) {
 
+                    @SuppressWarnings("unchecked")
                     final ITupleIterator<SegmentMetadata> itr = segmentIndex
                             .rangeIterator(null/* fromKey */,
                                     null/* toKey */, 0/* capacity */,
@@ -3693,18 +3677,184 @@ abstract public class StoreManager extends ResourceEvents implements
             
         }
         
-        if(isJournal) {
+    }
 
-            journalDeleteCount.incrementAndGet();
-            
-        } else {
-            
-            segmentStoreDeleteCount.incrementAndGet();
+    /**
+     * Variant used by {@link #deleteUnusedResources(long, Set)}, which is in
+     * turned invoked by {@link #purgeOldResources()}. This implementation is
+     * different in that we have the {@link IResourceManager} on hand when we
+     * need to delete the resource. I judge it worth the redundency in the code
+     * to have a variant specific to this use case so that the DELETE log
+     * messages report the {@link IResourceMetadata#getCreateTime() create time}
+     * which can be used as a cross-check on {@link #purgeOldResources()}.
+     * Pre-conditions:
+     * <ul>
+     * <li>The resource described by the {@link IResourceMetadata} exists and
+     * is not the live journal.</li>
+     * <li>The resource is not in use (not checked).</li>
+     * <li>The resource is found in {@link #resourceFiles}.</li>
+     * </ul>
+     * Post-conditions:
+     * <ul>
+     * <li>The resource is closed if it was open and is no longer found in the
+     * {@link #storeCache}.</li>
+     * <li>The resource is no longer found in {@link #resourceFiles}. </li>
+     * <li>The backing file for the resource has been deleted (the backing file
+     * is obtain from {@link #resourceFiles}).</li>
+     * <li>Various counters maintained by the {@link StoreManager} have been
+     * updated (bytes delete, bytes under management, etc).</li>
+     * </ul>
+     * <p>
+     * Note: The caller MUST remove the entry for the resource from either
+     * {@link #journalIndex} or the {@link #segmentIndex} as appropriate. For
+     * this use case, the caller can handle that efficiently since they are
+     * already traversing an iterator on the appropriate {@link BTree} and can
+     * use {@link Iterator#remove()} to delete the corresponding entry from the
+     * {@link BTree}.
+     * 
+     * @param resourceMetadata
+     *            The metadata describing the resource to be deleted.
+     */
+    private void deleteUnusedResource(final IResourceMetadata resourceMetadata) {
+        
+        if (INFO)
+            log.info("deleteResource: " + resourceMetadata);
+        
+        if (resourceMetadata == null)
+            throw new IllegalArgumentException();
+
+        final UUID uuid = resourceMetadata.getUUID();
+        
+        if (uuid == liveJournalRef.get().getRootBlockView().getUUID()) {
+
+            /*
+             * Can't close out the live journal!
+             * 
+             * Note: using the reference directly since invoked during startup
+             * to delete index segments left lying around if there is an
+             * incomplete move.
+             */
+
+            throw new IllegalArgumentException();
             
         }
 
-    }
+        /*
+         * Close out store iff open.
+         */
+        {
 
+            final IRawStore store = storeCache.remove(uuid);
+
+            if (store != null) {
+                
+                final File file = store.getFile();
+
+                if(resourceMetadata.isJournal()) {
+                    
+                    assert store instanceof AbstractJournal;
+                    
+                } else {
+                    
+                    assert store instanceof IndexSegmentStore;
+                    
+                }
+                
+                try {
+
+                    if (store.isOpen()) {
+
+                        // make sure the store is closed.
+                        store.close();
+                        
+                    }
+
+                } catch (IllegalStateException t) {
+
+                    /*
+                     * There should not be closed journals in the cache since
+                     * they are only closed by the finalizer.
+                     * 
+                     * However, an IndexSegmentStore will be closed if the
+                     * IndexSegment is closed and it can still be in the cache
+                     * until its reference is cleared when it gets finalized.
+                     * 
+                     * Note: if there is a concurrent close then that might be
+                     * interesting and should at least be explored further.
+                     */
+                    if (resourceMetadata.isJournal())
+                        // probably a problem.
+                        log.error(file, t);
+                    else
+                        // probably NOT a problem.
+                        log.warn(file, t);
+
+                }
+
+            }
+
+        }
+        
+        /*
+         * delete the backing file.
+         */
+        {
+
+            final File file = resourceFiles.remove(uuid);
+
+            /*
+             * Note: This logs the file as reported by [resourceFiles] as well
+             * as the file in IResourceMetadata in case any discrepency arises.
+             */
+//            if (INFO)
+//                log.info
+                log.warn("DELETE: " + resourceMetadata + " : " + file);
+            
+            if (file == null) {
+
+                /*
+                 * Note: This can happen if you confuse the indexUUID and the
+                 * indexSegment's UUID in the code. The former is on the
+                 * IndexMetadata while the latter (the one that you want) is on
+                 * the SegmentMetadata.
+                 */
+
+                throw new NoSuchStoreException(uuid);
+
+            }
+
+            if (!file.exists()) {
+
+                throw new RuntimeException("Not found: " + file);
+
+            }
+
+            final long length = file.length();
+
+            if (!file.delete()) {
+
+                throw new RuntimeException("Could not delete: " + file);
+
+            }
+
+            // track #of bytes deleted since startup.
+            bytesDeleted.addAndGet(length);
+
+            // track #of bytes still under management.
+            bytesUnderManagement.addAndGet(-length);
+            
+            if(resourceMetadata.isJournal()) {
+                journalBytesUnderManagement.addAndGet(-length);
+                journalDeleteCount.incrementAndGet();
+            } else {
+                segmentBytesUnderManagement.addAndGet(-length);
+                segmentStoreDeleteCount.incrementAndGet();
+            }
+
+        }
+
+    }
+    
     /**
      * Finds the journal spanning the first {@link ICommitRecord} that is
      * strictly greater than the specified timestamp and returns the timestamp
@@ -3789,9 +3939,9 @@ abstract public class StoreManager extends ResourceEvents implements
     }
     
     /**
-     * Finds all resources used by any registered index as of the given
-     * <i>commitTime</i> up to and including the lastCommitTime for the live
-     * journal.
+     * Finds all resources used by any registered index as of the
+     * <i>commitTimeToPreserve</i> up to and including the lastCommitTime for
+     * the live journal.
      * <p>
      * Note: We include all dependencies for all commit points subsequent to the
      * probe in order to ensure that we do not accidently release dependencies
@@ -3802,23 +3952,23 @@ abstract public class StoreManager extends ResourceEvents implements
      * attention to the release time or to any other aspect of the state of the
      * system.
      * 
-     * @param commitTime
-     *            A commit time.
+     * @param commitTimeToPreserve
+     *            The commit time corresponding to the first commit point which
+     *            must be preserved.
      * 
      * @return The set of resource {@link UUID}s required by at least one index
-     *         for the commit point GTE the specified commit time.
+     *         for any commit time GTE the specified commit time.
      */
-    protected Set<UUID> getResourcesForTimestamp(final long commitTime) {
+    protected Set<UUID> getResourcesForTimestamp(final long commitTimeToPreserve) {
 
         if (DEBUG)
-            log.debug("commitTime=" + commitTime + ", lastCommitTime="
+            log.debug("commitTimeToPreserve=" + commitTimeToPreserve
+                    + ", lastCommitTime="
                     + getLiveJournal().getRootBlockView().getLastCommitTime());
         
         // must be a commitTime.
-        if (commitTime < 0)
+        if (commitTimeToPreserve <= 0)
             throw new IllegalArgumentException();
-        
-        final long begin = System.currentTimeMillis();
         
         final Set<UUID> uuids = new LinkedHashSet<UUID>(512);
 
@@ -3837,6 +3987,7 @@ abstract public class StoreManager extends ResourceEvents implements
          */
         synchronized(journalIndex) {
 
+            @SuppressWarnings("unchecked")
             final ITupleIterator<JournalMetadata> itr = journalIndex.rangeIterator();
             
             while(itr.hasNext()) {
@@ -3853,11 +4004,17 @@ abstract public class StoreManager extends ResourceEvents implements
                 final long lastCommitTime = journal.getRootBlockView()
                         .getLastCommitTime();
 
-                if (lastCommitTime < commitTime) {
+                if (lastCommitTime < commitTimeToPreserve) {
                     
                     /*
                      * Ignore this journal since last commit point is strictly
                      * LT our starting [commitTime].
+                     * 
+                     * Note: Since the index partition views are re-defined on
+                     * the new journal by each synchronous overflow operation,
+                     * we do not need to consider older journals in order to
+                     * discover the resources used by all index partition views
+                     * defined as of the start of any given journal.
                      */
                     
                     continue;
@@ -3906,8 +4063,9 @@ abstract public class StoreManager extends ResourceEvents implements
                      * [commitRecord]. For each commitRecord, fetch the
                      * Name2Addr index and visit its Entries.
                      */
+                    @SuppressWarnings("unchecked")
                     final ITupleIterator<ICommitRecord> itr2 = commitRecordIndex
-                            .rangeIterator(commitTime/* fromKey */, null/* toKey */);
+                            .rangeIterator(commitTimeToPreserve/* fromKey */, null/* toKey */);
                     
                     while(itr2.hasNext()) {
                         
@@ -3932,6 +4090,7 @@ abstract public class StoreManager extends ResourceEvents implements
                                         commitRecord
                                                 .getRootAddr(AbstractJournal.ROOT_NAME2ADDR));
                         
+                        @SuppressWarnings("unchecked")
                         final ITupleIterator<Name2Addr.Entry> itr3 = name2addr.rangeIterator();
                         
                         while(itr3.hasNext()) {
@@ -3939,7 +4098,6 @@ abstract public class StoreManager extends ResourceEvents implements
                             final ITuple<Name2Addr.Entry> tuple3 = itr3.next();
                             
                             final Name2Addr.Entry entry3 = tuple3.getObject(); 
-//                                Name2Addr.EntrySerializer.INSTANCE.deserialize(tuple3.getValueStream());
                             
                             final long checkpointAddr = entry3.checkpointAddr;
                             
@@ -3996,17 +4154,14 @@ abstract public class StoreManager extends ResourceEvents implements
                         
                     } // next CommitRecordIndex.Entry
                     
-                }
+                } // block
                 
-            }
+            } // while(journalIndex.rangeIterator.hasNext())
             
-        }
+        } // synchronized( journalIndex )
 
-        final long elapsed = System.currentTimeMillis() - begin;
-        
         if (INFO)
-            log.info("commitTime=" + commitTime + ", #used=" + uuids.size()
-                    + ", elapsed=" + elapsed);
+            log.info("commitTime=" + commitTimeToPreserve + ", #used=" + uuids.size());
 
         return uuids;
 

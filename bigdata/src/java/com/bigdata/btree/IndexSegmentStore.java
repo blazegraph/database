@@ -507,6 +507,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
                     final Class cl = Class.forName(indexMetadata
                             .getBTreeClassName());
 
+                    @SuppressWarnings("unchecked")
                     final Constructor ctor = cl
                             .getConstructor(new Class[] { IndexSegmentStore.class });
 
@@ -520,10 +521,13 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
                      * Note: These counters are only allocated when the
                      * IndexSegment object is created and this is where we
                      * enforce a 1:1 correspondence between an IndexSegmentStore
-                     * and the IndexSegment loaded from that store.
+                     * and the IndexSegment loaded from that store. However, the
+                     * index can be closed and re-opened so we still need to
+                     * replace any counters which we find during attach().
                      */
 
-                    getCounters().attach(seg.getBtreeCounters().getCounters());
+                    getCounters().attach(seg.getBtreeCounters().getCounters(),
+                            true/*replace*/);
 
                     // set the canonicalizing weak reference to the open seg.
                     ref = new WeakReference<IndexSegment>(seg);

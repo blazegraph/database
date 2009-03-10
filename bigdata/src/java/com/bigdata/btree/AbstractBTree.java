@@ -173,7 +173,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
     /**
      * Counters tracking various aspects of the btree.
      */
-    private BTreeCounters btreeCounters = new BTreeCounters();
+    private volatile BTreeCounters btreeCounters = new BTreeCounters();
 
     /**
      * Counters tracking various aspects of the btree.
@@ -202,19 +202,23 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
         if (btreeCounters == null)
             throw new IllegalArgumentException();
 
-        synchronized (this) {
+//        /*
+//         * Note: synchronized to make the change visible if you are also
+//         * synchronized on [this].
+//         */
+//        synchronized (this) {
 
             this.btreeCounters = btreeCounters; 
 
-            if (this.counterSet != null) {
-                
-                // reattach the counters.
-                this.counterSet
-                        .attach(btreeCounters.getCounters(), true/* replace */);
-
-            }
+//            if (this.counterSet != null) {
+//                
+//                // reattach the counters.
+//                this.counterSet
+//                        .attach(btreeCounters.getCounters(), true/* replace */);
+//
+//            }
             
-        }
+//        }
         
     }
     
@@ -423,30 +427,40 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
 
     /**
      * Return some "statistics" about the btree including both the static
-     * {@link CounterSet} and the {@link BTreeCounters}s. Since this DOES NOT
-     * include the {@link #getDynamicCounterSet()}, holding a reference to the
-     * returned {@link ICounterSet} WILL NOT cause the {@link AbstractBTree} to
-     * remain strongly reachable.
+     * {@link CounterSet} and the {@link BTreeCounters}s.
+     * <p>
+     * Note: Since this DOES NOT include the {@link #getDynamicCounterSet()},
+     * holding a reference to the returned {@link ICounterSet} WILL NOT cause
+     * the {@link AbstractBTree} to remain strongly reachable.
      * 
      * @see #getStaticCounterSet()
      * @see #getDynamicCounterSet()
-     * @see #btreeCounters
      * @see BTreeCounters#getCounters()
      */
-    synchronized public ICounterSet getCounters() {
+    public ICounterSet getCounters() {
 
-        if (counterSet == null) {
+        final CounterSet counterSet = getStaticCounterSet();
 
-            counterSet = getStaticCounterSet();
+        counterSet.attach(btreeCounters.getCounters());
 
-            counterSet.attach(btreeCounters.getCounters());
-    
-        }
-        
         return counterSet;
-              
+
     }
-    private CounterSet counterSet;
+
+// synchronized public ICounterSet getCounters() {
+//
+//        if (counterSet == null) {
+//
+//            counterSet = getStaticCounterSet();
+//
+//            counterSet.attach(btreeCounters.getCounters());
+//    
+//        }
+//        
+//        return counterSet;
+//              
+//    }
+//    private CounterSet counterSet;
    
     /**
      * Return a new {@link CounterSet} containing dynamic counters - <strong>DO

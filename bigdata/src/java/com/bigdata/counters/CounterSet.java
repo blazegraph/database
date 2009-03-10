@@ -193,12 +193,12 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
             /*
              * If the child is a root then we attach its children.
              */
-            final Iterator<ICounterNode> itr = ((CounterSet) src).children.values()
-                    .iterator();
+            final Iterator<ICounterNode> itr = ((CounterSet) src).children
+                    .values().iterator();
 
             while (itr.hasNext()) {
 
-                attach2(itr.next(), replace );
+                attach2(itr.next(), replace);
 
             }
 

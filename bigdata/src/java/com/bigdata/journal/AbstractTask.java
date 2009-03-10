@@ -65,6 +65,7 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.locator.IResourceLocator;
+import com.bigdata.resources.NoSuchStoreException;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.resources.StaleLocatorReason;
@@ -314,14 +315,14 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * 
      * </ol>
      */
-    private Map<String,Entry> n2a;
-    
+    private Map<String, Entry> n2a;
+
     /**
      * The commit list contains metadata for all indices that were made dirty by
      * an {@link ITx#UNISOLATED} task.
      */
-    private ConcurrentHashMap<String,DirtyListener> commitList;
-    
+    private ConcurrentHashMap<String, DirtyListener> commitList;
+
     /**
      * Atomic read of {@link Entry}s for declares resources into {@link #n2a}.
      * This is done before an {@link ITx#UNISOLATED} task executes. If the task
@@ -336,7 +337,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         if (n2a != null)
             throw new IllegalStateException();
         
-        n2a = new HashMap<String,Entry>(resource.length);
+        n2a = new HashMap<String, Entry>(resource.length);
 
         /*
          * Note: getIndex() sets the listener on the BTree. That listener is
@@ -560,12 +561,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                 
             }
             
-            // entry from isolated view of Name2Addr as of task startup.
+            // entry from isolated view of Name2Addr as of task startup (call()).
             final Entry entry = n2a.get(name);
 
             if (entry == null) {
 
-                // index does not exist at this time.
+                // index did not exist at that time.
                 throw new NoSuchIndexException(name);
 
             }
@@ -573,9 +574,9 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             /*
              * Note: At this point we have an exclusive lock on the named
              * unisolated index. We recover the unisolated index from
-             * Name2Addr's cache. If not found, then we load the unisolated from
-             * the store, set the [lastCommitTime], and enter it into the
-             * unisolated Name2Addr's cache of unisolated indices.
+             * Name2Addr's cache. If not found, then we load the unisolated
+             * index from the store, set the [lastCommitTime], and enter it into
+             * the unisolated Name2Addr's cache of unisolated indices.
              */
             BTree btree;
             
@@ -613,7 +614,19 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
             }
 
-            return getUnisolatedIndexView(name, btree);
+            try {
+             
+                return getUnisolatedIndexView(name, btree);
+                
+            } catch (NoSuchStoreException ex) {
+                
+                /*
+                 * Add a little more information to the stack trace.
+                 */
+                throw new NoSuchStoreException(entry.toString() + ":"
+                        + ex.getMessage(), ex);
+                
+            }
 
         } else {
 
@@ -656,11 +669,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * 
      * @return The view.
      */
-    private ILocalBTreeView getUnisolatedIndexView(final String name, final BTree btree) {
-        
+    private ILocalBTreeView getUnisolatedIndexView(final String name,
+            final BTree btree) {
+
         // setup the task as the listener for dirty notices.
-        btree.setDirtyListener(new DirtyListener(name,btree));
-        
+        btree.setDirtyListener(new DirtyListener(name, btree));
+
         // find all sources if a partitioned index.
         final AbstractBTree[] sources = resourceManager.getIndexSources(name,
                 ITx.UNISOLATED, btree);
@@ -670,7 +684,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         final ILocalBTreeView view;
         if (sources.length == 1) {
 
-            view = (BTree)sources[0];
+            view = (BTree) sources[0];
 
         } else {
 
@@ -1808,9 +1822,10 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         
         final protected AbstractTask delegate;
         
-        protected DelegateTask(AbstractTask delegate) {
+        protected DelegateTask(final AbstractTask delegate) {
             
-            if(delegate == null) throw new IllegalArgumentException(); 
+            if (delegate == null)
+                throw new IllegalArgumentException(); 
             
             this.delegate = delegate;
             
@@ -2063,7 +2078,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * @param source
          */
         @SuppressWarnings("unchecked")
-        public IsolatedActionJournal(AbstractJournal source) {
+        public IsolatedActionJournal(final AbstractJournal source) {
 
             if (source == null)
                 throw new IllegalArgumentException();

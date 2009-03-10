@@ -1896,9 +1896,9 @@ abstract public class IndexManager extends StoreManager {
     }
 
     /**
-     * Return a {@link CounterSet} reflecting use of the named indices. Index
-     * partitions are in use their {@link CounterSet}s are reported under a
-     * path formed from name of the scale-out index and partition identifier.
+     * Return a {@link CounterSet} reflecting use of the named indices. When an
+     * index partition is in use, it {@link CounterSet} is reported under a path
+     * formed from name of the scale-out index and partition identifier.
      * 
      * @return A new {@link CounterSet} reflecting the use of the named indices.
      */

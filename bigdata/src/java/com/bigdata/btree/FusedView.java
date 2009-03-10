@@ -306,11 +306,6 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
             counterSet = new CounterSet();
 
             for (int i = 0; i < srcs.length; i++) {
-        
-                /*
-                 * @todo might have to clone the counters from the index since
-                 * they could already have another parent.
-                 */
                 
                 counterSet.makePath("view[" + i + "]").attach(
                         srcs[i].getCounters());
