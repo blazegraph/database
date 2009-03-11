@@ -152,7 +152,7 @@ import com.bigdata.service.ResourceService;
  * <p>
  * Note: There are only two entry points: a simple move and a move where the
  * compacting merge has already been performed, e.g., by a split, and we just
- * need to do the atomic update phase.
+ * need to do the atomic update phase.  
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -325,15 +325,15 @@ public class MoveTask extends AbstractPrepareTask<Void> {
     /**
      * Moves an index partition from this data service to another data service.
      * <p>
-     * This is an atomic operation. It moves an index segment (supplied by the
-     * caller) containing the historical view of the source index partition and
-     * generates and moves an index segment containing any buffered writes on
-     * the live journal for the source index partition to the target data
-     * service. Once the target index partition is registered on the target data
-     * service and the {@link IMetadataService} has been updated to reflect the
-     * move, this task updates the stale locator cache. At that point clients
-     * addressing tasks to the source index partition will discover that it has
-     * been moved.
+     * This is an "atomic update" operation. It moves an index segment (supplied
+     * by the caller) containing the historical view of the source index
+     * partition and generates and moves an index segment containing any
+     * buffered writes on the live journal for the source index partition to the
+     * target data service. Once the target index partition is registered on the
+     * target data service and the {@link IMetadataService} has been updated to
+     * reflect the move, this task updates the stale locator cache. At that
+     * point clients addressing tasks to the source index partition will
+     * discover that it has been moved.
      * <p>
      * Note: If the operation fails, then it has no side-effects but the caller
      * is responsible for deleting the <i>historicalWritesBuildResult</i> iff
@@ -352,6 +352,14 @@ public class MoveTask extends AbstractPrepareTask<Void> {
      * have an exclusive lock in order to ensure that the buffered writes are
      * transferred to the target index partition without allowing concurrent
      * writes on the source index partition.
+     * <p>
+     * Note: I have placed the "receive" of the historical index partition view
+     * within the atomic update task deliberately. It should add at most a few
+     * seconds to the execution time of that task and makes it easier to write
+     * corrective actions for the atomic update since we can offer a guarentees
+     * such that the existence of the target index partition on the target data
+     * service is sufficient to determine that the entire operation was
+     * successful.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
