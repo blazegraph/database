@@ -436,6 +436,9 @@ public interface IDataService extends ITxCommitProtocol, IService {
      *             if the task can not be accepted for execution.
      * @throws IOException
      *             if there is an RMI problem.
+     * 
+     * @todo change API to <T> Future<T> submit(tx,name,IIndexProcedure<T>).
+     *       Existing code will need to be recompiled after this API change.
      */
     public Future submit(long tx, String name, IIndexProcedure proc)
             throws IOException;

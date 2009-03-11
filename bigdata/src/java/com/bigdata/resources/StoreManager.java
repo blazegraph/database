@@ -4185,7 +4185,20 @@ abstract public class StoreManager extends ResourceEvents implements
 
     }
 
+    public File getIndexSegmentFile(final IndexMetadata indexMetadata) {
+
+        if (indexMetadata == null)
+            throw new IllegalArgumentException();
+
+        final IPartitionMetadata pmd = indexMetadata.getPartitionMetadata();
+
+        return getIndexSegmentFile(indexMetadata.getName(), indexMetadata
+                .getIndexUUID(), pmd == null ? -1 : pmd.getPartitionId());
+        
+    }
+    
     /**
+     * 
      * Note: The index name appears in the file path above the {@link UUID} of
      * the scale-out index. Therefore it is not possible to have collisions
      * arise in the file system when given indices whose scale-out names differ
@@ -4193,26 +4206,52 @@ abstract public class StoreManager extends ResourceEvents implements
      * files will always be stored in a directory specific to the scale-out
      * index.
      * 
+     * @param scaleOutIndexName
+     *            The name of the scale-out index.
+     * @param indexUUID
+     *            The UUID of the scale-out index.
+     * @param partitionId
+     *            The index partition identifier -or- <code>-1</code> if the
+     *            index is not partitioned (handles the MDS which does not use
+     *            partitioned indices at this time).
+     * 
+     * @return The {@link File} on which a {@link IndexSegmentStore} for that
+     *         index partition may be written. The file will be unique and
+     *         empty.
+     * 
+     * @throws IllegalArgumentException
+     *             if any argument is <code>null</code>
+     * @throws IllegalArgumentException
+     *             if the partitionId is negative and not <code>-1</code>
+     * 
      * @todo should the filename be relative or absolute?
      */
-    public File getIndexSegmentFile(final IndexMetadata indexMetadata) {
+    public File getIndexSegmentFile(final String scaleOutIndexName,
+            final UUID indexUUID, final int partitionId) {
 
         assertOpen();
 
+        if (scaleOutIndexName == null)
+            throw new IllegalArgumentException();
+
+        if (indexUUID == null)
+            throw new IllegalArgumentException();
+
+        if (partitionId < -1)
+            throw new IllegalArgumentException();
+        
         // munge index name to fit the file system.
-        final String mungedName = munge(indexMetadata.getName());
+        final String mungedName = munge(scaleOutIndexName);
 
         // subdirectory into which the individual index segs will be placed.
         final File indexDir = new File(segmentsDir, mungedName + File.separator
-                + indexMetadata.getIndexUUID().toString());
+                + indexUUID.toString());
 
         // make sure that directory exists.
         indexDir.mkdirs();
 
-        final IPartitionMetadata pmd = indexMetadata.getPartitionMetadata();
-
-        final String partitionStr = (pmd == null ? "" : "_part"
-                + leadingZeros.format(pmd.getPartitionId()));
+        final String partitionStr = (partitionId == -1 ? "" : "_part"
+                + leadingZeros.format(partitionId));
 
         final String prefix = mungedName + "" + partitionStr + "_";
 

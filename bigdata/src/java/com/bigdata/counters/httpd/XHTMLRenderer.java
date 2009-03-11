@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.lang.reflect.Field;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.Vector;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -3521,11 +3523,27 @@ public class XHTMLRenderer {
             eventsSB.append((offset < 0 ? "" : "+") +offset+" ], null,\n");
             
             final StringBuilder tooltipsSB = tooltipsByHost.get(key);
-            
-            /*
-             * use the tab-delimited format, but remove the trailing newline.
-             */
-            final String tooltip = e.toString().replace("\n", "");
+
+            final String tooltip;
+            if (false) {
+                /*
+                 * FIXME Finish the event flyover formatting support. I need to
+                 * validate the HTML table and then validate how it is embedded
+                 * inside of the flot data. Since it occurs inline, it probably
+                 * needs to be escaped. It may also be impossible to do this in
+                 * a manner which validates, but still possible to do it in a
+                 * manner which is accepted by at least some browsers.
+                 */
+                StringWriter sw = new StringWriter();
+                writeEventFlyover(sw, e);
+                tooltip = sw.toString();
+            } else {
+                /*
+                 * use the tab-delimited format, but remove the trailing
+                 * newline.
+                 */
+                tooltip = e.toString().replace("\n", "");
+            }
             
             // @todo does this need to escape embedded quotes for javascript?
             if (tooltip != null && !tooltip.startsWith("\"")) {
@@ -3679,6 +3697,96 @@ public class XHTMLRenderer {
 
     }
 
+    /**
+     * Pretty up an event by rendering onto the {@link Writer} as an (X)HTML
+     * table.
+     * 
+     * @param w
+     *            The writer.
+     * @param e
+     *            The event.
+     * 
+     * @throws IOException
+     */
+    protected void writeEventFlyover(final Writer w, final Event e)
+            throws IOException {
+        
+        final DateFormat dateFormat = DateFormat.getDateTimeInstance();
+
+        final String summary = e.majorEventType + " from "
+                + dateFormat.format(new Date(e.getStartTime())) + " to "
+                + dateFormat.format(new Date(e.getEndTime())) + ", uuid="
+                + e.eventUUID.toString();
+        
+        w.write("<table border=\"1\" summary=\"" + attrib(summary) + "\"\n>");
+
+        w.write(" <caption>");
+        w.write(cdata(e.majorEventType + " from "
+                + cdata(dateFormat.format(new Date(e.getStartTime()))) + " to "
+                + e.getEndTime()));
+        w.write("</caption\n>");
+        
+        // header row.
+        w.write(" <tr\n>");
+        w.write("  <th>" + "From: "
+                + cdata(dateFormat.format(new Date(e.getStartTime())))
+                + "</th\n>");
+        w.write("  <th>" + "To: "
+                + cdata(dateFormat.format(new Date(e.getEndTime())))
+                + "</th\n>");
+        w.write("  <th>"
+                + "Duration: " + (e.getEndTime() - e.getStartTime())
+                + "s</th\n>");
+        w.write(" </tr\n>");
+
+        // attributes.
+        w.write(" <tr\n>");
+        w.write("  <th align=\"left\">hostname</th>");
+        w.write("  <td colspan=\"2\">"+cdata(e.hostname.toString())+"</td>");
+        w.write(" </tr\n>");
+
+        w.write(" <tr\n>");
+        w.write("  <th align=\"left\">serviceIface</th>");
+        w.write("  <td colspan=\"2\">"+cdata(e.serviceIface.toString())+"</td>");
+        w.write(" </tr\n>");
+
+        w.write(" <tr\n>");
+        w.write("  <th align=\"left\">serviceName</th>");
+        w.write("  <td colspan=\"2\">"+cdata(e.serviceName.toString())+"</td>");
+        w.write(" </tr\n>");
+
+        w.write(" <tr\n>");
+        w.write("  <th align=\"left\">serviceUUID</th>");
+        w.write("  <td colspan=\"2\">"+cdata(e.serviceUUID.toString())+"</td>");
+        w.write(" </tr\n>");
+
+        w.write(" <tr\n>");
+        w.write("  <th align=\"left\">resource</th>");
+        w.write("  <td colspan=\"2\">"+cdata(e.resource.toString())+"</td>");
+        w.write(" </tr\n>");
+        
+        w.write(" <tr\n>");
+        w.write("  <th align=\"left\">minorEventType</th>");
+        w.write("  <td colspan=\"2\">"+cdata(e.minorEventType.toString())+"</td>");
+        w.write(" </tr\n>");
+
+        w.write(" <tr\n>");
+        w.write("  <th align=\"left\">majorEventType</th>");
+        w.write("  <td colspan=\"2\">"+cdata(e.majorEventType.toString())+"</td>");
+        w.write(" </tr\n>");
+
+        if (true && e.getDetails() != null && e.getDetails().length() > 0) {
+            // details on the last line by itself.
+            w.write(" <tr\n>");
+            w.write("  <th align=\"left\">");
+            w.write("  <td colspan=\"4\">" + cdata(e.getDetails()) + "</td>");
+            w.write(" </tr\n>");
+        }
+        
+        w.write("</table\n>");
+
+    }
+    
     /**
      * Write a text file into the html. The supplied resource will be relative
      * to this class.

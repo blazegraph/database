@@ -39,9 +39,14 @@ public class MoveResult extends AbstractResult {
     
     /**
      * @param name
+     *            The name of the source index partition.
      * @param indexMetadata
+     *            The index metadata object for the source index partition.
      * @param targetDataServiceUUID
+     *            The data service {@link UUID} for the target data service.
      * @param newPartitionId
+     *            The partition identifier assigned to the target index
+     *            partition.
      * @param oldLocator
      *            The locator for the source index partition.
      * @param newLocator

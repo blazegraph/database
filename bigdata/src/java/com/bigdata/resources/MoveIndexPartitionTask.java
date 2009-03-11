@@ -157,14 +157,6 @@ import com.bigdata.service.RawDataServiceTupleIterator;
  *       partition is not dropped until the atomic update task completes
  *       successfully.
  * 
- * @todo MOVE could also be a (full or partial) build followed by a copy of the
- *       index segment(s) in the view to the target data service and finally
- *       followed by the atomic update, which would copy over any tuples that
- *       have been buffered on the live journal. This could be much less
- *       expensive (depending on the state of the source index partition) and
- *       the data to be moved could be blasted across a socket. Try it out both
- *       ways.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

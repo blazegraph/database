@@ -64,6 +64,13 @@ public enum OverflowSubtaskEnum {
      * Operation copying an {@link IndexSegment} using the
      * {@link ResourceService}.
      */
-    SendSegment;
+    SendSegment,
+    /**
+     * The operation submitted to the target data service during a MOVE in which
+     * it receives the data for the source index partition and registers the
+     * target index partition.
+     */
+    Receive
+    ;
 
 }
