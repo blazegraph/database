@@ -63,8 +63,8 @@ import com.bigdata.sparse.SparseRowStore;
  * performing a datum {@link ISimpleBTree#lookup(Object)}. These procedures are
  * always directed to a single index partition. Since they are never mapped
  * across index partitions, there is no "aggregation" phase. Likewise, there is
- * no {@link AbstractIndexProcedureConstructor} since the procedure instance is always
- * created directly by the application.</dd>
+ * no {@link AbstractIndexProcedureConstructor} since the procedure instance is
+ * always created directly by the application.</dd>
  * 
  * <dt>A key range, <code>byte[] toKey, byte[] fromKey</code></dt>
  * 
@@ -96,7 +96,8 @@ import com.bigdata.sparse.SparseRowStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @tood add generic type for the return value (much like {@link Callable}).
+ * @todo add generic type for {@link #apply(IIndex)} 's return value (much like
+ *       {@link Callable}).
  */
 public interface IIndexProcedure extends Serializable {
 

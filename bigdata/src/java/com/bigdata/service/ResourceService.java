@@ -1099,7 +1099,9 @@ abstract public class ResourceService {
         }
 
         /**
-         * Return the {@link File} on which the resource was written.
+         * Return the {@link File} on which the resource was written. If the
+         * operation fails, then the caller is responsible deciding whether or
+         * not the {@link File} specified to the ctor needs to be deleted.
          * 
          * @throws IOException
          *             if the file exists and is not empty.
