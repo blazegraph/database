@@ -412,6 +412,9 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
+     * 
+     * @todo optimization to NOT send an empty index segment if there are no
+     *       buffered writes on the live journal.
      */
     protected static class AtomicUpdate extends AbstractTask<MoveResult> {
         
