@@ -228,11 +228,17 @@ abstract public class OverflowManager extends IndexManager {
     protected final AtomicBoolean asyncOverflowEnabled = new AtomicBoolean(true);
     
     /**
-     * #of overflows that have taken place. This counter is incremented each
-     * time the entire overflow operation is complete, including any
-     * asynchronous post-processing of the old journal.
+     * #of synchronous overflows that have taken place. This counter is
+     * incremented each time the synchronous overflow operation is complete.
      */
-    protected final AtomicLong overflowCounter = new AtomicLong(0L);
+    protected final AtomicLong synchronousOverflowCounter = new AtomicLong(0L);
+
+    /**
+     * #of asynchronous overflows that have taken place. This counter is
+     * incremented each time the entire overflow operation is complete,
+     * including any asynchronous post-processing of the old journal.
+     */
+    protected final AtomicLong asynchronousOverflowCounter = new AtomicLong(0L);
 
     /**
      * A flag that may be set to force the next overflow to perform a compacting
@@ -320,13 +326,23 @@ abstract public class OverflowManager extends IndexManager {
     protected final boolean overflowCancelledWhenJournalFull;
 
     /**
-     * #of overflows that have taken place. This counter is incremented each
-     * time the entire overflow operation is complete, including any
-     * post-processing of the old journal.
+     * #of synchronous overflows that have taken place. This counter is
+     * incremented each time the synchronous overflow operation.
      */
-    public long getOverflowCount() {
+    public long getSynchronousOverflowCount() {
     
-        return overflowCounter.get();
+        return synchronousOverflowCounter.get();
+        
+    }
+    
+    /**
+     * #of asynchronous overflows that have taken place. This counter is
+     * incremented each time the entire overflow operation is complete,
+     * including any post-processing of the old journal.
+     */
+    public long getAsynchronousOverflowCount() {
+    
+        return asynchronousOverflowCounter.get();
         
     }
     
@@ -771,11 +787,18 @@ abstract public class OverflowManager extends IndexManager {
         String ShouldOverflow = "Should Overflow";
 
         /**
-         * The #of overflow events that have taken place. This counter is
-         * incremented each time the entire overflow operation is complete,
-         * including any post-processing of the old journal.
+         * The #of synchronous overflow events that have taken place. This
+         * counter is incremented each time the synchronous overflow operation
+         * is complete.
          */
-        String OverflowCount = "Overflow Count";
+        String SynchronousOverflowCount = "Synchronous Overflow Count";
+
+        /**
+         * The #of asynchronous overflow events that have taken place. This
+         * counter is incremented each time the entire overflow operation is
+         * complete, including any post-processing of the old journal.
+         */
+        String AsynchronousOverflowCount = "Asynchronous Overflow Count";
 
         /**
          * The #of asynchronous overflow operations which have failed.
@@ -1478,7 +1501,7 @@ abstract public class OverflowManager extends IndexManager {
 
         final Event e = new Event(getFederation(), new EventResource(),
                 EventType.SynchronousOverflow, "overflowCounter="
-                        + overflowCounter).start();
+                        + asynchronousOverflowCounter).start();
 
         try {
 
@@ -1540,7 +1563,7 @@ abstract public class OverflowManager extends IndexManager {
                  * asynchronous overflow processing.
                  */
 
-                overflowCounter.incrementAndGet();
+                asynchronousOverflowCounter.incrementAndGet();
 
                 return null;
 
@@ -1553,7 +1576,7 @@ abstract public class OverflowManager extends IndexManager {
                  * asynchronous overflow processing.
                  */
 
-                overflowCounter.incrementAndGet();
+                asynchronousOverflowCounter.incrementAndGet();
 
                 return null;
 
@@ -1778,12 +1801,16 @@ abstract public class OverflowManager extends IndexManager {
         final long firstCommitTime;
         {
 
-            if(INFO)
-            log.info("doOverflow(): lastCommitTime=" + lastCommitTime + "\nfile="
-                    + oldJournal.getFile()
-                    + "\npre-condition views: overflowCounter="
-                    + getOverflowCount() + "\n"
-                    + listIndexPartitions(TimestampUtility.asHistoricalRead(lastCommitTime)));
+            if (INFO)
+                log.info("doOverflow(): lastCommitTime="
+                        + lastCommitTime
+                        + "\nfile="
+                        + oldJournal.getFile()
+                        + "\npre-condition views: synchronousOverflowCounter="
+                        + getSynchronousOverflowCount()
+                        + "\n"
+                        + listIndexPartitions(TimestampUtility
+                                .asHistoricalRead(lastCommitTime)));
 
             final Iterator<ViewMetadata> itr = overflowMetadata.views();
             
@@ -2077,25 +2104,13 @@ abstract public class OverflowManager extends IndexManager {
         }
 
         /*
-         * Show the new views once we have cut over to the new journal. if we do
-         * this before we cut over then the data will still be read from the old
-         * journal.
-         */
-        if(INFO)
-        log.info("\ndoOverflow(): firstCommitTime=" + firstCommitTime
-                + "\nfile=" + newJournal.getFile()
-                + "\npost-condition views: overflowCounter="
-                + getOverflowCount() + "\n"
-                + listIndexPartitions(TimestampUtility.asHistoricalRead(firstCommitTime)));
-        
-        /*
          * Change over the counter set to the new live journal.
          * 
          * Note: The spelling of the counter set names MUST be consistent with
          * their declarations!
          * 
-         * Note: getCounters() on this class gets attached to thew serviceRoot
-         * by the DataService so that is where we need to go to detach and then
+         * Note: getCounters() on this class gets attached to the serviceRoot by
+         * the DataService so that is where we need to go to detach and then
          * re-attach the counters.
          */
         try {
@@ -2117,21 +2132,31 @@ abstract public class OverflowManager extends IndexManager {
                 final CounterSet tmp = (CounterSet) serviceRoot
                         .getPath(IDataServiceCounters.resourceManager);
 
-                synchronized (tmp) {
+                if (tmp != null) {
+                    
+                    /*
+                     * Again, the resourceManager counters are not defined for
+                     * some unit tests.
+                     */
 
-                    // // the live journal is a child of the resource manager.
-                    // tmp.detach(IResourceManagerCounters.LiveJournal);
+                    synchronized (tmp) {
 
-                    // tmp.makePath(IResourceManagerCounters.LiveJournal).attach(
-                    // getLiveJournal().getCounters());
+                        // // the live journal is a child of the resource
+                        // manager.
+                        // tmp.detach(IResourceManagerCounters.LiveJournal);
 
-                    ((CounterSet) tmp
-                            .getPath(IResourceManagerCounters.LiveJournal))
-                            .attach(getLiveJournal().getBufferStrategy()
-                                    .getCounters(), true/* replace */);
+                        // tmp.makePath(IResourceManagerCounters.LiveJournal).attach(
+                        // getLiveJournal().getCounters());
 
-                    log.warn("Re-attached live journal counters: path="
-                            + tmp.getPath());
+                        ((CounterSet) tmp
+                                .getPath(IResourceManagerCounters.LiveJournal))
+                                .attach(getLiveJournal().getBufferStrategy()
+                                        .getCounters(), true/* replace */);
+
+                        log.warn("Re-attached live journal counters: path="
+                                + tmp.getPath());
+
+                    }
 
                 }
 
@@ -2143,11 +2168,26 @@ abstract public class OverflowManager extends IndexManager {
             
         }
         
-        if(INFO)
-            log.info("end");
-        
+        synchronousOverflowCounter.incrementAndGet();
+
+        /*
+         * Show the new views once we have cut over to the new journal. if we do
+         * this before we cut over then the data will still be read from the old
+         * journal.
+         */
+        if (INFO)
+            log.info("\ndoOverflow(): firstCommitTime="
+                    + firstCommitTime
+                    + "\nfile="
+                    + newJournal.getFile()
+                    + "\npost-condition views: synchronousOverflowCounter="
+                    + getSynchronousOverflowCount()
+                    + "\n"
+                    + listIndexPartitions(TimestampUtility
+                            .asHistoricalRead(firstCommitTime)));
+
         return overflowMetadata;
 
     }
-    
+
 }

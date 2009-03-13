@@ -194,7 +194,7 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
                 InterruptedException, ExecutionException {
 
             // no overflow yet.
-            assertEquals(0,resourceManager.getOverflowCount());
+            assertEquals(0,resourceManager.getAsynchronousOverflowCount());
             
             // the initial journal.
             final AbstractJournal j0 = resourceManager.getLiveJournal();
@@ -211,7 +211,7 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             registerIndex(name);
 
             // did overflow.
-            assertEquals(1,resourceManager.getOverflowCount());
+            assertEquals(1,resourceManager.getAsynchronousOverflowCount());
 
             // the new journal.
             final AbstractJournal j1 = resourceManager.getLiveJournal();
@@ -344,7 +344,7 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
                 InterruptedException, ExecutionException {
 
             // no overflow yet.
-            assertEquals(0,resourceManager.getOverflowCount());
+            assertEquals(0,resourceManager.getAsynchronousOverflowCount());
 
             // the initial journal.
             final AbstractJournal j0 = resourceManager.getLiveJournal();
@@ -364,7 +364,7 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             registerIndex(name);
 
             // did overflow.
-            assertEquals(1,resourceManager.getOverflowCount());
+            assertEquals(1,resourceManager.getAsynchronousOverflowCount());
 
             /*
              * Note: the old journal should have been closed for writes during
@@ -512,7 +512,7 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
                 InterruptedException, ExecutionException {
 
             // no overflow yet.
-            assertEquals(0,resourceManager.getOverflowCount());
+            assertEquals(0,resourceManager.getAsynchronousOverflowCount());
 
             // the initial journal.
             final AbstractJournal j0 = resourceManager.getLiveJournal();
@@ -535,7 +535,7 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             final long begin = System.currentTimeMillis();
 
             // did overflow.
-            assertEquals(1,resourceManager.getOverflowCount());
+            assertEquals(1,resourceManager.getAsynchronousOverflowCount());
 
             // two journals.
             assertEquals(2,resourceManager.getManagedJournalCount());
@@ -581,7 +581,7 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             registerIndex("B");
             
             // did overflow.
-            assertEquals(2,resourceManager.getOverflowCount());
+            assertEquals(2,resourceManager.getAsynchronousOverflowCount());
 
             // note: purge is not invoke on overflow anymore, so do it ourselves.
             resourceManager.purgeOldResources(100/*ms*/, false/*truncateJournal*/);

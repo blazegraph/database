@@ -224,6 +224,12 @@ public class CacheOnceMetadataIndex implements IMetadataIndex {
 
     }
 
+    public long rangeCountExactWithDeleted(byte[] fromKey, byte[] toKey) {
+
+        return mdi.rangeCountExactWithDeleted(fromKey, toKey);
+
+    }
+
     public ITupleIterator rangeIterator() {
 
         return mdi.rangeIterator();

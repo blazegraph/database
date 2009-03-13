@@ -34,6 +34,7 @@ import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -59,6 +60,7 @@ import com.bigdata.service.Event;
 import com.bigdata.service.EventResource;
 import com.bigdata.service.EventType;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.ResourceService;
 
 /**
  * A read-only store backed by a file containing a single {@link IndexSegment}.
@@ -67,7 +69,6 @@ import com.bigdata.service.IBigdataFederation;
  * @version $Id$
  */
 public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
-//        IValueAge {
 
     /**
      * Logger.
@@ -1066,6 +1067,25 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
      * other than {@link #_close()} that can set {@link #raf}. Since both this
      * method and {@link #_close()} are synchronized the state of that field is
      * well known inside of this method.
+     * <p>
+     * Note: {@link OverlappingFileLockException}s can arise when there are
+     * concurrent requests to obtain a shared lock on the same file. Personally,
+     * I think that this is a bug since the lock requests are shared and should
+     * be processed without deadlock. However, the code handles this case by
+     * proceeding without the lock - exactly as it would handle the case where a
+     * shared lock was not available. This is still somewhat fragile since it
+     * someone does not test the {@link FileLock} and was in fact granted an
+     * exclusive lock when they requested a shared lock then this code will be
+     * unwilling to send the resource. There are two ways to make that work out -
+     * either we DO NOT use {@link FileLock} for read-only files (index
+     * segments) or we ALWAYS discard the {@link FileLock} if it is not shared
+     * when we requested a shared lock and proceed without a lock. For this
+     * reason, the behavior of this class and {@link ResourceService} MUST
+     * match.
+     * 
+     * @see ResourceService
+     * @see http://blogs.sun.com/DaveB/entry/new_improved_in_java_se1
+     * @see http://forums.sun.com/thread.jspa?threadID=5324314.
      * 
      * @return The {@link FileChannel}.
      * 
@@ -1110,7 +1130,10 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             /*
              * Request a shared file lock.
              */
-            if (raf.getChannel().tryLock(0, Long.MAX_VALUE, true/* shared */) == null) {
+            final FileLock fileLock = raf.getChannel().tryLock(0,
+                    Long.MAX_VALUE, true/* shared */);
+            
+            if (fileLock == null) {
 
                 /*
                  * Note: A null return indicates that someone else holds the
@@ -1127,6 +1150,44 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
                 throw new IOException("File already locked: file=" + getFile());
 
             }
+
+            if(!fileLock.isShared()) {
+                
+                /*
+                 * DO NOT hold an exclusive lock for an index segment store
+                 * file!
+                 * 
+                 * Note: On platforms where shared locks are not support the JDK
+                 * will escalate to an exclusive lock. That would interfere with
+                 * our ability to MOVE index segments around using the
+                 * ResourceService so we make sure that we don't hold an
+                 * exclusive file lock here.
+                 */
+                
+                fileLock.release();
+                
+            }
+            
+        } catch (OverlappingFileLockException ex) {
+
+            /*
+             * Note: OverlappingFileLockException can be thrown when there are
+             * concurrent requests to obtain the same shared lock. I consider
+             * this a JDK bug. It should be possible to service both requests
+             * without deadlock.
+             * 
+             * Note: I had seen this exception occasionally even before we
+             * started using the ResourceService to MOVE index segments around.
+             * That also looks like a JDK bug since we only request the FileLock
+             * in this method, we know that the channel is closed, and this
+             * method is [synchronized]. Ergo, it should not be possible to have
+             * overlapping requests (concurrent requests).
+             */
+
+            if (INFO)
+                log
+                        .info("Will proceed without lock: file=" + file + " : "
+                                + ex);
 
         } catch (IOException ex) {
 
@@ -1400,25 +1461,5 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     final public long unpackAddr(DataInput in) throws IOException {
         return addressManager.unpackAddr(in);
     }
-    
-//    /*
-//     * API used to report how long it has been since the store was last
-//     * used. This is used to clear stores are not in active use from the
-//     * value cache, which helps us to better manage RAM.
-//     */
-//    
-//    final public void touch() {
-//    
-//        timestamp = System.nanoTime();
-//        
-//    }
-//    
-//    final public long timestamp() {
-//        
-//        return timestamp;
-//        
-//    }
-//    
-//    private long timestamp = System.nanoTime();
 
 }

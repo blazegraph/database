@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import java.util.Arrays;
+import java.util.Iterator;
 
 import org.apache.log4j.Logger;
 
@@ -87,6 +88,12 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
      * True iff the {@link #log} level is DEBUG or less.
      */
     final protected boolean DEBUG = log.isDebugEnabled();
+
+    /**
+     * Error message if the view has more than {@link Long#MAX_VALUE} elements
+     * and you requested an exact range count.
+     */
+    static protected transient final String ERR_RANGE_COUNT_EXCEEDS_MAX_LONG = "The range count can not be expressed as a 64-bit signed integer";
 
     /**
      * Holds the various btrees that are the sources for the view.
@@ -592,7 +599,6 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
      * than one source index.
      * 
      * @todo this could be done using concurrent threads.
-     * @todo watch for overflow of {@link Long#MAX_VALUE}
      */
     final public long rangeCount(byte[] fromKey, byte[] toKey) {
 
@@ -632,8 +638,18 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
         long count = 0;
         
         for (int i = 0; i < srcs.length; i++) {
-            
-            count += srcs[i].rangeCount(fromKey, toKey);
+
+            final long inc = srcs[i].rangeCount(fromKey, toKey);
+
+            if (count + inc < count) {
+
+                log.warn(ERR_RANGE_COUNT_EXCEEDS_MAX_LONG);
+                
+                return Long.MAX_VALUE;
+                
+            }
+
+            count += inc;
             
         }
         
@@ -643,10 +659,41 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
 
     /**
      * The exact range count is obtained using a key-range scan over the view.
-     * 
-     * @todo watch for overflow of {@link Long#MAX_VALUE}
      */
-    final public long rangeCountExact(final byte[] fromKey, final byte[] toKey) {
+    final public long rangeCountExact(byte[] fromKey, byte[] toKey) {
+
+        if (fromKey == null || toKey == null) {
+
+            /*
+             * Note: When an index partition is split, the new index partitions
+             * will initially use the same source index segments as the original
+             * index partition. Therefore we MUST impose an explicit constraint
+             * on the fromKey / toKey if none is given so that we do not read
+             * tuples lying outside of the index partition boundaries! However,
+             * if there is only a BTree in the view then the partition metadata
+             * might not be defined, so we check for that first.
+             */
+
+            final LocalPartitionMetadata pmd = getIndexMetadata()
+                    .getPartitionMetadata();
+
+            if (pmd != null) {
+            
+                if (fromKey == null) {
+                
+                    fromKey = pmd.getLeftSeparatorKey();
+                    
+                }
+
+                if (toKey == null) {
+
+                    toKey = pmd.getRightSeparatorKey();
+
+                }
+
+            }
+
+        }
 
         final ITupleIterator itr = rangeIterator(fromKey, toKey,
                 0/* capacity */, 0/* flags */, null/* filter */);
@@ -657,6 +704,9 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
 
             itr.next();
 
+            if (n == Long.MAX_VALUE)
+                throw new RuntimeException(ERR_RANGE_COUNT_EXCEEDS_MAX_LONG);
+            
             n++;
 
         }
@@ -665,6 +715,68 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
         
     }
     
+    /**
+     * An exact range count that includes any deleted tuples. This is obtained
+     * using a key-range scan over the view.
+     * 
+     * @see #rangeCountExact(byte[], byte[])
+     */
+    public long rangeCountExactWithDeleted(byte[] fromKey, byte[] toKey) {
+
+        if (fromKey == null || toKey == null) {
+
+            /*
+             * Note: When an index partition is split, the new index partitions
+             * will initially use the same source index segments as the original
+             * index partition. Therefore we MUST impose an explicit constraint
+             * on the fromKey / toKey if none is given so that we do not read
+             * tuples lying outside of the index partition boundaries! However,
+             * if there is only a BTree in the view then the partition metadata
+             * might not be defined, so we check for that first.
+             */
+
+            final LocalPartitionMetadata pmd = getIndexMetadata()
+                    .getPartitionMetadata();
+
+            if (pmd != null) {
+
+                if (fromKey == null) {
+
+                    fromKey = pmd.getLeftSeparatorKey();
+
+                }
+
+                if (toKey == null) {
+
+                    toKey = pmd.getRightSeparatorKey();
+
+                }
+
+            }
+
+        }
+
+        // set the DELETED flag so we also see the deleted tuples.
+        final Iterator itr = rangeIterator(fromKey, toKey, 0/* capacity */,
+                IRangeQuery.DELETED/* flags */, null/* filter */);
+
+        long n = 0L;
+
+        while (itr.hasNext()) {
+
+            itr.next();
+
+            if (n == Long.MAX_VALUE)
+                throw new RuntimeException(ERR_RANGE_COUNT_EXCEEDS_MAX_LONG);
+
+            n++;
+
+        }
+
+        return n;
+
+    }
+
     public ITupleIterator rangeIterator() {
 
         return rangeIterator(null, null);

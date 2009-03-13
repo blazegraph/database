@@ -113,7 +113,8 @@ import com.bigdata.service.Split;
  * 
  * @see KeyBuilder
  */
-abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearList {//, IValueAge  {
+abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
+        ILinearList {
 
     /**
      * The index is already closed.
@@ -1954,53 +1955,49 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
     }
 
     /**
-     * An exact range count that includes any deleted tuples.
-     * <p>
-     * Note: {@link #rangeCountExact(byte[], byte[])} DOES NOT count deleted
-     * tuples. Therefore its logic its logic here but this method also sets the
-     * {@link IRangeQuery#DELETED} flag so that we count both the deleted and
-     * the non-deleted tuples.
-     * 
-     * @param fromKey
-     * @param toKey
-     * 
-     * @return
-     * 
-     * @see #rangeCountExact(byte[], byte[])
+     * Note: {@link #rangeCount(byte[], byte[])} already reports deleted tuples
+     * for an {@link AbstractBTree} so this method is just delegated to that
+     * one. However,
+     * {@link FusedView#rangeCountExactWithDeleted(byte[], byte[])} treats this
+     * case differently since it must report the exact range count when
+     * considering all sources at once. It uses a range iterator scan visiting
+     * both deleted and undeleted tuples for that.
      */
     public long rangeCountExactWithDeleted(final byte[] fromKey,
             final byte[] toKey) {
+
+        return rangeCount(fromKey, toKey);
         
-        if (fromKey == null && toKey == null) {
-
-            /*
-             * In this case the entryCount() is exact and will report both
-             * deleted and undeleted tuples (assuming that delete markers are
-             * enabled).
-             */
-
-            return getEntryCount();
-
-        }
-
-        /*
-         * Only a key-range will be used. 
-         */
-
-        long n = 0L;
-
-        final Iterator itr = rangeIterator(fromKey, toKey, 0/* capacity */,
-                IRangeQuery.DELETED/* flags */, null/* filter */);
-
-        while (itr.hasNext()) {
-
-            itr.next();
-
-            n++;
-
-        }
-
-        return n;
+//        if (fromKey == null && toKey == null) {
+//
+//            /*
+//             * In this case the entryCount() is exact and will report both
+//             * deleted and undeleted tuples (assuming that delete markers are
+//             * enabled).
+//             */
+//
+//            return getEntryCount();
+//
+//        }
+//
+//        /*
+//         * Only a key-range will be used. 
+//         */
+//
+//        long n = 0L;
+//
+//        final Iterator itr = rangeIterator(fromKey, toKey, 0/* capacity */,
+//                IRangeQuery.DELETED/* flags */, null/* filter */);
+//
+//        while (itr.hasNext()) {
+//
+//            itr.next();
+//
+//            n++;
+//
+//        }
+//
+//        return n;
 
     }
 

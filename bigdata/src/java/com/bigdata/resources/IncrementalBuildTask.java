@@ -1,17 +1,15 @@
 package com.bigdata.resources;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 
-import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
-import com.bigdata.journal.AbstractTask;
+import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
@@ -59,17 +57,7 @@ import com.bigdata.service.EventResource;
  */
 public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
 
-    final protected ViewMetadata vmd;
-
-//    /**
-//     * The file on which the {@link IndexSegment} will be written.
-//     */
-//    final protected File outFile;
-    
-    /**
-     * The source view.
-     */
-    BTree src;
+    final private ViewMetadata vmd;
 
     /**
      * @param vmd
@@ -81,25 +69,6 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
                 .asHistoricalRead(vmd.commitTime), vmd.name);
 
         this.vmd = vmd;
-
-//        // the file to be generated.
-//        this.outFile = resourceManager.getIndexSegmentFile(vmd.indexMetadata);
-
-        /*
-         * Put a hard reference hold on the btree.
-         * 
-         * Note: This could be too aggressive if the data service is memory
-         * starved, but it will help us to finish the index segment builds as
-         * quickly as possible.
-         */
-        this.src = vmd.getBTree();
-        
-        /*
-         * Release soft references to the full view and the mutable btree on the
-         * ViewMetadata object (we are relying on the reference that we made
-         * above).
-         */  
-        vmd.clearRef();
         
     }
 
@@ -108,15 +77,8 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
 
         // release soft references.
         vmd.clearRef();
-
-        // release hard reference.
-        src = null;
         
     }
-
-//    final int BUILD_MAX_JOURNAL_COUNT = 3;
-//
-//    final long BUILD_MAX_SUM_ENTRY_COUNT = Bytes.megabyte * 10;
 
     /**
      * Build an {@link IndexSegment} from the compacting merge of an index
@@ -133,90 +95,70 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
 
         try {
 
-            final BuildResult result;
+            if (resourceManager.isOverflowAllowed())
+                throw new IllegalStateException();
+
+            final BuildResult buildResult;
             try {
 
-                if (resourceManager.isOverflowAllowed())
-                    throw new IllegalStateException();
-
-                // index partition name.
-                final String name = vmd.name;
-
                 /*
-                 * The source view.
+                 * Figure out which sources will be used in the build operation.
+                 * The sources are choosen in order. The first source is always
+                 * a BTree on a journal and is always in the accepted view.
+                 * 
+                 * Note: The order of the sources MUST be maintained. This
+                 * ensures that the generated index segment will preserve only
+                 * the most recently written tuple (or delete marker) for each
+                 * tuple in the accepted view. We are only permitted to purge
+                 * deleted tuples when all sources are accepted in the build
+                 * view since that is the only time we have a guarentee that
+                 * there is not a delete version of that tuple further back in
+                 * history which would reemerge if we dropped the delete marker.
                  */
-                if (INFO) {
+                final BuildViewMetadata buildViewMetadata = new BuildViewMetadata(
+                        vmd.getView(),
+                        resourceManager.maximumBuildSegmentBytes, e);
 
-                    log.info("src=" + name + ", counter="
-                            + src.getCounter().get() + ", checkpoint="
-                            + src.getCheckpoint());
-
-                }
-
-                /*
-                 * Figure out which sources we want to include. We MUST always
-                 * include the 1st source in the view since that is the mutable
-                 * BTree on the old journal. We continue to include sources in
-                 * the view until we find the first "large" source. We stop
-                 * there because the goal is to keep down the #of components in
-                 * the view without doing the heavy work of processing a large
-                 * source (winds up copying a lot of tuples). We only do that
-                 * additional work on a compacting merge.
-                 */
-                final AbstractBTree[] sources = src.getSources();
-
-                final List<AbstractBTree> accepted = new ArrayList<AbstractBTree>(
-                        sources.length);
+                if(INFO)
+                    log.info("acceptedView: " + buildViewMetadata);
                 
-                // the mutable BTree on the old journal.
-                accepted.add( sources[ 0 ] );
+                /*
+                 * Build the index segment from a view comprised of just the
+                 * accepted sources.
+                 */
+                buildResult = resourceManager.buildIndexSegment(vmd.name,
+                        buildViewMetadata.acceptedView,
+                        buildViewMetadata.compactingMerge, vmd.commitTime,
+                        null/* fromKey */, null/* toKey */, e);
 
-                int journalCount = 1;
-                long sumEntryCount = sources[0].getEntryCount();
-                long sumSegBytes = 0L;
-                for (int i = 1; i < sources.length; i++) {
+                if (buildResult.sourceCount != buildViewMetadata.naccepted) {
 
-                    final AbstractBTree s = sources[i];
-
-                    sumEntryCount += s.getEntryCount();
-
-                    if (s instanceof IndexSegment) {
-
-                        final IndexSegment seg = (IndexSegment) s;
-
-                        sumSegBytes += seg.getStore().size();
-
-                    } else {
-                        
-                        journalCount++;
-                        
-                    }
-
-//                    if (journalCount > BUILD_MAX_JOURNAL_COUNT)
-//                        break;
-//
-//                    if (sumEntryCount > BUILD_MAX_SUM_ENTRY_COUNT)
-//                        break;
-
-                    if (sumSegBytes > resourceManager.maximumBuildSegmentBytes)
-                        break;
-
-                    // accept another source into the view for the build.
-                    accepted.add(s);
+                    throw new AssertionError("Build result has "
+                            + buildResult.sourceCount + ", but expected "
+                            + buildViewMetadata.naccepted + " : acceptedView="
+                            + buildViewMetadata + ", buildResult=" + buildResult);
                     
                 }
-                
+
+                if (INFO)
+                    log.info("buildResult=" + buildResult);
+
                 /*
-                 * Note: If ALL sources are accepted, then we are actually doing
-                 * a compacting merge and we set the flag appropriately!
+                 * Verify that the resource manager can open the new index
+                 * segment. This provides verification both that the index
+                 * segment is registered with the store manager and that the
+                 * index segment can be read. However, we do not actually read
+                 * the leaves of the index segment here so there still could be
+                 * errors on the disk.
                  */
-                final boolean compactingMerge = accepted.size() == sources.length;
+                final IndexSegmentStore segStore = (IndexSegmentStore) resourceManager
+                        .openStore(buildResult.segmentMetadata.getUUID());
 
-                // Build the index segment.
-                result = resourceManager.buildIndexSegment(name, src, 
-                        compactingMerge, vmd.commitTime, null/* fromKey */,
-                        null/* toKey */, e);
-
+                assert segStore != null;
+                
+                if (INFO)
+                    log.info("indexSegmentStore=" + segStore.loadIndexSegment());
+                    
             } finally {
 
                 /*
@@ -228,37 +170,29 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
 
             }
 
-            /*
-             * @todo error handling should be inside of the atomic update task
-             * since it has more visibility into the state changes and when we
-             * can no longer delete the new index segment.
-             */
             try {
 
-                // task will update the index partition view definition.
-                final AbstractTask<Void> task = new AtomicUpdateIncrementalBuildTask(
-                        resourceManager, concurrencyManager, vmd.name,
-                        vmd.indexMetadata.getIndexUUID(), result, e.newSubEvent(
-                                OverflowSubtaskEnum.AtomicUpdate,
-                                (result.compactingMerge ? OverflowActionEnum.Merge
-                                        : OverflowActionEnum.Build)
-                                        + "(" + vmd.name + ") : " + vmd));
+                /*
+                 * Submit task that will update the definition of the index
+                 * partition view and wait for it to complete.
+                 */
+                concurrencyManager.submit(
+                        new AtomicUpdateIncrementalBuildTask(resourceManager,
+                                concurrencyManager, vmd.name, vmd.indexMetadata
+                                        .getIndexUUID(), buildResult, e)).get();
 
-                // submit task and wait for it to complete
-                concurrencyManager.submit(task).get();
-                    
             } catch (Throwable t) {
 
                 // delete the generated index segment.
                 resourceManager
-                        .deleteResource(result.segmentMetadata.getUUID(), false/* isJournal */);
+                        .deleteResource(buildResult.segmentMetadata.getUUID(), false/* isJournal */);
 
                 // re-throw the exception
                 throw new Exception(t);
 
             }
 
-            return result;
+            return buildResult;
 
         } finally {
 
@@ -301,7 +235,7 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
      * @version $Id$
      */
     static protected class AtomicUpdateIncrementalBuildTask extends
-            AbstractAtomicUpdateTask<Void> {
+            AbstractAtomicUpdateTask<IResourceMetadata[]> {
 
         /**
          * The expected UUID of the scale-out index.
@@ -310,7 +244,7 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
         
         final protected BuildResult buildResult;
         
-        final private Event updateEvent;
+        final private Event parentEvent;
         
         /**
          * @param resourceManager 
@@ -320,7 +254,7 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
          */
         public AtomicUpdateIncrementalBuildTask(ResourceManager resourceManager,
                 IConcurrencyManager concurrencyManager, String resource,
-                UUID indexUUID, BuildResult buildResult, Event updateEvent) {
+                UUID indexUUID, BuildResult buildResult, Event parentEvent) {
 
             super(resourceManager, ITx.UNISOLATED, resource);
 
@@ -333,14 +267,14 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
             if (!resource.equals(buildResult.name))
                 throw new IllegalArgumentException();
 
-            if (updateEvent == null)
+            if (parentEvent == null)
                 throw new IllegalArgumentException();
 
             this.indexUUID = indexUUID;
             
             this.buildResult = buildResult;
             
-            this.updateEvent = updateEvent;
+            this.parentEvent = parentEvent;
             
         }
 
@@ -349,13 +283,22 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
          * Atomic update.
          * </p>
          * 
-         * @return <code>null</code>
+         * @return The ordered array of resources that define the post-condition
+         *         view.
          */
         @Override
-        protected Void doTask() throws Exception {
+        protected IResourceMetadata[] doTask() throws Exception {
 
-            updateEvent.start();
-            
+            // populated with the description of the ordered sources of the new view.
+            final List<IResourceMetadata> newView = new LinkedList<IResourceMetadata>();
+
+            final Event updateEvent = parentEvent.newSubEvent(
+                    OverflowSubtaskEnum.AtomicUpdate,
+                    (buildResult.compactingMerge ? OverflowActionEnum.Merge
+                            : OverflowActionEnum.Build)
+                            + "(" + buildResult.name + ") : " + buildResult)
+                    .start();
+
             try {
 
                 if (resourceManager.isOverflowAllowed())
@@ -363,9 +306,8 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
 
                 final SegmentMetadata segmentMetadata = buildResult.segmentMetadata;
 
-                if (INFO)
-                    log.info("Begin: name=" + getOnlyResource()
-                            + ", newSegment=" + segmentMetadata);
+                if(INFO)
+                    log.info(buildResult.toString());
 
                 /*
                  * Open the unisolated B+Tree on the live journal that is
@@ -376,7 +318,7 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
                  * BTree and cause it to be checkpointed if this task succeeds
                  * normally.
                  */
-                final ILocalBTreeView view = (ILocalBTreeView) getIndex(getOnlyResource());
+                final ILocalBTreeView view = getIndex(getOnlyResource());
 
                 // The live B+Tree.
                 final BTree btree = view.getMutableBTree();
@@ -479,16 +421,19 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
                      * verify that the new index segment was built from a view
                      * that did not include data from the live journal.
                      */
-                    assert segmentMetadata.getCreateTime() < getJournal()
-                            .getRootBlockView().getFirstCommitTime();
+                    if (segmentMetadata.getCreateTime() >= getJournal()
+                            .getRootBlockView().getFirstCommitTime()) {
+
+                        throw new AssertionError(
+                                "IndexSegment includes data from the live journal?");
+
+                    }
 
                 }
 
                 // new view definition.
                 final IResourceMetadata[] newResources;
                 {
-
-                    final List<IResourceMetadata> newView = new LinkedList<IResourceMetadata>();
 
                     // the live journal.
                     newView.add(getJournal().getResourceMetadata());
@@ -562,14 +507,10 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
                 btree.setIndexMetadata(indexMetadata);
 
                 if (INFO)
-                    log
-                            .info("Updated view: name=" + getOnlyResource()
-                                    + ", pmd="
-                                    + indexMetadata.getPartitionMetadata()
-                                    + "\noldResources="
-                                    + Arrays.toString(currentResources)
-                                    + "\nnewResources="
-                                    + Arrays.toString(newResources));
+                    log.info("Updated view: name=" + getOnlyResource()
+                            + ", pmd=" + indexMetadata.getPartitionMetadata()
+                            + toString("oldResources", currentResources)
+                            + toString("newResources", newResources));
 
                 /*
                  * Verify that the btree recognizes that it needs to be
@@ -579,20 +520,33 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
                  */
                 assert btree.needsCheckpoint();
 
-                // notify successful index partition build.
-                // @todo could count as a compacting merge if we used all sources.
-                resourceManager.indexPartitionBuildCounter.incrementAndGet();
+                /*
+                 * update counter to reflect successful index partition build or
+                 * compacting merge (if all sources were included in the build
+                 * operation).
+                 */
+                if (buildResult.compactingMerge) {
 
-                return null;
+                    resourceManager.indexPartitionMergeCounter
+                            .incrementAndGet();
+
+                } else {
+
+                    resourceManager.indexPartitionBuildCounter
+                            .incrementAndGet();
+
+                }
+
+                return newResources;
 
             } finally {
 
-                updateEvent.end();
+                updateEvent.end("newView=" + newView.toString());
 
             }
 
-        }
+        } // doTask()
 
-    }
+    } // AtomicUpdate
 
 }

@@ -142,6 +142,12 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
         // Note: disables index partition moves.
         properties.setProperty(Options.MAXIMUM_MOVES_PER_TARGET, "0");
 
+        // Note: make sure joins are enabled.
+        properties.setProperty(Options.JOINS_ENABLED, "true");
+
+        // Note: disable scatter splits
+        properties.setProperty(Options.SCATTER_SPLIT_MAX_SPLITS,"1");
+
         /*
          * Note: Together these properties disable incremental index builds. We
          * need to do that since a compacting build is required before the
@@ -190,7 +196,7 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
             // must support delete markers
             indexMetadata.setDeleteMarkers(true);
 
-            overflowCounter0 = dataService0.getOverflowCounter();
+            overflowCounter0 = dataService0.getAsynchronousOverflowCounter();
             
             assertEquals(0,overflowCounter0);
             
@@ -199,7 +205,7 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
             // register the scale-out index, creating a single index partition.
             fed.registerIndex(indexMetadata,dataService0.getServiceUUID());
 
-            overflowCounter1 = dataService0.getOverflowCounter();
+            overflowCounter1 = dataService0.getAsynchronousOverflowCounter();
             
             assertEquals(1,overflowCounter1);
 
@@ -335,7 +341,7 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
         int nrounds = 0;
         long nwritten = 0L;
         boolean done = false;
-        final long overflowCounter0 = dataService0.getOverflowCounter();
+        final long overflowCounter0 = dataService0.getAsynchronousOverflowCounter();
         while (!done) {
             
             final int nentries = minimumEntryCountPerSplit;

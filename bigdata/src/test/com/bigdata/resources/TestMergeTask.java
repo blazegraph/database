@@ -29,14 +29,13 @@
 package com.bigdata.resources;
 
 import java.io.IOException;
-import java.util.Properties;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.ILocalBTreeView;
+import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentStore;
@@ -51,20 +50,19 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
-import com.bigdata.resources.ResourceManager.Options;
 
 /**
- * Basic test of building an index segment from an index partition on overflow.
- *  
+ * Basic test of compacting merge for an index partition on overflow.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestBuildTask extends AbstractResourceManagerTestCase {
+public class TestMergeTask extends AbstractResourceManagerTestCase {
 
     /**
      * 
      */
-    public TestBuildTask() {
+    public TestMergeTask() {
         super();
 
     }
@@ -72,36 +70,26 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
     /**
      * @param arg0
      */
-    public TestBuildTask(String arg0) {
+    public TestMergeTask(String arg0) {
         super(arg0);
     }
 
-    public Properties getProperties() {
-        
-        final Properties properties = new Properties( super.getProperties() );
-        
-        // Disable index copy - overflow will always cause an index segment build.
-        properties.setProperty(Options.COPY_INDEX_THRESHOLD,"0");
-
-        return properties;
-        
-    }
-
     /**
-     * Test generates an {@link IndexSegment} from an ordered subset of the
-     * sources specified for the fused view of an index partition. The resulting
-     * {@link IndexSegment} is a partial replacement for the historical view and
-     * must retain the most recent tuple or delete marker written for any key in
-     * the accepted sources in the generated {@link IndexSegment}.
-     * <p>
-     * When the {@link IndexSegment} is incorporated back into the view, it will
-     * be placed after the {@link BTree} on the live journal that is used to
-     * absorb buffered writes and before any sources which were not incorporated
-     * into the view. This change needs to be recorded in the
-     * {@link MetadataIndex} before clients will being reading from the new view
-     * using the new {@link IndexSegment}.
+     * Test generates an {@link IndexSegment} from a (typically historical)
+     * fused view of an index partition. The resulting {@link IndexSegment} is a
+     * complete replacement for the historical view but does not possess any
+     * deleted index entries. Typically the {@link IndexSegment} will be used to
+     * replace the current index partition definition such that the resources
+     * that were the inputs to the view from which the {@link IndexSegment} was
+     * built are no longer required to read on that view. This change needs to
+     * be recorded in the {@link MetadataIndex} before clients will being
+     * reading from the new view using the new {@link IndexSegment}.
+     * 
+     * @throws IOException
+     * @throws ExecutionException
+     * @throws InterruptedException
      */
-    public void test_build() throws IOException,
+    public void test_merge() throws IOException,
             InterruptedException, ExecutionException {
 
         /*
@@ -199,7 +187,7 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
         assertNotSame("closeTime", 0L, oldJournal.getRootBlockView()
                 .getCloseTime());
 
-        // run build task.
+        // run merge task.
         final BuildResult result;
         {
 
@@ -216,7 +204,7 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
             final ViewMetadata vmd = overflowMetadata.getViewMetadata(name);
             
             // task to run.
-            final IncrementalBuildTask task = new IncrementalBuildTask(vmd);
+            final CompactingMergeTask task = new CompactingMergeTask(vmd);
 
             try {
 
@@ -236,12 +224,6 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
                 
             }
 
-            /*
-             * since all sources were incorporated into the build, this was
-             * actually a compacting merge.
-             */
-            assertTrue(result.compactingMerge);
-            
             final IResourceMetadata segmentMetadata = result.segmentMetadata;
 
             if (log.isInfoEnabled())
@@ -249,6 +231,9 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
 
             // verify index segment can be opened.
             resourceManager.openStore(segmentMetadata.getUUID());
+            
+            // Note: this assertion only works if we store the file path vs its basename.
+//            assertTrue(new File(segmentMetadata.getFile()).exists());
 
             // verify createTime == lastCommitTime on the old journal.
             assertEquals("createTime", oldJournal.getRootBlockView()
@@ -274,13 +259,13 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
          */
         {
 
-            final ILocalBTreeView actual = resourceManager.getIndex(name,
-                    ITx.UNISOLATED);
+            final IIndex actual = resourceManager
+                    .getIndex(name, ITx.UNISOLATED);
 
             AbstractBTreeTestCase.assertSameBTree(groundTruth, actual);
 
         }
 
     }
-    
+
 }

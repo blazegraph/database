@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.resources;
 
 import com.bigdata.btree.IndexSegment;
+import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.service.ResourceService;
 
 /**
@@ -53,7 +54,16 @@ public enum OverflowSubtaskEnum {
      */
     AtomicUpdate,
     /**
+     * Operation responsible for deciding how many of the sources in the view
+     * will be used for an incremental build operation. When all sources are
+     * accepted, the build will actually be a compacting merge and deleted
+     * tuples will be purged from the index partition.
+     */
+    ChooseView,
+    /**
      * Copying historical data from the old journal.
+     * 
+     * @deprecated by {@link MoveTask}
      */
     CopyHistory,
     /**
@@ -63,14 +73,21 @@ public enum OverflowSubtaskEnum {
     /**
      * Operation copying an {@link IndexSegment} using the
      * {@link ResourceService}.
+     * 
+     * @deprecated by {@link MoveTask}
      */
-    SendSegment,
+    SendIndexSegment,
     /**
-     * The operation submitted to the target data service during a MOVE in which
-     * it receives the data for the source index partition and registers the
-     * target index partition.
+     * The overall operation submitted to the target data service during a MOVE
+     * in which it receives the data for the source index partition and
+     * registers the target index partition.
      */
-    Receive
+    ReceiveIndexPartition,
+    /**
+     * The operation in which an {@link IndexSegmentStore} file is received by
+     * the target data service as part of a MOVE operation.
+     */
+    ReceiveIndexSegment
     ;
 
 }

@@ -27,6 +27,8 @@
 
 package com.bigdata.btree;
 
+import java.util.Iterator;
+
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.IndexSegment.IndexSegmentTupleCursor;
 import com.bigdata.btree.filter.FilterConstructor;
@@ -101,6 +103,32 @@ public interface IRangeQuery {
      */
     public long rangeCountExact(byte[] fromKey, byte[] toKey);
 
+    /**
+     * Return the exact #of tuples in a half-open key range, including any
+     * deleted tuples. The fromKey and toKey need not exist in the B+Tree.
+     * <p>
+     * When the view is just an {@link AbstractBTree} the result is the same as
+     * for {@link IRangeQuery#rangeCount(byte[], byte[])}, which already
+     * reports all tuples regardless of whether or not they are deleted.
+     * <p>
+     * When the index is a view with multiple sources, this operation requires a
+     * key-range scan where both deleted and undeleted tuples are visited.
+     * 
+     * @param fromKey
+     *            The lowest key that will be counted (inclusive). When
+     *            <code>null</code> there is no lower bound.
+     * @param toKey
+     *            The first key that will not be counted (exclusive). When
+     *            <code>null</code> there is no upper bound.
+     * 
+     * @return The exact #of deleted and undeleted tuples in the half-open key
+     *         range.
+     * 
+     * @see IRangeQuery#rangeCountExact(byte[], byte[])
+     */
+    public long rangeCountExactWithDeleted(final byte[] fromKey,
+            final byte[] toKey);
+    
     /**
      * Flag specifies no data (the #of scanned index entries matching the optional
      * filter will still be reported).

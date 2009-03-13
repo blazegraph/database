@@ -124,8 +124,11 @@ public class TestBasicIndexStuff extends
         // running a procedure
         try {
 
-            dataService0.submit(ITx.UNISOLATED, name, new RangeCountProcedure(
-                    false/* exact */, null, null)).get();
+            dataService0.submit(
+                    ITx.UNISOLATED,
+                    name,
+                    new RangeCountProcedure(false/* exact */,
+                            false/*deleted*/, null, null)).get();
             
         } catch (Exception ex) {
 

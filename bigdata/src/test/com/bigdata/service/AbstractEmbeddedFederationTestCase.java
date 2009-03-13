@@ -286,7 +286,7 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
      * <p>
      * Note: Normally you use bring the data service to the brink of the desired
      * overflow event, note the current overflow counter using
-     * {@link IDataService#getOverflowCounter()}, use
+     * {@link IDataService#getAsynchronousOverflowCounter()}, use
      * {@link IDataService#forceOverflow()} to set the forceOverflow flag, do
      * one more write to trigger group commit and overflow processing, and then
      * invoke this method to await the end of overflow post-processing.
@@ -307,7 +307,7 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
 
         long newOverflowCounter;
 
-        while ((newOverflowCounter = dataService.getOverflowCounter()) == priorOverflowCounter) {
+        while ((newOverflowCounter = dataService.getAsynchronousOverflowCounter()) == priorOverflowCounter) {
 
             final long elapsed = System.currentTimeMillis() - begin;
             

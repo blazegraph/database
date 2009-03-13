@@ -114,7 +114,7 @@ public class NoCacheMetadataIndexView implements IMetadataIndex {
     public long rangeCount(final byte[] fromKey, final byte[] toKey) {
 
         final IIndexProcedure proc = new RangeCountProcedure(
-                false/* exact */, fromKey, toKey);
+                false/* exact */, false/*deleted*/, fromKey, toKey);
 
         final Long rangeCount;
         try {
@@ -135,7 +135,28 @@ public class NoCacheMetadataIndexView implements IMetadataIndex {
     public long rangeCountExact(final byte[] fromKey, final byte[] toKey) {
 
         final IIndexProcedure proc = new RangeCountProcedure(
-                true/* exact */, fromKey, toKey);
+                true/* exact */, false/*deleted*/, fromKey, toKey);
+
+        final Long rangeCount;
+        try {
+
+            rangeCount = (Long) getMetadataService().submit(timestamp,
+                    MetadataService.getMetadataIndexName(name), proc).get();
+
+        } catch (Exception e) {
+
+            throw new RuntimeException(e);
+
+        }
+
+        return rangeCount.longValue();
+        
+    }
+    
+    public long rangeCountExactWithDeleted(final byte[] fromKey, final byte[] toKey) {
+
+        final IIndexProcedure proc = new RangeCountProcedure(
+                true/* exact */, true/*deleted*/, fromKey, toKey);
 
         final Long rangeCount;
         try {

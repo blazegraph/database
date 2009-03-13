@@ -81,6 +81,19 @@ import com.bigdata.service.MetadataService;
  *       indices -- note that overflow handling will only work on that support
  *       deletion markers.
  * 
+ * @todo Document backup procedures for the journal (the journal is a
+ *       log-structured store; it can be deployed on RAID for media robustness;
+ *       can be safely copied using normal file copy mechanisms and restored;
+ *       can be compacted offline; a compact snapshot of a commit point (such as
+ *       the last commit point) can be generated online and used for recovery;
+ *       and can be exported onto index segments which can later be restored to
+ *       any journal, but those index segments need additional metadata to
+ *       recreate the appropriate relations which is found in the sparse row
+ *       store) and the federation (relies on service failover (primary and
+ *       secondaries) and a history retention policy; can be recovered from
+ *       existing index partitions in a bottom up matter, but that recovery code
+ *       has not been written).
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -217,10 +230,17 @@ abstract public class ResourceManager extends OverflowManager implements
                             }
                         });
 
-                tmp.addCounter(IOverflowManagerCounters.OverflowCount,
+                tmp.addCounter(IOverflowManagerCounters.SynchronousOverflowCount,
                         new Instrument<Long>() {
                             public void sample() {
-                                setValue(getOverflowCount());
+                                setValue(getSynchronousOverflowCount());
+                            }
+                        });
+
+                tmp.addCounter(IOverflowManagerCounters.AsynchronousOverflowCount,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue(getAsynchronousOverflowCount());
                             }
                         });
 

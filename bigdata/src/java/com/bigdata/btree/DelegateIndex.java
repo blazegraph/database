@@ -118,6 +118,10 @@ public class DelegateIndex implements IIndex {
         return delegate.rangeCountExact(fromKey, toKey);
     }
     
+    public long rangeCountExactWithDeleted(byte[] fromKey, byte[] toKey) {
+        return delegate.rangeCountExactWithDeleted(fromKey, toKey);
+    }
+    
     public ITupleIterator rangeIterator() {
         return rangeIterator(null,null);
     }

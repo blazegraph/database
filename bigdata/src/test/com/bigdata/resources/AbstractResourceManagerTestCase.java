@@ -106,7 +106,7 @@ public class AbstractResourceManagerTestCase extends
      */
     public Properties getProperties() {
         
-        Properties properties = new Properties( super.getProperties() );
+        final Properties properties = new Properties( super.getProperties() );
         
         // Note: test requires data on disk.
         properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
@@ -329,7 +329,7 @@ public class AbstractResourceManagerTestCase extends
             
         }
 
-        public long getOverflowCounter() throws IOException {
+        public long getAsynchronousOverflowCounter() throws IOException {
 
             throw new UnsupportedOperationException();
             

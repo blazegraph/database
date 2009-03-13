@@ -534,7 +534,7 @@ public class DumpFederation {
                             + "\tIndexSegmentBytesUnderManagement"// 
                             + "\tManagedJournalCount"// 
                             + "\tManagedSegmentCount"//
-                            + "\tOverflowCount"//
+                            + "\tAsynchronousOverflowCount"//
                             /*
                              * Extended metadata about the index partition.
                              */
@@ -585,7 +585,7 @@ public class DumpFederation {
                 sb.append("\t" + rec.detailRec.segmentBytesUnderManagement);
                 sb.append("\t" + rec.detailRec.managedJournalCount);
                 sb.append("\t" + rec.detailRec.managedSegmentCount);
-                sb.append("\t" + rec.detailRec.overflowCount);
+                sb.append("\t" + rec.detailRec.asynchronousOverflowCount);
                 
             } else {
                 
@@ -1117,7 +1117,7 @@ public class DumpFederation {
         /**
          * The #of overflow events.
          */
-        public final long overflowCount;
+        public final long asynchronousOverflowCount;
 
         /**
          * 
@@ -1296,7 +1296,7 @@ public class DumpFederation {
             
             this.managedSegmentCount = resourceManager.getManagedSegmentCount();
             
-            this.overflowCount = resourceManager.getOverflowCount();
+            this.asynchronousOverflowCount = resourceManager.getAsynchronousOverflowCount();
             
         }
 

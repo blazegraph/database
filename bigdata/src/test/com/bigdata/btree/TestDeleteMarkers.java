@@ -67,7 +67,7 @@ public class TestDeleteMarkers extends AbstractBTreeTestCase {
         final long timestamp = 0L;
 
         // create index.
-        BTree btree = BTree.create(new SimpleMemoryRawStore(),metadata);
+        BTree btree = BTree.create(new SimpleMemoryRawStore(), metadata);
         
         // verify delete markers are in use.
         assertTrue(btree.getIndexMetadata().getDeleteMarkers());
@@ -86,6 +86,10 @@ public class TestDeleteMarkers extends AbstractBTreeTestCase {
         
         assertEquals(0,btree.rangeCount(null, null));
         
+        assertEquals(0,btree.rangeCountExact(null, null));
+
+        assertEquals(0,btree.rangeCountExactWithDeleted(null, null));
+        
         assertSameIterator(new byte[][] {}, btree.rangeIterator(null, null,
                 0/* capacity */,
                 IRangeQuery.DEFAULT | IRangeQuery.DELETED, null/* filter */));
@@ -93,15 +97,19 @@ public class TestDeleteMarkers extends AbstractBTreeTestCase {
         /*
          * insert a null value under the key.
          */
-        btree.insert(k1, null, false/*delete*/, timestamp, null/*tuple*/);
+        btree.insert(k1, null, false/* delete */, timestamp, null/* tuple */);
 
         assertTrue(btree.contains( k1 ));
 
         assertEquals(null,btree.lookup( k1 ));
 
-        assertEquals(1,btree.getEntryCount());
-        
-        assertEquals(1,btree.rangeCount(null, null));
+        assertEquals(1, btree.getEntryCount());
+
+        assertEquals(1, btree.rangeCount(null, null));
+
+        assertEquals(1, btree.rangeCountExact(null, null));
+
+        assertEquals(1, btree.rangeCountExactWithDeleted(null, null));
         
         assertSameIterator(new byte[][] { null }, btree.rangeIterator(null,
                 null, 0/* capacity */, IRangeQuery.DEFAULT
@@ -110,16 +118,20 @@ public class TestDeleteMarkers extends AbstractBTreeTestCase {
         /*
          * insert a non-null value under that key.
          */
-        btree.insert(k1, v1, false/*delete*/, timestamp, null/*tuple*/);
+        btree.insert(k1, v1, false/* delete */, timestamp, null/* tuple */);
         
         assertTrue(btree.contains( k1 ));
 
-        assertEquals(v1,btree.lookup( k1 ));
+        assertEquals(v1, btree.lookup(k1));
 
-        assertEquals(1,btree.getEntryCount());
-        
-        assertEquals(1,btree.rangeCount(null, null));
-        
+        assertEquals(1, btree.getEntryCount());
+
+        assertEquals(1, btree.rangeCount(null, null));
+
+        assertEquals(1, btree.rangeCountExact(null, null));
+
+        assertEquals(1, btree.rangeCountExactWithDeleted(null, null));
+
         assertSameIterator(new byte[][] { v1 },
                 btree
                         .rangeIterator(null, null, 0/* capacity */,
@@ -142,6 +154,10 @@ public class TestDeleteMarkers extends AbstractBTreeTestCase {
 
         assertEquals(1, btree.rangeCount(null, null));
 
+        assertEquals(0, btree.rangeCountExact(null, null));
+
+        assertEquals(1, btree.rangeCountExactWithDeleted(null, null));
+
         // the deleted entry is NOT visible when we do NOT specify DELETED.
         assertSameIterator(new byte[][] {}, btree.rangeIterator(null,
                 null, 0/* capacity */, IRangeQuery.DEFAULT, null/* filter */));
@@ -158,7 +174,7 @@ public class TestDeleteMarkers extends AbstractBTreeTestCase {
      * markers are enabled.
      * 
      * @todo test the semantics of {@link BTree#remove(byte[])}, which should
-     *       be equivilant to an insert of a delete marker.
+     *       be equivalent to an insert of a delete marker.
      */
     public void test_removeNotAllowed() {
         

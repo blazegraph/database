@@ -354,7 +354,8 @@ public class ThroughputTestMaster
         
         final private byte[] nextKey() {
 
-            final long key = lastKey + r.nextInt(incRange);
+            // Note: Must be +1 so that the keys are strictly increasing!
+            final long key = lastKey + r.nextInt(incRange) + 1;
 
             final byte[] data = keyBuilder.reset().append(key).getKey();
             
