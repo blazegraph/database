@@ -298,7 +298,26 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
              * play while the journal is still the live journal. To work around
              * this we start at the 2nd entry in the array.
              */
-            if (resources.length > 2) {
+
+            /*
+             * Note: The practice of sending and index segment generated on one
+             * data service to another data service introduces another way in
+             * which the resource timestamp order can be broken. During the next
+             * synchronous overflow event you can see things like this:
+             * 
+             * resourceMetadata=[
+             * JournalMetadata{filename=journal28417.jnl,uuid=add43d12-29b5-44e5-b26a-ae1b0694f67d,createTime=1236974533730},
+             * JournalMetadata{filename=journal28409.jnl,uuid=b954caf8-431b-42ae-9453-4c009398bec2,createTime=1236974293720},
+             * SegmentMetadata{filename=U8000_spo_OSP_part00050_28412.seg,uuid=cd954860-76fa-41ff-b788-e73a21b2c306,createTime=1236974525108},
+             * SegmentMetadata{filename=U8000_spo_OSP_part00050_28411.seg,uuid=35840589-6fb5-4691-b271-cf660186cd4b,createTime=1236974523976} ]
+             * 
+             * This is in fact well-formed. However, because the index segments
+             * were generated on a different host, the create times get out of
+             * wack. For that reason, I have disabled checking here.  
+             */
+            final boolean checkCreateTimes = false;
+
+            if (checkCreateTimes && resources.length > 2) {
 
                 long lastTimestamp = resources[1/*2ndEntry*/].getCreateTime();
 
@@ -320,6 +339,7 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
                 }
 
             }
+           
         }
 
     }
