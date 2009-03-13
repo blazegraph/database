@@ -797,7 +797,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
              * makes it easy for us to tune the filter for a desired false
              * positive rate.
              */
-            if (metadata.getBloomFilterFactory() != null) {
+            if (metadata.getBloomFilterFactory() != null && plan.nentries > 0) {
 
                 // the desired error rate for the bloom filter.
                 final double p = metadata.getBloomFilterFactory().p;
