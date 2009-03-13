@@ -487,7 +487,7 @@ public class RDFKBInitialOverflowTask extends AbstractTask {
             // The results (and the futures for the tasks doing the work for each generated index partition).
             final Map<MoveResult, Future<? extends Object>> scatterSplitFutures = new LinkedHashMap<MoveResult, Future<? extends Object>>();
             final Event sendSegment = e.newSubEvent(
-                    OverflowSubtaskEnum.SendSegment, "").start();
+                    OverflowSubtaskEnum.SendIndexSegment, "").start();
             try {
 
                 { // TERM2ID

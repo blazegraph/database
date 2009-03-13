@@ -459,6 +459,9 @@ public interface IDataService extends ITxCommitProtocol, IService {
      *             if the task can not be accepted for execution.
      * @throws IOException
      *             if there is an RMI problem.
+     * 
+     * @todo change API to <T> Future<T> submit(Callable<T> proc). This will
+     *       break existing code but reflects the correct use of generics.
      */
     public Future<? extends Object> submit(Callable<? extends Object> proc)
             throws IOException;
@@ -574,10 +577,10 @@ public interface IDataService extends ITxCommitProtocol, IService {
             throws IOException, InterruptedException;
     
     /**
-     * The #of overflows that have taken place on this data service (the counter
-     * is not restart safe).
+     * The #of asynchronous overflows that have taken place on this data service
+     * (the counter is not restart safe).
      */
-    public long getOverflowCounter() throws IOException;
+    public long getAsynchronousOverflowCounter() throws IOException;
     
     /**
      * Return <code>true</code> iff the data service is currently engaged in

@@ -61,5 +61,5 @@ public interface ILocalBTreeView extends IIndex {
      * @return The bloom filter if one exists and otherwise <code>null</code>.
      */
     public IBloomFilter getBloomFilter();
-
+    
 }

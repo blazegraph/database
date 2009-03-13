@@ -264,6 +264,12 @@ public class ReadCommittedView implements ILocalBTreeView {
         
     }
 
+    public long rangeCountExactWithDeleted(byte[] fromKey, byte[] toKey) {
+        
+        return getIndex().rangeCountExactWithDeleted(fromKey, toKey);
+        
+    }
+
     /*
      * Note: We rely on the BTree returned by getIndex() to enforce the
      * read-only contract for the iterators exposed by this class.

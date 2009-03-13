@@ -48,7 +48,7 @@ import com.bigdata.service.IDataService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RegisterIndexTask extends AbstractTask {
+public class RegisterIndexTask extends AbstractTask<UUID> {
 
     final private IndexMetadata metadata;
     
@@ -81,7 +81,7 @@ public class RegisterIndexTask extends AbstractTask {
      * 
      * @return The {@link UUID} of the named index.
      */
-    protected Object doTask() throws Exception {
+    protected UUID doTask() throws Exception {
 
         final String name = getOnlyResource();
 

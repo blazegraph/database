@@ -1110,53 +1110,16 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
         lock.lock();
         try {
 
-            LockFutureTask<R, ? extends Object> task = null;
-
-            for (R r : resource) {
-
-                final ResourceQueue<R, LockFutureTask<R, ? extends Object>> resourceQueue = resourceQueues
-                        .get(r);
-
-                if (task == null) {
-
-                    /*
-                     * find the task by checking the resource queue for any of
-                     * its declared locks.
-                     */
-                    task = resourceQueue.queue.peek();
-
-                    if (task == null)
-                        throw new IllegalStateException(
-                                "Task does not hold declared lock: " + r);
-
-                } else {
-
-                    /*
-                     * verify that the task holds the rest of its declared
-                     * locks.
-                     */
-                    if (task != resourceQueue.queue.peek()) {
-
-                        throw new IllegalStateException(
-                                "Task does not hold declared lock: " + r);
-
-                    }
-                    
-                }
-
-            }
-
+            final LockFutureTask task = (LockFutureTask) getTaskWithLocks(resource);
+            
             if(task == null) {
                 
-                throw new AssertionError();
+                /*
+                 * There is no task holding all of these locks.
+                 */
                 
-            }
-
-            if (task.taskRunState != TaskRunState.RunningWithLocks) {
-
-                throw new IllegalStateException("taskRunState="
-                        + task.taskRunState);
-
+                throw new IllegalStateException();
+                
             }
             
             /*
@@ -1175,6 +1138,103 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
             
         }
         
+    }
+    
+    /**
+     * Return the task holding all of the specified locks.
+     * 
+     * @param resource
+     *            The locks.
+     * @return The task -or- <code>null</code> iff there is no such task.
+     */
+    public Runnable getTaskWithLocks(final R[] resource) {
+        
+        lock.lock();
+
+        try {
+
+            LockFutureTask<R, ? extends Object> task = null;
+
+            for (R r : resource) {
+
+                final ResourceQueue<R, LockFutureTask<R, ? extends Object>> resourceQueue = resourceQueues
+                        .get(r);
+
+                if (resourceQueue == null) {
+
+                    /*
+                     * There is no ResourceQueue for this resource so there can
+                     * not be any task holding the lock for that resource.
+                     */
+
+                    if (DEBUG)
+                        log.debug("No task holds this lock: " + r);
+
+                    return null;
+
+                }
+
+                if (task == null) {
+
+                    /*
+                     * Find the task by checking the resource queue for any of
+                     * its declared locks.
+                     */
+
+                    task = resourceQueue.queue.peek();
+
+                    if (task == null) {
+
+                        if (DEBUG)
+                            log.debug("No task holds this lock: " + r);
+
+                        return null;
+
+                    }
+
+                } else {
+
+                    /*
+                     * verify that the task holds the rest of its declared
+                     * locks.
+                     */
+
+                    if (task != resourceQueue.queue.peek()) {
+
+                        if (DEBUG)
+                            log
+                                    .debug("Task holding the other locks does not hold this lock: "
+                                            + r);
+
+                        return null;
+                        
+                    }
+
+                }
+
+            }
+
+            if (task == null) {
+
+                throw new AssertionError();
+
+            }
+
+            if (task.taskRunState != TaskRunState.RunningWithLocks) {
+
+                throw new IllegalStateException("taskRunState="
+                        + task.taskRunState);
+
+            }
+
+            return task;
+
+        } finally {
+
+            lock.unlock();
+
+        }
+
     }
     
     /**
@@ -1363,7 +1423,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
      * @param <T>
      *            The generic type of the outcome for the {@link Future}.
      */
-    static protected class LockFutureTask<R extends Comparable<R>, T> extends FutureTask<T> {
+    static public class LockFutureTask<R extends Comparable<R>, T> extends FutureTask<T> {
 
         /**
          * The instance of the outer class.
@@ -1399,8 +1459,8 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
          * {@link ResourceQueue}s for which the task has asserted a lock
          * request to remain strongly reachable. Without such hard references
          * the {@link ResourceQueue}s would be asynchronously cleared from the
-         * {@link NonBlockingLockManagerWithNewDesign#resourceQueues} collection by the
-         * garbage collector.
+         * {@link NonBlockingLockManagerWithNewDesign#resourceQueues} collection
+         * by the garbage collector.
          */
         private final LinkedHashSet<ResourceQueue<R, LockFutureTask<R, ? extends Object>>> lockedResources = new LinkedHashSet<ResourceQueue<R, LockFutureTask<R, ? extends Object>>>();
 
@@ -1626,6 +1686,25 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
             }
         }
 
+        /**
+         * Return <code>true</code> iff the task holds all its locks.
+         */
+        public boolean isLocksHeld() {
+            
+            lockService.lock.lock();
+            
+            try {
+                
+                return lockService.holdsAllLocks(this);
+                
+            } finally {
+                
+                lockService.lock.unlock();
+                
+            }
+            
+        }
+        
         /**
          * Request any locks declared by the task. If the locks are available
          * then submit the task for execution immediately.
@@ -2144,11 +2223,19 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
      * 
      * @return The {@link ResourceQueue}.
      */
-    private ResourceQueue<R,LockFutureTask<R,? extends Object>> declareResource(final R resource) {
+    private ResourceQueue<R, LockFutureTask<R, ? extends Object>> declareResource(
+            final R resource) {
 
         // test 1st to avoid creating a new ResourceQueue if it already exists.
         ResourceQueue<R, LockFutureTask<R, ? extends Object>> resourceQueue = resourceQueues
                 .get(resource);
+
+        if (resourceQueue != null) {
+
+            // already exists.
+            return resourceQueue;
+
+        }
 
         // not found, so create a new ResourceQueue for that resource.
         resourceQueue = new ResourceQueue<R, LockFutureTask<R, ? extends Object>>(
@@ -2700,14 +2787,14 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
                 final NonBlockingLockManagerWithNewDesign<R> lockService,
                 final R resource) {
 
-            if(lockService == null)
+            if (lockService == null)
                 throw new IllegalArgumentException();
-            
+
             if (resource == null)
                 throw new IllegalArgumentException();
 
             this.lockService = lockService;
-            
+
             this.resource = resource;
 
             this.queue = new LinkedBlockingQueue<T>(/* unbounded */);

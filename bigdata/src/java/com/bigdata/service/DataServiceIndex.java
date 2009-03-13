@@ -402,7 +402,7 @@ public class DataServiceIndex implements IClientIndex {
     public long rangeCount(byte[] fromKey, byte[] toKey) {
 
         final RangeCountProcedure proc = new RangeCountProcedure(
-                false/* exact */, fromKey, toKey);
+                false/* exact */, false/* deleted */, fromKey, toKey);
 
         final long rangeCount;
 
@@ -423,7 +423,28 @@ public class DataServiceIndex implements IClientIndex {
     public long rangeCountExact(byte[] fromKey, byte[] toKey) {
 
         final RangeCountProcedure proc = new RangeCountProcedure(
-                true/* exact */, fromKey, toKey);
+                true/* exact */, false/* deleted */, fromKey, toKey);
+
+        final long rangeCount;
+
+        try {
+
+            rangeCount = (Long) dataService.submit(timestamp, name, proc).get();
+
+        } catch (Exception ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+
+        return rangeCount;
+
+    }
+
+    public long rangeCountExactWithDeleted(byte[] fromKey, byte[] toKey) {
+
+        final RangeCountProcedure proc = new RangeCountProcedure(
+                true/* exact */, true/* deleted */, fromKey, toKey);
 
         final long rangeCount;
 

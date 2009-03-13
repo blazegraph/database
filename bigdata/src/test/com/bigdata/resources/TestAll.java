@@ -84,10 +84,15 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestResourceManagerBootstrap.class);
         // test overflow handling.
         suite.addTestSuite(TestOverflow.class);
-        // test of index segment build and full compacting merge tasks.
+        // test compacting merge.
+        suite.addTestSuite(TestMergeTask.class);
+        // test incremental builds.
         suite.addTestSuite(TestBuildTask.class);
-        // test merge/split of index partitions.
+        suite.addTestSuite(TestBuildTask2.class);
+        // test index partition split.
         suite.addTestSuite(TestSplitTask.class);
+        // Note: moves are tested in the com.bigdata.services package.
+        // Note: split+join are testing the com.bigdata.services.package.
 
         // test release of old resources.
         suite.addTestSuite(TestAddDeleteResource.class);

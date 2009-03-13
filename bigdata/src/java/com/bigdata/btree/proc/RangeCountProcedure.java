@@ -40,6 +40,7 @@ public class RangeCountProcedure extends AbstractKeyRangeIndexProcedure
     private static final long serialVersionUID = 5856712176446915328L;
 
     private boolean exact;
+    private boolean deleted;
     
     /**
      * De-serialization ctor.
@@ -53,18 +54,33 @@ public class RangeCountProcedure extends AbstractKeyRangeIndexProcedure
     /**
      * Range count using the specified bounds.
      * 
+     * @param exact
+     *            iff an exact range count is required.
+     * @param deleted
+     *            iff deleted tuples must be included in the count.
      * @param fromKey
      *            The lower bound (inclusive) -or- <code>null</code> if there
      *            is no lower bound.
      * @param toKey
      *            The upper bound (exclusive) -or- <code>null</code> if there
      *            is no upper bound.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>exact</i> is <code>false</code> and <i>deleted</i>
+     *             is <code>true</code> (there is no approximate reporting for
+     *             range counts of deleted and undeleted tuples).
      */
-    public RangeCountProcedure(boolean exact, byte[] fromKey, byte[] toKey) {
+    public RangeCountProcedure(boolean exact, boolean deleted, byte[] fromKey,
+            byte[] toKey) {
 
         super( fromKey, toKey );
         
+        if (!exact && deleted)
+            throw new IllegalArgumentException();
+        
         this.exact = exact;
+        
+        this.deleted = deleted;
         
     }
 
@@ -108,9 +124,17 @@ public class RangeCountProcedure extends AbstractKeyRangeIndexProcedure
 
         final byte[] toKey = constrainToKey(this.toKey, pmd);
 
-        final long rangeCount = exact ? ndx.rangeCountExact(fromKey, toKey)
-                : ndx.rangeCount(fromKey, toKey);
-
+        final long rangeCount;
+        if (exact) {
+            if (deleted) {
+                rangeCount = ndx.rangeCountExactWithDeleted(fromKey, toKey);
+            } else {
+                rangeCount = ndx.rangeCountExact(fromKey, toKey);
+            }
+        } else {
+            rangeCount = ndx.rangeCount(fromKey, toKey);
+        }
+                
         return new Long(rangeCount);
 
     }
@@ -120,6 +144,8 @@ public class RangeCountProcedure extends AbstractKeyRangeIndexProcedure
         super.readExternal(in);
         
         exact = in.readBoolean();
+
+        deleted = in.readBoolean();
         
     }
 
@@ -128,6 +154,8 @@ public class RangeCountProcedure extends AbstractKeyRangeIndexProcedure
         super.writeExternal(out);
         
         out.writeBoolean(exact);
+        
+        out.writeBoolean(deleted);
         
     }
 

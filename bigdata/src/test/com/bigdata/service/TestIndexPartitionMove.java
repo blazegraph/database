@@ -36,7 +36,6 @@ import java.util.concurrent.ExecutionException;
 import org.apache.log4j.Level;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IOverflowHandler;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
@@ -55,8 +54,6 @@ import com.bigdata.resources.ResourceManager.Options;
 
 /**
  * Some unit tests for moving an index partition.
- * 
- * @todo test with an {@link IOverflowHandler}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -91,6 +88,9 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
         
         // enable moves (one per target).
         properties.setProperty(ResourceManager.Options.MAXIMUM_MOVES_PER_TARGET,"1");
+
+        // disable scatter split
+        properties.setProperty(ResourceManager.Options.SCATTER_SPLIT_MAX_SPLITS,"1");
 
         /*
          * Note: Together these properties disable incremental index builds
@@ -215,7 +215,7 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
          * Once the client returns from tha retry we will notice that the
          * partition count has increased and exit this loop.
          */
-        final long overflowCounter0 = dataService0.getOverflowCounter();
+        final long overflowCounter0 = dataService0.getAsynchronousOverflowCounter();
         {
 
             log.info("Writing on indices to provoke overflow");

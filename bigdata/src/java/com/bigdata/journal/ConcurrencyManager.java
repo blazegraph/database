@@ -24,6 +24,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.BTree;
 import com.bigdata.concurrent.NonBlockingLockManager;
 import com.bigdata.concurrent.NonBlockingLockManagerWithNewDesign;
+import com.bigdata.concurrent.NonBlockingLockManagerWithNewDesign.LockFutureTask;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
@@ -1223,12 +1224,12 @@ public class ConcurrencyManager implements IConcurrencyManager {
             
         }
 
-        if (service == writeService) {
+        if (service instanceof WriteExecutorService) {
 
-            final NonBlockingLockManagerWithNewDesign<String> lockManager = writeService
+            final NonBlockingLockManagerWithNewDesign<String> lockManager = ((WriteExecutorService) service)
                     .getLockManager();
 
-            return lockManager.submit(task.getResource(), task);
+            return (LockFutureTask<String, T>) lockManager.submit(task.getResource(), task);
 
         } else {
 

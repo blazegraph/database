@@ -562,6 +562,22 @@ public class UnisolatedReadWriteIndex implements IIndex {
         
     }
 
+    public long rangeCountExactWithDeleted(byte[] fromKey, byte[] toKey) {
+
+        final Lock lock = readLock();
+
+        try {
+        
+            return ndx.rangeCountExactWithDeleted(fromKey, toKey);
+            
+        } finally {
+            
+            unlock(lock);
+            
+        }
+        
+    }
+
     final public ITupleIterator rangeIterator() {
 
         return rangeIterator(null, null);

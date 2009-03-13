@@ -189,19 +189,6 @@ public class SplitIndexPartitionTask extends
 
                 // Note: fused view for the source index partition.
                 final ILocalBTreeView src = vmd.getView();
-                // final ILocalBTreeView src = (ILocalBTreeView)getIndex(name);
-
-                if (INFO) {
-
-                    // note: the mutable btree - accessed here for debugging
-                    // only.
-                    final BTree btree = src.getMutableBTree();
-
-                    log.info("src=" + name + ",counter="
-                            + src.getCounter().get() + ",checkpoint="
-                            + btree.getCheckpoint());
-
-                }
 
                 /*
                  * Get the split points for the index. Each split point
@@ -264,8 +251,7 @@ public class SplitIndexPartitionTask extends
                         log.warn("No splits identified: will move: " + vmd);
 
                         return concurrencyManager.submit(
-                                new MoveIndexPartitionTask(vmd, moveTargets[0]))
-                                .get();
+                                new MoveTask(vmd, moveTargets[0])).get();
 
                     } else if (vmd.manditoryMerge) {
 
@@ -367,6 +353,14 @@ public class SplitIndexPartitionTask extends
                     }
 
                     /*
+                     * Obtain a new partition identifier for the partition that
+                     * will be created when we move the index partition to the
+                     * target data service.
+                     */
+                    final int newPartitionId = resourceManager
+                            .nextPartitionId(vmd.indexMetadata.getName());
+
+                    /*
                      * The name of the post-split index partition that is the
                      * source for the move operation.
                      */
@@ -375,26 +369,34 @@ public class SplitIndexPartitionTask extends
                                     result.splits[bestMoveIndex].pmd
                                             .getPartitionId());
 
-                    /*
-                     * Obtain a new partition identifier for the partition that
-                     * will be created when we move the index partition to the
-                     * target data service.
-                     */
-                    final int newPartitionId = resourceManager
-                            .nextPartitionId(vmd.indexMetadata.getName());
+//                    // register the new index partition.
+//                    final MoveResult moveResult = MoveIndexPartitionTask
+//                            .registerNewPartitionOnTargetDataService(
+//                                    resourceManager, moveTargets[0],
+//                                    nameOfPartitionToMove, newPartitionId, e);
+//
+//                    /*
+//                     * Move the buffered writes since the split and go live with
+//                     * the new index partition.
+//                     */
+//                    MoveIndexPartitionTask.moveBufferedWritesAndGoLive(
+//                            resourceManager, moveResult, e);
 
-                    // register the new index partition.
-                    final MoveResult moveResult = MoveIndexPartitionTask
-                            .registerNewPartitionOnTargetDataService(
-                                    resourceManager, moveTargets[0],
-                                    nameOfPartitionToMove, newPartitionId, e);
-
                     /*
-                     * Move the buffered writes since the split and go live with
-                     * the new index partition.
+                     * Move.
+                     * 
+                     * Note: We do not explicitly delete the source index
+                     * segment for the source index partition after the move. It
+                     * will be required for historical views of the that index
+                     * partition in case any client gained access to the index
+                     * partition after the split and before the move. It will
+                     * eventually be released once the view of the source index
+                     * partition becomes sufficiently aged that it falls off the
+                     * head of the database history.
                      */
-                    MoveIndexPartitionTask.moveBufferedWritesAndGoLive(
-                            resourceManager, moveResult, e);
+                    MoveTask.doAtomicUpdate(resourceManager, nameOfPartitionToMove,
+                            result.buildResults[bestMoveIndex], moveTargets[0],
+                            newPartitionId, e);
 
                 } else {
 
@@ -422,15 +424,6 @@ public class SplitIndexPartitionTask extends
                         }
                         
                         /*
-                         * The name of the post-split index partition that is
-                         * the source for the move operation.
-                         */
-                        final String nameOfPartitionToMove = DataService
-                                .getIndexPartitionName(vmd.indexMetadata
-                                        .getName(), result.splits[i].pmd
-                                        .getPartitionId());
-
-                        /*
                          * Obtain a new partition identifier for the partition
                          * that will be created when we move the index partition
                          * to the target data service.
@@ -438,19 +431,44 @@ public class SplitIndexPartitionTask extends
                         final int newPartitionId = resourceManager
                                 .nextPartitionId(vmd.indexMetadata.getName());
 
-                        // register the new index partition.
-                        final MoveResult moveResult = MoveIndexPartitionTask
-                                .registerNewPartitionOnTargetDataService(
-                                        resourceManager, moveTarget,
-                                        nameOfPartitionToMove, newPartitionId,
-                                        e);
+                        /*
+                         * The name of the post-split index partition that is
+                         * the source for the move operation.
+                         */
+                        final String nameOfPartitionToMove = DataService
+                                .getIndexPartitionName(vmd.indexMetadata
+                                        .getName(), result.splits[i].pmd
+                                        .getPartitionId());
+//
+//                        // register the new index partition.
+//                        final MoveResult moveResult = MoveIndexPartitionTask
+//                                .registerNewPartitionOnTargetDataService(
+//                                        resourceManager, moveTarget,
+//                                        nameOfPartitionToMove, newPartitionId,
+//                                        e);
+//
+//                        /*
+//                         * Move the buffered writes since the split and go live with
+//                         * the new index partition.
+//                         */
+//                        MoveIndexPartitionTask.moveBufferedWritesAndGoLive(
+//                                resourceManager, moveResult, e);
 
                         /*
-                         * Move the buffered writes since the split and go live with
-                         * the new index partition.
+                         * Move.
+                         * 
+                         * Note: We do not explicitly delete the source index
+                         * segment for the source index partition after the
+                         * move. It will be required for historical views of the
+                         * that index partition in case any client gained access
+                         * to the index partition after the split and before the
+                         * move. It will eventually be released once the view of
+                         * the source index partition becomes sufficiently aged
+                         * that it falls off the head of the database history.
                          */
-                        MoveIndexPartitionTask.moveBufferedWritesAndGoLive(
-                                resourceManager, moveResult, e);
+                        MoveTask.doAtomicUpdate(resourceManager,
+                                nameOfPartitionToMove, result.buildResults[i],
+                                moveTarget, newPartitionId, e);
 
                     }
 

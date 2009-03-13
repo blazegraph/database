@@ -275,6 +275,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         // set of index partition views to consider.
         final Iterator<ViewMetadata> itr = overflowMetadata.views();
 
+        // lazily initiallized.
+        UUID[] moveTargets = null;
+
         while(itr.hasNext()) {
 
             final ViewMetadata vmd = itr.next();
@@ -297,6 +300,26 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * onto this data service. Split, join, and move are all disallowed
              * until the index partition move is complete since each of them
              * would cause the index partition to become invalidated.
+             * 
+             * FIXME This can be fooled if there are a more or less even mixture
+             * of inserts and deletes on an ongoing basis. It will look like a
+             * split based on getPercentOfSplit() but examination by the split
+             * handler will see that there are not enough tuples to do a split.
+             * 
+             * FIXME The scatter split can be fooled in another way for the same
+             * use case. It creates an adjusted split handler based on the fast
+             * range count. With a lot of deletes mixed in there the actual
+             * range count will be much less and a split will be refused since
+             * there are not enough tuples to fill a split.
+             * 
+             * FIXME Both this case and the one mentioned above (which also
+             * applies to normal splits) can be observed using the
+             * StressTestConcurrent test. One way to handle this might be to
+             * move the scatter split inside of the normal split and then to
+             * decide how to split once we have done a more detailed inspection.
+             * This would break encapsulation on the split handler and require
+             * access to the potential move targets, #of index partitions for
+             * the scale-out index, etc.
              */
             if ( // only a single index partitions?
                 (vmd.getIndexPartitionCount() == 1L)//
@@ -319,8 +342,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * services will be reported.
                  */
                 // Target data services for the new index partitions.
-                final UUID[] moveTargets;
-                {
+                if (moveTargets == null) {
+                    
                     /*
                      * Identify the target data services for the new index
                      * partitions.
@@ -338,6 +361,17 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                             .getDataServiceUUIDs(
                                     resourceManager.scatterSplitMaxSplits/*maxCount*/);
 
+                    if (a == null || a.length == 1) {
+
+                        if (INFO)
+                            log
+                                    .info("Will not scatter split - insufficient data services discovered.");
+                        
+                        // abort scatter split logic.
+                        return tasks;
+                        
+                    }
+                    
                     final Set<UUID> tmp = new HashSet<UUID>(Arrays.asList(a));
 
                     tmp.add(resourceManager.getDataServiceUUID());
@@ -346,11 +380,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                 }
 
-                final int nsplits = Math.max(
+                // at most as many splits as there are data services.
+                final int nsplits = Math.min(
                         resourceManager.scatterSplitMaxSplits,
                         moveTargets.length);
-
-                overflowMetadata.setAction(vmd.name, OverflowActionEnum.Split);
 
                 // scatter split task.
                 final AbstractTask task = new ScatterSplitTask(vmd, nsplits,
@@ -358,6 +391,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                 // add to set of tasks to be run.
                 tasks.add(task);
+
+                overflowMetadata.setAction(vmd.name, OverflowActionEnum.Split);
 
                 putUsed(name, "willScatter(name=" + vmd + ")");
 
@@ -783,8 +818,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                                 .getIndexPartitionName(scaleOutIndexName, pmd
                                         .getPartitionId());
 
-                        final AbstractTask task = new MoveIndexPartitionTask(
-                                vmd, targetDataServiceUUID);
+                        final AbstractTask task = new MoveTask(vmd,
+                                targetDataServiceUUID);
 
                         // get the target service name.
                         String targetDataServiceName;
@@ -1421,7 +1456,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     log.info("Will move " + vmd.name + " to dataService="
                             + targetDataServiceName);
 
-                final AbstractTask task = new MoveIndexPartitionTask(vmd,
+                final AbstractTask task = new MoveTask(vmd,
                         targetDataServiceUUID);
 
                 tasks.add(task);
@@ -1777,12 +1812,12 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * Mandatory compacting merge.
                  */
                 
-                overflowMetadata.setAction(vmd.name, OverflowActionEnum.Merge);
-
                 final AbstractTask task = new CompactingMergeTask(vmd);
 
                 // add to set of tasks to be run.
                 tasks.add(task);
+
+                overflowMetadata.setAction(vmd.name, OverflowActionEnum.Merge);
 
                 putUsed(name, "willManditoryMerge(" + vmd + ")");
 
@@ -1822,14 +1857,14 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * Do an index (tail) split task.
                  */
 
-                overflowMetadata.setAction(vmd.name,
-                        OverflowActionEnum.TailSplit);
-                
                 final AbstractTask task = new SplitTailTask(vmd, null/* moveTarget */);
 
                 // add to set of tasks to be run.
                 tasks.add(task);
 
+                overflowMetadata.setAction(vmd.name,
+                        OverflowActionEnum.TailSplit);
+                
                 putUsed(name, "tailSplit(name=" + vmd + ")");
 
                 if (INFO)
@@ -1864,13 +1899,13 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * Do an index split task.
                  */
 
-                overflowMetadata.setAction(vmd.name, OverflowActionEnum.Split);
-
                 final AbstractTask task = new SplitIndexPartitionTask(vmd,
                         (UUID) null/* moveTarget */);
 
                 // add to set of tasks to be run.
                 tasks.add(task);
+
+                overflowMetadata.setAction(vmd.name, OverflowActionEnum.Split);
 
                 putUsed(name, "willSplit(name=" + vmd + ")");
 
@@ -1928,12 +1963,12 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * Select an optional compacting merge.
                  */
                 
-                overflowMetadata.setAction(vmd.name, OverflowActionEnum.Merge);
-
                 final AbstractTask task = new CompactingMergeTask(vmd);
 
                 // add to set of tasks to be run.
                 tasks.add(task);
+
+                overflowMetadata.setAction(vmd.name, OverflowActionEnum.Merge);
 
                 putUsed(vmd.name, "willOptionalMerge(" + vmd + ")");
 
@@ -1950,13 +1985,13 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * Incremental build.
                  */
                 
-                overflowMetadata.setAction(vmd.name, OverflowActionEnum.Build);
-                
                 final AbstractTask task = new IncrementalBuildTask(vmd);
 
                 // add to set of tasks to be run.
                 tasks.add(task);
 
+                overflowMetadata.setAction(vmd.name, OverflowActionEnum.Build);
+                
                 putUsed(vmd.name, "willBuild(" + vmd + ")");
 
                 if (INFO)
@@ -2028,7 +2063,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 
                 // The pre-condition views.
                 log.info("\npre-condition views: overflowCounter="
-                        + resourceManager.overflowCounter.get()
+                        + resourceManager.asynchronousOverflowCounter.get()
                         + "\n"
                         + resourceManager.listIndexPartitions(TimestampUtility
                                 .asHistoricalRead(lastCommitTime)));
@@ -2049,7 +2084,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
             final long elapsed = System.currentTimeMillis() - begin;
 
-            final long overflowCounter = resourceManager.overflowCounter
+            final long overflowCounter = resourceManager.asynchronousOverflowCounter
                     .incrementAndGet();
 
             log.warn("done: overflowCounter=" + overflowCounter
@@ -2060,7 +2095,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             // The post-condition views.
             if(INFO)
                 log.info("\npost-condition views: overflowCounter="
-                    + resourceManager.overflowCounter.get() + "\n"
+                    + resourceManager.asynchronousOverflowCounter.get() + "\n"
                     + resourceManager.listIndexPartitions(ITx.UNISOLATED));
 
             // purge resources that are no longer required.

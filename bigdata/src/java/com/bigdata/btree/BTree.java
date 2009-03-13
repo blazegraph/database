@@ -157,8 +157,7 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BTree extends AbstractBTree implements IIndex, ICommitter,
-        ILocalBTreeView {
+public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView {
     
     final public int getHeight() {
         

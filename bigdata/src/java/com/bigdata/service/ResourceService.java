@@ -44,6 +44,7 @@ import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
 import java.nio.channels.SocketChannel;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -60,6 +61,7 @@ import java.util.zip.CheckedInputStream;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.rawstore.Bytes;
@@ -632,6 +634,26 @@ abstract public class ResourceService {
 
         }
 
+        /**
+         * Note: {@link OverlappingFileLockException}s can arise when there are
+         * concurrent requests to obtain a shared lock on the same file.
+         * Personally, I think that this is a bug since the lock requests are
+         * shared and should be processed without deadlock. However, the code
+         * handles this case by proceeding without the lock - exactly as it
+         * would handle the case where a shared lock was not available. This is
+         * still somewhat fragile since it someone does not test the
+         * {@link FileLock} and was in fact granted an exclusive lock when they
+         * requested a shared lock then this code will be unwilling to send the
+         * resource. There are two ways to make that work out - either we DO NOT
+         * use {@link FileLock} for read-only files (index segments) or we
+         * ALWAYS discard the {@link FileLock} if it is not shared when we
+         * requested a shared lock and proceed without a lock. For this reason,
+         * the behavior of this class and {@link IndexSegmentStore} MUST match.
+         * 
+         * @see IndexSegmentStore
+         * @see http://blogs.sun.com/DaveB/entry/new_improved_in_java_se1
+         * @see http://forums.sun.com/thread.jspa?threadID=5324314.
+         */
         public void run()
         {
             
@@ -675,7 +697,20 @@ abstract public class ResourceService {
                 try {
 
                     fis = new FileInputStream(file);
-                    
+
+                } catch (IOException ex) {
+
+                    log.error(ex, ex);
+
+                    sendError(StatusEnum.INTERNAL_ERROR);
+
+                    return;
+
+                }
+
+                // try block used to ensure that we close [fis] in finally{}.
+                try {
+
                     /*
                      * Seek a shared lock on the file. This will prevent it from
                      * being deleted while we are sending its data and it will
@@ -683,69 +718,82 @@ abstract public class ResourceService {
                      * has a write lock. If we can't get a shared lock then no
                      * worries.
                      */
-                    final FileLock fileLock = fis.getChannel().tryLock(0,
-                            Long.MAX_VALUE, true/* shared */);
+                    try {
 
-                    if (fileLock == null) {
+                        final FileLock fileLock = fis.getChannel().tryLock(0,
+                                Long.MAX_VALUE, true/* shared */);
 
-                        throw new IOException("Resource is locked: " + file);
+                        if (fileLock == null) {
 
-                    }
-                    
-                    if(!fileLock.isShared()) {
-                        
+                            throw new IOException("Resource is locked: " + file);
+
+                        }
+
+                        if (!fileLock.isShared()) {
+
+                            /*
+                             * Do NOT hold the file lock if it is exclusive
+                             * (shared lock requests convert to exclusive lock
+                             * requests on some platforms). We do not want to
+                             * prevent others from accessing this resource,
+                             * especially not the StoreManager itself.
+                             */
+
+                            fileLock.release();
+
+                        }
+
+                    } catch (OverlappingFileLockException ex) {
+
                         /*
-                         * Do NOT hold the file lock if it is exclusive (shared
-                         * lock requests convert to exclusive lock requests on
-                         * some platforms). We do not want to prevent others
-                         * from accessing this resource, especially not the
-                         * StoreManager itself.
+                         * Note: OverlappingFileLockException can be thrown when
+                         * there are concurrent requests to obtain the same
+                         * shared lock. I consider this a JDK bug. It should be
+                         * possible to service both requests without deadlock.
                          */
-                        
-                        fileLock.release();
-                        
-                    }
-                    
-                } catch (IOException ex) {
 
-                    log.error(ex, ex);
-                    
-                    sendError(StatusEnum.INTERNAL_ERROR);
-                    
-                    return;
-                    
-                }
-                
-                try {
+                        if (INFO)
+                            log.info("Will proceed without lock: file=" + file
+                                    + " : " + ex);
+
+                    } catch (IOException ex) {
+
+                        log.error(ex, ex);
+
+                        sendError(StatusEnum.INTERNAL_ERROR);
+
+                        return;
+
+                    }
 
                     // Send the file.
                     sendResource(uuid, file, length, fis);
-                    
+
                     counters.nwrites++;
 
                 } catch (Exception ex) {
-                    
+
                     counters.writeErrorCount++;
-                    
+
                     // could be client death here.
                     log.warn(ex, ex);
-                    
+
                     return;
-                    
+
                 } finally {
-                    
+
                     try {
 
                         fis.close();
-                        
+
                     } catch (Throwable t) {
-                        
-                        /*ignore*/
-                        
+
+                        /* ignore */
+
                     }
-                    
+
                 }
-                
+
             } catch (SentErrorException ex) {
             
                 /*
@@ -976,8 +1024,17 @@ abstract public class ResourceService {
                 os.flush();
 
                 if (INFO)
-                    log.info("Sent: uuid=" + uuid + ", file=" + file
-                            + ", length=" + length + ", checksum=" + checksum);
+                    log.info("Sent: uuid="
+                            + uuid
+                            + ", file="
+                            + file
+                            + ", length="
+                            + length
+                            + ", checksum="
+                            + checksum
+                            + ", elapsed="
+                            + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()
+                                    - begin) + "ms");
                 
             } finally {
 
@@ -1113,6 +1170,8 @@ abstract public class ResourceService {
             if (INFO)
                 log.info("uuid=" + uuid + ", localFile=" + file);
             
+            final long begin = System.nanoTime();
+            
             Socket s = null;
             
             final FileOutputStream os = new FileOutputStream(file);
@@ -1170,6 +1229,7 @@ abstract public class ResourceService {
                 }
                 
                 // read the data.
+                long nread = 0L;
                 final long checksum;
                 {
 
@@ -1184,8 +1244,6 @@ abstract public class ResourceService {
                     
                     final byte[] buff = new byte[BUFSIZE];
 
-                    long nread = 0L;
-                    
                     while (nread < length) {
 
                         final long remaining = length - nread;
@@ -1225,13 +1283,6 @@ abstract public class ResourceService {
                     // the checksum of the bytes read from the socket.
                     checksum = cis.getChecksum().getValue();
 
-                    if(INFO) {
-                        
-                        log.info("read " + nread + " bytes, checksum="
-                                + checksum + ", uuid=" + uuid);
-                        
-                    }
-                    
                 }
                 
                 // read checksum from the socket and verify.
@@ -1247,6 +1298,22 @@ abstract public class ResourceService {
 
                     }
 
+                }
+
+                if (INFO) {
+
+                    log.info("read "
+                            + nread
+                            + " bytes, file="
+                            + file
+                            + ", checksum="
+                            + checksum
+                            + ", uuid="
+                            + uuid
+                            + ", elapsed="
+                            + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()
+                                    - begin) + "ms");
+                    
                 }
 
             } finally {

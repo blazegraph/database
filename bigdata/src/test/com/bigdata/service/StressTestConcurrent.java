@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -52,7 +53,10 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.NOPTupleSerializer;
+import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
@@ -122,7 +126,10 @@ public class StressTestConcurrent extends
     public StressTestConcurrent(String arg0) {
         super(arg0);
     }
-    
+
+    /**
+     * @todo try varying the releaseAge
+     */
     public Properties getProperties() {
         
         Properties properties = new Properties(super.getProperties());
@@ -143,11 +150,35 @@ public class StressTestConcurrent extends
         // enable moves (overrides value set in the test setup for the super class)
         properties.setProperty(Options.MAXIMUM_MOVES_PER_TARGET,Options.DEFAULT_MAXIMUM_MOVES_PER_TARGET);
 
+        // disable scatter split.
+        properties.setProperty(Options.SCATTER_SPLIT_MAX_SPLITS, "1");
+
+        /*
+         * Note: Overflow frequency is being controlled by specifying a small
+         * maximum extent above, so overflow acceleration should be turned off
+         * here or it will trigger every few writes!
+         * 
+         * Likewise, since we are overflowing so frequently, split acceleration
+         * does not give us enough time to build up enough writes and an index
+         * with very few writes gets split into too many index partitions.
+         */
+        
+        // disable split acceleration.
+      properties.setProperty(Options.ACCELERATE_SPLIT_THRESHOLD, "0");
+        // lots of acceleration (too much).
+//        properties.setProperty(Options.ACCELERATE_SPLIT_THRESHOLD, "50");
+
+      // disable overflow acceleration.
+      properties.setProperty(Options.ACCELERATE_OVERFLOW_THRESHOLD, "0");
+        // lots of acceleration (too much).
+//        properties.setProperty(Options.ACCELERATE_OVERFLOW_THRESHOLD, ""
+//                + (Bytes.gigabyte * 10));
+        
         // performance counter sampling interval.
-        properties.setProperty(Options.PERFORMANCE_COUNTERS_SAMPLE_INTERVAL,"5000");
+//        properties.setProperty(Options.PERFORMANCE_COUNTERS_SAMPLE_INTERVAL,"5000");
         
         // performance counter reporting interval (should be the same as the sampling interval).
-        properties.setProperty(IBigdataClient.Options.REPORT_DELAY,"5000");
+//        properties.setProperty(IBigdataClient.Options.REPORT_DELAY,"5000");
 
         // load balancer update delay
         properties.setProperty(LoadBalancerService.Options.UPDATE_DELAY,"10000");
@@ -155,8 +186,8 @@ public class StressTestConcurrent extends
         // Note: another way to disable moves is to restrict the test to a single data service.
 //        properties.setProperty(com.bigdata.service.EmbeddedBigdataFederation.Options.NDATA_SERVICES,"1");
 
-        // disable overflow processing
-//        properties.setProperty(Options.OVERFLOW_ENABLED,"false");
+         // make sure overflow processing is enabled.
+         properties.setProperty(Options.OVERFLOW_ENABLED,"true");
         
 //        properties.setProperty(Options.CREATE_TEMP_FILE,"true");
         
@@ -192,17 +223,22 @@ public class StressTestConcurrent extends
      *       correct since the properties need to be overriden. See
      *       {@link #doComparisonTest(Properties)}.
      * 
+     * @todo the stress test is not really triggering many of the more
+     *       interesting sequences, such as scatter split, move, join, build vs
+     *       compacting merge, etc. As such it is not stressing much of the
+     *       system and not providing much validation.
+     * 
      * @throws Exception
      */
     public void test_stressTest1() throws Exception {
 
-        int nclients = 40;
-        long timeout = 20; // 20 or 40
-        int ntrials = 1000; // 10000
+        int nclients = 40; // max concurrency limited by #of index partitions.
+        long timeout = 50; // 20 or 40 (ignored for correctness testing!)
+        int ntrials = 1000; // 1000 or 10000
         int keyLen = 4; // @todo not used right now.
         int nops = 100; // 100
         double insertRate = .8d;
-        int nindices = 10;
+        int nindices = 10; // was 10
         boolean testCorrectness = true;
 
         doConcurrentClientTest(client, nclients, timeout, ntrials, keyLen,
@@ -217,7 +253,7 @@ public class StressTestConcurrent extends
 //        }
         
     }
-
+    
     /**
      * A stress test with a pool of concurrent clients.
      * 
@@ -226,7 +262,9 @@ public class StressTestConcurrent extends
      * 
      * @param timeout
      *            The #of seconds before the test will terminate (ignored if
-     *            <i>testCorrectness := true</i>).
+     *            <i>testCorrectness := true</i> since tasks MUST run to
+     *            completion in order for comparisons against ground truth to be
+     *            valid).
      * 
      * @param nclients
      *            The #of concurrent clients.
@@ -324,10 +362,10 @@ public class StressTestConcurrent extends
         final IIndex[] groundTruth = new IIndex[nindices];
         final IRawStore[] groundTruthStore = new IRawStore[nindices];
         final ReentrantLock[] lock = new ReentrantLock[nindices];
-        
-        for(int i=0; i<nindices; i++) {
-            
-            final String name = basename+i;
+
+        for (int i = 0; i < nindices; i++) {
+
+            final String name = basename + i;
             final UUID indexUUID = UUID.randomUUID();
             final int entryCountPerSplit = 400;
             final double overCapacityMultiplier = 1.5;
@@ -337,6 +375,9 @@ public class StressTestConcurrent extends
                 final IndexMetadata indexMetadata = new IndexMetadata(name,
                         indexUUID);
 
+                indexMetadata.setTupleSerializer(new NOPTupleSerializer(
+                        new ASCIIKeyBuilderFactory(keyLen)));
+                
                 // The threshold below which we will try to join index
                 // partitions.
                 ((DefaultSplitHandler) indexMetadata.getSplitHandler())
@@ -370,11 +411,12 @@ public class StressTestConcurrent extends
                     groundTruthStore[i] = new TemporaryRawStore(
                             WormAddressManager.SCALE_UP_OFFSET_BITS);
 
-                    IndexMetadata md = indexMetadata.clone();
                     
+                    final IndexMetadata md = indexMetadata.clone();
+
                     // turn off delete markers for the ground truth index.
                     md.setDeleteMarkers(false);
-                    
+
                     groundTruth[i] = BTree.create(groundTruthStore[i], md);
 
                     lock[i] = new ReentrantLock();
@@ -410,28 +452,31 @@ public class StressTestConcurrent extends
             
         }
         
-        Collection<Callable<Void>> tasks = new HashSet<Callable<Void>>(); 
+        final Collection<Callable<Void>> tasks = new HashSet<Callable<Void>>();
 
-        for(int i=0; i<ntrials; i++) {
+        for (int i = 0; i < ntrials; i++) {
 
             final int k = i % nindices;
-            
-            tasks.add(new Task(index[k], keyLen, nops, insertRate, groundTruth[k], lock[k]));
-            
+
+            tasks.add(new Task(index[k], keyLen, nops, insertRate,
+                    groundTruth[k], lock[k]));
+
         }
 
         /*
          * Run the M transactions on N clients.
          */
-        
+
         final long begin = System.currentTimeMillis();
-        
+
         log.warn("Starting tasks on client");
 
         /*
-         * Note: We have to wait for all tasks to complete in order to test
-         * correctness since the ground truth data can otherwise differ from the
-         * data successfully committed on the database.
+         * Note: When [testCorrectness := true] we MUST wait for all tasks to
+         * complete since the ground truth data can otherwise differ from the
+         * data successfully committed on the database (if a task is cancelled
+         * during the write on groundTruth then it WILL NOT agree with the
+         * scale-out indices).
          */
         final List<Future<Void>> results = executorService.invokeAll(tasks,
                 testCorrectness ? Long.MAX_VALUE : timeout, TimeUnit.SECONDS);
@@ -447,51 +492,51 @@ public class StressTestConcurrent extends
         int nuncommitted = 0; // #of operations that did not complete in time.
         int ntimeout = 0;
         int ninterrupted = 0;
-        LinkedList<Exception> failures = new LinkedList<Exception>();
+        final LinkedList<Exception> failures = new LinkedList<Exception>();
         
         while(itr.hasNext()) {
 
-            Future<Void> future = itr.next();
-            
-            if(future.isCancelled()) {
-                
+            final Future<Void> future = itr.next();
+
+            if (future.isCancelled()) {
+
                 nuncommitted++;
-                
+
                 continue;
-                
+
             }
 
             try {
 
                 // Don't wait
-                future.get(0L,TimeUnit.MILLISECONDS);
-                
+                future.get(0L, TimeUnit.MILLISECONDS);
+
                 ncommitted++;
-                
-            } catch(ExecutionException ex ) {
-                
+
+            } catch (ExecutionException ex) {
+
                 // Validation errors are allowed and counted as aborted txs.
-                
-                if(ex.getCause() instanceof ValidationError) {
-                
+
+                if (ex.getCause() instanceof ValidationError) {
+
                     nfailed++;
-                    
+
                 } else {
-                
+
                     // Other kinds of exceptions are errors.
 
-                    log.error("Not expecting: "+ex.getMessage());
-                    
+                    log.error("Not expecting: " + ex.getMessage());
+
                     failures.add(ex);
-                    
+
                 }
-                
+
             } catch (InterruptedException e) {
 
                 ninterrupted++;
-                
+
             } catch (TimeoutException e) {
-                
+
                 ntimeout++;
                 
             }
@@ -506,22 +551,16 @@ public class StressTestConcurrent extends
          */
         executorService.shutdownNow();
 
-        Result ret = new Result();
-
-        // @todo the groupCommitCount is per data service so we can't easily report it here.
-//        final long groupCommitCount = dataService.getConcurrencyManager().getWriteService().getGroupCommitCount();
+        final Result ret = new Result();
         
-        ret.put("ncommitted",""+ncommitted);
-        ret.put("nfailed",""+nfailed);
-        ret.put("nuncommitted", ""+nuncommitted);
-        ret.put("ntimeout", ""+ntimeout);
-        ret.put("ninterrupted", ""+ninterrupted);
-        ret.put("elapsed(ms)", ""+elapsed);
-        ret.put("operations/sec", ""+(ncommitted * 1000 / elapsed));
-//        ret.put("groupCommitCount", ""+groupCommitCount);
-//        ret.put("avgCommitGroupSize", ""+(ncommitted/groupCommitCount));
-//        ret.put("#overflow", ""+((ResourceManager)dataService.getResourceManager()).getOverflowCount());
-        ret.put("failures", ""+(failures.size()));
+        ret.put("ncommitted", "" + ncommitted);
+        ret.put("nfailed", "" + nfailed);
+        ret.put("nuncommitted", "" + nuncommitted);
+        ret.put("ntimeout", "" + ntimeout);
+        ret.put("ninterrupted", "" + ninterrupted);
+        ret.put("elapsed(ms)", "" + elapsed);
+        ret.put("operations/sec", "" + (ncommitted * 1000 / elapsed));
+        ret.put("failures", "" + (failures.size()));
 
         System.err.println(ret.toString(true/*newline*/));
 
@@ -532,64 +571,128 @@ public class StressTestConcurrent extends
             fail("There were "+failures.size()+" failed tasks for unexpected causes");
             
         }
-        
+
         if(testCorrectness) {
-            
-//            /*
-//             * Make sure that any asynchronous overflow processing has completed
-//             * normally. 
-//             */
-//            {
-//                
-//                // all known data services.
-//                final UUID[] dataServiceUUID = federation.getDataServiceUUIDs(0);
-//                
-//                for(int i=0; i<dataServiceUUID.length; i++) {
-//                    
-//                    // await async overflow processing ...
-//                    
-//                }
-//                
-//            }
+        
+            /*
+             * @todo config parameter.
+             * 
+             * Note: there may be differences when we have forced overflow and
+             * when we have not since forcing overflow will trigger compacting
+             * merges. So you are more likely to find a problem if you DO NOT
+             * force overflow.
+             * 
+             * Note: This DOES NOT guarentee that overflow is forced on a given
+             * data service. it is forced if the method can gain the exclusive
+             * write lock for that data service. otherwise it will timeout and
+             * overflow processing will not be triggered on that data service.
+             */
+            final boolean forceOverflow = false;
+            if (forceOverflow) {
+
+                System.err.println("Forcing overflow: " + new Date());
+
+                ((AbstractScaleOutFederation) federation)
+                        .forceOverflow(true/* truncateJournal */);
+
+                System.err.println("Forced  overflow: " + new Date());
+
+            }
             
             /*
              * For each index, verify its state against the corresponding ground
              * truth index.
              */
-            
-            for(int i=0; i<nindices; i++) {
 
-                final String name = basename+i;
+            for (int i = 0; i < nindices; i++) {
+
+                final String name = basename + i;
 
                 final IIndex expected = groundTruth[i];
                 
-                System.err.println("Validating: "+name+" #groundTruthEntries="+groundTruth[i].rangeCount(null, null));
-                
+                System.err
+                        .println("Validating: " + name
+                                + " #groundTruthEntries="
+                                + groundTruth[i].rangeCount()
+                        + ", #partitions="
+                        + federation.getMetadataIndex(name, ITx.READ_COMMITTED)
+                                .rangeCount());
+
                 /*
                  * Note: This uses an iterator based comparison so that we can
                  * compare a local index without delete markers and a key-range
                  * partitioned index with delete markers.
                  * 
-                 * Note: test on the UNISOLATED as well as the READ_COMMITTED
-                 * since this can turn up problems with consistent reads by the
-                 * read committed operation.
+                 * Note: This is using a read-only tx reading from the last
+                 * commit point on the federation. That guarentees a consistent
+                 * read.
+                 * 
+                 * Note: Tasks must run to completion!
+                 * 
+                 * If any tasks were cancelled while they were running then the
+                 * groundTruth MIGHT NOT agree with the scale-out indices. This
+                 * is true even though the task which writes on the scale-out
+                 * indices does not update the ground truth until it has
+                 * successfully written on the scale-out index. The reason is
+                 * that the BTree code itself can notice the interrupt while we
+                 * are writing on the groundTruth index and if the task is
+                 * cancelled in the middle of a BTree mutation then the state of
+                 * the groundTruth and scale-out indices WILL NOT agree.
+                 * 
+                 * FIXME I still see errors where the last byte in the key is
+                 * off by one in this test from time to time. I am not sure if
+                 * this is a test harness problem (assumptions that the test
+                 * harness is making) or a system problem.
+                 * 
+                 * expected=com.bigdata.btree.Tuple@8291269{ nvisited=2368,
+                 * flags=[KEYS,VALS], key=[-128, 0, 11, -45], val=[108, -114,
+                 * -104, -47, -70], obj=[108, -114, -104, -47, -70],
+                 * sourceIndex=0},
+                 * 
+                 * actual=com.bigdata.btree.AbstractChunkedTupleIterator$ResultSetTuple@33369876{
+                 * nvisited=197, flags=[KEYS,VALS], key=[-128, 0, 11, -46],
+                 * val=[111, 56, 17, 100, 56], obj=[111, 56, 17, 100, 56],
+                 * sourceIndex=2}
                  */
-
-                assertSameEntryIterator(expected, federation.getIndex(name, ITx.UNISOLATED));
                 
-                assertSameEntryIterator(expected, federation.getIndex(name, ITx.READ_COMMITTED));
+                // read-only tx from lastCommitTime.
+                final long tx = federation.getTransactionService().newTx(
+                        ITx.READ_COMMITTED);
+                
+                try {
+                    
+                    assertSameEntryIterator(expected, federation.getIndex(name,
+                            tx));
+                    
+                } finally {
+                    
+                    federation.getTransactionService().abort(tx);
+                    
+                }
+
+                /*
+                 * Verify against the unisolated views (this might be Ok if all
+                 * tasks ran to completion, but if there is ongoing asynchronous
+                 * overflow activity then that could mess this up since the
+                 * UNISOLATED index views do not have read-consistent
+                 * semantics).
+                 */
+                assertSameEntryIterator(expected, federation.getIndex(name,
+                        ITx.UNISOLATED));
+
                 
                 /*
                  * Release the ground truth index and the backing store.
                  */
 
                 groundTruth[i] = null;
-                
+
                 groundTruthStore[i].destroy();
-                
+
             }
-            
-            System.err.println("Validated "+nindices+" indices against ground truth.");
+
+            System.err.println("Validated " + nindices
+                    + " indices against ground truth.");
             
         }
         
@@ -649,9 +752,10 @@ public class StressTestConcurrent extends
         
         final private byte[] nextKey() {
 
-            final int key = lastKey + r.nextInt(incRange);
+            // Note: MUST be + 1 so that the keys are strictly increasing!
+            final int key = lastKey + r.nextInt(incRange) + 1;
             
-            byte[] data = keyBuilder.reset().append(key).getKey();
+            final byte[] data = keyBuilder.reset().append(key).getKey();
             
             lastKey = key;
 
@@ -682,7 +786,8 @@ public class StressTestConcurrent extends
          * @todo keyLen is ignored. It could be replaced by an increment value
          *       that would govern the distribution of the keys.
          */
-        public Task(IIndex ndx, int keyLen, int nops, double insertRate, IIndex groundTruth, ReentrantLock lock) {
+        public Task(IIndex ndx, int keyLen, int nops, double insertRate,
+                IIndex groundTruth, ReentrantLock lock) {
 
             this.ndx = ndx;
            
@@ -755,6 +860,14 @@ public class StressTestConcurrent extends
 
                     if (groundTruth != null) {
 
+                        /*
+                         * Note: Even though we write on the groundTruth after
+                         * the scale-out index, it is possible that the mutation
+                         * on the ground truth will be interrupted if the task
+                         * is cancelled such that the groundTruth and the
+                         * scale-out index do not agree.
+                         */
+                        
                         groundTruth.submit(0/* fromIndex */, nops/* toIndex */,
                                 keys, vals, //
                                 BatchInsertConstructor.RETURN_NO_VALUES, //
@@ -798,6 +911,14 @@ public class StressTestConcurrent extends
                             );
 
                     if (groundTruth != null) {
+
+                        /*
+                         * Note: Even though we write on the groundTruth after
+                         * the scale-out index, it is possible that the mutation
+                         * on the ground truth will be interrupted if the task
+                         * is cancelled such that the groundTruth and the
+                         * scale-out index do not agree.
+                         */
 
                         groundTruth.submit(0/* fromIndex */, nops/* toIndex */,
                                 keys, null/* vals */,//

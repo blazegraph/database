@@ -372,7 +372,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 //                
 //                btree.setReadOnly(true);
                 
-                assert ((BTree) btree).getLastCommitTime() != 0;
+                assert btree.getLastCommitTime() != 0;
 //                btree.setLastCommitTime(commitRecord.getTimestamp());
                 
             }
@@ -385,10 +385,12 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         if (btree == null) {
 
-            log.warn("No such index: name="+name+", timestamp="+timestamp);
-            
+            log
+                    .warn("No such index: name=" + name + ", timestamp="
+                            + timestamp);
+
             return null;
-        
+
         }
 
         return new AbstractBTree[] {

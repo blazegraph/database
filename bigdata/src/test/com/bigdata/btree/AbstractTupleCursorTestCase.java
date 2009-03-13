@@ -1069,6 +1069,12 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
     /**
      * Compares two tuples for equality based on their data (flags, keys,
      * values, deleted marker, and version timestamp).
+     * <p>
+     * Note: This will fail if you apply it to tuples reported by
+     * {@link ITupleIterator}s whose DELETE flag was difference since it
+     * verifies the DELETE flag state and that is a property of the iterator NOT
+     * the tuple. Whether or not a tuple is deleted is detected using
+     * {@link ITuple#isDeletedVersion()}.
      * 
      * @param expected
      * @param actual

@@ -104,4 +104,42 @@ abstract public class AbstractResourceManagerTask<T> extends AbstractTask<T> {
 
     }
 
+    /**
+     * Pretty print a resource metadata array or other array of objects with
+     * long string representations by framing the output to have one line
+     * for each element of the array.
+     * 
+     * @param label
+     *            A label.
+     * @param a
+     *            The array.
+     *            
+     * @return The pretty printed string.
+     */
+    static public String toString(final String label, final Object[] a) {
+
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("\n");
+
+        sb.append(label);
+
+        sb.append("(" + a.length + ")=[");
+
+        for (Object t : a) {
+
+            sb.append("\n");
+
+            sb.append(t.toString());
+
+            sb.append(",");
+
+        }
+
+        sb.append("]");
+
+        return sb.toString();
+
+    }
+
 }

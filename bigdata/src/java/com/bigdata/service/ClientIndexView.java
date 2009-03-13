@@ -631,7 +631,7 @@ public class ClientIndexView implements IClientIndex {
         final LongAggregator handler = new LongAggregator();
         
         final RangeCountProcedure proc = new RangeCountProcedure(
-                false/* exact */, fromKey, toKey);
+                false/* exact */, false/* deleted */, fromKey, toKey);
 
         submit(fromKey, toKey, proc, handler);
 
@@ -642,20 +642,37 @@ public class ClientIndexView implements IClientIndex {
     /**
      * The exact range count is obtained by mapping a key-range scan over the
      * index partitions. The operation is parallelized.
-     * 
-     * @todo watch for overflow of {@link Long#MAX_VALUE}
      */
     final public long rangeCountExact(final byte[] fromKey, final byte[] toKey) {
 
         final LongAggregator handler = new LongAggregator();
         
         final RangeCountProcedure proc = new RangeCountProcedure(
-                true/* exact */, fromKey, toKey);
+                true/* exact */, false/*deleted*/, fromKey, toKey);
 
         submit(fromKey, toKey, proc, handler);
 
         return handler.getResult();
     
+    }
+    
+    /**
+     * The exact range count of deleted and undeleted tuples is obtained by
+     * mapping a key-range scan over the index partitions. The operation is
+     * parallelized.
+     */
+    final public long rangeCountExactWithDeleted(final byte[] fromKey,
+            final byte[] toKey) {
+
+        final LongAggregator handler = new LongAggregator();
+
+        final RangeCountProcedure proc = new RangeCountProcedure(
+                true/* exact */, true/* deleted */, fromKey, toKey);
+
+        submit(fromKey, toKey, proc, handler);
+
+        return handler.getResult();
+
     }
     
     final public ITupleIterator rangeIterator() {

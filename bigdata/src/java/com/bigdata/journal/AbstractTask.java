@@ -127,7 +127,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * Used to protect against re-submission of the same task object.
      */
     private final AtomicBoolean submitted = new AtomicBoolean(false);
-
+    
     /**
      * The object used to manage exclusive access to the unisolated indices.
      */
@@ -143,6 +143,22 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * indices are created.
      */
     protected final IResourceManager resourceManager;
+
+    /**
+     * Optionally verifies that the locks are held before/after the task
+     * executes.
+     * 
+     * @todo The most common reason to see an exception when this is enabled
+     *       that you did not submit the task to the concurrency manager and
+     *       hence it was not processed by the lock manager. E.g., you invoked
+     *       call() directly on some subclass of AbstractTask. That is a no-no,
+     *       unless you are using the Journal as a personal (no concurrency)
+     *       store. In that case it is Ok and some of the unit tests are written
+     *       that way which is why this is turned off by default. In particular,
+     *       it tends to interfere with some of the tx test suites since they
+     *       were written before the concurrency API was added.
+     */
+    private static final boolean verifyLocks = false;
     
     /**
      * The object used to manage access to the resources from which views of the
@@ -1716,11 +1732,26 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 //        // delegate will handle lock acquisition and invoke doTask().
 //        final LockManagerTask<String,T> delegate = new LockManagerTask<String,T>(lockManager,
 //                resource, new InnerWriteServiceCallable(this));
-
-        final Callable<T> delegate = new InnerWriteServiceCallable(this);
         
-        final WriteExecutorService writeService = concurrencyManager.getWriteService();
+        final Callable<T> delegate = new InnerWriteServiceCallable<T>(this);
+        
+        final WriteExecutorService writeService = concurrencyManager
+                .getWriteService();
 
+        if (verifyLocks && resource.length > 0
+                && writeService.getLockManager().getTaskWithLocks(resource) == null) {
+
+            /*
+             * Note: The most common reason for this exception is that you did
+             * not submit the task to the concurrency manager and hence it was
+             * not processed by the lock manager. E.g., you invoked call()
+             * directly on some subclass of AbstractTask. That is a no-no.
+             */
+            
+            throw new AssertionError("Task does not hold its locks: " + this);
+
+        }
+        
         writeService.beforeTask(t, this);
 
         boolean ran = false;
@@ -1730,11 +1761,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             final T ret;
             
             /*
-             * @todo verify: By the time the call returns any lock(s) have been
-             * released. Locks MUST be released as soon as the task is done
-             * writing so that it does NOT hold locks while it is awaiting
-             * commit. This make it possible for other operations to write on
-             * the same index in the same commit group.
+             * By the time the call returns any lock(s) have been released.
+             * 
+             * Note: Locks MUST be released as soon as the task is done writing
+             * so that it does NOT hold locks while it is awaiting commit. This
+             * make it possible for other operations to write on the same index
+             * in the same commit group.
              */
 //            try {
 
@@ -1764,7 +1796,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             // set flag.
             ran = true;
 
-            if(INFO) log.info("Task Ok: class=" + this);
+            if (INFO)
+                log.info("Task Ok: class=" + this);
                       
             /*
              * Note: The WriteServiceExecutor will await a commit signal before
@@ -1818,11 +1851,11 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static abstract protected class DelegateTask implements ITask {
+    static abstract protected class DelegateTask<T> implements ITask<T> {
         
-        final protected AbstractTask delegate;
+        final protected AbstractTask<T> delegate;
         
-        protected DelegateTask(final AbstractTask delegate) {
+        protected DelegateTask(final AbstractTask<T> delegate) {
             
             if (delegate == null)
                 throw new IllegalArgumentException(); 
@@ -1949,9 +1982,9 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static protected class InnerWriteServiceCallable extends DelegateTask {
+    static protected class InnerWriteServiceCallable<T> extends DelegateTask<T> {
 
-        InnerWriteServiceCallable(AbstractTask delegate) {
+        InnerWriteServiceCallable(final AbstractTask<T> delegate) {
             
             super(delegate);
             
@@ -1960,7 +1993,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         /**
          * Note: Locks on the named indices are ONLY held during this call.
          */
-        public Object call() throws Exception {
+        public T call() throws Exception {
 
             // The write service on which this task is running.
             final WriteExecutorService writeService = delegate.concurrencyManager
@@ -1976,7 +2009,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             try {
 
                 // invoke doTask() on AbstractTask with locks.
-                final Object ret = delegate.doTask();
+                final T ret = delegate.doTask();
 
                 // checkpoint while holding locks.
                 delegate.checkpointTask();
@@ -1986,26 +2019,31 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             } finally {
                 
                 /*
-                 * Note: This is the ONLY place where it would be safe to turn
-                 * autoCommit back on for the indices in the [indexCache]. As
-                 * soon as we leave this method we have lost the exclusive lock
-                 * on the index and another task could be running on it before
-                 * we can do anything else.
+                 * @todo This is the ONLY place where it would be safe to handle
+                 * after actions while holding the lock. As soon as we leave
+                 * this method we have lost the exclusive lock on the index and
+                 * another task could be running on it before we can do anything
+                 * else. However, note that an after action typically requires
+                 * that the task has already been committed or aborted. In order
+                 * to support such after actions we would have to wait until the
+                 * abort or commit before releasing the lock.
                  */
                 
                 delegate.nanoTime_finishedWork = System.nanoTime();
                 
                 writeService.activeTaskCountWithLocksHeld.decrementAndGet();
                 
-                /*
-                 * Release the locks held by the task.
-                 */
                 try {
+                    /*
+                     * Release the locks held by the task.
+                     */
                     writeService.getLockManager().releaseLocksForTask(
                             delegate.resource);
                 } catch (Throwable t) {
                     // log an error but do not abort the task.
-                    log.error(delegate, t);
+                    if (verifyLocks)
+                        log.error(delegate, t); // log as an error.
+                    // fall through
                 }
                 
             }

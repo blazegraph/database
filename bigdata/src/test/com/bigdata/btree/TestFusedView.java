@@ -397,6 +397,8 @@ public class TestFusedView extends AbstractBTreeTestCase {
         assertEquals(0, btree1.rangeCount(null, null));
         assertEquals(0, btree2.rangeCount(null, null));
         assertEquals(0, view.rangeCount(null, null));
+        assertEquals(0, view.rangeCountExact(null, null));
+        assertEquals(0, view.rangeCountExactWithDeleted(null, null));
         assertSameIterator(new byte[][] {}, btree1.rangeIterator(null, null));
         assertSameIterator(new byte[][] {}, btree2.rangeIterator(null, null));
         assertSameIterator(new byte[][] {}, view.rangeIterator(null, null));
@@ -410,9 +412,11 @@ public class TestFusedView extends AbstractBTreeTestCase {
          * btree2: {k3:=v3a}
          */
         btree2.insert(k3, v3a);
-        assertEquals(0,btree1.rangeCount(null, null));
-        assertEquals(1,btree2.rangeCount(null, null));
-        assertEquals(1,view.rangeCount(null, null));
+        assertEquals(0, btree1.rangeCount(null, null));
+        assertEquals(1, btree2.rangeCount(null, null));
+        assertEquals(1, view.rangeCount(null, null));
+        assertEquals(1, view.rangeCountExact(null, null));
+        assertEquals(1, view.rangeCountExactWithDeleted(null, null));
         assertSameIterator(new byte[][]{},btree1.rangeIterator(null,null));
         assertSameIterator(new byte[][]{v3a},btree2.rangeIterator(null,null));
         assertSameIterator(new byte[][]{v3a},view.rangeIterator(null, null));
@@ -428,9 +432,11 @@ public class TestFusedView extends AbstractBTreeTestCase {
          * btree2: {k3:=v3a}
          */
         btree1.insert(k5, v5a);
-        assertEquals(1,btree1.rangeCount(null, null));
-        assertEquals(1,btree2.rangeCount(null, null));
-        assertEquals(2,view.rangeCount(null, null));
+        assertEquals(1, btree1.rangeCount(null, null));
+        assertEquals(1, btree2.rangeCount(null, null));
+        assertEquals(2, view.rangeCount(null, null));
+        assertEquals(2, view.rangeCountExact(null, null));
+        assertEquals(2, view.rangeCountExactWithDeleted(null, null));
         assertSameIterator(new byte[][]{v5a},btree1.rangeIterator(null,null));
         assertSameIterator(new byte[][]{v3a},btree2.rangeIterator(null,null));
         assertSameIterator(new byte[][]{v3a,v5a},view.rangeIterator(null, null));
@@ -452,6 +458,8 @@ public class TestFusedView extends AbstractBTreeTestCase {
         assertEquals(2, btree1.rangeCount(null, null));
         assertEquals(1, btree2.rangeCount(null, null));
         assertEquals(3, view.rangeCount(null, null));
+        assertEquals(1, view.rangeCountExact(null, null));
+        assertEquals(2, view.rangeCountExactWithDeleted(null, null));
         assertSameIterator(new byte[][] { v5a }, btree1.rangeIterator(null,
                 null));
         // verify the deleted entry in the iterator.

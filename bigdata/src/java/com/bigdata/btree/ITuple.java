@@ -56,13 +56,17 @@ public interface ITuple<E extends Object> {
      * 
      * <pre>
      * 
-     * if( (flags & IRangeQuery.KEYS) != 0 ) {
+     * if ((flags &amp; IRangeQuery.KEYS) != 0) {
      * 
-     *   // keys requested.
+     *     // keys requested.
      * 
      * }
      * 
      * </pre>
+     * 
+     * Note: the {@link IRangeQuery#DELETED} flag state is a property of the
+     * iterator NOT the tuple. Whether or not a tuple is deleted is detected
+     * using {@link ITuple#isDeletedVersion()}.
      */
     public int flags();
     
@@ -216,9 +220,12 @@ public interface ITuple<E extends Object> {
     /**
      * Return <code>true</code> iff the index entry was marked as deleted.
      * <p>
-     * Note: Only indices that support transactional isolation can carry
-     * deletion markers for index entries. If the index does not support
-     * transactional isolation then this method MUST return <code>false</code>.
+     * Note: If the index does not support deletion markers then this method
+     * MUST return <code>false</code>.
+     * <p>
+     * Note: the {@link IRangeQuery#DELETED} flag state is a property of the
+     * iterator NOT the tuple. Whether or not a tuple is deleted is detected
+     * using {@link ITuple#isDeletedVersion()}.
      */
     public boolean isDeletedVersion();
 

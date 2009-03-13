@@ -771,7 +771,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
             if( i>0 && i % 10000 == 0 ) {
                 
-                System.err.println("i="+i+", key="+ikey);
+                if (log.isInfoEnabled())
+                    log.info("i=" + i + ", key=" + ikey);
                 
             }
 
@@ -887,7 +888,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
             if( i>0 && i%10000 == 0 ) {
             
-                System.err.println("i="+i+", key="+ikey);
+                if(log.isInfoEnabled())
+                    log.info("i=" + i + ", key=" + ikey);
                 
             }
 
@@ -1585,7 +1587,9 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         assertEquals("#nodes", 0, btree.nnodes);
         assertEquals("#leaves", 1, btree.nleaves);
         assertEquals("height", 0, btree.height);
-        log.info(btree.getBtreeCounters().toString());
+        
+        if (log.isInfoEnabled())
+            log.info(btree.getBtreeCounters().toString());
         
     }
     
@@ -1613,20 +1617,22 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         assertEquals("indexUUID", expected.getIndexMetadata().getIndexUUID(),
                 actual.getIndexMetadata().getIndexUUID());
         
-        // The #of entries must agree.
-        assertEquals("entryCount", expected.getEntryCount(), actual
-                .rangeCount(null,null));
+//        // The #of entries must agree.
+//        assertEquals("entryCount", expected.getEntryCount(), actual
+//                .rangeCount(null, null));
         
         // verify the entry iterator.
-//        doEntryIteratorTest(actual,expected);
-        doEntryIteratorTest(expected,actual);
+        final long actualTupleCount = doEntryIteratorTest(expected, actual);
+        
+        // verifies based on what amounts to an exact range count.
+        assertEquals("entryCount", expected.getEntryCount(), actualTupleCount);
         
         /*
          * Extract the ground truth mapping from the input btree.
          */
-        byte[][] keys = new byte[expected.getEntryCount()][];
+        final byte[][] keys = new byte[expected.getEntryCount()][];
         
-        byte[][] vals = new byte[expected.getEntryCount()][];
+        final byte[][] vals = new byte[expected.getEntryCount()][];
         
         getKeysAndValues(expected, keys, vals);
         
@@ -1646,7 +1652,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
          */
         if(actual instanceof AbstractBTree) {
 
-            doRandomIndexOfTest("actual", ((AbstractBTree)actual), keys, vals);
+            doRandomIndexOfTest("actual", ((AbstractBTree) actual), keys, vals);
             
         }
 
@@ -1655,11 +1661,13 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
          * truth btree for inconsistencies to be paranoid).
          */
 
-        System.err.println("Examining expected tree for inconsistencies");
+        if(log.isInfoEnabled())
+            log.info("Examining expected tree for inconsistencies");
         assert expected.dump(System.err);
 
         if(actual instanceof AbstractBTree) {
-            System.err.println("Examining actual tree for inconsistencies");
+            if(log.isInfoEnabled())
+                log.info("Examining actual tree for inconsistencies");
             assert ((AbstractBTree)actual).dump(System.err);
         }
 
@@ -1681,16 +1689,21 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param actual
      *            The btree to be tested.
      * 
+     * @return The #of tuples that were visited in <i>actual</i>.
+     * 
      * @see #doRandomLookupTest(String, AbstractBTree, byte[][], Object[])
      * @see #doRandomIndexOfTest(String, AbstractBTree, byte[][], Object[])
      */
-    static public void doEntryIteratorTest(AbstractBTree expected, IIndex actual ) {
+    static public long doEntryIteratorTest(final AbstractBTree expected,
+            final IIndex actual) {
 
-        ITupleIterator expectedItr = expected.rangeIterator();
-        
-        ITupleIterator actualItr = actual.rangeIterator(null,null);
+        final ITupleIterator expectedItr = expected.rangeIterator();
+
+        final ITupleIterator actualItr = actual.rangeIterator();
         
         int index = 0;
+
+        long actualTupleCount = 0L;
         
         while( expectedItr.hasNext() ) {
             
@@ -1700,13 +1713,15 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
                 
             }
             
-            ITuple expectedTuple = expectedItr.next();
+            final ITuple expectedTuple = expectedItr.next();
             
-            ITuple actualTuple = actualItr.next();
+            final ITuple actualTuple = actualItr.next();
             
-            byte[] expectedKey = expectedTuple.getKey();
+            actualTupleCount++;
             
-            byte[] actualKey = actualTuple.getKey();
+            final byte[] expectedKey = expectedTuple.getKey();
+            
+            final byte[] actualKey = actualTuple.getKey();
 
 //            System.err.println("index="+index+", key="+actualKey+", val="+actualVal);
             
@@ -1725,16 +1740,15 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
                 
             }
 
-
             if (expectedTuple.isDeletedVersion()) {
 
                 assert actualTuple.isDeletedVersion();
 
             } else {
 
-                byte[] expectedVal = expectedTuple.getValue();
+                final byte[] expectedVal = expectedTuple.getValue();
 
-                byte[] actualVal = actualTuple.getValue();
+                final byte[] actualVal = actualTuple.getValue();
 
                 try {
 
@@ -1774,7 +1788,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             fail("The iterator is willing to visit too many entries");
             
         }
-
+        
+        return actualTupleCount;
 
     }
 
@@ -1835,47 +1850,53 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param vals
      *            the values in key order.
      */
-    static public void doRandomLookupTest(String label, IIndex btree, byte[][] keys, byte[][] vals) {
-        
-        int nentries = (int)btree.rangeCount(null,null);
-        
-        System.err.println("\ncondition: "+label+", nentries="+nentries);
-        
-        int[] order = getRandomOrder(nentries);
+    static public void doRandomLookupTest(final String label,
+            final IIndex btree, final byte[][] keys, final byte[][] vals) {
 
-        long begin = System.currentTimeMillis();
+        final int nentries = keys.length;//btree.rangeCount(null, null);
 
-        boolean randomOrder = true;
-        
-        for(int i=0; i<nentries; i++) {
+        if (log.isInfoEnabled())
+            log.info("\ncondition: " + label + ", nentries=" + nentries);
 
-            int entryIndex = randomOrder ? order[i] : i;
+        final int[] order = getRandomOrder(nentries);
+
+        final long begin = System.currentTimeMillis();
+
+        final boolean randomOrder = true;
+
+        for (int i = 0; i < nentries; i++) {
+
+            final int entryIndex = randomOrder ? order[i] : i;
             
-            byte[] key = keys[entryIndex];
+            final byte[] key = keys[entryIndex];
         
-            byte[] val = btree.lookup(key);
-            
-            if(val==null && true) {
-                
+            final byte[] val = btree.lookup(key);
+
+            if (val == null && true) {
+
                 // Note: This exists only as a debug point.
-                
-                btree.lookup(key);
-                
-            }
-            
-            byte[] expectedVal = vals[entryIndex];
 
-            assertEquals(expectedVal,val);
+                btree.lookup(key);
+
+            }
+
+            final byte[] expectedVal = vals[entryIndex];
+
+            assertEquals(expectedVal, val);
             
         }
  
-        long elapsed = System.currentTimeMillis() - begin;
-        
-        System.err.println(label + " : tested " + nentries
+        if (log.isInfoEnabled()) {
+            
+            final long elapsed = System.currentTimeMillis() - begin;
+
+            log.info(label + " : tested " + nentries
                 + " keys order in " + elapsed + "ms");
         
-//        System.err.println(label + " : " + btree.getCounters().asXML(null/*filter*/));
-         
+//        log.info(label + " : " + btree.getCounters().asXML(null/*filter*/));
+            
+        }
+        
     }
 
     /**
@@ -1887,51 +1908,54 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * 
      * @param label
      *            A descriptive label for error messages.
-     * 
      * @param btree
      *            The btree.
-     * 
      * @param keys
      *            the keys in key order.
-     * 
      * @param vals
      *            the values in key order.
      */
-    static public void doRandomIndexOfTest(String label, AbstractBTree btree, byte[][] keys, byte[][] vals) {
-        
-        int nentries = btree.getEntryCount();
-        
-        System.err.println("\ncondition: "+label+", nentries="+nentries);
-        
-        int[] order = getRandomOrder(nentries);
+    static public void doRandomIndexOfTest(final String label,
+            final AbstractBTree btree, 
+            final byte[][] keys, final byte[][] vals) {
 
-        long begin = System.currentTimeMillis();
+        final int nentries = keys.length;//btree.getEntryCount();
 
-        boolean randomOrder = true;
-        
-        for(int i=0; i<nentries; i++) {
-            
-            int entryIndex = randomOrder ? order[i] : i;
-            
-            byte[] key = keys[entryIndex];
-        
-            assertEquals("indexOf",entryIndex,btree.indexOf(key));
-            
-            byte[] expectedVal = vals[entryIndex];
+        if (log.isInfoEnabled())
+            log.info("\ncondition: " + label + ", nentries=" + nentries);
 
-            assertEquals("keyAt",key,btree.keyAt(entryIndex));
+        final int[] order = getRandomOrder(nentries);
 
-            assertEquals("valueAt",expectedVal,btree.valueAt(entryIndex));
-            
+        final long begin = System.currentTimeMillis();
+
+        final boolean randomOrder = true;
+
+        for (int i = 0; i < nentries; i++) {
+
+            final int entryIndex = randomOrder ? order[i] : i;
+
+            final byte[] key = keys[entryIndex];
+
+            assertEquals("indexOf", entryIndex, btree.indexOf(key));
+
+            final byte[] expectedVal = vals[entryIndex];
+
+            assertEquals("keyAt", key, btree.keyAt(entryIndex));
+
+            assertEquals("valueAt", expectedVal, btree.valueAt(entryIndex));
+
         }
- 
-        long elapsed = System.currentTimeMillis() - begin;
-        
-        System.err.println(label + " : tested " + nentries
-                + " keys in " + elapsed + "ms");
-        
-        System.err.println(label + " : " + btree.getBtreeCounters());
-         
+
+        if (log.isInfoEnabled()) {
+
+            final long elapsed = System.currentTimeMillis() - begin;
+
+            log.info(label + " : tested " + nentries + " keys in " + elapsed
+                    + "ms");
+
+// log.info(label + " : " + btree.getBtreeCounters());
+        }
+
     }
     
     /**
@@ -2055,35 +2079,35 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         long nvisited = 0L;
         
-        while(expectedItr.hasNext()) {
+        while (expectedItr.hasNext()) {
 
-            assertTrue("Expecting another index entry: nvisited="+nvisited, actualItr.hasNext());
-            
+            assertTrue("Expecting another index entry: nvisited=" + nvisited,
+                    actualItr.hasNext());
+
             final ITuple expectedTuple = expectedItr.next();
 
             final ITuple actualTuple = actualItr.next();
+
+//            if(true) {
+//                System.err.println("expected: " + expectedTuple);
+//                System.err.println("  actual: " + actualTuple);
+//            }
             
             nvisited++;
 
-            if(!BytesUtil.bytesEqual(expectedTuple.getKey(), actualTuple.getKey())) {
-                
+            if (!BytesUtil.bytesEqual(expectedTuple.getKey(), actualTuple
+                    .getKey())) {
+
                 fail("Wrong key: nvisited=" + nvisited + ", expected="
-                        +expectedTuple
-//                        + BytesUtil.toString(expectedTuple.getKey())
-                        + ", actual="
-                        +actualTuple);
-//                        + BytesUtil.toString(actualTuple.getKey()));
-                        
+                        + expectedTuple + ", actual=" + actualTuple);
+
             }
-            
-            if(!BytesUtil.bytesEqual(expectedTuple.getValue(), actualTuple.getValue())) {
-                
+
+            if (!BytesUtil.bytesEqual(expectedTuple.getValue(), actualTuple
+                    .getValue())) {
+
                 fail("Wrong value: nvisited=" + nvisited + ", expected="
-                        +expectedTuple
-//                        + BytesUtil.toString(expectedTuple.getValue())
-                        + ", actual="
-                        +actualTuple);
-//                        + BytesUtil.toString(actualTuple.getValue()));
+                        + expectedTuple + ", actual=" + actualTuple);
                         
             }
             
@@ -2116,7 +2140,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * 
      * @todo use null values ~5% of the time.
      */
-    public static KV[] getRandomKeyValues(int N) {
+    public static KV[] getRandomKeyValues(final int N) {
 
         final Random r = new Random();
 

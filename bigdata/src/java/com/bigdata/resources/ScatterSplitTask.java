@@ -1,7 +1,11 @@
 package com.bigdata.resources;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.ISplitHandler;
@@ -51,6 +55,10 @@ import com.bigdata.sparse.SparseRowStore;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * FIXME There should be a unit test for scatter split. It currently gets
+ * excercised when we scatter split the POS index on the RDF DB during a
+ * scale-out index data load.
  */
 public class ScatterSplitTask extends
         AbstractPrepareTask<AbstractResult> {
@@ -143,17 +151,6 @@ public class ScatterSplitTask extends
                 .getSplitHandler()).getAdjustedSplitHandlerForEqualSplits(
                 nsplits, vmd.getRangeCount());
 
-        if (splitHandler == null) {
-            
-            /*
-             * This was checked as a pre-condition for overflow processing and
-             * should not be null.
-             */
-            
-            throw new AssertionError();
-            
-        }
-
     }
 
     @Override
@@ -184,26 +181,27 @@ public class ScatterSplitTask extends
 
         try {
 
+            if (resourceManager.isOverflowAllowed())
+                throw new IllegalStateException();
+
             final SplitResult result;
             try {
-
-                if (resourceManager.isOverflowAllowed())
-                    throw new IllegalStateException();
 
                 final String name = vmd.name;
 
                 // Note: fused view for the source index partition.
                 final ILocalBTreeView src = vmd.getView();
- 
-                 /*
+
+                /*
                  * Get the split points for the index. Each split point
                  * describes a new index partition. Together the split points
                  * MUST exactly span the source index partitions key range.
                  * There MUST NOT be any overlap in the key ranges for the
                  * splits.
                  */
-                
-                final Split[] splits = splitHandler.getSplits(resourceManager, src);
+
+                final Split[] splits = splitHandler.getSplits(resourceManager,
+                        src);
 
                 if (splits == null) {
 
@@ -253,9 +251,7 @@ public class ScatterSplitTask extends
              * partitions is in an index segment that we just built (new
              * writes MAY be buffered on the live journal, so we still have
              * to deal with that). Therefore we use a different entry point
-             * into the MOVE operation, one which does not copy over the
-             * data from the old journal but will still copy over any
-             * buffered writes.
+             * into the MOVE operation.
              * 
              * Note: It is allowable for one of the move targets to be this
              * data service, in which case we simply leave the corresponding
@@ -264,51 +260,104 @@ public class ScatterSplitTask extends
 
             final int nsplits = result.buildResults.length;
 
-            for (int i = 0; i < nsplits; i++) {
+            final List<MoveTask.AtomicUpdate> moveTasks = new ArrayList<MoveTask.AtomicUpdate>(
+                    nsplits);
 
-                // chose the move target using a round robin.
-                final UUID moveTarget = moveTargets[i % moveTargets.length];
+            // create the move tasks.
+            {
 
-                if (moveTarget == resourceManager.getDataServiceUUID()) {
+                for (int i = 0; i < nsplits; i++) {
 
-                    // ignore move to self.
-                    if (INFO)
-                        log.info("Ignoring move to self.");
-                    continue;
+                    // choose the move target using a round robin.
+                    final UUID moveTarget = moveTargets[i % moveTargets.length];
+
+                    if (moveTarget == resourceManager.getDataServiceUUID()) {
+
+                        // ignore move to self.
+                        if (INFO)
+                            log.info("Ignoring move to self.");
+                        continue;
+
+                    }
+
+                    /*
+                     * Obtain a new partition identifier for the partition that
+                     * will be created when we move the index partition to the
+                     * target data service.
+                     */
+                    final int newPartitionId = resourceManager
+                            .nextPartitionId(vmd.indexMetadata.getName());
+
+                    /*
+                     * The name of the post-split index partition that is the
+                     * source for the move operation.
+                     */
+                    final String nameOfPartitionToMove = DataService
+                            .getIndexPartitionName(vmd.indexMetadata.getName(),
+                                    result.splits[i].pmd.getPartitionId());
+
+                    // // register the new index partition.
+                    // final MoveResult moveResult = MoveIndexPartitionTask
+                    // .registerNewPartitionOnTargetDataService(
+                    // resourceManager, moveTarget,
+                    // nameOfPartitionToMove, newPartitionId, e);
+                    //
+                    // /*
+                    // * Move the writes buffered since the split and go live
+                    // with the
+                    // * new index partition.
+                    // */
+                    // MoveIndexPartitionTask.moveBufferedWritesAndGoLive(
+                    // resourceManager, moveResult, e);
+
+                    /*
+                     * Create a move task.
+                     * 
+                     * Note: We do not explicitly delete the source index
+                     * segment for the source index partition after the move. It
+                     * will be required for historical views of the that index
+                     * partition in case any client gained access to the index
+                     * partition after the split and before the move. It will
+                     * eventually be released once the view of the source index
+                     * partition becomes sufficiently aged that it falls off the
+                     * head of the database history.
+                     */
+                    moveTasks.add(new MoveTask.AtomicUpdate(resourceManager,
+                            nameOfPartitionToMove, result.buildResults[i],
+                            moveTarget, newPartitionId, e));
 
                 }
 
-                /*
-                 * The name of the post-split index partition that is
-                 * the source for the move operation.
-                 */
-                final String nameOfPartitionToMove = DataService
-                        .getIndexPartitionName(vmd.indexMetadata.getName(),
-                                result.splits[i].pmd.getPartitionId());
-
-                /*
-                 * Obtain a new partition identifier for the partition
-                 * that will be created when we move the index partition
-                 * to the target data service.
-                 */
-                final int newPartitionId = resourceManager
-                        .nextPartitionId(vmd.indexMetadata.getName());
-
-                // register the new index partition.
-                final MoveResult moveResult = MoveIndexPartitionTask
-                        .registerNewPartitionOnTargetDataService(
-                                resourceManager, moveTarget,
-                                nameOfPartitionToMove, newPartitionId, e);
-
-                /*
-                 * Move the writes buffered since the split and go live with the
-                 * new index partition.
-                 */
-                MoveIndexPartitionTask.moveBufferedWritesAndGoLive(
-                        resourceManager, moveResult, e);
-
             }
 
+            /*
+             * Submit the move tasks to executed in parallel and await their
+             * outcomes.
+             */
+            final List<Future<MoveResult>> futures = resourceManager
+                    .getConcurrencyManager().invokeAll(moveTasks);
+            
+            /*
+             * Log error if any move task failed (other than being cancelled).
+             */
+            for (Future f : futures) {
+
+                if (!f.isCancelled()) {
+
+                    try {
+
+                        f.get();
+
+                    } catch (ExecutionException ex) {
+
+                        log.error(ex);
+
+                    }
+
+                }
+                
+            }
+            
             // Done.
             return result;
 
@@ -319,4 +368,5 @@ public class ScatterSplitTask extends
         }
 
     }
+
 }

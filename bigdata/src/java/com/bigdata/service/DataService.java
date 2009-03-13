@@ -925,8 +925,20 @@ abstract public class DataService extends AbstractService
 
             try {
                 
+                /*
+                 * FIXME This is not working yet. If we submit directly to the
+                 * concurrency manager, then there is a ClassCastException on
+                 * the DirtyListener. If we submit directly to the WriteService
+                 * then the task does not hold its locks. None of these options
+                 * work. The write service really needs a refactor (to be state
+                 * based rather like the new lock service) before I finish the
+                 * distributed commit protocol.
+                 */
                 // submit and wait for the result.
-                concurrencyManager.getWriteService().submit(task).get();
+                concurrencyManager
+                .submit(task).get();
+//                .getWriteService().submit(task).get();
+//                .getWriteService().getLockManager().submit(task.getResource(), task).get();
 
                 /*
                  * FIXME The state changes for the local tx should be atomic across
@@ -1609,7 +1621,7 @@ abstract public class DataService extends AbstractService
 
             }
 
-            // submit the task and await its completion.
+            // submit the task and return its Future.
             return getFederation().getExecutorService().submit(task);
 
         } finally {
@@ -1984,7 +1996,7 @@ abstract public class DataService extends AbstractService
 
     }
 
-    public long getOverflowCounter() throws IOException {
+    public long getAsynchronousOverflowCounter() throws IOException {
 
         setupLoggingContext();
 
@@ -1996,7 +2008,7 @@ abstract public class DataService extends AbstractService
 
             }
 
-            return resourceManager.getOverflowCount();
+            return resourceManager.getAsynchronousOverflowCount();
 
         } finally {
 

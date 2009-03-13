@@ -165,14 +165,6 @@ public class SplitTailTask extends AbstractPrepareTask {
                  */
 
                 /*
-                 * The name of the post-split rightSibling (this is the source
-                 * index partition for the move operation).
-                 */
-                final String rightSiblingName = DataService
-                        .getIndexPartitionName(vmd.indexMetadata.getName(),
-                                result.splits[1].pmd.getPartitionId());
-
-                /*
                  * Obtain a new partition identifier for the partition that will
                  * be created when we move the rightSibling to the target data
                  * service.
@@ -180,19 +172,42 @@ public class SplitTailTask extends AbstractPrepareTask {
                 final int newPartitionId = resourceManager
                         .nextPartitionId(vmd.indexMetadata.getName());
                 
-                // register the new index partition.
-                final MoveResult moveResult = MoveIndexPartitionTask
-                        .registerNewPartitionOnTargetDataService(
-                                resourceManager, moveTarget, rightSiblingName,
-                                newPartitionId, e);
-            
                 /*
-                 * Move the buffered writes since the tail split and go live
-                 * with the new index partition.
+                 * The name of the post-split rightSibling (this is the source
+                 * index partition for the move operation).
                  */
-                MoveIndexPartitionTask.moveBufferedWritesAndGoLive(
-                        resourceManager, moveResult, e);
-                
+                final String rightSiblingName = DataService
+                        .getIndexPartitionName(vmd.indexMetadata.getName(),
+                                result.splits[1].pmd.getPartitionId());
+
+//                // register the new index partition.
+//                final MoveResult moveResult = MoveIndexPartitionTask
+//                        .registerNewPartitionOnTargetDataService(
+//                                resourceManager, moveTarget, rightSiblingName,
+//                                newPartitionId, e);
+//            
+//                /*
+//                 * Move the buffered writes since the tail split and go live
+//                 * with the new index partition.
+//                 */
+//                MoveIndexPartitionTask.moveBufferedWritesAndGoLive(
+//                        resourceManager, moveResult, e);
+
+                /*
+                 * Move.
+                 * 
+                 * Note: We do not explicitly delete the source index segment
+                 * for the rightSibling after the move. It will be required for
+                 * historical views of the rightSibling in case any client
+                 * gained access to the rightSibling after the split and before
+                 * the move. It will eventually be released once the view of the
+                 * rightSibling index partition becomes sufficiently aged that
+                 * it falls off the head of the database history.
+                 */
+                MoveTask.doAtomicUpdate(resourceManager, rightSiblingName,
+                        result.buildResults[1]/*rightSibling*/, moveTarget,
+                        newPartitionId, e);
+
             }
             
             // Done.

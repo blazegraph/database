@@ -273,6 +273,14 @@ abstract public class IndexManager extends StoreManager {
      * {@link ITx#READ_COMMITTED} view of that {@link BTree} needs to be
      * replaced by the most recently committed view, which is a different
      * {@link BTree} object and is loaded from a different checkpoint record.
+     * <p>
+     * Note: {@link ITx#UNISOLATED} indices have a related problem. Those views
+     * are no longer valid after synchronous overflow since a new view is
+     * defined by that process. Likewise, the various atomic update tasks during
+     * asynchronous overflow also change the definition of the view. Therefore I
+     * have modified the IndexManager to NOT permit UNISOLATES views into the
+     * index cache. Note however that the Journal still retains a live index
+     * cache and that we still have a separate cache for index segment stores.
      * 
      * @see Options#INDEX_CACHE_CAPACITY
      * @see Options#INDEX_CACHE_TIMEOUT
@@ -1452,7 +1460,8 @@ abstract public class IndexManager extends StoreManager {
 
             }
 
-            if (timestamp != ITx.READ_COMMITTED) {
+            if (timestamp != ITx.READ_COMMITTED
+                        && timestamp != ITx.UNISOLATED) {
 
                 // update the indexCache.
                 if (INFO)
@@ -1696,12 +1705,14 @@ abstract public class IndexManager extends StoreManager {
 
             try {
 
-                if (INFO)
-                    log.info("built index segment: " + name + ", file="
-                            + outFile);
+                final BuildResult tmp = new BuildResult(name, compactingMerge,
+                        src.getSources(), indexMetadata, segmentMetadata,
+                        builder);
 
-                return new BuildResult(name, compactingMerge, src.getSources(),
-                        indexMetadata, segmentMetadata, builder);
+                if (INFO)
+                    log.info("built index segment: " + tmp);
+
+                return tmp;
 
             } catch (Throwable t) {
 
@@ -1871,14 +1882,16 @@ abstract public class IndexManager extends StoreManager {
                 // first total for this index partition.
                 delta.put(name, current);
 
-                log.warn("First time: " + name);
+                if (INFO)
+                    log.info("First time: " + name);
 
             } else {
 
                 // compute the delta for this index partition.
                 delta.put(name, current.subtract(prior));
 
-                log.warn("Computed delta: " + name);
+                if (INFO)
+                    log.info("Computed delta: " + name);
 
             }
             

@@ -141,6 +141,11 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
     protected static final String ERR_TOO_MANY_TUPLES = "Too many tuples";
     
     /**
+     * Warning message when the index segment will be empty.
+     */
+    protected static final String ERR_NO_TUPLES = "No tuples";
+    
+    /**
      * The file mode used to open the file on which the {@link IndexSegment} is
      * written.
      */
@@ -436,7 +441,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      * @throws IOException
      */
     public static IndexSegmentBuilder newInstance(final String name,
-            final IIndex src, final File outFile, final File tmpDir,
+            final ILocalBTreeView src, final File outFile, final File tmpDir,
             final boolean compactingMerge, final long createTime,
             final byte[] fromKey, final byte[] toKey) throws IOException {
 
@@ -505,15 +510,11 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
              * new index segment. This is required in order for the fact that
              * those tuples were deleted as of the commitTime to be retained by
              * the generated index segment.
-             * 
-             * Note: An incremental build always reads from an (Abstract)BTree.
              */
-
-            final AbstractBTree btree = (AbstractBTree) src;
 
             flags = IRangeQuery.DEFAULT | IRangeQuery.DELETED;
 
-            final long n = btree.rangeCountExactWithDeleted(fromKey, toKey);
+            final long n = src.rangeCountExactWithDeleted(fromKey, toKey);
 
             if (n > Integer.MAX_VALUE) {
 
@@ -525,15 +526,16 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
             if (INFO)
                 log.info("Incremental build: name=" + name + ", nentries="
-                        + nentries + ", entryCount=" + btree.getEntryCount());
+                        + nentries + ", rangeCountExactWithDeleted=" + n);
 
         }
 
         /*
          * Iterator reading the source tuples to be copied to the index segment.
          * 
-         * Note: The DELETED flag will be set if this is not a compacting merge
-         * (i.e., when it is an incremental build).
+         * Note: The DELETED flag was set above unless this is a compacting
+         * merge. That is necessary to ensure that deleted tuples are preserved
+         * when the index segment does not reflect the total history of a view.
          */
         final ITupleIterator itr = src.rangeIterator(fromKey, toKey,
                 0/* capacity */, flags, null/* filter */);
@@ -624,10 +626,10 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             final File tmpDir,//
             final int entryCount,//
             final ITupleIterator entryIterator, //
-            final int m,
+            final int m,//
             IndexMetadata metadata,//
-            final long commitTime,
-            final boolean compactingMerge 
+            final long commitTime,//
+            final boolean compactingMerge// 
             )
             throws IOException {
 
@@ -640,21 +642,24 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         if (entryCount < 0)
             throw new IllegalArgumentException();
 
-        if (entryCount == 0 && !compactingMerge) {
-         
-            /*
-             * Note: A zero entry count is allowed for a compacting merge. This
-             * can arise when all tuples in an index (partition) have been
-             * deleted. It is impossible to detect this condition before we
-             * explicitly range count the tuples (including any delete markers).
-             * Rather than forcing the caller to handle this via a thrown
-             * exception it is significantly easier to generate an empty
-             * IndexSegment.
-             */
-            
-            throw new IllegalArgumentException();
-            
-        }
+//        if (entryCount == 0 && !compactingMerge) {
+//         
+//            /*
+//             * Note: A zero entry count is allowed for a compacting merge. This
+//             * can arise when all tuples in an index (partition) have been
+//             * deleted. It is impossible to detect this condition before we
+//             * explicitly range count the tuples (including any delete markers).
+//             * Rather than forcing the caller to handle this via a thrown
+//             * exception it is significantly easier to generate an empty
+//             * IndexSegment.
+//             */
+//            
+//            throw new IllegalArgumentException();
+//            
+//        }
+
+        if (entryCount == 0)
+            log.warn(ERR_NO_TUPLES);
         
         if (entryIterator == null)
             throw new IllegalArgumentException();
