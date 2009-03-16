@@ -139,12 +139,17 @@ public class TestAddDeleteResource extends AbstractResourceManagerTestCase {
             
             final long createTime = resourceManager.nextTimestamp();
 
-            // build an index segment from that btree.
+            /*
+             * Build an index segment from that btree.
+             * 
+             * Note: the IndexSegmentStore is on the retention list and
+             * therefore is not releaseable until we remove it from that list.
+             */
             buildResult = resourceManager.buildIndexSegment(INDEX_NAME, btree,
                     true/* compactingMerge */, createTime, null/* fromKey */,
                     null /* toKey */, new Event(resourceManager
                             .getFederation(), new EventResource(INDEX_NAME),
-                            "test", ""/* details */));
+                            "test"));
 
         }
 
@@ -153,7 +158,20 @@ public class TestAddDeleteResource extends AbstractResourceManagerTestCase {
             // Note: the build already added the index segment for us.
             assertEquals(1, resourceManager.getManagedSegmentCount());
 
-            // delete
+            try {
+                // delete (should fail since on the retentionSet).
+                resourceManager.deleteResource(buildResult.segmentMetadata
+                        .getUUID(), false/* isJournal */);
+                fail("Expecting: " + IllegalStateException.class);
+            } catch (IllegalStateException ex) {
+                log.info("Ignoring expected exception: " + ex);
+            }
+
+            // remove from the retentionSet.
+            resourceManager.retentionSetRemove(buildResult.segmentMetadata
+                    .getUUID());
+            
+            // delete (should succeed).
             resourceManager.deleteResource(buildResult.segmentMetadata
                     .getUUID(), false/* isJournal */);
 

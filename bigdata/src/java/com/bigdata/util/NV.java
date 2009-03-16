@@ -8,7 +8,7 @@ import java.io.Serializable;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class NV implements Serializable {
+public class NV implements Serializable, Comparable<NV> {
     
     /**
      * 
@@ -65,6 +65,17 @@ public class NV implements Serializable {
     public boolean equals(NV o) {
     
         return name.equals(o.name) && value.equals(o.value);
+        
+    }
+
+    /**
+     * Places into order by <code>name</code>.
+     */
+    public int compareTo(NV o) {
+        
+        int ret = name.compareTo(o.name);
+        
+        return ret;
         
     }
     

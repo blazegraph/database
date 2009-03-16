@@ -3,6 +3,7 @@ package com.bigdata.resources;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import com.bigdata.btree.BTree;
@@ -90,15 +91,14 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
 
         final Event e = new Event(resourceManager.getFederation(),
                 new EventResource(vmd.indexMetadata), OverflowActionEnum.Build,
-                OverflowActionEnum.Build + "(" + vmd.name + ") : " + vmd)
-                .start();
+                vmd.getParams()).start();
 
+        BuildResult buildResult = null;
         try {
 
             if (resourceManager.isOverflowAllowed())
                 throw new IllegalStateException();
 
-            final BuildResult buildResult;
             try {
 
                 /*
@@ -119,6 +119,8 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
                         vmd.getView(),
                         resourceManager.maximumBuildSegmentBytes, e);
 
+                e.addDetails(buildViewMetadata.getParams());
+                
                 if(INFO)
                     log.info("acceptedView: " + buildViewMetadata);
                 
@@ -131,6 +133,8 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
                         buildViewMetadata.compactingMerge, vmd.commitTime,
                         null/* fromKey */, null/* toKey */, e);
 
+                e.addDetails(buildResult.getParams());
+                
                 if (buildResult.sourceCount != buildViewMetadata.naccepted) {
 
                     throw new AssertionError("Build result has "
@@ -183,6 +187,10 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
 
             } catch (Throwable t) {
 
+                // make it releasable.
+                resourceManager.retentionSetRemove(buildResult.segmentMetadata
+                        .getUUID());
+
                 // delete the generated index segment.
                 resourceManager
                         .deleteResource(buildResult.segmentMetadata.getUUID(), false/* isJournal */);
@@ -195,6 +203,20 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
             return buildResult;
 
         } finally {
+
+            if (buildResult != null) {
+
+                /*
+                 * At this point the index segment was either incorporated into
+                 * the new view in a restart safe manner or there was an error.
+                 * Either way, we now remove the index segment store's UUID from
+                 * the retentionSet so it will be subject to the release policy
+                 * of the StoreManager.
+                 */
+                resourceManager.retentionSetRemove(buildResult.segmentMetadata
+                        .getUUID());
+
+            }
 
             e.end();
 
@@ -292,12 +314,23 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
             // populated with the description of the ordered sources of the new view.
             final List<IResourceMetadata> newView = new LinkedList<IResourceMetadata>();
 
+            /*
+             * Note: The event is labeled a "build" even if all sources
+             * participate in the build. This makes it easier to identify the
+             * compacting merges in the events log. The compacting merges are of
+             * interest since they are only triggered when the #of sources in
+             * the view grows too large and they require more effort. By
+             * contrast, some "builds" will in fact be compacting merges, but
+             * they were selected as builds and they are compacting merges by
+             * virtue of having so little work to do that it is cheaper to use
+             * all sources in the view and thereby postpone a more intensive
+             * compacting merge somewhat longer.
+             */
+            final Map<String, Object> v = buildResult.getParams();
+            v.put("summary", OverflowActionEnum.Build + "(" + buildResult.name
+                    + ")");
             final Event updateEvent = parentEvent.newSubEvent(
-                    OverflowSubtaskEnum.AtomicUpdate,
-                    (buildResult.compactingMerge ? OverflowActionEnum.Merge
-                            : OverflowActionEnum.Build)
-                            + "(" + buildResult.name + ") : " + buildResult)
-                    .start();
+                    OverflowSubtaskEnum.AtomicUpdate).start();
 
             try {
 
@@ -537,11 +570,13 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
 
                 }
 
+                updateEvent.addDetail("newView", newView.toString());
+                
                 return newResources;
 
             } finally {
 
-                updateEvent.end("newView=" + newView.toString());
+                updateEvent.end();
 
             }
 

@@ -171,15 +171,17 @@ public class SplitIndexPartitionTask extends
 
         final Event e = new Event(resourceManager.getFederation(),
                 new EventResource(vmd.indexMetadata), OverflowActionEnum.Split,
-                OverflowActionEnum.Split
-                        + (moveTargets != null ? "+" + OverflowActionEnum.Move
-                                : "") + "(" + vmd.name + ") : " + vmd
-                        + ", moveTargets=" + Arrays.toString(moveTargets))
-                .start();
+                vmd.getParams()).addDetail("summary", OverflowActionEnum.Split
+                + (moveTargets != null ? "+" + OverflowActionEnum.Move : "")
+                + "(" + vmd.name + ")");
+        if (moveTargets != null) {
+            e.addDetail("moveTargets", Arrays.toString(moveTargets));
+        }
+        e.start();
 
+        SplitResult splitResult = null;
         try {
 
-            final SplitResult result;
             try {
 
                 if (resourceManager.isOverflowAllowed())
@@ -286,7 +288,7 @@ public class SplitIndexPartitionTask extends
                 // validate the splits before processing them.
                 SplitUtility.validateSplits(src, splits);
 
-                result = SplitUtility.buildSplits(vmd, splits, e);
+                splitResult = SplitUtility.buildSplits(vmd, splits, e);
 
             } finally {
 
@@ -302,7 +304,7 @@ public class SplitIndexPartitionTask extends
             /*
              * Do the atomic update
              */
-            doSplitAtomicUpdate(resourceManager, vmd, result,
+            doSplitAtomicUpdate(resourceManager, vmd, splitResult,
                     OverflowActionEnum.Split,
                     resourceManager.indexPartitionSplitCounter, e);
 
@@ -336,8 +338,8 @@ public class SplitIndexPartitionTask extends
                     {
                         int indexOfMinLength = -1;
                         long minLength = Long.MAX_VALUE;
-                        for (int i = 0; i < result.buildResults.length; i++) {
-                            final BuildResult r = result.buildResults[i];
+                        for (int i = 0; i < splitResult.buildResults.length; i++) {
+                            final BuildResult r = splitResult.buildResults[i];
                             // #of bytes in that index segment.
                             final long length = r.builder.getCheckpoint().length;
                             if (length < minLength) {
@@ -345,11 +347,11 @@ public class SplitIndexPartitionTask extends
                                 minLength = length;
                             }
                         }
-                        assert indexOfMinLength != -1 : result.toString();
+                        assert indexOfMinLength != -1 : splitResult.toString();
                         bestMoveIndex = indexOfMinLength;
                         if (INFO)
                             log.info("Best split to move: "
-                                    + result.splits[bestMoveIndex]);
+                                    + splitResult.splits[bestMoveIndex]);
                     }
 
                     /*
@@ -366,21 +368,8 @@ public class SplitIndexPartitionTask extends
                      */
                     final String nameOfPartitionToMove = DataService
                             .getIndexPartitionName(vmd.indexMetadata.getName(),
-                                    result.splits[bestMoveIndex].pmd
+                                    splitResult.splits[bestMoveIndex].pmd
                                             .getPartitionId());
-
-//                    // register the new index partition.
-//                    final MoveResult moveResult = MoveIndexPartitionTask
-//                            .registerNewPartitionOnTargetDataService(
-//                                    resourceManager, moveTargets[0],
-//                                    nameOfPartitionToMove, newPartitionId, e);
-//
-//                    /*
-//                     * Move the buffered writes since the split and go live with
-//                     * the new index partition.
-//                     */
-//                    MoveIndexPartitionTask.moveBufferedWritesAndGoLive(
-//                            resourceManager, moveResult, e);
 
                     /*
                      * Move.
@@ -395,7 +384,7 @@ public class SplitIndexPartitionTask extends
                      * head of the database history.
                      */
                     MoveTask.doAtomicUpdate(resourceManager, nameOfPartitionToMove,
-                            result.buildResults[bestMoveIndex], moveTargets[0],
+                            splitResult.buildResults[bestMoveIndex], moveTargets[0],
                             newPartitionId, e);
 
                 } else {
@@ -407,7 +396,7 @@ public class SplitIndexPartitionTask extends
                      * simply leaf the corresponding index partition in place.
                      */
 
-                    final int nsplits = result.buildResults.length;
+                    final int nsplits = splitResult.buildResults.length;
 
                     for (int i = 0; i < nsplits; i++) {
 
@@ -437,22 +426,8 @@ public class SplitIndexPartitionTask extends
                          */
                         final String nameOfPartitionToMove = DataService
                                 .getIndexPartitionName(vmd.indexMetadata
-                                        .getName(), result.splits[i].pmd
+                                        .getName(), splitResult.splits[i].pmd
                                         .getPartitionId());
-//
-//                        // register the new index partition.
-//                        final MoveResult moveResult = MoveIndexPartitionTask
-//                                .registerNewPartitionOnTargetDataService(
-//                                        resourceManager, moveTarget,
-//                                        nameOfPartitionToMove, newPartitionId,
-//                                        e);
-//
-//                        /*
-//                         * Move the buffered writes since the split and go live with
-//                         * the new index partition.
-//                         */
-//                        MoveIndexPartitionTask.moveBufferedWritesAndGoLive(
-//                                resourceManager, moveResult, e);
 
                         /*
                          * Move.
@@ -467,7 +442,7 @@ public class SplitIndexPartitionTask extends
                          * that it falls off the head of the database history.
                          */
                         MoveTask.doAtomicUpdate(resourceManager,
-                                nameOfPartitionToMove, result.buildResults[i],
+                                nameOfPartitionToMove, splitResult.buildResults[i],
                                 moveTarget, newPartitionId, e);
 
                     }
@@ -477,9 +452,32 @@ public class SplitIndexPartitionTask extends
             }
 
             // Done.
-            return result;
+            return splitResult;
             
         } finally {
+
+            if (splitResult != null) {
+
+                for (BuildResult buildResult : splitResult.buildResults) {
+
+                    if (buildResult != null) {
+
+                        /*
+                         * At this point the index segment was either incorporated into
+                         * the new view in a restart safe manner or there was an error.
+                         * Either way, we now remove the index segment store's UUID from
+                         * the retentionSet so it will be subject to the release policy
+                         * of the StoreManager.
+                         */
+                        resourceManager
+                                .retentionSetRemove(buildResult.segmentMetadata
+                                        .getUUID());
+
+                    }
+
+                }
+
+            }
 
             e.end();
 
@@ -549,10 +547,10 @@ public class SplitIndexPartitionTask extends
             final AbstractTask<Void> task = new AtomicUpdateSplitIndexPartitionTask(
                     resourceManager, resources, action, vmd.indexMetadata
                             .getIndexUUID(), result, parentEvent.newSubEvent(
-                            OverflowSubtaskEnum.AtomicUpdate, action + "("
-                                    + vmd.name + "->"
-                                    + Arrays.toString(resources) + ") : src="
-                                    + vmd));
+                            OverflowSubtaskEnum.AtomicUpdate).addDetail(
+                            "summary",
+                            action + "(" + vmd.name + "->"
+                                    + Arrays.toString(resources)));
 
             // submit atomic update task and wait for it to complete
             resourceManager.getConcurrencyManager().submit(task).get();
@@ -577,6 +575,10 @@ public class SplitIndexPartitionTask extends
                 if (r == null)
                     continue;
 
+                // make it releasable.
+                resourceManager.retentionSetRemove(r.segmentMetadata.getUUID());
+
+                // delete it.
                 resourceManager.deleteResource(r.segmentMetadata.getUUID(),
                         false/* isJournal */);
 

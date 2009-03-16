@@ -446,9 +446,15 @@ public class SplitUtility {
      * Build N index segments based on those split points.
      * <p>
      * Note: This is done in parallel to minimize latency.
+     * <p>
+     * Note: The generated {@link IndexSegment}s are on the retentionSet and
+     * MUST be removed from that set once it has been incorporated in a restart
+     * safe manner into an index partition view or once the task fails.
      * 
-     * @throws InterruptedException 
-     * @throws ExecutionExceptions 
+     * @see StoreManager#retentionSetAdd(java.util.UUID)
+     * 
+     * @throws InterruptedException
+     * @throws ExecutionExceptions
      * 
      * @todo The operation could be serialized (or run with limited parallelism)
      *       in order to minimize the RAM burden for buffers during index
@@ -531,6 +537,11 @@ public class SplitUtility {
                 if (result == null)
                     continue;
 
+                // make it releasable.
+                vmd.resourceManager.retentionSetRemove(result.segmentMetadata
+                        .getUUID());
+
+                // delete it.
                 vmd.resourceManager.deleteResource(result.segmentMetadata
                         .getUUID(), false/* isJournal */);
 
@@ -593,6 +604,14 @@ public class SplitUtility {
             
         }
 
+        /**
+         * Note: The generated {@link IndexSegment} is on the retentionSet and
+         * MUST be removed from that set once it has been incorporated in a
+         * restart safe manner into an index partition view or once the task
+         * fails.
+         * 
+         * @see StoreManager#retentionSetAdd(java.util.UUID)
+         */
         @Override
         protected BuildResult doTask() throws Exception {
 
@@ -631,7 +650,14 @@ public class SplitUtility {
                 
             }
             
-            // build the index segment from the key range.
+            /*
+             * Build the index segment from the key range.
+             * 
+             * Note: The generated index segment is on the retentionSet and MUST
+             * be removed from that set once it has been incorporated in a
+             * restart safe manner into an index partition view or once the task
+             * fails.
+             */
             final BuildResult result = resourceManager.buildIndexSegment(name,
                     src, true/* compactingMerge */, vmd.commitTime,
                     fromKey, toKey, parentEvent);

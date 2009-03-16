@@ -40,7 +40,6 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.journal.Journal;
-import com.bigdata.resources.MoveIndexPartitionTask;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Event;
 
@@ -360,7 +359,8 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
      * invalid index partition identifier) once the move has been completed
      * successfully.
      * 
-     * @see MoveIndexPartitionTask
+     * @deprecated MoveTask manages without this field (it was required by the
+     *             previous MOVE implementation).
      */
     final public int getSourcePartitionId() {
         

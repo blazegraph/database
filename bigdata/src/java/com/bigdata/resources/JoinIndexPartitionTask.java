@@ -112,8 +112,10 @@ public class JoinIndexPartitionTask extends AbstractPrepareTask<JoinResult> {
         final Event e = new Event(resourceManager.getFederation(),
                 // Note: using the leftSibling for the event resource.
                 new EventResource(vmd[0].indexMetadata),
-                OverflowActionEnum.Join, OverflowActionEnum.Join + "("
-                        + Arrays.toString(getResource()) + ")").start();
+                OverflowActionEnum.Join).start();
+        
+        e.addDetail("summary", OverflowActionEnum.Join + "("
+                + Arrays.toString(getResource()) + ")");
 
         try {
 
@@ -350,7 +352,7 @@ public class JoinIndexPartitionTask extends AbstractPrepareTask<JoinResult> {
                  */
                 final AbstractTask<Void> task = new AtomicUpdateJoinIndexPartition(
                         resourceManager, names2, result, e.newSubEvent(
-                                OverflowSubtaskEnum.AtomicUpdate, summary));
+                                OverflowSubtaskEnum.AtomicUpdate));
                 
                 // submit task and wait for it to complete
                 concurrencyManager.submit(task).get();

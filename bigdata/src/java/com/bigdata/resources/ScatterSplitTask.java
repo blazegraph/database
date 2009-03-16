@@ -174,17 +174,18 @@ public class ScatterSplitTask extends
 
         final Event e = new Event(resourceManager.getFederation(),
                 new EventResource(vmd.indexMetadata), OverflowActionEnum.Split,
+                vmd.getParams()).addDetail(
+                "summary",
                 OverflowActionEnum.Split + "+" + OverflowActionEnum.Move + "("
-                        + vmd.name + ", nsplits=" + nsplits + ") : " + vmd
-                        + ", moveTargets=" + Arrays.toString(moveTargets))
-                .start();
+                        + vmd.name + ", nsplits=" + nsplits + ")").addDetail(
+                "moveTargets", Arrays.toString(moveTargets)).start();
 
+        SplitResult splitResult = null;
         try {
 
             if (resourceManager.isOverflowAllowed())
                 throw new IllegalStateException();
 
-            final SplitResult result;
             try {
 
                 final String name = vmd.name;
@@ -225,7 +226,7 @@ public class ScatterSplitTask extends
                 // validate the splits before processing them.
                 SplitUtility.validateSplits(src, splits);
 
-                result = SplitUtility.buildSplits(vmd, splits, e);
+                splitResult = SplitUtility.buildSplits(vmd, splits, e);
 
             } finally {
 
@@ -241,8 +242,8 @@ public class ScatterSplitTask extends
             /*
              * Do the atomic update.
              */
-            SplitIndexPartitionTask.doSplitAtomicUpdate(resourceManager, vmd, result,
-                    OverflowActionEnum.Split,
+            SplitIndexPartitionTask.doSplitAtomicUpdate(resourceManager, vmd,
+                    splitResult, OverflowActionEnum.Split,
                     resourceManager.indexPartitionSplitCounter, e);
 
             /*
@@ -258,7 +259,7 @@ public class ScatterSplitTask extends
              * index partition in place.
              */
 
-            final int nsplits = result.buildResults.length;
+            final int nsplits = splitResult.buildResults.length;
 
             final List<MoveTask.AtomicUpdate> moveTasks = new ArrayList<MoveTask.AtomicUpdate>(
                     nsplits);
@@ -294,21 +295,7 @@ public class ScatterSplitTask extends
                      */
                     final String nameOfPartitionToMove = DataService
                             .getIndexPartitionName(vmd.indexMetadata.getName(),
-                                    result.splits[i].pmd.getPartitionId());
-
-                    // // register the new index partition.
-                    // final MoveResult moveResult = MoveIndexPartitionTask
-                    // .registerNewPartitionOnTargetDataService(
-                    // resourceManager, moveTarget,
-                    // nameOfPartitionToMove, newPartitionId, e);
-                    //
-                    // /*
-                    // * Move the writes buffered since the split and go live
-                    // with the
-                    // * new index partition.
-                    // */
-                    // MoveIndexPartitionTask.moveBufferedWritesAndGoLive(
-                    // resourceManager, moveResult, e);
+                                    splitResult.splits[i].pmd.getPartitionId());
 
                     /*
                      * Create a move task.
@@ -323,7 +310,7 @@ public class ScatterSplitTask extends
                      * head of the database history.
                      */
                     moveTasks.add(new MoveTask.AtomicUpdate(resourceManager,
-                            nameOfPartitionToMove, result.buildResults[i],
+                            nameOfPartitionToMove, splitResult.buildResults[i],
                             moveTarget, newPartitionId, e));
 
                 }
@@ -350,7 +337,8 @@ public class ScatterSplitTask extends
 
                     } catch (ExecutionException ex) {
 
-                        log.error(ex);
+                        // log and continue.
+                        log.error(ex, ex);
 
                     }
 
@@ -359,9 +347,32 @@ public class ScatterSplitTask extends
             }
             
             // Done.
-            return result;
+            return splitResult;
 
         } finally {
+
+            if (splitResult != null) {
+
+                for (BuildResult buildResult : splitResult.buildResults) {
+
+                    if (buildResult != null) {
+
+                        /*
+                         * At this point the index segment was either incorporated into
+                         * the new view in a restart safe manner or there was an error.
+                         * Either way, we now remove the index segment store's UUID from
+                         * the retentionSet so it will be subject to the release policy
+                         * of the StoreManager.
+                         */
+                        resourceManager
+                                .retentionSetRemove(buildResult.segmentMetadata
+                                        .getUUID());
+
+                    }
+
+                }
+
+            }
 
             e.end();
 

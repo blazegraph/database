@@ -48,6 +48,7 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.BufferedDiskStrategy;
 import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.IResourceManager;
@@ -214,13 +215,18 @@ abstract public class OverflowManager extends IndexManager {
     private final boolean overflowEnabled;
     
     /**
+     * @see Options#OVERFLOW_THRESHOLD
+     */
+    protected final double overflowThreshold;
+    
+    /**
      * A flag used to disable overflow of the live journal until asynchronous
      * post-processing of the old journal has been completed.
      * 
      * @see PostProcessOldJournalTask
      */
     protected final AtomicBoolean overflowAllowed = new AtomicBoolean(true);
-
+    
     /**
      * A flag used to disable the asynchronous overflow processing for some unit
      * tests.
@@ -389,6 +395,35 @@ abstract public class OverflowManager extends IndexManager {
 
         String DEFAULT_OVERFLOW_ENABLED = "true";
 
+        /**
+         * Floating point property specifying the percentage of the maximum
+         * extent at which synchronous overflow processing will be triggered
+         * (default {@link #DEFAULT_OVERFLOW_THRESHOLD}). The value is
+         * multiplied into the configured
+         * {@link com.bigdata.journal.Options#MAXIMUM_EXTENT}. If the result is
+         * GTE the current extend of the live journal, then synchronous overflow
+         * processing will be triggered. However, note that synchronous overflow
+         * processing can not be triggered until asynchronous overflow
+         * processing for the last journal is complete. Therefore if
+         * asynchronous overflow processing takes a long time, the overflow
+         * threashold might not be checked until after it has already been
+         * exceeded.
+         * <p>
+         * The main purpose of this property is to trigger overflow processing
+         * before the maximum extent is exceeded. The trigger needs to lead the
+         * maximum extent somewhat since overflow processing can not proceed
+         * until there is an exclusive lock on the write service, and tasks
+         * already running will continue to write on the live journal.
+         * Overflowing the maximum extent is not a problem as long as the
+         * {@link BufferMode} supports transparent extension of the journal.
+         * However, some {@link BufferMode}s do not and therefore they can not
+         * be used reliably with the overflow manager.
+         */
+        String OVERFLOW_THRESHOLD = OverflowManager.class.getName()
+                + ".overflowThreshold";
+
+        String DEFAULT_OVERFLOW_THRESHOLD = ".9";
+        
         /**
          * Index partitions having no more than this many entries as reported by
          * a range count will be copied to the new journal during synchronous
@@ -888,6 +923,19 @@ abstract public class OverflowManager extends IndexManager {
 
             if (INFO)
                 log.info(Options.OVERFLOW_ENABLED + "=" + overflowEnabled);
+
+        }
+
+        // overflowThreshold
+        {
+
+            overflowThreshold = Double
+                    .parseDouble(properties.getProperty(
+                            Options.OVERFLOW_THRESHOLD,
+                            Options.DEFAULT_OVERFLOW_THRESHOLD));
+
+            if (INFO)
+                log.info(Options.OVERFLOW_THRESHOLD + "=" + overflowThreshold);
 
         }
 
@@ -1426,18 +1474,9 @@ abstract public class OverflowManager extends IndexManager {
         final long nextOffset;
         {
 
-            /*
-             * Choose maximum of the target maximum extent and the current user
-             * data extent so that we do not re-trigger overflow immediately if
-             * the buffer has been extended beyond the target maximum extent.
-             * Among other things this lets you run the buffer up to a
-             * relatively large extent (if you use a disk-only mode since you
-             * will run out of memory if you use a fully buffered mode).
-             */
-            
             nextOffset = journal.getRootBlockView().getNextOffset();
             
-            if (nextOffset > .9 * journal.getMaximumExtent()) {
+            if (nextOffset > overflowThreshold * journal.getMaximumExtent()) {
 
                 shouldOverflow = true;
 
@@ -1500,8 +1539,9 @@ abstract public class OverflowManager extends IndexManager {
         assert overflowAllowed.get();
 
         final Event e = new Event(getFederation(), new EventResource(),
-                EventType.SynchronousOverflow, "overflowCounter="
-                        + asynchronousOverflowCounter).start();
+                EventType.SynchronousOverflow).addDetail(
+                "synchronousOverflowCounter", synchronousOverflowCounter.get())
+                .start();
 
         try {
 

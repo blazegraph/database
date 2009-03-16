@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import org.CognitiveWeb.extser.ShortPacker;
@@ -40,6 +41,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.journal.Journal;
+import com.bigdata.service.Params;
 
 /**
  * Base class for {@link IResourceMetadata} implementations.
@@ -47,7 +49,8 @@ import com.bigdata.journal.Journal;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractResourceMetadata implements IResourceMetadata, Externalizable {
+abstract public class AbstractResourceMetadata implements IResourceMetadata,
+        Externalizable, Params {
 
     static final protected Logger log = Logger
             .getLogger(AbstractResourceMetadata.class);
@@ -75,6 +78,20 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
      * the {@link BTree} revision of interest.
      */
     private long createTime;
+
+    public Map<String, Object> getParams() {
+
+        final Map<String, Object> v = new HashMap<String, Object>();
+
+        v.put("UUID", uuid);
+
+        v.put("filename", filename);
+
+        v.put("createTime", createTime);
+
+        return v;
+            
+    }
     
     /**
      * De-serialization constructor.

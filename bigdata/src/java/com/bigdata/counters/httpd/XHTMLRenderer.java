@@ -23,9 +23,9 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.Vector;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -274,6 +274,11 @@ public class XHTMLRenderer {
         final public LinkedHashMap<String,Vector<String>> params;
         
         /**
+         * The request headers.
+         */
+        final public Properties headers;
+        
+        /**
          * The value of the {@link #PATH} query parameter. 
          */
         final public String path;
@@ -359,17 +364,22 @@ public class XHTMLRenderer {
          *            {@link CounterSetHTTPD} was started.
          * @param root
          *            The root of the counter set.
-         * @parm uri Percent-decoded URI without parameters, for example
-         *       "/index.cgi"
-         * @parm parms Parsed, percent decoded parameters from URI and, in case
-         *       of POST, data. The keys are the parameter names. Each value is
-         *       a {@link Collection} of {@link String}s containing the
-         *       bindings for the named parameter. The order of the URL
-         *       parameters is preserved.
+         * @param uri
+         *            Percent-decoded URI without parameters, for example
+         *            "/index.cgi"
+         * @param parms
+         *            Parsed, percent decoded parameters from URI and, in case
+         *            of POST, data. The keys are the parameter names. Each
+         *            value is a {@link Collection} of {@link String}s
+         *            containing the bindings for the named parameter. The order
+         *            of the URL parameters is preserved.
+         * @param header
+         *            Header entries, percent decoded
          */
         public Model(final IService service, final CounterSet root,
                 final String uri,
-                final LinkedHashMap<String, Vector<String>> params) {
+                final LinkedHashMap<String, Vector<String>> params,
+                final Properties headers) {
 
             this.service = service;
             
@@ -378,6 +388,8 @@ public class XHTMLRenderer {
             this.uri = uri;
 
             this.params = params;
+            
+            this.headers = headers;
 
             this.path = getProperty(params, PATH, ps);
 
@@ -731,14 +743,24 @@ public class XHTMLRenderer {
         }
 
         /**
-         * Re-create the request URL.
-         * 
-         * @todo move to request object?
+         * Re-create the request URL, including the protocol, host, port, and
+         * path but not any query parameters.
          */
-        public String getRequestURL() {
+        public StringBuilder getRequestURL() {
             
-            return getRequestURL(null);
+            final StringBuilder sb = new StringBuilder();
+
+            // protocol
+            sb.append("http://");
             
+            // host and port
+            sb.append(headers.get("host"));
+            
+            // path (including the leading '/')
+            sb.append(uri);
+
+            return sb;
+
         }
 
         /**
@@ -769,12 +791,10 @@ public class XHTMLRenderer {
                 }
                 
             }
+
+            final StringBuilder sb = getRequestURL();
             
-            final StringBuilder sb = new StringBuilder();
-            
-            sb.append(uri);
-            
-            sb.append("?path=" + encodeURL(getProperty(p,PATH, ps)));
+            sb.append("?path=" + encodeURL(getProperty(p, PATH, ps)));
             
             final Iterator<Map.Entry<String, Vector<String>>> itr = p
                     .entrySet().iterator();
@@ -991,11 +1011,13 @@ public class XHTMLRenderer {
         
         if (model.flot) {
 
-            w.write("<script\n type=\"text/javascript\" src=\"jquery.js\"></script\n>");
+            final String s = model.getRequestURL().toString();
+            
+            w.write("<script\n type=\"text/javascript\" src=\""+s+"jquery.js\"></script\n>");
 
-            w.write("<script\n type=\"text/javascript\" src=\"jquery.flot.js\"></script\n>");
+            w.write("<script\n type=\"text/javascript\" src=\""+s+"jquery.flot.js\"></script\n>");
 
-            w.write("<!--[if IE]><script type=\"text/javascript\" src=\"excanvas.pack.js\"></script><![endif]-->");
+            w.write("<!--[if IE]><script type=\"text/javascript\" src=\""+s+"excanvas.pack.js\"></script><![endif]-->");
 
         }
         
@@ -3775,12 +3797,13 @@ public class XHTMLRenderer {
         w.write("  <td colspan=\"2\">"+cdata(e.majorEventType.toString())+"</td>");
         w.write(" </tr\n>");
 
-        if (true && e.getDetails() != null && e.getDetails().length() > 0) {
-            // details on the last line by itself.
-            w.write(" <tr\n>");
-            w.write("  <th align=\"left\">");
-            w.write("  <td colspan=\"4\">" + cdata(e.getDetails()) + "</td>");
-            w.write(" </tr\n>");
+        if (true && e.getDetails() != null && e.getDetails().size() > 0) {
+            for (Map.Entry<String,Object> entry: e.getDetails().entrySet()) {
+                w.write(" <tr\n>");
+                w.write("  <th align=\"left\">" + cdata(entry.getKey()) + "</th>");
+                w.write("  <td colspan=\"4\">" + cdata(""+entry.getValue()) + "</td>");
+                w.write(" </tr\n>");
+            }
         }
         
         w.write("</table\n>");

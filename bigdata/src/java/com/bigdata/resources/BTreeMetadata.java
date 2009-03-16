@@ -261,6 +261,8 @@ class BTreeMetadata {
 
         sb.append("name=" + name);
 
+        sb.append(", action=" + action);
+        
         sb.append(", entryCount=" + entryCount);
 
         sb.append(", sourceCounts=" + "{all=" + sourceCount + ",journals="
