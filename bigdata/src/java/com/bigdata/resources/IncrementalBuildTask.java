@@ -554,21 +554,16 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
                 assert btree.needsCheckpoint();
 
                 /*
-                 * update counter to reflect successful index partition build or
-                 * compacting merge (if all sources were included in the build
-                 * operation).
+                 * Update counter to reflect successful index partition build.
+                 * 
+                 * Note: All build tasks are reported as builds so that we can
+                 * readily distinguish the tasks which were selected as
+                 * compacting merges from those which were selected as builds.
+                 * If you want to see how many tasks were "effective" compacting
+                 * merges (because all sources were used) then you need to look
+                 * at the events log for the indexSegmentBuild operation.
                  */
-                if (buildResult.compactingMerge) {
-
-                    resourceManager.indexPartitionMergeCounter
-                            .incrementAndGet();
-
-                } else {
-
-                    resourceManager.indexPartitionBuildCounter
-                            .incrementAndGet();
-
-                }
+                resourceManager.indexPartitionBuildCounter.incrementAndGet();
 
                 updateEvent.addDetail("newView", newView.toString());
                 
