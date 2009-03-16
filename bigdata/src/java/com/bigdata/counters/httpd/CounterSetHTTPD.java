@@ -94,15 +94,15 @@ public class CounterSetHTTPD extends AbstractHTTPD {
          */
         if (uri.contains("jquery.js")) {
 
-            return sendClasspathResource(MIME_TEXT_HTML, "jquery.js");
+            return sendClasspathResource(MIME_TEXT_JAVASCRIPT, "jquery.js");
 
         } else if (uri.contains("jquery.flot.js")) {
 
-            return sendClasspathResource(MIME_TEXT_HTML, "jquery.flot.js");
+            return sendClasspathResource(MIME_TEXT_JAVASCRIPT, "jquery.flot.js");
 
         } else if (uri.contains("excanvas.pack.js")) {
 
-            return sendClasspathResource(MIME_TEXT_HTML, "excanvas.pack.js");
+            return sendClasspathResource(MIME_TEXT_JAVASCRIPT, "excanvas.pack.js");
 
         } else if (true) {
 
@@ -162,7 +162,9 @@ public class CounterSetHTTPD extends AbstractHTTPD {
      *            The mime type for the response.
      * @param resource
      *            The resource.
+     * 
      * @return The {@link Response} which will send that resource.
+     * 
      * @throws RuntimeException
      *             if the resource is not found on the classpath.
      * @throws RuntimeException

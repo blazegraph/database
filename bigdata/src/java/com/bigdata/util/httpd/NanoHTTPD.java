@@ -246,7 +246,8 @@ public class NanoHTTPD implements IServiceShutdown
 		MIME_TEXT_PLAIN = "text/plain",
 		MIME_TEXT_HTML = "text/html",
 		MIME_DEFAULT_BINARY = "application/octet-stream",
-        MIME_APPLICATION_XML = "application/xml";
+        MIME_APPLICATION_XML = "application/xml",
+        MIME_TEXT_JAVASCRIPT = "text/javascript";
 
 	// ==================================================
 	// Socket & server code
