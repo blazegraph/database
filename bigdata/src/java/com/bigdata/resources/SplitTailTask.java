@@ -98,6 +98,12 @@ public class SplitTailTask extends AbstractPrepareTask {
 
         }
 
+        if (resourceManager.getDataServiceUUID().equals(moveTarget)) {
+
+            throw new IllegalArgumentException("Move to self");
+
+        }
+        
         this.moveTarget = moveTarget;
         
     }
