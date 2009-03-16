@@ -65,7 +65,12 @@ public class TestResourceService extends TestCase2 {
         super(name);
     }
 
-    public void test_sendFile() throws Exception {
+    /**
+     * Test the ability to receive a file.
+     * 
+     * @throws Exception
+     */
+    public void test_receiveFile() throws Exception {
 
         final UUID allowedUUID = UUID.randomUUID();
 

@@ -251,7 +251,7 @@ public class IndexSegment extends AbstractBTree {
 
                 openCloseEvent = new Event(fileStore.fed, new EventResource(
                         fileStore.getIndexMetadata(), fileStore.file),
-                        EventType.IndexSegmentOpenClose, ""/* details */);
+                        EventType.IndexSegmentOpenClose);
 
             }
             

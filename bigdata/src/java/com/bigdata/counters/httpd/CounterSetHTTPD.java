@@ -5,6 +5,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Properties;
 import java.util.Vector;
@@ -32,6 +35,12 @@ public class CounterSetHTTPD extends AbstractHTTPD {
      * The service reference iff one one specified to the ctor (may be null).
      */
     protected final IService service;
+
+    /**
+     * An immutable collection of pre-declared classpath resources which can be
+     * downloaded via httpd.
+     */
+    private final Collection<String> allowedClassPathResources;
     
     public CounterSetHTTPD(final int port, final CounterSet root) throws IOException {
 
@@ -57,6 +66,12 @@ public class CounterSetHTTPD extends AbstractHTTPD {
         
         // Note: MAY be null.
         this.service = service;
+    
+        this.allowedClassPathResources = Collections.unmodifiableCollection(Collections.synchronizedCollection(Arrays.asList(new String[]{
+                "jquery.js",
+                "jquery.flot.js",
+                "excanvas.pack.js"
+        })));
         
     }
     
@@ -78,31 +93,16 @@ public class CounterSetHTTPD extends AbstractHTTPD {
          * using the classpath.
          */
         if (uri.contains("jquery.js")) {
-            
-            mimeType = MIME_TEXT_HTML;
-            
-            is = getClass().getResourceAsStream("jquery.js");
-            
-            if (INFO)
-                log.info("Serving: jquery");
+
+            return sendClasspathResource(MIME_TEXT_HTML, "jquery.js");
 
         } else if (uri.contains("jquery.flot.js")) {
-            
-            mimeType = MIME_TEXT_HTML;
-            
-            is = getClass().getResourceAsStream("jquery.flot.js");
 
-            if (INFO)
-                log.info("Serving: flot");
+            return sendClasspathResource(MIME_TEXT_HTML, "jquery.flot.js");
 
         } else if (uri.contains("excanvas.pack.js")) {
-            
-            mimeType = MIME_TEXT_HTML;
 
-            is = getClass().getResourceAsStream("excanvas.pack.js");
-
-            if (INFO)
-                log.info("Serving: excanvas");
+            return sendClasspathResource(MIME_TEXT_HTML, "excanvas.pack.js");
 
         } else if (true) {
 
@@ -113,7 +113,7 @@ public class CounterSetHTTPD extends AbstractHTTPD {
             final OutputStreamWriter w = new OutputStreamWriter(baos);
 
             // build model of the controller state.
-            final Model model = new Model(service, root, uri, parms);
+            final Model model = new Model(service, root, uri, parms, header);
             
             // @todo if controller state error then send HTTP_BAD_REQUEST
             
@@ -154,5 +154,60 @@ public class CounterSetHTTPD extends AbstractHTTPD {
         return r;
         
     }
-    
+
+    /**
+     * Sewnd a resource from the classpath.
+     * 
+     * @param mimeType
+     *            The mime type for the response.
+     * @param resource
+     *            The resource.
+     * @return The {@link Response} which will send that resource.
+     * @throws RuntimeException
+     *             if the resource is not found on the classpath.
+     * @throws RuntimeException
+     *             if the resource was not explicitly declared as a resource
+     *             which may be sent in response to an httpd request.
+     */
+    protected Response sendClasspathResource(final String mimeType,
+            final String resource) {
+        
+        if (mimeType == null)
+            throw new IllegalArgumentException();
+
+        if (resource == null)
+            throw new IllegalArgumentException();
+        
+        if (allowedClassPathResources.contains(resource)) {
+
+            throw new RuntimeException("Resource not pre-declared: " + resource);
+            
+        }
+        
+        final InputStream is = getClass().getResourceAsStream(resource);
+
+        if (is == null) {
+
+            throw new RuntimeException("Resource not on classpath: " + resource);
+
+        }
+
+        if (INFO)
+            log.info("Serving: " + resource + " as " + mimeType);
+
+        /*
+         * Note: This response may be cached.
+         * 
+         * Note: The Response will consume and close the InputStream.
+         */
+
+        final String charset = "UTF-8";
+
+        final Response r = new Response(HTTP_OK, mimeType + "; charset='"
+                + charset + "'", is);
+
+        return r;
+
+    }
+
 }

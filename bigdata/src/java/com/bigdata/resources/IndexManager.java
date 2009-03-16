@@ -1563,12 +1563,27 @@ abstract public class IndexManager extends StoreManager {
      * Build an {@link IndexSegment} from an index partition. Delete markers are
      * propagated to the {@link IndexSegment} unless <i>compactingMerge</i> is
      * <code>true</code>.
+     * <p>
+     * Note: {@link IndexSegment}s are registered with the {@link StoreManager}
+     * by this method but are also placed into a hard reference collection (the
+     * <i>retentionSet</i>) in order to prevent their being released before
+     * they are put to use by incorporating them into an index partition view.
+     * The caller MUST remove the {@link IndexSegment} from that hard reference
+     * collection once the index has been incorporated into an index partition
+     * view or is no longer required (e.g., has been MOVEd). However, the caller
+     * MUST NOT remove the {@link IndexSegment} from the hard reference
+     * collection until after the commit point for the task which incoporates it
+     * into the index partition view. In practice, this means that those tasks
+     * must be encapsulated with either a post-condition action or wrapped by a
+     * caller which provides the necessary after-action in a finally{} clause.
      * 
-     * @param name
+     * @param indexPartitionName
      *            The name of the index partition (not the name of the scale-out
      *            index).
      * @param src
      *            A view of the index partition as of the <i>createTime</i>.
+     *            This may be a partial view of comprised from only the first N
+     *            sources in the view, in which case <i>compactingMerge := false</code>.
      * @param compactingMerge
      *            When <code>true</code> the caller asserts that <i>src</i>
      *            is a {@link FusedView} and deleted index entries WILL NOT be
@@ -1582,8 +1597,8 @@ abstract public class IndexManager extends StoreManager {
      *            {@link IndexSegment} is being generated. This value is written
      *            into {@link IndexSegmentCheckpoint#commitTime}.
      * @param fromKey
-     *            The lowest key that will be included (inclusive). When
-     *            <code>null</code> there is no lower bound.
+     *            The lowest key that will be included (inclusive). When <code>null</code>
+     *            there is no lower bound.
      * @param toKey
      *            The first key that will not be included (exclusive). When
      *            <code>null</code> there is no upper bound.
@@ -1595,36 +1610,34 @@ abstract public class IndexManager extends StoreManager {
      *             if any errors are encountered then the file (if it exists)
      *             will be deleted as a side-effect before returning control to
      *             the caller.
+     * 
+     * @see StoreManager#purgeOldResources(long, boolean)
      */
-//    * @param outFile
-//    *            The file on which the {@link IndexSegment} will be written.
-//    *            The file MAY exist, but if it exists then it MUST be empty.
-    public BuildResult buildIndexSegment(final String name,
-            final ILocalBTreeView src, //final File outFile,
-            final boolean compactingMerge, final long commitTime,
-            final byte[] fromKey, final byte[] toKey, final Event parentEvent)
-            throws Exception {
+    public BuildResult buildIndexSegment(final String indexPartitionName,
+            final ILocalBTreeView src, final boolean compactingMerge,
+            final long commitTime, final byte[] fromKey, final byte[] toKey,
+            final Event parentEvent) throws Exception {
 
-        if (name == null)
+        if (indexPartitionName == null)
             throw new IllegalArgumentException();
 
         if (src == null)
             throw new IllegalArgumentException();
         
-//        if (outFile == null)
-//            throw new IllegalArgumentException();
-        
         if (parentEvent == null)
             throw new IllegalArgumentException();
 
-        final String details = "name=" + name + ", merge=" + compactingMerge
-                + ", #sources=" + src.getSourceCount();
-        
-        final Event e = parentEvent.newSubEvent(EventType.IndexSegmentBuild,
-                details).start();
+        final Event e;
+        {
+            final Map<String, Object> m = new HashMap<String, Object>();
+            m.put("name", indexPartitionName);
+            m.put("merge", compactingMerge);
+            m.put("#sources", src.getSourceCount());
+
+            e = parentEvent.newSubEvent(EventType.IndexSegmentBuild, m).start();
+        }
 
         File outFile = null;
-        String moreDetails = null;
         try {
             final IndexMetadata indexMetadata;
             final SegmentMetadata segmentMetadata;
@@ -1639,7 +1652,7 @@ abstract public class IndexManager extends StoreManager {
                 outFile = getIndexSegmentFile(indexMetadata);
 
                 // new builder.
-                builder = IndexSegmentBuilder.newInstance(name, src, outFile,
+                builder = IndexSegmentBuilder.newInstance(indexPartitionName, src, outFile,
                         tmpDir, compactingMerge, commitTime, fromKey, toKey);
 
                 // build the index segment.
@@ -1651,18 +1664,21 @@ abstract public class IndexManager extends StoreManager {
                 {
 
                     final int nentries = builder.plan.nentries;
-//                    final long commitTime = builder.getCheckpoint().commitTime;
+
                     final long nbytes = builder.getCheckpoint().length;
                     
                     // data rate in MB/sec.
                     float mbPerSec = builder.mbPerSec;
 
-                    moreDetails = "name=" + name + ", filename=" + outFile + ", nentries="
-                            + nentries + ", commitTime=" + commitTime + ", elapsed="
-                            + builder.elapsed + ", "
-                            + fpf.format(((double) nbytes / Bytes.megabyte32)) + "MB"
-                            + ", rate=" + fpf.format(mbPerSec) + "MB/sec";
-
+                    // add more event details.
+                    e.addDetail("filename", outFile);
+                    e.addDetail("nentries", nentries);
+                    e.addDetail("commitTime", commitTime);
+                    e.addDetail("elapsed", +builder.elapsed);
+                    e.addDetail("MB", fpf
+                            .format(((double) nbytes / Bytes.megabyte32)));
+                    e.addDetail("MB/s", fpf.format(mbPerSec));
+            
                 }
 
                 // Describe the index segment.
@@ -1672,7 +1688,16 @@ abstract public class IndexManager extends StoreManager {
                         commitTime //
                 );
 
-                // Notify the resource manager so that it can find this file.
+                /*
+                 * Add to the retention set so the newly built index segment
+                 * will not be deleted before it is put to use.
+                 */
+                retentionSetAdd(segmentMetadata.getUUID());
+
+                /*
+                 * Now that the file is protected from release, notify the
+                 * resource manager so that it can find this file.
+                 */
                 addResource(segmentMetadata, outFile);
 
             } catch (Throwable t) {
@@ -1705,7 +1730,7 @@ abstract public class IndexManager extends StoreManager {
 
             try {
 
-                final BuildResult tmp = new BuildResult(name, compactingMerge,
+                final BuildResult tmp = new BuildResult(indexPartitionName, compactingMerge,
                         src.getSources(), indexMetadata, segmentMetadata,
                         builder);
 
@@ -1715,9 +1740,21 @@ abstract public class IndexManager extends StoreManager {
                 return tmp;
 
             } catch (Throwable t) {
+                
+                try {
+                
+                    // make it releasable.
+                    retentionSetRemove(segmentMetadata.getUUID());
+                    
+                } catch (Throwable t2) {
+
+                    log.warn(t2.getLocalizedMessage(), t2);
+
+                }
 
                 try {
 
+                    // release it.
                     deleteResource(segmentMetadata.getUUID(), false/* isJournal */);
 
                 } catch (Throwable t2) {
@@ -1735,7 +1772,7 @@ abstract public class IndexManager extends StoreManager {
 
         } finally {
 
-            e.end(moreDetails);
+            e.end();
 
         }
 

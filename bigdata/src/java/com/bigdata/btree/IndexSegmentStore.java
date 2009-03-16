@@ -431,8 +431,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
 
                     openCloseEvent = new Event(fed, new EventResource(
                             indexMetadata, file),
-                            EventType.IndexSegmentStoreOpenClose, ""/* details */)
-                            .start();
+                            EventType.IndexSegmentStoreOpenClose).start();
                     
                 }
 

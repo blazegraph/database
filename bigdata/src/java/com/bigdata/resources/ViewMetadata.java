@@ -1,6 +1,8 @@
 package com.bigdata.resources;
 
 import java.lang.ref.SoftReference;
+import java.util.HashMap;
+import java.util.Map;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeCounters;
@@ -9,7 +11,9 @@ import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.mdi.IMetadataIndex;
+import com.bigdata.service.Event;
 import com.bigdata.service.IMetadataService;
+import com.bigdata.service.Params;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -25,7 +29,7 @@ import com.bigdata.util.InnerCause;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-class ViewMetadata extends BTreeMetadata {
+class ViewMetadata extends BTreeMetadata implements Params {
 
     /**
      * Set <code>true</code> iff the index partition view is requested and the
@@ -374,6 +378,48 @@ class ViewMetadata extends BTreeMetadata {
 
         }
 
+    }
+    
+    /**
+     * Returns all the interesting properties in a semi-structured form which
+     * can be used to log an {@link Event}.
+     */
+    public Map<String,Object> getParams() {
+
+        final Map<String, Object> m = new HashMap<String, Object>();
+
+        m.put("name", name);
+
+        m.put("action", action);
+
+        m.put("entryCount", entryCount);
+
+        m.put("sourceCount", sourceCount);
+
+        m.put("journalSourceCount", sourceJournalCount);
+
+        m.put("segmentSourceCount", sourceSegmentCount);
+
+        m.put("manditoryMerge", manditoryMerge);
+
+        m.put("#leafSplit", btreeCounters.leavesSplit);
+
+        m.put("#headSplit", btreeCounters.headSplit);
+
+        m.put("#tailSplit", btreeCounters.tailSplit);
+
+        m.put("percentHeadSplits", percentHeadSplits);
+
+        m.put("percentTailSplits", percentTailSplits);
+
+        m.put("rangeCount", rangeCount);
+
+        m.put("percentOfSplit", percentOfSplit);
+
+        m.put("adjustedSplitHandler", adjustedSplitHandler);
+
+        return m;
+        
     }
     
     /**

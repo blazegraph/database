@@ -53,7 +53,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.NOPTupleSerializer;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
@@ -233,7 +232,7 @@ public class StressTestConcurrent extends
     public void test_stressTest1() throws Exception {
 
         int nclients = 40; // max concurrency limited by #of index partitions.
-        long timeout = 50; // 20 or 40 (ignored for correctness testing!)
+        long timeout = 50; // 20 or 40 (Note: ignored for correctness testing!)
         int ntrials = 1000; // 1000 or 10000
         int keyLen = 4; // @todo not used right now.
         int nops = 100; // 100

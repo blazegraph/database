@@ -30,8 +30,12 @@ package com.bigdata.service;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.StringTokenizer;
+import java.util.TreeMap;
 import java.util.UUID;
 
 import org.apache.log4j.Logger;
@@ -118,14 +122,69 @@ public class Event implements Serializable {
     /**
      * Event details.
      */
-    protected String details;
+    protected Map<String,Object> details;
     
     /**
      * Event details.
      */
-    public String getDetails() {
+    public Map<String,Object> getDetails() {
         
         return details;
+        
+    }
+
+    /**
+     * Add details.
+     * @param details
+     * @return This {@link Event}.
+     */
+    public Event addDetails(final Map<String, Object> details) {
+
+        if(details == null)
+            throw new IllegalArgumentException();
+        
+        synchronized (this) {
+
+            if (this.details == null) {
+
+                this.details = details;
+
+            } else {
+
+                this.details.putAll(details);
+
+            }
+
+        }
+
+        return this;
+
+    }
+    
+    /**
+     * Add a detail.
+     * @param name
+     * @param value
+     * @return This {@link Event}.
+     */
+    public Event addDetail(final String name, final Object value) {
+
+        if(name == null)
+            throw new IllegalArgumentException();
+
+        synchronized (this) {
+
+            if (details == null) {
+
+                details = new HashMap<String, Object>();
+
+            }
+
+            details.put(name, value);
+
+        }
+        
+        return this;
         
     }
 
@@ -173,6 +232,30 @@ public class Event implements Serializable {
 
     }
 
+    public Event(final IBigdataFederation fed, final EventResource resource,
+            final Object majorEventType) {
+        
+        this(fed, resource, majorEventType, (Map<String,Object>) null/* details */);
+        
+    }
+
+//    public Event(final IBigdataFederation fed, final EventResource resource,
+//            final Object majorEventType, final NV[] details) {
+//
+//        this(fed, resource, majorEventType, ""/* minorEventType */, null/*details*/);
+//        
+//        if (details != null) {
+//         
+//            for (NV nv : details) {
+//                
+//                addDetail(nv.getName(), nv.getValue());
+//                
+//            }
+//            
+//        }
+//
+//    }
+
     /**
      * Event ctor.
      * 
@@ -185,15 +268,15 @@ public class Event implements Serializable {
      * @param majorEventType
      *            The major type of the event (use of enums is encouraged).
      * @param details
-     *            Some details for the event (unstructured).
+     *            Optional details for the event.
      */
     public Event(final IBigdataFederation fed, final EventResource resource,
-            final Object majorEventType, final String details) {
+            final Object majorEventType, final Map<String,Object> details) {
 
         this(fed, resource, majorEventType, ""/* minorEventType */, details);
         
     }
-
+    
     /**
      * Sub-event ctor.
      * 
@@ -208,14 +291,14 @@ public class Event implements Serializable {
      * @param minorEventType
      *            The minor type of the event (use of enums is encouraged).
      * @param details
-     *            Some details for the event (unstructured).
+     *            Optional details for the event.
      * 
      * @todo consider passing along the {@link UUID} of the parent event but
      *       then must correlate that {@link UUID} when the event is recieved.
      */
     protected Event(final IBigdataFederation fed, final EventResource resource,
             final Object majorEventType, final Object minorEventType,
-            final String details) {
+            final Map<String,Object> details) {
 
         if (fed == null)
             throw new IllegalArgumentException();
@@ -227,9 +310,6 @@ public class Event implements Serializable {
             throw new IllegalArgumentException();
 
         if (minorEventType == null)
-            throw new IllegalArgumentException();
-
-        if (details == null)
             throw new IllegalArgumentException();
 
         this.fed = fed;
@@ -250,8 +330,8 @@ public class Event implements Serializable {
 
         this.minorEventType = minorEventType;
 
-        this.details = details;
-
+        this.details = details; // MAY be null.
+        
         /*
          * @todo Assignment should be based on a federation configuration
          * option.
@@ -265,19 +345,67 @@ public class Event implements Serializable {
 
     }
 
+//    /**
+//     * A child event (major type is the type of the parent).
+//     * 
+//     * @param minorEventType
+//     * 
+//     * @param details
+//     *            Optional ordered (name,value) array.
+//     * 
+//     * @return
+//     */
+//    public Event newSubEvent(Object minorEventType, final NV[] details) {
+//
+//        return new Event(fed, this.resource, this.majorEventType,
+//                minorEventType, (Set<NV>) (details != null ? new TreeMap<NV>(
+//                        Arrays.asList(details)) : null));
+//
+//    }
+
     /**
      * A child event (major type is the type of the parent).
      * 
      * @param minorEventType
-
-     * @param details
      * 
-     * @return
+     * @return The sub-event.
      */
-    public Event newSubEvent(Object minorEventType, String details) {
+    public Event newSubEvent(Object minorEventType) {
+
+        return newSubEvent(minorEventType, (Map<String, Object>) null/* details */);
+        
+    }
+
+    /**
+     * A child event (major type is the type of the parent).
+     * 
+     * @param minorEventType
+     * 
+     * @param details
+     *            Optional ordered (name,value) array.
+     * 
+     * @return The sub-event.
+     */
+    public Event newSubEvent(Object minorEventType,
+            final Map<String, Object> details) {
+
+        final Map<String, Object> m;
+        if (this.details == null && details == null) {
+            m = null;
+        } else {
+            m = new HashMap<String, Object>();
+            if (this.details != null) {
+                // details from the parent event.
+                m.putAll(this.details);
+            }
+            if (details != null) {
+                // given details.
+                m.putAll(details);
+            }
+        }
 
         return new Event(fed, this.resource, this.majorEventType,
-                minorEventType, details);
+                minorEventType, m);
         
     }
 
@@ -321,33 +449,14 @@ public class Event implements Serializable {
     }
 
     /**
-     * Variant of {@link #end()} which may be used to append more details to the
-     * event.
-     * 
-     * @param moreDetails
-     *            Additional details (optional).
-     * 
-     * @return The event.
-     */
-    synchronized public Event end(Object moreDetails) {
-        
-        if (moreDetails != null) {
-
-            details = details + "::" + moreDetails;
-            
-        }
-
-        return end();
-        
-    }
-    
-    /**
      * Sends the end event.
      * <p>
      * Note: You can use this method for "instantenous" events.
+     * 
+     * @return The event.
      */
     synchronized public Event end() {
-        
+
         if (complete) {
 
             throw new IllegalStateException();
@@ -413,11 +522,13 @@ public class Event implements Serializable {
     }
     
     /**
-     * Tab-delimited format (with newline).
+     * Tab-delimited format (with newline). The details columns are written in a
+     * dense format where each (name,value) pair is expressed as
+     * <code>name=value</code>, so only the non-null columns are written out.
      */
     public String toString() {
         
-        StringBuilder sb = new StringBuilder();
+        final StringBuilder sb = new StringBuilder();
         
         sb.append(eventUUID); sb.append('\t'); 
         sb.append(resource.indexName); sb.append('\t');
@@ -439,20 +550,78 @@ public class Event implements Serializable {
         sb.append(hostname); sb.append('\t'); 
         sb.append(serviceIface.getName()); sb.append('\t'); 
         sb.append(serviceName); sb.append('\t'); 
-        sb.append(serviceUUID); sb.append('\t'); 
-        sb.append(details); sb.append('\n');
+        sb.append(serviceUUID);
+        if (details != null) {
+            final String[] keys = details.keySet().toArray(new String[]{});
+            Arrays.sort(keys);
+            for (String s : keys) {
+                sb.append('\t');
+                sb.append(s);
+                sb.append("=");
+                sb.append("" + details.get(s));
+            }
+//            for (Map.Entry<String, Object> entry : details.entrySet()) {
+//                sb.append('\t');
+//                sb.append(entry.getKey());
+//                sb.append("=");
+//                sb.append("" + entry.getValue());
+//            }
+        }
+        sb.append('\n');
         
         return sb.toString();
         
     }
 
+//    /**
+//     * A class that knows how to render events in a stable tab-delimited format.
+//     * Known detail columns are predeclared and will be written out in the order
+//     * in which they were declared. Additional detail columns are recognized the
+//     * first time they are used and will always be written out at the column
+//     * index that they were assigned. This makes it possible to reimport the
+//     * events data into a worksheet for processing.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    public static class EventRenderer {
+//        
+//        public void declareColumn(String) {
+//            
+//        }
+//        public String render(Event e) {
+//            
+//        }
+//        
+//    }
+//    
+//    /**
+//     * Class which parses events written by the {@link EventRenderer}.
+//     * 
+//     * @todo we can't really reverse the {@link EventRenderer} when there are
+//     *       columns that are not predeclared since their values will never be
+//     *       written out.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    public static class EventParser {
+//        
+//        public Event parseEvent(String s) {
+//            
+//        }
+//        
+//    }
+    
     /**
      * Construct an event from the tab-delimited serialization produced from
      * {@link #toString()}.
      * 
-     * @param s the tab delimited serialization
-     * @throws ClassNotFoundException 
-     *          if any fields specify an invalid classname
+     * @param s
+     *            the tab delimited serialization
+     *            
+     * @throws ClassNotFoundException
+     *             if any fields specify an invalid classname
      */
     protected Event(final String s) throws ClassNotFoundException {
 //        System.err.println(s);
@@ -518,9 +687,14 @@ public class Event implements Serializable {
         String serviceIfaceName = st.nextToken();
         this.serviceIface = Class.forName(serviceIfaceName);    
         this.serviceName = st.nextToken(); 
-        this.serviceUUID = UUID.fromString(st.nextToken()); 
-        if (st.hasMoreTokens()) {
-            this.details = st.nextToken();
+        this.serviceUUID = UUID.fromString(st.nextToken());
+        this.details = new TreeMap<String,Object>();
+        while(st.hasMoreTokens()) {
+            final String t = st.nextToken();
+            final int pos = t.indexOf('=');
+            final String name = t.substring(0,pos);
+            final String value = t.substring(pos+1,t.length());
+            this.details.put(name,value);
         }
         } catch(Throwable t) {
             throw new RuntimeException("At field: " + st.getCurrentFieldIndex()

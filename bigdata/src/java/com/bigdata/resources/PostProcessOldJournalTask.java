@@ -418,9 +418,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * partitions and both index partitions will be marked as "used".
      * <p>
      * If the rightSibling of an undercapacity index partition is remote, then a
-     * {@link MoveIndexPartitionTask} is created to move the undercapacity index
-     * partition to the remove data service and the undercapacity index partition
-     * will be marked as "used".
+     * {@link MoveTask} is created to move the undercapacity index partition to
+     * the remove data service and the undercapacity index partition will be
+     * marked as "used".
      */
     protected List<AbstractTask> chooseIndexPartitionJoins() {
 
@@ -2054,8 +2054,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         final long begin = System.currentTimeMillis();
         
         final Event e = new Event(resourceManager.getFederation(),
-                new EventResource(), EventType.AsynchronousOverflow, ""/* details */)
-                .start();
+                new EventResource(), EventType.AsynchronousOverflow).addDetail(
+                "asynchronousOverflowCounter",
+                resourceManager.asynchronousOverflowCounter.get()).start();
         
         try {
 
@@ -2357,7 +2358,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     .toMillis(task.nanoTime_finishedWork
                             - task.nanoTime_beginWork);
 
-            log.warn("Task complete: elapsed=" + elapsed + ", task=" + task);
+            if(INFO)
+                log.info("Task complete: elapsed=" + elapsed + ", task=" + task);
 
         } catch (Throwable t) {
 

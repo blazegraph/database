@@ -82,8 +82,7 @@ public class TestBuildTask2 extends AbstractResourceManagerTestCase {
      * Note: The parameters here determine how stressful this test will be.
      */
 
-    
-    final private long maxSumSegBytes = (Bytes.kilobyte * 4);
+    final private long maxSumSegBytes = (Bytes.kilobyte * 6);
 
     /**
      * The maximum #of tuples to insert or remove in each update.
@@ -201,310 +200,333 @@ public class TestBuildTask2 extends AbstractResourceManagerTestCase {
         while (npasses++ < 50) {
 
             final Event e = new Event(resourceManager.getFederation(),
-                    new EventResource(name), "test", "pass=" + npasses);
-            
-            /*
-             * Write more data on the index, updating ground truth as we go.
-             */
-            {
+                    new EventResource(name), "test").addDetail("pass", ""
+                    + npasses).start();
+
+            try {
 
                 /*
-                 * Add some tuples.
-                 */
-                
-                final int nentries = r.nextInt(maxtuples) + 1;
-                final int base = r.nextInt(maxBaseKey);
-
-                final byte[][] keys = new byte[nentries][];
-                final byte[][] vals = new byte[nentries][];
-
-                for (int i = 0; i < nentries; i++) {
-
-                    if (randomKeys) {
-                        // strictly increasing but random ordered keys.
-                        keys[i] = KeyBuilder.asSortKey(base
-                                + r.nextInt(maxKeyInc) + 1);
-                    } else {
-                        // strictly increasing non-random ordered keys.
-                        keys[i] = KeyBuilder.asSortKey(i + npasses * nentries);
-                    }
-
-                    vals[i] = new byte[4];
-
-                    r.nextBytes(vals[i]);
-
-                    groundTruth.insert(keys[i], vals[i]);
-
-                }
-
-                final IIndexProcedure proc = BatchInsertConstructor.RETURN_NO_VALUES
-                        .newInstance(indexMetadata, 0/* fromIndex */,
-                                nentries/* toIndex */, keys, vals);
-
-                // submit the task and wait for it to complete.
-                concurrencyManager.submit(
-                        new IndexProcedureTask(concurrencyManager,
-                                ITx.UNISOLATED, name, proc)).get();
-
-                if (log.isInfoEnabled())
-                    log.info("groundTruth: entryCount now "
-                            + groundTruth.getEntryCount());
-                
-            }
-            
-            if (percentRemove > 0) {
-            
-                /*
-                 * Delete some randomly selected tuples.
-                 */
-                
-                final int nentries = (int) ((r.nextInt(maxtuples) + 1)
-                        * percentRemove + 1);
-
-                final byte[][] keys = new byte[nentries][];
-
-                for (int i = 0; i < nentries; i++) {
-
-                    final int entryCount = groundTruth.getEntryCount();
-
-                    // any existing key.
-                    final int j = r.nextInt(entryCount);
-
-                    keys[i] = groundTruth.keyAt(j); 
-                    
-                    groundTruth.remove(keys[i]);
-
-                }
-
-                final IIndexProcedure proc = BatchRemoveConstructor.RETURN_NO_VALUES
-                        .newInstance(indexMetadata, 0/* fromIndex */,
-                                nentries/* toIndex */, keys, null/* vals */);
-
-                // submit the task and wait for it to complete.
-                concurrencyManager.submit(
-                        new IndexProcedureTask(concurrencyManager,
-                                ITx.UNISOLATED, name, proc)).get();
-
-                if (log.isInfoEnabled())
-                    log.info("groundTruth: entryCount now "
-                            + groundTruth.getEntryCount());
-                
-            }
-
-            /*
-             * Force overflow causing an empty btree to be created for that index on
-             * a new journal and the view definition in the new btree to be updated.
-             */
-            final OverflowMetadata overflowMetadata;
-            final ManagedJournal oldJournal;
-            {
-
-                final long priorOverflowCount = resourceManager
-                        .getSynchronousOverflowCount();
-
-                // createTime of the old journal.
-                final long createTime0 = resourceManager.getLiveJournal()
-                        .getRootBlockView().getCreateTime();
-
-                // uuid of the old journal.
-                final UUID uuid0 = resourceManager.getLiveJournal()
-                        .getRootBlockView().getUUID();
-
-                // force overflow onto a new journal.
-                overflowMetadata = resourceManager.doSynchronousOverflow();
-
-                // make sure that the overflow counter was incremented.
-                assertEquals("synchronousOverflowCount", priorOverflowCount + 1,
-                        resourceManager.getSynchronousOverflowCount());
-                
-                // nothing should have been copied to the new journal.
-                assertEquals(0, overflowMetadata
-                        .getActionCount(OverflowActionEnum.Copy));
-
-                // lookup the old journal again using its createTime.
-                oldJournal = (ManagedJournal) resourceManager
-                        .getJournal(createTime0);
-                
-                assertEquals("uuid", uuid0, oldJournal.getRootBlockView()
-                        .getUUID());
-                
-                assertNotSame("closeTime", 0L, oldJournal.getRootBlockView()
-                        .getCloseTime());
-                
-            }
-
-            /*
-             * Tally up the view as of the lastCommitTime on the oldJournal.
-             */
-            final BuildViewMetadata acceptedView;
-            {
-               
-                final ILocalBTreeView actual = resourceManager.getIndex(name,
-                        oldJournal.getLastCommitTime());
-                
-                acceptedView = new BuildViewMetadata(actual,
-                        maxSumSegBytes, e);
-
-                if (log.isInfoEnabled()) {
-
-                    log.info(AbstractResourceManagerTask
-                            .toString("actualViewResources", actual
-                                    .getResourceMetadata()));
-                    
-                    log.info(AbstractResourceManagerTask.toString(
-                            "actualViewSources  ", actual.getSources()));
-                    
-                    log.info("\npass=" + npasses + " : acceptedView="
-                            + acceptedView);
-                    
-                }
-
-                assertEquals(actual.getSourceCount(), acceptedView.nsources);
-                
-            }
-
-            /*
-             * Run build task.
-             * 
-             * Note: The task start time is a historical read on the final
-             * committed state of the old journal. This means that the generated
-             * index segment will have a createTime EQ to the lastCommitTime on
-             * the old journal.
-             */
-            final BuildResult buildResult;
-            {
-
-                /*
-                 * Metadata about the index partition generated during sync
-                 * overflow.
-                 * 
-                 * Note: This reflects the state of the index partition before
-                 * overflow. For example, the new live journal is NOT part of
-                 * the view.
-                 */
-                final ViewMetadata vmd = overflowMetadata.getViewMetadata(name);
-
-                if (log.isInfoEnabled())
-                    log.info("pre-condition view: " + vmd);
-
-                assertTrue(vmd.getView().getSources()[0].getStore() == oldJournal);
-
-                try {
-
-                    // overflow must be disallowed as a task pre-condition.
-                    resourceManager.overflowAllowed.compareAndSet(true, false);
-
-                    /*
-                     * Submit task and await result (metadata describing the new
-                     * index segment).
-                     */
-                    buildResult = concurrencyManager.submit(
-                            new IncrementalBuildTask(vmd)).get();
-
-                } finally {
-
-                    // re-enable overflow processing.
-                    resourceManager.overflowAllowed.set(true);
-                    
-                }
-
-                /*
-                 * Verify that the BuildResult reports that the anticipated #of
-                 * sources were incorporated into the index segment.
-                 */
-                assertEquals(acceptedView.naccepted, buildResult.sourceCount);
-                
-                /*
-                 * Verify that the ordered sources in the BuildResult are the
-                 * first N ordered sources from the view of the index partition
-                 * as of the lastCommitTime on the old journal that were
-                 * accepted into the build's view.
+                 * Write more data on the index, updating ground truth as we go.
                  */
                 {
 
-                    final IResourceMetadata[] expected = resourceManager
-                            .getIndex(name, oldJournal.getLastCommitTime())
-                            .getResourceMetadata();
+                    /*
+                     * Add some tuples.
+                     */
 
-                    final IResourceMetadata[] actual = buildResult.sources;
-                    
-                    assertEquals(acceptedView.naccepted, actual.length);
-                    
-                    for (int i = 0; i < acceptedView.naccepted; i++) {
+                    final int nentries = r.nextInt(maxtuples) + 1;
+                    final int base = r.nextInt(maxBaseKey);
 
-                        assertEquals(expected[i], actual[i]);
+                    final byte[][] keys = new byte[nentries][];
+                    final byte[][] vals = new byte[nentries][];
+
+                    for (int i = 0; i < nentries; i++) {
+
+                        if (randomKeys) {
+                            // strictly increasing but random ordered keys.
+                            keys[i] = KeyBuilder.asSortKey(base
+                                    + r.nextInt(maxKeyInc) + 1);
+                        } else {
+                            // strictly increasing non-random ordered keys.
+                            keys[i] = KeyBuilder.asSortKey(i + npasses
+                                    * nentries);
+                        }
+
+                        vals[i] = new byte[4];
+
+                        r.nextBytes(vals[i]);
+
+                        groundTruth.insert(keys[i], vals[i]);
 
                     }
+
+                    final IIndexProcedure proc = BatchInsertConstructor.RETURN_NO_VALUES
+                            .newInstance(indexMetadata, 0/* fromIndex */,
+                                    nentries/* toIndex */, keys, vals);
+
+                    // submit the task and wait for it to complete.
+                    concurrencyManager.submit(
+                            new IndexProcedureTask(concurrencyManager,
+                                    ITx.UNISOLATED, name, proc)).get();
+
+                    if (log.isInfoEnabled())
+                        log.info("groundTruth: entryCount now "
+                                + groundTruth.getEntryCount());
+
+                }
+
+                if (percentRemove > 0) {
+
+                    /*
+                     * Delete some randomly selected tuples.
+                     */
+
+                    // #of tuples actually deleted.
+                    int nentries = 0;
+                    
+                    // maximum #of tuples that we will attempt to delete.
+                    final int maxentries = (int) ((r.nextInt(maxtuples) + 1)
+                            * percentRemove + 1);
+
+                    final byte[][] keys = new byte[maxentries][];
+
+                    for (int i = 0; i < maxentries
+                            && groundTruth.getEntryCount() > 0; i++) {
+
+                        final int entryCount = groundTruth.getEntryCount();
+
+                        // any existing key.
+                        final int j = r.nextInt(entryCount);
+
+                        keys[i] = groundTruth.keyAt(j);
+
+                        groundTruth.remove(keys[i]);
+                        
+                        nentries++;
+
+                    }
+
+                    final IIndexProcedure proc = BatchRemoveConstructor.RETURN_NO_VALUES
+                            .newInstance(indexMetadata, 0/* fromIndex */,
+                                    nentries/* toIndex */, keys, null/* vals */);
+
+                    // submit the task and wait for it to complete.
+                    concurrencyManager.submit(
+                            new IndexProcedureTask(concurrencyManager,
+                                    ITx.UNISOLATED, name, proc)).get();
+
+                    if (log.isInfoEnabled())
+                        log.info("groundTruth: entryCount now "
+                                + groundTruth.getEntryCount());
 
                 }
 
                 /*
-                 * Spot check access to the new index segment and its
-                 * createTime.
+                 * Force overflow causing an empty btree to be created for that
+                 * index on a new journal and the view definition in the new
+                 * btree to be updated.
                  */
+                final OverflowMetadata overflowMetadata;
+                final ManagedJournal oldJournal;
+                {
 
-                final IResourceMetadata segmentMetadata = buildResult.segmentMetadata;
+                    final long priorOverflowCount = resourceManager
+                            .getSynchronousOverflowCount();
 
-                if (log.isInfoEnabled())
-                    log.info(segmentMetadata.toString());
+                    // createTime of the old journal.
+                    final long createTime0 = resourceManager.getLiveJournal()
+                            .getRootBlockView().getCreateTime();
 
-                // verify index segment can be opened.
-                resourceManager.openStore(segmentMetadata.getUUID());
+                    // uuid of the old journal.
+                    final UUID uuid0 = resourceManager.getLiveJournal()
+                            .getRootBlockView().getUUID();
 
-                // verify createTime == lastCommitTime on the old journal.
-                assertEquals("createTime", oldJournal.getRootBlockView()
-                        .getLastCommitTime(), segmentMetadata.getCreateTime());
+                    // force overflow onto a new journal.
+                    overflowMetadata = resourceManager.doSynchronousOverflow();
 
-            }
+                    // make sure that the overflow counter was incremented.
+                    assertEquals("synchronousOverflowCount",
+                            priorOverflowCount + 1, resourceManager
+                                    .getSynchronousOverflowCount());
 
-            // verify unisolated index view against groundTruth.
-            {
-             
-                /*
-                 * Note: The groundTruth index reflects the total write set to
-                 * date. The index segment after a compacting merge reflects
-                 * only those historical writes before the last overflow.
-                 * Therefore this will fail if you write on the groundTruth
-                 * index after the overflow and before you verify against
-                 * groundTruth.
-                 */
-                final ILocalBTreeView actual = resourceManager.getIndex(name,
-                        ITx.UNISOLATED);
+                    // nothing should have been copied to the new journal.
+                    assertEquals(0, overflowMetadata
+                            .getActionCount(OverflowActionEnum.Copy));
 
-                /*
-                 * There should be no writes on the mutable btree on the live
-                 * journal.
-                 */
-                assertEquals("entryCount", 0, actual.getMutableBTree()
-                        .getEntryCount());
+                    // lookup the old journal again using its createTime.
+                    oldJournal = (ManagedJournal) resourceManager
+                            .getJournal(createTime0);
 
-                /*
-                 * Verify same data from ground truth and the new view (using
-                 * btree helper classes for this).
-                 */
-                AbstractBTreeTestCase.assertSameBTree(groundTruth, actual);
-                
-            }
-            
-            if (acceptedView.compactingMerge) {
+                    assertEquals("uuid", uuid0, oldJournal.getRootBlockView()
+                            .getUUID());
+
+                    assertNotSame("closeTime", 0L, oldJournal
+                            .getRootBlockView().getCloseTime());
+
+                }
 
                 /*
-                 * Verify segment has all data in the groundTruth btree.
+                 * Tally up the view as of the lastCommitTime on the oldJournal.
                  */
+                final BuildViewMetadata acceptedView;
+                {
 
-                final IndexSegmentStore segStore = (IndexSegmentStore) resourceManager
-                        .openStore(buildResult.segmentMetadata.getUUID());
+                    final ILocalBTreeView actual = resourceManager.getIndex(
+                            name, oldJournal.getLastCommitTime());
 
-                final IndexSegment seg = segStore.loadIndexSegment();
+                    acceptedView = new BuildViewMetadata(actual,
+                            maxSumSegBytes, e);
 
-                AbstractBTreeTestCase.assertSameBTree(groundTruth, seg);
+                    if (log.isInfoEnabled()) {
 
-                continue;
-                
-            } else {
-                
-                // Success.
-                return;
+                        log.info(AbstractResourceManagerTask.toString(
+                                "actualViewResources", actual
+                                        .getResourceMetadata()));
+
+                        log.info(AbstractResourceManagerTask.toString(
+                                "actualViewSources  ", actual.getSources()));
+
+                        log.info("\npass=" + npasses + " : acceptedView="
+                                + acceptedView);
+
+                    }
+
+                    assertEquals(actual.getSourceCount(), acceptedView.nsources);
+
+                }
+
+                /*
+                 * Run build task.
+                 * 
+                 * Note: The task start time is a historical read on the final
+                 * committed state of the old journal. This means that the
+                 * generated index segment will have a createTime EQ to the
+                 * lastCommitTime on the old journal.
+                 */
+                final BuildResult buildResult;
+                {
+
+                    /*
+                     * Metadata about the index partition generated during sync
+                     * overflow.
+                     * 
+                     * Note: This reflects the state of the index partition
+                     * before overflow. For example, the new live journal is NOT
+                     * part of the view.
+                     */
+                    final ViewMetadata vmd = overflowMetadata
+                            .getViewMetadata(name);
+
+                    if (log.isInfoEnabled())
+                        log.info("pre-condition view: " + vmd);
+
+                    assertTrue(vmd.getView().getSources()[0].getStore() == oldJournal);
+
+                    try {
+
+                        // overflow must be disallowed as a task pre-condition.
+                        resourceManager.overflowAllowed.compareAndSet(true,
+                                false);
+
+                        /*
+                         * Submit task and await result (metadata describing the
+                         * new index segment).
+                         */
+                        buildResult = concurrencyManager.submit(
+                                new IncrementalBuildTask(vmd)).get();
+
+                    } finally {
+
+                        // re-enable overflow processing.
+                        resourceManager.overflowAllowed.set(true);
+
+                    }
+
+                    /*
+                     * Verify that the BuildResult reports that the anticipated
+                     * #of sources were incorporated into the index segment.
+                     */
+                    assertEquals(acceptedView.naccepted,
+                            buildResult.sourceCount);
+
+                    /*
+                     * Verify that the ordered sources in the BuildResult are
+                     * the first N ordered sources from the view of the index
+                     * partition as of the lastCommitTime on the old journal
+                     * that were accepted into the build's view.
+                     */
+                    {
+
+                        final IResourceMetadata[] expected = resourceManager
+                                .getIndex(name, oldJournal.getLastCommitTime())
+                                .getResourceMetadata();
+
+                        final IResourceMetadata[] actual = buildResult.sources;
+
+                        assertEquals(acceptedView.naccepted, actual.length);
+
+                        for (int i = 0; i < acceptedView.naccepted; i++) {
+
+                            assertEquals(expected[i], actual[i]);
+
+                        }
+
+                    }
+
+                    /*
+                     * Spot check access to the new index segment and its
+                     * createTime.
+                     */
+
+                    final IResourceMetadata segmentMetadata = buildResult.segmentMetadata;
+
+                    if (log.isInfoEnabled())
+                        log.info(segmentMetadata.toString());
+
+                    // verify index segment can be opened.
+                    resourceManager.openStore(segmentMetadata.getUUID());
+
+                    // verify createTime == lastCommitTime on the old journal.
+                    assertEquals("createTime", oldJournal.getRootBlockView()
+                            .getLastCommitTime(), segmentMetadata
+                            .getCreateTime());
+
+                }
+
+                // verify unisolated index view against groundTruth.
+                {
+
+                    /*
+                     * Note: The groundTruth index reflects the total write set
+                     * to date. The index segment after a compacting merge
+                     * reflects only those historical writes before the last
+                     * overflow. Therefore this will fail if you write on the
+                     * groundTruth index after the overflow and before you
+                     * verify against groundTruth.
+                     */
+                    final ILocalBTreeView actual = resourceManager.getIndex(
+                            name, ITx.UNISOLATED);
+
+                    /*
+                     * There should be no writes on the mutable btree on the
+                     * live journal.
+                     */
+                    assertEquals("entryCount", 0, actual.getMutableBTree()
+                            .getEntryCount());
+
+                    /*
+                     * Verify same data from ground truth and the new view
+                     * (using btree helper classes for this).
+                     */
+                    AbstractBTreeTestCase.assertSameBTree(groundTruth, actual);
+
+                }
+
+                if (acceptedView.compactingMerge) {
+
+                    /*
+                     * Verify segment has all data in the groundTruth btree.
+                     */
+
+                    final IndexSegmentStore segStore = (IndexSegmentStore) resourceManager
+                            .openStore(buildResult.segmentMetadata.getUUID());
+
+                    final IndexSegment seg = segStore.loadIndexSegment();
+
+                    AbstractBTreeTestCase.assertSameBTree(groundTruth, seg);
+
+                    continue;
+
+                } else {
+
+                    // Success.
+                    return;
+
+                }
+
+            } finally {
+
+                e.end();
 
             }
 

@@ -67,12 +67,11 @@ public class CompactingMergeTask extends AbstractPrepareTask<BuildResult> {
 
         final Event e = new Event(resourceManager.getFederation(), 
                 new EventResource(vmd.indexMetadata),
-                OverflowActionEnum.Merge, OverflowActionEnum.Merge + "("
-                        + vmd.name + ") : " + vmd).start();
+                OverflowActionEnum.Merge, vmd.getParams()).start();
 
+        BuildResult buildResult = null;
         try {
 
-            final BuildResult result;
             try {
 
                 if (resourceManager.isOverflowAllowed())
@@ -89,7 +88,7 @@ public class CompactingMergeTask extends AbstractPrepareTask<BuildResult> {
                  */
 
                 // build the index segment.
-                result = resourceManager
+                buildResult = resourceManager
                         .buildIndexSegment(vmd.name, vmd.getView(),
                                 true/* compactingMerge */, vmd.commitTime,
                                 null/* fromKey */, null/* toKey */, e);
@@ -119,14 +118,12 @@ public class CompactingMergeTask extends AbstractPrepareTask<BuildResult> {
                 concurrencyManager.submit(
                         new AtomicUpdateCompactingMergeTask(resourceManager,
                                 concurrencyManager, vmd.name, indexUUID,
-                                result, e.newSubEvent(
-                                        OverflowSubtaskEnum.AtomicUpdate,
-                                        OverflowActionEnum.Merge + "("
-                                                + vmd.name + ") : " + vmd)))
-                        .get();
+                                buildResult, e.newSubEvent(
+                                        OverflowSubtaskEnum.AtomicUpdate, vmd
+                                                .getParams()))).get();
 
-//                /*
-//                 * Verify that the view was updated. If the atomic update task
+// /*
+// * Verify that the view was updated. If the atomic update task
 //                 * runs correctly then it will replace the IndexMetadata object
 //                 * on the mutable BTree with a new view containing only the live
 //                 * journal and the new index segment (for a compacting merge).
@@ -145,18 +142,36 @@ public class CompactingMergeTask extends AbstractPrepareTask<BuildResult> {
 
             } catch (Throwable t) {
 
+                // make it releasable.
+                resourceManager.retentionSetRemove(buildResult.segmentMetadata
+                        .getUUID());
+
                 // delete the generated index segment.
                 resourceManager
-                        .deleteResource(result.segmentMetadata.getUUID(), false/* isJournal */);
+                        .deleteResource(buildResult.segmentMetadata.getUUID(), false/* isJournal */);
 
                 // re-throw the exception
                 throw new Exception(t);
 
             }
 
-            return result;
+            return buildResult;
 
         } finally {
+
+            if (buildResult != null) {
+
+                /*
+                 * At this point the index segment was either incorporated into
+                 * the new view in a restart safe manner or there was an error.
+                 * Either way, we now remove the index segment store's UUID from
+                 * the retentionSet so it will be subject to the release policy
+                 * of the StoreManager.
+                 */
+                resourceManager.retentionSetRemove(buildResult.segmentMetadata
+                        .getUUID());
+
+            }
 
             e.end();
 

@@ -108,6 +108,7 @@ import com.bigdata.service.IDataService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.service.ResourceService;
 import com.bigdata.sparse.SparseRowStore;
+import com.bigdata.util.NV;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -448,6 +449,83 @@ abstract public class StoreManager extends ResourceEvents implements
      */
     final private IndexSegmentIndex segmentIndex;
 
+    /**
+     * A non-thread-safe collection of {@link UUID}s for {@link IndexSegment}s
+     * which have been newly built but not yet incorporated in a re-start safe
+     * manner into an index partition view. {@link UUID}s in this collection
+     * are excluded from release by {@link #purgeOldResources()}.
+     * 
+     * @see #purgeOldResources()
+     * @see IndexManager#buildIndexSegment(String,
+     *      com.bigdata.btree.ILocalBTreeView, boolean, long, byte[], byte[],
+     *      Event)
+     */
+    final private Set<UUID> retentionSet = new HashSet<UUID>();
+    
+    /**
+     * Add an {@link IndexSegment} to the set of {@link IndexSegment}s which
+     * have been generated but not yet incorporated into an index partition view
+     * and hence we must take special cautions to prevent their release.
+     * 
+     * @param The {@link UUID} of the {@link IndexSegmentStore}.
+     * 
+     * @see #retentionSetRemove(UUID)
+     * @see #retentionSet
+     */
+    protected void retentionSetAdd(final UUID uuid) {
+
+        if (uuid == null)
+            throw new IllegalArgumentException();
+
+        synchronized (retentionSet) {
+
+            if (!retentionSet.add(uuid)) {
+
+                // that UUID is already in this collection.
+                throw new IllegalStateException("Already in set: " + uuid);
+
+            }
+            
+        }
+
+    }
+ 
+    /**
+     * Remove an {@link IndexSegment} from the {@link #retentionSet}. DO NOT
+     * invoke this until the {@link IndexSegment} has been incorporated in a
+     * restart safe manner into an index partition view (that is, post-commit
+     * rather than during the task that incorporates it into the view) or is
+     * known to be no longer required (post MOVE, task failed, etc).
+     * 
+     * @param uuid
+     *            The {@link UUID} of the {@link IndexSegmentStore}.
+     * 
+     * @see #retentionSetAdd(UUID)
+     * @see #retentionSet
+     */
+    protected void retentionSetRemove(final UUID uuid) {
+
+        if (uuid == null)
+            throw new IllegalArgumentException();
+
+        synchronized (retentionSet) {
+
+            if (!retentionSet.remove(uuid)) {
+
+                /*
+                 * Note: Only a warning since invoked during error handling when
+                 * the resource might have not made it into the retentionSet in
+                 * the first place.
+                 */
+
+                log.warn("Not in retentionSet: " + uuid);
+
+            }
+
+        }
+        
+    }
+    
     /**
      * A cache that is used by the to automatically close out unused
      * {@link IndexSegmentStore}s. An {@link IndexSegment} that is no longer
@@ -1570,6 +1648,14 @@ abstract public class StoreManager extends ResourceEvents implements
          * 
          * @todo test MDS to verify that the index partition flagged as an
          *       incomplete move is not registered as part of scale-out index?
+         * 
+         * @deprecated This is no longer necessary. The new MOVE does not use
+         *             {@link LocalPartitionMetadata#getSourcePartitionId()}
+         *             field. Index segments are cleaned up during a failed
+         *             receive. If the index segment for some reason is NOT
+         *             cleaned up, then it will be released eventually (unless
+         *             an immortal database is being used) since it will not be
+         *             incorporated into any index partition view.
          */
         private void purgeIncompleteMoves() {
 
@@ -2135,6 +2221,8 @@ abstract public class StoreManager extends ResourceEvents implements
      *             {@link #isTransient} is <code>false</code>.
      * 
      * @see #deleteResource(UUID, boolean)
+     * @see #retentionSetAdd(UUID)
+     * @see #retentionSetRemove(UUID)
      */
     synchronized protected void addResource(
             final IResourceMetadata resourceMetadata,
@@ -3187,14 +3275,21 @@ abstract public class StoreManager extends ResourceEvents implements
 
                 resourcesInUse = getResourcesForTimestamp(commitTimeToPreserve);
 
+                synchronized(retentionSet) {
+
+                    resourcesInUse.addAll(retentionSet);
+                    
+                }
+                
                 elapsedScanCommitIndicesTime = System.currentTimeMillis()
                         - begin;
             }
-            if (true) {
-                // log the in use resources (resources that MUST NOT be
-                // deleted).
+            if (INFO) {
+                /* Log the in use resources (resources that MUST NOT be
+                 * deleted).
+                 */
                 for (UUID uuid : resourcesInUse) {
-                    log.warn("In use: file=" + resourceFiles.get(uuid)
+                    log.info("In use: file=" + resourceFiles.get(uuid)
                             + ", uuid=" + uuid);
                 }
             }
@@ -3241,16 +3336,23 @@ abstract public class StoreManager extends ResourceEvents implements
     
     /**
      * Delete unused resources given a set of resources that are still in use.
-     * The basic steps are:
+     * The unused resources are identified by scanning the {@link #journalIndex}
+     * and the {@link #segmentIndex}. For each resource found in either of
+     * those indices which is NOT found in <i>resourcesInUse</i> and whose
+     * createTime is GTE the specified timestamp, we take the following steps:
      * <ol>
-     * 
      * <li>close iff open</li>
-     * 
-     * <li>remove from lists of known resources.</li>
-     * 
+     * <li>remove from lists of known resources</li>
      * <li>delete in the file system</li>
-     * 
      * </ol>
+     * Note: {@link IndexSegment}s pose a special case. Their create time is
+     * the timestamp associated with their source view. During asynchronous
+     * overflow processing we generate {@link IndexSegment}s from the
+     * lastCommitTime of the old journal. Therefore their createTime timestamp
+     * is often LT the <i>commitTimeToPreserve</i>. In order to prevent these
+     * {@link IndexSegment}s from being released before they are put to use (by
+     * incorporating them into an index partition view) we DO NOT add them to
+     * the {@link #segmentIndex} until they are part of an index partition view.
      * 
      * @param commitTimeToPreserve
      *            Resources created as of or later than this timestamp WILL NOT
@@ -3261,6 +3363,10 @@ abstract public class StoreManager extends ResourceEvents implements
      *            times LTE to <i>commitTimeToPreserve</i> but are in use but
      *            at least one view as of that commit time and therefore MUST
      *            NOT be deleted.
+     * 
+     * @see IndexManager#buildIndexSegment(String,
+     *      com.bigdata.btree.ILocalBTreeView, boolean, long, byte[], byte[],
+     *      Event)
      */
     private void deleteUnusedResources(final long commitTimeToPreserve,
             final Set<UUID> resourcesInUse) {
@@ -3493,6 +3599,17 @@ abstract public class StoreManager extends ResourceEvents implements
             
         }
 
+        synchronized (retentionSet) {
+
+            if (retentionSet.contains(uuid)) {
+
+                throw new IllegalStateException("Resource in retentionSet: "
+                        + uuid);
+
+            }
+
+        }
+        
         /*
          * Close out store iff open.
          */
@@ -3737,6 +3854,17 @@ abstract public class StoreManager extends ResourceEvents implements
 
             throw new IllegalArgumentException();
             
+        }
+
+        synchronized (retentionSet) {
+
+            if (retentionSet.contains(uuid)) {
+
+                throw new IllegalStateException("Resource in retentionSet: "
+                        + uuid);
+
+            }
+
         }
 
         /*
@@ -4321,18 +4449,17 @@ abstract public class StoreManager extends ResourceEvents implements
             try {
 
                 final Event event = new Event(getFederation(),
-                        new EventResource(), EventType.PurgeResources, "")
-                        .start();
+                        new EventResource(), EventType.PurgeResources).start();
 
-                PurgeResult result = null;
-                
                 try {
 
-                    result = purgeOldResources();
+                    final PurgeResult purgeResult = purgeOldResources();
 
-                    if (result != null) {
+                    if (purgeResult != null) {
 
-                        log.warn(result.toString());
+                        log.warn(purgeResult.toString());
+
+                        event.addDetails(purgeResult.getParams());
                         
                     }
                     
@@ -4346,7 +4473,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
                 } finally {
                 
-                    event.end(result);
+                    event.end();
                     
                 }
             

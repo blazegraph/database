@@ -1,7 +1,9 @@
 package com.bigdata.resources;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
@@ -33,6 +35,12 @@ import com.bigdata.service.Event;
  */
 class BuildViewMetadata {
 
+    /**
+     * The maximum #of bytes of {@link IndexSegment}s to allow into the view
+     * (from the ctor).
+     */
+    public final long maxSumSegBytes;
+    
     /** #of sources in the given view. */
     public final int nsources;
 
@@ -76,13 +84,13 @@ class BuildViewMetadata {
         final StringBuilder sb = new StringBuilder();
 
         sb.append(getClass().getSimpleName());
-        sb.append("{nsources=" + nsources);
-        sb.append(",naccepted=" + naccepted);
-        sb.append(",compactingMerge=" + compactingMerge);
-        sb.append(",journalCount=" + journalCount);
-        sb.append(",segmentCount=" + segmentCount);
-        sb.append(",sumEntryCount=" + sumEntryCount);
-        sb.append(",sumSegBytes=" + sumSegBytes);
+        sb.append("{nsources="+nsources);
+        sb.append(",naccepted="+naccepted);
+        sb.append(",compactingMerge="+compactingMerge);
+        sb.append(",journalCount="+journalCount);
+        sb.append(",segmentCount="+segmentCount);
+        sb.append(",sumEntryCount="+sumEntryCount);
+        sb.append(",sumSegBytes="+sumSegBytes);
         sb.append("}");
 
         return sb.toString();
@@ -115,11 +123,14 @@ class BuildViewMetadata {
 
         if (maxSumSegBytes < 0)
             throw new IllegalArgumentException();
+      
+        final Event e = parentEvent.newSubEvent(OverflowSubtaskEnum.ChooseView)
+                .start();
 
-        final Event e = parentEvent.newSubEvent(OverflowSubtaskEnum.ChooseView,
-                "maxSumSegBytes=" + maxSumSegBytes).start();
         try {
 
+            this.maxSumSegBytes = maxSumSegBytes;
+            
             final AbstractBTree[] sources = src.getSources();
 
             this.nsources = sources.length;
@@ -205,11 +216,37 @@ class BuildViewMetadata {
 
             }
 
+            e.addDetails(getParams());
+            
         } finally {
 
-            e.end(toString());
+            e.end();
 
         }
+
+    }
+
+    public Map<String, Object> getParams() {
+
+        final Map<String, Object> m = new HashMap<String, Object>();
+
+        m.put("maxSumSegBytes", maxSumSegBytes);
+        
+        m.put("nsources", nsources);
+        
+        m.put("naccepted", naccepted);
+        
+        m.put("compactingMerge", compactingMerge);
+        
+        m.put("journalCount", journalCount);
+        
+        m.put("segmentCount", segmentCount);
+        
+        m.put("sumEntryCount", sumEntryCount);
+        
+        m.put("sumSegBytes", sumSegBytes);
+
+        return m;
 
     }
 

@@ -31,6 +31,7 @@ package com.bigdata.util.httpd;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Properties;
 import java.util.Vector;
@@ -55,6 +56,9 @@ public abstract class AbstractHTTPD extends NanoHTTPD {
     public Response serve(final String uri, final String method,
             final Properties header,
             final LinkedHashMap<String, Vector<String>> parms) {
+
+        if (INFO)
+            log.info(method + " '" + uri + "' ");
 
         try {
 
@@ -101,6 +105,24 @@ public abstract class AbstractHTTPD extends NanoHTTPD {
 
     }
 
+    /**
+     * 
+     * @param uri
+     *            Percent-decoded URI without parameters, for example
+     *            "/index.cgi"
+     * @param method
+     *            "GET", "POST" etc.
+     * @param parms
+     *            Parsed, percent decoded parameters from URI and, in case of
+     *            POST, data. The keys are the parameter names. Each value is a
+     *            {@link Collection} of {@link String}s containing the bindings
+     *            for the named parameter. The order of the URL parameters is
+     *            preserved.
+     * @param header
+     *            Header entries, percent decoded
+     * @return
+     * @throws Exception
+     */
     public Response doGet(String uri, String method, Properties header,
             LinkedHashMap<String, Vector<String>> parms) throws Exception {
 

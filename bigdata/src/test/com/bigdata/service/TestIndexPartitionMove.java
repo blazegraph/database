@@ -218,7 +218,8 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
         final long overflowCounter0 = dataService0.getAsynchronousOverflowCounter();
         {
 
-            log.info("Writing on indices to provoke overflow");
+            if(log.isInfoEnabled())
+                log.info("Writing on indices to provoke overflow");
 
             int nrounds = 0;
             long nwritten = 0L;
@@ -334,7 +335,8 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
          */
         {
 
-            log.info("Writing on indices to provoke overflow");
+            if (log.isInfoEnabled())
+                log.info("Writing on indices to provoke overflow");
             
             int nrounds = 0;
             long nwritten = 0L;
@@ -476,7 +478,7 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
         System.err.println("Verifying scale-out index against ground truth");
 
         assertSameEntryIterator(groundTruth, fed.getIndex(name,ITx.UNISOLATED));
-
+        
     }
     
 }

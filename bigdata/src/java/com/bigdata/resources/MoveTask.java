@@ -32,6 +32,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
 import java.net.InetAddress;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -54,7 +55,6 @@ import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.mdi.SegmentMetadata;
-import com.bigdata.resources.MoveIndexPartitionTask.AtomicUpdateMoveIndexPartitionTask;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Event;
 import com.bigdata.service.EventResource;
@@ -63,6 +63,7 @@ import com.bigdata.service.IDataServiceAwareProcedure;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.service.ResourceService;
+import com.bigdata.util.NV;
 
 /**
  * Task moves an index partition to another {@link IDataService}.
@@ -226,9 +227,12 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
         this.summary = OverflowActionEnum.Move + "(" + vmd.name + "->"
                 + targetIndexName + ")";
 
+        final Map<String, Object> params = vmd.getParams();
+
+        params.put("summary", summary);
+
         this.e = new Event(resourceManager.getFederation(), new EventResource(
-                vmd.indexMetadata), OverflowActionEnum.Move, summary + " : "
-                + vmd);
+                vmd.indexMetadata), OverflowActionEnum.Move, params);
 
     }
 
@@ -252,12 +256,12 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
 
         e.start();
 
+        BuildResult historicalWritesBuildResult = null;
         try {
 
             if (resourceManager.isOverflowAllowed())
                 throw new IllegalStateException();
             
-            final BuildResult historicalWritesBuildResult;
             try {
 
                 // view of the source index partition.
@@ -295,37 +299,44 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
 
             }
 
-            final MoveResult moveResult;
-            try {
-                
-                /*
-                 * Atomic move of the index partition.
-                 */
-                
-                moveResult = doAtomicUpdate(resourceManager, vmd.name,
-                        historicalWritesBuildResult, targetDataServiceUUID,
-                        newPartitionId, e);
+            /*
+             * Atomic move of the index partition.
+             */
 
-                if (INFO)
-                    log.info("Successfully moved index partition: " + summary);
-                
-            } finally {
+            final MoveResult moveResult = doAtomicUpdate(resourceManager,
+                    vmd.name, historicalWritesBuildResult,
+                    targetDataServiceUUID, newPartitionId, e);
 
-                /*
-                 * Delete the index segment since it is no longer required and
-                 * was not incorporated into a view used by this data service.
-                 */
-
-                resourceManager.deleteResource(
-                        historicalWritesBuildResult.segmentMetadata.getUUID(),
-                        false/* isJournal */);             
-
-            }
+            if (INFO)
+                log.info("Successfully moved index partition: " + summary);
 
             return moveResult;
 
         } finally {
 
+            if (historicalWritesBuildResult != null) {
+
+                /*
+                 * At this point the index segment was either MOVEd to the
+                 * target data service or there was an error. Either way, we now
+                 * remove the index segment store's UUID from the retentionSet
+                 * so it will be subject to the release policy of the
+                 * StoreManager.
+                 */
+                resourceManager
+                        .retentionSetRemove(historicalWritesBuildResult.segmentMetadata
+                                .getUUID());
+
+                /*
+                 * Delete the index segment since it is no longer required and
+                 * was not incorporated into a view used by this data service.
+                 */
+                resourceManager.deleteResource(
+                        historicalWritesBuildResult.segmentMetadata.getUUID(),
+                        false/* isJournal */);
+
+            }
+            
             e.end();
 
         }
@@ -416,7 +427,7 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
      * @todo optimization to NOT send an empty index segment if there are no
      *       buffered writes on the live journal.
      */
-    protected static class AtomicUpdate extends AbstractTask<MoveResult> {
+    protected static class AtomicUpdate extends AbstractAtomicUpdateTask<MoveResult> {
         
         private final ResourceManager resourceManager;
         private final String sourceIndexName;
@@ -453,8 +464,7 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
                 final Event parentEvent//
                 ) {
 
-            super(resourceManager.getConcurrencyManager(), ITx.UNISOLATED,
-                    sourceIndexName);
+            super(resourceManager, ITx.UNISOLATED, sourceIndexName);
 
             if (historicalWritesBuildResult == null)
                 throw new IllegalArgumentException();
@@ -482,175 +492,214 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
          */
         public MoveResult doTask() throws Exception {
 
-            // Unisolated view of the source index partition.
-            final BTree src = getIndex(getOnlyResource()).getMutableBTree();
-
-            // The current index metadata record.
-            final IndexMetadata indexMetadata = src.getIndexMetadata();
-
-            // The name of the scale-out index whose index partition is being moved.
-            final String scaleOutIndexName = indexMetadata.getName();
+            final Event e = parentEvent.newSubEvent(
+                    OverflowSubtaskEnum.AtomicUpdate).start();
             
-            // The name of the target index partition.
-            final String targetIndexName = DataService.getIndexPartitionName(
-                    scaleOutIndexName, targetIndexPartitionId);
-
-            // The current metadata for the source index partition view.
-            final LocalPartitionMetadata pmd = indexMetadata
-                    .getPartitionMetadata();
-
-            // The current locator for the source index partition.
-            final PartitionLocator oldLocator = new PartitionLocator(//
-                    pmd.getPartitionId(),//
-                    resourceManager.getDataServiceUUID(),//
-                    pmd.getLeftSeparatorKey(),//
-                    pmd.getRightSeparatorKey()//
-            );
-
-            // The locator for the target index partition.
-            final PartitionLocator newLocator = new PartitionLocator(
-                    targetIndexPartitionId,//
-                    targetDataServiceUUID,//
-                    pmd.getLeftSeparatorKey(),//
-                    pmd.getRightSeparatorKey()//
-            );
-            
-            /*
-             * Build an index segment from the buffered writes on the live
-             * journal for the source index partition.
-             * 
-             * Note: DO NOT specify a compacting merge. That presumes that the
-             * entire view is being processed so that deleted tuples may be
-             * removed from the view. That is NOT the case here. There MAY be
-             * deleted tuples in the buffered writes and those MUST be included
-             * in the generated index segment so that the total view when
-             * reconstructed on the target data service will still report that
-             * those tuples are deleted. If you do not do this then a historical
-             * tuple could "reappear" after the move.
-             * 
-             * Note: The [createTime] for the generated index segment store will
-             * reflect the commit point for the last buffered write on the
-             * source index partition.
-             */
-
-            final long sourceCommitTime = src.getLastCommitTime();
-
-            final BuildResult bufferedWritesBuildResult = resourceManager
-                    .buildIndexSegment(sourceIndexName, src,
-                            true/* compactingMerge */, sourceCommitTime,
-                            null/* fromKey */, null/* toKey */, parentEvent);
-
+            BuildResult bufferedWritesBuildResult = null;
             try {
 
-                final IDataService targetDataService = resourceManager
-                        .getFederation().getDataService(targetDataServiceUUID);
+                // Unisolated view of the source index partition.
+                final BTree src = getIndex(getOnlyResource()).getMutableBTree();
 
-                if (targetDataService == null)
-                    throw new Exception("No such data service: "
-                            + targetDataServiceUUID);
+                // The current index metadata record.
+                final IndexMetadata indexMetadata = src.getIndexMetadata();
+
+                // The name of the scale-out index whose index partition is
+                // being moved.
+                final String scaleOutIndexName = indexMetadata.getName();
+
+                // The name of the target index partition.
+                final String targetIndexName = DataService
+                        .getIndexPartitionName(scaleOutIndexName,
+                                targetIndexPartitionId);
+
+                // The current metadata for the source index partition view.
+                final LocalPartitionMetadata pmd = indexMetadata
+                        .getPartitionMetadata();
+
+                // The current locator for the source index partition.
+                final PartitionLocator oldLocator = new PartitionLocator(//
+                        pmd.getPartitionId(),//
+                        resourceManager.getDataServiceUUID(),//
+                        pmd.getLeftSeparatorKey(),//
+                        pmd.getRightSeparatorKey()//
+                );
+
+                // The locator for the target index partition.
+                final PartitionLocator newLocator = new PartitionLocator(
+                        targetIndexPartitionId,//
+                        targetDataServiceUUID,//
+                        pmd.getLeftSeparatorKey(),//
+                        pmd.getRightSeparatorKey()//
+                );
 
                 /*
-                 * Submit task to the target data service that will copy the
-                 * index segment store resources onto that data service and
-                 * register the target index partition using the given
-                 * IndexMetadata and the copied index segment store files.
+                 * Build an index segment from the buffered writes on the live
+                 * journal for the source index partition.
+                 * 
+                 * Note: DO NOT specify a compacting merge. That presumes that
+                 * the entire view is being processed so that deleted tuples may
+                 * be removed from the view. That is NOT the case here. There
+                 * MAY be deleted tuples in the buffered writes and those MUST
+                 * be included in the generated index segment so that the total
+                 * view when reconstructed on the target data service will still
+                 * report that those tuples are deleted. If you do not do this
+                 * then a historical tuple could "reappear" after the move.
+                 * 
+                 * Note: The [createTime] for the generated index segment store
+                 * will reflect the commit point for the last buffered write on
+                 * the source index partition.
                  */
+
+                final long sourceCommitTime = src.getLastCommitTime();
+
+                bufferedWritesBuildResult = resourceManager
+                        .buildIndexSegment(sourceIndexName, src,
+                                true/* compactingMerge */, sourceCommitTime,
+                                null/* fromKey */, null/* toKey */,
+                                parentEvent);
+
                 {
-                    
-                    final Event e = parentEvent.newSubEvent(
-                            OverflowSubtaskEnum.ReceiveIndexPartition, ""/* details */)
-                            .start();
-                    
-                    try {
 
-                        targetDataService.submit(new ReceiveIndexPartitionTask(
-                                indexMetadata,//
-                                resourceManager.getDataServiceUUID(),//
-                                targetIndexPartitionId,//
-                                historicalWritesBuildResult.segmentMetadata,//
-                                bufferedWritesBuildResult.segmentMetadata,//
-                                InetAddress.getLocalHost(),//
-                                resourceManager.getResourceServicePort()//
-                                )).get();
-                    
-                    } catch (ExecutionException ex) {
-                        
-                        // The task failed.
-                        rollbackMove(ex, scaleOutIndexName, targetIndexName,
-                                targetDataService, oldLocator, newLocator);
-                        
-                    } catch (InterruptedException ex) {
-                        
-                        // Task was interrupted.
-                        rollbackMove(ex, scaleOutIndexName, targetIndexName,
-                                targetDataService, oldLocator, newLocator);
-                        
-                    } catch (IOException ex) {
-                        
-                        // RMI failure submitting task or obtain its outcome.
-                        rollbackMove(ex, scaleOutIndexName, targetIndexName,
-                                targetDataService, oldLocator, newLocator);
-                        
-                    } finally {
-                    
-                        e.end();
-                        
+                    final IDataService targetDataService = resourceManager
+                            .getFederation().getDataService(
+                                    targetDataServiceUUID);
+
+                    if (targetDataService == null)
+                        throw new Exception("No such data service: "
+                                + targetDataServiceUUID);
+
+                    /*
+                     * Submit task to the target data service that will copy the
+                     * index segment store resources onto that data service and
+                     * register the target index partition using the given
+                     * IndexMetadata and the copied index segment store files.
+                     */
+                    {
+
+                        final Event receiveIndexPartitionEvent = parentEvent
+                                .newSubEvent(
+                                        OverflowSubtaskEnum.ReceiveIndexPartition)
+                                .start();
+
+                        try {
+
+                            targetDataService
+                                    .submit(
+                                            new ReceiveIndexPartitionTask(
+                                                    indexMetadata,//
+                                                    resourceManager
+                                                            .getDataServiceUUID(),//
+                                                    targetIndexPartitionId,//
+                                                    historicalWritesBuildResult.segmentMetadata,//
+                                                    bufferedWritesBuildResult.segmentMetadata,//
+                                                    InetAddress.getLocalHost(),//
+                                                    resourceManager
+                                                            .getResourceServicePort()//
+                                            )).get();
+
+                        } catch (ExecutionException ex) {
+
+                            // The task failed.
+                            rollbackMove(ex, scaleOutIndexName,
+                                    targetIndexName, targetDataService,
+                                    oldLocator, newLocator);
+
+                        } catch (InterruptedException ex) {
+
+                            // Task was interrupted.
+                            rollbackMove(ex, scaleOutIndexName,
+                                    targetIndexName, targetDataService,
+                                    oldLocator, newLocator);
+
+                        } catch (IOException ex) {
+
+                            // RMI failure submitting task or obtain its
+                            // outcome.
+                            rollbackMove(ex, scaleOutIndexName,
+                                    targetIndexName, targetDataService,
+                                    oldLocator, newLocator);
+
+                        } finally {
+
+                            receiveIndexPartitionEvent.end();
+
+                        }
+
                     }
-                    
+
+                    /*
+                     * The source index partition has been moved. All we need to
+                     * do is drop the source index partition and notify clients
+                     * that their locators for that key range are stale.
+                     */
+
+                    /*
+                     * The index manager will notify tasks that index partition
+                     * has moved.
+                     * 
+                     * Note: At this point, if the commit for this task fails,
+                     * then clients will still be notified that the source index
+                     * partition was moved. That is Ok since it WAS moved.
+                     */
+                    resourceManager.setIndexPartitionGone(getOnlyResource(),
+                            StaleLocatorReason.Move);
+
+                    /*
+                     * Drop the old index partition.
+                     * 
+                     * Note: This action is rolled back automatically if this
+                     * task fails. The consequence of this here is that the
+                     * source index partition will remain registered on this
+                     * data service. However, clients are being redirected
+                     * (using stale locator exceptions) to the target data
+                     * service and the metadata index will direct new requests
+                     * to the target data service as well. So the consequence of
+                     * failure here is that the source index partition becomes a
+                     * zombie. It will remain on this data service forever
+                     * unless someone explicitly drops it.
+                     */
+                    getJournal().dropIndex(getOnlyResource());
+
+                    // notify successful index partition move.
+                    resourceManager.indexPartitionMoveCounter.incrementAndGet();
+
                 }
-
-                /*
-                 * The source index partition has been moved. All we need to do
-                 * is drop the source index partition and notify clients that
-                 * their locators for that key range are stale.
-                 */
-
-                /*
-                 * The index manager will notify tasks that index partition has
-                 * moved.
-                 * 
-                 * Note: At this point, if the commit for this task fails, then
-                 * clients will still be notified that the source index
-                 * partition was moved. That is Ok since it WAS moved.
-                 */
-                resourceManager.setIndexPartitionGone(getOnlyResource(),
-                        StaleLocatorReason.Move);
-
-                /*
-                 * Drop the old index partition.
-                 * 
-                 * Note: This action is rolled back automatically if this task
-                 * fails. The consequence of this here is that the source index
-                 * partition will remain registered on this data service.
-                 * However, clients are being redirected (using stale locator
-                 * exceptions) to the target data service and the metadata index
-                 * will direct new requests to the target data service as well.
-                 * So the consequence of failure here is that the source index
-                 * partition becomes a zombie. It will remain on this data
-                 * service forever unless someone explicitly drops it.
-                 */
-                getJournal().dropIndex(getOnlyResource());
-
-                // notify successful index partition move.
-                resourceManager.indexPartitionMoveCounter.incrementAndGet();
+                
+                return new MoveResult(scaleOutIndexName,
+                        src.getIndexMetadata(), targetDataServiceUUID,
+                        targetIndexPartitionId, oldLocator, newLocator);
 
             } finally {
 
-                /*
-                 * Delete the index segment containing the buffer writes since
-                 * it no longer required by this data service.
-                 */
+                if (bufferedWritesBuildResult != null) {
 
-                resourceManager.deleteResource(
-                        bufferedWritesBuildResult.segmentMetadata.getUUID(),
-                        false/* isJournal */);
+                    /*
+                     * At this point the index segment was either MOVEd to the
+                     * target data service or there was an error. Either way, we
+                     * now remove the index segment store's UUID from the
+                     * retentionSet so it will be subject to the release policy
+                     * of the StoreManager.
+                     */
+                    resourceManager
+                            .retentionSetRemove(bufferedWritesBuildResult.segmentMetadata
+                                    .getUUID());
+
+                    /*
+                     * Delete the index segment containing the buffer writes
+                     * since it no longer required by this data service.
+                     */
+                    resourceManager
+                            .deleteResource(
+                                    bufferedWritesBuildResult.segmentMetadata
+                                            .getUUID(), false/* isJournal */);
+
+                }
+
+                e.end();
 
             }
-
-            return new MoveResult(scaleOutIndexName, src.getIndexMetadata(),
-                    targetDataServiceUUID, targetIndexPartitionId, oldLocator,
-                    newLocator);
-
+            
         }
 
         /**
@@ -938,18 +987,39 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
              * Run the inner task on the write service of the target data
              * service.
              */
-            return (Void) getDataService().getConcurrencyManager().submit(
-                    new InnerReceiveIndexPartitionTask(
-                            getDataService().getResourceManager(),//
-                            targetIndexName,//
-                            sourceIndexMetadata,//
-                            sourceDataServiceUUID,//
-                            targetIndexPartitionId,//
-                            historyIndexSegmentMetadata,//
-                            bufferedWritesIndexSegmentMetadata,//
-                            addr,//
-                            port//
-                            )).get();
+            final ResourceManager resourceManager = getDataService()
+            .getResourceManager();
+            try {
+
+                return (Void) getDataService().getConcurrencyManager().submit(
+                        new InnerReceiveIndexPartitionTask(//
+                                resourceManager,//
+                                targetIndexName,//
+                                sourceIndexMetadata,//
+                                sourceDataServiceUUID,//
+                                targetIndexPartitionId,//
+                                historyIndexSegmentMetadata,//
+                                bufferedWritesIndexSegmentMetadata,//
+                                addr,//
+                                port//
+                        )).get();
+                
+            } finally {
+                
+                /*
+                 * Regardless of whether the move was successful or not, we now
+                 * remove from the received index segment stores from the
+                 * retention set so that these resources become releaseable.
+                 */
+
+                resourceManager.retentionSetRemove(historyIndexSegmentMetadata
+                        .getUUID());
+                
+                resourceManager
+                        .retentionSetRemove(bufferedWritesIndexSegmentMetadata
+                                .getUUID());
+                
+            }
             
         }
         
@@ -1057,8 +1127,9 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
 
             this.parentEvent = new Event(resourceManager.getFederation(),
                     new EventResource(sourceIndexMetadata.getName(),
-                            sourceIndexPartitionId), OverflowActionEnum.Move,
-                    summary);
+                            sourceIndexPartitionId), OverflowActionEnum.Move);
+
+            this.parentEvent.addDetail("summary", this.summary);
 
         }
 
@@ -1086,7 +1157,7 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
 
             SegmentMetadata targetHistorySegmentMetadata = null;
             SegmentMetadata targetBufferedWritesSegmentMetadata = null;
-
+            parentEvent.start();
             try {
 
                 targetHistorySegmentMetadata = receiveIndexSegmentStore(sourceHistorySegmentMetadata);
@@ -1128,6 +1199,10 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
 
                 throw new Exception(t);
 
+            } finally {
+                
+                parentEvent.end();
+                
             }
 
         }
@@ -1154,7 +1229,7 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
 
             final Event e = parentEvent.newSubEvent(
                     OverflowSubtaskEnum.ReceiveIndexSegment,
-                    sourceSegmentMetadata.toString()).start();
+                    sourceSegmentMetadata.getParams()).start();
 
             try {
 
@@ -1171,9 +1246,10 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
                 // make sure that the parent directory exists.
                 file.getParentFile().mkdirs();
 
-                // construct the metadata describing the index segment that we
-                // are
-                // going to receive.
+                /*
+                 * Construct the metadata describing the index segment that we
+                 * are going to receive.
+                 */
                 final SegmentMetadata targetSegmentMetadata = new SegmentMetadata(
                         file, sourceSegmentMetadata.getUUID(),
                         sourceSegmentMetadata.getCreateTime());
@@ -1199,6 +1275,9 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
 
                 }
 
+                // put on the retentionSet first!
+                resourceManager.retentionSetAdd(sourceSegmentMetadata.getUUID());
+                
                 // add the resource to those managed by this service.
                 resourceManager.addResource(sourceSegmentMetadata, file);
 
@@ -1243,7 +1322,8 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
                 final SegmentMetadata bufferedWritesSegmentMetadata) {
 
             final Event e = parentEvent.newSubEvent(
-                    OverflowSubtaskEnum.RegisterIndex, targetIndexName).start();
+                    OverflowSubtaskEnum.RegisterIndex).addDetail(
+                    "targetIndexName", targetIndexName).start();
 
             try {
 

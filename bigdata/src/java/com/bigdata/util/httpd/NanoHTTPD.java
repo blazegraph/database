@@ -88,7 +88,7 @@ public class NanoHTTPD implements IServiceShutdown
 {
     
     final static public Logger log = Logger.getLogger(NanoHTTPD.class);
-    
+
     /**
      * True iff the {@link #log} level is INFO or less.
      */
@@ -115,14 +115,19 @@ public class NanoHTTPD implements IServiceShutdown
      * 
      * (By default, this delegates to serveFile() and allows directory listing.)
      * 
-     * @parm uri Percent-decoded URI without parameters, for example
-     *       "/index.cgi"
-     * @parm method "GET", "POST" etc.
-     * @parm parms Parsed, percent decoded parameters from URI and, in case of
-     *       POST, data. The keys are the parameter names. Each value is a
-     *       {@link Collection} of {@link String}s containing the bindings for
-     *       the named parameter. The order of the URL parameters is preserved.
-     * @parm header Header entries, percent decoded
+     * @param uri
+     *            Percent-decoded URI without parameters, for example
+     *            "/index.cgi"
+     * @param method
+     *            "GET", "POST" etc.
+     * @param parms
+     *            Parsed, percent decoded parameters from URI and, in case of
+     *            POST, data. The keys are the parameter names. Each value is a
+     *            {@link Collection} of {@link String}s containing the bindings
+     *            for the named parameter. The order of the URL parameters is
+     *            preserved.
+     * @param header
+     *            Header entries, percent decoded
      * 
      * @return HTTP response, see class Response for details
      */

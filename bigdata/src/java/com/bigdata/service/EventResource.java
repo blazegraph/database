@@ -141,7 +141,7 @@ public class EventResource implements Serializable {
      * 
      * @param md
      */
-    public EventResource(IndexMetadata md) {
+    public EventResource(final IndexMetadata md) {
 
         if (md == null) {
 
@@ -166,7 +166,7 @@ public class EventResource implements Serializable {
 
     }
 
-    public EventResource(String indexName, int partitionId) {
+    public EventResource(final String indexName, final int partitionId) {
 
         if (indexName == null)
             throw new IllegalArgumentException();
@@ -187,7 +187,7 @@ public class EventResource implements Serializable {
      * @param file
      *            Required.
      */
-    public EventResource(IndexMetadata md, File file) {
+    public EventResource(final IndexMetadata md, final File file) {
 
         if (file == null)
             throw new IllegalArgumentException();
@@ -213,7 +213,8 @@ public class EventResource implements Serializable {
         
     }
     
-    public EventResource(String indexName, int partitionId, File file) {
+    public EventResource(final String indexName, final int partitionId,
+            final File file) {
 
         if (indexName == null)
             throw new IllegalArgumentException();
@@ -229,7 +230,8 @@ public class EventResource implements Serializable {
 
     }
     
-    public EventResource(String indexName, String partitionId, String file) {
+    public EventResource(final String indexName, final String partitionId,
+            final String file) {
         
         this.indexName = indexName;
         

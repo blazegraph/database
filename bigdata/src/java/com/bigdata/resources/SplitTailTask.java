@@ -114,14 +114,18 @@ public class SplitTailTask extends AbstractPrepareTask {
         
         final Event e = new Event(resourceManager.getFederation(),
                 new EventResource(vmd.indexMetadata),
-                OverflowActionEnum.TailSplit, OverflowActionEnum.TailSplit
+                OverflowActionEnum.TailSplit, vmd.getParams()).addDetail(
+                "summary", OverflowActionEnum.TailSplit
                         + (moveTarget != null ? "+" + OverflowActionEnum.Move
-                                : "") + "(" + vmd.name + ") : " + vmd
-                        + ", moveTarget=" + moveTarget).start();
+                                : "") + "(" + vmd.name + ")");
+        if (moveTarget != null) {
+            e.addDetail("moveTarget", "" + moveTarget);
+        }
+        e.start();
 
+        SplitResult splitResult = null;
         try {
 
-            final SplitResult result;
             try {
                 
                 /*
@@ -135,7 +139,7 @@ public class SplitTailTask extends AbstractPrepareTask {
                 // validate the splits before processing them.
                 SplitUtility.validateSplits(vmd.getBTree(), splits);
 
-                result = SplitUtility.buildSplits(vmd, splits, e);
+                splitResult = SplitUtility.buildSplits(vmd, splits, e);
 
             } finally {
 
@@ -150,7 +154,7 @@ public class SplitTailTask extends AbstractPrepareTask {
         
             // Do the atomic update
             SplitIndexPartitionTask.doSplitAtomicUpdate(resourceManager, vmd,
-                    result, OverflowActionEnum.TailSplit,
+                    splitResult, OverflowActionEnum.TailSplit,
                     resourceManager.indexPartitionTailSplitCounter, e);
             
             if (moveTarget != null) {
@@ -178,20 +182,7 @@ public class SplitTailTask extends AbstractPrepareTask {
                  */
                 final String rightSiblingName = DataService
                         .getIndexPartitionName(vmd.indexMetadata.getName(),
-                                result.splits[1].pmd.getPartitionId());
-
-//                // register the new index partition.
-//                final MoveResult moveResult = MoveIndexPartitionTask
-//                        .registerNewPartitionOnTargetDataService(
-//                                resourceManager, moveTarget, rightSiblingName,
-//                                newPartitionId, e);
-//            
-//                /*
-//                 * Move the buffered writes since the tail split and go live
-//                 * with the new index partition.
-//                 */
-//                MoveIndexPartitionTask.moveBufferedWritesAndGoLive(
-//                        resourceManager, moveResult, e);
+                                splitResult.splits[1].pmd.getPartitionId());
 
                 /*
                  * Move.
@@ -205,16 +196,39 @@ public class SplitTailTask extends AbstractPrepareTask {
                  * it falls off the head of the database history.
                  */
                 MoveTask.doAtomicUpdate(resourceManager, rightSiblingName,
-                        result.buildResults[1]/*rightSibling*/, moveTarget,
+                        splitResult.buildResults[1]/*rightSibling*/, moveTarget,
                         newPartitionId, e);
 
             }
             
             // Done.
-            return result;
+            return splitResult;
                         
         } finally {
             
+            if (splitResult != null) {
+
+                for (BuildResult buildResult : splitResult.buildResults) {
+
+                    if (buildResult != null) {
+
+                        /*
+                         * At this point the index segment was either incorporated into
+                         * the new view in a restart safe manner or there was an error.
+                         * Either way, we now remove the index segment store's UUID from
+                         * the retentionSet so it will be subject to the release policy
+                         * of the StoreManager.
+                         */
+                        resourceManager
+                                .retentionSetRemove(buildResult.segmentMetadata
+                                        .getUUID());
+
+                    }
+
+                }
+
+            }
+
             e.end();
             
         }

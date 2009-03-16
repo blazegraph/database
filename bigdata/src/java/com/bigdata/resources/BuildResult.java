@@ -1,5 +1,8 @@
 package com.bigdata.resources;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
@@ -7,6 +10,7 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.SegmentMetadata;
+import com.bigdata.service.Params;
 
 /**
  * The result of an {@link CompactingMergeTask}.
@@ -14,7 +18,7 @@ import com.bigdata.mdi.SegmentMetadata;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BuildResult extends AbstractResult {
+public class BuildResult extends AbstractResult implements Params {
 
     /**
      * The #of sources in the view from which the {@link IndexSegment} was
@@ -126,19 +130,35 @@ public class BuildResult extends AbstractResult {
             this.sources[i] = sources[i].getStore().getResourceMetadata();
 
         }
-        
+
         this.segmentMetadata = segmentMetadata;
-        
+
         this.builder = builder;
 
     }
 
     public String toString() {
-        
+
         return "BuildResult{name=" + name + ", #sources=" + sourceCount
                 + ", merge=" + compactingMerge + ", #tuples(out)="
                 + builder.getCheckpoint().nentries + "}";
 
     }
 
+    public Map<String,Object> getParams() {
+
+        final Map<String,Object> v = new HashMap<String,Object>();
+
+        v.put("name", name);
+        
+        v.put("#sources", sourceCount);
+        
+        v.put("merge", compactingMerge);
+        
+        v.put("#tuples(out)", builder.getCheckpoint().nentries);
+
+        return v;
+        
+    }
+    
 }
