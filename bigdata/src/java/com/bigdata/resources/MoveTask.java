@@ -987,10 +987,10 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
              * service.
              */
             final ResourceManager resourceManager = getDataService()
-            .getResourceManager();
+                    .getResourceManager();
             try {
 
-                return (Void) getDataService().getConcurrencyManager().submit(
+                getDataService().getConcurrencyManager().submit(
                         new InnerReceiveIndexPartitionTask(//
                                 resourceManager,//
                                 targetIndexName,//
@@ -1002,6 +1002,11 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
                                 addr,//
                                 port//
                         )).get();
+
+                // update the index partition receive counter.
+                resourceManager.indexPartitionReceiveCounter.incrementAndGet();
+
+                return null;
                 
             } finally {
                 
