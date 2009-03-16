@@ -309,18 +309,18 @@ abstract public class DataService extends AbstractService
                 
             }
             
-            /**
-             * @todo this must report the entire service failover chain.
-             */
-            public UUID[] getDataServiceUUIDs() {
-
-                return new UUID[] {
-                        
-                    getDataServiceUUID()
-                        
-                };
-                
-            }
+//            /**
+//             * @todo this must report the entire service failover chain.
+//             */
+//            public UUID[] getDataServiceUUIDs() {
+//
+//                return new UUID[] {
+//                        
+//                    getDataServiceUUID()
+//                        
+//                };
+//                
+//            }
             
         };
 

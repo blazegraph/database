@@ -287,13 +287,13 @@ public interface IResourceManager extends IServiceShutdown {
      */
     public IBigdataFederation getFederation();
     
-    /**
-     * Return the ordered {@link UUID}[] of the physical {@link IDataService}
-     * failover chain for the logical {@link IDataService} whose resources are
-     * under management by this class.
-     * 
-     * @deprecated This is not used right now and might go away.
-     */
-    public UUID[] getDataServiceUUIDs();
+//    /**
+//     * Return the ordered {@link UUID}[] of the physical {@link IDataService}
+//     * failover chain for the logical {@link IDataService} whose resources are
+//     * under management by this class.
+//     * 
+//     * @deprecated This is not used right now and might go away.
+//     */
+//    public UUID[] getDataServiceUUIDs();
 
 }

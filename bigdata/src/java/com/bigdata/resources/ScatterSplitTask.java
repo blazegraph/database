@@ -272,7 +272,7 @@ public class ScatterSplitTask extends
                     // choose the move target using a round robin.
                     final UUID moveTarget = moveTargets[i % moveTargets.length];
 
-                    if (moveTarget == resourceManager.getDataServiceUUID()) {
+                    if (resourceManager.getDataServiceUUID().equals(moveTarget)) {
 
                         // ignore move to self.
                         if (INFO)

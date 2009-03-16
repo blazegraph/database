@@ -973,15 +973,15 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
     }
 
-    /**
-     * @throws UnsupportedOperationException
-     *             always.
-     */
-    public UUID[] getDataServiceUUIDs() {
-
-        throw new UnsupportedOperationException();
-        
-    }
+//    /**
+//     * @throws UnsupportedOperationException
+//     *             always.
+//     */
+//    public UUID[] getDataServiceUUIDs() {
+//
+//        throw new UnsupportedOperationException();
+//        
+//    }
 
     /**
      * Always returns <code>null</code> since index partition moves are not

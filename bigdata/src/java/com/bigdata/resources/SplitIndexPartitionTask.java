@@ -121,7 +121,7 @@ public class SplitIndexPartitionTask extends
                 throw new IllegalArgumentException();
 
             if (moveTargets.length == 1
-                    && moveTargets[0] == resourceManager.getDataServiceUUID()) {
+                    && resourceManager.getDataServiceUUID().equals(moveTargets[0])) {
                 // can't specify this data service as the sole target for a move.
                 throw new IllegalArgumentException();
             }
@@ -403,7 +403,7 @@ public class SplitIndexPartitionTask extends
                         final UUID moveTarget = moveTargets[i
                                 % moveTargets.length];
                         
-                        if (moveTarget == resourceManager.getDataServiceUUID()) {
+                        if (resourceManager.getDataServiceUUID().equals(moveTarget)) {
 
                             // ignore move to self.
                             if(INFO)

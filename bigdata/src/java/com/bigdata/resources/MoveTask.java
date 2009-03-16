@@ -63,7 +63,6 @@ import com.bigdata.service.IDataServiceAwareProcedure;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.service.ResourceService;
-import com.bigdata.util.NV;
 
 /**
  * Task moves an index partition to another {@link IDataService}.
@@ -1177,6 +1176,9 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
                 if (targetHistorySegmentMetadata != null) {
                     try {
                         resourceManager
+                                .retentionSetRemove(targetHistorySegmentMetadata
+                                        .getUUID());
+                        resourceManager
                                 .deleteResource(targetHistorySegmentMetadata
                                         .getUUID(), false/* isJournal */);
                     } catch (Throwable t2) {
@@ -1187,8 +1189,11 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
                 if (targetBufferedWritesSegmentMetadata != null) {
                     try {
                         resourceManager
-                                .deleteResource(targetBufferedWritesSegmentMetadata
-                                        .getUUID(), false/* isJournal */);
+                                .retentionSetRemove(targetBufferedWritesSegmentMetadata
+                                        .getUUID());
+                        resourceManager.deleteResource(
+                                targetBufferedWritesSegmentMetadata.getUUID(),
+                                false/* isJournal */);
                     } catch (Throwable t2) {
                         // ignore
                     }
