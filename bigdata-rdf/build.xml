@@ -81,7 +81,7 @@
             <packageset dir="${bigdata.rdf.dir}/src/java"/>
             <packageset dir="${bigdata.sails.dir}/src/java"/>
 			<doctitle><![CDATA[<h1>bigdata&#174;</h1>]]></doctitle>
-	    	<bottom><![CDATA[<i>Copyright &#169; 2006-2008 SYSTAP, LLC. All Rights Reserved.</i>]]></bottom>
+	    	<bottom><![CDATA[<i>Copyright &#169; 2006-2009 SYSTAP, LLC. All Rights Reserved.</i>]]></bottom>
     		<tag name="todo" scope="all" description="TODO:"/>
     		<tag name="issue" scope="all" description="ISSUE:"/>
     		<!--tag name="FIXME" scope="all" description="FIXME:"/-->
@@ -90,6 +90,27 @@
         </javadoc>
     </target>
 
+	<target name="publish-api"> <!--depends="javadoc" -->
+		<fail message="File doesn't exist!">
+		  	<condition>
+		  		<not>
+					<available file="docs" type="dir"/>
+				</not>
+	  		</condition>
+		</fail>
+		<input message="username:" addproperty="ssh.username" defaultValue="${ssh.username}"/>
+		<input message="password:" addproperty="ssh.password" defaultValue="${ssh.password}"/>
+		<exec executable="${ssh.scp}">
+			<arg value="-r"/> <!-- recursive. -->
+			<arg value="-v"/> <!-- verbose protocol. -->
+			<arg value="-C"/> <!-- compression. -->
+			<arg value="-l"/><arg value="${ssh.username}"/>
+			<arg value="-pw"/><arg value="${ssh.password}"/>
+			<arg value="docs"/> <!-- from -->
+			<arg value="shell.speakeasy.net:systap.com/bigdata/"/> <!-- to -->
+		</exec>
+	</target>
+	
 	<!-- bundles all jars for easier deployment/performance analysis. -->
 	<target name="bundle">
 		<copy toDir="${build.dir}/lib">
