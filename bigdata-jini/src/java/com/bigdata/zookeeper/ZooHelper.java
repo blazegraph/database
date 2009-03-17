@@ -135,7 +135,7 @@ public class ZooHelper {
     
             socket.setSoTimeout(100/* timeout(ms) */);
     
-            OutputStream os = socket.getOutputStream();
+            final OutputStream os = socket.getOutputStream();
     
             os.write("kill".getBytes("ASCII"));
     
@@ -148,10 +148,12 @@ public class ZooHelper {
     
         } finally {
     
-            socket.shutdownOutput();
+//            socket.shutdownOutput();
+//    
+//            socket.shutdownInput();
     
-            socket.shutdownInput();
-    
+            socket.close();
+            
         }
     
     }

@@ -622,6 +622,8 @@ abstract public class AbstractFederation implements IBigdataFederation {
     
     /**
      * Applies an {@link AbstractIndexCache} and strengthens the return type.
+     * 
+     * {@inheritDoc}
      */
     public IClientIndex getIndex(String name, long timestamp) {
 
@@ -1106,8 +1108,8 @@ abstract public class AbstractFederation implements IBigdataFederation {
             if (httpdPort == -1) {
 
                 if (INFO)
-                    log.info("httpd disabled: "+path);
-                
+                    log.info("httpd disabled: " + path);
+
                 return;
 
             }
@@ -1119,7 +1121,8 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
             } catch (IOException e) {
 
-                log.error("Could not start httpd : "+path, e);
+                log.error("Could not start httpd: port=" + httpdPort
+                        + ", path=" + path, e);
 
                 return;
                 

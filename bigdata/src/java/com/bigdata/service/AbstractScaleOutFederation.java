@@ -97,6 +97,8 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
 
     /**
      * Strengthens the return type.
+     * 
+     * {@inheritDoc}
      */
     public ClientIndexView getIndex(String name, long timestamp) {
 

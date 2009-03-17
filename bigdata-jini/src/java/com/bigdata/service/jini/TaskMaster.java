@@ -202,6 +202,21 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
          */
         private static final long serialVersionUID = -340273551639560974L;
 
+        /**
+         * Set <code>true</code> iff an existing job is being resumed
+         * (defaults to <code>false</code> until proven otherwise).
+         */
+        private boolean resumedJob = false;
+        
+        /**
+         * Return <code>true</code> iff an existing job is being resumed.
+         */
+        public boolean isResumedJob() {
+            
+            return resumedJob;
+            
+        }
+        
         /*
          * Public options and configuration information. 
          */
@@ -229,12 +244,12 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
         /**
          * @see ConfigurationOptions#MIN_DATA_SERVICES
          */
-        final int minDataServices;
+        public final int minDataServices;
 
         /**
          * @see ConfigurationOptions#AWAIT_DATA_SERVICES_TIMEOUT}
          */
-        final long awaitDataServicesTimeout;
+        public final long awaitDataServicesTimeout;
 
         /*
          * Debugging and benchmarking options.
@@ -246,7 +261,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
          * 
          * @see ConfigurationOptions#FORCE_OVERFLOW
          */
-        final boolean forceOverflow;
+        public final boolean forceOverflow;
 
         /**
          * The directory into which scheduled dumps of the index partition
@@ -254,7 +269,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
          * 
          * @see ConfigurationOptions#INDEX_DUMP_DIR
          */
-        final File indexDumpDir;
+        public final File indexDumpDir;
 
         /**
          * The namespace to be used for the scheduled dumps of the index
@@ -262,7 +277,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
          * 
          * @see ConfigurationOptions#INDEX_DUMP_NAMESPACE
          */
-        final String indexDumpNamespace;
+        public final String indexDumpNamespace;
         
         /**
          * Allows extension of {@link #toString()}
@@ -278,6 +293,8 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
             final StringBuilder sb = new StringBuilder();
             
             sb.append(getClass().getName());
+            
+            sb.append("{ resumedJob=" + isResumedJob());
 
             /*
              * General options.
@@ -442,7 +459,24 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
     /**
      * Runs the master. SIGTERM (normal kill or ^C) will cancel the job,
-     * including any running clients.
+     * including any running clients. A simple <code>main()</code> can be
+     * written as follows:
+     * 
+     * <pre>
+     * public static void main(String[] args) {
+     * 
+     *     final JiniFederation fed = new JiniClient(args).connect();
+     * 
+     *     final TaskMaster task = new MyMaster(fed);
+     * 
+     *     // execute master wait for it to finish.
+     *     task.innerMain().get();
+     * 
+     * }
+     * </pre>
+     * 
+     * Where <code>MyMaster</code> is a concrete subclass of
+     * {@link TaskMaster}.
      * 
      * @return The {@link Future} for the master. Use {@link Future#get()} to
      *         await the outcome of the master.
@@ -450,7 +484,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      * @throws InterruptedException
      * @throws ExecutionException
      */
-    final protected Future<Void> innerMain() {
+    final public Future<Void> innerMain() {
 
         final Future<Void> future = fed.getExecutorService().submit(this);
 
@@ -501,6 +535,12 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      * service.
      * 
      * @return <code>null</code>
+     * 
+     * @todo In my experience zookeeper (at least 3.0.1) has a tendency to drop
+     *       sessions for the java client when under modest load. Because of
+     *       this I am not verifying that the {@link TaskMaster} retains the
+     *       {@link ZLock} for the job throughout its run. Doing so at this
+     *       point is just begging for an aborted run.
      */
     public Void call() throws Exception {
 
@@ -511,168 +551,179 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
          * existing instance of the job in zookeeper (same component and
          * jobName).
          */
-        setupJobState();
+        final ZLock zlock = setupJobState();
 
-        // note: take timestamp after discovering services!
-        final long begin = System.currentTimeMillis();
+        try {
 
-        // callback for overrides.
-        beginJob();
-        
-        /*
-         * Setup scheduled metadata dumps of the index partitions in the KB.
-         */
-        if (jobState.indexDumpDir != null) {
-           
-            // runs @t0, 1m, 2m, ... 9m.
-            fed.addScheduledTask(new ScheduledDumpTask(fed,
-                    jobState.indexDumpNamespace, 10, jobState.indexDumpDir,
-                    "indexDump", TimeUnit.MINUTES), 0/* initialDelay */,
-                    1/* delay */, TimeUnit.MINUTES);
+            // note: take timestamp after discovering services!
+            final long begin = System.currentTimeMillis();
 
-            // runs @t10m, 20m, 30m, ... 50m.
-            fed.addScheduledTask(new ScheduledDumpTask(fed,
-                    jobState.indexDumpNamespace, 5, jobState.indexDumpDir,
-                    "indexDump", TimeUnit.MINUTES), 10/* initialDelay */,
-                    10/* delay */, TimeUnit.MINUTES);
-
-            // runs @t1h, 2h, ... until cancelled.
-            fed.addScheduledTask(new ScheduledDumpTask(fed,
-                    jobState.indexDumpNamespace, 0, jobState.indexDumpDir,
-                    "indexDump", TimeUnit.MINUTES), 1/* initialDelay */,
-                    1/* delay */, TimeUnit.HOURS);
-
-        }
-
-        {
+            // callback for overrides.
+            beginJob();
 
             /*
-             * Start the client tasks.
+             * Setup scheduled metadata dumps of the index partitions in the KB.
              */
+            if (jobState.indexDumpDir != null) {
 
-            // set if some task fails.
-            boolean failure = false;
+                // runs @t0, 1m, 2m, ... 9m.
+                fed.addScheduledTask(new ScheduledDumpTask(fed,
+                        jobState.indexDumpNamespace, 10, jobState.indexDumpDir,
+                        "indexDump", TimeUnit.MINUTES), 0/* initialDelay */,
+                        1/* delay */, TimeUnit.MINUTES);
 
-            /*
-             * The #of services that will be tasked to run the clients. If there
-             * are more clients than services, then some services will be tasked
-             * with more than one client.
-             */
-            final int nservices = jobState.client2DataService.length;
+                // runs @t10m, 20m, 30m, ... 50m.
+                fed.addScheduledTask(new ScheduledDumpTask(fed,
+                        jobState.indexDumpNamespace, 5, jobState.indexDumpDir,
+                        "indexDump", TimeUnit.MINUTES), 10/* initialDelay */,
+                        10/* delay */, TimeUnit.MINUTES);
 
-            if (INFO)
-                log.info("Will run " + jobState.nclients + " on " + nservices
-                        + " services");
-
-            final Map<Integer/* client# */, Future> clientFutures = new LinkedHashMap<Integer, Future>(
-                    jobState.nclients/* initialCapacity */);
-
-            for (int clientNum = 0; clientNum < jobState.nclients; clientNum++) {
-
-                // use the stable assignment made above or read from zookeeper.
-                final UUID serviceUUID = jobState.client2DataService[clientNum];
-
-                // lookup the data service.
-                final IDataService dataService = fed
-                        .getDataService(serviceUUID);
-
-                if (INFO)
-                    log.info("Running client#=" + clientNum + " on "
-                            + dataService.getHostname());
-
-                final Callable<? extends Object> clientTask = newClientTask(clientNum);
-
-                clientFutures.put(clientNum, dataService.submit(clientTask));
+                // runs @t1h, 2h, ... until cancelled.
+                fed.addScheduledTask(new ScheduledDumpTask(fed,
+                        jobState.indexDumpNamespace, 0, jobState.indexDumpDir,
+                        "indexDump", TimeUnit.MINUTES), 1/* initialDelay */,
+                        1/* delay */, TimeUnit.HOURS);
 
             }
 
-            try {
-
-                while (!allDone(clientFutures)) {
-
-                    final int nremaining = clientFutures.size();
-
-                    if (DEBUG)
-                        log.debug("#remaining futures=" + nremaining);
-
-                    if (nremaining < 10)
-                        // sleep a bit before rechecking the futures.
-                        Thread.sleep(1000/* ms */);
-                    else
-                        // sleep longer if there are more clients.
-                        Thread.sleep(10000/* ms */);
-
-                }
-
-            } catch (Throwable t) {
+            {
 
                 /*
-                 * Cancel all futures on error.
+                 * Start the client tasks.
                  */
 
-                failure = true;
-                
-                try {
+                // set if some task fails.
+                boolean failure = false;
 
-                    cancelAll(clientFutures, true/* mayInterruptIfRunning */);
+                /*
+                 * The #of services that will be tasked to run the clients. If
+                 * there are more clients than services, then some services will
+                 * be tasked with more than one client.
+                 */
+                final int nservices = jobState.client2DataService.length;
 
-                } catch (Throwable t2) {
+                if (INFO)
+                    log.info("Will run " + jobState.nclients + " on "
+                            + nservices + " services");
 
-                    log.error(t2);
+                final Map<Integer/* client# */, Future> clientFutures = new LinkedHashMap<Integer, Future>(
+                        jobState.nclients/* initialCapacity */);
+
+                for (int clientNum = 0; clientNum < jobState.nclients; clientNum++) {
+
+                    // use the stable assignment made above or read from
+                    // zookeeper.
+                    final UUID serviceUUID = jobState.client2DataService[clientNum];
+
+                    // lookup the data service.
+                    final IDataService dataService = fed
+                            .getDataService(serviceUUID);
+
+                    if (INFO)
+                        log.info("Running client#=" + clientNum + " on "
+                                + dataService.getHostname());
+
+                    final Callable<? extends Object> clientTask = newClientTask(clientNum);
+
+                    clientFutures
+                            .put(clientNum, dataService.submit(clientTask));
 
                 }
 
-                throw new Exception(t);
+                try {
+
+                    while (!allDone(clientFutures)) {
+
+                        final int nremaining = clientFutures.size();
+
+                        if (DEBUG)
+                            log.debug("#remaining futures=" + nremaining);
+
+                        if (nremaining < 10)
+                            // sleep a bit before rechecking the futures.
+                            Thread.sleep(1000/* ms */);
+                        else
+                            // sleep longer if there are more clients.
+                            Thread.sleep(10000/* ms */);
+
+                    }
+
+                } catch (Throwable t) {
+
+                    /*
+                     * Cancel all futures on error.
+                     */
+
+                    failure = true;
+
+                    try {
+
+                        cancelAll(clientFutures, true/* mayInterruptIfRunning */);
+
+                    } catch (Throwable t2) {
+
+                        log.error(t2);
+
+                    }
+
+                    throw new Exception(t);
+
+                }
+
+                /*
+                 * Done.
+                 */
+
+                final long elapsed = System.currentTimeMillis() - begin;
+
+                if (INFO)
+                    log.info("Done: " + (failure ? "failure" : "success")
+                            + ", elapsed=" + elapsed);
+
+                if (failure) {
+
+                    // halt processing on failure.
+                    return null;
+
+                }
+
+            }
+
+            if (jobState.forceOverflow) {
+
+                /*
+                 * @todo This is an operation that we would like to run once by
+                 * the master which actually executes the clients even if there
+                 * are multiple masters (multiple master support is not really
+                 * all there yet and there are interactions with how the client
+                 * tasks handle multiple instances of themselves so this is all
+                 * forward looking).
+                 */
+
+                System.out.println("Forcing overflow: now=" + new Date());
+
+                fed.forceOverflow(true/* truncateJournal */);
+
+                System.out.println("Forced overflow: now=" + new Date());
 
             }
 
             /*
-             * Done.
+             * Delete zookeeper state when the job completes successfully.
              */
-
-            final long elapsed = System.currentTimeMillis() - begin;
+            ZooHelper.destroyZNodes(fed.getZookeeperAccessor().getZookeeper(),
+                    jobState.getJobZPath(fed), 0/* depth */);
 
             if (INFO)
-                log.info("Done: " + (failure ? "failure" : "success")
-                        + ", elapsed=" + elapsed);
+                log.info("All done: elapsed="
+                        + (System.currentTimeMillis() - begin));
 
-            if (failure) {
+        } finally {
 
-                // halt processing on failure.
-                return null;
-                
-            }
-            
-        }
-
-        if (jobState.forceOverflow) {
-
-            /*
-             * @todo This is an operation that we would like to run once by the
-             * master which actually executes the clients even if there are
-             * multiple masters (multiple master support is not really all there
-             * yet and there are interactions with how the client tasks handle
-             * multiple instances of themselves so this is all forward looking).
-             */
-
-            System.out.println("Forcing overflow: now=" + new Date());
-
-            fed.forceOverflow(true/* truncateJournal */);
-
-            System.out.println("Forced overflow: now=" + new Date());
+            zlock.unlock();
 
         }
         
-        /*
-         * Delete zookeeper state when the job completes successfully.
-         */
-        ZooHelper.destroyZNodes(fed.getZookeeperAccessor().getZookeeper(),
-                jobState.getJobZPath(fed), 0/* depth */);
-
-        if (INFO)
-            log.info("All done: elapsed="
-                    + (System.currentTimeMillis() - begin));
-
         return null;
 
     }
@@ -706,8 +757,9 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
     abstract protected T newClientTask(final int clientNum);
     
     /**
-     * Callable invoked when the job is ready to execute. The default
-     * implementation is a NOP. This may be used to register indices, etc.
+     * Callable invoked when the job is ready to execute and is holding the
+     * {@link ZLock} for the {@link JobState}. The default implementation is a
+     * NOP. This may be used to register indices, etc.
      * 
      * @throws Exception
      */
@@ -721,11 +773,13 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      * with the {@link JobState} read from zookeeper if a pre-existing job is
      * found in zookeeper.
      * 
+     * @return The global lock for the master running the job.
+     * 
      * @throws KeeperException
      * @throws InterruptedException
      * @throws TimeoutException
      */
-    protected void setupJobState() throws KeeperException,
+    protected ZLock setupJobState() throws KeeperException,
             InterruptedException, TimeoutException {
 
         final ZooKeeper zookeeper = fed.getZookeeperAccessor().getZookeeper();
@@ -750,7 +804,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
         }
 
         /*
-         * Use a global lock to protect the job state during setup.
+         * Use a global lock to protect the job.
          * 
          * Note: We just created parent of this lock node (or at any rate,
          * ensured that it exists).
@@ -769,9 +823,12 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
                 zookeeper.create(jobZPath, SerializerUtil.serialize(jobState),
                         fed.getZooConfig().acl, CreateMode.PERSISTENT);
 
+                if (INFO)
+                    log.info("New job: " + jobState);
+
                 try {
 
-                    assignClientsToServices(jobState);
+                    assignClientsToServices(zookeeper, jobState);
 
                     // write those assignments into zookeeper.
                     zookeeper.setData(jobZPath, SerializerUtil
@@ -803,21 +860,49 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
                  * clients for a job that is currently running.
                  * 
                  * Note: We use the client to data service UUID assignments read
-                 * from the znode data!
+                 * from the znode data which are part of the jobState
+                 * 
+                 * @todo stable assignments are only required when clients will
+                 * read or write local data or local indices and should be a
+                 * declarative configuration option.
                  */
 
                 jobState = (S) SerializerUtil.deserialize(zookeeper.getData(
                         jobZPath, false, new Stat()));
 
-                log.warn("Running an existing job: " + jobZPath);
+                jobState.resumedJob = true;
+                
+                log.warn("Pre-existing job: " + jobZPath);
 
             }
+            
+            for (int clientNum = 0; clientNum < jobState.nclients; clientNum++) {
 
-        } finally {
+                setupClientState(zookeeper, clientNum);
+
+            }
+            
+        } catch(KeeperException t) {
 
             zlock.unlock();
 
+            throw t;
+            
+        } catch(InterruptedException t) {
+            
+            zlock.unlock();
+
+            throw t;
+            
+        } catch(Throwable t) {
+
+            zlock.unlock();
+
+            throw new RuntimeException( t );
+            
         }
+        
+        return zlock;
 
     }
 
@@ -830,8 +915,9 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      *       <p>
      *       we also need to support pipelines of master tasks.
      */
-    protected void assignClientsToServices(final JobState jobState)
-            throws KeeperException, InterruptedException, TimeoutException {
+    protected void assignClientsToServices(final ZooKeeper zookeeper,
+            final JobState jobState) throws KeeperException,
+            InterruptedException, TimeoutException {
 
         final UUID[] serviceUUIDs = fed.awaitServices(jobState.minDataServices,
                 jobState.awaitDataServicesTimeout);
@@ -843,6 +929,44 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
             final UUID serviceUUID = serviceUUIDs[i];
 
             jobState.client2DataService[clientNum] = serviceUUID;
+            
+        }
+
+    }
+    
+    /**
+     * Verify the existence of the client's zpath. If it does not exist then it
+     * is created but its data will be an empty byte[]. The client, when it
+     * runs, can examine the data in this znode and decide whether it is a new
+     * start or resuming an existing run.
+     * 
+     * @param clientNum
+     *            The client number.
+     * 
+     * @see JobState#getClientZPath(JiniFederation, int)
+     * 
+     * @throws InterruptedException
+     * @throws KeeperException
+     */
+    protected void setupClientState(final ZooKeeper zookeeper,
+            final int clientNum) throws KeeperException, InterruptedException {
+
+        final String clientZPath = jobState.getClientZPath(fed, clientNum);
+
+        try {
+
+            zookeeper.create(clientZPath, new byte[0], fed.getZooConfig().acl,
+                    CreateMode.PERSISTENT);
+
+            if (INFO)
+                log.info("New client: " + clientZPath);
+
+        } catch (NodeExistsException ex) {
+
+            if (INFO)
+                log.info("Existing client: " + clientZPath);
+
+            // fall through.
 
         }
 
