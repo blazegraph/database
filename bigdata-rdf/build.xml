@@ -106,7 +106,7 @@
 			<arg value="-C"/> <!-- compression. -->
 			<arg value="-l"/><arg value="${ssh.username}"/>
 			<arg value="-pw"/><arg value="${ssh.password}"/>
-			<arg value="docs"/> <!-- from -->
+			<arg value="${build.docs}"/> <!-- from -->
 			<arg value="shell.speakeasy.net:systap.com/bigdata/"/> <!-- to -->
 		</exec>
 	</target>
