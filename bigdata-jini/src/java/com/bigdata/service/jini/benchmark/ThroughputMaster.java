@@ -223,8 +223,13 @@ public class ThroughputMaster
          * clustered and are likely to be not only within the same index
          * partition by in the same region of the B+Tree on that index
          * partition. As incRange is becomes larger, the keys are more likely to
-         * be distributed within a given index partition and to cross the
-         * separator keys for index partitions.
+         * be distributed within a given index partition.
+         * 
+         * @todo Even {@link Integer#MAX_VALUE} is not sufficient to cause
+         *       scattering across index partitions since the range for
+         *       {@link Long} is so much larger than the range {@link Integer}
+         *       (it is restricted to Integer by {@link Random#nextInt(int)} but
+         *       we could find a way to work around that).
          * 
          * @todo update incRange =&gt; operations per second (Disk, no sync on
          *       commit, laptop, 5.23.07).
@@ -347,7 +352,7 @@ public class ThroughputMaster
                     ConfigurationOptions.NAMESPACE, String.class);
 
             npartitions = (Integer) config.getEntry(component,
-                    ConfigurationOptions.NPARTITIONS, Integer.TYPE, Long
+                    ConfigurationOptions.NPARTITIONS, Integer.TYPE, Integer
                             .valueOf(0));
 
             maxKeysPerOp = (Integer) config.getEntry(component,
