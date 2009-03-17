@@ -253,7 +253,11 @@ public class ThroughputMaster
          * After every N operations, where N is specified by this property, the
          * state of the client will be updated in zookeeper. The interval may be
          * varied in order to determine when zookeeper becomes a bottleneck for
-         * the database.
+         * the database. The default is ZERO (0) which disables client updates
+         * in zookeeper entirely.
+         * 
+         * @todo an expired session will end the run which makes this not very
+         *       safe.
          */
         String ZOOKEEPER_UPDATE_INTERVAL = "zookeeperUpdateInterval";
         
@@ -305,7 +309,7 @@ public class ThroughputMaster
         /**
          * @see ConfigurationOptions#ZOOKEEPER_UPDATE_INTERVAL 
          */
-        public final int zookeeperUpdateInterval;
+        public final long zookeeperUpdateInterval;
         
         @Override
         protected void toString(StringBuilder sb) {
@@ -361,9 +365,9 @@ public class ThroughputMaster
             incRange = (Integer) config.getEntry(component,
                     ConfigurationOptions.INC_RANGE, Integer.TYPE);
             
-            zookeeperUpdateInterval = (Integer) config.getEntry(component,
-                    ConfigurationOptions.ZOOKEEPER_UPDATE_INTERVAL,
-                    Integer.TYPE);
+            zookeeperUpdateInterval = (Long) config.getEntry(component,
+                    ConfigurationOptions.ZOOKEEPER_UPDATE_INTERVAL, Long.TYPE,
+                    Long.valueOf(0));
 
         }
 
@@ -393,7 +397,13 @@ public class ThroughputMaster
      * @throws ConfigurationException
      * @throws ExecutionException
      * @throws InterruptedException
-     * @throws KeeperException 
+     * @throws KeeperException
+     * 
+     * FIXME clients should report a throughput measure such as operations per
+     * second and the master should aggregate and report that back on the
+     * console.
+     * 
+     * @todo could report as tasks complete (#running, outcome).
      */
     static public void main(final String[] args) throws ConfigurationException,
             ExecutionException, InterruptedException, KeeperException {
@@ -565,13 +575,17 @@ public class ThroughputMaster
                  * this for each operation? I could very easily see how it might
                  * since all writes on zookeeper are serialized and all tasks
                  * would be writing on zookeeper pretty much all the time!
+                 * 
+                 * @todo in fact, zookeeper can just die (session expired) so
+                 * doing this is not very safe :-!
                  */
-                if (nops - lastNops > jobState.zookeeperUpdateInterval) {
+                if (jobState.zookeeperUpdateInterval != 0
+                        && (nops - lastNops) >= jobState.zookeeperUpdateInterval) {
 
                     writeClientState(new ClientState(nops));
 
                     lastNops = nops;
-                    
+
                 }
                 
             }
