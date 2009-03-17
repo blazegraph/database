@@ -2290,7 +2290,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 
             }
             
-            log.warn("Completed "+ndone+" out of "+tasks.size()+" tasks");
+            log.warn("Completed " + ndone + " out of " + tasks.size()
+                    + " tasks");
             
         } finally {
             

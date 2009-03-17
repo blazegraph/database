@@ -4267,10 +4267,11 @@ abstract public class StoreManager extends ResourceEvents implements
                                     
                                     if (uuids.add(t.getUUID())) {
 
-                                        if (DEBUG)
-                                            log.debug("Dependency: file="
-                                                + t.getFile() + ", uuid="
-                                                + t.getUUID());
+                                        if (INFO)
+                                            log.info("Dependency: file="
+                                                    + t.getFile() + ", uuid="
+                                                    + t.getUUID() + ", view="
+                                                    + pmd);
                                         
                                     }
                                     
