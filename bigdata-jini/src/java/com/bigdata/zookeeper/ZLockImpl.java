@@ -397,7 +397,9 @@ public class ZLockImpl implements ZLock {
                 disconnected = true;
                 knownDeleted = true;
                 cancelled = true;
-                log.error("Session expired: " + event + " : zpath=" + zpath);
+                log.error("Session expired: " + event + " : zxid="
+                        + Long.toHexString(zookeeper.getSessionId())
+                        + ", zpath=" + zpath);
                 return;
             }
             case Disconnected: {
