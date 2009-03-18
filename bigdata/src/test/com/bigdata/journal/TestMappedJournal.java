@@ -139,12 +139,9 @@ public class TestMappedJournal extends AbstractJournalTestCase {
         assertNotNull("raf", bufferStrategy.raf);
         assertEquals("bufferMode", BufferMode.Mapped, bufferStrategy
                 .getBufferMode());
-        assertNotNull("directBuffer", bufferStrategy.getBuffer());
         assertNotNull("mappedBuffer", bufferStrategy.mappedBuffer);
         assertTrue("userExtent", bufferStrategy.getExtent() > bufferStrategy
                 .getUserExtent());
-        assertEquals("bufferCapacity", bufferStrategy.getUserExtent(),
-                bufferStrategy.getBuffer().capacity());
 
         journal.destroy();
 

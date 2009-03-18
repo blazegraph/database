@@ -132,11 +132,8 @@ public class TestDirectJournal extends AbstractJournalTestCase {
         assertNotNull("raf", bufferStrategy.raf);
         assertEquals("bufferMode", BufferMode.Direct, bufferStrategy
                 .getBufferMode());
-        assertNotNull("directBuffer", bufferStrategy.getBuffer());
         assertTrue("userExtent", bufferStrategy.getExtent() > bufferStrategy
                 .getUserExtent());
-        assertEquals("bufferCapacity", bufferStrategy.getUserExtent(),
-                bufferStrategy.getBuffer().capacity());
 
         journal.destroy();
 

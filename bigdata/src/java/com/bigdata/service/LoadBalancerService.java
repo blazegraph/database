@@ -319,7 +319,11 @@ abstract public class LoadBalancerService extends AbstractService
     protected final int historyMinutes;
     
     /**
-     * The #of milliseconds that completed events will be retained.
+     * The maximum age of an {@link Event} that will be keep "on the books".
+     * Events older than this are purged. An error is logged if an event is
+     * purged before its end() event arrives. This generally indicates a code
+     * path where {@link Event#end()} is not getting called but could also
+     * indicate a disconnected client or service.
      * 
      * @see Options#EVENT_HISTORY_MILLIS
      */
@@ -440,7 +444,11 @@ abstract public class LoadBalancerService extends AbstractService
         String DEFAULT_SERVICE_JOIN_TIMEOUT = "" + (3 * 1000);
 
         /**
-         * The #of milliseconds that completed events will be retained.
+         * The maximum age of an {@link Event} that will be keep "on the books".
+         * Events older than this are purged. An error is logged if an event is
+         * purged before its end() event arrives. This generally indicates a
+         * code path where {@link Event#end()} is not getting called but could
+         * also indicate a disconnected client or service.
          */
         String EVENT_HISTORY_MILLIS = LoadBalancerService.class.getName()
                 + ".eventHistoryMillis";
@@ -1401,7 +1409,7 @@ abstract public class LoadBalancerService extends AbstractService
                     serviceCounterSet, IDataServiceCounters.concurrencyManager
                             + ps + IConcurrencyManagerCounters.writeService
                             + ps + IThreadPoolExecutorTaskCounters.AverageQueuingTime,
-                    100d/* default (ms) */, historyMinutes);
+                    10d/* default (ms) */, historyMinutes);
 
             final double dataDirBytesAvailable = getAverageValueForMinutes(
                     serviceCounterSet, IDataServiceCounters.resourceManager
@@ -2038,7 +2046,7 @@ abstract public class LoadBalancerService extends AbstractService
         final long now = System.currentTimeMillis();
 
         /*
-         * Any completed events which are older than the cutoff point are
+         * Any completed events which are older (LT) than the cutoff point are
          * discarded.
          */
         final long cutoff = now - eventHistoryMillis;
@@ -2129,36 +2137,32 @@ abstract public class LoadBalancerService extends AbstractService
 
                 final Event t = itr.next();
 
-                if (t.isComplete()) {
+                if (t.receiptTime > cutoff) {
+
+                    break;
+
+                }
+
+                // discard old event.
+                itr.remove();
+
+                if (!t.isComplete()) {
 
                     /*
-                     * The age of the event.
-                     * 
-                     * Note: This is measured by timestamps assigned by the
-                     * service which generated the event.
+                     * This presumes that events should complete within the
+                     * event history retention period. A failure to receive the
+                     * end() event most likely indicates that the client has a
+                     * code path where end() is not invoked for the event.
                      */
-                    final long age = e.endTime - e.startTime;
                     
-                    // age of the 'end' timestamp for this event.
-                    if (age >= eventHistoryMillis) {
-                        
-                        // discard completed event.
-                        itr.remove();
-//                        log.warn("Discarded event: "+e);
-                        
-                        npruned++;
-                        
-                    } else {
-                        
-                        // done pruning events.
-                        break;
-                        
-                    }
-                    
+                    log.error("No end? " + e);
+
                 }
-                
+
+                npruned++;
+
             }
-            
+
             if (INFO)
                 log.info("There are " + events.size() + " events : cutoff="
                         + cutoff + ", #pruned " + npruned);
