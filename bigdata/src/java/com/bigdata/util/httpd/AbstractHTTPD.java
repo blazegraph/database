@@ -68,15 +68,15 @@ public abstract class AbstractHTTPD extends NanoHTTPD {
 
             } else if ("POST".equalsIgnoreCase(method)) {
 
-                return doGet(uri, method, header, parms);
+                return doPost(uri, method, header, parms);
 
             } else if ("PUT".equalsIgnoreCase(method)) {
 
-                return doGet(uri, method, header, parms);
+                return doPut(uri, method, header, parms);
 
             } else if ("DELETE".equalsIgnoreCase(method)) {
 
-                return doGet(uri, method, header, parms);
+                return doDelete(uri, method, header, parms);
 
             } else {
 
