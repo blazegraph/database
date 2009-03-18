@@ -489,7 +489,7 @@ abstract public class DataService extends AbstractService
          * underneath of the {@link IndexManager}.
          * <p>
          * Note: This method limits the frequency of update to no more than once
-         * per second.
+         * every 5 seconds.
          * <p>
          * Note: {@link OverflowManager#overflow()} is responsible for
          * reattaching the counters for the live {@link ManagedJournal} during
@@ -502,7 +502,7 @@ abstract public class DataService extends AbstractService
             final long elapsed = now - lastReattachMillis;
 
             if (service.isOpen() && service.resourceManager.isRunning()
-                    && elapsed > 1000/* ms */) {
+                    && elapsed > 5000/* ms */) {
 
                 // The service's counter set hierarchy.
                 final CounterSet serviceRoot = service.getFederation()

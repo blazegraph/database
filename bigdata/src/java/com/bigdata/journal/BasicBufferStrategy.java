@@ -49,36 +49,31 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
      * blocks using the buffer. The offset of the image into the backing file is
      * given by {@link FileMetadata#headerSize0}.
      * <p>
-     * Note: The {@link #buffer} reference is updated by
-     * {@link #truncate(long)}. Since both readers and writers MUST use the
-     * current value for this variable it is marked as <code>volatile</code>.
+     * Note: The {@link #buffer} reference is updated by {@link #truncate(long)}.
+     * Since both readers and writers MUST use the current value for this
+     * variable it is marked as <code>volatile</code>.
+     * <p>
+     * Note: Access to the buffer's internal state (its offset and limit) MUST
+     * be serialized in order to prevent a concurrent modification of the
+     * buffer's internal state resulting in an inconsistent view.
+     * Synchronization is on <i>this</i> (the {@link BasicBufferStrategy}
+     * reference).
      */
     private volatile ByteBuffer buffer;
     
-    protected ByteBuffer getBuffer() {
-        
-        return buffer;
-        
-    }
-    
     /**
-     * 
      * @param readOnly
      * @return
      */
-    protected ByteBuffer getBufferView(boolean readOnly) {
+    synchronized protected ByteBuffer getBufferView(boolean readOnly) {
 
-        synchronized (buffer) {
+        if (readOnly) {
 
-            if (readOnly) {
+            return buffer.asReadOnlyBuffer();
 
-                return buffer.asReadOnlyBuffer();
+        } else {
 
-            } else {
-
-                return buffer.duplicate();
-
-            }
+            return buffer.duplicate();
 
         }
 
@@ -300,9 +295,8 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
 
         final int newCapacity = (int) newUserExtent;
         
-        ByteBuffer tmp = (isDirect?ByteBuffer.allocateDirect(newCapacity):
-            ByteBuffer.allocate(newCapacity)
-            );
+        final ByteBuffer tmp = (isDirect ? ByteBuffer
+                .allocateDirect(newCapacity) : ByteBuffer.allocate(newCapacity));
         
         /*
          * Copy at most those bytes that have been written on.

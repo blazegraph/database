@@ -468,21 +468,18 @@ public class LoadBalancerServer extends AbstractServer {
                         } catch (Exception ex) {
 
                             /*
-                             * Typically this is because the live journal has been
-                             * concurrently closed during the request.
+                             * Typically this is because the live journal has
+                             * been concurrently closed during the request.
                              */
 
-                            log.warn("Could not re-attach dynamic counters: " + ex, ex);
+                            log.warn("Could not re-attach dynamic counters: "
+                                    + ex, ex);
 
                         }
-
-                        return super.doGet(uri, method, header, parms);
-
-                    } else {
-                    
-                        return new Response(HTTP_NOTFOUND, MIME_TEXT_PLAIN, uri);
-                    
+                        
                     }
+
+                    return super.doGet(uri, method, header, parms);
                     
                 }
 

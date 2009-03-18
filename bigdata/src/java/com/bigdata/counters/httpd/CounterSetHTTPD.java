@@ -5,10 +5,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Vector;
 
@@ -37,10 +37,38 @@ public class CounterSetHTTPD extends AbstractHTTPD {
     protected final IService service;
 
     /**
+     * Class used to pre-declare classpath resources that are available for
+     * download via httpd.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private static class DeclaredResource {
+        
+        final String localResource;
+        final String mimeType;
+
+        /**
+         * 
+         * @param localResource
+         *            The name of a resource to be located using the classpath.
+         * @param mimeType
+         *            The mime type of that resource.
+         */
+        public DeclaredResource(final String localResource, final String mimeType) {
+            
+            this.localResource = localResource;
+            this.mimeType = mimeType;
+            
+        }
+        
+    }
+    
+    /**
      * An immutable collection of pre-declared classpath resources which can be
      * downloaded via httpd.
      */
-    private final Collection<String> allowedClassPathResources;
+    private final Map<String/*uri*/,DeclaredResource> allowedClassPathResources;
     
     public CounterSetHTTPD(final int port, final CounterSet root) throws IOException {
 
@@ -67,14 +95,26 @@ public class CounterSetHTTPD extends AbstractHTTPD {
         // Note: MAY be null.
         this.service = service;
     
-        this.allowedClassPathResources = Collections.unmodifiableCollection(Collections.synchronizedCollection(Arrays.asList(new String[]{
-                "jquery.js",
-                "jquery.flot.js",
-                "excanvas.pack.js"
-        })));
+        final HashMap<String/* uri */, DeclaredResource> map = new HashMap<String, DeclaredResource>();
+
+        /*
+         * Pre-declare resources that will be served from the CLASSPATH.
+         */
+
+        map.put("/jquery.js", new DeclaredResource("jquery.js",
+                MIME_TEXT_JAVASCRIPT + "; charset='UTF-8'"));
+
+        map.put("/jquery.flot.js", new DeclaredResource("jquery.flot.js",
+                MIME_TEXT_JAVASCRIPT + "; charset='UTF-8'"));
+
+        map.put("/excanvas.pack.js", new DeclaredResource("excanvas.pack.js",
+                MIME_TEXT_JAVASCRIPT + "; charset='UTF-8'"));
+
+        this.allowedClassPathResources = Collections
+                .unmodifiableMap(Collections.synchronizedMap(map));
         
     }
-    
+
     public Response doGet(final String uri, final String method,
             final Properties header,
             final LinkedHashMap<String, Vector<String>> parms) throws Exception {
@@ -89,20 +129,15 @@ public class CounterSetHTTPD extends AbstractHTTPD {
         final InputStream is;
 
         /*
-         * Note: This hacks specific downloadable resources which are accessed
-         * using the classpath.
+         * If the request uri is one of the pre-declared resources then we send
+         * that resource.
          */
-        if (uri.contains("jquery.js")) {
+        final DeclaredResource decl = allowedClassPathResources.get(uri);
 
-            return sendClasspathResource(MIME_TEXT_JAVASCRIPT, "jquery.js");
+        if (decl != null) {
 
-        } else if (uri.contains("jquery.flot.js")) {
-
-            return sendClasspathResource(MIME_TEXT_JAVASCRIPT, "jquery.flot.js");
-
-        } else if (uri.contains("excanvas.pack.js")) {
-
-            return sendClasspathResource(MIME_TEXT_JAVASCRIPT, "excanvas.pack.js");
+            // send that resource.
+            return sendClasspathResource(decl.mimeType, decl.localResource);
 
         } else if (true) {
 
@@ -171,7 +206,7 @@ public class CounterSetHTTPD extends AbstractHTTPD {
      *             if the resource was not explicitly declared as a resource
      *             which may be sent in response to an httpd request.
      */
-    protected Response sendClasspathResource(final String mimeType,
+    final private Response sendClasspathResource(final String mimeType,
             final String resource) {
         
         if (mimeType == null)
@@ -179,13 +214,7 @@ public class CounterSetHTTPD extends AbstractHTTPD {
 
         if (resource == null)
             throw new IllegalArgumentException();
-        
-        if (allowedClassPathResources.contains(resource)) {
-
-            throw new RuntimeException("Resource not pre-declared: " + resource);
-            
-        }
-        
+                
         final InputStream is = getClass().getResourceAsStream(resource);
 
         if (is == null) {
@@ -203,10 +232,7 @@ public class CounterSetHTTPD extends AbstractHTTPD {
          * Note: The Response will consume and close the InputStream.
          */
 
-        final String charset = "UTF-8";
-
-        final Response r = new Response(HTTP_OK, mimeType + "; charset='"
-                + charset + "'", is);
+        final Response r = new Response(HTTP_OK, mimeType, is);
 
         return r;
 

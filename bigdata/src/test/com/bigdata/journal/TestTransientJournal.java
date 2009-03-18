@@ -126,11 +126,8 @@ public class TestTransientJournal extends AbstractJournalTestCase {
                 bufferStrategy.getMaximumExtent());
         assertEquals(Options.BUFFER_MODE, BufferMode.Transient, bufferStrategy
                 .getBufferMode());
-        assertNotNull("directBuffer", bufferStrategy.getBuffer());
         assertEquals("userExtent", bufferStrategy.getExtent(), bufferStrategy
                 .getUserExtent());
-        assertEquals("bufferCapacity", bufferStrategy.getUserExtent(),
-                bufferStrategy.getBuffer().capacity());
         
     }
             

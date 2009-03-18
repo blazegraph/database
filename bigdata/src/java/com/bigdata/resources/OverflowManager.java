@@ -1682,6 +1682,14 @@ abstract public class OverflowManager extends IndexManager {
          * Note: The old journal MUST be closed out before we open the new
          * journal since the journal will use the SAME direct ByteBuffer
          * instance for their write cache.
+         * 
+         * FIXME Change this to use a direct buffer pool so we can prepare the
+         * new journal entirely before we close out the old one and thereby
+         * avoid burning the bridge (closing the old journal) before we cross it
+         * (onto the new journal). Do this when changing the buffer pool
+         * allocation strategy to support a direct buffers for the Direct and
+         * BufferedDisk modes. Update the comments inline above when making this
+         * change.
          */
         {
 

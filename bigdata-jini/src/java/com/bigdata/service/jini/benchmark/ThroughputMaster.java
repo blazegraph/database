@@ -180,12 +180,13 @@ public class ThroughputMaster
 //        String INDEX_COUNT = "indexCount";
 
         /**
-         * #of index operations to execute per client.
+         * The #of index operations to execute per client.
          */
         String OPERATION_COUNT = "operationCount";
 
         /**
-         * seed used for random data generation (default is 0).
+         * The seed used for random data generation (default is 0, which uses a
+         * different seed for each run).
          */
         String SEED = "seed";
 
@@ -195,10 +196,20 @@ public class ThroughputMaster
         String NAMESPACE = "namespace";
         
         /**
-         * The #of index partitions (pre-splits the index). The default is ZERO
-         * (0) which is interpreted as NOT pre-splitting the index.
+         * The #of index partitions (pre-splits the index). ZERO (0) which is
+         * interpreted as NOT pre-splitting the index. There is no default.
          */
         String NPARTITIONS = "npartitions";
+
+        /**
+         * Boolean option specifies whether the key ranges for client operations
+         * are disjoint or shared. When <code>true</code>, each client is
+         * assigned a key-range when it is created and the client will choose
+         * its startKey for each operations from that key-range. When
+         * <code>false</code>, each client chooses a startKey randomly from
+         * the entire key range for each task. There is no default.
+         */
+        String START_KEY_PARTITIONS = "startKeyPartitions";
         
         /**
          * The maximum #of keys to be used in each operation submitted by a
@@ -295,6 +306,11 @@ public class ThroughputMaster
          * @see ConfigurationOptions#NPARTITIONS
          */
         public final int npartitions;
+        
+        /**
+         * @see ConfigurationOptions#START_KEY_PARTITIONS
+         */
+        public final boolean startKeyPartitions;
 
         /**
          * @see ConfigurationOptions#MAX_KEYS_PER_OP
@@ -327,6 +343,9 @@ public class ThroughputMaster
             sb.append(", " + ConfigurationOptions.NPARTITIONS + "="
                     + npartitions);
 
+            sb.append(", " + ConfigurationOptions.START_KEY_PARTITIONS + "="
+                    + startKeyPartitions);
+
             sb.append(", " + ConfigurationOptions.MAX_KEYS_PER_OP + "="
                     + maxKeysPerOp);
 
@@ -356,8 +375,10 @@ public class ThroughputMaster
                     ConfigurationOptions.NAMESPACE, String.class);
 
             npartitions = (Integer) config.getEntry(component,
-                    ConfigurationOptions.NPARTITIONS, Integer.TYPE, Integer
-                            .valueOf(0));
+                    ConfigurationOptions.NPARTITIONS, Integer.TYPE);
+
+            startKeyPartitions = (Boolean) config.getEntry(component,
+                    ConfigurationOptions.START_KEY_PARTITIONS, Boolean.TYPE);
 
             maxKeysPerOp = (Integer) config.getEntry(component,
                     ConfigurationOptions.MAX_KEYS_PER_OP, Integer.TYPE);
@@ -551,12 +572,41 @@ public class ThroughputMaster
                 final int nkeys = r.nextInt(jobState.maxKeysPerOp) + 1;
 
                 /*
-                 * random choice.
+                 * Choose the startKey for this task.
                  * 
-                 * note: this is non-negative because of how we pre-split the
-                 * index.
+                 * Note: The startKey is restricted to be non-negative because
+                 * of how we pre-split the index.
                  */
-                final long firstKey = Math.abs(r.nextLong());
+                
+                final long firstKey;
+                
+                if (jobState.startKeyPartitions) {
+                    
+                    /*
+                     * Random across the entire key range.
+                     */
+
+                    firstKey = Math.abs(r.nextLong());
+                    
+                } else {
+
+                    /*
+                     * Random within the pre-assigned key range.
+                     */
+
+                    // key range (1/Nth of the total key range).
+                    final long keyRange = (Long.MAX_VALUE / jobState.nclients);
+                    
+                    // base constant for this client.
+                    final long base = clientNum * keyRange;
+
+                    // random value within the key range for this trial.
+                    final long offset = (long) r.nextDouble() * keyRange;
+
+                    // place client's start key within its assigned key range.
+                    firstKey = base + offset;
+                    
+                }
                 
                 /*
                  * Note: balances inserts against deletes but probably more
@@ -564,9 +614,10 @@ public class ThroughputMaster
                  * different kinds of isolation levels.
                  */
                 final double insertRate = 1d;
-                
-                new Task(ndx, r, nkeys, firstKey, jobState.incRange, insertRate).call();
-                
+
+                new Task(ndx, r, nkeys, firstKey, jobState.incRange, insertRate)
+                        .call();
+
                 nops += nkeys;
                 
                 /*

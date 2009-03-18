@@ -135,7 +135,8 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
         String FORCE_OVERFLOW = "forceOverflow";
 
         /**
-         * #of clients to use.
+         * #of clients to use. The clients will be distributed across the
+         * discovered data services in the federation.
          */
         String NCLIENTS = "nclients";
 

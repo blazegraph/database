@@ -123,7 +123,7 @@ public class DirectBufferStrategy extends DiskBackedBufferStrategy {
 
     }
     
-    synchronized public void truncate(long newExtent) {
+    synchronized public void truncate(final long newExtent) {
         
         super.truncate(newExtent);
         
@@ -143,7 +143,8 @@ public class DirectBufferStrategy extends DiskBackedBufferStrategy {
              */
             force(true);
             
-            System.err.println("Disk file: newLength="+cf.format(newExtent));
+            if (INFO)
+                log.info("Disk file: newLength=" + cf.format(newExtent));
             
         } catch(IOException ex) {
             
