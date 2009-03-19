@@ -55,13 +55,42 @@ public class CounterSetHTTPD extends AbstractHTTPD {
          * @param mimeType
          *            The mime type of that resource.
          */
-        public DeclaredResource(final String localResource, final String mimeType) {
+        public DeclaredResource(final String localResource,
+                final String mimeType) throws IOException {
             
             this.localResource = localResource;
+
             this.mimeType = mimeType;
+
+            if (localResource == null)
+                throw new IllegalArgumentException();
+
+            if (mimeType == null)
+                throw new IllegalArgumentException();
+
+            // verify that the resource is on the classpath.
+            InputStream is = getInputStream();
+
+            is.close();
+
+        }
+
+        public InputStream getInputStream() throws IOException {
+
+            final InputStream is = getClass()
+                    .getResourceAsStream(localResource);
+
+            if (is == null) {
+
+                throw new IOException("Resource not on classpath: "
+                        + localResource);
+
+            }
+
+            return is;
             
         }
-        
+
     }
     
     /**
@@ -137,7 +166,7 @@ public class CounterSetHTTPD extends AbstractHTTPD {
         if (decl != null) {
 
             // send that resource.
-            return sendClasspathResource(decl.mimeType, decl.localResource);
+            return sendClasspathResource(decl);
 
         } else if (true) {
 
@@ -191,40 +220,24 @@ public class CounterSetHTTPD extends AbstractHTTPD {
     }
 
     /**
-     * Sewnd a resource from the classpath.
+     * Send a resource from the classpath.
      * 
-     * @param mimeType
-     *            The mime type for the response.
-     * @param resource
-     *            The resource.
+     * @param decl
+     *            A pre-declared resource.
      * 
      * @return The {@link Response} which will send that resource.
      * 
-     * @throws RuntimeException
+     * @throws IOException
      *             if the resource is not found on the classpath.
-     * @throws RuntimeException
-     *             if the resource was not explicitly declared as a resource
-     *             which may be sent in response to an httpd request.
      */
-    final private Response sendClasspathResource(final String mimeType,
-            final String resource) {
-        
-        if (mimeType == null)
+    final private Response sendClasspathResource(final DeclaredResource decl)
+            throws IOException {
+
+        if (decl == null)
             throw new IllegalArgumentException();
-
-        if (resource == null)
-            throw new IllegalArgumentException();
-                
-        final InputStream is = getClass().getResourceAsStream(resource);
-
-        if (is == null) {
-
-            throw new RuntimeException("Resource not on classpath: " + resource);
-
-        }
 
         if (INFO)
-            log.info("Serving: " + resource + " as " + mimeType);
+            log.info("Serving: " + decl.localResource + " as " + decl.mimeType);
 
         /*
          * Note: This response may be cached.
@@ -232,7 +245,8 @@ public class CounterSetHTTPD extends AbstractHTTPD {
          * Note: The Response will consume and close the InputStream.
          */
 
-        final Response r = new Response(HTTP_OK, mimeType, is);
+        final Response r = new Response(HTTP_OK, decl.mimeType, decl
+                .getInputStream());
 
         return r;
 
