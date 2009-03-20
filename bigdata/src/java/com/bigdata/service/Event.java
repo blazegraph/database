@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -75,7 +76,7 @@ public class Event implements Serializable {
      */
     private static final long serialVersionUID = 2651293369056916231L;
 
-    private transient IBigdataFederation fed;
+    protected transient IBigdataFederation fed;
 
     /**
      * Unique event identifier.
@@ -239,23 +240,6 @@ public class Event implements Serializable {
         
     }
 
-//    public Event(final IBigdataFederation fed, final EventResource resource,
-//            final Object majorEventType, final NV[] details) {
-//
-//        this(fed, resource, majorEventType, ""/* minorEventType */, null/*details*/);
-//        
-//        if (details != null) {
-//         
-//            for (NV nv : details) {
-//                
-//                addDetail(nv.getName(), nv.getValue());
-//                
-//            }
-//            
-//        }
-//
-//    }
-
     /**
      * Event ctor.
      * 
@@ -345,24 +329,6 @@ public class Event implements Serializable {
 
     }
 
-//    /**
-//     * A child event (major type is the type of the parent).
-//     * 
-//     * @param minorEventType
-//     * 
-//     * @param details
-//     *            Optional ordered (name,value) array.
-//     * 
-//     * @return
-//     */
-//    public Event newSubEvent(Object minorEventType, final NV[] details) {
-//
-//        return new Event(fed, this.resource, this.majorEventType,
-//                minorEventType, (Set<NV>) (details != null ? new TreeMap<NV>(
-//                        Arrays.asList(details)) : null));
-//
-//    }
-
     /**
      * A child event (major type is the type of the parent).
      * 
@@ -370,9 +336,10 @@ public class Event implements Serializable {
      * 
      * @return The sub-event.
      */
-    public Event newSubEvent(Object minorEventType) {
+    public Event newSubEvent(final Object minorEventType) {
 
-        return newSubEvent(minorEventType, (Map<String, Object>) null/* details */);
+        return new Event(fed, this.resource, this.majorEventType,
+                minorEventType, this.details);
         
     }
 
@@ -386,26 +353,33 @@ public class Event implements Serializable {
      * 
      * @return The sub-event.
      */
-    public Event newSubEvent(Object minorEventType,
+    public Event newSubEvent(final Object minorEventType,
             final Map<String, Object> details) {
 
-        final Map<String, Object> m;
-        if (this.details == null && details == null) {
-            m = null;
-        } else {
-            m = new HashMap<String, Object>();
-            if (this.details != null) {
-                // details from the parent event.
-                m.putAll(this.details);
-            }
-            if (details != null) {
-                // given details.
-                m.putAll(details);
-            }
+        final Event e = newSubEvent(minorEventType);
+        
+        if( details != null ) {
+            
+            e.addDetails(details);
+            
         }
+        
+//        final Map<String, Object> m;
+//        if (this.details == null && details == null) {
+//            m = null;
+//        } else {
+//            m = new HashMap<String, Object>();
+//            if (this.details != null) {
+//                // details from the parent event.
+//                m.putAll(this.details);
+//            }
+//            if (details != null) {
+//                // given details.
+//                m.putAll(details);
+//            }
+//        }
 
-        return new Event(fed, this.resource, this.majorEventType,
-                minorEventType, m);
+        return e;
         
     }
 
@@ -428,22 +402,13 @@ public class Event implements Serializable {
         
         // assign start time.
         startTime = System.currentTimeMillis();
-        
-        if(fed instanceof AbstractFederation) {
 
-            try {
-                ((AbstractFederation) fed).sendEvent(this);
-            } catch (Throwable t) {
-                log.warn(t);
-            }
-            
-        } else {
-            
-            if (INFO)
-                log.info(this);
-            
+        try {
+            sendEvent();
+        } catch (Throwable t) {
+            log.warn(t);
         }
-        
+
         return this;
 
     }
@@ -473,26 +438,36 @@ public class Event implements Serializable {
             startTime = endTime;
             
         }
-        
-        if(fed instanceof AbstractFederation) {
 
-            try {
-                ((AbstractFederation) fed).sendEvent(this);
-            } catch(Throwable t) {
-                log.warn(t);
-            }
-
-        } else {
-
-            if (INFO)
-                log.info(this);
-
+        try {
+            sendEvent();
+        } catch (Throwable t) {
+            log.warn(t);
         }
         
         return this;
 
     }
 
+    /**
+     * Dispatche the {@link Event} via
+     * {@link AbstractFederation#sendEvent(Event)}.
+     */
+    protected void sendEvent() throws IOException {
+
+        if(fed instanceof AbstractFederation) {
+
+                ((AbstractFederation) fed).sendEvent(this);
+            
+        } else {
+            
+            if (INFO)
+                log.info(this);
+            
+        }
+
+    }
+    
     /**
      * A header that can be used to interpret the output of {@link #toString()}
      * (with newline).
@@ -765,9 +740,10 @@ public class Event implements Serializable {
         public String nextToken() {
             String token = tokens.get(i++);
             if (delim.contains(token)) {
+                // handles a blank column
                 token = tokens.get(i);
                 if (delim.contains(token)) {
-                    token = null;
+                    token = BLANK;
                 } else {
                     i++;
                 }
@@ -775,12 +751,15 @@ public class Event implements Serializable {
             if (token != null) {
                 token = token.trim();
                 if (token.length() == 0) {
-                    token = null;
+                    // handles a column of whitespace.
+                    token = BLANK;
                 }
             }
             return token;
         }
         
     }
+    
+    static final String BLANK = "";
     
 }
