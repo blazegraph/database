@@ -39,15 +39,7 @@ import java.util.concurrent.TimeoutException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ILoadBalancerService extends IService {
-   
-    /**
-     * Sent an event.
-     * 
-     * @param e
-     *            The event.
-     */
-    public void notifyEvent(Event e) throws IOException;
+public interface ILoadBalancerService extends IService, IEventReceivingService {
     
     /**
      * Send performance counters. Clients SHOULD invoke this method no less than

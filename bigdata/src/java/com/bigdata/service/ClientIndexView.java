@@ -2297,23 +2297,11 @@ public class ClientIndexView implements IClientIndex {
      *             if none of the data services identified in the index
      *             partition locator record could be discovered.
      */
-    public IDataService getDataService(PartitionLocator pmd) {
+    public IDataService getDataService(final PartitionLocator pmd) {
 
         final UUID serviceUUID = pmd.getDataServiceUUID();
 
-        final IDataService dataService;
-
-        try {
-
-            dataService = fed.getDataService(serviceUUID);
-
-        } catch (Exception ex) {
-
-            throw new RuntimeException(ex);
-
-        }
-
-        return dataService;
+        return fed.getDataService(serviceUUID);
 
     }
 

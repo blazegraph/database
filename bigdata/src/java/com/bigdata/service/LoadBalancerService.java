@@ -9,7 +9,6 @@ import java.io.OutputStream;
 import java.text.NumberFormat;
 import java.util.Arrays;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.Vector;
@@ -34,11 +33,14 @@ import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.IHostCounters;
 import com.bigdata.counters.IRequiredHostCounters;
 import com.bigdata.counters.ICounterSet.IInstrumentFactory;
+import com.bigdata.journal.Journal;
 import com.bigdata.journal.ConcurrencyManager.IConcurrencyManagerCounters;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.ResourceManager.IResourceManagerCounters;
 import com.bigdata.resources.StoreManager.IStoreManagerCounters;
 import com.bigdata.service.DataService.IDataServiceCounters;
+import com.bigdata.service.EventReceiver.EventBTree;
 import com.bigdata.service.mapred.IMapService;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
@@ -148,27 +150,6 @@ abstract public class LoadBalancerService extends AbstractService
      * True iff the {@link #log} level is DEBUG or less.
      */
     static final protected boolean DEBUG = log.isDebugEnabled();
-
-    /**
-     * Inner class provides a named logger for {@link Event}s.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class EventLog {
-
-        final static protected Logger eventLog = Logger.getLogger(EventLog.class);
-        
-        final static protected boolean INFO = eventLog.isInfoEnabled();
-        
-        static {
-            
-            if(INFO)
-                EventLog.eventLog.info(Event.getHeader());
-            
-        }
-        
-    }
 
     final protected String ps = ICounterSet.pathSeparator;
     
@@ -318,30 +299,7 @@ abstract public class LoadBalancerService extends AbstractService
      */
     protected final int historyMinutes;
     
-    /**
-     * The maximum age of an {@link Event} that will be keep "on the books".
-     * Events older than this are purged. An error is logged if an event is
-     * purged before its end() event arrives. This generally indicates a code
-     * path where {@link Event#end()} is not getting called but could also
-     * indicate a disconnected client or service.
-     * 
-     * @see Options#EVENT_HISTORY_MILLIS
-     */
-    protected final long eventHistoryMillis;
-    
-    /**
-     * Basically a ring buffer of events without a capacity limit and with
-     * random access by the event {@link UUID}. New events are added to the
-     * collection by {@link #notifyEvent(Event)}. That method also scans the
-     * head of the collection, purging any events that are older than the
-     * desired #of minutes of event history to retain.
-     * <p>
-     * Since this is a "linked" collection, the order of the events in the
-     * collection will always reflect their arrival time. This lets us scan the
-     * events in temporal order, filtering for desired criteria and makes it
-     * possible to prune the events in the buffer as new events arrive.
-     */
-    protected final LinkedHashMap<UUID,Event> events = new LinkedHashMap<UUID,Event>(10000/* initialCapacity */);
+    protected final EventReceiver eventReceiver;
     
     /**
      * Options understood by the {@link LoadBalancerService}.
@@ -449,6 +407,8 @@ abstract public class LoadBalancerService extends AbstractService
          * purged before its end() event arrives. This generally indicates a
          * code path where {@link Event#end()} is not getting called but could
          * also indicate a disconnected client or service.
+         * 
+         * @see EventReceiver
          */
         String EVENT_HISTORY_MILLIS = LoadBalancerService.class.getName()
                 + ".eventHistoryMillis";
@@ -595,13 +555,45 @@ abstract public class LoadBalancerService extends AbstractService
         // eventHistoryMillis
         {
 
-            eventHistoryMillis = Long.parseLong(properties.getProperty(
-                    Options.EVENT_HISTORY_MILLIS,
-                    Options.DEFAULT_EVENT_HISTORY_MILLIS));
+            final long eventHistoryMillis = Long.parseLong(properties
+                    .getProperty(Options.EVENT_HISTORY_MILLIS,
+                            Options.DEFAULT_EVENT_HISTORY_MILLIS));
 
             if (INFO)
                 log.info(Options.EVENT_HISTORY_MILLIS + "="
                         + eventHistoryMillis);
+
+            /*
+             * Setup a BTree backed by a file on the disk that will be used to
+             * persist the completed events. This is passed to the
+             * EventReceiver. The BTree is used to get the events out of RAM and
+             * to decouple the reporting from the receiving. We delegate
+             * everything dealing with the events to that class.
+             */
+
+            final IRawStore eventStore;
+
+            // Uses a temporary store.
+//          eventStore = new TemporaryRawStore();
+
+            // Uses a restart safe store.
+            {
+                
+                final Properties p = new Properties();
+
+//                p.setProperty(com.bigdata.journal.Options.BUFFER_MODE, BufferMode.Disk);
+                
+                p.setProperty(com.bigdata.journal.Options.FILE, new File(
+                        logDir, "events" + com.bigdata.journal.Options.JNL)
+                        .toString());
+
+                eventStore = new Journal(p);
+                
+            }
+            
+            final EventBTree eventBTree = EventBTree.create(eventStore);
+
+            eventReceiver = new EventReceiver(eventHistoryMillis, eventBTree);
 
         }
 
@@ -2039,138 +2031,33 @@ abstract public class LoadBalancerService extends AbstractService
      * {@link UUID} or adds the event to the set of recent events, and then
      * prunes the set of recent events so that all completed events older than
      * {@link #eventHistoryMillis} are discarded.
+     * 
+     * @see EventReceiver
      */
-    public void notifyEvent(Event e) {
+    public void notifyEvent(Event e) throws IOException {
 
-        // timestamp for start/end time of the event.
-        final long now = System.currentTimeMillis();
-
-        /*
-         * Any completed events which are older (LT) than the cutoff point are
-         * discarded.
-         */
-        final long cutoff = now - eventHistoryMillis;
-
-        synchronized (events) {
-
-            /*
-             * Record the event, either setting its start time or its end time
-             * as appropriate.
-             */
-            {
-
-                {
-                    
-                    // is this a known event?
-                    final Event t = events.get(e.eventUUID);
-
-                    if (t == null) {
-
-                        /*
-                         * This is a new event so add to the collection of
-                         * recent events.
-                         * 
-                         * Note: If a start event is received, then there is a
-                         * service restart, and then we see the end event the
-                         * receipt time assigned to the event will be after the
-                         * actual event start time. Outside of making events
-                         * restart safe there is not much that we can do about
-                         * this.
-                         */
-                    
-                        events.put(e.eventUUID, e);
-                        
-                        // timestamp when we got this event.
-                        e.receiptTime = now;
-
-                    } else {
-                        
-                        /*
-                         * There is an existing event. We replace the details
-                         * with the details of the new event.
-                         * 
-                         * Note: We do not update events which are already
-                         * flagged as complete. At stake is the fact that the
-                         * client might send us two "end()" events if the end()
-                         * event is generated before the start() event gets sent
-                         * along. The logic in the client does not exclude this
-                         * possibility.
-                         */
-
-                        if (t.isComplete()) {
-
-                            // copy potentially updated details from the new event.
-                            t.details = e.details;
-
-                            // grab the end time from the new event.
-                            t.endTime = e.endTime;
-                            
-                            // mark the event as complete.
-                            t.complete = true;
-                            
-                            // use the pre-existing event reference.
-                            e = t;
-
-                        }
-                        
-                    }
-                    
-                }
-
-            }
-
-            if(EventLog.INFO) {
-                
-                EventLog.eventLog.info(e.toString());
-                
-            }
-              
-            /*
-             * Prune the events, discarding any whose end time is LTE to the
-             * cutoff.
-             */
-            final Iterator<Event> itr = events.values().iterator();
-
-            int npruned = 0;
-            
-            while (itr.hasNext()) {
-
-                final Event t = itr.next();
-
-                if (t.receiptTime > cutoff) {
-
-                    break;
-
-                }
-
-                // discard old event.
-                itr.remove();
-
-                if (!t.isComplete()) {
-
-                    /*
-                     * This presumes that events should complete within the
-                     * event history retention period. A failure to receive the
-                     * end() event most likely indicates that the client has a
-                     * code path where end() is not invoked for the event.
-                     */
-                    
-                    log.error("No end? " + e);
-
-                }
-
-                npruned++;
-
-            }
-
-            if (INFO)
-                log.info("There are " + events.size() + " events : cutoff="
-                        + cutoff + ", #pruned " + npruned);
-            
-        }
+        eventReceiver.notifyEvent(e);
         
     }
-    
+
+    /**
+     * {@inheritDoc}
+     */
+    public Iterator<Event> rangeIterator(long fromTime, long toTime) {
+        
+        return eventReceiver.rangeIterator(fromTime, toTime);
+        
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public long rangeCount(long fromTime, long toTime) {
+        
+        return eventReceiver.rangeCount(fromTime, toTime);
+        
+    }
+
     public void notify(final UUID serviceUUID, final byte[] data) {
 
         setupLoggingContext();
@@ -2757,12 +2644,4 @@ abstract public class LoadBalancerService extends AbstractService
         
     }
 
-    /**
-     * Implements {@link IEventReportingService}.
-     */
-    public LinkedHashMap<UUID,Event> getEvents() {
-        
-        return events;
-        
-    }
 }

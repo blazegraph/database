@@ -120,7 +120,7 @@ public class DataServicesClient extends
         
         if (serviceItem == null) {
 
-            log.warn("No such service: uuid=" + serviceUUID);
+            log.error("No such service: uuid=" + serviceUUID);
 
             return null;
 

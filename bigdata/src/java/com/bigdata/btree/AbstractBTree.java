@@ -28,11 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import java.io.PrintStream;
+import java.io.Serializable;
 import java.lang.ref.Reference;
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
+import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 
 import org.apache.log4j.Level;
@@ -942,6 +944,22 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     final public IResourceMetadata[] getResourceMetadata() {
         
+        if (store == null) {
+
+            /*
+             * This covers the case of a transient BTree (no backing store).
+             * 
+             * Note that the indexUUID is reported as the store's UUID in this
+             * case.
+             */
+            return new IResourceMetadata[] {
+                    
+                new TransientResourceMetadata(metadata.getIndexUUID())
+                    
+            };
+
+        }
+
         return new IResourceMetadata[] {
           
                 store.getResourceMetadata()
@@ -949,7 +967,49 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         };
         
     }
-    
+
+    /**
+     * Static class since must be {@link Serializable}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static final class TransientResourceMetadata implements IResourceMetadata {
+
+        private final UUID uuid;
+        
+        public TransientResourceMetadata(final UUID uuid) {
+            this.uuid = uuid;
+        }
+
+        private static final long serialVersionUID = 1L;
+
+        public boolean isJournal() {
+            return false;
+        }
+
+        public boolean isIndexSegment() {
+            return false;
+        }
+
+        public boolean equals(IResourceMetadata o) {
+            return false;
+        }
+
+        public long getCreateTime() {
+            return 0L;
+        }
+
+        public String getFile() {
+            return "";
+        }
+
+        public UUID getUUID() {
+            return uuid;
+        }
+
+    }
+
     /**
      * Returns the metadata record for this btree.
      * <p>

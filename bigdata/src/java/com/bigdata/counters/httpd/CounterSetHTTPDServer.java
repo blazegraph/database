@@ -129,8 +129,10 @@ public class CounterSetHTTPDServer implements Runnable {
 
                         service.readCSV(reader);
 
-                        System.out.println("read "+service.getEvents().size()+" events from file: " + file);
-                        
+                        System.out.println("read "
+                                + service.rangeCount(0L, Long.MAX_VALUE)
+                                + " events from file: " + file);
+
                     } finally {
 
                         if (reader != null) {

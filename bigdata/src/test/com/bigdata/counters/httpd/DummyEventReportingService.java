@@ -4,13 +4,13 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.service.Event;
+import com.bigdata.service.EventReceiver;
 import com.bigdata.service.IEventReportingService;
 import com.bigdata.service.IService;
 
@@ -21,27 +21,17 @@ import com.bigdata.service.IService;
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$
  */
-public class DummyEventReportingService implements IEventReportingService, IService {
+public class DummyEventReportingService extends EventReceiver implements
+        IService {
 
-    /**
-     * The events for this simulated event reporting service.
-     */
-    private final LinkedHashMap<UUID, Event> events;
-    
     /**
      * Construct with an empty set of events
      */
     public DummyEventReportingService() {
-        this.events = new LinkedHashMap<UUID, Event>();
-    }
     
-    /**
-     * Construct using supplied events.
-     * 
-     * @param events the events
-     */
-    public DummyEventReportingService(LinkedHashMap<UUID, Event> events) {
-        this.events = events;
+        super(Long.MAX_VALUE/* eventHistoryMillis */, EventBTree
+                .createTransient());
+
     }
     
     /**
@@ -92,23 +82,15 @@ public class DummyEventReportingService implements IEventReportingService, IServ
                 return 0;
             }
         });
-        // add into LinkedHashMap
+
         for (Event e : events) {
-            this.events.put(e.eventUUID, e);
+        
+            notifyEvent(e);
+            
         }
+
     }
     
-    /**
-     * Return the events for this simulated event reporting service.
-     * 
-     * @return the events
-     */
-    public LinkedHashMap<UUID, Event> getEvents() {
-        
-        return events;
-        
-    }
-
     public String getHostname() throws IOException {
         
         return AbstractStatisticsCollector.fullyQualifiedHostName;
@@ -134,5 +116,5 @@ public class DummyEventReportingService implements IEventReportingService, IServ
     }
 
     final UUID serviceUUID = UUID.randomUUID();
-    
+
 }

@@ -523,8 +523,13 @@ public class JiniFederation extends AbstractDistributedFederation implements
     public IDataService getDataService(UUID serviceUUID) {
 
         // Note: return null if service not available/discovered.
-        if (dataServicesClient == null)
+        if (dataServicesClient == null) {
+
+            log.error("No data service client?");
+            
             return null;
+            
+        }
 
         return dataServicesClient.getDataService(serviceUUID);
 

@@ -328,7 +328,8 @@ public class XHTMLRenderer {
          * 
          * @see IEventReportingService
          */
-        final LinkedHashMap<UUID, Event> events;
+//        final LinkedHashMap<UUID, Event> events;
+        final IEventReportingService eventReportingService;
         
         /**
          * <code>true</code> iff we need to output the scripts to support
@@ -485,12 +486,12 @@ public class XHTMLRenderer {
             if (service != null && service instanceof IEventReportingService) {
 
                 // events are available.
-                events = ((IEventReportingService) service).getEvents();
+                eventReportingService = ((IEventReportingService) service);
 
             } else {
 
                 // events are not available.
-                events = null;
+                eventReportingService = null;
                 
             }
             
@@ -522,7 +523,7 @@ public class XHTMLRenderer {
 
             }
 
-            if (events != null) {
+            if (eventReportingService != null) {
                 
                 final Iterator<Map.Entry<String, Vector<String>>> itr = params
                         .entrySet().iterator();
@@ -642,7 +643,7 @@ public class XHTMLRenderer {
             
             switch (reportType) {
             case events:
-                if (events == null) {
+                if (eventReportingService == null) {
 
                     /*
                      * Throw exception since the report type requires events but
@@ -1080,12 +1081,8 @@ public class XHTMLRenderer {
             case events:
                 
                 // render the time-series chart
-                synchronized(model.events) {
-                    
-                    writeFlot(w, model.events);
-                    
-                }
-
+                writeFlot(w, model.eventReportingService);
+                
                 break;
                 
             }
@@ -3304,14 +3301,15 @@ public class XHTMLRenderer {
     
     /**
      * Write the html to render the Flot-based time-series chart, plotting the
-     * supplied events. 
+     * supplied events.
      */
     protected void writeFlot(final Writer w,
-            final LinkedHashMap<UUID, Event> events) throws IOException {
+            final IEventReportingService eventReportingService)
+            throws IOException {
         
         writeResource(w, "flot-start.txt");
         
-        writeEvents(w, events);
+        writeEvents(w, eventReportingService);
         
         writeResource(w, "flot-end.txt");
         
@@ -3439,8 +3437,16 @@ public class XHTMLRenderer {
      *       engine with each service, this could be a standoff module.
      */
     protected void writeEvents(final Writer w,
-            final LinkedHashMap<UUID, Event> events) throws IOException {
+            final IEventReportingService eventReportingService)
+            throws IOException {
 
+        /*
+         * @todo make model parameters. for example, so you can see the events
+         * for the last 5 minutes, last hour, last day, etc.
+         */
+        final long fromTime = 0L;
+        final long toTime = Long.MAX_VALUE;
+        
         /*
          * Map from the key for the event group to the basename of the variables
          * for that event group.
@@ -3464,14 +3470,20 @@ public class XHTMLRenderer {
         final Map<String,StringBuilder> tooltipsByHost = new HashMap<String,StringBuilder>();
 
         int naccepted = 0;
+        int nvisited = 0;
         
-        for (Map.Entry<UUID, Event> entry : events.entrySet()) {
+        final Iterator<Event> itr = eventReportingService.rangeIterator(
+                fromTime, toTime);
         
-            final Event e = entry.getValue();
+        while (itr.hasNext()) {
+
+            final Event e = itr.next();
+
+            nvisited++;
             
             // apply the event filters.
             if (!e.isComplete() || !acceptEvent(e)) {
-                
+
                 continue;
                 
             }
@@ -3587,7 +3599,8 @@ public class XHTMLRenderer {
             
         }
 
-        log.warn("accepted: " + naccepted + " out of " + events.size()
+        log.warn("accepted: " + naccepted + " out of "
+                + nvisited
                 + " events");
         
         // all series.

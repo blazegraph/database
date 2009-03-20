@@ -70,8 +70,9 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("bigdata services");
 
-        // unit test for parsing events.
+        // event handling
         suite.addTestSuite(TestEventParser.class);
+        suite.addTestSuite(TestEventReceiver.class);
         
         // tests of the round-robin aspects of the LBS (isolated behaviors).
         suite.addTestSuite(TestLoadBalancerRoundRobin.class);
