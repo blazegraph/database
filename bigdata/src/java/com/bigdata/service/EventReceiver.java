@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.UUID;
+import java.util.concurrent.locks.Lock;
 
 import org.apache.log4j.Logger;
 
@@ -146,6 +147,16 @@ public class EventReceiver implements IEventReceivingService,
         
     }
 
+    /**
+     * Acquire and return the write lock for the {@link EventBTree}. The caller
+     * MUST {@link Lock#unlock()} the lock!
+     */
+    public Lock getWriteLock() {
+        
+        return ndx.writeLock();
+        
+    }
+    
     /**
      * A {@link BTree} whose keys are event start times and whose values are the
      * serialized {@link Event}s. 

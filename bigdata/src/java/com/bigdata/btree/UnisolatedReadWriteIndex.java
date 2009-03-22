@@ -140,11 +140,14 @@ public class UnisolatedReadWriteIndex implements IIndex {
     /**
      * An exclusive write lock used (in the absence of other concurrency control
      * mechanisms) to serialize all processes accessing an unisolated index when
-     * a writer must run.
+     * a writer must run. This is automatically obtained by methods on this
+     * class which will write on the underlying {@link IIndex}. It is exposed
+     * for processes which need to obtain the write lock to coordinate external
+     * operations.
      * 
      * @return The acquired lock.
      */
-    private Lock writeLock() {
+    public Lock writeLock() {
        
         final Lock writeLock = readWriteLock.writeLock();
         
@@ -177,11 +180,14 @@ public class UnisolatedReadWriteIndex implements IIndex {
     /**
      * A shared read lock used (in the absence of other concurrency control
      * mechanisms) to permit concurrent readers on an unisolated index while
-     * serializing access to that index when a writer must run.
+     * serializing access to that index when a writer must run. This is
+     * automatically obtained by methods on this class which will write on the
+     * underlying {@link IIndex}. It is exposed for processes which need to
+     * obtain the write lock to coordinate external operations.
      * 
      * @return The acquired lock.
      */
-    private Lock readLock() {
+    protected Lock readLock() {
         
         final Lock readLock = readWriteLock.readLock();
 
