@@ -19,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
@@ -36,7 +37,6 @@ import com.bigdata.counters.ICounterSet.IInstrumentFactory;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.ConcurrencyManager.IConcurrencyManagerCounters;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.ResourceManager.IResourceManagerCounters;
 import com.bigdata.resources.StoreManager.IStoreManagerCounters;
 import com.bigdata.service.DataService.IDataServiceCounters;
@@ -299,6 +299,11 @@ abstract public class LoadBalancerService extends AbstractService
      */
     protected final int historyMinutes;
     
+    /**
+     * Used to persist the logged events.
+     */
+    final protected Journal eventStore;
+
     protected final EventReceiver eventReceiver;
     
     /**
@@ -571,8 +576,6 @@ abstract public class LoadBalancerService extends AbstractService
              * everything dealing with the events to that class.
              */
 
-            final IRawStore eventStore;
-
             // Uses a temporary store.
 //          eventStore = new TemporaryRawStore();
 
@@ -590,8 +593,15 @@ abstract public class LoadBalancerService extends AbstractService
                 eventStore = new Journal(p);
                 
             }
-            
-            final EventBTree eventBTree = EventBTree.create(eventStore);
+
+            EventBTree eventBTree = (EventBTree) eventStore.getIndex("events");
+
+            if (eventBTree == null) {
+
+                eventStore.registerIndex("events", eventBTree = EventBTree
+                        .create(eventStore));                
+                
+            }
 
             eventReceiver = new EventReceiver(eventHistoryMillis, eventBTree);
 
@@ -632,6 +642,29 @@ abstract public class LoadBalancerService extends AbstractService
         // log the final state of the counters.
         logCounters("final");
 
+        /*
+         * Obtain the exclusive write lock for the event BTree before flushing
+         * writes.
+         */
+        final Lock lock = eventReceiver.getWriteLock();
+        try {
+
+            // Flush any buffered writes to the event store.
+            eventStore.getIndex("events").flush();
+
+            // Normal shutdown of the event store.
+            eventStore.shutdown();
+            
+        } catch (Throwable t) {
+            
+            log.error(t, t);
+            
+        } finally {
+            
+            lock.unlock();
+            
+        }
+        
         super.shutdown();
         
         if (INFO)
@@ -651,6 +684,9 @@ abstract public class LoadBalancerService extends AbstractService
         // log the final state of the counters.
         logCounters("final");
 
+        // immediate shutdown.
+        eventStore.shutdownNow();
+        
         super.shutdownNow();
         
         if (INFO)
@@ -2036,6 +2072,9 @@ abstract public class LoadBalancerService extends AbstractService
      */
     public void notifyEvent(Event e) throws IOException {
 
+        if(!isOpen())
+            throw new IllegalStateException();
+        
         eventReceiver.notifyEvent(e);
         
     }
@@ -2044,7 +2083,10 @@ abstract public class LoadBalancerService extends AbstractService
      * {@inheritDoc}
      */
     public Iterator<Event> rangeIterator(long fromTime, long toTime) {
-        
+
+        if(!isOpen())
+            throw new IllegalStateException();
+
         return eventReceiver.rangeIterator(fromTime, toTime);
         
     }
@@ -2053,7 +2095,10 @@ abstract public class LoadBalancerService extends AbstractService
      * {@inheritDoc}
      */
     public long rangeCount(long fromTime, long toTime) {
-        
+
+        if(!isOpen())
+            throw new IllegalStateException();
+
         return eventReceiver.rangeCount(fromTime, toTime);
         
     }
