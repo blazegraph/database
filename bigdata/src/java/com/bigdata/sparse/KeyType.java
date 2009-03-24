@@ -42,11 +42,17 @@ public enum KeyType {
 
     Double(3, Bytes.SIZEOF_LONG),
 
+    /** Variable length Unicode string. */
     Unicode(4, 0/* variable length */),
 
+    /** Variable length ASCII string. */
     ASCII(5, 0/* variable length */),
 
-    Date(6, Bytes.SIZEOF_LONG);
+    Date(6, Bytes.SIZEOF_LONG),
+    
+//    /** Variable length unsigned byte[] (no translation). */
+//    UnsignedBytes(7, 0/* variable length */)
+    ;
 
     private KeyType(int b, int encodedLength) {
 
@@ -120,6 +126,8 @@ public enum KeyType {
             return ASCII;
         case 6:
             return Date;
+//        case 7:
+//            return UnsignedBytes;
         default:
             throw new IllegalArgumentException("byte=" + b);
         }

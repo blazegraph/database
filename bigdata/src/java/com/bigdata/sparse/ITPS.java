@@ -56,7 +56,8 @@ public interface ITPS {
     public Object getPrimaryKey();
   
     /**
-     * The timestamp assigned by an atomic write operation.
+     * The timestamp assigned by an atomic write operation (for atomic readback
+     * only).
      * 
      * @return The timestamp.
      * 

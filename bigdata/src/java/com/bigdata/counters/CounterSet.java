@@ -331,12 +331,11 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
     }
     
     /**
-     * Visits counters belonging directly to this set of counters and
-     * matching the optional filter.
+     * Visits direct child counters matching the optional filter.
      * <p>
-     * Note: Since the filter does NOT have to be anchored at the root, the
-     * only place we can apply a filter that is NOT anchored at the root is
-     * when checking a fully qualified counter name.
+     * Note: Since the filter does NOT have to be anchored at the root, the only
+     * place we can apply a filter that is NOT anchored at the root is when
+     * checking a fully qualified counter name.
      * 
      * @todo optimize for patterns that are anchored by filtering the child
      *       {@link ICounterSet}.
