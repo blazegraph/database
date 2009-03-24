@@ -409,11 +409,15 @@ abstract public class OverflowManager extends IndexManager {
          * {@value #DEFAULT_OVERFLOW_MAX_COUNT}). When ZERO (0) there is no
          * limit on the #of synchonous overflow operations. This option is
          * mainly used for testing, but it can be enabled if you want higher
-         * throughput and you know that the data will be well distributed on the
-         * federation after N overflows. Once synchronous overflow is disabled,
-         * all future writes will be buffered by the live journal and index
-         * partition builds, merges, splits, joins, and moves will no longer be
-         * executed.
+         * throughput (for a while) and you know that the data will be well
+         * distributed on the federation after N overflows. Once synchronous
+         * overflow is disabled, all future writes will be buffered by the live
+         * journal and index partition builds, merges, splits, joins, and moves
+         * will no longer be executed. Eventually the live journal extent will
+         * grow large enough that throughput will drop (due to IOWAIT on random
+         * seeks against the journal) and it is possible that the maximum
+         * possible journal extent can be exceeded unless you also configure
+         * {@link com.bigdata.journal.Options#OFFSET_BITS} for scale-up.
          */
         String OVERFLOW_MAX_COUNT = OverflowManager.class.getName()
                 + ".overflowMaxCount";
