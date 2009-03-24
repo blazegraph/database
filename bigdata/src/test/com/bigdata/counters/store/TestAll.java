@@ -1,6 +1,6 @@
-/*
+/**
 
-Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,30 +20,51 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-
 */
 /*
- * Created on Mar 13, 2008
+ * Created on Oct 14, 2006
  */
 
-package com.bigdata.counters;
+package com.bigdata.counters.store;
+
+import junit.framework.Test;
+import junit.framework.TestCase;
+import junit.framework.TestSuite;
 
 /**
+ * Aggregates tests in dependency order.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * @param <T>
  */
-public interface ISample<T> {
-    
-    /** The variable name. */
-    public String getName();
-    
-    /** The time at which the value was reported. */
-    public long getTimestamp();
-    
-    /** The value reported. */
-    public T getValue();
+public class TestAll extends TestCase {
+
+    /**
+     * 
+     */
+    public TestAll() {
+    }
+
+    /**
+     * @param arg0
+     */
+    public TestAll(String arg0) {
+        super(arg0);
+    }
+
+    /**
+     * Returns a test that will run each of the implementation specific test
+     * suites in turn.
+     */
+    public static Test suite()
+    {
+
+        TestSuite suite = new TestSuite("performance counter store");
+       
+        suite.addTestSuite(TestCounterSetBTree.class);
+
+        return suite;
+        
+    }
     
 }
-

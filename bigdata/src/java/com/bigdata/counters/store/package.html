@@ -1,0 +1,67 @@
+<html>
+<head>
+<title>Counters Store</title>
+</head>
+<body>
+
+<p>
+
+    This package provides a persistence mechanism for performance
+    counters. Counters can be stored at a granularity of up to one
+    second and queried efficiently for a given time range,
+    granularity, and filtered path.  For example, a query could
+    request the average value of <code>IOWAIT</code> for all hosts
+    over the last 12 hours.
+
+</p><p>
+
+    The counters are written into a BTree backed by a local
+    file.  The schema is:
+
+    <pre>
+    [minute][path][timestamp] : value
+    </pre>
+
+    where <code>minute</code> is the floor of the minute for the
+    <code>timestamp</code> associated with the counter value, where
+    <code>path</code> is the fully qualified path of the counter, and
+    where <code>value</code> is the datum reported for that counter
+    value.
+
+</p><p>
+
+    The keys can be easily compressed since many keys will share a
+    common prefix.  At the same time it is possible to store counters
+    which are sampled more frequently than once per second.  Finally,
+    since the minutes appear first in the key, we can scan only the
+    time range of interest.  Of course, when scanning a large period
+    of time we will still have to page through a lot of data.
+
+</p><p>
+
+    When querying, we materialize a view of the time period at an
+    appropriate granularity.<dl>
+    
+    <dt>Minutes</dt>
+    
+    <dd>If we want the last minute we scan that minute and filter the
+    counter paths selecting the paths and their timestamped values of
+    interest.</dd>
+
+    <dt>Hours or Days</dt>
+
+    <dd>For higher aggregations we allocate a History of the
+    appropriate length, e.g., 12 hours, and scan the row store over
+    the specified time period.  The values are inserted into the
+    history for each counter and the History automatically reports the
+    correct aggregate.</dd>
+    
+    </dl>
+    
+    Regardless, the httpd query interprets a counter set having data
+    only for the desired time period and at the desired granularity.
+	      
+</p>
+
+</body>
+</html>

@@ -436,9 +436,10 @@ public class KeyBuilder implements IKeyBuilder {
      * 
      * @see #appendASCII(String)
      */
-    public static String decodeASCII(byte[] key, int off, int len) {
+    public static String decodeASCII(final byte[] key, final int off,
+            final int len) {
 
-        byte[] b = new byte[len];
+        final byte[] b = new byte[len];
 
         System.arraycopy(key, off, b, 0, len);
 
@@ -1340,9 +1341,17 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
     
-    public static IKeyBuilder newInstance(int capacity) {
+    /**
+     * Create an instance for ASCII keys with the specified initial capacity.
+     * 
+     * @param initialCapacity
+     *            The initial capacity.
+     * 
+     * @return The new instance.
+     */
+    public static IKeyBuilder newInstance(final int initialCapacity) {
      
-        return newInstance(capacity, CollatorEnum.ASCII, null/* locale */,
+        return newInstance(initialCapacity, CollatorEnum.ASCII, null/* locale */,
                 null/* strength */, null/* decomposition mode */);
         
     }

@@ -194,6 +194,10 @@ public class Schema implements Externalizable {
                 return keyBuilder.appendText(v.toString(), false/*unicode*/, true/*successor*/).appendNul();
             case Date:
                 return keyBuilder.append(successor(keyBuilder,((Date) v).getTime()));
+//            case UnsignedBytes:
+//                return keyBuilder.append((byte[])v).appendNul();
+            default:
+                throw new UnsupportedOperationException();
             }
             
         } else {
@@ -214,11 +218,15 @@ public class Schema implements Externalizable {
                 return keyBuilder.appendText(v.toString(),false/*unicode*/,false/*successor*/).appendNul();
             case Date:
                 return keyBuilder.append(((Date) v).getTime());
+//            case UnsignedBytes:
+//                return keyBuilder.append((byte[]) v);
+            default:
+                throw new UnsupportedOperationException();
             }
             
         }
 
-        return keyBuilder;
+//        return keyBuilder;
         
     }
  
@@ -251,6 +259,7 @@ public class Schema implements Externalizable {
             return SuccessorUtil.successor(((Number)v).doubleValue());
         case Unicode:
         case ASCII:
+//        case UnsignedBytes:
             /*
              * Note: See toKey() for how to correctly form the sort key for the
              * successor of a Unicode value.
@@ -259,10 +268,12 @@ public class Schema implements Externalizable {
 //            return SuccessorUtil.successor(v.toString());
 //            return SuccessorUtil.successor(v.toString());
         case Date:
-            return SuccessorUtil.successor(((Date)v).getTime());
+            return SuccessorUtil.successor(((Date) v).getTime());
+        default:
+            throw new UnsupportedOperationException();
         }
-
-        return keyBuilder;
+//
+//        return keyBuilder;
         
     }
     
