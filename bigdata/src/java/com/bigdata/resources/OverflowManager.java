@@ -210,9 +210,14 @@ abstract public class OverflowManager extends IndexManager {
     private final ExecutorService overflowService;
 
     /**
-     * Flag set based on {@link Options#OVERFLOW_ENABLED}
+     * @see Options#OVERFLOW_ENABLED
      */
     private final boolean overflowEnabled;
+    
+    /**
+     * @see Options#OVERFLOW_MAX_COUNT
+     */
+    private final int overflowMaxCount;
     
     /**
      * @see Options#OVERFLOW_THRESHOLD
@@ -355,13 +360,16 @@ abstract public class OverflowManager extends IndexManager {
     /**
      * <code>true</code> if overflow processing is enabled and
      * <code>false</code> if overflow processing was disabled as a
-     * configuration option, in which case the live journal will NOT overflow.
+     * configuration option or if a maximum overflow count was configured and
+     * has been satisified, in which case the live journal will NOT overflow.
      * 
      * @see Options#OVERFLOW_ENABLED
+     * @see Options#OVERFLOW_MAX_COUNT
      */
     public boolean isOverflowEnabled() {
         
-        return overflowEnabled;
+        return overflowEnabled
+                && (overflowMaxCount == 0 || synchronousOverflowCounter.get() < overflowMaxCount);
         
     }
 
@@ -395,6 +403,23 @@ abstract public class OverflowManager extends IndexManager {
 
         String DEFAULT_OVERFLOW_ENABLED = "true";
 
+        /**
+         * Option may be used to permit a fixed number of synchronous overflow
+         * operations after which overflow is disabled (default
+         * {@value #DEFAULT_OVERFLOW_MAX_COUNT}). When ZERO (0) there is no
+         * limit on the #of synchonous overflow operations. This option is
+         * mainly used for testing, but it can be enabled if you want higher
+         * throughput and you know that the data will be well distributed on the
+         * federation after N overflows. Once synchronous overflow is disabled,
+         * all future writes will be buffered by the live journal and index
+         * partition builds, merges, splits, joins, and moves will no longer be
+         * executed.
+         */
+        String OVERFLOW_MAX_COUNT = OverflowManager.class.getName()
+                + ".overflowMaxCount";
+
+        String DEFAULT_OVERFLOW_MAX_COUNT = "0";
+        
         /**
          * Floating point property specifying the percentage of the maximum
          * extent at which synchronous overflow processing will be triggered
@@ -926,6 +951,18 @@ abstract public class OverflowManager extends IndexManager {
 
         }
 
+        // overflowMaxCount
+        {
+
+            overflowMaxCount = Integer.parseInt(properties.getProperty(
+                    Options.OVERFLOW_MAX_COUNT,
+                    Options.DEFAULT_OVERFLOW_MAX_COUNT));
+
+            if (INFO)
+                log.info(Options.OVERFLOW_MAX_COUNT + "=" + overflowMaxCount);
+
+        }
+
         // overflowThreshold
         {
 
@@ -1440,7 +1477,7 @@ abstract public class OverflowManager extends IndexManager {
 
         }
 
-        if (!overflowEnabled) {
+        if (!isOverflowEnabled()) {
             
             if (DEBUG)
                 log.debug("Overflow processing is disabled");
