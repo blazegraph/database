@@ -66,6 +66,8 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite(TestSerialization.class);
 
+        suite.addTestSuite(TestTermIdEncoder.class);
+        
         suite.addTestSuite(TestTerm2IdTupleSerializer.class);
 
         suite.addTestSuite(TestId2TermTupleSerializer.class);

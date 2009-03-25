@@ -34,7 +34,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
@@ -55,6 +54,7 @@ import com.bigdata.btree.proc.IParallelizableIndexProcedure;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 
 /**
@@ -123,14 +123,12 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final static protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final static protected boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final static protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final static protected boolean DEBUG = log.isDebugEnabled();
 
 //    static {
 //        if(DEBUG) {
@@ -263,7 +261,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
      * 
      * @todo no point sending bnodes when readOnly.
      */
-    public Object apply(IIndex ndx) {
+    public Object apply(final IIndex ndx) {
         
         final int numTerms = getKeyCount();
         
@@ -274,6 +272,9 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
         
         // used to assign term identifiers.
         final ICounter counter = ndx.getCounter();
+
+        // true iff this is an unpartitioned index.
+        final boolean scaleOut = counter instanceof BTree.PartitionedCounter;
         
         // used to serialize term identifers.
         final DataOutputBuffer idbuf = new DataOutputBuffer(Bytes.SIZEOF_LONG);
@@ -312,7 +313,8 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
                 } else {
                     
                     // assign a term identifier.
-                    termId = assignTermId(counter.incrementAndGet(), code);
+                    termId = TermIdEncoder.encode(scaleOut, counter
+                            .incrementAndGet(), code);
                 }
                 
             } else {
@@ -334,7 +336,8 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
                     } else {
 
                         // assign a term identifier.
-                        termId = assignTermId(counter.incrementAndGet(), code);
+                        termId = TermIdEncoder.encode(scaleOut, counter
+                                .incrementAndGet(), code);
 
                         if (DEBUG && enableGroundTruth) {
 
@@ -420,73 +423,8 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
 
     }
     
-    /**
-     * Assign a term identifier.
-     * <p>
-     * Note: We set the low two bits to indicate whether a term is a
-     * {@link Literal}, {@link BNode}, {@link URI}, or {@link Statement} so
-     * that we can tell at a glance (without lookup up the term in the index)
-     * what "kind" of thing the term identifier stands for.
-     * <p>
-     * Note: when using partitioned indices the partition identifier is already
-     * in the high word like [partitionId|counter], so this shifts everything
-     * left by two bits. The result is that the #of partitions is reduced
-     * four-fold rather than the #of distinct counter values within a given
-     * index partition.
-     * 
-     * @todo we could use negative term identifiers except that we pack the
-     *       termId in a manner that does not allow negative integers. a
-     *       different pack routine would allow us all bits.
-     */
-    static public long assignTermId(final long id0, final byte code) {
-        
-//        final long id0 = counter.incrementAndGet();
-        
-        // 0L is never used as a counter value.
-        assert id0 != IRawTripleStore.NULL;
-
-        // Left shift two bits to make room for term type coding.
-        long id = id0 << 2;
-        
-        switch(code) {
-
-        case ITermIndexCodes.TERM_CODE_URI:
-        
-            id |= ITermIdCodes.TERMID_CODE_URI;
-            
-            break;
-            
-        case ITermIndexCodes.TERM_CODE_LIT:
-        case ITermIndexCodes.TERM_CODE_DTL:
-        case ITermIndexCodes.TERM_CODE_LCL:
-            
-            id |= ITermIdCodes.TERMID_CODE_LITERAL;
-            
-            break;
-            
-        case ITermIndexCodes.TERM_CODE_BND:
-            
-            id |= ITermIdCodes.TERMID_CODE_BNODE;
-            
-            break;
-            
-        case ITermIndexCodes.TERM_CODE_STMT:
-            
-            id |= ITermIdCodes.TERMID_CODE_STATEMENT;
-            
-            break;
-            
-        default: 
-            
-            throw new AssertionError("Unknown term type: code=" + code);
-        
-        }
-        
-        return id;
-        
-    }
-    
-    private void groundTruthTest(byte[] key, long termId, IIndex ndx, ICounter counter) {
+    private void groundTruthTest(byte[] key, long termId, IIndex ndx,
+            ICounter counter) {
         
         if(groundTruthId2Term.isEmpty()) {
             
