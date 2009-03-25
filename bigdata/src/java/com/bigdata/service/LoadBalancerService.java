@@ -1469,8 +1469,8 @@ abstract public class LoadBalancerService extends AbstractService
                 // much higher utilization if the host is very short on disk.
                 adjustedRawScore *= 10d;
 
-                log.warn("service=" + serviceName
-                        + " : very short on disk: "+IStoreManagerCounters.TmpDirBytesAvailable+"="
+                log.warn("service=" + serviceName + " : very short on disk: "
+                        + IStoreManagerCounters.DataDirBytesAvailable + "="
                         + bytesFormat.format(dataDirBytesAvailable));
 
             } else if (dataDirBytesAvailable < Bytes.gigabyte * 10) {
@@ -1478,8 +1478,8 @@ abstract public class LoadBalancerService extends AbstractService
                 // higher utilization if the host is short on disk.
                 adjustedRawScore *= 2d;
 
-                log.warn("service=" + serviceName
-                        + " : is short on disk: "+IStoreManagerCounters.DataDirBytesAvailable+"="
+                log.warn("service=" + serviceName + " : is short on disk: "
+                        + IStoreManagerCounters.DataDirBytesAvailable + "="
                         + bytesFormat.format(dataDirBytesAvailable));
 
             }
@@ -1501,8 +1501,8 @@ abstract public class LoadBalancerService extends AbstractService
                 // much higher utilization if the host is very short on disk.
                 adjustedRawScore *= 10d;
 
-                log.warn("service=" + serviceName
-                        + " : very short on disk: "+IStoreManagerCounters.TmpDirBytesAvailable+"="
+                log.warn("service=" + serviceName + " : very short on disk: "
+                        + IStoreManagerCounters.TmpDirBytesAvailable + "="
                         + bytesFormat.format(tmpDirBytesAvailable));
 
             } else if (tmpDirBytesAvailable < Bytes.gigabyte * 10) {
@@ -1510,8 +1510,8 @@ abstract public class LoadBalancerService extends AbstractService
                 // higher utilization if the host is short on disk.
                 adjustedRawScore *= 2d;
 
-                log.warn("service=" + serviceName
-                        + " : is short on disk: "+IStoreManagerCounters.TmpDirBytesAvailable+"="
+                log.warn("service=" + serviceName + " : is short on disk: "
+                        + IStoreManagerCounters.TmpDirBytesAvailable + "="
                         + bytesFormat.format(tmpDirBytesAvailable));
 
             }
