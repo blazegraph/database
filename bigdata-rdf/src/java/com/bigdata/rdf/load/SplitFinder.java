@@ -519,14 +519,14 @@ public class SplitFinder {
      * @param partitionId
      * 
      * @return The term identifier corresponding to a local counter value of
-     *         zero (0) for that partitionId.
+     *         one (1) for that partitionId for a URI. 
      */
     protected static long mockTermId(final int partitionId) {
         
         /*
          * The unchanging value for the low word of the term identifiers.
          */
-        final int localCounter = 0;
+        final int localCounter = 1;
 
         return mockTermId(partitionId, localCounter);
         
