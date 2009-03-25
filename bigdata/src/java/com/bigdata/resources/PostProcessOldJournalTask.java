@@ -38,6 +38,8 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.proc.BatchLookup;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
+import com.bigdata.counters.ICounter;
+import com.bigdata.counters.IRequiredHostCounters;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
@@ -911,6 +913,30 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             
         }
 
+        /*
+         * Determine if this host has a sufficient load to consider moving index
+         * partitions.
+         * 
+         * FIXME There needs to be a significant difference in the load between
+         * two hosts before one can be a candidate for a move of an index
+         * partition to the other. The load balancer API does not consider the
+         * load of the source host when determining which hosts are possible
+         * targets for a move.
+         */
+        final double percentCPUTime = ((Number) ((ICounter) resourceManager
+                .getFederation().getCounterSet().getPath(
+                        IRequiredHostCounters.CPU_PercentProcessorTime))
+                .getInstrument().getValue()).doubleValue();
+
+        if (percentCPUTime < resourceManager.movePercentCpuTimeThreshold) {
+
+            if (INFO)
+                log.info("Host is not busy.");
+            
+            return EMPTY_LIST;
+        
+        }
+        
         // inquire if this service is highly utilized.
         final boolean highlyUtilizedService;
         try {

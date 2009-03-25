@@ -162,6 +162,11 @@ abstract public class OverflowManager extends IndexManager {
     protected final int maximumMovesPerTarget;
 
     /**
+     * @see Options#MOVE_PERCENT_CPU_TIME_THRESHOLD
+     */
+    protected final double movePercentCpuTimeThreshold;
+    
+    /**
      * The maximum #of optional compacting merge operations that will be
      * performed during a single overflow event.
      * 
@@ -628,6 +633,19 @@ abstract public class OverflowManager extends IndexManager {
 
         String DEFAULT_MAXIMUM_MOVES_PER_TARGET = "2";
 
+        /**
+         * The threshold for a service to consider itself sufficiently loaded
+         * that it will consider moving an index partition (default
+         * {@value #DEFAULT_MOVE_PERCENT_CPU_TIME_THRESHOLD}). This threshold
+         * IS NOT considered for scatter splits, since the goal there is to
+         * distribute the data evenly across the federation.
+         */
+        String MOVE_PERCENT_CPU_TIME_THRESHOLD = OverflowManager.class
+                .getName()
+                + ".movePercentCpuTimeThreshold";
+
+        String DEFAULT_MOVE_PERCENT_CPU_TIME_THRESHOLD = ".6";
+        
         /**
          * The maximum #of optional compacting merge operations that will be
          * performed during a single overflow event (default
@@ -1222,6 +1240,28 @@ abstract public class OverflowManager extends IndexManager {
             
         }
 
+        // movePercentCpuTimeThreshold
+        {
+
+            movePercentCpuTimeThreshold = Double.parseDouble(properties
+                    .getProperty(Options.MOVE_PERCENT_CPU_TIME_THRESHOLD,
+                            Options.DEFAULT_MOVE_PERCENT_CPU_TIME_THRESHOLD));
+
+            if (INFO)
+                log.info(Options.MOVE_PERCENT_CPU_TIME_THRESHOLD + "="
+                        + movePercentCpuTimeThreshold);
+            
+            if (movePercentCpuTimeThreshold < .5
+                    || movePercentCpuTimeThreshold > 1.) {
+
+                throw new RuntimeException(
+                        Options.MOVE_PERCENT_CPU_TIME_THRESHOLD
+                                + " must be in [0.5:1.0]");
+                
+            }
+
+        }
+        
 //        {
 //            maximumSourcesPerView = Integer.parseInt(properties.getProperty(
 //                    Options.MAXIMUM_SOURCES_PER_VIEW,
