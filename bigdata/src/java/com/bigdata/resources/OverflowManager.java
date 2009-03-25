@@ -1256,7 +1256,7 @@ abstract public class OverflowManager extends IndexManager {
 
                 throw new RuntimeException(
                         Options.MOVE_PERCENT_CPU_TIME_THRESHOLD
-                                + " must be in [0.5:1.0]");
+                                + " must be in [0.5:1.0] ");
                 
             }
 

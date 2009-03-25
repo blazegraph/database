@@ -404,6 +404,15 @@ abstract public class AbstractFederation implements IBigdataFederation {
     }
     private CounterSet countersRoot;
     private CounterSet serviceRoot;
+
+    public CounterSet getHostCounterSet() {
+
+        final String pathPrefix = ICounterSet.pathSeparator
+                + AbstractStatisticsCollector.fullyQualifiedHostName;
+
+        return (CounterSet) getCounterSet().getPath(pathPrefix);
+        
+    }
     
     public CounterSet getServiceCounterSet() {
 
