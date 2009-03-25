@@ -55,6 +55,20 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
      */
     private static final long serialVersionUID = -5480378815444534653L;
 
+    /**
+     * Enables validation that a pre-assigned term identifier is being
+     * consistently mapped onto the same term. Errors are reported if, for
+     * example, the index has a record that a term identifier is mapped onto one
+     * URL but the procedure was invoked with a different URI paired to that
+     * term identifiers. When such errors are reported, they generally indicate
+     * a problem with the TERM2ID index where it is failing to maintain a
+     * consistent mapping.
+     * <p>
+     * Validation may be disabled for releases, however it is not really that
+     * much overhead since the operation is on the in-memory representation.
+     */
+    static protected transient final boolean validate = true;
+    
     public final boolean isReadOnly() {
         
         return false;
@@ -118,14 +132,6 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
             // Note: the value is the serialized term (and never a BNode).
             final byte[] val;
 
-            /*
-             * Note: Validation SHOULD be disabled except for testing.
-             * 
-             * FIXME turn off validation for release or performance testing (its
-             * not really that much overhead so maybe leave it on).
-             */
-            final boolean validate = true;
-            
             if (validate) {
 
                 // The term identifier.
@@ -190,7 +196,8 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
                         log.error("oldval=" + BytesUtil.toString(oldval));
                         log.error("val=" + valSer.deserialize(val));
                         log.error("oldval=" + valSer.deserialize(oldval));
-                        log.error(ndx.getIndexMetadata().getPartitionMetadata().toString());
+                        if(ndx.getIndexMetadata().getPartitionMetadata()!=null)
+                            log.error(ndx.getIndexMetadata().getPartitionMetadata().toString());
                         
                         throw new RuntimeException("Consistency problem: id="+ id);
                         

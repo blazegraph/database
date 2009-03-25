@@ -61,10 +61,12 @@ import com.bigdata.mdi.IPartitionMetadata;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.lexicon.ITermIndexCodes;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.lexicon.Term2IdTupleSerializer;
 import com.bigdata.rdf.lexicon.Term2IdWriteProc;
+import com.bigdata.rdf.lexicon.TermIdEncoder;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
@@ -511,8 +513,8 @@ public class SplitFinder {
 
     /**
      * There are some additional twists. See {@link BTree.PartitionedCounter}
-     * and {@link Term2IdWriteProc#assignTermId(long, byte)} for how we actually
-     * form the term identifier before we build the unsigned byte[] key.
+     * and {@link TermIdEncoder} for how we actually form the term identifier
+     * before we build the unsigned byte[] key.
      * 
      * @param partitionId
      * 
@@ -532,17 +534,19 @@ public class SplitFinder {
 
     /**
      * There are some additional twists. See {@link BTree.PartitionedCounter}
-     * and {@link Term2IdWriteProc#assignTermId(long, byte)} for how we actually
-     * form the term identifier before we build the unsigned byte[] key.
+     * and {@link TermIdEncoder} for how we actually form the term identifier
+     * before we build the unsigned byte[] key.
      * 
      * @param partitionId
      * @param localCounter
      * 
-     * @return The term identifier corresponding to a local counter value of
-     *         zero (0) for that partitionId.
+     * @return The term identifier.
      */
     protected static long mockTermId(final int partitionId, final int localCounter) {
 
+        TermIdEncoder.encodeScaleOut(partitionId, localCounter,
+                ITermIndexCodes.TERM_CODE_URI);
+        
         /*
          * Place the partition identifier into the high int32 word and place
          * the truncated counter value into the low int32 word.
