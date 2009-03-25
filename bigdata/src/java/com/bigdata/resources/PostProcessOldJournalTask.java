@@ -39,6 +39,7 @@ import com.bigdata.btree.proc.BatchLookup;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
 import com.bigdata.counters.ICounter;
+import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.IRequiredHostCounters;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
@@ -49,6 +50,7 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
+import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Event;
 import com.bigdata.service.EventResource;
@@ -923,18 +925,26 @@ public class PostProcessOldJournalTask implements Callable<Object> {
          * load of the source host when determining which hosts are possible
          * targets for a move.
          */
-        final double percentCPUTime = ((Number) ((ICounter) resourceManager
-                .getFederation().getCounterSet().getPath(
-                        IRequiredHostCounters.CPU_PercentProcessorTime))
-                .getInstrument().getValue()).doubleValue();
-
-        if (percentCPUTime < resourceManager.movePercentCpuTimeThreshold) {
-
-            if (INFO)
-                log.info("Host is not busy.");
+        {
             
-            return EMPTY_LIST;
-        
+            final AbstractFederation fed = (AbstractFederation) resourceManager
+                    .getFederation();
+
+            final ICounterSet hostRoot = fed.getHostCounterSet();
+            
+            final double percentCPUTime = ((Number) ((ICounter) hostRoot
+                    .getPath(IRequiredHostCounters.CPU_PercentProcessorTime))
+                    .getInstrument().getValue()).doubleValue();
+
+            if (percentCPUTime < resourceManager.movePercentCpuTimeThreshold) {
+
+                if (INFO)
+                    log.info("Host is not busy.");
+
+                return EMPTY_LIST;
+
+            }
+
         }
         
         // inquire if this service is highly utilized.

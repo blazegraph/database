@@ -111,6 +111,12 @@ public interface IBigdataFederation extends IIndexManager, IFederationDelegate {
     
     /**
      * The node in {@link #getCounterSet()} corresponding to the root of the
+     * host on which the client or service is executing.
+     */
+    public CounterSet getHostCounterSet();
+    
+    /**
+     * The node in {@link #getCounterSet()} corresponding to the root of the
      * client or service connected using this federation.
      */
     public CounterSet getServiceCounterSet();
