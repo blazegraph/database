@@ -593,6 +593,11 @@ public class AbstractResourceManagerTestCase extends
 
         public void serviceLeave(UUID serviceUUID) {
         }
+
+        public CounterSet getHostCounterSet() {
+            // TODO Auto-generated method stub
+            return null;
+        }
         
     }
     

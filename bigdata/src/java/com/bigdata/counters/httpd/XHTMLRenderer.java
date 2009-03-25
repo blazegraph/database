@@ -187,7 +187,7 @@ public class XHTMLRenderer {
          * For example,
          * 
          * <pre>
-         * events.majorType = AsynchronousOverflow
+         * events.majorEventType = AsynchronousOverflow
          * </pre>
          * 
          * would select just the asynchronous overflow events and
