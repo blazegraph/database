@@ -2225,6 +2225,13 @@ public class XHTMLRenderer {
         if (counter == null)
             throw new IllegalArgumentException();
         
+        if (model.pattern == null) {
+
+            // no pattern, so no captured groups.
+            return null;
+            
+        }
+        
         final Matcher m = model.pattern.matcher(counter.getPath());
         
         // #of capturing groups in the pattern.
