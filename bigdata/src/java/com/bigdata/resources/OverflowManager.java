@@ -130,16 +130,26 @@ abstract public class OverflowManager extends IndexManager {
      * @see Options#TAIL_SPLIT_THRESHOLD
      */
     final protected double tailSplitThreshold;
-    
+
+    /**
+     * @see Options#SCATTER_SPLIT_ENABLED
+     */
+    final protected boolean scatterSplitEnabled;
+
     /**
      * @see Options#SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD
      */
     final protected double scatterSplitPercentOfSplitThreshold;
 
     /**
-     * @see Options#SCATTER_SPLIT_MAX_SPLITS
+     * @see Options#SCATTER_SPLIT_DATA_SERVICES_COUNT
      */
-    final protected int scatterSplitMaxSplits;
+    final protected int scatterSplitDataServicesCount;
+
+    /**
+     * @see Options#SCATTER_SPLIT_INDEX_PARTITIONS_COUNT
+     */
+    final protected int scatterSplitIndexPartitionsCount;
     
     /**
      * @see Options#JOINS_ENABLED
@@ -520,31 +530,74 @@ abstract public class OverflowManager extends IndexManager {
         String DEFAULT_TAIL_SPLIT_THRESHOLD = ".4";
         
         /**
+         * Boolean option indicates whether or not scatter splits are performed
+         * (default {@value #SCATTER_SPLIT_ENABLED}).
+         */
+        String SCATTER_SPLIT_ENABLED = OverflowManager.class.getName()
+                + ".scatterSplitEnabled";
+
+        String DEFAULT_SCATTER_SPLIT_ENABLED = "true";
+
+        /**
          * The percentage of the nominal index partition size at which a scatter
          * split is triggered when there is only a single index partition for a
          * given scale-out index (default
          * {@link #DEFAULT_SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD}). The
          * scatter split will break the index into multiple partitions and
          * distribute those index partitions across the federation in order to
-         * allow more resources to be brought to bear on the scale-out index. A
-         * value of TWO (2.0) MAY be used to effectively disable scatter splits
-         * as normal index splits will take precedence.
+         * allow more resources to be brought to bear on the scale-out index.
+         * The value must LT the nominal index partition split point or normal
+         * index splits will take precedence and a scatter split will never be
+         * performed. The allowable range is therefore constrained to
+         * <code>(0.1 : 1.0)</code>.
          */
-        String SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD = "scatterSplitPercentOfSplitThreshold";
+        String SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD = OverflowManager.class
+                .getName()
+                + ".scatterSplitPercentOfSplitThreshold";
         
         String DEFAULT_SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD = ".25";
         
         /**
-         * The maximum #of data services onto which the initial index partition
-         * will be distributed by a scatter split (default
-         * {@value #DEFAULT_SCATTER_SPLIT_MAX_SPLITS}). When ZERO (0), the
-         * index will be scattered to ALL discovered data services. A value of
-         * ONE (1) may be used to disable scatter splits (it implies NO splits).
+         * The #of data services on which the index will be scattered or ZERO(0)
+         * to use all discovered data services (default
+         * {@value #DEFAULT_SCATTER_SPLIT_DATA_SERVICES_COUNT}).
          */
-        String SCATTER_SPLIT_MAX_SPLITS = "scatterSplitMaxSplits";
+        String SCATTER_SPLIT_DATA_SERVICES_COUNT = OverflowManager.class
+                .getName()
+                + ".scatterSplitDataServicesCount";
 
-        String DEFAULT_SCATTER_SPLIT_MAX_SPLITS = "50";
+        String DEFAULT_SCATTER_SPLIT_DATA_SERVICES_COUNT = "0";
 
+        /**
+         * The #of index partitions to generate when an index is scatter split.
+         * The index partitions will be evenly distributed across up to
+         * {@link #SCATTER_SPLIT_DATA_SERVICES_COUNT} discovered data services.
+         * When ZERO(0), the scatter split will generate
+         * <code>(NDATA_SERVICES x 2)</code> index partitions, where
+         * NDATA_SERVICES is either {@link #SCATTER_SPLIT_DATA_SERVICES_COUNT}
+         * or the #of discovered data services when that option is ZERO (0).
+         * <p>
+         * The "ideal" number of index partitions is generally between (NCORES x
+         * NDATA_SERVICES / NINDICES) and (NCORES x NDATA_SERVICES). When there
+         * are NCORES x NDATA_SERVICES index partitions, each core is capable of
+         * servicing a distinct index partition assuming that the application
+         * and the "schema" are capable of driving the data service writes with
+         * that concurrency. However, if you have NINDICES, and the application
+         * drives writes on all index partitions of all indices at the same
+         * rate, then a 1:1 allocation of index partitions to cores would be
+         * "ideal".
+         * <p>
+         * The "right" answer also depends on the data scale. If you have far
+         * less data than can fill that many index partitions to 200M each, then
+         * you should adjust the scatter split to use fewer index partitions or
+         * fewer data services.
+         */
+        String SCATTER_SPLIT_INDEX_PARTITIONS_COUNT = OverflowManager.class
+                .getName()
+                + ".scatterSplitIndexPartitionsCount";
+
+        String DEFAULT_SCATTER_SPLIT_INDEX_PARTITIONS_COUNT = "0";
+        
         /**
          * Option may be used to disable index partition joins.
          * 
@@ -1119,6 +1172,19 @@ abstract public class OverflowManager extends IndexManager {
             }
 
         }
+
+        // scatterSplitEnabled
+        {
+
+            scatterSplitEnabled = Boolean.parseBoolean(properties.getProperty(
+                    Options.SCATTER_SPLIT_ENABLED,
+                    Options.DEFAULT_SCATTER_SPLIT_ENABLED));
+
+            if (INFO)
+                log.info(Options.SCATTER_SPLIT_ENABLED + "="
+                        + scatterSplitEnabled);
+
+        }
         
         // scatterSplitPercentOfSplitThreshold
         {
@@ -1133,35 +1199,60 @@ abstract public class OverflowManager extends IndexManager {
                 log.info(Options.SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD + "="
                         + scatterSplitPercentOfSplitThreshold);
 
-            if (scatterSplitPercentOfSplitThreshold < 0
-                    || scatterSplitPercentOfSplitThreshold > 2) {
+            if (scatterSplitPercentOfSplitThreshold < 0.1
+                    || scatterSplitPercentOfSplitThreshold > 1.0) {
 
                 throw new RuntimeException(
                         Options.SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD
-                                + " must be in [0:2]");
+                                + " must be in [0.1:1.0]");
 
             }
 
         }
 
+        // scatterSplitDataServicesCount
         {
 
-            scatterSplitMaxSplits = Integer.parseInt(properties.getProperty(
-                    Options.SCATTER_SPLIT_MAX_SPLITS,
-                    Options.DEFAULT_SCATTER_SPLIT_MAX_SPLITS));
+            scatterSplitDataServicesCount = Integer.parseInt(properties
+                    .getProperty(Options.SCATTER_SPLIT_DATA_SERVICES_COUNT,
+                            Options.DEFAULT_SCATTER_SPLIT_DATA_SERVICES_COUNT));
 
             if (INFO)
-                log.info(Options.SCATTER_SPLIT_MAX_SPLITS + "="
-                        + scatterSplitMaxSplits);
+                log.info(Options.SCATTER_SPLIT_DATA_SERVICES_COUNT + "="
+                        + scatterSplitDataServicesCount);
 
-            if (scatterSplitMaxSplits < 0) {
+            if (scatterSplitDataServicesCount < 0) {
 
-                throw new RuntimeException(Options.SCATTER_SPLIT_MAX_SPLITS
-                        + " must be non-negative");
+                throw new RuntimeException(
+                        Options.SCATTER_SPLIT_DATA_SERVICES_COUNT
+                                + " must be non-negative");
+
+            }
+
+        }
+
+        // scatterSplitIndexPartitionsCount
+        {
+
+            scatterSplitIndexPartitionsCount = Integer
+                    .parseInt(properties
+                            .getProperty(
+                                    Options.SCATTER_SPLIT_INDEX_PARTITIONS_COUNT,
+                                    Options.DEFAULT_SCATTER_SPLIT_INDEX_PARTITIONS_COUNT));
+
+            if (INFO)
+                log.info(Options.SCATTER_SPLIT_INDEX_PARTITIONS_COUNT + "="
+                        + scatterSplitIndexPartitionsCount);
+
+            if (scatterSplitIndexPartitionsCount < 0) {
+
+                throw new RuntimeException(
+                        Options.SCATTER_SPLIT_INDEX_PARTITIONS_COUNT
+                                + " must be non-negative");
 
             }
             
-        }
+        }  
         
         // joinsEnabled
         {

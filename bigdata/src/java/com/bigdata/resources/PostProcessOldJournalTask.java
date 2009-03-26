@@ -329,8 +329,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 (vmd.getIndexPartitionCount() == 1L)//
                 // move not in progress
                 && vmd.pmd.getSourcePartitionId() == -1//
-                // enough output index partiions to qualify as "scatter".
-                && (resourceManager.scatterSplitMaxSplits >= 2 || resourceManager.scatterSplitMaxSplits == 0)
+                // scatter splits enabled.
+                && resourceManager.scatterSplitEnabled
                 // trigger scatter split before too much data builds up in one place.
                 && vmd.getPercentOfSplit() >= resourceManager.scatterSplitPercentOfSplitThreshold
             ) {
@@ -363,7 +363,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     final UUID[] a = resourceManager
                             .getFederation()
                             .getDataServiceUUIDs(
-                                    resourceManager.scatterSplitMaxSplits/*maxCount*/);
+                                    resourceManager.scatterSplitDataServicesCount/* maxCount */);
 
                     if (a == null || a.length == 1) {
 
@@ -384,10 +384,11 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                 }
 
-                // at most as many splits as there are data services.
-                final int nsplits = Math.min(
-                        resourceManager.scatterSplitMaxSplits,
-                        moveTargets.length);
+                // #of splits.
+                final int nsplits = resourceManager.scatterSplitIndexPartitionsCount == 0//
+                        ? (2 * moveTargets.length) // two per data service.
+                        : resourceManager.scatterSplitIndexPartitionsCount//
+                        ;
 
                 // scatter split task.
                 final AbstractTask task = new ScatterSplitTask(vmd, nsplits,

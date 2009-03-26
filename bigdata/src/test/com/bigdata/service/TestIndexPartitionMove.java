@@ -90,7 +90,7 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
         properties.setProperty(ResourceManager.Options.MAXIMUM_MOVES_PER_TARGET,"1");
 
         // disable scatter split
-        properties.setProperty(ResourceManager.Options.SCATTER_SPLIT_MAX_SPLITS,"1");
+        properties.setProperty(ResourceManager.Options.SCATTER_SPLIT_ENABLED,"false5");
 
         /*
          * Note: Together these properties disable incremental index builds

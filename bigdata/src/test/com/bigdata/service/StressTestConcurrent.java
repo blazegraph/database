@@ -150,7 +150,7 @@ public class StressTestConcurrent extends
         properties.setProperty(Options.MAXIMUM_MOVES_PER_TARGET,Options.DEFAULT_MAXIMUM_MOVES_PER_TARGET);
 
         // disable scatter split.
-        properties.setProperty(Options.SCATTER_SPLIT_MAX_SPLITS, "1");
+        properties.setProperty(Options.SCATTER_SPLIT_ENABLED, "false");
 
         /*
          * Note: Overflow frequency is being controlled by specifying a small
