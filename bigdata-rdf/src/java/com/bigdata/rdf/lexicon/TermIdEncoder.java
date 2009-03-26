@@ -139,7 +139,7 @@ public class TermIdEncoder {
             
         }
 
-        if (scaleOut) {
+        if (false && scaleOut) {
 
             // the index partition local counter.
             final int localCounter = (int) (counter >> 0) & 0xffffffff;
