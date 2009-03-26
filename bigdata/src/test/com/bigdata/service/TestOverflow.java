@@ -146,7 +146,7 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
         properties.setProperty(Options.JOINS_ENABLED, "true");
 
         // Note: disable scatter splits
-        properties.setProperty(Options.SCATTER_SPLIT_MAX_SPLITS,"1");
+        properties.setProperty(Options.SCATTER_SPLIT_ENABLED,"false");
 
         /*
          * Note: Together these properties disable incremental index builds. We

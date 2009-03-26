@@ -3512,7 +3512,7 @@ abstract public class StoreManager extends ResourceEvents implements
                 } catch (Throwable t) {
 
                     // log error and keep going.
-                    log.error("Could not delete segment: "
+                    log.error("Could not delete segment - continuing: "
                             + resourceMetadata.getFile(), t);
 
                 }
