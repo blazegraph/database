@@ -84,7 +84,7 @@ public class JMXLog4jMBeanUtil {
      *      jmx/package-summary.html
      */
     public static void registerLog4jMBeans() throws JMException {
-        
+
         if (Boolean.getBoolean("com.bigdata.jmx.log4j.disable") == true) {
 
             return;
@@ -93,6 +93,22 @@ public class JMXLog4jMBeanUtil {
 
         // Log4J MBean
         final HierarchyDynamicMBean hdm = new HierarchyDynamicMBean();
+
+        /*
+         * Register the hierarchy MBean with the platform's mbean server.
+         * 
+         * Note: It appears that you need to do this before you add loggers to
+         * this mbean.
+         */
+        {
+
+            final MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+
+            final ObjectName mbo = new ObjectName("log4j:hierarchy=default");
+
+            mbs.registerMBean(hdm, mbo);
+
+        }
 
         // Add the root logger to the Hierarchy MBean
         {
@@ -124,20 +140,6 @@ public class JMXLog4jMBeanUtil {
                 }
 
             }
-
-        }
-
-        /*
-         * Register the hierarchy MBean with the platform's mbean
-         server.
-         */
-        {
-
-            final MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
-
-            final ObjectName mbo = new ObjectName("log4j:hierarchy=default");
-
-            mbs.registerMBean(hdm, mbo);
 
         }
 
