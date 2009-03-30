@@ -271,7 +271,7 @@ public class WormAddressManager implements IAddressManager {
      *            so this indirectly determines the maximum #of bytes that may
      *            be stored in a record.
      */
-    public WormAddressManager(int offsetBits) {
+    public WormAddressManager(final int offsetBits) {
         
         assertOffsetBits( offsetBits );
         
