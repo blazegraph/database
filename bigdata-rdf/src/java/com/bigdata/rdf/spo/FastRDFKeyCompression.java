@@ -54,10 +54,15 @@ import com.bigdata.rawstore.Bytes;
  *     at com.bigdata.rdf.spo.FastRDFKeyCompression.read(FastRDFKeyCompression.java:151)
  *     at com.bigdata.btree.ResultSet.readExternal(ResultSet.java:667)
  * </pre>
+ * 
  * No such problem is observed with the {@link PrefixSerializer}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated By the {@link PrefixSerializer}. Also note that the
+ *             FastKeyCompression can no longer be used since it assumes that
+ *             the term identifiers are non-negative, which is no longer true.
  */
 public class FastRDFKeyCompression implements IDataSerializer, Externalizable {
 

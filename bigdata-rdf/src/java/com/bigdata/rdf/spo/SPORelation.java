@@ -596,34 +596,10 @@ public class SPORelation extends AbstractRelation<ISPO> {
     protected IndexMetadata getStatementIndexMetadata(final SPOKeyOrder keyOrder) {
 
         final IndexMetadata metadata = newIndexMetadata(getFQN(keyOrder));
-        
-        final IDataSerializer leafKeySer;
-        if(false) {
-            
-            /*
-             * Note: This shows a substantial savings on disk and is only
-             * slightly more expensive than the PrefixSerializer. See
-             * src/architecture/index performance tradeoffs.xls for details. The
-             * best overall performance on LUBM U5 was observed at m=256.
-             * 
-             * Update: 10/1/2008. PrefixSerializer is now faster for load,
-             * closure and query than the FastRDFKeyCompression. The only
-             * advantage of the FastRDFKeyCompression is that it produces
-             * somewhat smaller store files.
-             * 
-             * FIXME performance comparison of this key compression technique
-             * with some others, including leading value compression, huffman
-             * compression, and hu-tucker compression (the latter offers no
-             * benefit since we will fully de-serialize the keys before
-             * performing search in a leaf).
-             */
-            leafKeySer = FastRDFKeyCompression.N3;
-            
-        } else {
 
-            leafKeySer = DefaultTupleSerializer.getDefaultLeafKeySerializer();
-            
-        }
+        // leading key compression works great.
+        final IDataSerializer leafKeySer = DefaultTupleSerializer
+                .getDefaultLeafKeySerializer();
 
         final IDataSerializer leafValSer;
         if (!statementIdentifiers) {

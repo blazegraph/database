@@ -162,7 +162,7 @@ public class TestKeyCompression extends TestCase2 {
 
     public void test_prefixSerializer() throws IOException {
         
-        final IDataSerializer ser = FastRDFKeyCompression.N3;
+        final IDataSerializer ser = PrefixSerializer.INSTANCE;
         
         doRoundTripTest(getData(0), ser);
         
@@ -178,23 +178,23 @@ public class TestKeyCompression extends TestCase2 {
 
     }
     
-    public void test_fastKeyCompression() throws IOException {
-
-        final IDataSerializer ser = FastRDFKeyCompression.N3;
-        
-        doRoundTripTest(getData(0), ser);
-        
-        doRoundTripTest(getData(1), ser);
-        
-        doRoundTripTest(getData(10), ser);
-        
-        doRoundTripTest(getData(100), ser);
-
-        doRoundTripTest(getData(1000), ser);
-        
-        doRoundTripTest(getData(10000), ser);
-
-    }
+//    public void test_fastKeyCompression() throws IOException {
+//
+//        final IDataSerializer ser = FastRDFKeyCompression.N3;
+//        
+//        doRoundTripTest(getData(0), ser);
+//        
+//        doRoundTripTest(getData(1), ser);
+//        
+//        doRoundTripTest(getData(10), ser);
+//        
+//        doRoundTripTest(getData(100), ser);
+//
+//        doRoundTripTest(getData(1000), ser);
+//        
+//        doRoundTripTest(getData(10000), ser);
+//
+//    }
     
     /**
      * Do a round-trip compression test.
