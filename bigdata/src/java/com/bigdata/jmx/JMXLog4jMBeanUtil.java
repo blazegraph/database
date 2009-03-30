@@ -133,11 +133,11 @@ public class JMXLog4jMBeanUtil {
 
                 final Logger logger = (Logger) enumer.nextElement();
 
-                try {
+//                try {
                     hdm.addLoggerMBean(logger.getName());
-                } catch (Throwable t) {
-                    log.error("Could not add logger: " + logger.getName(), t);
-                }
+//                } catch (Throwable t) {
+//                    log.error("Could not add logger: " + logger.getName(), t);
+//                }
 
             }
 
