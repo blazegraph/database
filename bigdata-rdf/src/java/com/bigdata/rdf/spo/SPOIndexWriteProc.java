@@ -89,19 +89,27 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
 
     private transient final long NULL = IRawTripleStore.NULL;
     
-    @Override
-    protected IDataSerializer getKeySerializer() {
-
-        return new FastRDFKeyCompression(IRawTripleStore.N);
-
-    }
-
-    @Override
-    protected IDataSerializer getValSerializer() {
-
-        return new FastRDFValueCompression();
-
-    }
+    /*
+     * This was directly supplying the key and value compression routines
+     * rather than using the defaults from the IndexMetadata.  This was an
+     * oversight back when I refactored the index procedures to be able to
+     * use the configured IndexMetadata.  In fact, the FastKeyCompression
+     * can no longer be used since it assumes that the term identifiers
+     * are non-negative, which is no longer true.
+     */
+//    @Override
+//    protected IDataSerializer getKeySerializer() {
+//
+//        return new FastRDFKeyCompression(IRawTripleStore.N);
+//
+//    }
+//
+//    @Override
+//    protected IDataSerializer getValSerializer() {
+//
+//        return new FastRDFValueCompression();
+//
+//    }
 
     public final boolean isReadOnly() {
         
