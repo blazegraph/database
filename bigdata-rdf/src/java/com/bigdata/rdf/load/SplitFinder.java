@@ -61,12 +61,10 @@ import com.bigdata.mdi.IPartitionMetadata;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.lexicon.ITermIndexCodes;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.lexicon.Term2IdTupleSerializer;
 import com.bigdata.rdf.lexicon.Term2IdWriteProc;
-import com.bigdata.rdf.lexicon.TermIdEncoder;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
@@ -78,7 +76,6 @@ import com.bigdata.resources.DefaultSplitHandler;
 import com.bigdata.resources.IPartitionIdFactory;
 import com.bigdata.resources.SplitUtility;
 import com.bigdata.service.AbstractScaleOutFederation;
-import com.bigdata.service.DataService;
 import com.bigdata.service.Split;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniClientConfig;
@@ -88,22 +85,20 @@ import com.bigdata.striterator.IKeyOrder;
 import com.bigdata.util.NV;
 
 /**
- * Utility class pre-parses a bunch of RDF data into a "terms" and "preds" index
- * and then recommends {@link Split}s for the {@link AbstractTripleStore}
- * indices. This approach takes advantage of the "schema" for the RDF DB to
- * distribute index partitions across a federation in something which approaches
- * an optimal manner. A utility method is defined to create an
- * {@link AbstractTripleStore} using the generated {@link Split}s where the
+ * Utility class pre-parses the ontology and identified subset of some large RDF
+ * data set into a local triple store and optionally creates a scale-out triple
+ * store using the computed separator keys for the various indices where the
  * index partitions are distributed across the discovered services in the
- * federation.
+ * federation. This approach takes advantage of the "schema" for the RDF DB to
+ * distribute index partitions across a federation in something approaching an
+ * optimal manner for all except the POS index, which can not be pre-split in
+ * this manner.
  * <p>
  * The RDF DB is comprised of 5 core indices. There are two for the lexicon
- * (TERM2ID and ID2TERM), and three statement indices: SPO, POS, and OSP. The
+ * (TERM2ID and ID2TERM), and three statement indices: (SPO, POS, and OSP). The
  * "pre-parse" loads data into a {@link LocalTripleStore} backed by a
- * {@link BufferMode#Temporary} journal which is then used to compute the
- * separator keys for each index partition. With the separator keys, we are then
- * able to create a {@link ScaleOutTripleStore} whose indices are pre-split and
- * allocated on the desired #of discovered {@link DataService}s.
+ * {@link BufferMode#Temporary} journal which is then used to compute separator
+ * keys for each index partition.
  * <p>
  * The split points are computed as follows:
  * <dl>
@@ -112,26 +107,6 @@ import com.bigdata.util.NV;
  * 
  * <dd>The {@link Split}s for the "terms" index directly give the separator
  * keys for the TERM2ID index.</dd>
- * 
- * <dt>POS</dt>
- * 
- * <dd>The POS split points need to be choosen based on the weighted
- * distribution. Note that we already know the #of distinct statements in the
- * {@link LocalTripleStore}. We want to have N index partitions. So we want to
- * assign 1/N statements to each POS index partition.
- * <p>
- * We scan the POS index, counting the of #of statements visited for each
- * distinct predicate. This data is stored in an list of
- * (term,termId,partId,rangeCount) tuples. Once the scan is complete we resolve
- * the term for each termId and then sort the array lexically by term. Next, for
- * each element of the array, we resolve the partition identifier of the TERM2ID
- * index partition which <em>would</em> assign the term identifier for that
- * predicate (based on the splits that we choose for the TERM2ID index).
- * <p>
- * Finally, we choose the separator keys for the POS index finding a set of N
- * ordered buckets of predicates whose range counts are roughly equal. If the
- * last POS index partition would have too small a range count then we generate
- * N-1 separator keys instead.
  * 
  * <dt>ID2TERM</dt>
  * 
@@ -176,7 +151,28 @@ import com.bigdata.util.NV;
  * @todo there is no support for pre-partitioning the full text index at this
  *       time. it needs to be supported both here and in
  *       {@link LexiconRelation#create(Map)}.
- *       
+ * 
+ * @todo POS splits are not being pre-computed. See various notes in the code as
+ *       to why.
+ *       <dd>The POS split points need to be choosen based on the weighted
+ *       distribution. Note that we already know the #of distinct statements in
+ *       the {@link LocalTripleStore}. We want to have N index partitions. So
+ *       we want to assign 1/N statements to each POS index partition.
+ *       <p>
+ *       We scan the POS index, counting the of #of statements visited for each
+ *       distinct predicate. This data is stored in an list of
+ *       (term,termId,partId,rangeCount) tuples. Once the scan is complete we
+ *       resolve the term for each termId and then sort the array lexically by
+ *       term. Next, for each element of the array, we resolve the partition
+ *       identifier of the TERM2ID index partition which <em>would</em> assign
+ *       the term identifier for that predicate (based on the splits that we
+ *       choose for the TERM2ID index).
+ *       <p>
+ *       Finally, we choose the separator keys for the POS index finding a set
+ *       of N ordered buckets of predicates whose range counts are roughly
+ *       equal. If the last POS index partition would have too small a range
+ *       count then we generate N-1 separator keys instead.
+ * 
  * @todo I rather doubt that the justifications mechanism can scale-out. Instead
  *       do a magic sets integration which will eliminate the requirement for
  *       the justifications index and allow an option for eager, incremental, or
@@ -250,6 +246,28 @@ public class SplitFinder {
 
             // protect caller's object against writes.
             final Properties p = new Properties(properties);
+
+            if (!("0"
+                    .equals(p
+                            .getProperty(AbstractTripleStore.Options.TERMID_BITS_TO_REVERSE)))) {
+
+                /*
+                 * The split finder makes assumptions about how term identifiers
+                 * are formed which are deeply embedded in its operation so you
+                 * MUST explictly set this option so that those assumptions are
+                 * valid. However, if you use the default for this option, then
+                 * the scale-out system self-partitions quite well using scatter
+                 * splits and you don't need to use the split finder (which is
+                 * good since you can't). The only problem is likely to come if
+                 * you use say 1-2 bits since the data will be tightly grouped
+                 * onto just a few index partitions.
+                 */
+                
+                throw new RuntimeException(
+                        AbstractTripleStore.Options.TERMID_BITS_TO_REVERSE
+                                + " : MUST be explicitly set to ZERO to use the split finder.");
+                
+            }
             
             p.setProperty(com.bigdata.journal.Options.FILE, File
                     .createTempFile("SplitFinder", ".jnl").toString());
@@ -272,6 +290,7 @@ public class SplitFinder {
                     "false");
             p.setProperty(AbstractTripleStore.Options.JUSTIFY, "false");
 
+            
             // create our transient triple store.
             tempStore = new LocalTripleStore( p );
             
@@ -513,13 +532,13 @@ public class SplitFinder {
 
     /**
      * There are some additional twists. See {@link BTree.PartitionedCounter}
-     * and {@link TermIdEncoder} for how we actually form the term identifier
+     * and {@link Term2IdWriteProc} for how we actually form the term identifier
      * before we build the unsigned byte[] key.
      * 
      * @param partitionId
      * 
-     * @return The term identifier corresponding to a local counter value of
-     *         one (1) for that partitionId for a URI. 
+     * @return The term identifier corresponding to a local counter value of one
+     *         (1) for that partitionId for a URI.
      */
     protected static long mockTermId(final int partitionId) {
         
@@ -534,7 +553,7 @@ public class SplitFinder {
 
     /**
      * There are some additional twists. See {@link BTree.PartitionedCounter}
-     * and {@link TermIdEncoder} for how we actually form the term identifier
+     * and {@link Term2IdWriteProc} for how we actually form the term identifier
      * before we build the unsigned byte[] key.
      * 
      * @param partitionId
@@ -544,8 +563,8 @@ public class SplitFinder {
      */
     protected static long mockTermId(final int partitionId, final int localCounter) {
 
-        TermIdEncoder.encodeScaleOut(partitionId, localCounter,
-                ITermIndexCodes.TERM_CODE_URI);
+//        TermIdEncoder.SCALE_UP.encodeScaleUp(partitionId, localCounter,
+//                ITermIndexCodes.TERM_CODE_URI);
         
         /*
          * Place the partition identifier into the high int32 word and place
@@ -765,33 +784,33 @@ public class SplitFinder {
         
     }
 
-    /**
-     * Places {@link PredStat}s into order first by the TERM2ID partition
-     * identifier and then by the low word of the predicate's term identifier as
-     * assigned by the temporary database.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    private static class PartIdTermIdComparator implements Comparator<PredStat> {
-
-        public int compare(PredStat arg0, PredStat arg1) {
-
-            final long mid0 = mockTermId(arg0.partId, (int)arg0.termId);
-
-            final long mid1 = mockTermId(arg1.partId, (int)arg1.termId);
-            
-            if (mid0 > mid1) {
-                return -1;
-            } else if (mid0 < mid1) {
-                return 1;
-            } else {
-                return 0;
-            }
-            
-        }
-        
-    }
+//    /**
+//     * Places {@link PredStat}s into order first by the TERM2ID partition
+//     * identifier and then by the low word of the predicate's term identifier as
+//     * assigned by the temporary database.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    private static class PartIdTermIdComparator implements Comparator<PredStat> {
+//
+//        public int compare(PredStat arg0, PredStat arg1) {
+//
+//            final long mid0 = mockTermId(arg0.partId, (int)arg0.termId);
+//
+//            final long mid1 = mockTermId(arg1.partId, (int)arg1.termId);
+//            
+//            if (mid0 > mid1) {
+//                return -1;
+//            } else if (mid0 < mid1) {
+//                return 1;
+//            } else {
+//                return 0;
+//            }
+//            
+//        }
+//        
+//    }
     
     /**
      * Return the index of the {@link Split} that spans the <i>key</i>.

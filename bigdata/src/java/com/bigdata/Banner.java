@@ -33,6 +33,8 @@ import java.util.Date;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.jmx.JMXLog4jMBeanUtil;
+
 /**
  * Class has a static method which writes a copyright banner on stdout once per
  * JVM. This method is invoked from several core classes in order to ensure that
@@ -67,6 +69,17 @@ public class Banner {
 
             }
 
+            try {
+
+                // Optionally register a lo4j MBean.
+                JMXLog4jMBeanUtil.registerLog4jMBeans();
+                
+            } catch (Throwable t) {
+                
+                log.error("Problem registering log4j mbean?", t);
+                
+            }
+            
         }
         
     }

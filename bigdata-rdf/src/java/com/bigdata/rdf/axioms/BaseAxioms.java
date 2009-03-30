@@ -299,11 +299,17 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
         
         for(int i=0; i<naxioms; i++) {
             
-            final long s = LongPacker.unpackLong(in);
+//            final long s = LongPacker.unpackLong(in);
+//            
+//            final long p = LongPacker.unpackLong(in);
+//            
+//            final long o = LongPacker.unpackLong(in);
+
+            final long s = in.readLong();
             
-            final long p = LongPacker.unpackLong(in);
+            final long p = in.readLong();
             
-            final long o = LongPacker.unpackLong(in);
+            final long o = in.readLong();
             
             final SPO spo = new SPO(s, p, o, StatementEnum.Axiom);
             
@@ -330,11 +336,17 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
             
             final SPO spo = itr.next().getObject();
             
-            LongPacker.packLong(out, spo.s());
-            
-            LongPacker.packLong(out, spo.p());
-            
-            LongPacker.packLong(out, spo.o());
+//            LongPacker.packLong(out, spo.s());
+//            
+//            LongPacker.packLong(out, spo.p());
+//            
+//            LongPacker.packLong(out, spo.o());
+
+            out.writeLong(spo.s());
+
+            out.writeLong(spo.p());
+
+            out.writeLong(spo.o());
             
         }
         

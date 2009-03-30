@@ -291,7 +291,8 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
             final Value value = valueSer.deserialize(b);
 
             // the assigned term identifier.
-            final long id = LongPacker.unpackLong(in);
+//            final long id = LongPacker.unpackLong(in);
+            final long id = in.readLong();
 
             // stuff in the map.
             values.put(value, id);
@@ -346,7 +347,8 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
             out.write(buf.array(), 0, buf.limit());
             
             // pack the term identifier onto the output stream.
-            LongPacker.packLong(out, id);
+//            LongPacker.packLong(out, id);
+            out.writeLong(id);
             
         }
         

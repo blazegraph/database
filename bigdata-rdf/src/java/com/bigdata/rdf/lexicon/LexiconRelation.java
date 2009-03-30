@@ -26,7 +26,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.CognitiveWeb.extser.LongPacker;
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
@@ -83,6 +82,7 @@ import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.search.TokenBuffer;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.Split;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -167,6 +167,36 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                 AbstractTripleStore.Options.STORE_BLANK_NODES,
                 AbstractTripleStore.Options.DEFAULT_STORE_BLANK_NODES));
         
+        {
+
+            final String defaultValue;
+            if (indexManager instanceof IBigdataFederation
+                    && ((IBigdataFederation) indexManager).isScaleOut()) {
+
+                defaultValue = AbstractTripleStore.Options.DEFAULT_TERMID_BITS_TO_REVERSE;
+
+            } else {
+
+                // false unless this is a scale-out deployment.
+                defaultValue = "0";
+
+            }
+
+            termIdBitsToReverse = Integer
+                    .parseInt(getProperty(
+                            AbstractTripleStore.Options.TERMID_BITS_TO_REVERSE,
+                            defaultValue));
+            
+            if (termIdBitsToReverse < 0 || termIdBitsToReverse > 31) {
+
+                throw new IllegalArgumentException(
+                        AbstractTripleStore.Options.TERMID_BITS_TO_REVERSE
+                                + "=" + termIdBitsToReverse);
+                
+            }
+            
+        }
+
         {
 
             final Set<String> set = new HashSet<String>();
@@ -352,6 +382,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
     private IIndex term2id;
     private final boolean textIndex;
     private final boolean storeBlankNodes;
+//    private final boolean scaleOutTermIds;
+    private final int termIdBitsToReverse;
 
     /**
      * <code>true</code> iff blank nodes are being stored in the lexicon's
@@ -540,7 +572,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      * @return An iterator visiting the term identifiers for the matching
      *         {@link Literal}s.
      */
-    public Iterator<Long> prefixScan(Literal lit) {
+    public Iterator<Long> prefixScan(final Literal lit) {
 
         if (lit == null)
             throw new IllegalArgumentException();
@@ -564,7 +596,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      *       than for access to the index, and the rules already provide that).
      */
     @SuppressWarnings("unchecked")
-    public Iterator<Long> prefixScan(Literal[] lits) {
+    public Iterator<Long> prefixScan(final Literal[] lits) {
 
         if (lits == null || lits.length == 0)
             throw new IllegalArgumentException();
@@ -648,7 +680,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                         final long tid;
                         try {
 
-                            tid = LongPacker.unpackLong(tuple.getValueStream());
+                            tid = tuple.getValueStream().readLong();
+//                            tid = LongPacker.unpackLong(tuple.getValueStream());
 
                         } catch (IOException e) {
 
@@ -908,7 +941,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                 // run the procedure.
                 termIdIndex.submit(0/* fromIndex */, ndistinct/* toIndex */,
                         keys, null/* vals */, new Term2IdWriteProcConstructor(
-                                readOnly, storeBlankNodes),
+                                readOnly, storeBlankNodes, //scaleOutTermIds,
+                                termIdBitsToReverse),
                         new IResultHandler<Term2IdWriteProc.Result, Void>() {
 
                             /**
@@ -1095,7 +1129,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         private final KVO<BigdataValue>[] a;
         private final int ndistinct;
         
-        public ReverseIndexWriterTask(KVO<BigdataValue>[] a, int ndistinct) {
+        public ReverseIndexWriterTask(final KVO<BigdataValue>[] a,
+                final int ndistinct) {
             
             this.a = a;
             
@@ -1364,7 +1399,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
                 termIdIndex.submit(0/* fromIndex */, nexplicit/* toIndex */,
                         keys, null/* vals */, new Term2IdWriteProcConstructor(
-                                false/* readOnly */, storeBlankNodes),
+                                false/* readOnly */, storeBlankNodes, //scaleOutTermIds,
+                                termIdBitsToReverse),
                         new IResultHandler<Term2IdWriteProc.Result, Void>() {
 
                             /**
@@ -1425,7 +1461,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      * @todo allow registeration of datatype specific tokenizers (we already
      *       have language family based lookup).
      */
-    protected void indexTermText(int capacity, Iterator<BigdataValue> itr) {
+    protected void indexTermText(final int capacity, final Iterator<BigdataValue> itr) {
         
         final FullTextIndex ndx = getSearchEngine();
 
@@ -2145,7 +2181,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      * {@link BigdataValue#setTermId(long) sets the term identifier} as a
      * side-effect.
      */
-    final public long getTermId(Value value) {
+    final public long getTermId(final Value value) {
 
         if (value == null) {
 
@@ -2186,7 +2222,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         final long termId;
         try {
 
-            termId = new DataInputBuffer(tmp).unpackLong();
+            termId = new DataInputBuffer(tmp).readLong();
+//            termId = new DataInputBuffer(tmp).unpackLong();
 
         } catch (IOException ex) {
 
@@ -2294,7 +2331,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
                 try {
 
-                    id = tuple.getValueStream().unpackLong();
+//                    id = tuple.getValueStream().unpackLong();
+                    id = tuple.getValueStream().readLong();
 
                 } catch (final IOException ex) {
 

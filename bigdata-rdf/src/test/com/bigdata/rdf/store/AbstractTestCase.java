@@ -369,7 +369,8 @@ abstract public class AbstractTestCase
                 
                 try {
 
-                    id = tuple.getValueStream().unpackLong();
+                    id = tuple.getValueStream().readLong();
+//                    id = tuple.getValueStream().unpackLong();
 
                 } catch (IOException ex) {
 
