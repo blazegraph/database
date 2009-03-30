@@ -70,6 +70,8 @@ import org.apache.log4j.spi.LoggerRepository;
  */
 public class JMXLog4jMBeanUtil {
 
+    protected static final Logger log = Logger.getLogger(JMXLog4jMBeanUtil.class);
+    
     /**
      * Register the log4j JMX mbeans. Set environment variable
      * <code>com.bigdata.jmx.log4j.disable</code> to true to disable
@@ -115,7 +117,11 @@ public class JMXLog4jMBeanUtil {
 
                 final Logger logger = (Logger) enumer.nextElement();
 
-                hdm.addLoggerMBean(logger.getName());
+                try {
+                    hdm.addLoggerMBean(logger.getName());
+                } catch (Throwable t) {
+                    log.error("Could not add logger: " + logger.getName(), t);
+                }
 
             }
 
