@@ -183,8 +183,9 @@ public class Term2IdTupleSerializer extends DefaultTupleSerializer {
 
         try {
             
-            idbuf.reset().packLong((Long)obj);
-        
+//            idbuf.reset().packLong((Long)obj);
+            idbuf.reset().writeLong((Long)obj);
+      
             return idbuf.toByteArray();
             
         } catch(IOException ex) {
@@ -203,7 +204,8 @@ public class Term2IdTupleSerializer extends DefaultTupleSerializer {
 
         try {
             
-            return Long.valueOf(tuple.getValueStream().unpackLong());
+            return Long.valueOf(tuple.getValueStream().readLong());
+//            return Long.valueOf(tuple.getValueStream().unpackLong());
             
         } catch (IOException e) {
             

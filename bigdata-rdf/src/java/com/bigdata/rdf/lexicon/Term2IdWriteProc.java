@@ -35,15 +35,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 import org.apache.log4j.Logger;
-import org.openrdf.model.BNode;
-import org.openrdf.model.Literal;
-import org.openrdf.model.Statement;
-import org.openrdf.model.URI;
 
-import com.bigdata.btree.AbstractBTree;
-import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.FusedView;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.compression.IDataSerializer;
@@ -54,8 +47,6 @@ import com.bigdata.btree.proc.IParallelizableIndexProcedure;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.IRawTripleStore;
 
 /**
  * This unisolated operation inserts terms into the <em>term:id</em> index,
@@ -144,9 +135,17 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
 //        }
 //    }
 
-    /*
-     * Flag enables optional ground truth verification. This is not a scaleable
-     * option! It is only enabled at the DEBUG level IFF this flag is ALSO set.
+    /**
+     * Flag enables optional ground truth verification. It is only enabled at
+     * the DEBUG level IFF this flag is ALSO set.
+     * <p>
+     * <strong>WARNING: This IS NOT scaleable! </strong>
+     * <p>
+     * <strong>WARNING: This option IS NOT safe when using more than one triple
+     * store either concurrently or in sequence! For example, you can use it to
+     * examine a single unit test for inconsistences, but not a sequence of unit
+     * tests since the data will be kept within the same global map and hence
+     * confound the test!</strong>
      */
     private static boolean enableGroundTruth = false;
     private static ConcurrentHashMap<Long,byte[]> groundTruthId2Term;
@@ -195,7 +194,11 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
         return storeBlankNodes;
         
     }
-    
+
+//    private boolean scaleOutTermIds;
+
+    private int scaleOutTermIdBitsToReverse;
+
     /**
      * De-serialization constructor.
      */
@@ -203,32 +206,42 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
         
     }
     
-    protected Term2IdWriteProc(IDataSerializer keySer, int fromIndex, int toIndex,
-            byte[][] keys, boolean readOnly, boolean storeBlankNodes) {
+    protected Term2IdWriteProc(IDataSerializer keySer, int fromIndex,
+            int toIndex, byte[][] keys, boolean readOnly,
+            boolean storeBlankNodes, //boolean scaleOutTermIds,
+            int scaleOutTermIdBitsToReverse) {
 
         super(keySer, null, fromIndex, toIndex, keys, null /* vals */);
-        
+
         this.readOnly = readOnly;
-        
+
         this.storeBlankNodes = storeBlankNodes;
-        
+
+//        this.scaleOutTermIds = scaleOutTermIds;
+
+        this.scaleOutTermIdBitsToReverse = scaleOutTermIdBitsToReverse;
+
     }
 
     public static class Term2IdWriteProcConstructor extends
             AbstractIndexProcedureConstructor<Term2IdWriteProc> {
 
-//        public static Term2IdWriteProcConstructor READ_WRITE = new Term2IdWriteProcConstructor(false);
-//        
-//        public static Term2IdWriteProcConstructor READ_ONLY = new Term2IdWriteProcConstructor(true);
-
         private final boolean readOnly;
         private final boolean storeBlankNodes;
+//        private final boolean scaleOutTermIds;
+        private final int scaleOutTermIdBitsToReverse;
         
-        public Term2IdWriteProcConstructor(boolean readOnly,boolean storeBlankNodes) {
+        public Term2IdWriteProcConstructor(boolean readOnly,
+                boolean storeBlankNodes, //boolean  scaleOutTermIds,
+                int scaleOutTermIdBitsToReverse) {
             
             this.readOnly = readOnly;
             
             this.storeBlankNodes = storeBlankNodes;
+            
+//            this.scaleOutTermIds = scaleOutTermIds;
+            
+            this.scaleOutTermIdBitsToReverse = scaleOutTermIdBitsToReverse;
             
         }
         
@@ -239,7 +252,8 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
             assert vals == null;
             
             return new Term2IdWriteProc(keySer, fromIndex, toIndex, keys,
-                    readOnly, storeBlankNodes);
+                    readOnly, storeBlankNodes, //scaleOutTermIds,
+                    scaleOutTermIdBitsToReverse);
 
         }
 
@@ -273,11 +287,14 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
         // used to assign term identifiers.
         final ICounter counter = ndx.getCounter();
 
-        // true iff this is an unpartitioned index.
-        final boolean scaleOut = counter instanceof BTree.PartitionedCounter;
+//        // true iff this is an unpartitioned index.
+//        final boolean scaleOut = counter instanceof BTree.PartitionedCounter;
         
         // used to serialize term identifers.
         final DataOutputBuffer idbuf = new DataOutputBuffer(Bytes.SIZEOF_LONG);
+        
+        final TermIdEncoder encoder = new TermIdEncoder(//scaleOutTermIds,
+                scaleOutTermIdBitsToReverse);
         
         // #of new terms (#of writes on the index).
         int nnew = 0;
@@ -313,8 +330,8 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
                 } else {
                     
                     // assign a term identifier.
-                    termId = TermIdEncoder.encode(scaleOut, counter
-                            .incrementAndGet(), code);
+                    termId = TermIdEncoder.setFlags(encoder.encode(counter
+                            .incrementAndGet()), code);
                 }
                 
             } else {
@@ -336,8 +353,8 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
                     } else {
 
                         // assign a term identifier.
-                        termId = TermIdEncoder.encode(scaleOut, counter
-                                .incrementAndGet(), code);
+                        termId = TermIdEncoder.setFlags(encoder.encode(counter
+                                .incrementAndGet()), code);
 
                         if (DEBUG && enableGroundTruth) {
 
@@ -348,7 +365,8 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
                         // format as packed long integer.
                         try {
 
-                            idbuf.reset().packLong(termId);
+//                            idbuf.reset().packLong(termId);
+                            idbuf.reset().writeLong(termId); // may be negative.
 
                         } catch (IOException ex) {
 
@@ -372,7 +390,8 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
                     try {
 
                         // unpack the existing term identifier.
-                        termId = new DataInputBuffer(tmp).unpackLong();
+//                        termId = new DataInputBuffer(tmp).unpackLong();
+                        termId = new DataInputBuffer(tmp).readLong();
                         
                     } catch (IOException ex) {
                         
@@ -389,35 +408,34 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
         }
 
         /*
-         * comment out - this is for debugging (it does not actually rely on
-         * ground truth and was used to help track down a lost updates problem).
+         * Note: this is for debugging. It does not rely on ground truth, but
+         * only logs information. It was originally used to track down a lost
+         * update problem.
          */
-        if (enableGroundTruth && ndx.getIndexMetadata().getPartitionMetadata() != null) {
-            
-            // the partition identifier (assuming index is partitioned).
-            final long id0 = counter.get();
-            final long pid = id0 >> 32;
-            final long mask = 0xffffffffL;
-            final int ctr = (int) (id0 & mask);
-
-            // note: the mutable btree - accessed here for debugging only.
-            final BTree btree;
-            if (ndx instanceof AbstractBTree) {
-                btree = (BTree) ndx;
-            } else {
-                btree = (BTree) ((FusedView) ndx).getSources()[0];
-            }
-            
-            log.warn("after task"+
-            ": nnew="+nnew+//
-            ", partitionId="+ndx.getIndexMetadata().getPartitionMetadata().getPartitionId()+//
-            ", pid="+pid+//
-            ", ctr="+ctr+//
-            ", counter="+counter.getClass().getName()+//
-            ", sourceCheckpoint="+btree.getCheckpoint()// btree was loaded from here.
-            );
-            
-        }
+//        if (enableGroundTruth && ndx.getIndexMetadata().getPartitionMetadata() != null) {
+//
+//            final long v = counter.get();
+//            final int pid = (int) v >>> 32;
+//            final int ctr = (int) v;
+//
+//            // note: the mutable btree - accessed here for debugging only.
+//            final BTree btree;
+//            if (ndx instanceof AbstractBTree) {
+//                btree = (BTree) ndx;
+//            } else {
+//                btree = (BTree) ((FusedView) ndx).getSources()[0];
+//            }
+//            
+//            log.warn("after task"+
+//            ": nnew="+nnew+//
+//            ", partitionId="+ndx.getIndexMetadata().getPartitionMetadata().getPartitionId()+//
+//            ", pid="+pid+//
+//            ", ctr="+ctr+//
+//            ", counter="+counter.getClass().getName()+//
+//            ", sourceCheckpoint="+btree.getCheckpoint()// btree was loaded from here.
+//            );
+//            
+//        }
         
         return new Result(ids);
 
@@ -489,35 +507,42 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
         super.readMetadata(in);
         
         readOnly = in.readBoolean();
-        
+     
+//        scaleOutTermIds = in.readBoolean();
+
+        scaleOutTermIdBitsToReverse = (int) in.readByte();
+
     }
 
     /**
      * Writes metadata (not the keys or values, but just other metadata used by
      * the procedure).
      * <p>
-     * The default implementation writes <code>toIndex - fromIndex</code>, which
-     * is the #of keys.
+     * The default implementation writes <code>toIndex - fromIndex</code>,
+     * which is the #of keys.
      * 
      * @param out
      * 
      * @throws IOException
      */
     protected void writeMetadata(ObjectOutput out) throws IOException {
-        
+
         super.writeMetadata(out);
-        
+
         out.writeBoolean(readOnly);
-        
+
+//        out.writeBoolean(scaleOutTermIds);
+
+        out.writeByte((byte) scaleOutTermIdBitsToReverse);
+
     }
     
     /**
      * Object encapsulates the discovered / assigned term identifiers and
-     * provides efficient serialization for communication of those data to
-     * the client.
+     * provides efficient serialization for communication of those data to the
+     * client.
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
     public static class Result implements Externalizable {
@@ -562,9 +587,10 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
             
             ids = new long[n];
             
-            for(int i=0; i<n; i++) {
+            for (int i = 0; i < n; i++) {
                 
-                ids[i] = LongPacker.unpackLong(in);
+//                ids[i] = LongPacker.unpackLong(in);
+                ids[i] = in.readLong();
                 
             }
             
@@ -578,9 +604,10 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
             
             LongPacker.packLong(out,n);
 
-            for(int i=0; i<n; i++) {
+            for (int i = 0; i < n; i++) {
                 
-                LongPacker.packLong(out, ids[i]);
+//                LongPacker.packLong(out, ids[i]);
+                out.writeLong(ids[i]);
                 
             }
             

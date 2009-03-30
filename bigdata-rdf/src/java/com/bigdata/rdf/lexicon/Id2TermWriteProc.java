@@ -166,12 +166,12 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
 
                     /*
                      * Note: This would fail if the serialization of the term
-                     * was changed. In order to validate when different
-                     * serialization formats might be in use you have to
-                     * actually deserialize the terms. However, I have the
-                     * validation logic here just as a sanity check while
-                     * getting the basic system running - it is not meant to be
-                     * deployed.
+                     * was changed for an existing database instance. In order
+                     * to validate when different serialization formats might be
+                     * in use you have to actually deserialize the terms.
+                     * However, I have the validation logic here just as a
+                     * sanity check while getting the basic system running - it
+                     * is not meant to be deployed.
                      */
 
                     if (! BytesUtil.bytesEqual(val, oldval)) {

@@ -66,17 +66,25 @@ public class RdfTypeRdfsResourceFilter implements IElementFilter<ISPO>, External
 
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
         
-        rdfType = LongPacker.unpackLong(in);
+//        rdfType = LongPacker.unpackLong(in);
+//
+//        rdfsResource = LongPacker.unpackLong(in);
 
-        rdfsResource = LongPacker.unpackLong(in);
+        rdfType = in.readLong();
+
+        rdfsResource = in.readLong();
         
     }
 
     public void writeExternal(ObjectOutput out) throws IOException {
 
-        LongPacker.packLong(out,rdfType);
+//        LongPacker.packLong(out,rdfType);
+//
+//        LongPacker.packLong(out,rdfsResource);
 
-        LongPacker.packLong(out,rdfsResource);
+        out.writeLong(rdfType);
+
+        out.writeLong(rdfsResource);
         
     }
     

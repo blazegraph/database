@@ -432,6 +432,70 @@ abstract public class AbstractTripleStore extends
         String DEFAULT_STORE_BLANK_NODES = "false";
 
         /**
+         * Option effects how evenly distributed the assigned term identifiers
+         * which has a pronounced effect on the ID2TERM and statement indices
+         * for <em>scale-out deployments</em>. The default for a scale-out
+         * deployment is {@value #DEFAULT_TERMID_BITS_TO_REVERSE}, but the
+         * default for a scale-up deployment is ZERO(0).
+         * <p>
+         * For the scale-out triple store, the term identifiers are formed by
+         * placing the index partition identifier in the high word and the local
+         * counter for the index partition into the low word. In addition, the
+         * sign bit is "stolen" from each value such that the low two bits are
+         * left open for bit flags which encode the type (URI, Literal, BNode or
+         * SID) of the term. The effect of this option is to cause the low N
+         * bits of the local counter value to be reversed and written into the
+         * high N bits of the term identifier (the other bits are shifted down
+         * to make room for this). Regardless of the configured value for this
+         * option, all bits (except the sign bit) of the both the partition
+         * identifier and the local counter are preserved.
+         * <p>
+         * Normally, the low bits of a sequential counter will vary the most
+         * rapidly. By reversing the localCounter and placing some of the
+         * reversed bits into the high bits of the term identifier we cause the
+         * term identifiers to be uniformly (but not randomly) distributed. This
+         * is much like using hash function without collisions or a random
+         * number generator that does not produce duplicates. When ZERO (0) no
+         * bits are reversed so the high bits of the term identifiers directly
+         * reflect the partition identifier and the low bits are assigned
+         * sequentially by the local counter within each TERM2ID index
+         * partition.
+         * <p>
+         * The use of a non-zero value for this option can easily cause the
+         * write load on the index partitions for the ID2TERM and statement
+         * indices to be perfectly balanced. However, using too many bits has
+         * some negative consequences on locality of operations <em>within</em>
+         * an index partition (since the distribution of the keys be
+         * approximately uniform distribution, leading to poor cache
+         * performance, more copy-on-write for the B+Tree, and both more IO and
+         * faster growth in the journal for writes (since there will be more
+         * leaves made dirty on average by each bulk write)).
+         * <p>
+         * The use of a non-zero value for this option also directly effects the
+         * degree of scatter for bulk read or write operations. As more bits are
+         * used, it becomes increasingly likely that each bulk read or write
+         * operation will on average touch all index partitions. This is because
+         * #of low order local counter bits reversed and rotated into the high
+         * bits of the term identifier places an approproximate bound on the #of
+         * index partitions of the ID2TERM or a statement index that will be
+         * touched by a scattered read or write. However, that number will
+         * continue to grow slowly over time as new partition identifiers are
+         * introduced (the partition identifers appear next in the encoded term
+         * identifier and therefore determine the degree of locality or scatter
+         * once the quickly varying high bits have had their say).
+         * <p>
+         * The "right" value really depends on the expected scale of the
+         * knowledge base. If you estimate that you will have 50 x 200M index
+         * partitions for the statement indices, then SQRT(50) =~ 7 would be a
+         * good choice.
+         */
+        String TERMID_BITS_TO_REVERSE = AbstractTripleStore.class
+                .getName()
+                + ".termIdBitsToReverse";
+
+        String DEFAULT_TERMID_BITS_TO_REVERSE = "6";
+
+        /**
          * Boolean option (default <code>true</code>) enables support for a
          * full text index that may be used to lookup literals by tokens found
          * in the text of those literals.

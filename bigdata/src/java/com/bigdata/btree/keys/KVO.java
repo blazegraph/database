@@ -46,7 +46,7 @@ public class KVO<O> implements Comparable<KVO<O>>{
     public byte[] val;
     public O obj;
     
-    public KVO(byte[] key, byte[] val, O obj) {
+    public KVO(final byte[] key, final byte[] val, O obj) {
         
         this.key = key;
         
@@ -64,7 +64,8 @@ public class KVO<O> implements Comparable<KVO<O>>{
 
     public String toString() {
         
-        return "KVO{key=" + key + ", val=" + val + ", obj=" + obj + "}";
+        return "KVO{key=" + BytesUtil.toString(key) + ", val=" + val + ", obj="
+                + obj + "}";
         
     }
     
