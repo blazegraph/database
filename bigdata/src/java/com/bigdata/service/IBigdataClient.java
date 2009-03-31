@@ -451,7 +451,7 @@ public interface IBigdataClient {
          * 
          * @see #DEFAULT_REPORT_DELAY
          */
-        String REPORT_DELAY = IBigdataClient.class.getName() + "reportDelay";
+        String REPORT_DELAY = IBigdataClient.class.getName() + ".reportDelay";
 
         /**
          * The default {@link #REPORT_DELAY}.
