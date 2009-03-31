@@ -53,7 +53,7 @@ public class DataServiceTupleIterator<E> extends RawDataServiceTupleIterator<E> 
      * Used to submit delete requests to the scale-out index in a robust
      * manner.
      */
-    protected final ClientIndexView ndx;
+    protected final IScaleOutClientIndex ndx;
     
     /**
      * 
@@ -77,7 +77,7 @@ public class DataServiceTupleIterator<E> extends RawDataServiceTupleIterator<E> 
      * @param flags
      * @param filter
      */
-    public DataServiceTupleIterator(final ClientIndexView ndx,
+    public DataServiceTupleIterator(final IScaleOutClientIndex ndx,
             final IDataService dataService, final String name,
             final long timestamp, final byte[] fromKey, final byte[] toKey,
             final int capacity, final int flags, final IFilterConstructor filter) {

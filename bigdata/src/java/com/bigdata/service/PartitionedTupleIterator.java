@@ -66,7 +66,7 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
     /**
      * The index on which the range query is being performed.
      */
-    private final ClientIndexView ndx;
+    private final IScaleOutClientIndex ndx;
     
     /**
      * Iterator traversing the index partition locators spanned by the query.
@@ -256,7 +256,7 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
      *             if readConsistent is requested and the index view is
      *             {@link ITx#UNISOLATED}.
      */
-    public PartitionedTupleIterator(final ClientIndexView ndx,
+    public PartitionedTupleIterator(final IScaleOutClientIndex ndx,
             final long ts, final boolean isReadConsistentTx, final byte[] fromKey,
             final byte[] toKey, final int capacity, final int flags,
             final IFilterConstructor filter) {

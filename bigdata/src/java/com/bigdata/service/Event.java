@@ -32,12 +32,11 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
-import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.log4j.Logger;
 
@@ -122,8 +121,13 @@ public class Event implements Serializable {
 
     /**
      * Event details.
+     * <p>
+     * Note: This is a {@link ConcurrentHashMap} since otherwise concurrent
+     * modification exceptions can occur if the {@link #start()} event is being
+     * serialized concurrent with the application signaling the {@link #end()}
+     * event.
      */
-    protected Map<String,Object> details;
+    protected ConcurrentHashMap<String,Object> details;
     
     /**
      * Event details.
@@ -148,7 +152,7 @@ public class Event implements Serializable {
 
             if (this.details == null) {
 
-                this.details = details;
+                this.details = new ConcurrentHashMap<String, Object>(details);
 
             } else {
 
@@ -177,7 +181,7 @@ public class Event implements Serializable {
 
             if (details == null) {
 
-                details = new HashMap<String, Object>();
+                details = new ConcurrentHashMap<String, Object>();
 
             }
 
@@ -314,7 +318,12 @@ public class Event implements Serializable {
 
         this.minorEventType = minorEventType;
 
-        this.details = details; // MAY be null.
+        // MAY be null.
+        if (details != null) {
+
+            addDetails(details);
+
+        }
         
         /*
          * @todo Assignment should be based on a federation configuration
@@ -663,7 +672,7 @@ public class Event implements Serializable {
         this.serviceIface = Class.forName(serviceIfaceName);    
         this.serviceName = st.nextToken(); 
         this.serviceUUID = UUID.fromString(st.nextToken());
-        this.details = new TreeMap<String,Object>();
+        this.details = new ConcurrentHashMap<String,Object>();
         while(st.hasMoreTokens()) {
             final String t = st.nextToken();
             final int pos = t.indexOf('=');

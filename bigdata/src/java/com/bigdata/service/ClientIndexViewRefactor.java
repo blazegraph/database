@@ -89,6 +89,20 @@ import com.bigdata.util.concurrent.TaskCounters;
  * A client-side view of a scale-out index as of some <i>timestamp</i>.
  * </p>
  * <p>
+ * This variant is a refactor which automatically aggregates writes for an index
+ * partition using resource queues. This gives better throughput when writes are
+ * scattered across more than a handfull of index partitions. Throughput is
+ * improved for several reasons: (a) fewer threads are required since the client
+ * will never issue more than one concurrent write request per index partition;
+ * (b) writes are automatically aggregated, resulting in larger writes as the
+ * system becomes more heavily loaded; (c) the clients effectively self-throttle
+ * the write requests so the data services never have more than one concurrent
+ * write request per client per index partition on the data service; and (d) if
+ * an index partition is split / moved / joined, then the client must re-issue
+ * at most ONE write request since it only submits a single request per index
+ * partition at a time.
+ * </p>
+ * <p>
  * This view automatically handles the split, join, or move of index partitions
  * within the federation. The {@link IDataService} throws back a (sometimes
  * wrapped) {@link StaleLocatorException} when it does not have a registered
@@ -111,6 +125,10 @@ import com.bigdata.util.concurrent.TaskCounters;
  * an index partition is split, joined, or moved - the historical states always
  * remain behind).
  * </p>
+ * 
+ * @todo add resource queues.
+ * 
+ * @todo isolate the read aspect of the client view into a base class?
  * 
  * @todo If the index was dropped then that should cause the operation to abort
  *       (only possible for read committed or unisolated operations).
@@ -140,14 +158,14 @@ import com.bigdata.util.concurrent.TaskCounters;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ClientIndexView implements IScaleOutClientIndex {
+public class ClientIndexViewRefactor implements IScaleOutClientIndex {
 
     /**
      * Note: Invocations of the non-batch API are logged at the WARN level since
      * they result in an application that can not scale-out efficiently.
      */
     protected static final transient Logger log = Logger
-            .getLogger(ClientIndexView.class);
+            .getLogger(ClientIndexViewRefactor.class);
     
     /**
      * True iff the {@link #log} level is WARN or less.
@@ -382,7 +400,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
      *            object contains the template {@link IndexMetadata} for the
      *            scale-out index partitions.
      */
-    public ClientIndexView(final AbstractScaleOutFederation fed,
+    public ClientIndexViewRefactor(final AbstractScaleOutFederation fed,
             final String name, final long timestamp,
             final IMetadataIndex metadataIndex) {
 
@@ -1524,7 +1542,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
          */
         public String toString() {
             
-            return "Index=" + ClientIndexView.this.getName() + ", Procedure "
+            return "Index=" + ClientIndexViewRefactor.this.getName() + ", Procedure "
                     + proc.getClass().getName() + " : " + split;
             
         }
@@ -1655,7 +1673,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
             
             // the name of the index partition.
             final String name = DataService.getIndexPartitionName(//
-                    ClientIndexView.this.name, // the name of the scale-out index.
+                    ClientIndexViewRefactor.this.name, // the name of the scale-out index.
                     split.pmd.getPartitionId() // the index partition identifier.
                     );
 
@@ -1861,7 +1879,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
         /**
          * The {@link IKeyRangeIndexProcedure} is re-mapped for the constrained
          * key range of the stale locator using
-         * {@link ClientIndexView#submit(byte[], byte[], IKeyRangeIndexProcedure, IResultHandler)}.
+         * {@link ClientIndexViewRefactor#submit(byte[], byte[], IKeyRangeIndexProcedure, IResultHandler)}.
          */
         @Override
         protected void retry() throws Exception {
@@ -1888,7 +1906,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
                  * operation but MUST compute new splits against the updated
                  * locators.
                  */
-                ClientIndexView.this.submit(ts, fromKey, toKey,
+                ClientIndexViewRefactor.this.submit(ts, fromKey, toKey,
                         (IKeyRangeIndexProcedure) proc, resultHandler);
             
             } finally {
@@ -1956,7 +1974,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
         /**
          * Submit using
-         * {@link ClientIndexView#submit(int, int, byte[][], byte[][], AbstractIndexProcedureConstructor, IResultHandler)}.
+         * {@link ClientIndexViewRefactor#submit(int, int, byte[][], byte[][], AbstractIndexProcedureConstructor, IResultHandler)}.
          * This will recompute the split points and re-map the procedure across
          * the newly determined split points.
          */
@@ -1985,7 +2003,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
                  * operation but MUST compute new splits against the updated
                  * locators.
                  */
-                ClientIndexView.this.submit(ts, split.fromIndex, split.toIndex,
+                ClientIndexViewRefactor.this.submit(ts, split.fromIndex, split.toIndex,
                         keys, vals, ctor, resultHandler);
                 
             } finally {

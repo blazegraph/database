@@ -69,19 +69,16 @@ import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.data.Stat;
+import org.openrdf.model.BNode;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.jini.start.BigdataZooDefs;
-import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
-import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.axioms.RdfsAxioms;
-import com.bigdata.rdf.lexicon.LexiconKeyOrder;
-import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.PresortRioLoader;
-import com.bigdata.rdf.spo.SPORelation;
+import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.ITripleStore;
@@ -1092,6 +1089,17 @@ public class RDFDataLoadMaster implements Callable<Void> {
     /**
      * Create the {@link ITripleStore} specified by
      * {@link ConfigurationOptions#NAMESPACE}.
+     * <p>
+     * Note: The properties used to configure the {@link ITripleStore} are taken
+     * from {@link IBigdataClient#getProperties()}. For the jini deployment,
+     * you specify those properties by declaring
+     * 
+     * <pre>
+     * properties = NV[]{...};
+     * </pre>
+     * 
+     * for the component which is the master for the job, e.g., the
+     * {@link RDFDataLoadMaster}.
      * 
      * @return The {@link ITripleStore}
      */
@@ -1100,9 +1108,16 @@ public class RDFDataLoadMaster implements Callable<Void> {
         if (INFO)
             log.info("Creating tripleStore: " + jobState.namespace);
 
+        /*
+         * Pick up properties configured for the client as defaults.
+         * 
+         * You can specify those properties using NV[] for the component that is
+         * executing the master.
+         */
+        final Properties properties = fed.getClient().getProperties();
+
         final AbstractTripleStore tripleStore = new ScaleOutTripleStore(fed,
-                jobState.namespace, ITx.UNISOLATED,
-                getProperties(jobState.namespace));
+                jobState.namespace, ITx.UNISOLATED, properties);
 
         // create the triple store.
         tripleStore.create();
@@ -1131,7 +1146,7 @@ public class RDFDataLoadMaster implements Callable<Void> {
 
         tripleStore.getDataLoader().loadFiles(jobState.ontology/* file */,
                 jobState.ontology.getPath()/* baseURI */,
-                jobState.fallback/* rdfFormat */, new RDFFilenameFilter());
+                JobState.fallback/* rdfFormat */, new RDFFilenameFilter());
 
         System.out.println("axiomAndOntologyCount="
                 + tripleStore.getStatementCount());
@@ -1151,6 +1166,9 @@ public class RDFDataLoadMaster implements Callable<Void> {
         log.info("tripleStore: namespace=" + tripleStore.getNamespace());
         
         final Properties p = tripleStore.getProperties();
+
+        log.info(Options.TERMID_BITS_TO_REVERSE + "="
+                + p.getProperty(Options.TERMID_BITS_TO_REVERSE));
 
         // log.info(Options.INCLUDE_INFERRED + "="
         // + p.getProperty(Options.INCLUDE_INFERRED));
@@ -1195,312 +1213,6 @@ public class RDFDataLoadMaster implements Callable<Void> {
 //        log.info("bloomFilterFactory="
 //                + tripleStore.getSPORelation().getSPOIndex().getIndexMetadata()
 //                        .getBloomFilterFactory());
-
-    }
-
-    /**
-     * Return the {@link Properties} that will be used by
-     * {@link #createTripleStore()}. The {@link AbstractTripleStore} will
-     * remember the properties with which it was created and use those values
-     * each time it is re-opened. The properties are stored in the global row
-     * store for the backing {@link IIndexManager}.
-     * 
-     * @param namespace
-     *            The namespace for the {@link ITripleStore}.
-     * 
-     * FIXME Properties are hardwired. Either from the {@link Configuration} or
-     * a Properties object obtained from the caller or {@link JobState}.
-     * 
-     * @todo some of these properties are in the bigdata-sails module. to avoid
-     *       a compile time dependency those options are given using literals
-     *       rather than symbolic constants.
-     */
-    protected Properties getProperties(final String namespace) {
-
-        // pick up system properties as defaults.
-        // final Properties properties = new Properties(System.getProperties());
-        // do not pick up system properties as defaults.
-        // final Properties properties = new Properties();
-
-        /*
-         * Pick up properties configured for the client as defaults.
-         * 
-         * You can specify those properties using NV[] for the component that is
-         * executing the master.
-         */
-        final Properties properties = fed.getClient().getProperties();
-
-        /*
-         * When "true", the store will perform incremental closure as the data
-         * are loaded. When "false", the closure will be computed after all data
-         * are loaded. (Actually, since we are not loading through the SAIL
-         * making this true does not cause incremental TM but it does disable
-         * closure, so "false" is what you need here).
-         */
-        properties.setProperty("com.bigdata.rdf.sail.truthMaintenance", "false"
-        // BigdataSail.Options.TRUTH_MAINTENANCE, "false"
-                );
-
-        /*
-         * Enable rewrites of high-level queries into native rules (native JOIN
-         * execution). (Can be changed without re-loading the data to compare
-         * the performance of the Sesame query evaluation against using the
-         * native rules to perform query evaluation.)
-         */
-        // properties.setProperty(BigdataSail.Options.NATIVE_JOINS, "true");
-        properties.setProperty("com.bigdata.rdf.sail.nativeJoins", "true");
-
-        /*
-         * May be used to turn off inference during query.
-         * 
-         * Note: This will cause ALL inferences to be filtered out!
-         */
-        // properties.setProperty(Options.INCLUDE_INFERRED, "false");
-        /*
-         * May be used to turn off query-time expansion of entailments such as
-         * (x rdf:type rdfs:Resource) and owl:sameAs even through those
-         * entailments were not materialized during forward closure.
-         */
-        // Note: disables the backchainer!
-        properties.setProperty("com.bigdata.rdf.sail.queryTimeExpander",
-                "false");
-        // properties.setProperty(BigdataSail.Options.QUERY_TIME_EXPANDER,
-        // "false");
-
-        /*
-         * Option to restrict ourselves to RDFS only inference. This condition
-         * may be compared readily to many other stores.
-         * 
-         * Note: While we can turn on some kinds of owl processing (e.g.,
-         * TransitiveProperty, see below), we can not compute all the necessary
-         * entailments (only queries 11 and 13 benefit).
-         * 
-         * Note: There are no owl:sameAs assertions in LUBM.
-         * 
-         * Note: lubm query does not benefit from owl:inverseOf.
-         * 
-         * Note: lubm query does benefit from owl:TransitiveProperty (queries 11
-         * and 13).
-         * 
-         * Note: owl:Restriction (which we can not compute) plus
-         * owl:TransitiveProperty is required to get all the answers for LUBM.
-         */
-        properties
-                .setProperty(Options.AXIOMS_CLASS, RdfsAxioms.class.getName());
-        // properties.setProperty(Options.AXIOMS_CLASS,NoAxioms.class.getName());
-
-        /*
-         * Produce a full closure (all entailments) so that the backward chainer
-         * is always a NOP. Note that the configuration properties are stored in
-         * the database (in the global row store) so you always get exactly the
-         * same configuration that you created when reopening a triple store.
-         */
-        // properties.setProperty(Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE,
-        // "true");
-        // properties.setProperty(Options.FORWARD_CHAIN_OWL_SAMEAS_PROPERTIES,
-        // "true");
-        /*
-         * Additional owl inferences. LUBM only both inverseOf and
-         * TransitiveProperty of those that we support (owl:sameAs,
-         * owl:inverseOf, owl:TransitiveProperty), but not owl:sameAs.
-         */
-        properties.setProperty(Options.FORWARD_CHAIN_OWL_INVERSE_OF, "true");
-        properties.setProperty(Options.FORWARD_CHAIN_OWL_TRANSITIVE_PROPERY,
-                "true");
-
-        // Note: FastClosure is the default.
-        // properties.setProperty(Options.CLOSURE_CLASS,
-        // FullClosure.class.getName());
-
-        /*
-         * Various things that effect native rule execution.
-         */
-        // properties.setProperty(Options.FORCE_SERIAL_EXECUTION, "false");
-        // properties.setProperty(Options.MUTATION_BUFFER_CAPACITY, "20000");
-        properties.setProperty(Options.CHUNK_CAPACITY, "100");
-        // properties.setProperty(Options.QUERY_BUFFER_CAPACITY, "10000");
-        // properties.setProperty(Options.FULLY_BUFFERED_READ_THRESHOLD,
-        // "10000");
-
-        /*
-         * Turn off incremental closure in the DataLoader object.
-         */
-        properties.setProperty(
-                com.bigdata.rdf.store.DataLoader.Options.CLOSURE,
-                DataLoader.ClosureEnum.None.toString());
-
-        /*
-         * Turn off commit in the DataLoader object. We do not need to commit
-         * anything until we have loaded all the data and computed the closure
-         * over the database.
-         */
-        properties.setProperty(com.bigdata.rdf.store.DataLoader.Options.COMMIT,
-                DataLoader.CommitEnum.None.toString());
-
-        /*
-         * Turn off Unicode support for index keys (this is a big win for load
-         * rates since LUBM does not use Unicode data, but it has very little
-         * effect on query rates since the only time we generate Unicode sort
-         * keys is when resolving the Values in the queries to term identifiers
-         * in the database).
-         */
-        // properties.setProperty(Options.COLLATOR,
-        // CollatorEnum.ASCII.toString());
-        /*
-         * Turn off the full text index unless it has been explicitly enabled.
-         */
-        if (properties.getProperty(Options.TEXT_INDEX) == null) {
-
-            properties.setProperty(Options.TEXT_INDEX, "false");
-
-        }
-
-        /*
-         * Turn on bloom filter for the SPO index (good up to ~2M index entries
-         * for scale-up -or- for any size index for scale-out).
-         */
-        properties.setProperty(Options.BLOOM_FILTER, "true");
-
-        /*
-         * Turn off statement identifiers.
-         */
-        properties.setProperty(Options.STATEMENT_IDENTIFIERS, "false");
-
-        /*
-         * Turn off justifications (impacts only the load performance, but it is
-         * a big impact and only required if you will be doing TM).
-         */
-        properties.setProperty(Options.JUSTIFY, "false");
-
-        /*
-         * Maximum #of subqueries to evaluate concurrently for the 1st join
-         * dimension for native rules. Zero disables the use of an executor
-         * service. One forces a single thread, but runs the subquery on the
-         * executor service. N>1 is concurrent subquery evaluation.
-         */
-        // properties.setProperty(Options.MAX_PARALLEL_SUBQUERIES, "5");
-        properties.setProperty(Options.MAX_PARALLEL_SUBQUERIES, "0");
-
-        /*
-         * Choice of the join algorithm.
-         * 
-         * false is pipeline, which scales-out.
-         * 
-         * true is nested, which is also the default right now but does not
-         * scale-out.
-         */
-        properties.setProperty(Options.NESTED_SUBQUERY, "false");
-
-        {
-            /*
-             * Tweak the split points for the various indices to achieve 100M
-             * segments (based on U50 data set).
-             * 
-             * FIXME These changes should be applied to the triple store, but in
-             * a manner that permits explicit override. They result in good
-             * sizes for the index partitions.
-             */
-
-            // turn on direct buffering for index segment nodes : @todo should be on by default?
-            properties.setProperty(com.bigdata.config.Configuration
-                    .getOverrideProperty(namespace,
-                            IndexMetadata.Options.INDEX_SEGMENT_BUFFER_NODES),
-                    "true");
-
-            // statement indices (10x the default)
-            properties
-                    .setProperty(
-                            com.bigdata.config.Configuration
-                                    .getOverrideProperty(
-                                            namespace
-                                                    + "."
-                                                    + SPORelation.NAME_SPO_RELATION,
-                                            IndexMetadata.Options.SPLIT_HANDLER_MIN_ENTRY_COUNT),
-                            "" + (500 * Bytes.kilobyte32 * 10));
-
-            properties
-                    .setProperty(
-                            com.bigdata.config.Configuration
-                                    .getOverrideProperty(
-                                            namespace
-                                                    + "."
-                                                    + SPORelation.NAME_SPO_RELATION,
-                                            IndexMetadata.Options.SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT),
-                            "" + (1 * Bytes.megabyte32 * 10));
-
-            // term2id index (5x the default).
-            properties
-                    .setProperty(
-                            com.bigdata.config.Configuration
-                                    .getOverrideProperty(
-                                            namespace
-                                                    + "."
-                                                    + LexiconRelation.NAME_LEXICON_RELATION
-                                                    + "."
-                                                    + LexiconKeyOrder.TERM2ID,
-                                            IndexMetadata.Options.SPLIT_HANDLER_MIN_ENTRY_COUNT),
-                            "" + (500 * Bytes.kilobyte32 * 5));
-
-            properties
-                    .setProperty(
-                            com.bigdata.config.Configuration
-                                    .getOverrideProperty(
-                                            namespace
-                                                    + "."
-                                                    + LexiconRelation.NAME_LEXICON_RELATION
-                                                    + "."
-                                                    + LexiconKeyOrder.TERM2ID,
-                                            IndexMetadata.Options.SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT),
-                            "" + (1 * Bytes.megabyte32 * 5));
-
-            // id2term index (2x the default)
-            properties
-                    .setProperty(
-                            com.bigdata.config.Configuration
-                                    .getOverrideProperty(
-                                            namespace
-                                                    + "."
-                                                    + LexiconRelation.NAME_LEXICON_RELATION
-                                                    + "."
-                                                    + LexiconKeyOrder.ID2TERM,
-                                            IndexMetadata.Options.SPLIT_HANDLER_MIN_ENTRY_COUNT),
-                            "" + (500 * Bytes.kilobyte32 * 2));
-
-            properties
-                    .setProperty(
-                            com.bigdata.config.Configuration
-                                    .getOverrideProperty(
-                                            namespace
-                                                    + "."
-                                                    + LexiconRelation.NAME_LEXICON_RELATION
-                                                    + "."
-                                                    + LexiconKeyOrder.ID2TERM,
-                                            IndexMetadata.Options.SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT),
-                            "" + (1 * Bytes.megabyte32 * 2));
-
-        }
-
-        // /*
-        // * This buffers the mutable B+Trees. A large value is good (the
-        // default
-        // * is a large value).
-        // */
-        // properties.setProperty(
-        // IndexMetadata.Options.BTREE_READ_RETENTION_QUEUE_CAPACITY, "10000");
-
-        // may be used to turn off database-at-once closure during load.
-        // properties.setProperty(Options.COMPUTE_CLOSURE, "false");
-
-        /*
-         * Note: LUBM uses blank nodes. Therefore re-loading LUBM will always
-         * cause new statements to be asserted and result in the closure being
-         * updated if it is recomputed. Presumably you can tell bigdata to store
-         * the blank nodes and RIO to preserve them, but it does not seem to
-         * work (RIO creates new blank nodes on reparse). Maybe this is a RIO
-         * bug?
-         */
-        // properties.setProperty(Options.STORE_BLANK_NODES,"true");
-        return properties;
 
     }
 

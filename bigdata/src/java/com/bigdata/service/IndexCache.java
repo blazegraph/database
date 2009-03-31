@@ -9,7 +9,7 @@ import com.bigdata.mdi.IMetadataIndex;
  * @version $Id$
  * @param <T>
  */
-public class IndexCache extends AbstractIndexCache<ClientIndexView>{
+public class IndexCache extends AbstractIndexCache<IScaleOutClientIndex>{
     
     private final AbstractScaleOutFederation fed;
     
