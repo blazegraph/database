@@ -430,6 +430,10 @@ public class FullTextIndex extends AbstractRelation {
      * 
      * @throws IllegalStateException
      *             if the client does not have write access.
+     * 
+     * @todo this is not using {@link #acquireExclusiveLock()} since I generally
+     *       allocate the text index inside of another relation and
+     *       {@link #acquireExclusiveLock()} is not reentrant for zookeeper.
      */
     public void create() {
 
@@ -439,9 +443,9 @@ public class FullTextIndex extends AbstractRelation {
 
         final IIndexManager indexManager = getIndexManager();
 
-        final IResourceLock resourceLock = acquireExclusiveLock();
-
-        try {
+//        final IResourceLock resourceLock = acquireExclusiveLock();
+//
+//        try {
 
             /*
              * FIXME register a tuple serializer that knows how to unpack the
@@ -464,11 +468,11 @@ public class FullTextIndex extends AbstractRelation {
 
             ndx = getIndex(name);
 
-        } finally {
-
-            unlock(resourceLock);
-
-        }
+//        } finally {
+//
+//            unlock(resourceLock);
+//
+//        }
         
     }
 
