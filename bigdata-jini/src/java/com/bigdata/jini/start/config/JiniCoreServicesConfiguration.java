@@ -227,7 +227,8 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
 
             }
 
-            System.err.println("Will run: "+cmd);
+            if (log.isInfoEnabled())
+                log.info("Will run: " + cmd);
             
             cmds.add(cmd.toString());
 
