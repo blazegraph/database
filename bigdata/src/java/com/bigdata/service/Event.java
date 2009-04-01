@@ -32,6 +32,9 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.ConcurrentModificationException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
@@ -121,13 +124,8 @@ public class Event implements Serializable {
 
     /**
      * Event details.
-     * <p>
-     * Note: This is a {@link ConcurrentHashMap} since otherwise concurrent
-     * modification exceptions can occur if the {@link #start()} event is being
-     * serialized concurrent with the application signaling the {@link #end()}
-     * event.
      */
-    protected ConcurrentHashMap<String,Object> details;
+    protected Map<String,Object> details;
     
     /**
      * Event details.
@@ -152,18 +150,29 @@ public class Event implements Serializable {
 
             if (this.details == null) {
 
-                this.details = new ConcurrentHashMap<String, Object>(details);
-
-            } else {
-
-                this.details.putAll(details);
+                this.details = newDetails();
 
             }
+
+            this.details.putAll(details);
 
         }
 
         return this;
 
+    }
+    
+    /**
+     * Factory for the details hash map. This is a synchronized collection since
+     * the event can be serialized concurrent with {@link #end()} which would
+     * otherwise lead to a {@link ConcurrentModificationException}. It can not
+     * be a {@link ConcurrentHashMap} since that class does not support
+     * <code>null</code> values.
+     */
+    protected static Map<String,Object> newDetails() {
+        
+        return Collections.synchronizedMap(new HashMap<String, Object>());
+        
     }
     
     /**
@@ -181,7 +190,7 @@ public class Event implements Serializable {
 
             if (details == null) {
 
-                details = new ConcurrentHashMap<String, Object>();
+                details = newDetails();
 
             }
 
@@ -672,7 +681,7 @@ public class Event implements Serializable {
         this.serviceIface = Class.forName(serviceIfaceName);    
         this.serviceName = st.nextToken(); 
         this.serviceUUID = UUID.fromString(st.nextToken());
-        this.details = new ConcurrentHashMap<String,Object>();
+        this.details = newDetails();
         while(st.hasMoreTokens()) {
             final String t = st.nextToken();
             final int pos = t.indexOf('=');
