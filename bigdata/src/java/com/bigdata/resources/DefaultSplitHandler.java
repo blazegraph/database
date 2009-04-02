@@ -95,12 +95,14 @@ public class DefaultSplitHandler implements ISplitHandler {
         sb.append("{ minimumEntryCount=" + minimumEntryCount);
 
         sb.append(", entryCountPerSplit=" + entryCountPerSplit);
-        
+
         sb.append(", sampleRate=" + sampleRate);
         
         sb.append(", overCapacityMultiplier=" + overCapacityMultiplier);
         
         sb.append(", underCapacityMultiplier=" + underCapacityMultiplier);
+        
+        sb.append(", targetCountPerSplit=" + getTargetEntryCountPerSplit());
         
         sb.append("}");
         
@@ -130,7 +132,7 @@ public class DefaultSplitHandler implements ISplitHandler {
      * @param underCapacityMultiplier
      *            When an index partition will be split, the #of new index
      *            partitions will be choosen such that each index partition is
-     *            approximately <i>underCapacityMultiple</i> full.
+     *            approximately <i>underCapacityMultiplier</i> full.
      * @param sampleRate
      *            The #of samples to take per estimated split (non-negative, and
      *            generally on the order of 10s of samples). The purpose of the
@@ -216,7 +218,10 @@ public class DefaultSplitHandler implements ISplitHandler {
     static void assertSplitJoinStable(final int minimumEntryCount,
             final int entryCountPerSplit, final double underCapacityMultiplier) {
 
-        if (minimumEntryCount > underCapacityMultiplier * entryCountPerSplit) {
+        final int targetEntryCount = (int) Math.round(underCapacityMultiplier
+                * entryCountPerSplit);
+        
+        if (minimumEntryCount > targetEntryCount) {
             
             throw new IllegalArgumentException("minimumEntryCount("
                     + minimumEntryCount + ") exceeds underCapacityMultiplier("
@@ -373,6 +378,21 @@ public class DefaultSplitHandler implements ISplitHandler {
 
     }
 
+    /**
+     * The target #of tuples per split, which is given by:
+     * 
+     * <pre>
+     * targetEntryCountPerSplit := underCapacityMultiplier * entryCountPerSplit
+     * </pre>
+     * 
+     */
+    public int getTargetEntryCountPerSplit() {
+
+        return (int) Math.round(getUnderCapacityMultiplier()
+                * getEntryCountPerSplit());
+        
+    }
+    
     public boolean shouldSplit(final long rangeCount) {
 
         /*
@@ -727,14 +747,11 @@ public class DefaultSplitHandler implements ISplitHandler {
             final IIndex ndx, final int nsplits, final Sample[] samples,
             final long nvisited) {
 
-        final int targetCapacity = (int) Math.ceil(getEntryCountPerSplit()
-                * getUnderCapacityMultiplier());
-
         // The splits that we will generate.
         final List<Split> splits = new ArrayList<Split>(nsplits);
 
         final Splitter splitter = new Splitter(partitionIdFactory, ndx,
-                nsplits, samples, targetCapacity, nvisited);
+                nsplits, samples, this, nvisited);
 
         while (true) {
 
@@ -881,27 +898,46 @@ public class DefaultSplitHandler implements ISplitHandler {
 
         final DefaultSplitHandler s = this;
 
-        final int adjustedEntryCountPerSplit = (int) (rangeCount / nsplits);
+        /*
+         * Note: adjusted such that:
+         * 
+         * targetCapacity := entryCountPerSplit * underCapacityMultiplier
+         * 
+         * where targetCapacity is the desired number of tuples per split, which
+         * is:
+         * 
+         * targetCapacity := rangeCount / nsplits
+         * 
+         * which is to say that both things need to be true.
+         */ 
+        final double adjustedEntryCountPerSplit = (rangeCount
+                / (s.getUnderCapacityMultiplier() * nsplits));
 
-        final double ratio = adjustedEntryCountPerSplit
-                / s.getEntryCountPerSplit();
+        // Note: this ratio is constant before/after the adjustment.
+        final double ratio = s.getMinimumEntryCount()
+                / (double) s.getEntryCountPerSplit();
 
-        final int adjustedMinEntryCount = (int) (s.getMinimumEntryCount() * ratio);
+        final int adjustedTargetEntryCount = (int) Math.round(s
+                .getUnderCapacityMultiplier()
+                * adjustedEntryCountPerSplit);
+
+        // Note: caps the low end so that minEntryCount GTE targetEntryCount.
+        final double adjustedMinEntryCount = Math.min(
+                adjustedEntryCountPerSplit * ratio, adjustedTargetEntryCount);
         
         // adjusted split handler.
         final DefaultSplitHandler t = new DefaultSplitHandler(//
-                adjustedMinEntryCount,//
-                adjustedEntryCountPerSplit,//
+                (int)Math.round(adjustedMinEntryCount),//
+                (int)Math.round(adjustedEntryCountPerSplit),//
                 s.getOverCapacityMultiplier(), // unchanged 
-//                s.getUnderCapacityMultiplier(), // unchanged
-                .99, // we want each split to be full.
+                s.getUnderCapacityMultiplier(), // unchanged
                 s.getSampleRate() // unchanged
         );
 
         if (INFO)
             log.info("nsplits=" + nsplits + ", rangeCount=" + rangeCount
-                    + ", unadjustedSplitHandler=" + this
-                    +", adjustedSplitHandler=" + t);
+                    + ", ratio=" + ratio + ", unadjustedSplitHandler=" + this
+                    + ", adjustedSplitHandler=" + t);
 
         return t;
 

@@ -44,6 +44,7 @@ import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.service.Split;
 import com.bigdata.sparse.SparseRowStore;
+import com.bigdata.test.ExperimentDriver;
 
 /**
  * Unit tests for the {@link DefaultSplitHandler}.
@@ -211,6 +212,97 @@ public class TestDefaultSplitHandler extends TestCase2 {
     }
     
     /**
+     * Unit tests validate that the adjusted split handler embodies constraints
+     * such that an index partition would be split into more or less equal sized
+     * key ranges.
+     * <p>
+     * Note: There are several ways to make the adjusted split handler do its
+     * job. However, they do not all work out equally well. This test is written
+     * to verify that the adjustments preserve the underCapacityMultiplier while
+     * making
+     * 
+     * <pre>
+     * rangeCount := nsplits * entryCountPerSplit * underCapacityMultiplier
+     * </pre>
+     * 
+     * true within the constraints of rounding.
+     * <p>
+     * The adjusted split handler should also adjust the minimumEntryCount
+     * (smallest split size before a join would be triggered) such that
+     * 
+     * <pre>
+     * ratio := minimumEntryCount / entryCountPerSplit
+     * </pre>
+     * 
+     * remains constant before and after the adjustment within the constraints
+     * of rounding.
+     */
+    public void test_adjustedForEqualsSplits() {
+
+        final int minimumEntryCount = 500 * Bytes.kilobyte32;
+        final int entryCountPerSplit = 1 * Bytes.megabyte32;
+        final double overCapacityMultiplier = 1.5;
+        final double underCapacityMultiplier = .75;
+        final int sampleRate = 20;
+
+        final DefaultSplitHandler splitHandler = new DefaultSplitHandler(
+                minimumEntryCount, entryCountPerSplit, overCapacityMultiplier,
+                underCapacityMultiplier, sampleRate);
+
+        final int nsplits = 2;
+        final long rangeCount = 2000;
+
+        final double expectedRatio = minimumEntryCount
+                / (double) entryCountPerSplit;
+
+        final DefaultSplitHandler adjustedSplitHandler = splitHandler
+                .getAdjustedSplitHandlerForEqualSplits(nsplits, rangeCount);
+
+        final double actualRatio = adjustedSplitHandler.getMinimumEntryCount()
+                / (double) adjustedSplitHandler.getEntryCountPerSplit();
+
+        final double actualProduct = nsplits
+                * adjustedSplitHandler.getEntryCountPerSplit()
+                * adjustedSplitHandler.getUnderCapacityMultiplier();
+
+        if (log.isInfoEnabled())
+            log.info("nsplits=" + nsplits + ", rangeCount=" + rangeCount
+                    + ", product=" + actualProduct + ", expectedRatio="
+                    + expectedRatio + ", actualRatio=" + actualRatio);
+        
+        assertEquals("product", rangeCount, Math.round(actualProduct));
+
+        if (actualRatio / expectedRatio < .99
+                || actualRatio / expectedRatio > 1.01) {
+
+            /*
+             * The ratios are not close to being the same (not near 1:1).
+             */
+            
+            fail("ratio: expected=" + expectedRatio + ", actual=" + actualRatio);
+
+        }
+
+        /*
+         * This value should not have been changed.
+         * 
+         * Note: this one is important as it effects how the split points are
+         * choosen and how many splits actually get choosen.
+         */
+        assertEquals("underCapacityMultiplier", underCapacityMultiplier,
+                adjustedSplitHandler.getUnderCapacityMultiplier());
+
+        // should not have been changed (not critical)
+        assertEquals("overCapacityMultiplier", overCapacityMultiplier,
+                adjustedSplitHandler.getOverCapacityMultiplier());
+
+        // should not have been changed (not critical).
+        assertEquals("sampleRate", sampleRate, adjustedSplitHandler
+                .getSampleRate());
+
+    }
+    
+    /**
      * Stress test based on a randomly populated index which attempts to create
      * TWO (2) splits (the minimum) through N splits, where N is the #of tuples
      * in the index (the maximum). This adjusts the {@link DefaultSplitHandler}
@@ -288,7 +380,7 @@ public class TestDefaultSplitHandler extends TestCase2 {
 
         final IPartitionIdFactory partitionIdFactory = new MockPartitionIdFactory();
 
-//        final int i = 233; { // fixed value
+//        final int i = 3; { // fixed value
         for (int i = 2; i < entryCount; i++) { //stress test
 
             final int nsplits = i;
@@ -321,10 +413,95 @@ public class TestDefaultSplitHandler extends TestCase2 {
                 // compute the splits.
                 final Split[] splits = adjustedSplitHandler.getSplits(
                         partitionIdFactory, btree);
-                
+
                 // validate the computed splits.
                 SplitUtility.validateSplits(btree, splits);
 
+                if (splits.length != nsplits) {
+
+                    /*
+                     * This is not necessarily an error. We do check for error
+                     * conditions below (a split which is too small or too
+                     * large).
+                     */
+                    
+                    log.warn("nsplits: expected=" + nsplits + ", actual="
+                            + splits.length);
+
+                }
+
+                // #of tuples samples that will be coverged per sample. 
+                final double tuplesPerSample = entryCount
+                        / adjustedSplitHandler.getSampleRate(); 
+                
+                /*
+                 * This is the ideal #of tuples in a split. Reality is permitted
+                 * to vary somewhat. For the purposes of this test we allow some
+                 * variation since the point is to verify that the splits are of
+                 * approximately the right size and there are cases where we
+                 * need to accept more or fewer tuples into a given split.
+                 */
+                final int targetEntryCountPerSplit = adjustedSplitHandler
+                        .getTargetEntryCountPerSplit();
+
+                // The permitted margin of error from the ideal.
+                final double margin = .3;
+                
+                final int minAllowed = (int) Math.min(//
+                        targetEntryCountPerSplit - tuplesPerSample / 2, //
+                        targetEntryCountPerSplit * (1 - margin));
+
+                final int maxAllowed = (int) Math.max(//
+                        targetEntryCountPerSplit + tuplesPerSample / 2,//
+                        targetEntryCountPerSplit * (1 + margin));
+
+                for (int j = 0; j < splits.length; j++) {
+
+                    final Split split = splits[j];
+
+                    if (j + 1 == splits.length) {
+
+                        /*
+                         * If samples have a bias such that each split is
+                         * slightly the target capacity, then the last split can
+                         * wind up short. Therefore we give it a greater margin
+                         * than the other splits. However, it should not be
+                         * under 1/2 of the ideal -- otherwise the tuples really
+                         * should have been placed within the previous split.
+                         */
+                        
+                        if (split.ntuples < targetEntryCountPerSplit / 2) {
+
+                            fail("Not enough tuples: split[" + j + "] : "
+                                    + split + ", targetEntryCountPerSplit="
+                                    + targetEntryCountPerSplit);
+
+                        }
+
+                    } else {
+                        
+                        if (split.ntuples < minAllowed) {
+
+                            fail("Not enough tuples: split[" + j + "] : "
+                                    + split + ", targetEntryCountPerSplit="
+                                    + targetEntryCountPerSplit + ", margin="
+                                    + margin + ", minAllowed=" + minAllowed);
+
+                        }
+                        
+                    }
+                    
+                    if (split.ntuples > maxAllowed) {
+
+                        fail("Too many tuples: split[" + j + "] : " + split
+                                + ", targetEntryCountPerSplit="
+                                + targetEntryCountPerSplit + ", margin="
+                                + margin + ", maxAllowed=" + maxAllowed);
+
+                    }
+                    
+                }
+                
             } catch (Throwable t) {
 
                 fail("entryCount=" + entryCount + ", nsplits=" + nsplits

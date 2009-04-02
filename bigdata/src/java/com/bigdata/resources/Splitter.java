@@ -1,5 +1,7 @@
 package com.bigdata.resources;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.mdi.ISeparatorKeys;
@@ -16,11 +18,15 @@ import com.bigdata.service.Split;
  */
 class Splitter {
 
+    protected static final Logger log = Logger.getLogger(Splitter.class); 
+    
     /**
      * The factory for partition identifiers for the generated {@link Split}s.
      */
     final IPartitionIdFactory partitionIdFactory;
 
+    final DefaultSplitHandler splitHandler;
+    
     /**
      * The target #of splits to generate.
      */
@@ -40,6 +46,11 @@ class Splitter {
     final Sample[] samples;
 
     /**
+     * The average #of tuples spanned by each {@link Sample}.
+     */
+    final int tuplesPerSample;
+    
+    /**
      * The name of the scale-out index.
      */
     final String scaleOutIndexName;
@@ -58,6 +69,7 @@ class Splitter {
         sb.append(", targetSplitCapacity=" + targetSplitCapacity);
         sb.append(", actualTupleCount=" + actualTupleCount);
         sb.append(", nsamples=" + samples.length);
+        sb.append(", tuplesPerSamples=" + tuplesPerSample);
         sb.append(", scaleOutIndexName=" + scaleOutIndexName);
         sb.append(", fromIndex=" + fromIndex);
         sb.append(", oldpmd=" + oldpmd);
@@ -101,30 +113,51 @@ class Splitter {
 
     Splitter(final IPartitionIdFactory partitionIdFactory, final IIndex ndx,
             final int targetSplitCount, final Sample[] samples,
-            final int targetCapacity, final long nvisited) {
+            final DefaultSplitHandler splitHandler, final long nvisited) {
 
         if (partitionIdFactory == null)
             throw new IllegalArgumentException();
+        
         if (ndx == null)
             throw new IllegalArgumentException();
+        
         if (targetSplitCount < 2)
             throw new IllegalArgumentException();
+        
         if (samples == null)
             throw new IllegalArgumentException();
-        if (targetCapacity <= 0)
+        
+        if (splitHandler == null)
             throw new IllegalArgumentException();
+        
         if (nvisited < 0)
             throw new IllegalArgumentException();
 
         this.partitionIdFactory = partitionIdFactory;
 
+        this.splitHandler = splitHandler;
+        
         this.targetSplitCount = targetSplitCount;
 
-        this.targetSplitCapacity = targetCapacity;
+        /*
+         * The nominal tuple count for a split. This uses the under capacity
+         * multipler to compute an estimate of the #of tuples at the low end of
+         * an index partition capacity. A split SHOULD have at least this many
+         * tuples. However, it MAY have more (or fewer) tuples. For example, if
+         * the separator key for the split would violate an application
+         * constraint, then the separator key could be moved in either direction
+         * so as to satisify that constraint. The other case where more tuples
+         * may are often present is the last split where more tuples are
+         * incorporated into the split in order to prevent the creation of
+         * another split which would be "too small".
+         */
+        targetSplitCapacity = splitHandler.getTargetEntryCountPerSplit();
 
         this.actualTupleCount = (int) nvisited;
 
         this.samples = samples;
+        
+        this.tuplesPerSample = actualTupleCount / samples.length;
 
         this.scaleOutIndexName = ndx.getIndexMetadata().getName();
 
@@ -160,8 +193,8 @@ class Splitter {
 
         if (fromIndex == actualTupleCount) {
 
-            if (DefaultSplitHandler.INFO)
-                DefaultSplitHandler.log.info("No more splits: " + this);
+            if (log.isInfoEnabled())
+                log.info("No more splits: " + this);
 
             return null;
 
@@ -182,17 +215,56 @@ class Splitter {
 
             final int count = t.offset - usedTupleCount;
 
-            if (count >= targetSplitCapacity) {
+            // #of tuples that would be remaining after this split.
+            final int remaining = actualTupleCount - usedTupleCount - count;
 
+            /*
+             * True iff there are not enough tuples remaining to create two
+             * splits @ .8 of their target capacity.
+             */
+            final boolean lastSplit = (count + remaining) / 2 < targetSplitCapacity * .8;
+
+            if (lastSplit) {
+
+                /*
+                 * Everything remaining will go into this split. It may be a bit
+                 * over the target capacity.
+                 * 
+                 * Note: always assign the rightSeparator to the last split.
+                 */
+
+                if (log.isInfoEnabled())
+                    log.info("Remaining into the last split: count=" + count
+                            + ", remaining=" + remaining);
+                    
+                usedTupleCount = actualTupleCount;
+
+                return newSplit(actualTupleCount/* toIndex */, oldpmd
+                        .getRightSeparatorKey());
+
+            }
+
+            /*
+             * Note: Because we only sample the tuples, we are forced to
+             * consider only every nvisited/nsamples tuples. This means that we
+             * can easily run beyond the ideal split point. That is why the
+             * sample size is considered and we will emit a split early if
+             * accepting more tuples would rob the next split (or the last
+             * split).
+             */
+            final boolean enough = (count + tuplesPerSample / 2) >= targetSplitCapacity;
+//            final boolean enoughForLast2 = ((count + remaining) / 2) >= .9 * targetSplitCapacity;
+//            if (count >= targetSplitCapacity) {
+            if(enough) {
                 /*
                  * Handles case where the split is filled with tuples before
                  * we run out of tuples.
                  */
 
-                if (DefaultSplitHandler.INFO)
-                    DefaultSplitHandler.log.info("Filled split[" + splitIndex
-                            + "] with " + count + " entries: targetCapacity="
-                            + targetSplitCapacity + ", samples[j]=" + t);
+                if (log.isInfoEnabled())
+                    log.info("Filled split[" + splitIndex + "] with " + count
+                            + " entries: targetCapacity=" + targetSplitCapacity
+                            + ", samples[j]=" + t);
 
                 /*
                  * Note: We have consumed this sample so we increment the

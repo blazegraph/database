@@ -89,8 +89,11 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
         // enable moves (one per target).
         properties.setProperty(ResourceManager.Options.MAXIMUM_MOVES_PER_TARGET,"1");
 
+        // disable the CPU threshold for moves.
+        properties.setProperty(ResourceManager.Options.MOVE_PERCENT_CPU_TIME_THRESHOLD,".0");
+        
         // disable scatter split
-        properties.setProperty(ResourceManager.Options.SCATTER_SPLIT_ENABLED,"false5");
+        properties.setProperty(ResourceManager.Options.SCATTER_SPLIT_ENABLED,"false");
 
         /*
          * Note: Together these properties disable incremental index builds
@@ -171,7 +174,7 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
             
             IMetadataIndex mdi = ndx.getMetadataIndex();
             
-            assertEquals("#index partitions", 1, mdi.rangeCount(null, null));
+            assertEquals("#index partitions", 1, mdi.rangeCount());
 
             // This is the initial partition locator metadata record.
             pmd0 = mdi.get(new byte[]{});
@@ -252,7 +255,8 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
                 if (groundTruth.getEntryCount() >= overCapacityMultiplier
                         * entryCountPerSplit) {
 
-                    dataService0.forceOverflow(false/*immediate*/,false/*compactingMerge*/);
+                    dataService0
+                            .forceOverflow(false/* immediate */, false/*compactingMerge*/);
 
                     done = true;
 
@@ -265,7 +269,7 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
                                 null/* handler */);
 
                 assertEquals("rangeCount", groundTruth.getEntryCount(), fed
-                        .getIndex(name, ITx.UNISOLATED).rangeCount(null, null));
+                        .getIndex(name, ITx.UNISOLATED).rangeCount());
 
                 nrounds++;
 
@@ -288,7 +292,7 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
         // wait until overflow processing is done.
         final long overflowCounter1 = awaitOverflow(dataService0,overflowCounter0);
         
-        assertEquals("partitionCount", 2,getPartitionCount(name));
+        assertEquals("partitionCount", 2, getPartitionCount(name));
         
         /*
          * Compare the index against ground truth after overflow.
@@ -296,7 +300,7 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
         
         System.err.println("Verifying scale-out index against ground truth");
 
-        assertSameEntryIterator(groundTruth, fed.getIndex(name,ITx.UNISOLATED));
+        assertSameEntryIterator(groundTruth, fed.getIndex(name, ITx.UNISOLATED));
 
         /*
          * Fake out the load balancer so that it will report the source data

@@ -316,12 +316,12 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
                     + ", service=" + dataService);
 
             /*
-             * Note: You can change this constant if you are debugging so that
+             * FIXME You can change this constant if you are debugging so that
              * the test will not terminate too soon, but change it back so that
-             * the test will terminate quickly when run automatically.  The
-             * value should be [2000] ms.
+             * the test will terminate quickly when run automatically. The value
+             * should be [2000] ms.
              */
-            if (false&&elapsed > 2000) {
+            if (elapsed > 2000) {
              
                 fail("No overflow after " + elapsed + "ms?");
                 

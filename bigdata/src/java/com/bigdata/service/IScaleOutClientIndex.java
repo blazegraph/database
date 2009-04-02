@@ -110,6 +110,6 @@ public interface IScaleOutClientIndex extends IClientIndex {
      * Return the object used to access the services in the connected
      * federation.
      */
-    public AbstractScaleOutFederation getFederation();
+    AbstractScaleOutFederation getFederation();
 
 }
