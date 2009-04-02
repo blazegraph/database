@@ -924,7 +924,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
          * two hosts before one can be a candidate for a move of an index
          * partition to the other. The load balancer API does not consider the
          * load of the source host when determining which hosts are possible
-         * targets for a move.
+         * targets for a move. [Also, be careful that the unit tests for MOVE
+         * will still run when we introduce this requirement.]
          */
         {
             
@@ -932,20 +933,53 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     .getFederation();
 
             final ICounterSet hostRoot = fed.getHostCounterSet();
-            
-            final double percentCPUTime = ((Number) ((ICounter) hostRoot
-                    .getPath(IRequiredHostCounters.CPU_PercentProcessorTime))
-                    .getInstrument().getValue()).doubleValue();
 
-            if (percentCPUTime < resourceManager.movePercentCpuTimeThreshold) {
+            if (hostRoot != null) {
 
-                if (INFO)
-                    log.info("Host is not busy.");
+                final ICounter percentCPUTimeCounter = (ICounter) hostRoot
+                        .getPath(IRequiredHostCounters.CPU_PercentProcessorTime);
 
-                return EMPTY_LIST;
+                if (percentCPUTimeCounter != null) {
+
+                    final double percentCPUTime = ((Number) percentCPUTimeCounter
+                            .getInstrument().getValue()).doubleValue();
+
+                    if (percentCPUTime < resourceManager.movePercentCpuTimeThreshold) {
+
+                        /*
+                         * The host has been demonstrated to not be busy so
+                         * there is no point moving an index partition in order
+                         * to shed load.
+                         */
+                        
+                        if (INFO)
+                            log.info("Host is not busy.");
+
+                        return EMPTY_LIST;
+
+                    }
+
+                } else {
+
+                    /*
+                     * Log warning but continue since may be executing before
+                     * counters were reported or in a test harness.
+                     */
+                    log.warn("Counter not found? "
+                            + IRequiredHostCounters.CPU_PercentProcessorTime);
+
+                }
+
+            } else {
+
+                /*
+                 * Log warning but continue since may be executing before
+                 * counters were reported or in a test harness.
+                 */
+                log.warn("No counters for this host?");
 
             }
-
+            
         }
         
         // inquire if this service is highly utilized.
