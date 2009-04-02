@@ -49,6 +49,7 @@ import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.IndexPartitionCause;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.resources.ResourceManager.Options;
@@ -606,6 +607,14 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
                                 journal.getResourceMetadata(),//
                                 segmentMetadata //
                         },//
+                        /*
+                         * Note: using fake data here since the resource manager
+                         * has not been instantiated yet.
+                         */
+                        new IndexPartitionCause(
+                                        IndexPartitionCause.CauseEnum.Register,
+                                        0/*overflowCounter*/, System
+                                                .currentTimeMillis()/*lastCommitTime*/),
                         "bootstrap() "// history
                         ));
 

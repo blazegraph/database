@@ -1,7 +1,6 @@
 package com.bigdata.service.jini;
 
 import java.util.Arrays;
-import java.util.Properties;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -11,7 +10,6 @@ import net.jini.discovery.LookupDiscovery;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.util.NV;
 
 /**
@@ -147,55 +145,6 @@ public class JiniClientConfig {
 
         if (INFO)
             log.info(toString());
-
-    }
-
-    /**
-     * Read {@link Options#PROPERTIES} for the optional application or server
-     * class identified by [cls].
-     * <p>
-     * Note: Anything read for the specific class will overwrite any value for
-     * the same properties specified for {@link JiniClient}.
-     * 
-     * @param className
-     *            The class name of the client or service (optional). When
-     *            specified, properties defined for that class in the
-     *            configuration will be used and will override those specified
-     *            for the {@value Options#NAMESPACE}.
-     * @param config
-     *            The {@link Configuration}.
-     * 
-     * @todo this could be replaced by explicit use of the java identifier
-     *       corresponding to the Option and simply collecting all such
-     *       properties into a Properties object using their native type (as
-     *       reported by the ConfigurationFile).
-     */
-    static public Properties getProperties(final String className,
-            final Configuration config) throws ConfigurationException {
-
-        final Properties properties = new Properties();
-
-        final NV[] a = (NV[]) config.getEntry(JiniClient.class.getName(),
-                Options.PROPERTIES, NV[].class, new NV[] {}/* defaultValue */);
-
-        final NV[] b;
-        if (className != null) {
-
-            b = (NV[]) config.getEntry(className, Options.PROPERTIES,
-                    NV[].class, new NV[] {}/* defaultValue */);
-
-        } else
-            b = null;
-
-        final NV[] tmp = ServiceConfiguration.concat(a, b);
-
-        for (NV nv : tmp) {
-
-            properties.setProperty(nv.getName(), nv.getValue());
-
-        }
-
-        return properties;
 
     }
 

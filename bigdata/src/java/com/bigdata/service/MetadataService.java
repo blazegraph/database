@@ -48,6 +48,7 @@ import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IndexExistsException;
 import com.bigdata.journal.NoSuchIndexException;
+import com.bigdata.mdi.IndexPartitionCause;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
@@ -1122,7 +1123,8 @@ abstract public class MetadataService extends DataService implements
                          * the when the task actually executes on the data
                          * service.
                          */
-                         null, // Signal to the RegisterIndexTask.
+                         null, // [resources] Signal to the RegisterIndexTask.
+                         null, // [cause] Signal to RegisterIndexTask
                          /*
                           * History.
                           */

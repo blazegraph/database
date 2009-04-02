@@ -10,17 +10,14 @@ import org.apache.log4j.Logger;
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.ILinearList;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleCursor;
 import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.IndexMetadata.Options;
+import com.bigdata.btree.filter.Advancer;
 import com.bigdata.mdi.IResourceMetadata;
-import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.resources.SplitIndexPartitionTask.AtomicUpdateSplitIndexPartitionTask;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.Split;
@@ -135,7 +132,10 @@ public class DefaultSplitHandler implements ISplitHandler {
      *            partitions will be choosen such that each index partition is
      *            approximately <i>underCapacityMultiple</i> full.
      * @param sampleRate
-     *            #of samples to take per estimated split.
+     *            The #of samples to take per estimated split (non-negative, and
+     *            generally on the order of 10s of samples). The purpose of the
+     *            samples is to accomodate the actual distribution of the keys
+     *            in the index.
      * 
      * @throws IllegalArgumentException
      *             if any argument, or combination or arguments, is out of
@@ -201,8 +201,17 @@ public class DefaultSplitHandler implements ISplitHandler {
     }
     
     /**
+     * Verify that a split will not result in index partitions whose range
+     * counts are such that they would be immediately eligible for a join.
      * 
+     * @throws IllegalArgumentException
+     *             if split / join is not stable for the specified values.
      * 
+     * @todo it might be worth while to convert this to a warning since actions
+     *       such as a scatter split are designed with the expectation that the
+     *       splits may be undercapacity but will fill up before the next
+     *       overflow (or that joins will simply not be triggered for N
+     *       overflows after a split).
      */
     static void assertSplitJoinStable(final int minimumEntryCount,
             final int entryCountPerSplit, final double underCapacityMultiplier) {
@@ -230,6 +239,10 @@ public class DefaultSplitHandler implements ISplitHandler {
 
     public void setMinimumEntryCount(final int minimumEntryCount) {
 
+        if (minimumEntryCount < 0)
+            throw new IllegalArgumentException("minimumEntryCount="
+                    + minimumEntryCount);
+        
         assertSplitJoinStable(minimumEntryCount, getEntryCountPerSplit(),
                 getUnderCapacityMultiplier());
 
@@ -248,13 +261,20 @@ public class DefaultSplitHandler implements ISplitHandler {
 
     public void setEntryCountPerSplit(final int entryCountPerSplit) {
 
-        if (entryCountPerSplit < Options.MIN_BRANCHING_FACTOR) {
+//        if (entryCountPerSplit < Options.MIN_BRANCHING_FACTOR) {
+//
+//            throw new IllegalArgumentException(
+//                    "entryCountPerSplit must be GTE the minimum branching factor: entryCountPerSplit="
+//                            + entryCountPerSplit
+//                            + ", minBranchingFactor="
+//                            + Options.MIN_BRANCHING_FACTOR);
+//
+//        }
+        if (entryCountPerSplit < 1) {
 
             throw new IllegalArgumentException(
-                    "entryCountPerSplit must be GTE the minimum branching factor: entryCountPerSplit="
-                            + entryCountPerSplit
-                            + ", minBranchingFactor="
-                            + Options.MIN_BRANCHING_FACTOR);
+                    "entryCountPerSplit must be GTE ONE(1): entryCountPerSplit="
+                            + entryCountPerSplit);
 
         }
 
@@ -274,7 +294,10 @@ public class DefaultSplitHandler implements ISplitHandler {
 
     }
 
-    public void setSampleRate(int sampleRate) {
+    public void setSampleRate(final int sampleRate) {
+        
+        if (sampleRate <= 0)
+            throw new IllegalArgumentException();
 
         this.sampleRate = sampleRate;
 
@@ -440,13 +463,18 @@ public class DefaultSplitHandler implements ISplitHandler {
      *            Used to return the actual #of tuples in the view as measured
      *            by a scan of the index partition.
      * 
-     * @return An ordered array of {@link Sample}s as an aid to choosen the
+     * @return An ordered array of {@link Sample}s as an aid to choose the
      *         split points for the view.
+     * 
+     * @todo We could probably use an {@link Advancer} which automatically skips
+     *       over [sampleEveryNTuples] after each tuple that it visits, but that
+     *       is not going to reduce the actual work performed since the view is
+     *       a local B+Tree.
      */
     public Sample[] sampleIndex(final ILocalBTreeView ndx,
             final AtomicLong nvisited) {
 
-        final int rangeCount = (int) Math.min(ndx.rangeCount(null, null),
+        final int rangeCount = (int) Math.min(ndx.rangeCount(),
                 Integer.MAX_VALUE);
 
         final ITupleIterator itr = ndx.rangeIterator(null, null,
@@ -508,7 +536,9 @@ public class DefaultSplitHandler implements ISplitHandler {
 
         }
 
-        assert samples.size() > 0;
+        final int nsamples = samples.size();
+        
+        assert nsamples > 0;
 
         assert samples.get(0).offset == 0 : "Expecting offset := 0 for 1st sample, not "
                 + samples.get(0).offset;
@@ -516,13 +546,13 @@ public class DefaultSplitHandler implements ISplitHandler {
         // the actual #of index entries in the view.
         nvisited.set(tuple == null ? 0L : tuple.getVisitCount());
 
-        if(INFO)
-        log.info("Collected " + samples.size() + " samples from " + nvisited
-                + " index entries; estimatedSplitCount=" + numSplitsEstimate
-                + ", sampleRate=" + getSampleRate() + ", sampling every "
-                + sampleEveryNTuples);
+        if (INFO)
+            log.info("Collected " + nsamples + " samples from " + nvisited
+                    + " index entries; estimatedSplitCount="
+                    + numSplitsEstimate + ", sampleRate=" + getSampleRate()
+                    + ", sampling every " + sampleEveryNTuples);
 
-        return samples.toArray(new Sample[samples.size()]);
+        return samples.toArray(new Sample[nsamples]);
 
     }
 
@@ -544,11 +574,6 @@ public class DefaultSplitHandler implements ISplitHandler {
      *         identifiers.
      * 
      * @see #getSplits(IIndex, int, Sample[])
-     * 
-     * FIXME Can't we use an {@link ITupleCursor} or {@link ILinearList} here
-     * and do less work by advancing to a desired #of tuples into the
-     * {@link BTree}? E.g., scanning forward or backward and using keyAt() and
-     * indexOf().
      * 
      * @todo Subclasses which impose constraints on where the index partition
      *       can be split need to use {@link ITupleCursor}. They can simply
@@ -702,138 +727,30 @@ public class DefaultSplitHandler implements ISplitHandler {
             final IIndex ndx, final int nsplits, final Sample[] samples,
             final long nvisited) {
 
-        // The source index partition metadata.
-        final IndexMetadata indexMetadata = ndx.getIndexMetadata();
-
-        // The target #of index entries per split.
-        final int targetCapacity = (int) (getEntryCountPerSplit() * getUnderCapacityMultiplier());
+        final int targetCapacity = (int) Math.ceil(getEntryCountPerSplit()
+                * getUnderCapacityMultiplier());
 
         // The splits that we will generate.
         final List<Split> splits = new ArrayList<Split>(nsplits);
 
-        // The metadata for the index partition that is being split. 
-        final LocalPartitionMetadata oldpmd = ndx.getIndexMetadata().getPartitionMetadata();
+        final Splitter splitter = new Splitter(partitionIdFactory, ndx,
+                nsplits, samples, targetCapacity, nvisited);
 
-        if (oldpmd.getSourcePartitionId() != -1) {
-            
-            throw new IllegalStateException(
-                    "Split not allowed during move: sourcePartitionId="
-                            + oldpmd.getSourcePartitionId());
+        while (true) {
+
+            final Split split = splitter.nextSplit();
+
+            if (split != null) {
+
+                splits.add(split);
+                
+            } else {
+                
+                break;
+                
+            }
             
         }
-        
-        // index into the samples[].
-        int j = 0;
-        // #of index entries assigned into splits so far.
-        int nused = 0;
-        // begin at index zero into the source index partition.
-        int fromIndex = 0;
-        // begin with the leftSeparator for the source index partition.
-        byte[] fromKey = oldpmd.getLeftSeparatorKey();
-
-        for (int i = 0; i < nsplits; i++) {
-
-            Sample sample = null;
-
-            // consider remaining samples.
-            for (; j < samples.length; j++) {
-
-                sample = samples[j];
-
-                final int count = sample.offset - nused;
-
-                if (count >= targetCapacity) {
-
-                    if (INFO)
-                        log.info("Filled split[" + i + "] with " + count
-                                + " entries: targetCapacity=" + targetCapacity
-                                + ", samples[j]=" + sample);
-
-                    j++; // consumed.
-
-                    nused += count;
-
-                    break;
-
-                }
-
-            }
-
-            final int toIndex;
-            if (sample == null) {
-
-                assert j == samples.length : "j="+j+", samples.length="+samples.length;
-
-                toIndex = 0;
-
-            } else {
-
-                toIndex = sample.offset;
-
-            }
-
-            if (fromIndex == toIndex) {
-
-                /*
-                 * Note: I've seen what appears to be an empty Split, which is
-                 * illegal, so I added this to get some more information on when
-                 * that occurs and added detail to the asserts in the Split()
-                 * ctor. If you see this warning look into it a bit further and
-                 * see what the fence post conditions are.
-                 */
-                
-                log
-                        .warn("Skipping over an empty split: fromIndex="
-                                + fromIndex + ", toIndex=" + toIndex + ", j="
-                                + j + ", nused=" + nused + ", fromKey="
-                                + fromKey + ", sample=" + sample);
-
-                continue;
-                
-            }
-            
-            final byte[] toKey;
-            if (i == nsplits - 1) {
-
-                // Note: always assign the rightSeparator to the last split.
-
-                toKey = ndx.getIndexMetadata().getPartitionMetadata()
-                        .getRightSeparatorKey();
-
-            } else {
-
-                assert sample != null;
-
-                toKey = sample.key;
-
-            }
-
-            // Get the next partition identifier for the named scale-out index.
-            final int partitionId = partitionIdFactory
-                    .nextPartitionId(indexMetadata.getName());
-
-            final LocalPartitionMetadata pmd = new LocalPartitionMetadata(
-                    partitionId,//
-                    -1, // Note: split not allowed during move.
-                    fromKey,//
-                    toKey,//
-                    /*
-                     * Note: no resources for an index segment
-                     */
-                    null,//
-                    oldpmd.getHistory()+
-                    "chooseSplitPoint(oldPartitionId="
-                            + oldpmd.getPartitionId() + ",nsplits=" + nsplits
-                            + ",newPartitionId=" + partitionId + ") "
-                    );
-
-            splits.add( new Split(pmd, fromIndex, toIndex) );
-
-            fromKey = toKey;
-
-            fromIndex = toIndex;
-
-        } // next split.
 
         final int splitCount = splits.size();
 
@@ -853,9 +770,8 @@ public class DefaultSplitHandler implements ISplitHandler {
      * Return an adjusted split handler. The split handler will be adjusted to
      * be heavily biased in favor of splitting an index partition when the #of
      * index partitions for a scale-out index is small. This adjustment is
-     * designed to very rapidly (re-)distribute a new scale-out index until
-     * there are at least 10 index partitions and rapidly (re-)distribute a
-     * scale-out index until they are at least 100 index partitions. Thereafter
+     * designed to rapidly (re-)distribute a new scale-out index until there are
+     * at least <i>accelerateSplitThreshold</i> index partitions. Thereafter
      * the as configured behavior will be observed.
      * <p>
      * Note: The potential parallelism of a data service is limited by the #of
@@ -876,6 +792,10 @@ public class DefaultSplitHandler implements ISplitHandler {
      * Note: The adjustment is proportional to the #of existing index partitions
      * and is adjusted using a floating point discount factor. This should
      * prevent a split triggering a subsequent join on the next overflow.
+     * <p>
+     * Note: There are other ways to achieve a similar goal, including
+     * pre-splitting an index partition (when possible) or scatter-splits of an
+     * index partition once it has buffered up some data.
      * 
      * @param accelerateSplitThreshold
      *            The #of index partitions below which we will accelerate the

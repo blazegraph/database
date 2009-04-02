@@ -249,14 +249,25 @@ public class SplitUtility {
                 
                 // if null then the source right separator must have been null.
                 if (originalPartitionMetadata.getRightSeparatorKey() != null)
-                    throw new AssertionError();
+                    throw new AssertionError(
+                            "rightSeparator for lastSplit: expected="
+                                    + BytesUtil
+                                            .toString(originalPartitionMetadata
+                                                    .getRightSeparatorKey())
+                                    + ", actual=null");
                 
             } else {
-                
+
                 // otherwise must compare as equals byte-by-byte.
                 if (!rightSeparator.equals(originalPartitionMetadata
                         .getRightSeparatorKey()))
-                    throw new AssertionError();
+                    throw new AssertionError(
+                            "rightSeparator for lastSplit: expected="
+                                    + BytesUtil
+                                            .toString(originalPartitionMetadata
+                                                    .getRightSeparatorKey())
+                                    + ", actual="
+                                    + BytesUtil.toString(rightSeparator));
                 
             }
             
@@ -390,6 +401,10 @@ public class SplitUtility {
                      * Note: no resources for an index segment
                      */
                     null,//
+                    /*
+                     * Note: cause will be set by the atomic update task.
+                     */
+                    null,//
                     oldpmd.getHistory()
                             + "chooseTailSplitPoint(oldPartitionId="
                             + oldpmd.getPartitionId() + ",nsplits=" + 2
@@ -420,6 +435,11 @@ public class SplitUtility {
                     toKey,//
                     /*
                      * Note: no resources for an index segment
+                     */
+                    null,//
+                    /*
+                     * Note: Cause will be set by the atomic update for the
+                     * split task.
                      */
                     null,//
                     oldpmd.getHistory()

@@ -288,7 +288,7 @@ public class SPOIndexWriter implements Callable<Long> {
 
         }
 
-        long elapsed = System.currentTimeMillis() - beginIndex;
+        final long elapsed = System.currentTimeMillis() - beginIndex;
 
         return elapsed;
 

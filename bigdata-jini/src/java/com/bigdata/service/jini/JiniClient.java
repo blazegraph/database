@@ -40,8 +40,10 @@ import net.jini.config.ConfigurationProvider;
 
 import org.apache.zookeeper.ZooKeeper;
 
+import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.service.AbstractScaleOutClient;
+import com.bigdata.util.NV;
 import com.sun.jini.start.ServiceDescriptor;
 
 /**
@@ -196,7 +198,133 @@ public class JiniClient extends AbstractScaleOutClient {
         return config;
         
     }
+
+    /**
+     * {@inheritDoc}
+     * 
+     * @see #getProperties(String component)
+     */
+    @Override
+    public Properties getProperties() {
+        
+        return super.getProperties();
+        
+    }
     
+    /**
+     * Return the {@link Properties} for the {@link JiniClient} merged with
+     * those for the named component in the {@link Configuration}. Any
+     * properties found for the {@link JiniClient} "component" will be read
+     * first. Properties for the named component are next, and therefore will
+     * override those given for the {@link JiniClient}. You can specify
+     * properties for either the {@link JiniClient} or the <i>component</i>
+     * using:
+     * 
+     * <pre>
+     * properties = NV[]{...};
+     * </pre>
+     * 
+     * in the appropriate section of the {@link Configuration}. For example:
+     * 
+     * <pre>
+     * 
+     * // Jini client configuration
+     * com.bigdata.service.jini.JiniClient {
+     * 
+     *     // ...
+     * 
+     *     // optional JiniClient properties.
+     *     properties = new NV[] {
+     *        
+     *        new NV(&quot;foo&quot;,&quot;bar&quot;)
+     *        
+     *     };
+     * 
+     * }
+     * </pre>
+     * 
+     * And overrides for a named component as:
+     * 
+     * <pre>
+     * 
+     * com.bigdata.service.FooBaz {
+     * 
+     *    properties = new NV[] {
+     *    
+     *        new NV(&quot;foo&quot;,&quot;baz&quot;),
+     *        new NV(&quot;goo&quot;,&quot;12&quot;),
+     *    
+     *    };
+     * 
+     * }
+     * </pre>
+     * 
+     * @param component
+     *            The name of the component.
+     * 
+     * @return The properties specified for that component.
+     * 
+     * @see #getConfiguration()
+     */
+    public Properties getProperties(final String component)
+            throws ConfigurationException {
+
+        return JiniClient.getProperties(component, getConfiguration());
+
+    }
+    
+    /**
+     * Read {@value JiniClientConfig.Options#PROPERTIES} for the optional
+     * application or server class identified by [cls].
+     * <p>
+     * Note: Anything read for the specific class will overwrite any value for
+     * the same properties specified for {@link JiniClient}.
+     * 
+     * @param className
+     *            The class name of the client or service (optional). When
+     *            specified, properties defined for that class in the
+     *            configuration will be used and will override those specified
+     *            for the {@value Options#NAMESPACE}.
+     * @param config
+     *            The {@link Configuration}.
+     * 
+     * @todo this could be replaced by explicit use of the java identifier
+     *       corresponding to the Option and simply collecting all such
+     *       properties into a Properties object using their native type (as
+     *       reported by the ConfigurationFile).
+     */
+    static public Properties getProperties(final String className,
+            final Configuration config) throws ConfigurationException {
+    
+        final Properties properties = new Properties();
+
+        final NV[] a = (NV[]) config
+                .getEntry(JiniClient.class.getName(),
+                        JiniClientConfig.Options.PROPERTIES, NV[].class,
+                        new NV[] {}/* defaultValue */);
+
+        final NV[] b;
+        if (className != null) {
+
+            b = (NV[]) config.getEntry(className,
+                    JiniClientConfig.Options.PROPERTIES, NV[].class,
+                    new NV[] {}/* defaultValue */);
+    
+        } else
+            b = null;
+    
+        final NV[] tmp = ServiceConfiguration.concat(a, b);
+    
+        for (NV nv : tmp) {
+    
+            properties.setProperty(nv.getName(), nv.getValue());
+    
+        }
+    
+        return properties;
+    
+    }
+
     /**
      * Installs a {@link SecurityManager} and returns a new client.
      * 
@@ -263,7 +391,7 @@ public class JiniClient extends AbstractScaleOutClient {
     public JiniClient(final Class cls, final Configuration config)
             throws ConfigurationException {
 
-        super(JiniClientConfig.getProperties(cls.getName(), config));
+        super(JiniClient.getProperties(cls.getName(), config));
         
         this.jiniConfig = new JiniClientConfig(cls.getName(), config);
 
