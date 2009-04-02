@@ -38,6 +38,7 @@ import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.IndexPartitionCause;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
@@ -288,6 +289,7 @@ public class JoinIndexPartitionTask extends AbstractPrepareTask<JoinResult> {
                         // Note: the live journal.
                         getJournal().getResourceMetadata() //
                         },//
+                        IndexPartitionCause.join(resourceManager),
                         // new history line.
                         summary+" "));
 

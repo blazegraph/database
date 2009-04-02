@@ -42,6 +42,7 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.IndexPartitionCause;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 
@@ -120,6 +121,7 @@ public class TestOverflow extends AbstractResourceManagerTestCase {
                     new IResourceMetadata[]{
                             journal.getResourceMetadata()
                     },//
+                    IndexPartitionCause.register(resourceManager),
                     ""//history
                     ));
             

@@ -78,6 +78,7 @@ public class TestIndexPartitionFencePosts extends AbstractBTreeTestCase {
                 new byte[]{}, // leftSeparator
                 null, // rightSeparator
                 null, // no resource descriptions.
+                null, // no cause.
                 "" // history
                 ));
         

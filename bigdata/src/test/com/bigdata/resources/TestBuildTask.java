@@ -48,6 +48,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.IndexProcedureTask;
 import com.bigdata.journal.RegisterIndexTask;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.IndexPartitionCause;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
@@ -124,6 +125,7 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
                     new IResourceMetadata[] {//
                             resourceManager.getLiveJournal().getResourceMetadata(), //
                     }, //
+                    IndexPartitionCause.register(resourceManager),
                     "" // history
                     ));
 

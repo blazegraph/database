@@ -60,7 +60,9 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("resources");
+        final TestSuite suite = new TestSuite("resources");
+        
+        suite.addTestSuite(TestDefaultSplitHandler.class);
 
         /*
          * Test management of local resources.

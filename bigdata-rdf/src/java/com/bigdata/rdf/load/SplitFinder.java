@@ -463,6 +463,8 @@ public class SplitFinder {
                 new IResourceMetadata[]{
                         tempStore.getIndexManager().getResourceMetadata()
                 },
+                // cause
+                null,
                 "" // history
                 );
 
@@ -1692,8 +1694,8 @@ public class SplitFinder {
             
             final Configuration config = fed.getClient().getConfiguration();
 
-            final Properties properties = JiniClientConfig.getProperties(
-                    ConfigurationOptions.COMPONENT, config);
+            final Properties properties = fed.getClient().getProperties(
+                    ConfigurationOptions.COMPONENT);
 
             final int nsplits = (Integer) config.getEntry(
                     ConfigurationOptions.COMPONENT,

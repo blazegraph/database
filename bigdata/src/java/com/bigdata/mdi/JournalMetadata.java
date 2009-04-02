@@ -98,15 +98,15 @@ public class JournalMetadata extends AbstractResourceMetadata {
 
     }
 
-    public JournalMetadata(File file, /*long nbytes,*/ UUID uuid, long commitTime) {
+    public JournalMetadata(File file, /*long nbytes,*/ UUID uuid, long createTime) {
         
-        this(file.getName()/*,nbytes*/,uuid,commitTime);
+        this(file.getName()/*,nbytes*/,uuid,createTime);
         
     }
 
-    JournalMetadata(String file, /*long nbytes, */UUID uuid, long commitTime) {
+    JournalMetadata(String file, /*long nbytes, */UUID uuid, long createTime) {
 
-        super(file, /*nbytes, */ uuid, commitTime);
+        super(file, /*nbytes, */ uuid, createTime);
 
     }
 

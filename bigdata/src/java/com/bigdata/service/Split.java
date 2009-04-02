@@ -93,8 +93,12 @@ public class Split {
 
         this.pmd = pmd;
 
-        assert fromIndex >= 0 : "fromIndex="+fromIndex;
-        assert toIndex >= fromIndex : "fromIndex="+fromIndex+", toIndex="+toIndex;
+        if (fromIndex < 0)
+            throw new IllegalArgumentException("fromIndex=" + fromIndex);
+
+        if (toIndex < fromIndex)
+            throw new IllegalArgumentException("fromIndex=" + fromIndex
+                    + ", toIndex=" + toIndex);
 
         this.fromIndex = fromIndex;
 

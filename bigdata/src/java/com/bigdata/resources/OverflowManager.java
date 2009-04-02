@@ -2134,6 +2134,7 @@ abstract public class OverflowManager extends IndexManager {
                                     oldpmd.getLeftSeparatorKey(),//
                                     oldpmd.getRightSeparatorKey(),//
                                     newResources, //
+                                    oldpmd.getIndexPartitionCause(),
                                     oldpmd.getHistory()+
                                     OverflowActionEnum.Copy+
                                     "(lastCommitTime="
@@ -2179,6 +2180,7 @@ abstract public class OverflowManager extends IndexManager {
                                     oldpmd.getLeftSeparatorKey(),//
                                     oldpmd.getRightSeparatorKey(),//
                                     newResources, //
+                                    oldpmd.getIndexPartitionCause(),
                                     oldpmd.getHistory()+
                                     "overflow(lastCommitTime="
                                             + lastCommitTime + ",entryCount="

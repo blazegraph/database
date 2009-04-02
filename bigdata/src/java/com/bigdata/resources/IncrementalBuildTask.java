@@ -521,6 +521,7 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
                         currentpmd.getLeftSeparatorKey(),//
                         currentpmd.getRightSeparatorKey(),//
                         newResources, //
+                        currentpmd.getIndexPartitionCause(),
                         currentpmd.getHistory()
                                 + OverflowActionEnum.Build//
                                 + "(lastCommitTime="

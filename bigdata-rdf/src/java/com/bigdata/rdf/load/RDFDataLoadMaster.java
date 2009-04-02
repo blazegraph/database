@@ -76,6 +76,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.jini.start.BigdataZooDefs;
 import com.bigdata.journal.ITx;
+import com.bigdata.rdf.load.SplitFinder.ConfigurationOptions;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.rio.StatementBuffer;
@@ -90,6 +91,7 @@ import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.jini.JiniClient;
+import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.zookeeper.ZLock;
 import com.bigdata.zookeeper.ZooHelper;
@@ -1032,7 +1034,7 @@ public class RDFDataLoadMaster implements Callable<Void> {
      * {@link EDS}) or connect to an existing federation ({@link JDS} for
      * scale-out configurations).
      */
-    public AbstractTripleStore openTripleStore() {
+    public AbstractTripleStore openTripleStore() throws ConfigurationException {
 
         /*
          * Create/re-open the triple store.
@@ -1087,23 +1089,17 @@ public class RDFDataLoadMaster implements Callable<Void> {
     }
 
     /**
-     * Create the {@link ITripleStore} specified by
-     * {@link ConfigurationOptions#NAMESPACE}.
-     * <p>
-     * Note: The properties used to configure the {@link ITripleStore} are taken
-     * from {@link IBigdataClient#getProperties()}. For the jini deployment,
-     * you specify those properties by declaring
+     * Create the {@link AbstractTripleStore} specified by
+     * {@link ConfigurationOptions#NAMESPACE}. The {@link AbstractTripleStore}
+     * is configured using {@link JiniClient#getProperties(String)}, where the
+     * <i>component</i> is the name of the {@link RDFDataLoadMaster} (sub)class
+     * that is being executed.
      * 
-     * <pre>
-     * properties = NV[]{...};
-     * </pre>
+     * @return The {@link AbstractTripleStore}
      * 
-     * for the component which is the master for the job, e.g., the
-     * {@link RDFDataLoadMaster}.
-     * 
-     * @return The {@link ITripleStore}
+     * @see JiniClient#getProperties(String)
      */
-    protected AbstractTripleStore createTripleStore() {
+    protected AbstractTripleStore createTripleStore() throws ConfigurationException {
 
         if (INFO)
             log.info("Creating tripleStore: " + jobState.namespace);
@@ -1114,8 +1110,9 @@ public class RDFDataLoadMaster implements Callable<Void> {
          * You can specify those properties using NV[] for the component that is
          * executing the master.
          */
-        final Properties properties = fed.getClient().getProperties();
-
+        final Properties properties = fed.getClient().getProperties(
+                getClass().getName());
+        
         final AbstractTripleStore tripleStore = new ScaleOutTripleStore(fed,
                 jobState.namespace, ITx.UNISOLATED, properties);
 

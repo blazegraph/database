@@ -106,6 +106,12 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
     private IResourceMetadata[] resources;
 
     /**
+     * The reason why an index partition was created together with some metadata
+     * about when it was created.
+     */
+    private IndexPartitionCause cause;
+    
+    /**
      * A history of operations giving rise to the current partition metadata.
      * E.g., register(timestamp), copyOnOverflow(timestamp), split(timestamp),
      * join(partitionId,partitionId,timestamp), etc. This is truncated when
@@ -191,6 +197,8 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
      *            the {@link IndexMetadata} is sent to a remote
      *            {@link DataService} this field MUST be <code>null</code> and
      *            the remote {@link DataService} will fill it in on arrival.
+     * @param cause
+     *            The underlying cause for the creation of the index partition.
      * @param history
      *            A human interpretable history of the index partition. The
      *            history is a series of whitespace delimited records each of
@@ -204,6 +212,7 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
             final byte[] leftSeparatorKey,//
             final byte[] rightSeparatorKey,// 
             final IResourceMetadata[] resources,//
+            final IndexPartitionCause cause,
             final String history
             ) {
 
@@ -221,6 +230,8 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
 
         this.resources = resources;
 
+        this.cause = cause;
+        
         this.history = history;
         
         /*
@@ -254,6 +265,14 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
                 
             }
 
+            for (IResourceMetadata t : resources) {
+
+                if (t == null)
+                    throw new IllegalArgumentException(
+                            "null value in resources[]");
+                
+            }
+            
             /*
              * This is the "live" journal.
              * 
@@ -265,7 +284,7 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
              * partition.
              */
 
-            if (!(resources[0] instanceof JournalMetadata)) {
+            if (!resources[0].isJournal()) {
 
                 throw new RuntimeException(
                         "Expecting a journal as the first resource: " + this);
@@ -412,6 +431,16 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
     }
 
     /**
+     * The reason why an index partition was created together with some metadata
+     * about when it was created.
+     */
+    final public IndexPartitionCause getIndexPartitionCause() {
+        
+        return cause;
+        
+    }
+    
+    /**
      * A history of the changes to the index partition.
      * 
      * @deprecated I've essentially disabled the history (it is always empty
@@ -490,6 +519,7 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
         ", leftSeparator="+BytesUtil.toString(leftSeparatorKey)+
         ", rightSeparator="+BytesUtil.toString(rightSeparatorKey)+
         ", resourceMetadata="+Arrays.toString(resources)+
+        ", cause="+cause+
         ", history="+history+
         "}"
         ;

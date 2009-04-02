@@ -66,7 +66,6 @@ import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
-import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
@@ -2669,84 +2668,14 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     }
     
     /**
-     * Validates some aspects of the {@link IndexMetadata} for an index
-     * partition and sets the {@link IResourceMetadata} to this journal if it is
-     * <code>null</code> since a remote caller can not have the correct
-     * metadata on hand when they formulate the request.
+     * Provides an opportunity to validate some aspects of the
+     * {@link IndexMetadata} for an index partition.
      */
     protected void validateIndexMetadata(final String name,
             final IndexMetadata metadata) {
 
-        final LocalPartitionMetadata pmd = metadata.getPartitionMetadata();
-
-        if (pmd != null) {
-
-            if (pmd.getResources() == null) {
-
-                /*
-                 * A [null] for the resources field is a specific indication
-                 * that we need to specify the resource metadata for the live
-                 * journal at the time that the index partition is registered.
-                 * This indicator is used when the metadata service registers an
-                 * index partition remotely on a data service since it does not
-                 * (and can not) have access to the resource metadata for the
-                 * live journal as of the time that the index partition actually
-                 * gets registered on the data service.
-                 * 
-                 * The index partition split and join tasks do not have this
-                 * problem since they are run locally. However, an index
-                 * partition move operation also needs to do this.
-                 */
-
-                metadata.setPartitionMetadata(//
-                        new LocalPartitionMetadata(//
-                                pmd.getPartitionId(),//
-                                pmd.getSourcePartitionId(),//
-                                pmd.getLeftSeparatorKey(),//
-                                pmd.getRightSeparatorKey(),//
-                                new IResourceMetadata[] {//
-                                    // The live journal.
-                                    getResourceMetadata() //
-                                },
-                                /*
-                                 * Note: Retains whatever history given by the
-                                 * caller.
-                                 */
-                                pmd.getHistory()+
-                                "register(name="+name+",partitionId="+pmd.getPartitionId()+") "
-                                ));
-
-            } else {
-
-                if (pmd.getResources().length == 0) {
-
-                    throw new RuntimeException(
-                            "Missing resource description: name=" + name
-                                    + ", pmd=" + pmd);
-
-                }
-
-                if (!pmd.getResources()[0].isJournal()) {
-
-                    throw new RuntimeException(
-                            "Expecting resources[0] to be journal: name="
-                                    + name + ", pmd=" + pmd);
-
-                }
-
-                if (!pmd.getResources()[0].getUUID().equals(
-                        getRootBlockView().getUUID())) {
-
-                    throw new RuntimeException(
-                            "Expecting resources[0] to be this journal but has wrong UUID: name="
-                                    + name + ", pmd=" + pmd);
-
-                }
-
-            }
-            
-        }
-
+        // NOP, but extended by the ManagedJournal.
+        
     }
     
     /**

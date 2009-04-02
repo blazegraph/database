@@ -545,6 +545,7 @@ public class CompactingMergeTask extends AbstractPrepareTask<BuildResult> {
                         currentpmd.getLeftSeparatorKey(),//
                         currentpmd.getRightSeparatorKey(),//
                         newResources, //
+                        currentpmd.getIndexPartitionCause(),
                         currentpmd.getHistory()
                                 + OverflowActionEnum.Merge//
                                 + "(lastCommitTime="
