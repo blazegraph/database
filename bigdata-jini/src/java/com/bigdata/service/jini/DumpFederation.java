@@ -540,7 +540,8 @@ public class DumpFederation {
                              */
                             + "\tLeftSeparator"//
                             + "\tRightSeparator"//
-                            + "\tView"
+                            + "\tView"//
+                            + "\tCause"//
                             + "\tHistory"//
                             ;
 
@@ -628,11 +629,17 @@ public class DumpFederation {
                         + Arrays.toString(rec.detailRec.pmd.getResources())
                         + "\"");
 
+                // cause (reason why the index partition was created).
+                sb.append("\t\""
+                        + rec.detailRec.pmd.getIndexPartitionCause()
+                        + "\"");
+
                 // history
                 sb.append("\t\"" + rec.detailRec.pmd.getHistory() + "\"");
 
             } else {
 
+                sb.append("\tN/A");
                 sb.append("\tN/A");
                 sb.append("\tN/A");
 
