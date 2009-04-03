@@ -568,6 +568,8 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
 
         }
 
+        cause = (IndexPartitionCause)in.readObject();
+        
         history = in.readUTF();
         
         resources = nresources>0 ? new IResourceMetadata[nresources] : null;
@@ -620,6 +622,8 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
 
         }
 
+        out.writeObject(cause);
+        
         out.writeUTF(getTruncatedHistory());
                 
         /*
