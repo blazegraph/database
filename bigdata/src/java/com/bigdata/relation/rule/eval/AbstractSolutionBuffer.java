@@ -96,44 +96,44 @@ abstract public class AbstractSolutionBuffer<R> extends
         
     }
     
-    /**
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * @param <E>
-     */
-    private static class ArrayIterator<E> implements ICloseableIterator<E> {
-
-        private final int n;
-        private final E[] a;
-        
-        private int i = 0;
-        
-        public ArrayIterator(int n, E[] a) {
-            
-            this.n = n;
-            
-            this.a = a;
-            
-        }
-        
-        public void close() {
-            // NOP.
-        }
-
-        public boolean hasNext() {
-            return i < n;
-        }
-
-        public E next() {
-            return a[i++];
-        }
-
-        public void remove() {
-            throw new UnsupportedOperationException();
-        }
-        
-    }
+//    /**
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     * @param <E>
+//     */
+//    private static class ArrayIterator<E> implements ICloseableIterator<E> {
+//
+//        private final int n;
+//        private final E[] a;
+//        
+//        private int i = 0;
+//        
+//        public ArrayIterator(int n, E[] a) {
+//            
+//            this.n = n;
+//            
+//            this.a = a;
+//            
+//        }
+//        
+//        public void close() {
+//            // NOP.
+//        }
+//
+//        public boolean hasNext() {
+//            return i < n;
+//        }
+//
+//        public E next() {
+//            return a[i++];
+//        }
+//
+//        public void remove() {
+//            throw new UnsupportedOperationException();
+//        }
+//        
+//    }
 
     /**
      * Concrete implementations must process the {@link ISolution}s, causing
