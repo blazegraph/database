@@ -1,4 +1,7 @@
 <!-- @todo add dependencies for GOM and add GOM to sources that are compiled, jared, etc. -->
+<!-- @todo trim fastutils using a tool to chase the actual class files that we use. -->
+<!-- @todo change the release target to put release notes into the root of the archives. -->
+<!-- @todo maven2 setup so we can run and publish unit tests results. -->
 <project name="bigdata" default="jar" basedir=".">
 
     <property file="build.properties"/>
@@ -226,13 +229,22 @@
 		<exec executable="${ssh.scp}">
 			<arg value="-v"/> <!-- verbose protocol. -->
 			<arg value="-C"/> <!-- compression. -->
-			<arg value="-batch"/> <!-- batch mode. -->
-			<arg value="-l"/><arg value="${ssh.username}"/>
 			<!--
+			<arg value="-l"/><arg value="${ssh.username}"/>
 			<arg value="-pw"/><arg value="${ssh.password}"/>
 			-->
-			<arg value="${release.dir}/${version}-*.tgz"/> <!-- from -->
-			<arg value="frs.sourceforge.net:uploads"/> <!-- to -->
+			<arg value="${release.dir}/${version}-bin.tgz"/> <!-- from -->
+			<arg value="${ssh.username}@frs.sourceforge.net:uploads"/> <!-- to -->
+		</exec>
+		<exec executable="${ssh.scp}">
+			<arg value="-v"/> <!-- verbose protocol. -->
+			<arg value="-C"/> <!-- compression. -->
+			<!--
+			<arg value="-l"/><arg value="${ssh.username}"/>
+			<arg value="-pw"/><arg value="${ssh.password}"/>
+			-->
+			<arg value="${release.dir}/${version}-src.tgz"/> <!-- from -->
+			<arg value="${ssh.username}@frs.sourceforge.net:uploads"/> <!-- to -->
 		</exec>
 	</target>
 	
