@@ -4,6 +4,8 @@ import java.io.File;
 import java.io.FilenameFilter;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
@@ -13,6 +15,8 @@ import com.bigdata.counters.OneShotInstrument;
  * partitioned loading of files from a shared volume.
  */
 public class FileSystemLoader {
+    
+    protected static final Logger log = Logger.getLogger(FileSystemLoader.class);
     
     /**
      * The #of files scanned.
@@ -141,7 +145,8 @@ public class FileSystemLoader {
 
         if (file.isDirectory()) {
 
-            if(ConcurrentDataLoader.INFO) ConcurrentDataLoader.log.info("Scanning directory: " + file);
+            if (log.isInfoEnabled())
+                log.info("Scanning directory: " + file);
 
             final File[] files = filter == null ? file.listFiles() : file
                     .listFiles(filter);
@@ -158,8 +163,8 @@ public class FileSystemLoader {
              * Processing a standard file.
              */
 
-            if (ConcurrentDataLoader.INFO)
-                ConcurrentDataLoader.log.info("Scanning file: " + file);
+            if (log.isInfoEnabled())
+                log.info("Scanning file: " + file);
 
             try {
 
@@ -167,7 +172,7 @@ public class FileSystemLoader {
                 
             } catch (Exception ex) {
                 
-                ConcurrentDataLoader.log.error(file, ex);
+                log.error(file, ex);
                 
             }
 
@@ -233,8 +238,8 @@ public class FileSystemLoader {
             
         }
 
-        if (ConcurrentDataLoader.INFO)
-                ConcurrentDataLoader.log.info("client#=" + clientNum + ", #scanned=" + nscanned
+        if (log.isInfoEnabled())
+            log.info("client#=" + clientNum + ", #scanned=" + nscanned
                     + ", file=" + file);
 
         try {
@@ -243,7 +248,7 @@ public class FileSystemLoader {
             
         } catch (Exception e) {
             
-            ConcurrentDataLoader.log.error("Will not load: " + file, e);
+            log.error("Will not load: " + file, e);
             
         }
 
