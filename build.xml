@@ -1,0 +1,261 @@
+<!-- @todo add dependencies for GOM and add GOM to sources that are compiled, jared, etc. -->
+<project name="bigdata" default="jar" basedir=".">
+
+    <property file="build.properties"/>
+
+    <path id="build.classpath">
+        <fileset dir="${bigdata.dir}/bigdata/lib">
+            <include name="**/*.jar"/>
+        </fileset>
+        <fileset dir="${bigdata.dir}/bigdata-jini/lib">
+            <include name="**/*.jar"/>
+        </fileset>
+        <fileset dir="${bigdata.dir}/bigdata-rdf/lib">
+            <include name="**/*.jar"/>
+        </fileset>
+        <fileset dir="${bigdata.dir}/bigdata-sails/lib">
+            <include name="**/*.jar"/>
+        </fileset>
+    </path>
+
+    <path id="runtime.classpath">
+        <pathelement location="${build.dir}"/>
+        <path refid="build.classpath"/>
+    </path>
+
+    <target name="clean" description="cleans everything in [build.dir], but not the releases.">
+        <delete dir="${build.dir}"/>
+    </target>
+
+    <target name="prepare">
+    	<!-- setup ${version} for regular or snapshot. -->
+	 	<tstamp>
+    	   <format property="today" pattern="ddMMyy" locale="en,US"/>
+    	</tstamp>
+	  	<condition property="version"
+  				value="bigdata-${build.ver}-${today}"
+		  		else="bigdata-${build.ver}">
+	  		<istrue value="${snapshot}"/>
+  		</condition>
+		<!--<echo message="today=${today}"/>-->
+		<echo message="version=${version}"/>
+    	<!-- create directories. -->
+        <mkdir dir="${build.dir}"/>
+        <mkdir dir="${build.dir}/classes"/>
+	    <mkdir dir="${build.dir}/docs"/>
+	    <mkdir dir="${build.dir}/lib"/>
+	    <mkdir dir="${build.dir}/src"/>
+    </target>
+
+	<!-- Note: javac error results often if verbose is disabled. -->
+	<!-- I was able to perform a build with 1.6.0_07. -->
+	<!-- I set the target to 1.5 to support deployment on non-1.6 JVMs. -->
+    <target name="compile" depends="prepare">
+        <mkdir dir="${build.dir}"/>
+        <javac destdir="${build.dir}/classes" 
+               classpathref="build.classpath"
+        	   verbose="off"
+        	   target="1.5"
+               debug="on">
+            <src path="${bigdata.dir}/bigdata/src/java"/>
+            <src path="${bigdata.dir}/bigdata-jini/src/java"/>
+            <src path="${bigdata.dir}/bigdata-rdf/src/java"/>
+            <src path="${bigdata.dir}/bigdata-sails/src/java"/>
+        	<!-- Do not include the unit tests.
+            <src path="${bigdata.dir}/bigdata/src/test"/>
+            <src path="${bigdata.dir}/bigdata-jini/src/test"/>
+            <src path="${bigdata.dir}/bigdata-rdf/src/test"/>
+            <src path="${bigdata.dir}/bigdata-sails/src/test"/>
+            -->
+        </javac>
+    	<!-- copy resources. -->
+        <copy toDir="${build.dir}/classes">
+            <fileset dir="${bigdata.dir}/bigdata/src/java">
+                <exclude name="**/*.java"/>
+                <exclude name="**/package.html"/>
+                <exclude name="**/BytesUtil.c"/>
+            </fileset>
+            <fileset dir="${bigdata.dir}/bigdata-jini/src/java">
+                <exclude name="**/*.java"/>
+                <exclude name="**/package.html"/>
+            </fileset>
+            <fileset dir="${bigdata.dir}/bigdata-rdf/src/java">
+                <exclude name="**/*.java"/>
+                <exclude name="**/package.html"/>
+            </fileset>
+            <fileset dir="${bigdata.dir}/bigdata-sails/src/java">
+                <exclude name="**/*.java"/>
+                <exclude name="**/package.html"/>
+            </fileset>
+        </copy>
+    </target>
+
+    <target name="jar" depends="compile"
+    	description="generates the jar.">
+        <jar destfile="${build.dir}/${version}.jar">
+            <fileset dir="${build.dir}/classes"/>
+            <manifest>
+                <!--<attribute name="Main-Class" value="com/bigdata/rdf/rio/TestRioIntegration"/>-->
+            </manifest>
+        </jar>
+    </target>
+
+	<!-- Note: the javadoc requires a LOT of RAM, but runs quickly on a
+		 server	class machine. -->
+	<target name="javadoc" depends="prepare" if="javadoc">
+        <mkdir dir="${build.dir}/docs/api"/>
+        <javadoc destdir="${build.dir}/docs/api"
+        	defaultexcludes="yes"
+        	         author="true"
+        	        version="true"
+        	            use="true"
+        		   overview="../bigdata/overview.html"
+				windowtitle="bigdata&#174;"
+               classpathref="build.classpath">
+            <packageset dir="${bigdata.dir}/bigdata/src/java"/>
+            <packageset dir="${bigdata.dir}/bigdata-jini/src/java"/>
+            <packageset dir="${bigdata.dir}/bigdata-rdf/src/java"/>
+            <packageset dir="${bigdata.dir}/bigdata-sails/src/java"/>
+			<doctitle><![CDATA[<h1>bigdata&#174;</h1>]]></doctitle>
+	    	<bottom><![CDATA[<i>Copyright &#169; 2006-2009 SYSTAP, LLC. All Rights Reserved.</i>]]></bottom>
+    		<tag name="todo" scope="all" description="TODO:"/>
+    		<tag name="issue" scope="all" description="ISSUE:"/>
+    		<!--tag name="FIXME" scope="all" description="FIXME:"/-->
+		    <link href="http://java.sun.com/j2se/1.5.0/docs/api/"/>
+		    <link href="http://openrdf.org/doc/sesame/api/"/>
+        </javadoc>
+    </target>
+
+	<target name="bundle"
+		description="bundles all dependencies for easier deployments and releases.">
+		<copy toDir="${build.dir}/lib">
+        <fileset dir="${bigdata.dir}/bigdata/lib">
+            <include name="**/*.jar"/>
+            <include name="**/*.so"/>
+            <include name="**/*.dll"/>
+        </fileset>
+        <fileset dir="${bigdata.dir}/bigdata-jini/lib">
+            <include name="**/*.jar"/>
+        </fileset>
+        <fileset dir="${bigdata.dir}/bigdata-rdf/lib">
+            <include name="**/*.jar"/>
+        </fileset>
+        <fileset dir="${bigdata.dir}/bigdata-sails/lib">
+            <include name="**/*.jar"/>
+        </fileset>
+		</copy>
+	</target>
+
+    <target name="release-prepare" depends="jar, bundle, javadoc"
+			description="create a release.">
+    	<!-- The source tree. -->
+		<copy toDir="${build.dir}/src">
+	        <fileset dir="${bigdata.dir}/bigdata/src"/>
+            <fileset dir="${bigdata.dir}/bigdata-jini/src"/>
+            <fileset dir="${bigdata.dir}/bigdata-rdf/src"/>
+            <fileset dir="${bigdata.dir}/bigdata-sails/src"/>
+		</copy>
+		<!-- common files for the root of the archive. -->
+		<copy tofile="${build.dir}/LICENSE.txt" file="bigdata/LICENSE.txt"/>
+		<copy tofile="${build.dir}/overview.html" file="bigdata/overview.html"/>
+		<copy tofile="${build.dir}/readme-jini.txt" file="bigdata-jini/readme.txt"/>
+		<copy toDir="${build.dir}/LEGAL" flatten="true">
+			<fileset dir="${bigdata.dir}">
+				<include name="**/LEGAL/*"/>
+    		</fileset>
+		</copy>
+    </target>
+
+	<target name="release" depends="release-prepare"
+    		description="create source and binary tarballs.">
+		<mkdir dir="${release.dir}"/>
+		<!-- binary distribution. -->
+		<tar destfile="${release.dir}/${version}-bin.tgz"
+			 compression="gzip"
+		>
+			<!-- binary distribution (docs, but no source). -->
+			<tarfileset dir="${build.dir}" prefix="${version}">
+				 <!-- common files from the root of the archive. -->
+				 <include name="LICENSE.txt"/>
+				 <include name="overview.html"/>
+				 <include name="readme-jini.txt"/>
+				 <include name="LEGAL/*"/>
+				 <!-- src, classes, jar, lib, docs. -->
+				 <exclude name="src/**"/>
+				 <exclude name="classes/**"/>
+				 <include name="${version}.jar"/>
+				 <include name="lib/**"/>
+				 <include name="docs/**"/>
+			</tarfileset>
+		</tar>
+		<!-- source distribution. -->
+		<!-- Note: use GNU long file names for paths GT 100 characters. -->
+		<tar destfile="${release.dir}/${version}-src.tgz"
+			 compression="gzip"
+		>
+			<!-- source, but no jar, compiled, docs, etc. -->
+			<tarfileset dir="${build.dir}" prefix="${version}">
+				 <!-- common files from the root of the archive. -->
+				 <include name="LICENSE.txt"/>
+				 <include name="overview.html"/>
+				 <include name="readme-jini.txt"/>
+				 <include name="LEGAL/*"/>
+				 <!-- src, classes, jar, lib, docs. -->
+				 <include name="src/**"/>
+				 <exclude name="classes/**"/>
+				 <exclude name="${version}.jar"/>
+				 <exclude name="lib/**"/>
+				 <exclude name="docs/**"/>
+			</tarfileset>
+		</tar>
+	</target>
+	
+	<!-- Note: I use a public/private key to do this.  You can uncomment the
+	     ssh.password lines if you are going to authenticate directly.
+	     
+	     Note: If you do not have the public key for frs.sourceforge.net cached
+	     in your SSH repository then this will not work since it requests that
+	     you confirm the public key interactively.
+	     -->
+	<target name="upload" depends="release"
+			description="copy release files to server.">
+		<input message="username:" addproperty="ssh.username" defaultValue="${ssh.username}"/>
+		<!-- unless automated by public/private key
+		<input message="password:" addproperty="ssh.password" defaultValue="${ssh.password}"/>
+		-->
+		<exec executable="${ssh.scp}">
+			<arg value="-v"/> <!-- verbose protocol. -->
+			<arg value="-C"/> <!-- compression. -->
+			<arg value="-batch"/> <!-- batch mode. -->
+			<arg value="-l"/><arg value="${ssh.username}"/>
+			<!--
+			<arg value="-pw"/><arg value="${ssh.password}"/>
+			-->
+			<arg value="${release.dir}/${version}-*.tgz"/> <!-- from -->
+			<arg value="frs.sourceforge.net:uploads"/> <!-- to -->
+		</exec>
+	</target>
+	
+	<target name="publish-api" depends="javadoc"
+			description="copy javadoc to server.">
+		<fail message="Javadoc not generated.">
+		  	<condition>
+		  		<not>
+					<available file="docs/api" type="dir"/>
+				</not>
+	  		</condition>
+		</fail>
+		<input message="username:" addproperty="ssh.username" defaultValue="${ssh.username}"/>
+		<input message="password:" addproperty="ssh.password" defaultValue="${ssh.password}"/>
+		<exec executable="${ssh.scp}">
+			<arg value="-r"/> <!-- recursive. -->
+			<arg value="-v"/> <!-- verbose protocol. -->
+			<arg value="-C"/> <!-- compression. -->
+			<arg value="-l"/><arg value="${ssh.username}"/>
+			<arg value="-pw"/><arg value="${ssh.password}"/>
+			<arg value="${build.dir}/docs"/> <!-- from -->
+			<arg value="shell.speakeasy.net:systap.com/bigdata/"/> <!-- to -->
+		</exec>
+	</target>
+	
+</project>
