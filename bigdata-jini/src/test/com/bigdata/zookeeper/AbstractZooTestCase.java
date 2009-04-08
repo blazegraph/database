@@ -109,7 +109,7 @@ public abstract class AbstractZooTestCase extends TestCase2 {
      * contains a description of the zookeeper server instance in case we need
      * to start one.
      */
-    protected final String configFile = "file:src/test/com/bigdata/zookeeper/testzoo.config";
+    protected final String configFile = "file:bigdata-jini/src/test/com/bigdata/zookeeper/testzoo.config";
 
     /**
      * Note: The sessionTimeout is computed as 2x the tickTime as read out of

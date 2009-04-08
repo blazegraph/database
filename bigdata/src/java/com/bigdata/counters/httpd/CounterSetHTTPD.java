@@ -14,6 +14,7 @@ import java.util.Vector;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.httpd.XHTMLRenderer.Model;
+import com.bigdata.counters.query.CounterSetSelector;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.service.IService;
 import com.bigdata.util.httpd.AbstractHTTPD;
@@ -176,8 +177,11 @@ public class CounterSetHTTPD extends AbstractHTTPD {
             
             final OutputStreamWriter w = new OutputStreamWriter(baos);
 
+            // @todo parameterize for CounterSet vs CounterSetBTree.
+            final ICounterSelector counterSelector = new CounterSetSelector(root);
+            
             // build model of the controller state.
-            final Model model = new Model(service, root, uri, parms, header);
+            final Model model = new Model(service, counterSelector, uri, parms, header);
             
             // @todo if controller state error then send HTTP_BAD_REQUEST
             

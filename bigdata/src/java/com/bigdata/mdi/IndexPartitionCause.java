@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
-import com.bigdata.journal.ITimestampService;
 import com.bigdata.resources.ResourceManager;
 
 /**
@@ -152,6 +151,13 @@ public class IndexPartitionCause implements Externalizable {
                 resourceManager.getLiveJournal()
                         .getLastCommitTime());
 
+    }
+    
+    /**
+     * De-serialization ctor.
+     */
+    public IndexPartitionCause() {
+        
     }
     
     /**

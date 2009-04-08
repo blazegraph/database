@@ -455,6 +455,7 @@ abstract public class ServiceConfiguration implements Serializable {
 
              if (listener == null)
                 throw new IllegalArgumentException();
+             
             this.listener = listener;
             
         }

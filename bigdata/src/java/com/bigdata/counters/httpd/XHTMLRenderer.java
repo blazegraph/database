@@ -19,14 +19,9 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.UUID;
 import java.util.Vector;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
@@ -38,12 +33,17 @@ import com.bigdata.counters.ICounter;
 import com.bigdata.counters.ICounterNode;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.IHistoryEntry;
-import com.bigdata.counters.IInstrument;
 import com.bigdata.counters.IServiceCounters;
 import com.bigdata.counters.PeriodEnum;
-import com.bigdata.counters.History.SampleIterator;
 import com.bigdata.counters.httpd.XHTMLRenderer.Model.ReportEnum;
 import com.bigdata.counters.httpd.XHTMLRenderer.Model.TimestampFormatEnum;
+import com.bigdata.counters.query.CSet;
+import com.bigdata.counters.query.CounterSetSelector;
+import com.bigdata.counters.query.HistoryTable;
+import com.bigdata.counters.query.PivotTable;
+import com.bigdata.counters.render.HTMLHistoryTableRenderer;
+import com.bigdata.counters.render.PivotTableRenderer;
+import com.bigdata.counters.render.ValueFormatter;
 import com.bigdata.service.Event;
 import com.bigdata.service.IEventReportingService;
 import com.bigdata.service.IService;
@@ -53,10 +53,6 @@ import com.bigdata.util.HTMLUtility;
  * (X)HTML rendering of a {@link CounterSet}.
  * 
  * @todo UI widgets for regex filters, depth, correlated.
- * 
- * @todo parameterize for expand/collapse of paths, perhaps in session (need
- *       more support on the server to do that) or else just in the URL query
- *       paramoeters.
  * 
  * @todo make documentation available on the counters via click through on their
  *       name.
@@ -71,6 +67,8 @@ public class XHTMLRenderer {
     final static protected boolean INFO = log.isInfoEnabled();
 
     final static protected boolean DEBUG = log.isDebugEnabled();
+
+    final public static String ps = ICounterSet.pathSeparator;
 
     public static class Model {
         
@@ -249,18 +247,16 @@ public class XHTMLRenderer {
 
         };
 
-        final private String ps = ICounterSet.pathSeparator;
-
-        /**
-         * The service reference IFF one was specified when
-         * {@link CounterSetHTTPD} was started.
-         */
-        final public IService service;
+//        /**
+//         * The service reference IFF one was specified when
+//         * {@link CounterSetHTTPD} was started.
+//         */
+//        final public IService service;
         
         /**
-         * The {@link CounterSet} provided by the caller.
+         * Object used to select the performance counters of interest.
          */
-        final public CounterSet root;
+        final public ICounterSelector counterSelector;
         
         /**
          * The URI from the request.
@@ -303,12 +299,26 @@ public class XHTMLRenderer {
         final public TimestampFormatEnum timestampFormat;
 
         /**
-         * The ordered category column names to be used for a
-         * {@link ReportEnum#pivot} report.
+         * The ordered labels to be assigned to the category columns in a
+         * {@link ReportEnum#pivot} report (optional). The order of the names in
+         * the URL query parameters MUST correspond with the order of the
+         * capturing groups in the {@link #REGEX}.
          * 
          * @see #CATEGORY
          */
         final public String[] category;
+        
+        /**
+         * The inclusive lower bound in milliseconds of the timestamp for the
+         * counters or events to be selected.
+         */
+        final long fromTime;
+
+        /**
+         * The exclusive upper bound in milliseconds of the timestamp for the
+         * counters or events to be selected.
+         */
+        final long toTime;
         
         /**
          * The reporting period to be used. When <code>null</code> all periods
@@ -363,8 +373,9 @@ public class XHTMLRenderer {
          * @param fed
          *            The service object IFF one was specified when
          *            {@link CounterSetHTTPD} was started.
-         * @param root
-         *            The root of the counter set.
+         * @param counterSelector
+         *            Object used to select the performance counters of
+         *            interest.
          * @param uri
          *            Percent-decoded URI without parameters, for example
          *            "/index.cgi"
@@ -377,14 +388,14 @@ public class XHTMLRenderer {
          * @param header
          *            Header entries, percent decoded
          */
-        public Model(final IService service, final CounterSet root,
+        public Model(final IService service, final ICounterSelector counterSelector,
                 final String uri,
                 final LinkedHashMap<String, Vector<String>> params,
                 final Properties headers) {
 
-            this.service = service;
+//            this.service = service;
             
-            this.root = root;
+            this.counterSelector = counterSelector;
 
             this.uri = uri;
 
@@ -405,6 +416,15 @@ public class XHTMLRenderer {
             if (depth <= 0)
                 throw new IllegalArgumentException("depth must be GT ZERO(0)");
 
+            /*
+             * FIXME fromTime and toTime are not yet being parsed. They should
+             * be interpreted so as to allow somewhat flexible specification and
+             * should be applied to both performance counter views and event
+             * views.
+             */
+            fromTime = 0L;
+            toTime = Long.MAX_VALUE;
+            
             {
             
                 // the regex that we build up (if any).
@@ -672,8 +692,8 @@ public class XHTMLRenderer {
             if (INFO)
                 log.info(TIMESTAMP_FORMAT + "=" + timestampFormat);
 
-            this.period = getProperty(params, PERIOD, null) == null ? null
-                    : PeriodEnum.valueOf(getProperty(params, PERIOD, null));
+            this.period = PeriodEnum.valueOf(getProperty(params, PERIOD,
+                    PeriodEnum.Minutes.toString()/* defaultValue */));
 
             if (INFO)
                 log.info(PERIOD + "=" + period);
@@ -703,13 +723,6 @@ public class XHTMLRenderer {
             
         }
 
-        // @todo parameterize, perhaps by passing in as an interface.
-        protected boolean isExpanded(String path) {
-            
-            return true;
-            
-        }
-        
         /**
          * Return the first value for the named property.
          * 
@@ -824,39 +837,38 @@ public class XHTMLRenderer {
             }
             
             return sb.toString();
-            
+
         }
-        
+
         static public String encodeURL(final String url) {
-            
+
             final String charset = "UTF-8";
 
             try {
-                
+
                 return URLEncoder.encode(url, charset);
-                
+
             } catch (UnsupportedEncodingException e) {
-                
-                log.error("Could not encode: charset="+charset+", url="+url);
-                
+
+                log.error("Could not encode: charset=" + charset + ", url="
+                        + url);
+
                 return url;
-                
+
             }
             
         }
         
     } // class Model
     
-    final private String encoding = "UTF-8";
-    
-    final private String ps = ICounterSet.pathSeparator;
+    static final private String encoding = "UTF-8";
     
     /*
      * Note: the page is valid for any of these doctypes.
      */
 //    final private DoctypeEnum doctype = DoctypeEnum.html_4_01_strict
 //    final private DoctypeEnum doctype = DoctypeEnum.html_4_01_transitional
-    final private DoctypeEnum doctype = DoctypeEnum.xhtml_1_0_strict;
+    static final private DoctypeEnum doctype = DoctypeEnum.xhtml_1_0_strict;
     
     /**
      * Allows override of the binding(s) for a named property.
@@ -864,7 +876,7 @@ public class XHTMLRenderer {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private class NV {
+    static private class NV {
         
         public final String name;
         public final Vector<String> values;
@@ -1028,13 +1040,16 @@ public class XHTMLRenderer {
         
         w.write("<body\n>");
 
-        final ICounterNode node = model.root.getPath(model.path);
+        /*
+         * @todo alternative ICounterSelect given just a Path.
+         */
+        final ICounterNode node = ((CounterSetSelector)model.counterSelector).getRoot().getPath(model.path);
         
         if(node == null) {
 
             /*
              * Used when the path does not evaluate to anything in the
-             * hierarchy. The generate markup at least lets you choose a parent
+             * hierarchy. The generated markup at least lets you choose a parent
              * from the path.
              */
             
@@ -1060,27 +1075,34 @@ public class XHTMLRenderer {
             
             case hierarchy:
             
+                /*
+                 * @todo rewrite to use node.getDepth() + model.depth so that
+                 * the relative depth is maintained during navigation.
+                 */ 
                 writeCounterSet(w, (CounterSet) node, model.depth);
                 
                 break;
                 
             case correlated:
                 
-                writeCorrelatedCounters(w, selectCounters((CounterSet) node,
-                        model.depth));
+                writeHistoryTable(w, model.counterSelector.selectCounters(
+                        model.depth, model.pattern, model.fromTime,
+                        model.toTime, model.period), model.period,
+                        model.timestampFormat);
                 
                 break;
                 
             case pivot:
                 
-                writePivotTable(w, selectCounters((CounterSet) node,
-                        model.depth));
+                writePivotTable(w, model.counterSelector.selectCounters(
+                        model.depth, model.pattern, model.fromTime,
+                        model.toTime, model.period));
                 
                 break;
                 
             case events:
                 
-                // render the time-series chart
+                // render the time-series chart : FIXME respect fromTime/toTime.
                 writeFlot(w, model.eventReportingService);
                 
                 break;
@@ -1101,11 +1123,14 @@ public class XHTMLRenderer {
 
     /**
      * A clickable trail of the path from the root.
+     * 
+     * @deprecated by refactor inside of a rendering object.
      */
-    protected void writeFullPath(Writer w, String path) throws IOException {
-        
-        writePath(w, path, 0/*root*/);
-        
+    protected void writeFullPath(Writer w, String path)
+            throws IOException {
+
+        writePath(w, path, 0/* root */);
+
     }
     
     /**
@@ -1114,6 +1139,8 @@ public class XHTMLRenderer {
      * @param rootDepth
      *            The path components will be shown beginning at this depth -
      *            ZERO (0) is the root.
+     * 
+     * @deprecated by refactor inside of a rendering object.
      */
     protected void writePath(Writer w, String path, int rootDepth)
             throws IOException {
@@ -1209,7 +1236,8 @@ public class XHTMLRenderer {
 
     /**
      * Writes all counters in the hierarchy starting with the specified
-     * {@link CounterSet} in a single table.
+     * {@link CounterSet} in a single table (this is the navigational view of
+     * the counter set hierarchy).
      */
     protected void writeCounterSet(Writer w, final CounterSet counterSet,
             final int depth) throws IOException {
@@ -1312,6 +1340,12 @@ public class XHTMLRenderer {
 
                     /*
                      * Report the average over the last hour, day, and month.
+                     * 
+                     * @todo could report the current value, the weighted
+                     * average for the last 5 units, and the weighted average
+                     * for the last 10 units. Need a method to compute the
+                     * weighted average for a History. Reuse that method in the
+                     * LBS.
                      */
 
                     HistoryInstrument inst = (HistoryInstrument) counter
@@ -1358,616 +1392,331 @@ public class XHTMLRenderer {
     }
     
     /**
-     * Writes details on a single counter.
+     * Writes details on a single counter using a {@link HistoryTable} view.
      * 
      * @param counter
      *            The counter.
-     * @throws IOException 
-     */
-    protected void writeCounter(Writer w, ICounter counter) throws IOException {
-        
-//        w.write("<p>path: ");
-//        
-//        writePath(w, path);
-//
-//        w.write("</p>");
-//
-//        w.write("<p>value: ");
-//        
-//        // the most recent value.
-//        w.write(cdata(value(counter.getValue())));
-//        
-//        w.write("</p>");
-//
-//        w.write("<p>time: ");
-//
-//        w.write(cdata(new Date(counter.lastModified()).toString()));
-//        
-//        w.write("</p>");
-
-        if(counter.getInstrument() instanceof HistoryInstrument) {
-         
-            writeHistoryCounter(w, counter);
-            
-        }
-        
-    }
-    
-    /**
-     * Writes details on a single counter whose {@link IInstrument} provides a
-     * history. The goal is to be able to easily copy and paste the data into a
-     * program for plotting, e.g., as an X-Y graph (values against time).
-     * 
-     * @param counter
-     *            The counter.
-     * 
-     * @see HistoryInstrument
-     */
-    protected void writeHistoryCounter(Writer w, ICounter counter)
-            throws IOException {
-
-        HistoryInstrument inst = (HistoryInstrument) counter.getInstrument();
-
-        if (inst.minutes.size() > 0) {
-            w.write("<p>");
-            w.write("</p>");
-            writeSamples(w, counter, inst.minutes);
-        }
-
-        if (inst.hours.size() > 0) {
-            w.write("<p>");
-            w.write("</p>");
-            writeSamples(w, counter, inst.hours);
-        }
-
-        if (inst.days.size() > 0) {
-            w.write("<p>");
-            w.write("</p>");
-            writeSamples(w, counter, inst.days);
-        }
-        
-    }
-
-    /**
-     * Writes a table containing the samples for a {@link History} for some
-     * {@link ICounter}.
-     * 
-     * @param w
-     * @param counter
-     * @param h
      * 
      * @throws IOException
      */
-    protected void writeSamples(Writer w, ICounter counter, History h) throws IOException {
-        
-        /*
-         * Figure out the label for the units of the history.
-         * 
-         * FIXME The history really needs to be separately informed of the
-         * period (in ms) of its buckets (that is, how many seconds, minutes,
-         * hours, etc), and the #of buckets that it will collect. The two are
-         * not of necessity aligned: the source MUST include at least enough
-         * samples to make up one sample at the higher level, but the source MAY
-         * collect more samples and the higher level MAY collect an arbitrary
-         * number of samples. Change this in History, allow configuration of the
-         * HistoryInstrument, make sure that interchange reflects this, and then
-         * replace the explicitly specified period here with the appropriate
-         * method call on the History object. And add a label to the history
-         * object or a typesafe enum for minutes, hours, days, etc.
-         */
-        final String units;
-        final DateFormat dateFormat;
-        final long period;
-        if (h.getPeriod() == 1000 * 60L) {
-            units = "Minutes";
-            period = 1000*60;// 60 seconds (in ms).
-            dateFormat = DateFormat.getTimeInstance(DateFormat.SHORT);
-        } else if (h.getPeriod() == 1000 * 60 * 24L) {
-            units = "Hours";
-            period = 1000*60*60;// 60 minutes (in ms).
-            dateFormat = DateFormat.getTimeInstance(DateFormat.MEDIUM);
-        } else if (h.getSource() != null
-                && h.getSource().getPeriod() == 1000 * 60 * 24L) {
-            units = "Days";
-            period = 1000*60*60*24;// 24 hours (in ms).
-            dateFormat = DateFormat.getDateInstance(DateFormat.MEDIUM);
-        } else {
-            throw new AssertionError("period="+h.getPeriod());
-//            units = "period=" + h.getPeriod() + "ms";
-//            dateFormat = DateFormat.getDateTimeInstance();
-        }
+    protected void writeCounter(final Writer w, final ICounter counter)
+            throws IOException {
 
-        /*
-         * Iterator will visit the timestamped samples in the history.
-         * 
-         * Note: the iterator is a snapshot of the history at the time that the
-         * iterator is requested.
-         * 
-         * @todo This scans the history first, building up the table rows in a
-         * buffer. Originally that was required to get the first/last timestamps
-         * from the history before we format the start of the table but now the
-         * iterator will report those timestamps directly and this could be
-         * moved inline.
-         */
-        final SampleIterator itr = h.iterator();
+        if (counter.getInstrument() instanceof HistoryInstrument) {
 
-        final StringBuilder sb = new StringBuilder();
-
-        final long firstTimestamp = itr.getFirstSampleTime();
-
-        final long lastTimestamp = itr.getLastSampleTime();
-
-        while (itr.hasNext()) {
-
-            final IHistoryEntry sample = itr.next();
-
-            sb.append(" <tr\n>");
-
-            final long lastModified = sample.lastModified();
-
-            /*
-             * The time will be zero for the first row and a delta (expressed in
-             * the units of the history) for the remaining rows.
-             * 
-             * Note: The time units are computed using floating point math and
-             * then converted to a display form using formatting in order to be
-             * able to accurately convey where a sample falls within the
-             * granularity of the unit (e.g., early or late in the day).
-             */
-            final String timeStr = model.unitsFormat
-                    .format(((double) lastModified - firstTimestamp) / period);
-
-            sb.append("  <td>" + cdata(timeStr) + "</td\n>");
-
-            sb.append("  <td>" + value(counter, sample.getValue())
-                    + "</td\n>");
-
-            sb.append("  <td>"
-                    + cdata(dateFormat.format(new Date(lastModified)))
-                    + "</td\n>");
-
-            sb.append(" </tr\n>");
+            writeHistoryTable(w, new ICounter[] { counter }, model.period,
+                    model.timestampFormat);
 
         }
-
-        /*
-         * Summary for the table.
-         * 
-         * @todo add some more substance to the summary?
-         */
-        final String summary = "Showing samples: period=" + units + ", path="
-                + counter.getPath();
-
-        /*
-         * Format the entire table now that we have all the data on hand.
-         */
-
-        w.write("<table border=\"1\" summary=\"" + attrib(summary) + "\"\n>");
-
-        // // caption : @todo use css to left justify the path.
-        // w.write(" <caption>");
-        // writePath(w, counter.getPath());
-        // w.write(" </caption\n>");
-
-        // header row.
-        w.write(" <tr\n>");
-        w.write("  <th colspan=\"3\">");
-        writeFullPath(w, counter.getPath());
-        w.write("  </th\n>");
-        w.write(" </tr\n>");
-
-        // header row.
-        w.write(" <tr\n>");
-        w.write("  <th>" + "From: "
-                + dateFormat.format(new Date(firstTimestamp)) + "</th\n>");
-        w.write("  <th>" + "To: " + dateFormat.format(new Date(lastTimestamp))
-                + "</th\n>");
-        // w.write(" <th></th>");
-        w.write(" </tr\n>");
-
-        // header row.
-        w.write(" <tr\n>");
-        w.write("  <th>" + cdata(units) + "</th\n>");
-        w.write("  <th>" + cdata(counter.getName()) + "</th\n>");
-        w.write("  <th>Timestamp</th>\n");
-        w.write(" </tr\n>");
-
-        // data rows.
-        w.write(sb.toString());
-
-        w.write("</table\n>");
 
     }
+    
+//    /**
+//     * Writes details on a single counter whose {@link IInstrument} provides a
+//     * history. The goal is to be able to easily copy and paste the data into a
+//     * program for plotting, e.g., as an X-Y graph (values against time).
+//     * 
+//     * @param counter
+//     *            The counter.
+//     * 
+//     * @see HistoryInstrument
+//     */
+//    protected void writeHistoryCounter(Writer w, ICounter counter)
+//            throws IOException {
+//
+//        final HistoryInstrument inst = (HistoryInstrument) counter.getInstrument();
+//        
+//        if (inst.minutes.size() > 0) {
+//            w.write("<p>");
+//            w.write("</p>");
+//            writeSamples(w, counter, inst.minutes);
+//        }
+//
+//        if (inst.hours.size() > 0) {
+//            w.write("<p>");
+//            w.write("</p>");
+//            writeSamples(w, counter, inst.hours);
+//        }
+//
+//        if (inst.days.size() > 0) {
+//            w.write("<p>");
+//            w.write("</p>");
+//            writeSamples(w, counter, inst.days);
+//        }
+//        
+//    }
+
+//    /**
+//     * Writes a table containing the samples for a {@link History} for some
+//     * {@link ICounter}.
+//     * 
+//     * @param w
+//     * @param counter
+//     * @param h
+//     * 
+//     * @throws IOException
+//     * 
+//     * @deprecated replace with
+//     *             {@link #writeHistoryTable(Writer, ICounter[], PeriodEnum, TimestampFormatEnum)}
+//     *             for the specified counter and units.
+//     */
+//    protected void writeSamples(Writer w, ICounter counter, History h) throws IOException {
+//        
+//        /*
+//         * Figure out the label for the units of the history.
+//         */
+//        final String units;
+//        final DateFormat dateFormat;
+//        final long period;
+//        if (h.getPeriod() == 1000 * 60L) {
+//            units = "Minutes";
+//            period = 1000*60;// 60 seconds (in ms).
+//            dateFormat = DateFormat.getTimeInstance(DateFormat.SHORT);
+//        } else if (h.getPeriod() == 1000 * 60 * 24L) {
+//            units = "Hours";
+//            period = 1000*60*60;// 60 minutes (in ms).
+//            dateFormat = DateFormat.getTimeInstance(DateFormat.MEDIUM);
+//        } else if (h.getSource() != null
+//                && h.getSource().getPeriod() == 1000 * 60 * 24L) {
+//            units = "Days";
+//            period = 1000*60*60*24;// 24 hours (in ms).
+//            dateFormat = DateFormat.getDateInstance(DateFormat.MEDIUM);
+//        } else {
+//            throw new AssertionError("period="+h.getPeriod());
+////            units = "period=" + h.getPeriod() + "ms";
+////            dateFormat = DateFormat.getDateTimeInstance();
+//        }
+//
+//        /*
+//         * Iterator will visit the timestamped samples in the history.
+//         * 
+//         * Note: the iterator is a snapshot of the history at the time that the
+//         * iterator is requested.
+//         * 
+//         * @todo This scans the history first, building up the table rows in a
+//         * buffer. Originally that was required to get the first/last timestamps
+//         * from the history before we format the start of the table but now the
+//         * iterator will report those timestamps directly and this could be
+//         * moved inline.
+//         */
+//        final SampleIterator itr = h.iterator();
+//
+//        final StringBuilder sb = new StringBuilder();
+//
+//        final long firstTimestamp = itr.getFirstSampleTime();
+//
+//        final long lastTimestamp = itr.getLastSampleTime();
+//
+//        while (itr.hasNext()) {
+//
+//            final IHistoryEntry sample = itr.next();
+//
+//            sb.append(" <tr\n>");
+//
+//            final long lastModified = sample.lastModified();
+//
+//            /*
+//             * The time will be zero for the first row and a delta (expressed in
+//             * the units of the history) for the remaining rows.
+//             * 
+//             * Note: The time units are computed using floating point math and
+//             * then converted to a display form using formatting in order to be
+//             * able to accurately convey where a sample falls within the
+//             * granularity of the unit (e.g., early or late in the day).
+//             */
+//            final String timeStr = model.unitsFormat
+//                    .format(((double) lastModified - firstTimestamp) / period);
+//
+//            sb.append("  <td>" + cdata(timeStr) + "</td\n>");
+//
+//            sb.append("  <td>" + value(counter, sample.getValue())
+//                    + "</td\n>");
+//
+//            sb.append("  <td>"
+//                    + cdata(dateFormat.format(new Date(lastModified)))
+//                    + "</td\n>");
+//
+//            sb.append(" </tr\n>");
+//
+//        }
+//
+//        /*
+//         * Summary for the table.
+//         * 
+//         * @todo add some more substance to the summary?
+//         */
+//        final String summary = "Showing samples: period=" + units + ", path="
+//                + counter.getPath();
+//
+//        /*
+//         * Format the entire table now that we have all the data on hand.
+//         */
+//
+//        w.write("<table border=\"1\" summary=\"" + attrib(summary) + "\"\n>");
+//
+//        // // caption : @todo use css to left justify the path.
+//        // w.write(" <caption>");
+//        // writePath(w, counter.getPath());
+//        // w.write(" </caption\n>");
+//
+//        // header row.
+//        w.write(" <tr\n>");
+//        w.write("  <th colspan=\"3\">");
+//        writeFullPath(w, counter.getPath());
+//        w.write("  </th\n>");
+//        w.write(" </tr\n>");
+//
+//        // header row.
+//        w.write(" <tr\n>");
+//        w.write("  <th>" + "From: "
+//                + dateFormat.format(new Date(firstTimestamp)) + "</th\n>");
+//        w.write("  <th>" + "To: " + dateFormat.format(new Date(lastTimestamp))
+//                + "</th\n>");
+//        // w.write(" <th></th>");
+//        w.write(" </tr\n>");
+//
+//        // header row.
+//        w.write(" <tr\n>");
+//        w.write("  <th>" + cdata(units) + "</th\n>");
+//        w.write("  <th>" + cdata(counter.getName()) + "</th\n>");
+//        w.write("  <th>Timestamp</th>\n");
+//        w.write(" </tr\n>");
+//
+//        // data rows.
+//        w.write(sb.toString());
+//
+//        w.write("</table\n>");
+//
+//    }
 
     /**
-     * A class representing one or more performance counter histories where
-     * those histories have been aligned so that the individual timestamps for
-     * the performance counter values in each row are aligned.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static class HistoryTable {
+    public class HTMLValueFormatter extends ValueFormatter {
 
-        /**
-         * The selected counters.
-         */
-        final ICounter[] a;
-
-        /**
-         * Identifies the history to be written for each of the selected
-         * counters by its based reporting period.
-         */
-        final PeriodEnum basePeriod;
-
+        protected final Model model;
+        
         /**
          * 
-         * @param a
-         *            The selected counters.
-         * @param basePeriod
-         *            Identifies the history to be written for each of the
-         *            selected counters by its based reporting period.
+         * @param dateFormat
+         * @param model
+         * 
+         * FIXME Do not require {@link Model} -- it makes it to difficult to run
+         * outside of the {@link CounterSetHTTPD}? (Not really, we could just
+         * parse a URL into the required form.) The other problem is that this
+         * is a non-static inner class of {@link XHTMLRenderer} (for
+         * {@link #value(ICounter, Object)}, which could be handled easily
+         * enough by copying the code, making it reference the
+         * {@link HTMLValueFormatter}, etc.).
          */
-        public HistoryTable(final ICounter[] a,
-                final PeriodEnum basePeriod) {
+        public HTMLValueFormatter(DateFormat dateFormat, Model model) {
             
-            if (a == null)
-                throw new IllegalArgumentException();
-
-            if (basePeriod == null)
-                throw new IllegalArgumentException();
-
-            this.a = a;
-
-            this.ncols = a.length;
+            super(dateFormat);
             
-            this.basePeriod = basePeriod;
+            this.model = model;
             
-            // The units of the history (first column).
-            units = basePeriod.name();
+        }
+        
+        /**
+         * Formats a counter value as a String AND performs any escaping necessary
+         * for inclusion in a CDATA section (we do both operations together so that
+         * we can format {@link IServiceCounters#LOCAL_HTTPD} as a link anchor.
+         */
+        public String value(final ICounter counter, final Object val) {
 
-            // The period for those units.
-            period = basePeriod.getBasePeriodMillis();
-
-            if (INFO)
-                log.info("#counters=" + a.length + ", units=" + units
-                        + ", period=" + period);
+            return XHTMLRenderer.this.value(counter,val);
             
-            /*
-             * Create a snapshot iterator for each counter and find the first and
-             * last timestamp across the samples for all histories that will be
-             * written into the table.
-             */
-            long firstTimestamp = Long.MAX_VALUE;
-            long lastTimestamp = Long.MIN_VALUE;
-            int maxSamplesIndex = -1;
-            int firstSampleTimeIndex = -1;
-            int lastSampleTimeIndex = -1;
-            this.firstLogicalSlot = new long[a.length];
-            
-            /*
-             * An array of snapshot history iterators for the selected units of
-             * the specified counters.
-             */
-            final SampleIterator[] hitrs = new SampleIterator[ncols];
+        }
 
-            for (int col = 0; col < ncols; col++) {
+        /**
+         * A clickable trail of the path from the root.
+         */
+        public void writeFullPath(Writer w, String path)
+                throws IOException {
 
-                if (a[col] == null)
-                    throw new IllegalArgumentException();
+            writePath(w, path, 0/* root */);
 
-                if (!(a[col].getInstrument() instanceof HistoryInstrument)) {
+        }
+        
+        /**
+         * A clickable trail of the path.
+         * 
+         * @param rootDepth
+         *            The path components will be shown beginning at this depth -
+         *            ZERO (0) is the root.
+         */
+        public void writePath(Writer w, String path, int rootDepth)
+                throws IOException {
 
-                    throw new IllegalArgumentException();
+            final String[] a = path.split(ps);
 
-                }
-
-                // snapshot iterator for the history for that counter.
-                final SampleIterator itr = ((HistoryInstrument) a[col]
-                        .getInstrument()).getHistory(basePeriod).iterator();
-
-                hitrs[col] = itr;
-
-                final int sampleCount = itr.getSampleCount();
-
-                if (sampleCount == 0) {
-
-                    // No samples for that counter and this period.
-                    continue;
-                    
-                }
+            if (rootDepth == 0) {
                 
-                // the logical slot into which the first sample falls for
-                // that history.
-                firstLogicalSlot[col] = itr.getFirstSampleTime() / period;
-
-                if (itr.getFirstSampleTime() < firstTimestamp) {
-
-                    // update the earliest timestamp for the histories.
-                    firstTimestamp = itr.getFirstSampleTime();
-
-                    // update the index of the history with the earliest sample.
-                    firstSampleTimeIndex = col;
-
-                }
-
-                if (itr.getLastSampleTime() > lastTimestamp) {
-
-                    // update the latest timestamp for the histories.
-                    lastTimestamp = itr.getLastSampleTime();
-
-                    // update the index of the history with the latest sample.
-                    lastSampleTimeIndex = col;
-
-                }
-
-                if (maxSamplesIndex == -1
-                        || sampleCount > hitrs[maxSamplesIndex]
-                                .getSampleCount()) {
-
-                    // update the index of the history with the most samples.
-                    maxSamplesIndex = col;
-
-                }
-
+                // click through to the root of the counter hierarchy
+                w.write("<a href=\""
+                        + model.getRequestURL(new NV[] { new NV(Model.PATH, ps) })
+                        + "\">");
+                w.write(ps);
+                w.write("</a>");
+                
             }
+            
+            // builds up the path query parameter for each split.
+            final StringBuilder sb = new StringBuilder(ps);
 
-            if (maxSamplesIndex != -1) {
+            for (int n = 1; n < a.length; n++) {
 
-                /*
-                 * There is some data for the table.
-                 */
+                final String name = a[n];
                 
-                assert firstSampleTimeIndex != -1;
-                assert lastSampleTimeIndex != -1;
+                if (n > 1) {
 
-                // the maximum #of samples.
-                this.maxSamples = hitrs[maxSamplesIndex].getSampleCount();
-                this.maxSamplesIndex = maxSamplesIndex;
+                    if ((n+1) > rootDepth) {
 
-                this.firstTimestamp = firstTimestamp;
-                this.lastTimestamp = lastTimestamp;
-                this.firstSampleTimeIndex = firstSampleTimeIndex;
-                this.lastSampleTimeIndex = lastSampleTimeIndex;
-                this.logicalSlotOffset = firstLogicalSlot[firstSampleTimeIndex];
+                        w.write("&nbsp;");
 
-                /*
-                 * Figure out how many rows we need to display. This can be more
-                 * than the #of samples. It is in fact the max( sampleCount +
-                 * the offset of the first row) for each counters.
-                 */
-                int nrows = -1;
-                for (int col = 0; col < ncols; col++) {
-
-                    final int x = getFirstRowIndex(col)
-                            + hitrs[col].getSampleCount();
-
-                    if (x > nrows) {
-
-                        nrows = x;
-
-                    }
-
-                }
-                this.nrows = nrows;
-
-                if (INFO) {
-
-                    log.info("nrows=" + nrows + ", ncols=" + ncols);
-                    
-                    log.info("maxSamples=" + maxSamples + " @ index="
-                            + maxSamplesIndex);
-
-                    log.info("firstTimestamp=" + firstTimestamp + " @ index="
-                            + firstSampleTimeIndex);
-
-                    log.info("lastTimestamp=" + lastTimestamp + " @ index="
-                            + lastSampleTimeIndex);
-
-                    log.info("logicalSlotOffset=" + logicalSlotOffset
-                            + " : firstLogicalSlot="
-                            + Arrays.toString(firstLogicalSlot));
-
-                    StringBuilder sb = new StringBuilder();
-                    sb.append("[");
-                    for (int i = 0; i < a.length; i++) {
-
-                        if (i > 0)
-                            sb.append(", ");
-
-                        sb.append(getFirstRowIndex(i));
+                        w.write(ps);
                         
                     }
-                    sb.append("]");
-                    
-                    log.info("adjustedLogicalSlots: "+sb);
-                    
+
+                    sb.append(ps);
+
                 }
+
+                final String prefix = sb.toString();
                 
-            } else {
+                sb.append(name);
 
-                this.nrows = 0;
-                this.maxSamples = 0;
-                this.maxSamplesIndex = 0;
-                this.firstTimestamp = 0L;
-                this.firstSampleTimeIndex = 0;
-                this.lastTimestamp = 0L;
-                this.lastSampleTimeIndex = 0;
-                this.logicalSlotOffset = 0L;
+                if ((n+1) > rootDepth) {
 
-            }
+                    if(rootDepth!=0 && n==rootDepth) {
+                        
+                        w.write("<a href=\""
+                                + model.getRequestURL(new NV[] { new NV(Model.PATH, prefix) }) + "\">");
 
-            /*
-             * Align the counters and populate the rows with the counter values
-             * from the selected history unit.
-             */
-            
-            data = new IHistoryEntry[nrows][];
+                        w.write("...");
 
-            // pre-populate each row of the table with an array.
-            for (int row = 0; row < nrows; row++) {
-
-                data[row] = new IHistoryEntry[ncols];
-
-            }
-
-            /*
-             * Now fill in each cell of the table. Since we know the row at
-             * which each counter starts in the table, it is easier to proceed
-             * in column order for each counter in turn.
-             */
-            for (int col = 0; col < ncols; col++) {
-
-                final int firstRow = getFirstRowIndex(col);
-                
-                final SampleIterator itr = hitrs[col];
-
-                int i = 0;
-
-                if (DEBUG && col == 0)
-                    log.debug(a[col].getPath());
-
-                while (itr.hasNext()) {
-
-                    final IHistoryEntry e = itr.next();
-
-                    final int row = i + firstRow;
-
-                    if (DEBUG && col == 0)
-                        log.debug("data[" + row + "," + col + "] = " + e);
-
-                    data[row][col] = e;
-
-                    i++;
+                        w.write("</a>");
+                        
+                        w.write("&nbsp;"+ps);
+                        
+                    }
                     
+                    w.write("&nbsp;");
+
+                    w.write("<a href=\""
+                            + model.getRequestURL(new NV[] { new NV(Model.PATH, sb
+                                    .toString()) }) + "\">");
+
+                    // current path component.
+                    w.write(cdata(name));
+
+                    w.write("</a>");
+
                 }
-                
+
             }
-
-        }
-
-        /**
-         * The logical slot into which the first sample falls for each of the
-         * specified counters. This is just <code>timestamp/period</code> for
-         * the sample.
-         */
-        final long[] firstLogicalSlot;
-
-        /**
-         * The logical slots are adjusted to a common base (origin zero) by
-         * subtracting out the logical slot of the counter with the earliest
-         * timestamp for any of the specified counters - this is the value of
-         * {@link #firstLogicalSlot} at the {@link #firstSampleTimeIndex}.
-         */
-        final long logicalSlotOffset;
-
-        /**
-         * The index of the row into which the first sample for a counter falls
-         * is given by
-         * 
-         * <pre>
-         * (int) (firstLogicalSlot[counterIndex] - logicalSlotOffset)
-         * </pre>
-         * 
-         * @param counterIndex
-         *            The index of the counter in the array specified to the
-         *            ctor.
-         */
-        public int getFirstRowIndex(final int counterIndex) {
-
-            return (int) (firstLogicalSlot[counterIndex] - logicalSlotOffset);
-
-        }
-        
-        /**
-         * The earliest timestamp in the selected history units for any of the
-         * specified counters.
-         */
-        final long firstTimestamp;
-
-        /**
-         * The most recent timestamp in the selected history units for any of
-         * the specified counters.
-         */
-        final long lastTimestamp;
-
-        /**
-         * The index of the counter in the specified array having the greatest
-         * number of samples for the selected history units.
-         */
-        final int maxSamplesIndex;
-
-        /**
-         * The index of the counter in the specified array whose first sample
-         * timestamp was selected as the {@link #firstTimestamp} for the table.
-         */
-        final int firstSampleTimeIndex;
-
-        /**
-         * The index of the counter in the specified array whose last sample
-         * timestamp was selected as the {@link #lastTimestamp} for the table.
-         */
-        final int lastSampleTimeIndex;
-
-        /**
-         * The index of the counter in the specified array with the greatest #of
-         * samples for the selected history units.
-         */
-        final int maxSamples;
-        
-        /**
-         * The #of rows in the table. This can be more than the #of samples. It
-         * is in fact the max( sampleCount + rowOffset) for each counters.
-         */
-        final int nrows;
-
-        /**
-         * The #of columns in the table.  This is the same as the #of counters
-         * specified to the ctor.
-         */
-        final int ncols;
-        
-        /**
-         * The label for the units of the history.
-         */
-        final String units;
-        
-        /**
-         * The #of milliseconds in each unit for {@link #units}.
-         */
-        final long period;
-
-        /**
-         * An array of the performance counter values. The first index is the
-         * row. The second index is the column and is correlated with the array
-         * specified to the ctor. The rows of the performance counters in the
-         * caller's array are aligned by first deciding which counter has the
-         * earliest timestamp to be reported ({@link #firstSampleTimeIndex})
-         * and then examining the other counters and deciding if they have a
-         * value for the same reporting period. If a counter has a value for the
-         * same reporting period then the value is incorporated into that row
-         * and the row index for that counter is advanced. Otherwise the row
-         * index for that counter IS NOT advanced. If there is no data for a
-         * given counter in a given row then that cell will be <code>null</code>.
-         * It is necessary to align the samples in this manner as counters are
-         * created and destroyed over the life of the system and thus some
-         * counters may not have data for some reporting periods.
-         */
-        final IHistoryEntry[][] data;
-
-        /**
-         * Return the timestamp for the row, which is the timestamp of first
-         * sample which would be allowed into the logical slot for that row.
-         * 
-         * @param row
-         *            The row.
-         * 
-         * @return The timestamp of the first sample which would be allowed into
-         *         that row.
-         */
-        public long getTimestamp(final int row) {
-
-            return (row + logicalSlotOffset) * period;
             
         }
         
@@ -1975,10 +1724,6 @@ public class XHTMLRenderer {
     
     /**
      * Writes out a table containing the histories for the selected counters.
-     * <p>
-     * The <code>From:</code> and <code>To:</code> values will report the
-     * first timestamp in any history and the last timestamp in history
-     * respectively. 
      * 
      * @param a
      *            The selected counters.
@@ -1998,6 +1743,8 @@ public class XHTMLRenderer {
      * @throws IllegalArgumentException
      *             if any element of <i>a</i> does not use a
      *             {@link HistoryInstrument}.
+     * 
+     * @todo review use of basePeriod - this is {@link Model#period}, right?
      */
     protected void writeHistoryTable(final Writer w, final ICounter[] a,
             final PeriodEnum basePeriod,
@@ -2053,905 +1800,98 @@ public class XHTMLRenderer {
             throw new AssertionError(timestampFormat.toString());
         }
 
-        /*
-         * Generate the table.
-         * 
-         * The table has one column for each counter having history data. The
-         * 1st header row of the table has the counter path. The seconds header
-         * row has just the counter name. The data rows are the samples from
-         * each period of the history for each counter.
-         */
-
-        // the table start tag.
-        {
-            /*
-             * Summary for the table.
-             * 
-             * @todo add some more substance to the summary?
-             */
-            final String summary = "Showing samples: period=" + t.units;
-
-            /*
-             * Format the entire table now that we have all the data on hand.
-             */
-
-            w.write("<table border=\"1\" summary=\"" + attrib(summary)
-                    + "\"\n>");
-
-            // // caption : @todo use css to left justify the path.
-            // w.write(" <caption>");
-            // writePath(w, counter.getPath());
-            // w.write(" </caption\n>");
-        }
-
-        // the header rows.
-        {
-
-            // header row.
-            w.write(" <tr\n>");
-            w.write("  <th></th\n>");
-            w.write("  <th>"
-                    + "From: "
-                    + cdata((dateFormat != null ? dateFormat.format(new Date(
-                            t.firstTimestamp)) : Long.toString(t.firstTimestamp)))
-                    + "</th\n>");
-            w.write("  <th colspan=\"*\">"
-                    + "To: "
-                    + cdata((dateFormat != null ? dateFormat.format(new Date(
-                            t.lastTimestamp)) : Long.toString(t.lastTimestamp)))
-                    + "</th\n>");
-            w.write(" </tr\n>");
-
-            // header row.
-            w.write(" <tr\n>");
-            w.write("  <th></th\n>");
-            for (ICounter counter : a) {
-                w.write("  <th colspan=\"*\">");
-                writeFullPath(w, counter.getPath());
-                w.write("  </th\n>");
-            }
-            w.write(" </tr\n>");
-
-            // header row.
-            w.write(" <tr\n>");
-            w.write("  <th>" + cdata(t.units) + "</th\n>");
-            for (ICounter counter : a) {
-                /*
-                 * If the pattern included capturing groups then use the matched
-                 * groups as the label for the column.
-                 */
-                final String[] groups = getCapturedGroups(counter);
-                final String label;
-                if (groups != null) {
-                    final StringBuilder sb = new StringBuilder();
-                    for (int i = 0; i < groups.length; i++) {
-                        final String s = groups[i];
-                        if (i > 0)
-                            sb.append(":");
-                        sb.append(s);
-                    }
-                    label = sb.toString();
-                } else {
-                    // default label is the counter name.
-                    label = counter.getName();
-                }
-                w.write("  <th>" + cdata(label) + "</th\n>");
-            }
-            w.write("  <th>Timestamp</th>\n");
-            w.write(" </tr\n>");
-
-        }
-
-        // for each row.
-        for (int row = 0; row < t.nrows; row++) {
-
-            /*
-             * Populate array with the formatted values from each counter's
-             * history for the current row.
-             */
-
-            final String[] valStr = new String[a.length];
-
-            // for each counter (in a fixed order).
-            for (int col = 0; col < t.ncols; col++) {
-
-                final ICounter c = a[col];
-
-                final IHistoryEntry e = t.data[row][col];
-
-                valStr[col] = value(c, e == null ? "" : e.getValue());
-
-            }
-
-            /*
-             * The time will be zero for the first row and a delta (expressed in
-             * the units of the history) for the remaining rows.
-             * 
-             * Note: The time units are computed using floating point math and
-             * then converted to a display form using formatting in order to be
-             * able to accurately convey where a sample falls within the
-             * granularity of the unit (e.g., early or late in the day).
-             */
-
-            final long timestamp = t.getTimestamp(row);
-
-            final String timeStr = model.unitsFormat
-                    .format(((double) timestamp - t.getTimestamp(0/* row */))
-                            / t.period);
-
-            w.write(" <tr\n>");
-
-            w.write("  <td>" + cdata(timeStr) + "</td\n>");
-            
-            for(String s : valStr) {
-
-                w.write("  <td>" + s + "</td\n>");
-                
-            }
-
-            w.write("  <td>"
-                    + cdata((dateFormat != null ? dateFormat.format(new Date(
-                            timestamp)) : Long.toString(timestamp)))
-                    + "</td\n>");
-
-            w.write(" </tr\n>");
-
-        } // next row.
-       
-        // the table end tag.
-        w.write("</table\n>");
-
+        new HTMLHistoryTableRenderer(t, model.pattern, new HTMLValueFormatter(
+                dateFormat, model)).render(w);
+        
     }
 
     /**
-     * Return the data captured by {@link Model#pattern} from the path of the
-     * specified <i>counter</i>.
-     * <p>
-     * Note: This is used to extract the parts of the {@link Model#pattern}
-     * which are of interest - presuming that you mark some parts with capturing
-     * groups and other parts that you do not care about with non-capturing
-     * groups.
-     * <p>
-     * Note: There is a presumption that {@link Model#pattern} was used to
-     * {@link #selectCounters(CounterSet, int)} and that <i>counter</i> is one
-     * of the selected counters, in which case {@link Model#pattern} is KNOWN to
-     * match {@link ICounterNode#getPath()}.
-     * 
-     * @return The captured groups -or- <code>null</code> if there are no
-     *         capturing groups.
-     */
-    protected String[] getCapturedGroups(final ICounter counter) {
-
-        if (counter == null)
-            throw new IllegalArgumentException();
-        
-        if (model.pattern == null) {
-
-            // no pattern, so no captured groups.
-            return null;
-            
-        }
-        
-        final Matcher m = model.pattern.matcher(counter.getPath());
-        
-        // #of capturing groups in the pattern.
-        final int groupCount = m.groupCount();
-
-        if(groupCount == 0) {
-            
-            // No capturing groups.
-            return null;
-
-        }
-
-        if (!m.matches()) {
-
-            throw new IllegalArgumentException("No match? counter=" + counter
-                    + ", regex=" + model.pattern);
-
-        }
-
-        /*
-         * Pattern is matched w/ at least one capturing group so assemble a
-         * label from the matched capturing groups.
-         */
-
-        if (DEBUG) {
-            log.debug("input  : " + counter.getPath());
-            log.debug("pattern: " + model.pattern);
-            log.debug("matcher: " + m);
-            log.debug("result : " + m.toMatchResult());
-        }
-
-        final String[] groups = new String[groupCount];
-
-        for (int i = 1; i <= groupCount; i++) {
-
-            final String s = m.group(i);
-
-            if (DEBUG)
-                log.debug("group[" + i + "]: " + m.group(i));
-
-            groups[i - 1] = s;
-
-        }
-
-        return groups;
-
-    }
-
-    /**
-     * Pairs together an ordered set of category values for a pivot table with
-     * the set of counters which share that set of category values.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static class CSet {
-        
-        /**
-         * The set of ordered category values.
-         */
-        final String[] cats;
-        
-        /**
-         * The set of counters sharing the same set of ordered category values.
-         */
-        final List<ICounter> counters;
-        
-        public String toString() {
+    public static class HTMLPivotTableRenderer extends PivotTableRenderer {
 
-//            final StringBuilder sb = new StringBuilder();
-//
-//            int i = 0;
-//
-//            for (ICounter c : counters) {
-//
-//                if (i > 0)
-//                    sb.append(",");
-//
-//                // @todo use c.getPath() if you want to see WHICH counter was included.
-//                sb.append(c.getName());
-//
-//                i++;
-//                
-//            }
-            
-            return "CSet{cats=" + Arrays.toString(cats) + //
-                    ", #counters="+counters.size()+//
-                    // Note: This is just too much detail.
-                    //",counters=[" + sb + "]" + //
-                    "}";
+        public HTMLPivotTableRenderer(PivotTable pt,
+                ValueFormatter formatter) {
+
+            super(pt, formatter);
             
         }
 
         /**
-         * Create a set based on the specified category values and initially
-         * containing the specified {@link ICounter}.
-         * 
-         * @param cats
-         *            An ordered set of category values.
-         * @param counter
-         *            A counter from whose {@link ICounterNode#getPath()} the
-         *            category values were extracted as capturing groups.
-         */
-        public CSet(final String[] cats, final ICounter counter) {
-            
-            if(cats == null)
-                throw new IllegalArgumentException();
-
-            if(counter == null)
-                throw new IllegalArgumentException();
-
-            this.cats = cats;
-            
-            this.counters = new LinkedList<ICounter>();
-            
-            add( counter );
-            
-        }
-
-        /**
-         * Add another counter to that set.
-         * 
-         * @param counter
-         *            The counter.
-         */
-        public void add(final ICounter counter) {
-
-            if(counter == null)
-                throw new IllegalArgumentException();
-
-            counters.add( counter );
-            
-        }
-        
-    }
-    
-    /**
-     * The set of distinct ordered matched sets of category values in the
-     * current row of the history table paired with the {@link ICounter}s
-     * matched up on those category values.
-     */
-    protected List<CSet> getCategoryValueSets(final ICounter[] a) {
-
-        if (a == null)
-            throw new IllegalArgumentException();
-        
-        // maximum result is one set per counter.
-        final String[][] sets = new String[a.length][];
-
-        for (int i = 0; i < a.length; i++) {
-
-            final ICounter c = a[i];
-
-            if (a[i] == null)
-                throw new IllegalArgumentException();
-            
-            sets[i] = getCapturedGroups(c);
-
-        }
-
-        /*
-         * Now figure out which of those sets are distinct. Each time we find a
-         * set that duplicates the current set we clear its reference. After
-         * each set has been checked for duplicates in the set of sets we move
-         * on to the next set whose reference has not been cleared. We are done
-         * when all references in [sets] have been cleared.
-         */
-        final List<CSet> csets = new LinkedList<CSet>();
-
-        for(int i=0; i<sets.length; i++) {
-            
-            final String[] set = sets[i];
-            
-            if(set == null) // already cleared.
-                continue;
-            
-            final CSet cset = new CSet(set, a[i]);
-            
-            // add to the collection that we will return.
-            csets.add(cset);
-            
-            // and clear any duplicates in [sets].
-            for (int j = i + 1; j < sets.length; j++) {
-
-                final String[] oset = sets[j];
-
-                if (oset == null) // already cleared.
-                    continue;
-
-                // all sets must be the same size.
-                assert oset.length == set.length;
-                
-                // assume same set until proven otherwise.
-                boolean same = true;
-                for (int k = 0; k < set.length && same; k++) {
-
-                    if (!set[k].equals(oset[k])) {
-
-                        // not the same set : will terminate loop.
-                        same = false;
-
-                    }
-
-                }
-
-                if(same) {
-                    
-                    // clear oset reference since it is a duplicate.
-                    sets[j] = null;
-            
-                    // add another counter to that set.
-                    cset.add(a[j]);
-                    
-                }
-                
-            }
-            
-        }
-        
-        return csets;
-
-    }
-        
-    /**
-     * Writes out a pivot table containing the histories for the selected
-     * counters. Sample output is:
-     * 
-     * <pre>
-     * Minutes  Timestamp    hostname indexName   indexPartitionName  readSecs    writeSecs   leafSplits  tailSplits
-     * 0    1:41PM  blade8  spo spo#12  0.12    0.3 10  4
-     * 0    1:41PM  blade8  spo spo#14  0.01    0.2 20  1
-     * </pre>
-     * 
-     * There are two time columns. One gives the #of elapsed units and the
-     * column header is the specified <i>basePeriod</i> and will be zero for
-     * the first row and is incremented by one each time we move into another
-     * sampling period for the given {@link PeriodEnum}. The other time column
-     * is timestamp associated with the row. The format of that timestamp is
-     * specified by {@link Model#timestampFormat}.
-     * <p>
-     * There are three category columns (hostname, indexName, and
-     * indexPartitionName). The category were selected by the capturing groups
-     * in {@link Model#pattern} and take on different values for each row in the
-     * table. In order to get nice column names you MUST specify the column
-     * names using the {@link Model#CATEGORY} URL query parameter. The given
-     * category column names are used in order and synthetic column names are
-     * generated if none (or not enough) were specified in the {@link Model}.
-     * <p>
-     * There are four counter columns. Each counter column corresponds to an
-     * {@link ICounter} whose path was matched by the {@link Model#pattern}.
-     * <p>
-     * Note: The orientation of the data in the pivot table view is different
-     * from the data in the correlated view. The pivot table puts each set of
-     * cells having the same values for the category columns onto a single line.
-     * Those cells are choosen by a read cross the columns in a given row of the
-     * {@link HistoryTable}. The timestamp columns correspond to the current
-     * row of the history table and are therefore repeated if there is more than
-     * one set of distinct ordered bindings for the category column values in
-     * the selected counters.
-     * <p>
-     * Note: The counter sets are designed as regular hierarchies: we often find
-     * the "same" counter name under different paths. For example:
-     * 
-     * <pre>
-     *   indices/TERM2ID/TERM2ID#0/IO/writeSecs
-     *   indices/TERM2ID/TERM2ID#2/IO/writeSecs
-     *   indices/SPO/SPO#7/IO/writeSecs
-     *   Live Journal/IO/writeSecs
-     * </pre>
-     * 
-     * All of these have a "writeSecs" counter. However, the first 3 are in
-     * essence the same counter, just for a different resource index, while the
-     * last one is a counter for a journal resource.
-     * <p>
-     * The {@link Pattern}
-     * 
-     * <pre>
-     * 
-     * .*\Qindices/\E(.*)\Q/IO/writeSecs\E
-     * 
-     * </pre>
-     * 
-     * Would match only the first three rows and would capture
-     * 
-     * <pre>
-     * [TERM2ID/TERM2ID#0]
-     * [TERM2ID/TERM2ID#2]
-     * [SPO/SPO#7]
-     * </pre>
-     * 
-     * You can also capture additional groups, such as the name of the host on
-     * which the data service was running within which the index partition is
-     * living. Those capture groups might look like:
-     * 
-     * <pre>
-     * [blade2, TERM2ID/TERM2ID#0]
-     * [blade3, TERM2ID/TERM2ID#2]
-     * [blade2, SPO/SPO#7]
-     * </pre>
-     * 
-     * There will be only one "writeSecs" value column in the generated pivot
-     * table. The performance {@link ICounter} for a given resource will be
-     * reported under that "writeSecs" column in a row whose category column
-     * values are identical to the captured groups for that
-     * {@link ICounterNode#getPath()}.
-     * <p>
-     * Note: When switching from a pivot table view to a correlated view be sure
-     * that you DO NOT use a capturing group for the counter name (the last
-     * component of its path). That will give you a distinct row for every
-     * sample and blanks in the other value columns.
-     * 
-     * @param a
-     *            The selected counters.
-     * @param basePeriod
-     *            Identifies the history to be written for each of the selected
-     *            counters by its based reporting period.
-     * @param timestampFormat
-     *            The format in which to report the timestamp associated with
-     *            the row.
-     * 
-     * @throws IllegalArgumentException
-     *             if <i>w</i> is <code>null</code>.
-     * @throws IllegalArgumentException
-     *             if <i>a</i> is <code>null</code>.
-     * @throws IllegalArgumentException
-     *             if any element of <i>a</i> <code>null</code>.
-     * @throws IllegalArgumentException
-     *             if any element of <i>a</i> does not use a
-     *             {@link HistoryInstrument}.
-     * 
-     * @todo automatically detect if the last capturing group captures the
-     *       counter name and then drop that from the set of category columns.
-     *       this will make it much easier to switch between a correlated view
-     *       and a pivot view since you often want the counter name to be a
-     *       capturing group for the pivot view.
-     */
-    protected void writePivotTable(final Writer w, final ICounter[] a,
-            final PeriodEnum basePeriod,
-            final TimestampFormatEnum timestampFormat) throws IOException {
-
-        if (w == null)
-            throw new IllegalArgumentException();
-
-        if (a == null)
-            throw new IllegalArgumentException();
-
-        if (a.length == 0) {
-
-            // No data.
-            
-            return;
-            
-        }
-        
-        if (basePeriod == null)
-            throw new IllegalArgumentException();
-
-        if (timestampFormat == null)
-            throw new IllegalArgumentException();
-
-        final HistoryTable t = new HistoryTable(a, basePeriod);
-
-        final PivotTable pt = new PivotTable(t);
-        
-        /*
-         * Figure out how we will format the timestamp (From:, To:, and the last
-         * column).
-         */
-        final DateFormat dateFormat;
-        switch(timestampFormat) {
-        case dateTime:
-            switch (basePeriod) {
-            case Minutes:
-                dateFormat = DateFormat.getTimeInstance(DateFormat.SHORT);
-                break;
-            case Hours:
-                dateFormat = DateFormat.getTimeInstance(DateFormat.MEDIUM);
-                break;
-            case Days:
-                dateFormat = DateFormat.getDateInstance(DateFormat.MEDIUM);
-                break;
-            default:
-                throw new AssertionError();
-            }
-            break;
-        case epoch:
-            dateFormat = null;
-            break;
-        default:
-            throw new AssertionError(timestampFormat.toString());
-        }
-
-        /*
          * Generate the table.
          */
+        public void render(final Writer w) throws IOException {
 
-        // the table start tag.
-        {
-
-            // Summary for the table : @todo more substance in summary.
-            final String summary = "Showing samples: period=" + t.units;
-
-            w.write("<table border=\"1\" summary=\"" + attrib(summary)
-                    + "\"\n>");
-
-        }
-
-        // the header rows.
-        {
-
-            // header row.
-            w.write(" <tr\n>");
-            // timestamp column headers.
-            w.write("  <th>" + cdata(t.units) + "</th\n>");
-            w.write("  <th>" + cdata("timestamp") + "</th\n>");
-            for (String s : pt.cnames) {
-                // category column headers.
-                w.write("  <th>" + cdata(s) + "</th\n>");
-            }
-            for (String s : pt.vcols) {
-                // performance counter column headers.
-                w.write("  <th>" + cdata(s) + "</th\n>");
-            }
-            w.write(" </tr\n>");
-
-        }
-
-        /*
-         * FIXME Refactor to use PivotTable and an iterator construct that
-         * visits rows.
-         */
-        
-        // for each row in the HistoryTable.
-        for (int row = 0; row < t.nrows; row++) {
-
-            /*
-             * The time will be zero for the first row and a delta (expressed in
-             * the units of the history) for the remaining rows.
-             * 
-             * Note: The time units are computed using floating point math and
-             * then converted to a display form using formatting in order to be
-             * able to accurately convey where a sample falls within the
-             * granularity of the unit (e.g., early or late in the day).
-             */
-            final long timestamp = t.getTimestamp(row);
-
-            final String unitStr = cdata(model.unitsFormat
-                    .format(((double) timestamp - t.getTimestamp(0/* row */))
-                            / t.period));
-
-            final String timeStr = cdata((dateFormat != null ? dateFormat
-                    .format(new Date(timestamp)) : Long.toString(timestamp)));
+            final HistoryTable t = pt.src;
             
-            /*
-             * The set of distinct ordered matched category values in the
-             * current row of the history table.
-             */
-            for(CSet cset : pt.csets) {
+            // the table start tag.
+            {
 
-                assert cset.cats.length == pt.cnames.length : "cset categories="
-                        + Arrays.toString(cset.cats) + " vs "
-                        + "category names: " + Arrays.toString(pt.cnames);
-                
-                /*
-                 * Aggregate values for counters in this cset having a value for
-                 * each value column in turn.
-                 * 
-                 * If none of the counters in the cset have a value for the row
-                 * in the data table then we will not display a row in the
-                 * output table for this cset. However, there can still be other
-                 * csets which do select counters in the data table for which
-                 * there are samples and that would be displayed under the
-                 * output for for their cset.
-                 */
-                
-                final Double[] vals = new Double[pt.vcols.size()];
-                
-                // #of value columns having a value.
-                int ndefined = 0;
-                
-                // index of the current value column.
-                int valueColumnIndex = 0;
-                
-                // for each value column.
-                for (String vcol : pt.vcols) {
+                // Summary for the table : @todo more substance in summary.
+                final String summary = "Showing samples: period=" + t.units;
 
-                    // #of values aggregated for this value column.
-                    int valueCountForColumn = 0;
-                    
-                    // The aggregated value for this value column.
-                    double val = 0d;
+                w.write("<table border=\"1\" summary=\"" + attrib(summary)
+                        + "\"\n>");
 
-                    // consider each counter in the cset for this output row.
-                    for (ICounter c : cset.counters) {
+            }
 
-                        if (!c.getName().equals(vcol)) {
+            // the header rows.
+            {
 
-                            // not for this value column (skip over).
-                            continue;
-
-                        }
-
-                        // find the index for that counter in the data table.
-                        for (int col = 0; col < a.length; col++) {
-
-                            if (c != a[col])
-                                continue;
-
-                            // get the sample from the data table.
-                            final IHistoryEntry e = t.data[row][col];
-
-                            if (e == null) {
-
-                                // no sampled value.
-                                continue;
-                                
-                            }
-
-                            // @todo catch class cast problems and ignore
-                            // val.  @todo protected against overflow of
-                            // double.
-                            val += ((Number) e.getValue()).doubleValue();
-
-                            valueCountForColumn++;
-                            
-                            /*
-                             * The counter appears just once in the data table
-                             * so we can stop once we find its index.
-                             */
-                            break;
-
-                        }
-
-                    } // next counter in CSet.
-
-                    if (valueCountForColumn > 0) {
-
-                        /*
-                         * There was at least one sample for the current value
-                         * column.
-                         */
-                        
-                        // save the value.
-                        vals[valueColumnIndex] = val;
-
-                        // #of non-empty values in this row.
-                        ndefined++;
-
-                    }
-
-                    if (DEBUG && valueCountForColumn > 0)
-                        log.debug("vcol=" + vcol + ", vcol#="
-                                + valueColumnIndex + ", #values="
-                                + valueCountForColumn + ", val=" + val);
-                    
-                    valueColumnIndex++;
-
-                } // next value column.
-
-                if (ndefined == 0) {
-                 
-                    // no data for this row.
-                    continue;
-                    
-                }
-
+                // header row.
                 w.write(" <tr\n>");
-
-                w.write("  <td>" + unitStr + "</td\n>");
-
-                w.write("  <td>" + timeStr + "</td\n>");
-
-                for (int j = 0; j < pt.cnames.length; j++) {
-
-                    w.write("  <td>" + cset.cats[j] + "</td\n>");
-
+                // timestamp column headers.
+                w.write("  <th>" + cdata(t.units) + "</th\n>");
+                w.write("  <th>" + cdata("timestamp") + "</th\n>");
+                for (String s : pt.cnames) {
+                    // category column headers.
+                    w.write("  <th>" + cdata(s) + "</th\n>");
                 }
-
-                for (int j = 0; j < vals.length; j++) {
-
-                    final String s = vals[j] == null ? "" : Double
-                            .toString(vals[j]);
-
-                    w.write("  <td>" + s + "</td\n>");
-
+                for (String s : pt.vcols) {
+                    // performance counter column headers.
+                    w.write("  <th>" + cdata(s) + "</th\n>");
                 }
+                w.write(" </tr\n>");
 
             }
-            
-            w.write(" </tr\n>");
-
-        } // next row.
-       
-        // the table end tag.
-        w.write("</table\n>");
-
-    }
-
-    /**
-     * Aggregates data from a table by grouping the cells in the table into sets ({@link CSet}s)
-     * of category columns. The values for cells belonging to the same
-     * {@link CSet} are aggregated for each distinct
-     * {@link ICounterNode#getName()}. 
-     */
-    class PivotTable {
-       
-        /**
-         * The HistoryTable (converts counter heirarchy into regular table).
-         */
-        public final HistoryTable src;
-        
-        /**
-         * The selected counters (redundent reference to {@link HistoryTable#a}.
-         */
-        final ICounter[] a;
-
-        /**
-         * The ordered set of distinct counter names. The order of the selected
-         * counters is preserved here (minus duplicate counter names) due to the
-         * virtues of the linked hash set.
-         */
-        final LinkedHashSet<String> vcols;
-        
-        /**
-         * Aggregation of the selected counters ({@link #a}) into sets sharing
-         * the same category values.
-         */
-        final List<CSet> csets;
-        
-        /**
-         * An array of category column names. The names can be specified using
-         * URL query parameters. When they are not specified or when there are
-         * not enough specified parameters then we use some generated names.
-         * 
-         * @see Model#CATEGORY
-         */
-        final String[] cnames;
-        
-        /**
-         * 
-         * @param t
-         *            The source data.
-         */
-        public PivotTable(final HistoryTable t) {
-
-            if(t == null)
-                throw new IllegalArgumentException();
-
-            // the HistoryTable (converts counter heirarchy into regular table).
-            this.src = t;
-
-            // the selected counters (used to derived the HistoryTable).
-            this.a = t.a;
-            
-            /*
-             * The ordered set of distinct counter names. The order of the selected
-             * counters is preserved here (minus duplicate counter names) due to the
-             * virtues of the linked hash set.
-             */
-            vcols = new LinkedHashSet<String>();
-            for (int i = 0; i < a.length; i++) {
-                
-                vcols.add(a[i].getName());
-                
-            }
-
-            if (INFO)
-                log.info("vnames: " + vcols);
-
-            // aggregate counters into sets sharing the same category values.
-            csets = getCategoryValueSets(a);
-
-            if (INFO)
-                log.info("csets: " + csets);
-
-            // #of capturing groups in the pattern.
-            final int ngroups = model.pattern.matcher("").groupCount();
-
-            if (INFO)
-                log.info("ngroups=" + ngroups);
 
             /*
-             * An array of category column names. The names can be specified using
-             * URL query parameters. When they are not specified or when there are
-             * not enough specified parameters then we use some generated names.
+             * FIXME Refactor to use PivotTable and an iterator construct that
+             * visits rows.
              */
-            cnames = new String[ngroups];
-
-            for (int i = 0; i < ngroups; i++) {
-
-                if (model.category != null && model.category.length > i) {
-
-                    cnames[i] = model.category[i];
-
-                } else {
-
-                    cnames[i] = "group#" + i;
-
-                }
-
-            }
-
-            if (INFO)
-                log.info("category names=" + Arrays.toString(cnames));
             
             // for each row in the HistoryTable.
             for (int row = 0; row < t.nrows; row++) {
 
-                // The timestamp for the row.
+                /*
+                 * The time will be zero for the first row and a delta (expressed in
+                 * the units of the history) for the remaining rows.
+                 * 
+                 * Note: The time units are computed using floating point math and
+                 * then converted to a display form using formatting in order to be
+                 * able to accurately convey where a sample falls within the
+                 * granularity of the unit (e.g., early or late in the day).
+                 */
                 final long timestamp = t.getTimestamp(row);
+
+                final String unitStr = cdata(formatter.unitsFormat
+                        .format(((double) timestamp - t
+                                .getTimestamp(0/* row */))
+                                / t.period));
+
+                final String timeStr = cdata(formatter.date(timestamp));
                 
                 /*
                  * The set of distinct ordered matched category values in the
                  * current row of the history table.
                  */
-                for(CSet cset : csets) {
+                for(CSet cset : pt.csets) {
 
-                    assert cset.cats.length == cnames.length : "cset categories="
+                    assert cset.cats.length == pt.cnames.length : "cset categories="
                             + Arrays.toString(cset.cats) + " vs "
-                            + "category names: " + Arrays.toString(cnames);
+                            + "category names: " + Arrays.toString(pt.cnames);
                     
                     /*
                      * Aggregate values for counters in this cset having a value for
@@ -2965,7 +1905,7 @@ public class XHTMLRenderer {
                      * output for for their cset.
                      */
                     
-                    final Double[] vals = new Double[vcols.size()];
+                    final Double[] vals = new Double[pt.vcols.size()];
                     
                     // #of value columns having a value.
                     int ndefined = 0;
@@ -2974,7 +1914,7 @@ public class XHTMLRenderer {
                     int valueColumnIndex = 0;
                     
                     // for each value column.
-                    for (String vcol : vcols) {
+                    for (String vcol : pt.vcols) {
 
                         // #of values aggregated for this value column.
                         int valueCountForColumn = 0;
@@ -2993,9 +1933,9 @@ public class XHTMLRenderer {
                             }
 
                             // find the index for that counter in the data table.
-                            for (int col = 0; col < a.length; col++) {
+                            for (int col = 0; col < t.a.length; col++) {
 
-                                if (c != a[col])
+                                if (c != t.a[col])
                                     continue;
 
                                 // get the sample from the data table.
@@ -3056,197 +1996,112 @@ public class XHTMLRenderer {
                         
                     }
 
-                    // @todo else output a PivotRow.
-//                    
-//                    new PivotRow(row, timestamp,cset,vals);
+                    w.write(" <tr\n>");
+
+                    w.write("  <td>" + unitStr + "</td\n>");
+
+                    w.write("  <td>" + timeStr + "</td\n>");
+
+                    for (int j = 0; j < pt.cnames.length; j++) {
+
+                        w.write("  <td>" + cset.cats[j] + "</td\n>");
+
+                    }
+
+                    for (int j = 0; j < vals.length; j++) {
+
+                        final String s = vals[j] == null ? "" : Double
+                                .toString(vals[j]);
+
+                        w.write("  <td>" + s + "</td\n>");
+
+                    }
+                    
+                    w.write(" </tr\n>");
                     
                 }
 
             } // next row.
+           
+            // the table end tag.
+            w.write("</table\n>");
 
         }
-
-        /**
-         * A row in a {@link PivotTable}.
-         * 
-         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-         *         Thompson</a>
-         * @version $Id$
-         */
-        class PivotRow {
-
-            /**
-             * The row of the source {@link HistoryTable} whose aggregated
-             * values are captured by the row of the pivot table.
-             */
-            final int row;
-            
-            /**
-             * The timestamp associated with the data in the row.
-             */
-            final long timestamp;
-
-            /**
-             * The category set for this row. The values for the category
-             * columns in the row are {@link CSet#cats}.
-             */
-            final CSet cset;
-
-            /**
-             * The value columns for the row. There is one element in the array
-             * for each element in {@link PivotTable#vcols}. The element MAY be
-             * <code>null</code> in which case there was no data for that
-             * counter for this row.
-             */
-            final Double[] values;
-
-            /**
-             * 
-             * @param row
-             *            The row of the source {@link HistoryTable} whose
-             *            aggregated values are captured by the row of the pivot
-             *            table.
-             * @param timestamp
-             *            The timestamp associated with the data in the row.
-             * @param cset
-             *            The category set for this row. The values for the
-             *            category columns in the row are {@link CSet#cats}.
-             * @param values
-             *            The value columns for the row. There is one element in
-             *            the array for each element in {@link PivotTable#vcols}.
-             *            The element MAY be <code>null</code> in which case
-             *            there was no data for that counter for this row.
-             */
-            PivotRow(final int row, final long timestamp, final CSet cset,
-                    final Double[] values) {
-
-                if (cset == null)
-                    throw new IllegalArgumentException();
-
-                if (cset.cats.length != PivotTable.this.cnames.length)
-                    throw new IllegalArgumentException();
-                
-                if (values == null)
-                    throw new IllegalArgumentException();
-
-                if (values.length != PivotTable.this.vcols.size())
-                    throw new IllegalArgumentException();
-
-                this.row = row;
-                
-                this.timestamp = timestamp;
-                
-                this.cset = cset;
-                
-                this.values = values;
-
-            }
-
-        }
-
-    }
-
-    /**
-     * Selects and returns all counters with history in the hierarchy starting
-     * with the specified {@link CounterSet} up to the specified depth.
-     */
-    protected ICounter[] selectCounters(final CounterSet counterSet,
-            final int depth) {
-
-        // depth of the hierarchy at the point where we are starting.
-        final int ourDepth = counterSet.getDepth();
-
-        if (INFO)
-            log.info("path=" + counterSet.getPath() + ", depth=" + depth
-                    + ", ourDepth=" + ourDepth);
-
-        final Iterator<ICounterNode> itr = counterSet.getNodes(model.pattern);
-
-        final Vector<ICounter> counters = new Vector<ICounter>();
-        
-        while(itr.hasNext()) {
-
-            final ICounterNode node = itr.next();
-
-            if (DEBUG)
-                log.debug("considering: " + node.getPath());
-            
-            if(depth != 0) { 
-                
-                final int counterDepth = node.getDepth();
-                
-                if((counterDepth - ourDepth) > depth) {
-                
-                    // prune rendering
-                    if (DEBUG)
-                        log.debug("skipping: " + node.getPath());
-                    
-                    continue;
-                    
-                }
-                
-            }
-            
-            if(node instanceof ICounter) {
-
-                final ICounter c = (ICounter) node;
-                
-                if(c.getInstrument() instanceof HistoryInstrument) {
-
-                    counters.add( c );
-                    
-                }
-                
-            }
-            
-        }
-        
-        final ICounter[] a = counters.toArray(new ICounter[counters.size()]);
-
-        return a;
         
     }
     
     /**
-     * Writes all counters with history in the hierarchy starting with the
-     * specified {@link CounterSet} in a single table using a correlated view.
+     * Writes out a pivot table view.
+     * 
+     * @param w
+     *            Where to write the data.
+     * @param a
+     *            The selected counters.
+     * @param basePeriod
+     * @param timestampFormat
+     * 
+     * @throws IOException
+     * 
+     * @todo review use of basePeriod. is this {@link Model#period}?
      */
-    protected void writeCorrelatedCounters(final Writer w, final ICounter[] a)
-            throws IOException {
-        
-        if (model.period == null) {
+    protected void writePivotTable(final Writer w, final ICounter[] a,
+            final PeriodEnum basePeriod,
+            final TimestampFormatEnum timestampFormat) throws IOException {
 
-            /*
-             * Report for all periods.
-             */
+        if (w == null)
+            throw new IllegalArgumentException();
+
+        if (a == null)
+            throw new IllegalArgumentException();
+
+        if (a.length == 0) {
+
+            // No data.
             
-            writeHistoryTable(w, a, PeriodEnum.Minutes, model.timestampFormat);
+            return;
+            
+        }
+        
+        if (basePeriod == null)
+            throw new IllegalArgumentException();
 
-            writeHistoryTable(w, a, PeriodEnum.Hours, model.timestampFormat);
+        if (timestampFormat == null)
+            throw new IllegalArgumentException();
 
-            writeHistoryTable(w, a, PeriodEnum.Days, model.timestampFormat);
+        final HistoryTable t = new HistoryTable(a, basePeriod);
 
-        } else {
-
-            /*
-             * Report only the specified period.
-             */
-
-            switch (model.period) {
+        final PivotTable pt = new PivotTable(model.pattern, model.category, t);
+        
+        /*
+         * Figure out how we will format the timestamp (From:, To:, and the last
+         * column).
+         */
+        final DateFormat dateFormat;
+        switch(timestampFormat) {
+        case dateTime:
+            switch (basePeriod) {
             case Minutes:
-                writeHistoryTable(w, a, PeriodEnum.Minutes, model.timestampFormat);
+                dateFormat = DateFormat.getTimeInstance(DateFormat.SHORT);
                 break;
             case Hours:
-                writeHistoryTable(w, a, PeriodEnum.Hours, model.timestampFormat);
+                dateFormat = DateFormat.getTimeInstance(DateFormat.MEDIUM);
                 break;
             case Days:
-                writeHistoryTable(w, a, PeriodEnum.Days, model.timestampFormat);
+                dateFormat = DateFormat.getDateInstance(DateFormat.MEDIUM);
                 break;
             default:
-                throw new AssertionError(model.period.toString());
+                throw new AssertionError();
             }
-
+            break;
+        case epoch:
+            dateFormat = null;
+            break;
+        default:
+            throw new AssertionError(timestampFormat.toString());
         }
+
+        new HTMLPivotTableRenderer(pt,
+                new HTMLValueFormatter(dateFormat, model)).render(w);
         
     }
     
@@ -3880,9 +2735,9 @@ public class XHTMLRenderer {
      * @param s
      *            The string.
      * 
-     * @return
+     * @return The encoded string.
      */
-    protected String cdata(final String s) {
+    static public String cdata(final String s) {
 
         if (s == null)
             throw new IllegalArgumentException();
@@ -3899,7 +2754,7 @@ public class XHTMLRenderer {
      *            
      * @return
      */
-    protected String attrib(final String s) {
+    static public String attrib(final String s) {
         
         return HTMLUtility.escapeForXHTML(s);
         
@@ -3915,6 +2770,8 @@ public class XHTMLRenderer {
      * @param value
      *            The counter value (MAY be <code>null</code>).
      * @return
+     * 
+     * @deprecated Move into formatter objects.
      */
     protected String value(final ICounter counter, final Object val) {
         

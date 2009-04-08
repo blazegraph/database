@@ -273,7 +273,7 @@ public class ProcessHelper {
         // save the listener reference.
         this.listener = listener;
     
-        log.warn("command: "+processBuilder.command());
+        log.warn("command: " + processBuilder.command());
 //        log.warn("environment: "+builder.environment());
         
         /*
@@ -374,12 +374,13 @@ public class ProcessHelper {
             String s;
 
             /*
-             * Note: when the process is killed, readLine() will return
-             * since the stream will be closed.
+             * Note: when the process is killed, readLine() will return since
+             * the stream will be closed.
              */
             while ((s = is.readLine()) != null) {
 
-                if(INFO) log.info(s);
+                if (INFO)
+                    log.info(s);
 
             }
 
@@ -527,7 +528,7 @@ public class ProcessHelper {
      * 
      * @return
      */
-    static public String getCommandString(ProcessBuilder processBuilder) {
+    static public String getCommandString(final ProcessBuilder processBuilder) {
         
         final StringBuilder sb = new StringBuilder();
         

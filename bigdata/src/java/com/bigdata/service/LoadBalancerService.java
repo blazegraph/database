@@ -28,11 +28,13 @@ import org.apache.log4j.MDC;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.DefaultInstrumentFactory;
+import com.bigdata.counters.History;
 import com.bigdata.counters.HistoryInstrument;
 import com.bigdata.counters.ICounter;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.IHostCounters;
 import com.bigdata.counters.IRequiredHostCounters;
+import com.bigdata.counters.PeriodEnum;
 import com.bigdata.counters.ICounterSet.IInstrumentFactory;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.ConcurrencyManager.IConcurrencyManagerCounters;
@@ -154,9 +156,12 @@ abstract public class LoadBalancerService extends AbstractService
     final protected String ps = ICounterSet.pathSeparator;
     
     /**
-     * Used to read {@link CounterSet} XML.
+     * Used to read {@link CounterSet} XML. This must support overwrite since
+     * new data arrives every minute and eventually the ring buffer must
+     * overwrite old values. In addition, this may support multiple levels of
+     * aggregation so that minutes may be rolled into hours and hours into days.
      */
-    final private IInstrumentFactory instrumentFactory = DefaultInstrumentFactory.INSTANCE;
+    final private IInstrumentFactory instrumentFactory = DefaultInstrumentFactory.OVERWRITE_60M;
     
     /**
      * Service join timeout in milliseconds - used when we need to wait for a
@@ -1427,11 +1432,11 @@ abstract public class LoadBalancerService extends AbstractService
              * we have access to per-process counters for CPU, DISK, and MEMORY.
              */
 
-            final double averageQueueLength = getAverageValueForMinutes(
-                    serviceCounterSet, IDataServiceCounters.concurrencyManager
-                            + ps + IConcurrencyManagerCounters.writeService
-                            + ps + IThreadPoolExecutorCounters.AverageQueueLength,
-                    0d/* default (queueLength) */, historyMinutes);
+//            final double averageQueueLength = getAverageValueForMinutes(
+//                    serviceCounterSet, IDataServiceCounters.concurrencyManager
+//                            + ps + IConcurrencyManagerCounters.writeService
+//                            + ps + IThreadPoolExecutorCounters.AverageQueueLength,
+//                    0d/* default (queueLength) */, historyMinutes);
 
             final double averageQueueingTime = getAverageValueForMinutes(
                     serviceCounterSet, IDataServiceCounters.concurrencyManager
@@ -1520,7 +1525,7 @@ abstract public class LoadBalancerService extends AbstractService
              
                 log.info("serviceName=" + serviceName//
                         + ", serviceUUID=" + serviceUUID //
-                        + ", averageQueueLength=" + averageQueueLength//
+//                        + ", averageQueueLength=" + averageQueueLength//
                         + ", averageQueueingTime=" + millisFormat.format(averageQueueingTime)//
                         + ", dataDirBytesAvail="+bytesFormat.format(dataDirBytesAvailable)//
                         + ", tmpDirBytesAvail="+bytesFormat.format(tmpDirBytesAvailable)//
@@ -1576,6 +1581,8 @@ abstract public class LoadBalancerService extends AbstractService
          * @param defaultValue
          * @param minutes
          * @return
+         * 
+         * FIXME should be a weighted average, right?
          */
         protected double getAverageValueForMinutes(
                 final ICounterSet counterSet, final String path,
@@ -1594,8 +1601,8 @@ abstract public class LoadBalancerService extends AbstractService
                 final HistoryInstrument inst = (HistoryInstrument) c
                         .getInstrument();
 
-                final double val = ((Number) inst.minutes.getAverage(minutes))
-                        .doubleValue();
+                final double val = ((Number) inst.getHistory().getAverage(
+                        minutes)).doubleValue();
 
                 return val;
 
@@ -1649,9 +1656,11 @@ abstract public class LoadBalancerService extends AbstractService
 
                         if (tmpScores.getChild(hn) == null) {
 
-                            tmpScores.addCounter(hn,
-                                    new HistoryInstrument<Double>(
-                                            new Double[] {}));
+                            tmpScores
+                                    .addCounter(hn,
+                                            new HistoryInstrument<Double>(
+                                                    new History<Double>(new Double[60], PeriodEnum.Minutes
+                                                            .getPeriodMillis(), true/*overwrite*/)));
 
                         }
 
@@ -1686,7 +1695,11 @@ abstract public class LoadBalancerService extends AbstractService
 
                             tmpFormula.addCounter(hn,
                                     new HistoryInstrument<String>(
-                                            new String[] {}));
+                                                    new History<String>(
+                                                            new String[60],
+                                                            PeriodEnum.Minutes
+                                                                    .getPeriodMillis(),
+                                                            true/*overwrite*/)));
 
                         }
 
@@ -1735,8 +1748,15 @@ abstract public class LoadBalancerService extends AbstractService
 
                         if (tmpScores.getChild(idStr) == null) {
 
-                            tmpScores.addCounter(idStr, new HistoryInstrument<Double>(new Double[]{}));
-                            
+                            tmpScores
+                                    .addCounter(
+                                            idStr,
+                                            new HistoryInstrument<Double>(
+                                                    new History<Double>(
+                                                            new Double[60],
+                                                            PeriodEnum.Minutes
+                                                                    .getPeriodMillis(),
+                                                            true/*overwrite*/)));                            
                         }
                         
                         {
@@ -1774,7 +1794,15 @@ abstract public class LoadBalancerService extends AbstractService
 
                         if (tmpFormula.getChild(idStr) == null) {
 
-                            tmpFormula.addCounter(idStr, new HistoryInstrument<String>(new String[]{}));
+                            tmpFormula
+                                    .addCounter(
+                                            idStr,
+                                            new HistoryInstrument<String>(
+                                                    new History<String>(
+                                                            new String[60],
+                                                            PeriodEnum.Minutes
+                                                                    .getPeriodMillis(),
+                                                            true/*overwrite*/)));
                             
                         }
                         

@@ -52,8 +52,6 @@ public class TestAll extends TestCase {
     public static Test suite() {
 
         final TestSuite suite = new TestSuite("start");
-
-        suite.addTest(com.bigdata.jini.start.TestAll.suite());
         
         // 
         suite.addTestSuite(TestServiceConfigurationZNodeEnum.class);

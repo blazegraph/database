@@ -1370,9 +1370,12 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     /**
      * Private instance used for mutation operations (insert, remove) which are
-     * single threaded.
+     * single threaded. Both {@link IRangeQuery#KEYS} and
+     * {@link IRangeQuery#VALS} are requested so that indices which encode part
+     * of the application object within the key can recover the application
+     * object in {@link #insert(Object, Object)} and {@link #remove(Object)}.
      */
-    public final Tuple writeTuple = new Tuple(this,/*KEYS|*/VALS);
+    public final Tuple writeTuple = new Tuple(this, KEYS | VALS);
 
     /**
      * A {@link ThreadLocal} {@link Tuple} that is used to copy the value

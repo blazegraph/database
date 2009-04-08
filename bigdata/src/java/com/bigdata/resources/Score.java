@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.resources;
 
+import java.util.Comparator;
+
 import com.bigdata.btree.BTreeCounters;
 
 /**
@@ -103,4 +105,58 @@ class Score implements Comparable<Score> {
 
     }
 
+    /**
+     * Places {@link Score} into ascending order (lowest score to highest
+     * score). Ties are broken based on an alpha sort of the index name.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static public class ASC implements Comparator<Score> {
+
+        public int compare(Score arg0, Score arg1) {
+
+            if (arg0.rawScore < arg1.rawScore) {
+
+                return -1;
+
+            } else if (arg0.rawScore > arg1.rawScore) {
+
+                return 1;
+
+            }
+
+            return arg0.name.compareTo(arg1.name);
+
+        }
+
+    }
+
+    /**
+     * Places {@link Score} into descending order (highest score to lowest
+     * score). Ties are broken based on an alpha sort of the index name.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static public class DESC implements Comparator<Score> {
+
+        public int compare(Score arg0, Score arg1) {
+
+            if (arg1.rawScore < arg0.rawScore) {
+
+                return -1;
+
+            } else if (arg1.rawScore > arg0.rawScore) {
+
+                return 1;
+
+            }
+
+            return arg0.name.compareTo(arg1.name);
+
+        }
+
+    }
+    
 }

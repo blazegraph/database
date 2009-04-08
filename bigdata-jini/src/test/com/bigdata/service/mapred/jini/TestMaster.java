@@ -110,7 +110,7 @@ public class TestMaster extends AbstractServerTestCase {
         super(arg0);
     }
 
-    private String path = "src/resources/config/standalone/";
+    private String path = "bigdata-jini/src/resources/config/standalone/";
 
     protected MapReduceServiceDiscoveryManager serviceDiscoveryManager;
     

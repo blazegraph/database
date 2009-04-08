@@ -58,9 +58,10 @@ public class XMLUtility {
     static protected final Logger log = Logger.getLogger(XMLUtility.class);
 
     public static final XMLUtility INSTANCE = new XMLUtility();
-    
-    private XMLUtility() {}
-    
+
+    private XMLUtility() {
+    }
+
     /**
      * Serializes an {@link ICounterSet} as XML.
      * 
@@ -71,10 +72,11 @@ public class XMLUtility {
      * @param filter
      *            A filter to be applied to the counters (optional). Only the
      *            matched counters will be serialized.
-     *            
+     * 
      * @throws IOException
      */
-    public void writeXML(CounterSet root, final Writer w, final Pattern filter) throws IOException {
+    public void writeXML(CounterSet root, final Writer w, final Pattern filter)
+            throws IOException {
         
         w.write("<counters");
         w.write(" xmlns:xs=\""+NAMESPACE_XSD+"\"");
@@ -156,13 +158,16 @@ public class XMLUtility {
                 
                 if(counter.getInstrument() instanceof HistoryInstrument) {
 
-                    HistoryInstrument inst = (HistoryInstrument)counter.getInstrument();
+                    final HistoryInstrument inst = (HistoryInstrument) counter
+                            .getInstrument();
+
+                    writeHistory(w, inst.getHistory(), "minutes");
                     
-                    writeHistory(w, inst.minutes, "minutes");
-                    
-                    writeHistory(w, inst.hours, "hours");
-                    
-                    writeHistory(w, inst.days, "days");
+//                    writeHistory(w, inst.minutes, "minutes");
+//                    
+//                    writeHistory(w, inst.hours, "hours");
+//                    
+//                    writeHistory(w, inst.days, "days");
                        
                 }
                 
@@ -189,8 +194,8 @@ public class XMLUtility {
      * 
      * @throws IOException
      */
-    protected void writeHistory(Writer w, History h, String units)
-            throws IOException {
+    protected void writeHistory(final Writer w, final History h,
+            final String units) throws IOException {
 
         /*
          * Note: synchronized on the history to prevent concurrent modification.
@@ -291,34 +296,6 @@ public class XMLUtility {
          * Set each time we enter a <code>cs</code> element.
          */
         private String path;
-        
-//            /**
-//             * Set each time we enter a <code>c</code> element. The value will be
-//             * <code>null</code> if there is no node with the same path as the
-//             * described counter (the {@link #path} plus the counter
-//             * <code>name</code> attribute), a {@link CounterSet} if the path
-//             * describes a {@link CounterSet} rather than a {@link Counter}, or a
-//             * {@link Counter} if there is a pre-existing counter for that path.
-//             */
-//            private ICounterNode node;
-
-//            /**
-//             * The value of the <code>name</code> attribute from the last
-//             * <code>c</code> element.
-//             */
-//            private String name;
-//            
-//            /**
-//             * The value of the <code>time</code> attribute from the last
-//             * <code>c</code> element.
-//             */
-//            private long time;
-//            
-//            /**
-//             * The value of the <code>type</code> attribute from the last
-//             * <code>c</code> element.
-//             */
-//            private String type;
         
         /** The current counter. */
         private ICounter counter;
@@ -450,11 +427,11 @@ public class XMLUtility {
                     history = inst.minutes;
                     
                 } else if (units.equals("hours")) {
-
+                    
                     history = inst.hours;
                     
                 } else if (units.equals("days")) {
-
+                    
                     history = inst.days;
                     
                 } else {

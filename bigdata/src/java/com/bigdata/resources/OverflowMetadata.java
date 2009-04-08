@@ -202,7 +202,8 @@ public class OverflowMetadata {
         synchronized (vmd) {
 
             if (vmd.action != null)
-                throw new IllegalStateException();
+                throw new IllegalStateException("Already set: " + vmd.action
+                        + ", given=" + action);
 
             // set on the ViewMetadata object itself.
             vmd.action = action;

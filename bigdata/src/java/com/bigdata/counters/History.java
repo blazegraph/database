@@ -8,10 +8,7 @@ import org.apache.log4j.Logger;
 
 
 /**
- * Retains history for N periods, where the period is expressed in
- * milliseconds. When the history would overflow, the average for the last N
- * periods is optionally added to another {@link History} which aggregates
- * this one.
+ * Retains history for N periods, where the period is expressed in milliseconds.
  * <p>
  * This class is thread-safe.
  * 
@@ -389,7 +386,7 @@ public class History<T> {
 
             current++;
 
-            return (IHistoryEntry) entry.clone();
+            return (IHistoryEntry<T>) entry.clone();
 
         }
 
@@ -516,8 +513,6 @@ public class History<T> {
      */
     synchronized public String toString() {
 
-        final T average = getAverage(); //@todo move to end
-
         final StringBuilder sb = new StringBuilder();
 
         sb.append("{");
@@ -539,6 +534,8 @@ public class History<T> {
             n++;
 
         }
+
+        final T average = getAverage();
 
         sb.append("},average=" + average + ",n=" + n);
 
@@ -897,6 +894,16 @@ public class History<T> {
 
                 if (data[ps] != null) {
 
+                    if(!overwrite) {
+                        /*
+                         * Note: Overwrite is not always desirable - there is a
+                         * ctor option to disable it.
+                         */
+                        throw new RuntimeException("Would overwrite data: ps="
+                                + ps + ", capacity=" + capacity + ", size="
+                                + size);
+                    }
+                    
                     // clear old slot.
                     
                     size--;
@@ -977,15 +984,20 @@ public class History<T> {
      * Constructor used at the base collection period.
      * 
      * @param data
-     *            An array whose size is the capacity of the history buffer.
-     *            The contents of the array will be used to store the data. (This
-     *            API requirement arises since generics are fixed at compile time
-     *            rather than runtime.)
+     *            An array whose size is the capacity of the history buffer. The
+     *            contents of the array will be used to store the data. (This
+     *            API requirement arises since generics are fixed at compile
+     *            time rather than runtime.)
      * @param period
      *            The period covered by each slot in milliseconds.
+     * @param overwrite
+     *            <code>true</code> iff overwrite of slots in the buffer is
+     *            allowed (when <code>false</code> the buffer will fill up and
+     *            then refuse additional samples if they would overwrite slots
+     *            which are in use).
      */
     @SuppressWarnings("unchecked")
-    protected History(final T[] data, final long period) {
+    public History(final T[] data, final long period, boolean overwrite) {
 
         if (data == null)
             throw new IllegalArgumentException();
@@ -1002,7 +1014,7 @@ public class History<T> {
         
         this.period = period;
 
-        //            this.source = null;
+        this.overwrite = overwrite;
 
         this.timestamps = new long[capacity];
 
@@ -1044,7 +1056,7 @@ public class History<T> {
         
         this.period = source.period * capacity;
 
-        //            this.source = source;
+        this.overwrite = true;
 
         this.timestamps = new long[capacity];
 
@@ -1073,6 +1085,8 @@ public class History<T> {
 
     private final long period;
 
+    private final boolean overwrite;
+    
     private final boolean _numeric;
 
     private final boolean _long;
@@ -1080,6 +1094,17 @@ public class History<T> {
     private final boolean _double;
 
     private History<T> sink;
+    
+    /**
+     * The sink on which the history writes when it overflows -or-
+     * <code>null</code> if no sink has been assigned (it is assigned by the
+     * alternate ctor).
+     */
+    protected History<T> getSink() {
+        
+        return sink;
+        
+    }
 
     /**
      * The timestamp of the last sample reported in a given period.

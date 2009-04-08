@@ -112,14 +112,12 @@ public class TestBigdataClient extends AbstractServerTestCase {
     public void setUp() throws Exception {
 
         super.setUp();
-        
-//        final String groups = ".groups = new String[]{\"" + getName() + "\"}";
 
         /*
          * Start up a timestamp server.
          */
         timestampServer0 = new TransactionServer(
-                new String[] { "src/resources/config/standalone/TimestampServer0.config" },
+                new String[] { "bigdata-jini/src/resources/config/standalone/TransactionServer0.config" },
                 new FakeLifeCycle());
 
         new Thread() {
@@ -137,7 +135,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
          * sure that it is detected by the metadata server once it starts up.
          */
         dataServer1 = new DataServer(
-                new String[] { "src/resources/config/standalone/DataServer1.config" },
+                new String[] { "bigdata-jini/src/resources/config/standalone/DataServer1.config" },
                 new FakeLifeCycle());
 
         new Thread() {
@@ -154,7 +152,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
          * Start the metadata server.
          */
         metadataServer0 = new MetadataServer(
-                new String[] { "src/resources/config/standalone/MetadataServer0.config" },
+                new String[] { "bigdata-jini/src/resources/config/standalone/MetadataServer0.config" },
                 new FakeLifeCycle());
         
         new Thread() {
@@ -172,7 +170,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
          * sure that it is detected by the metadata server once it starts up.
          */
         dataServer0 = new DataServer(
-                new String[] { "src/resources/config/standalone/DataServer0.config" },
+                new String[] { "bigdata-jini/src/resources/config/standalone/DataServer0.config" },
                 new FakeLifeCycle());
 
         new Thread() {
@@ -189,7 +187,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
          * Start up a load balancer server.
          */
         loadBalancerServer0 = new LoadBalancerServer(
-                new String[] { "src/resources/config/standalone/LoadBalancerServer0.config" },
+                new String[] { "bigdata-jini/src/resources/config/standalone/LoadBalancerServer0.config" },
                 new FakeLifeCycle());
 
         new Thread() {
@@ -203,8 +201,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
         }.start();
 
         client = JiniClient.newInstance(
-                new String[] { "src/resources/config/standalone/Client.config"
-//                        , BigdataClient.CLIENT_LABEL+groups
+                new String[] { "bigdata-jini/src/resources/config/standalone/Client.config"
                         });
 
         // Wait until all the services are up.

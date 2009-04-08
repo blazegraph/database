@@ -71,7 +71,7 @@ public class AbstractFedZooTestCase extends TestCase2 {
     /**
      * A configuration file used by some of the unit tests in this package.
      */
-    protected final String configFile = "file:src/test/com/bigdata/jini/start/testfed.config";
+    protected final String configFile = "file:bigdata-jini/src/test/com/bigdata/jini/start/testfed.config";
 
     // ACL used for the unit tests.
     protected final List<ACL> acl = Ids.OPEN_ACL_UNSAFE;
@@ -162,6 +162,5 @@ public class AbstractFedZooTestCase extends TestCase2 {
         }
         
     }
-
 
 }

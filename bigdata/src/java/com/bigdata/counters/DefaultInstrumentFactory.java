@@ -39,32 +39,99 @@ import com.bigdata.counters.ICounterSet.IInstrumentFactory;
  */
 public class DefaultInstrumentFactory implements IInstrumentFactory {
 
-    public static final DefaultInstrumentFactory INSTANCE = new DefaultInstrumentFactory();
-    
-    private DefaultInstrumentFactory() {
-        
+    /**
+     * Instance supports overwrite, so the ring buffer will eventually overwrite
+     * old values as new values arrive. Minutes are migrated onto hours and
+     * hours are migrated onto days. Up to 30 days of data will be retained.
+     */
+    public static final DefaultInstrumentFactory OVERWRITE_60M = new DefaultInstrumentFactory(
+            60/* slots */, PeriodEnum.Minutes, true/* overwrite */);
+
+    public static final DefaultInstrumentFactory NO_OVERWRITE_60M = new DefaultInstrumentFactory(
+            60/* slots */, PeriodEnum.Minutes, false/* overwrite */);
+
+    private final int nslots;
+
+    private final PeriodEnum period;
+
+    private final boolean overwrite;
+
+    /**
+     * 
+     * @param nslots
+     *            The #of units of the period to be retained by the
+     *            {@link History}.
+     * @param period
+     *            The period in which those units are measured.
+     * @param overwrite
+     *            If the {@link History} may serve as a ring buffer.
+     */
+    public DefaultInstrumentFactory(final int nslots, final PeriodEnum period,
+            final boolean overwrite) {
+
+        if (nslots <= 0)
+            throw new IllegalArgumentException();
+
+        if (period == null)
+            throw new IllegalArgumentException();
+
+        this.nslots = nslots;
+
+        this.period = period;
+
+        this.overwrite = overwrite;
+
     }
 
-    public IInstrument newInstance(Class type) {
+    public IInstrument newInstance(final Class type) {
 
-        if(type==null) throw new IllegalArgumentException();
-        
+        if (type == null)
+            throw new IllegalArgumentException();
+
         if (type == Double.class || type == Float.class) {
 
-            return new HistoryInstrument<Double>(new Double[] {});
-            
+            final History<Double> minutes = new History<Double>(
+                    new Double[nslots], period.getPeriodMillis(), overwrite);
+
+            if (overwrite) {
+
+                // 24 hours in a day
+                final History<Double> hours = new History<Double>(24, minutes);
+
+                // 30 days of history
+//                final History<Double> days = 
+                new History<Double>(30, hours);
+
+            }
+
+            return new HistoryInstrument<Double>(minutes);
+
         } else if (type == Long.class || type == Integer.class) {
-            
-            return new HistoryInstrument<Long>(new Long[] {});
-            
-        } else if( type == String.class ) {
-            
+
+            final History<Long> minutes = new History<Long>(
+                    new Long[nslots], period.getPeriodMillis(), overwrite);
+
+            if (overwrite) {
+
+                // 24 hours in a day
+                final History<Long> hours = new History<Long>(24, minutes);
+
+                // 30 days of history
+//                final History<Long> days = 
+                new History<Long>(30, hours);
+
+            }
+
+            return new HistoryInstrument<Long>(minutes);
+
+        } else if (type == String.class) {
+
             return new StringInstrument();
-            
+
         } else {
-            
-            throw new UnsupportedOperationException("type: "+type);
-            
+
+            throw new UnsupportedOperationException("type: " + type);
+
         }
         
     }

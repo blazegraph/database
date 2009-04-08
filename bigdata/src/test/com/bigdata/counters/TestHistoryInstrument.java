@@ -32,10 +32,11 @@ import java.util.Random;
 
 import junit.framework.TestCase2;
 
-
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo unit tests when overwrite is disabled.
  */
 public class TestHistoryInstrument extends TestCase2 {
     
@@ -74,7 +75,7 @@ public class TestHistoryInstrument extends TestCase2 {
     public void test_history01() {
     
         // a history buffer with 60 samples each spaced 60 seconds apart.
-        final History<Double> h = new History<Double>(new Double[60], t60);
+        final History<Double> h = new History<Double>(new Double[60], t60, true/*overwrite*/);
 
         assertEquals(0,h.size());
         assertEquals(60,h.capacity());
@@ -118,13 +119,13 @@ public class TestHistoryInstrument extends TestCase2 {
         /*
          * a history buffer with 2 samples each spaced 60 seconds apart.
          */
-        final History<Double> h = new History<Double>(new Double[2], t60);
+        final History<Double> h = new History<Double>(new Double[2], t60, true/* overwrite */);
 
         assertEquals(0,h.size());
         assertEquals(2,h.capacity());
         
         /*
-         * a history buffer with 2 samples each spaced two minutes apart.
+         * a history buffer with 3 samples each spaced two minutes apart.
          */
         final History<Double> h2 = new History<Double>(3,h);
 
@@ -180,50 +181,50 @@ public class TestHistoryInstrument extends TestCase2 {
 
     }
     
-    /**
-     * Test {@link HistoryInstrument}.
-     */
-    public void test_001() {
-        
-        HistoryInstrument<Double> h = new HistoryInstrument<Double>(new Double[]{});
-
-        assertEquals(60,h.minutes.capacity());
-        assertEquals(24,h.hours.capacity());
-        assertEquals(30,h.days.capacity());
-
-        assertTrue(h.minutes.isNumeric());
-        assertFalse(h.minutes.isLong());
-        assertTrue(h.minutes.isDouble());
-
-        log.info(h.toString());
-
-        /*
-         * Fill the entire buffer with per-minute samples and verify that we
-         * overflow to the per hour samples buffer when we add the 61st sample.
-         */
-        int nsamples = 1; // e.g., the 1st sample.
-        for(int i=0; i<60; i++) {
-            
-            h.minutes.add(t0+i*t60, (double)i);
-            
-            assertEquals(i+1,h.minutes.size());
-
-            if (nsamples == 61) {
-
-                assertEquals("nsamples="+nsamples,1,h.hours.size());
-                
-            } else {
-                
-                assertEquals("nsamples="+nsamples,0,h.hours.size());
-                
-            }
-            
-            nsamples++;
-            
-        }
-        
-        log.info(h.toString());
-        
-    }
+//    /**
+//     * Test {@link HistoryInstrument}.
+//     */
+//    public void test_001() {
+//        
+//        HistoryInstrument<Double> h = new HistoryInstrument<Double>(new Double[]{});
+//
+//        assertEquals(60,h.minutes.capacity());
+//        assertEquals(24,h.hours.capacity());
+//        assertEquals(30,h.days.capacity());
+//
+//        assertTrue(h.minutes.isNumeric());
+//        assertFalse(h.minutes.isLong());
+//        assertTrue(h.minutes.isDouble());
+//
+//        log.info(h.toString());
+//
+//        /*
+//         * Fill the entire buffer with per-minute samples and verify that we
+//         * overflow to the per hour samples buffer when we add the 61st sample.
+//         */
+//        int nsamples = 1; // e.g., the 1st sample.
+//        for(int i=0; i<60; i++) {
+//            
+//            h.minutes.add(t0+i*t60, (double)i);
+//            
+//            assertEquals(i+1,h.minutes.size());
+//
+//            if (nsamples == 61) {
+//
+//                assertEquals("nsamples="+nsamples,1,h.hours.size());
+//                
+//            } else {
+//                
+//                assertEquals("nsamples="+nsamples,0,h.hours.size());
+//                
+//            }
+//            
+//            nsamples++;
+//            
+//        }
+//        
+//        log.info(h.toString());
+//        
+//    }
     
 }

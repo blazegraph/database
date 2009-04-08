@@ -79,25 +79,6 @@ public class TestAll extends TestCase {
 
             //        suite.addTestSuite( TestServer.class ); // Does not implement TestCase.
 
-            //@todo test delete of zookeeper node when service is destroyed (but not if shutdown?)
-//            /*
-//             * Basic integration tests for zookeeper.
-//             */
-//            suite.addTestSuite( TestZookeeperServerEntry.class );
-//            suite.addTestSuite( TestZookeeper.class );
-            
-            /*
-             * Test of a single client talking to a single data service instance
-             * without the use of the metadata service or a transaction manager.
-             */
-            suite.addTestSuite( TestDataServer0.class );
-
-            /*
-             * Test of a single client talking to a single metadata service
-             * instance.
-             */
-            suite.addTestSuite( TestMetadataServer0.class );
-
             /*
              * Test of a single client talking to a bigdata federation.
              */
