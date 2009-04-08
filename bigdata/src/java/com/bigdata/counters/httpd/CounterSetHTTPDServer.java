@@ -163,8 +163,10 @@ public class CounterSetHTTPDServer implements Runnable {
 
                     is = new BufferedInputStream(new FileInputStream(file));
 
-                    counterSet.readXML(is, DefaultInstrumentFactory.INSTANCE,
-                            null/* filter */);
+                    counterSet
+                            .readXML(is,
+                                    DefaultInstrumentFactory.OVERWRITE_60M,
+                                    null/* filter */);
 
                 } finally {
 

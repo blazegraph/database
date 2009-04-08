@@ -34,9 +34,11 @@ import java.util.Random;
 import junit.framework.TestCase;
 
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.History;
 import com.bigdata.counters.HistoryInstrument;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
+import com.bigdata.counters.PeriodEnum;
 
 /**
  * Utility class for testing {@link CounterSetHTTPD} or
@@ -53,7 +55,7 @@ public class TestCounterSetHTTPDServer extends TestCase {
      * 
      * @param root
      */
-    protected void setUp(CounterSet root) throws Exception {
+    protected void setUp(final CounterSet root) throws Exception {
 
         final Random r = new Random();
         {
@@ -62,12 +64,14 @@ public class TestCounterSetHTTPDServer extends TestCase {
 
             cset.addCounter("hostname", new OneShotInstrument<String>(
                     InetAddress.getLocalHost().getHostName()));
-            
-            cset.addCounter("ipaddr", new OneShotInstrument<String>(
-                    InetAddress.getLocalHost().getHostAddress()));
 
+            cset.addCounter("ipaddr", new OneShotInstrument<String>(InetAddress
+                    .getLocalHost().getHostAddress()));
+
+            // 60 minutes of data : @todo replace with CounterSetBTree (no fixed limit).
             final HistoryInstrument<Double> history1 = new HistoryInstrument<Double>(
-                    new Double[] {});
+                    new History<Double>(new Double[60], PeriodEnum.Minutes
+                            .getPeriodMillis(), true/*overwrite*/));
 
             cset.addCounter("random", new Instrument<Integer>() {
 

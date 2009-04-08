@@ -50,6 +50,9 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
+import com.bigdata.rawstore.Bytes;
+import com.bigdata.resources.ResourceManager.IResourceManagerCounters;
+import com.bigdata.resources.StoreManager.IStoreManagerCounters;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Event;
@@ -58,6 +61,7 @@ import com.bigdata.service.EventType;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.MetadataService;
+import com.bigdata.service.DataService.IDataServiceCounters;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -128,14 +132,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       transaction has a write set for that index partition on a data service
  *       then we may need to move (or split and move) the transaction write set
  *       before it can be validated.
- * 
- * @todo its possible to play "catch up" on a "hot for write" index by copying
- *       behind the commit point on the live journal to the target journal in
- *       order to minimize the duration of the unisolated operation that handles
- *       the atomic cut over of the index to its new host. it might also be
- *       possible to duplicate the writes on the new host while they continue to
- *       be absorbed on the old host, but it would seem to be difficult to get
- *       the conditions just right for that.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -243,6 +239,104 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         
     }
     
+    /**
+     * Return the value of a host counter.
+     * 
+     * @param path
+     *            The path (relative to the host root).
+     * @param defaultValue
+     *            The default value to use if the counter was not found.
+     *            
+     * @return The value if found and otherwise the defaultValue.
+     */
+    protected double getHostCounter(final String path, final double defaultValue) {
+
+        final AbstractFederation fed = (AbstractFederation) resourceManager
+                .getFederation();
+
+        final ICounterSet hostRoot = fed.getHostCounterSet();
+
+        if (hostRoot == null) {
+
+            /*
+             * Log warning but continue since may be executing before counters
+             * were reported or in a test harness.
+             */
+
+            log.warn("Host counters not available?");
+
+            return defaultValue;
+
+        }
+
+        final ICounter c = (ICounter) hostRoot.getPath(path);
+
+        if (c != null) {
+
+            return ((Number) c.getInstrument().getValue()).doubleValue();
+
+        }
+
+        /*
+         * Log warning but continue since may be executing before counters were
+         * reported or in a test harness.
+         */
+        log.warn("Host counter not found? " + path);
+
+        return defaultValue;
+
+    }
+
+    /**
+     * Return the value of a service counter.
+     * 
+     * @param path
+     *            The path (relative to the service root).
+     * @param defaultValue
+     *            The default value to use if the counter was not found.
+     * 
+     * @return The value if found and otherwise the defaultValue.
+     */
+    protected double getServiceCounter(final String path,
+            final double defaultValue) {
+
+        final AbstractFederation fed = (AbstractFederation) resourceManager
+                .getFederation();
+
+        final ICounterSet serviceRoot = fed.getServiceCounterSet();
+
+        if (serviceRoot == null) {
+
+            /*
+             * Log warning but continue since may be executing before counters
+             * were reported or in a test harness.
+             */
+
+            log.warn("Service counters not available?");
+
+            return defaultValue;
+
+        }
+
+        final ICounter c = (ICounter) serviceRoot.getPath(path);
+
+        if (c != null) {
+
+            return ((Number) c.getInstrument().getValue()).doubleValue();
+
+        }
+
+        /*
+         * Log warning but continue since may be executing before counters were
+         * reported or in a test harness.
+         */
+
+        log.warn("Service counter not found? " + path);
+
+        return defaultValue;
+
+    }
+
     /**
      * 
      * @param resourceManager
@@ -427,7 +521,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * the remove data service and the undercapacity index partition will be
      * marked as "used".
      */
-    protected List<AbstractTask> chooseIndexPartitionJoins() {
+    protected List<AbstractTask> chooseJoins() {
 
         if (!resourceManager.joinsEnabled) {
 
@@ -871,19 +965,73 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         
     }
 
-    protected List<AbstractTask> chooseIndexPartitionMoves() {
+    /**
+     * Helper class reports performance counters of interest for this service.
+     * <p>
+     * Note: Default values are used when the performance counter is not
+     * available. Reasonable defaults are choosen, but they could still trigger
+     * inappropriate behavior depending on the thresholds set for move/split and
+     * if the host is selected as "highly utilized" by the LBS.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    class ResourceScores {
+        
+        final double percentCPUTime;
+        final double majorPageFaultsPerSec;
+        final double dataDirBytesFree;
+        final double tmpDirBytesFree;
+        
+        ResourceScores() {
 
-        if (resourceManager.maximumMovesPerTarget == 0) {
+            percentCPUTime = getHostCounter(
+                    IRequiredHostCounters.CPU_PercentProcessorTime, .5d/* defaultValue */);
 
-            // Moves are not allowed.
-            
-            return EMPTY_LIST;
+            majorPageFaultsPerSec = getHostCounter(
+                    IRequiredHostCounters.Memory_majorFaultsPerSecond, .0d/* defaultValue */);
+
+            dataDirBytesFree = getServiceCounter(
+                    IDataServiceCounters.resourceManager
+                            + ICounterSet.pathSeparator
+                            + IResourceManagerCounters.StoreManager
+                            + ICounterSet.pathSeparator
+                            + IStoreManagerCounters.DataDirBytesAvailable,
+                    Bytes.gigabyte * 20/* defaultValue */);
+
+            tmpDirBytesFree = getServiceCounter(
+                    IDataServiceCounters.resourceManager
+                            + ICounterSet.pathSeparator
+                            + IResourceManagerCounters.StoreManager
+                            + ICounterSet.pathSeparator
+                            + IStoreManagerCounters.TmpDirBytesAvailable,
+                    Bytes.gigabyte * 10/* defaultValue */);
             
         }
 
+    }
+    
+    /**
+     * Identify index partitions which are global hot spots and either schedule
+     * them for a move (if this host is at peak CPU, low disk, or swapping
+     * heavily) or a split (if the CPU is underutilized).
+     * <p>
+     * The LBS ranks services based on their average queueing time. When a
+     * service is "highly utilized" according to the LBS, we consider its
+     * resource utilization. If the service is utilizing most of its CPU, if it
+     * is swapping heavily, or if it is low on disk, then we need to shed an
+     * index partition in order to reduce the workload. On the other hand, if
+     * the service is NOT utilizing a significant percentage of its CPU then its
+     * concurrency generally can be improved by splitting a "hot" index
+     * partition since this allows the host to allocate two cores to handle the
+     * same key range which was previously being serviced by a single core.
+     * 
+     * @return
+     */
+    protected List<AbstractTask> chooseMoveOrSplit() {
+
         /*
          * Figure out if this data service is considered to be highly utilized.
-         * We will consider moves IFF this is a highly utilized service.
          * 
          * Note: We consult the load balancer service on this since it is able
          * to put the load of this service into perspective by also considering
@@ -898,7 +1046,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         
         try {
 
-            loadBalancerService = resourceManager.getFederation().getLoadBalancerService();
+            loadBalancerService = resourceManager.getFederation()
+                    .getLoadBalancerService();
 
         } catch (Exception ex) {
 
@@ -916,72 +1065,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             
         }
 
-        /*
-         * Determine if this host has a sufficient load to consider moving index
-         * partitions.
-         * 
-         * FIXME There needs to be a significant difference in the load between
-         * two hosts before one can be a candidate for a move of an index
-         * partition to the other. The load balancer API does not consider the
-         * load of the source host when determining which hosts are possible
-         * targets for a move. [Also, be careful that the unit tests for MOVE
-         * will still run when we introduce this requirement.]
-         */
-        {
-            
-            final AbstractFederation fed = (AbstractFederation) resourceManager
-                    .getFederation();
-
-            final ICounterSet hostRoot = fed.getHostCounterSet();
-
-            if (hostRoot != null) {
-
-                final ICounter percentCPUTimeCounter = (ICounter) hostRoot
-                        .getPath(IRequiredHostCounters.CPU_PercentProcessorTime);
-
-                if (percentCPUTimeCounter != null) {
-
-                    final double percentCPUTime = ((Number) percentCPUTimeCounter
-                            .getInstrument().getValue()).doubleValue();
-
-                    if (percentCPUTime < resourceManager.movePercentCpuTimeThreshold) {
-
-                        /*
-                         * The host has been demonstrated to not be busy so
-                         * there is no point moving an index partition in order
-                         * to shed load.
-                         */
-                        
-                        if (INFO)
-                            log.info("Host is not busy.");
-
-                        return EMPTY_LIST;
-
-                    }
-
-                } else {
-
-                    /*
-                     * Log warning but continue since may be executing before
-                     * counters were reported or in a test harness.
-                     */
-                    log.warn("Counter not found? "
-                            + IRequiredHostCounters.CPU_PercentProcessorTime);
-
-                }
-
-            } else {
-
-                /*
-                 * Log warning but continue since may be executing before
-                 * counters were reported or in a test harness.
-                 */
-                log.warn("No counters for this host?");
-
-            }
-            
-        }
-        
         // inquire if this service is highly utilized.
         final boolean highlyUtilizedService;
         try {
@@ -998,7 +1081,77 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             return EMPTY_LIST;
             
         }
+
+        if (!highlyUtilizedService) {
+            
+            if(log.isInfoEnabled())
+                log.info("Service is not highly utilized.");
+            
+            return EMPTY_LIST;
+            
+        }
         
+        /*
+         * At this point we know that the LBS considers this host and service to
+         * be highly utilized (relative to the other hosts and services). If
+         * there is evidence of resource exhaustion for critical resources (CPU,
+         * RAM, or DIKS) then we will MOVE index partitions in order to shed
+         * some load. Otherwise, we will SPLIT hot index partitions in order to
+         * increase the potential concurrency of the workload for this service.
+         * 
+         * FIXME Be careful that the unit tests for MOVE will still run when I
+         * make these changes.
+         * 
+         * @todo config options for these triggers.
+         */
+        final ResourceScores resourceScores = new ResourceScores();
+
+        final boolean shouldMove = //
+            // heavy CPU utilization.
+            (resourceScores.percentCPUTime >= resourceManager.movePercentCpuTimeThreshold) ||
+            // swapping heavily.
+            (resourceScores.majorPageFaultsPerSec > 20) ||
+            // running out of disk (data dir).
+            (resourceScores.dataDirBytesFree < Bytes.gigabyte * 5)||
+            // running out of disk (tmp dir).
+            (resourceScores.dataDirBytesFree < Bytes.gigabyte * .5)
+            ;
+        
+        if (shouldMove) {
+
+            return chooseMoves(loadBalancerService);
+            
+        }
+
+        return chooseHotSplits();
+        
+    }
+        
+    /**
+     * Return tasks which will MOVE selected index partitions onto one or more
+     * other host(s).
+     * <p>
+     * Note: This method should not be invoked: (a) unless the LBS has
+     * identified this host and service has being highly utilized; and (b) there
+     * is evidence of resource exhaustion for one or more of the critical
+     * resources (CPU, RAM, DISK).
+     * 
+     * @param loadBalancerService
+     *            The proxy for the LBS.
+     * 
+     * @return The tasks.
+     */
+    private List<AbstractTask> chooseMoves(
+            final ILoadBalancerService loadBalancerService) {
+        
+        if (resourceManager.maximumMovesPerTarget == 0) {
+
+            // Moves are not allowed.
+            
+            return EMPTY_LIST;
+            
+        }
+
         /*
          * The minimum #of active index partitions on a data service. We will
          * consider moving index partitions iff this threshold is exceeeded.
@@ -1010,12 +1163,11 @@ public class PostProcessOldJournalTask implements Callable<Object> {
          */
         final int nactive = overflowMetadata.getActiveCount();
 
-        if (!highlyUtilizedService || nactive <= minActiveIndexPartitions) {
+        if (nactive <= minActiveIndexPartitions) {
 
-            if(INFO)
-            log.info("Preconditions for move not satisified: highlyUtilized="
-                    + highlyUtilizedService + ", nactive=" + nactive
-                    + ", minActive=" + minActiveIndexPartitions);
+            if (INFO)
+                log.info("Preconditions for move not satisified: nactive="
+                        + nactive + ", minActive=" + minActiveIndexPartitions);
             
             return EMPTY_LIST;
             
@@ -1034,6 +1186,12 @@ public class PostProcessOldJournalTask implements Callable<Object> {
          * Obtain some data service UUIDs onto which we will try and offload
          * some index partitions iff this data service is deemed to be highly
          * utilized.
+         * 
+         * FIXME The LBS should interpret the excludedServiceUUID as the source
+         * service UUID and then provide a list of those services having an LBS
+         * computed service score which is significantly lower than the score
+         * for this service. [@todo changing this will break some unit tests
+         * and javadoc will need to be updated as well.]
          */
         final UUID[] underUtilizedDataServiceUUIDs;
         try {
@@ -1134,6 +1292,19 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             final String name = score.name;
             
             if(isUsed(name)) continue;
+
+            if (overflowMetadata.isCopied(name)) {
+
+                /*
+                 * The write set from the old journal was already copied to the
+                 * new journal so we do not need to do a build.
+                 */
+
+                putUsed(name, "wasCopied(name=" + name + ")");
+
+                continue;
+                
+            }
 
             // test for indices that have been split, joined, or moved.
             final StaleLocatorReason reason = resourceManager
@@ -1366,13 +1537,15 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 : score.drank / vmd.getPercentOfSplit()//
                 ;
 
-            // @todo conditionally log @ info
-            log.warn(vmd.name + " : tailSplit=" + vmd.isTailSplit()
-                    + ", moveCandidate=" + moveCandidate + ", movePriority="
-                    + movePriority + ", drank=" + score.drank
-                    + ", percentOfSplit=" + vmd.getPercentOfSplit() + " : "
-                    + vmd + " : " + score);
-            
+            if (log.isInfoEnabled())
+                log
+                        .info(vmd.name + " : tailSplit=" + vmd.isTailSplit()
+                                + ", moveCandidate=" + moveCandidate
+                                + ", movePriority=" + movePriority + ", drank="
+                                + score.drank + ", percentOfSplit="
+                                + vmd.getPercentOfSplit() + " : " + vmd + " : "
+                                + score);
+
             if (!moveCandidate) {
 
                 /*
@@ -1549,7 +1722,213 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         return tasks;
 
     }
-    
+
+    /**
+     * Return tasks which will split "hot" index partitions.
+     * <p>
+     * Note: This method should not be invoked: (a) unless the LBS deems that
+     * this service is heavily utilized; and (b) if the local host and service
+     * performance counters indicate exhaustion of any critical resources (CPU,
+     * RAM or DISK).
+     * <p>
+     * Note: This chooses "hot splits" based on the assumption that an index
+     * partition with a high {@link Score} (which means a lot of write time)
+     * will continue to grow. If there are heavy writes on an index partition
+     * but it does not continue to grow, then it is possible that the index
+     * partition will later be JOINed with itself.
+     */
+    protected List<AbstractTask> chooseHotSplits() {
+
+        // just those indices that survive the cuts we impose here.
+        final List<Score> scores = new LinkedList<Score>();
+
+        // filter the scores for just the most active indices.
+        for (Score score : overflowMetadata.getScores()) {
+
+            final String name = score.name;
+            
+            if(isUsed(name)) continue;
+
+            if (overflowMetadata.isCopied(name)) {
+
+                /*
+                 * The write set from the old journal was already copied to the
+                 * new journal so we do not need to do a build.
+                 */
+
+                putUsed(name, "wasCopied(name=" + name + ")");
+
+                continue;
+                
+            }
+
+            // test for indices that have been split, joined, or moved.
+            final StaleLocatorReason reason = resourceManager
+                    .getIndexPartitionGone(score.name);
+
+            if (reason != null) {
+                
+                /*
+                 * Note: The counters are accumulated over the life of the
+                 * journal. This tells us that the named index was moved, split,
+                 * or joined sometimes during the live of that old journal.
+                 * Since it is gone we skip over it here.
+                 */
+                
+                if (INFO)
+                    log.info("Skipping index: name=" + score.name + ", reason="
+                            + reason);
+                
+                continue;
+                
+            }
+            
+            // get the view metadata.
+            final ViewMetadata vmd = overflowMetadata.getViewMetadata(name);
+            
+            if (vmd == null) {
+
+                /*
+                 * Note: The counters are accumulated over the live of the
+                 * journal. This tells us that the named index was dropped
+                 * sometimes during the life cycle of that old journal. Since it
+                 * is gone we skip over it here.
+                 */
+
+                if (INFO)
+                    log.info("Skipping index: name=" + name
+                            + ", reason=dropped");
+
+                continue;
+
+            }
+
+            if (vmd.pmd.getSourcePartitionId() != -1) {
+
+                /*
+                 * This index is currently being moved onto this data service so
+                 * it is NOT a candidate for a split, join, or move.
+                 */
+
+                if (INFO)
+                    log.info("Skipping index: name=" + name
+                            + ", reason=moveInProgress");
+
+                continue;
+
+            }
+
+            /*
+             * Don't hot split an index partition if it is the only partition
+             * for that index and scatter splits are enabled.
+             */
+            if (vmd.getIndexPartitionCount() == 1
+                    && resourceManager.scatterSplitEnabled) {
+
+                if (INFO)
+                    log.info("Skipping index: name=" + name
+                            + ", reason=preferScatterSplit");
+
+                continue;
+
+            }
+
+            /*
+             * If the Score is high in the ordinal ranking or above a threshold
+             * in the double precision rank then we will consider a hot split
+             * for this index partition.
+             */
+            if (score.rank >= scores.size() - 2 || score.drank > .8) {
+
+                /*
+                 * There must be enough data in the index partition to make it
+                 * worth while to split. 25% is a reasonable lower bound since
+                 * it does not take that long to generate that much data (50M if
+                 * you are using 200M index partitions).
+                 */
+                if (vmd.getPercentOfSplit() > .25) {
+
+                    // this is an index that we will consider again below.
+                    scores.add(score);
+
+                }
+
+            }
+            
+        }
+
+        // convert to an array.
+        final Score[] a = scores.toArray(new Score[0]);
+        
+        // put into descending order (highest score first).
+        Arrays.sort(a, new Score.DESC());
+        
+        /*
+         * Now consider the move candidates in their assigned priority order.
+         */
+        int nsplit = 0;
+        final int maxHotSplits = a.length; // @todo config maxHotSplits
+
+        final List<AbstractTask> tasks = new ArrayList<AbstractTask>(maxHotSplits);
+        
+        // the surviving scores in order from highest to lowest.
+        final Iterator<Score> itr = Arrays.asList(a).iterator();
+        
+        while (nsplit < maxHotSplits && itr.hasNext()) {
+
+            final Score score = itr.next();
+            
+            final String name = score.name;
+            
+            // the highest priority candidate for a split.
+            final ViewMetadata vmd = overflowMetadata.getViewMetadata(name);
+            
+            if (INFO)
+                log.info("Considering hot split candidate: " + vmd);
+
+            if (vmd.percentTailSplits >= resourceManager.tailSplitThreshold) {
+
+                /*
+                 * Do an index (tail) split task.
+                 */
+
+                final AbstractTask task = new SplitTailTask(vmd, null/* moveTarget */);
+
+                // add to set of tasks to be run.
+                tasks.add(task);
+
+                overflowMetadata.setAction(vmd.name,
+                        OverflowActionEnum.TailSplit);
+
+                putUsed(name, "tailSplit(name=" + vmd + ")");
+
+                if (INFO)
+                    log.info("will tailSpl: " + vmd);
+
+                continue;
+
+            }
+            
+            /*
+             * Do a normal split.
+             */
+
+            final AbstractTask task = new SplitIndexPartitionTask(vmd,
+                    (UUID) null/* moveTarget */);
+
+            // add to set of tasks to be run.
+            tasks.add(task);
+
+            overflowMetadata.setAction(vmd.name, OverflowActionEnum.Split);
+
+            putUsed(name, "willSplit(name=" + vmd + ")");
+
+        } // itr.hasNext()
+
+        return tasks;
+        
+    }
+
     /**
      * Examine each named index on the old journal and decide what, if anything,
      * to do with that index. These indices are key range partitions of named
@@ -1721,7 +2100,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * place on this data service.
              */
             tasks.addAll(chooseScatterSplits());
-            
+
             /*
              * Identify any index partitions that have underflowed and will
              * either be joined or moved. When an index partition is joined its
@@ -1730,19 +2109,13 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * the rightSibling now that we know it is being used by the join
              * operation.
              */
-
-            tasks.addAll(chooseIndexPartitionJoins());
+            tasks.addAll(chooseJoins());
 
             /*
-             * Identify index partitions that will be moved based on
-             * utilization.
-             * 
-             * We only identify index partitions when this data service is
-             * highly utilized and when there is at least one underutilized data
-             * service available.
+             * Identify index partitions that will be split or moved when this
+             * service is highly utilized.
              */
-            
-            tasks.addAll(chooseIndexPartitionMoves());
+            tasks.addAll(chooseMoveOrSplit());
 
         }
 
@@ -1755,7 +2128,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
          * journal).
          */
 
-        tasks.addAll(chooseIndexPartitionSplitBuildOrMerge(compactingMerge));
+        tasks.addAll(chooseSplitBuildOrMerge(compactingMerge));
 
         /*
          * Log the selected post-processing decisions at a high level.
@@ -1807,7 +2180,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * 
      * @return The list of tasks.
      */
-    protected List<AbstractTask> chooseIndexPartitionSplitBuildOrMerge(
+    protected List<AbstractTask> chooseSplitBuildOrMerge(
             final boolean compactingMerge) {
 
         // counters : must sum to ndone as post-condition.

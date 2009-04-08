@@ -29,16 +29,26 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.counters.store;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.StringWriter;
 import java.util.concurrent.TimeUnit;
+
+import javax.xml.parsers.ParserConfigurationException;
 
 import junit.framework.TestCase2;
 
 import org.apache.commons.io.FileSystemUtils;
+import org.xml.sax.SAXException;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.DefaultInstrumentFactory;
+import com.bigdata.counters.History;
+import com.bigdata.counters.HistoryInstrument;
 import com.bigdata.counters.ICounter;
+import com.bigdata.counters.IHistoryEntry;
 import com.bigdata.counters.Instrument;
+import com.bigdata.counters.PeriodEnum;
+import com.bigdata.counters.History.SampleIterator;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -100,14 +110,16 @@ public class TestCounterSetBTree extends TestCase2 {
         if (log.isInfoEnabled())
             log.info(root.asXML(null/* filter */));
         
-        fixture.insert(root.getCounters(null/* filter */));
+        fixture.writeHistory(root.getCounters(null/* filter */));
 
-        final long toTime = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(1);
-        
+        /*
+         * Note: The toTime needs to be ONE (1) minute beyond the time of
+         * interest since the minutes come first in the key.
+         */
+        final long toTime = fromTime + TimeUnit.MINUTES.toMillis(1);
+
         final CounterSet tmp = fixture.rangeIterator(fromTime, toTime,
-                TimeUnit.MILLISECONDS, null/* filter */,
-                TimeUnit.SECONDS/* granularity */,
-                DefaultInstrumentFactory.INSTANCE);
+                TimeUnit.MINUTES, null/* filter */, 0/* depth */);
 
         if (log.isInfoEnabled())
             log.info(tmp.asXML(null/* filter */));
@@ -128,4 +140,131 @@ public class TestCounterSetBTree extends TestCase2 {
         
     }
 
+    
+    /**
+     * Unit test reads some known data from a local test resource.
+     * 
+     * @throws SAXException
+     * @throws ParserConfigurationException
+     * @throws IOException
+     */
+    public void test_XML() throws IOException, ParserConfigurationException,
+            SAXException {
+
+        final CounterSetBTree fixture = CounterSetBTree.createTransient();
+
+        final CounterSet expected = new CounterSet();
+
+        final InputStream is = getClass().getResourceAsStream(
+                "counters-test0.xml");
+
+        assertNotNull("Could not locate resource", is);
+
+        try {
+            /*
+             * Note: This will throw a runtime exception if a source file
+             * contains more than 60 minutes worth of history data.
+             */
+            expected
+                    .readXML(is, new DefaultInstrumentFactory(60/* nslots */,
+                            PeriodEnum.Minutes, false/* overwrite */), null/* filter */);
+
+        } finally {
+
+            is.close();
+
+        }
+
+        if (log.isInfoEnabled()) {
+            final StringWriter w = new StringWriter();
+            expected.asXML(w, null/* filter */);
+            log.info("expected:\n" + w);
+        }
+
+        if (log.isInfoEnabled())
+            log.info("Writing counters on store.");
+
+        fixture.writeHistory(expected.getCounters(null/* filter */));
+
+        final CounterSet actual = fixture
+                .rangeIterator(0L/* fromTime */, 0L/* toTime */,
+                        TimeUnit.MINUTES, null/* filter */, 0/* depth */);
+
+        if (log.isInfoEnabled()) {
+            final StringWriter w = new StringWriter();
+            actual.asXML(w, null/* filter */);
+            log.info("actual:\n" + w);
+        }
+
+        final String path = "/blade10.dpp2.org/CPU/% Processor Time";
+        
+        assertNotNull(path, expected.getPath(path));
+        assertNotNull(path, actual.getPath(path));
+        assertTrue(expected.getPath(path) instanceof ICounter);
+        assertTrue(actual.getPath(path) instanceof ICounter);
+        assertTrue(((ICounter) expected.getPath(path)).getInstrument() instanceof HistoryInstrument);
+        assertTrue(((ICounter) actual.getPath(path)).getInstrument() instanceof HistoryInstrument);
+        
+        final History<Double> expectedHistory = ((HistoryInstrument<Double>) ((ICounter) expected
+                .getPath(path)).getInstrument()).getHistory();
+
+        final History<Double> actualHistory = ((HistoryInstrument<Double>) ((ICounter) actual
+                .getPath(path)).getInstrument()).getHistory();
+
+        assertSameHistory(expectedHistory, actualHistory);
+
+    }
+
+    protected static void assertSameHistory(final History expected,
+            final History actual) {
+
+        assertEquals("period", expected.getPeriod(), actual.getPeriod());
+
+        /*
+         * Note: Can't compare capacity since they are allocated by different
+         * sections of the code for different purposes.
+         */
+//        assertEquals("capacity", expected.capacity(), actual.capacity());
+
+        assertEquals("size", expected.size(), actual.size());
+        
+        assertEquals("valueType", expected.getValueType(), actual
+                .getValueType());
+        
+        final SampleIterator esitr = expected.iterator();
+
+        final SampleIterator asitr = actual.iterator();
+        
+        assertEquals("firstSampleTime", esitr.getFirstSampleTime(), asitr
+                .getFirstSampleTime());
+
+        assertEquals("lastSampleTime", esitr.getLastSampleTime(), asitr
+                .getLastSampleTime());
+
+        while (esitr.hasNext()) {
+
+            final IHistoryEntry eEntry = esitr.next();
+
+            assert (asitr.hasNext());
+
+            final IHistoryEntry aEntry = asitr.next();
+
+            /*
+             * Note: Can't compare total of the #of samples in a slot or the
+             * count of the #of samples in a slot since those data are not
+             * serialized in the XML representation.
+             */
+            
+//            assertEquals("total", eEntry.getTotal(), aEntry.getTotal());
+//
+//            assertEquals("count", eEntry.getCount(), aEntry.getCount());
+
+            assertEquals("average", eEntry.getValue(), aEntry.getValue());
+
+        }
+        
+        assertFalse("Actual visits too many entries.", asitr.hasNext());
+        
+    }
+    
 }

@@ -67,6 +67,8 @@ public class TestAll extends TestCase {
 
         suite.addTest(com.bigdata.counters.store.TestAll.suite());
 
+        suite.addTest(com.bigdata.counters.query.TestAll.suite());
+
         suite.addTest(com.bigdata.counters.linux.TestAll.suite());
 
         return suite;

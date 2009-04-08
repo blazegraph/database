@@ -74,9 +74,9 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
      */
     public void test_loadAndVerify_small() throws Exception {
         
-        final String file = "src/test/com/bigdata/rdf/rio/small.rdf";
+        final String resource = "src/test/com/bigdata/rdf/rio/small.rdf";
 
-        doLoadAndVerifyTest( file );
+        doLoadAndVerifyTest( resource );
         
     }
 
@@ -87,9 +87,9 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
      */
     public void test_loadAndVerify_sampleData() throws Exception {
         
-        final String file = "src/test/com/bigdata/rdf/rio/sample data.rdf";
+        final String resource = "src/test/com/bigdata/rdf/rio/sample data.rdf";
 
-        doLoadAndVerifyTest( file );
+        doLoadAndVerifyTest( resource );
         
     }
    
@@ -101,11 +101,11 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
         
 //      final String file = "../rdf-data/nciOncology.owl";
         final String file = "../rdf-data/alibaba_v41.rdf";
-        
-        if(!new File(file).exists()) {
-            
-            fail("Resource not found: "+file+", test skipped: "+getName());
-            
+
+        if (!new File(file).exists()) {
+
+            fail("Resource not found: " + file + ", test skipped: " + getName());
+
             return;
             
         }
@@ -119,13 +119,13 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
      * re-parse that all expected statements were made persistent in the
      * database. 
      * 
-     * @param file
+     * @param resource
      * 
      * @throws Exception
      */
-    protected void doLoadAndVerifyTest(String file) throws Exception {
+    protected void doLoadAndVerifyTest(final String resource) throws Exception {
 
-        assertTrue("File not found? file=" + file, new File(file).exists());
+//        assertTrue("File not found? file=" + resource, new File(resource).exists());
 
         AbstractTripleStore store;
         {
@@ -179,7 +179,7 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
                 final DataLoader dataLoader = new DataLoader(properties, store);
 
                 // load into the datbase.
-                dataLoader.loadData(file, "" /* baseURI */, RDFFormat.RDFXML);
+                dataLoader.loadData(resource, "" /* baseURI */, RDFFormat.RDFXML);
 
 //                // database-at-once closure (optional for this test).
 //                store.getInferenceEngine().computeClosure(null/*focusStore*/);
@@ -207,7 +207,7 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
             final int maxerrors = 20;
             {
 
-                log.info("Verifying all statements found using reparse: file="+file);
+                log.info("Verifying all statements found using reparse: file="+resource);
                 
                 // buffer capacity (#of statements per batch).
                 final int capacity = 100000;
@@ -216,10 +216,10 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
                         capacity, nerrs, maxerrors);
 
                 loader.loadRdf(new BufferedReader(new InputStreamReader(
-                        new FileInputStream(file))), ""/* baseURI */,
+                        new FileInputStream(resource))), ""/* baseURI */,
                         RDFFormat.RDFXML, false/* verify */);
 
-                log.info("End of reparse: nerrors="+nerrs+", file="+file);
+                log.info("End of reparse: nerrors="+nerrs+", file="+resource);
                 
             }
 

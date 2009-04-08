@@ -75,7 +75,7 @@ public class TestResourceService extends TestCase2 {
         final UUID allowedUUID = UUID.randomUUID();
 
         final File allowedFile = new File(
-                "src/test/com/bigdata/service/testSendFile.seg");
+                "bigdata/src/test/com/bigdata/service/testSendFile.seg");
 
         assertTrue("Could not locate file: " + allowedFile, allowedFile
                 .exists());
@@ -151,7 +151,7 @@ public class TestResourceService extends TestCase2 {
         final UUID allowedUUID = UUID.randomUUID();
 
         final File allowedFile = new File(
-                "src/test/com/bigdata/service/testSendFile.seg");
+                "bigdata/src/test/com/bigdata/service/testSendFile.seg");
 
         assertTrue("Could not locate file: " + allowedFile, allowedFile
                 .exists());
