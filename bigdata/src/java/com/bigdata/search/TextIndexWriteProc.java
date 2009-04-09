@@ -8,6 +8,8 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
+import com.bigdata.btree.proc.IParallelizableIndexProcedure;
+import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
 
 /**
  * Writes on the text index.
@@ -15,7 +17,9 @@ import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class IndexWriteProc extends AbstractKeyArrayIndexProcedure {
+public class TextIndexWriteProc extends AbstractKeyArrayIndexProcedure
+        implements IParallelizableIndexProcedure,
+        IMutableRelationIndexWriteProcedure {
 
     /**
      * 
@@ -23,14 +27,15 @@ public class IndexWriteProc extends AbstractKeyArrayIndexProcedure {
     private static final long serialVersionUID = 9013449121306914750L;
 
     public static class IndexWriteProcConstructor extends
-            AbstractIndexProcedureConstructor<IndexWriteProc> {
+            AbstractIndexProcedureConstructor<TextIndexWriteProc> {
 
         /**
          * Variant which always overwrites any existing entry. Note that you
          * must still delete all entries for a document before re-indexing that
          * document.
          */
-        public static IndexWriteProc.IndexWriteProcConstructor OVERWRITE = new IndexWriteProcConstructor(true);
+        public static TextIndexWriteProc.IndexWriteProcConstructor OVERWRITE = new IndexWriteProcConstructor(
+                true);
 
         /**
          * Variant that will not overwrite an existing entry for a
@@ -38,7 +43,8 @@ public class IndexWriteProc extends AbstractKeyArrayIndexProcedure {
          * only grows in size; and (b) the content of each document is
          * unchanging.
          */
-        public static IndexWriteProc.IndexWriteProcConstructor NO_OVERWRITE = new IndexWriteProcConstructor(false);
+        public static TextIndexWriteProc.IndexWriteProcConstructor NO_OVERWRITE = new IndexWriteProcConstructor(
+                false);
         
         private final boolean overwrite;
 
@@ -46,17 +52,17 @@ public class IndexWriteProc extends AbstractKeyArrayIndexProcedure {
          * 
          * @param overwrite
          */
-        private IndexWriteProcConstructor(boolean overwrite) {
+        private IndexWriteProcConstructor(final boolean overwrite) {
             
             this.overwrite = overwrite;
             
         }
         
-        public IndexWriteProc newInstance(IDataSerializer keySer,
+        public TextIndexWriteProc newInstance(IDataSerializer keySer,
                 IDataSerializer valSer,int fromIndex, int toIndex,
                 byte[][] keys, byte[][] vals) {
 
-            return new IndexWriteProc(keySer, valSer, fromIndex, toIndex, keys,
+            return new TextIndexWriteProc(keySer, valSer, fromIndex, toIndex, keys,
                     vals, overwrite);
 
         }
@@ -66,13 +72,13 @@ public class IndexWriteProc extends AbstractKeyArrayIndexProcedure {
     /**
      * De-serialization constructor.
      */
-    public IndexWriteProc() {
+    public TextIndexWriteProc() {
         
     }
     
     private boolean overwrite;
     
-    protected IndexWriteProc(IDataSerializer keySer, IDataSerializer valSer,
+    protected TextIndexWriteProc(IDataSerializer keySer, IDataSerializer valSer,
             int fromIndex, int toIndex, byte[][] keys, byte[][] vals,
             boolean overwrite) {
 
@@ -92,7 +98,7 @@ public class IndexWriteProc extends AbstractKeyArrayIndexProcedure {
      * @return The #of pre-existing tuples that were updated as an
      *         {@link Integer}.
      */
-    public Object apply(IIndex ndx) {
+    public Object apply(final IIndex ndx) {
 
         int updateCount = 0;
 

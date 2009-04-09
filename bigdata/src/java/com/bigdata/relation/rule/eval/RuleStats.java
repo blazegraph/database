@@ -75,7 +75,7 @@ public class RuleStats {
      * @param step
      *            The {@link IStep}.
      */
-    public RuleStats(IStep step) {
+    public RuleStats(final IStep step) {
        
         this.rule = step;
 
@@ -709,7 +709,7 @@ public class RuleStats {
      * @see ProgramTask#executeMutation(IStep)
      * @see MutationTask#flushBuffers(IJoinNexus, RuleStats, java.util.Map)
      */
-    synchronized public void add(RuleStats o) {
+    synchronized public void add(final RuleStats o) {
     
         if (o == null)
             throw new IllegalArgumentException();

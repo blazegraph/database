@@ -67,12 +67,12 @@ import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.IRuleTaskFactory;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.IEvaluationPlan;
 import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
+import com.bigdata.relation.rule.eval.IRuleTaskFactory;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.IStepTask;
 

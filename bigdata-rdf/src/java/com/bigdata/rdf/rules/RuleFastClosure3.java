@@ -35,8 +35,8 @@ import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.IRuleTaskFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
+import com.bigdata.relation.rule.eval.IRuleTaskFactory;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.IStepTask;
 

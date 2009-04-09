@@ -54,6 +54,11 @@ import com.bigdata.service.DataService;
  */
 public class MutationTask extends AbstractStepTask {
 
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 6503299789509746764L;
+
     protected MutationTask(ActionEnum action,
             IJoinNexusFactory joinNexusFactory, IStep step,
             IIndexManager indexManager, DataService dataService) {
@@ -247,9 +252,6 @@ public class MutationTask extends AbstractStepTask {
             }
             
         }
-
-        // make the write sets visible.
-        joinNexus.makeWriteSetsVisible();
         
     }
     

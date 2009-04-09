@@ -32,14 +32,11 @@ import java.io.Serializable;
 import java.util.Iterator;
 import java.util.concurrent.ExecutorService;
 
-import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.btree.keys.ISortKeyBuilder;
 import com.bigdata.io.IStreamSerializer;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.Journal;
-import com.bigdata.journal.TemporaryStore;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.IMutableRelation;
@@ -57,7 +54,6 @@ import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.IRuleTaskFactory;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.Var;
@@ -563,15 +559,5 @@ public interface IJoinNexus {
      * intermediate {@link IBindingSet}s from one join dimension to the next.
      */
     IStreamSerializer<IBindingSet[]> getBindingSetSerializer();
-    
-    /**
-     * Make the write sets visible, eg, by committing the store(s) having
-     * buffered write sets.
-     * 
-     * @deprecated by the use of {@link UnisolatedReadWriteIndex} when running a
-     *             rule set as a mutation operation on a local {@link Journal}
-     *             or {@link TemporaryStore}
-     */
-    void makeWriteSetsVisible();
-    
+  
 }

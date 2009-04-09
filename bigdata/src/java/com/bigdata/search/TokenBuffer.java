@@ -137,7 +137,7 @@ public class TokenBuffer {
      * 
      * @throws IndexOutOfBoundsException
      */
-    public TermFrequencyData get(int index) {
+    public TermFrequencyData get(final int index) {
         
         if (index < 0 || index >= count)
             throw new IndexOutOfBoundsException(); 
@@ -166,11 +166,12 @@ public class TokenBuffer {
      * @param token
      *            The token.
      */
-    public void add(long docId, int fieldId, Token token) {
+    public void add(final long docId, final int fieldId, final Token token) {
 
-        if(DEBUG) {
-            
-            log.debug("docId="+docId+", fieldId="+fieldId+", token="+token);
+        if (DEBUG) {
+
+            log.debug("docId=" + docId + ", fieldId=" + fieldId + ", token="
+                    + token);
             
         }
         
@@ -278,24 +279,25 @@ public class TokenBuffer {
         }
         
         if (INFO)
-            log.info("count="+count+", ndocs="+ndocs+", nfields="+nfields+", nterms="+nterms);
-        
+            log.info("count=" + count + ", ndocs=" + ndocs + ", nfields="
+                    + nfields + ", nterms=" + nterms);
+
         /*
          * Generate keys[] and vals[].
-         */ 
+         */
 
         // array of correlated key/value tuples.
         final KV[] a = new KV[nterms];
-               
+
         // Note: reused for each {doc,field,token} tuple key.
         final IKeyBuilder keyBuilder = textIndexer.getKeyBuilder();
-        
+
         // Note: reused for each {doc,field,token} tuple value.
         final ByteArrayBuffer buf = new ByteArrayBuffer();
-        
+
         // #of {term,doc,field} tuples generated
         int n = 0;
-        
+
         // for each {doc,field} tuple.
         for (int i = 0; i < count; i++) {
 
@@ -373,7 +375,8 @@ public class TokenBuffer {
      * 
      * @return The #of pre-existing records that were updated.
      */
-    protected long writeOnIndex(int n, byte[][] keys, byte[][] vals) {
+    protected long writeOnIndex(final int n, final byte[][] keys,
+            final byte[][] vals) {
 
         final IntegerAggregator resultHandler = new IntegerAggregator();
         
@@ -382,8 +385,8 @@ public class TokenBuffer {
                 keys,//
                 vals,//
                 (textIndexer.isOverwrite() //
-                        ? IndexWriteProc.IndexWriteProcConstructor.OVERWRITE
-                        : IndexWriteProc.IndexWriteProcConstructor.NO_OVERWRITE//
+                        ? TextIndexWriteProc.IndexWriteProcConstructor.OVERWRITE
+                        : TextIndexWriteProc.IndexWriteProcConstructor.NO_OVERWRITE//
                         ),//
                  resultHandler//
                 );

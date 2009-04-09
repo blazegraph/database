@@ -24,6 +24,11 @@ import com.bigdata.service.DataService;
 public class QueryTask extends AbstractStepTask {
 
     /**
+     * 
+     */
+    private static final long serialVersionUID = -1795376592525891934L;
+    
+    /**
      * The {@link IBlockingBuffer} on which the {@link ISolution}s will be
      * written.
      */

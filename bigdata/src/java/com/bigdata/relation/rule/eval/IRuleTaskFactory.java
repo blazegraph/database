@@ -26,14 +26,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jul 1, 2008
  */
 
-package com.bigdata.relation.rule;
+package com.bigdata.relation.rule.eval;
 
 import java.io.Serializable;
 
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.relation.rule.eval.IJoinNexus;
-import com.bigdata.relation.rule.eval.ISolution;
-import com.bigdata.relation.rule.eval.IStepTask;
+import com.bigdata.relation.rule.IRule;
 
 /**
  * A factory for objects that handle the execution of an {@link IRule}. This

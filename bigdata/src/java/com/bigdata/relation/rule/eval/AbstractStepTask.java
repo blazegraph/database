@@ -185,8 +185,8 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
      *       <p>
      *       Do the same thing for running a program as a sequence.
      */
-    protected RuleStats runParallel(IJoinNexus joinNexus, IStep program,
-            List<Callable<RuleStats>> tasks) throws InterruptedException,
+    protected RuleStats runParallel(final IJoinNexus joinNexus, final IStep program,
+            final List<Callable<RuleStats>> tasks) throws InterruptedException,
             ExecutionException {
     
         if (INFO)
@@ -230,9 +230,9 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
      * @throws InterruptedException
      * @throws ExecutionException
      */
-    protected RuleStats runSequential(IJoinNexus joinNexus, IStep program,
-            List<Callable<RuleStats>> tasks) throws InterruptedException,
-            ExecutionException {
+    protected RuleStats runSequential(final IJoinNexus joinNexus,
+            final IStep program, final List<Callable<RuleStats>> tasks)
+            throws InterruptedException, ExecutionException {
     
         final int ntasks = tasks.size();
         
@@ -304,8 +304,8 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
      * @throws InterruptedException
      * @throws ExecutionException
      */
-    protected RuleStats runOne(IJoinNexus joinNexus, IStep program,
-            Callable<RuleStats> task) throws InterruptedException,
+    protected RuleStats runOne(final IJoinNexus joinNexus, final IStep program,
+            final Callable<RuleStats> task) throws InterruptedException,
             ExecutionException {
     
         if (INFO)

@@ -81,7 +81,6 @@ import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.IRuleTaskFactory;
 import com.bigdata.relation.rule.ISolutionExpander;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.relation.rule.IVariable;
@@ -98,6 +97,7 @@ import com.bigdata.relation.rule.eval.IProgramTask;
 import com.bigdata.relation.rule.eval.IRangeCountFactory;
 import com.bigdata.relation.rule.eval.IRuleState;
 import com.bigdata.relation.rule.eval.IRuleStatisticsFactory;
+import com.bigdata.relation.rule.eval.IRuleTaskFactory;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.ProgramTask;
 import com.bigdata.relation.rule.eval.RuleStats;
@@ -1183,14 +1183,15 @@ public class RDFJoinNexus implements IJoinNexus {
          * @param capacity
          * @param relation
          */
-        public InsertSPOAndJustificationBuffer(int capacity, IMutableRelation<E> relation) {
+        public InsertSPOAndJustificationBuffer(final int capacity,
+                final IMutableRelation<E> relation) {
 
             super(capacity, relation);
             
         }
 
         @Override
-        protected long flush(IChunkedOrderedIterator<ISolution<E>> itr) {
+        protected long flush(final IChunkedOrderedIterator<ISolution<E>> itr) {
 
             try {
 
@@ -1333,9 +1334,9 @@ public class RDFJoinNexus implements IJoinNexus {
         if (getAction() != ActionEnum.Insert)
             throw new IllegalStateException();
 
-        if(DEBUG) {
-            
-            log.debug("relation="+relation);
+        if (DEBUG) {
+
+            log.debug("relation=" + relation);
             
         }
         
@@ -1385,7 +1386,7 @@ public class RDFJoinNexus implements IJoinNexus {
     }
 
     @SuppressWarnings("unchecked")
-    public IChunkedOrderedIterator<ISolution> runQuery(IStep step)
+    public IChunkedOrderedIterator<ISolution> runQuery(final IStep step)
             throws Exception {
 
         if (step == null)
@@ -1493,15 +1494,14 @@ public class RDFJoinNexus implements IJoinNexus {
 
     }
     
-    public long runMutation(final IStep step)
-            throws Exception {
+    public long runMutation(final IStep step) throws Exception {
 
         if (step == null)
             throw new IllegalArgumentException();
-        
+
         if (!action.isMutation())
             throw new IllegalStateException();
-        
+
         if (step.isRule() && ((IRule) step).getHead() == null) {
 
             throw new IllegalArgumentException("No head for this rule: " + step);
@@ -1529,16 +1529,16 @@ public class RDFJoinNexus implements IJoinNexus {
      * @param step
      *            The step.
      */
-    protected boolean isEmptyProgram(IStep step) {
+    protected boolean isEmptyProgram(final IStep step) {
 
-        if (!step.isRule() && ((IProgram)step).stepCount() == 0) {
+        if (!step.isRule() && ((IProgram) step).stepCount() == 0) {
 
             return true;
 
         }
 
         return false;
-        
+
     }
 
     /**
@@ -1550,7 +1550,7 @@ public class RDFJoinNexus implements IJoinNexus {
      * @return Either an {@link IChunkedOrderedIterator} (query) or {@link Long}
      *         (mutation count).
      */
-    protected Object runProgram(ActionEnum action, IStep step)
+    protected Object runProgram(final ActionEnum action, final IStep step)
             throws Exception {
 
         if (action == null)
@@ -1594,22 +1594,13 @@ public class RDFJoinNexus implements IJoinNexus {
      * This variant handles both local indices on a {@link TemporaryStore} or
      * {@link Journal} WITHOUT concurrency controls (fast).
      */
-    protected Object runLocalProgram(ActionEnum action, IStep step) throws Exception {
+    protected Object runLocalProgram(final ActionEnum action, final IStep step)
+            throws Exception {
 
         if (INFO)
             log.info("Running local program: action=" + action + ", program="
                     + step.getName());
 
-        /*
-         * If there are uncommitted writes then they need to be made visible
-         * before we run the operation so that the read-committed relation views
-         * have access to the most recent state. (This is not necessary when
-         * using the scale-out API since all client operations are auto-commit
-         * unisolated writes).
-         */
-
-        makeWriteSetsVisible();
-        
         final IProgramTask innerTask = new ProgramTask(action, step,
                 getJoinNexusFactory(), getIndexManager());
 
@@ -1636,23 +1627,7 @@ public class RDFJoinNexus implements IJoinNexus {
         final IProgramTask innerTask = new ProgramTask(action, step,
                 getJoinNexusFactory(), getIndexManager());
 
-        final Object ret = innerTask.call();
-        
-//        if(!(ret instanceof IRemoteChunkedIterator)) {
-//            
-//            return ret;
-//            
-//        }
-//
-//        /*
-//         * The federation is using RMI so we got back a proxy object. We wrap
-//         * that proxy object so that it looks like an IChunkedOrderedIterator
-//         * and return it to the caller.
-//         */
-//        
-//        return new WrappedRemoteChunkedIterator((IRemoteChunkedIterator) ret);
-        
-        return ret;
+        return innerTask.call();
 
     }
 
@@ -1684,96 +1659,5 @@ public class RDFJoinNexus implements IJoinNexus {
         return dataService.submit(innerTask).get();
 
     }
-
-    public void makeWriteSetsVisible() {
-
-        return;
-        
-//    	if(useReentrantReadWriteLockAndUnisolatedReads) {
-//    		
-//    		/*
-//    		 * NOP
-//    		 */
-//    		
-//    		return;
-//    		
-//    	}
-//    	
-////        assert action.isMutation();
-//        
-//        assert getWriteTimestamp() == ITx.UNISOLATED;
-//        
-//        if (indexManager instanceof Journal) {
-//        
-//            /*
-//             * The RDF KB runs against a LocalTripleStore without concurrency
-//             * controls.
-//             * 
-//             * Commit the Journal before running the operation in order to make
-//             * sure that the read-committed views are based on the most recently
-//             * written data (the caller is responsible for flushing any buffers,
-//             * but this makes sure that the buffered index writes are
-//             * committed).
-//             */
-//            
-//            // commit.
-//            ((Journal)getIndexManager()).commit();
-//
-//            // current read-behind timestamp.
-//            lastCommitTime = ((IJournal)indexManager).getLastCommitTime();
-//                
-//        } else if(indexManager instanceof IJournal) {
-//            
-//            /*
-//             * An IJournal object exposed by the AbstractTask. We don't have to
-//             * commit anything since the writes were performed under the control
-//             * of the ConcurrencyManager. However, we can advance the
-//             * read-behind time to the most recent commit timestamp.
-//             */
-//            
-//            // current read-behind timestamp.
-//            lastCommitTime = ((IJournal)indexManager).getLastCommitTime();
-//
-//        } else if(indexManager instanceof TemporaryStore) {
-//            
-//            /*
-//             * This covers the case where the database itself (as opposed to the
-//             * focusStore) is a TempTripleStore on a TemporaryStore.
-//             * 
-//             * Checkpoint the TemporaryStore before running the operation so
-//             * that the read-committed views of the relations will be up to
-//             * date.
-//             * 
-//             * Note: The value returned by checkpoint() is a checkpoint record
-//             * address NOT a timestamp. The only index views that are supported
-//             * for a TemporaryStore are UNISOLATED and READ_COMMITTED.
-//             */
-//            
-//            ((TemporaryStore)getIndexManager()).checkpoint();
-//            
-//        } else if(indexManager instanceof IBigdataFederation) {
-//            
-//            /*
-//             * The federation API auto-commits unisolated writes.
-//             */
-//            
-//            // current read-behind timestamp.
-//            lastCommitTime = ((IBigdataFederation)indexManager).getLastCommitTime();
-//            
-//        } else {
-//            
-//            throw new AssertionError("Not expecting: "
-//                    + indexManager.getClass());
-//            
-//        }
-        
-    }
-    
-//    /**
-//     * Updated each time {@link #makeWriteSetsVisible()} does a commit (which
-//     * only occurs for the local {@link Journal} scenario) and used instead of
-//     * {@link ITx#READ_COMMITTED} for the read time for the {@link Journal}.
-//     */
-//    private long lastCommitTime = 0L;
 
 }
