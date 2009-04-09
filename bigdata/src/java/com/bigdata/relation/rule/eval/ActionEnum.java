@@ -31,7 +31,6 @@ package com.bigdata.relation.rule.eval;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.rule.IProgram;
 
-
 /**
  * Symbolic constants corresponding to the type of action associated with the
  * execution of an {@link IProgram}.
@@ -64,7 +63,7 @@ public enum ActionEnum {
 
     final private boolean mutation;
     
-    private ActionEnum(boolean mutation) {
+    private ActionEnum(final boolean mutation) {
 
         this.mutation = mutation;
         

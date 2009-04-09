@@ -50,7 +50,6 @@ import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.IRuleTaskFactory;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.Predicate;
@@ -298,11 +297,6 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
         public long getWriteTimestamp() {
 
             return 0;
-        }
-
-        public void makeWriteSetsVisible() {
-
-            
         }
 
         public IBindingSet newBindingSet(IRule rule) {

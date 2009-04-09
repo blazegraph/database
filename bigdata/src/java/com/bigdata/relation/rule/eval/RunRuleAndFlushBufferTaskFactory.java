@@ -2,7 +2,6 @@ package com.bigdata.relation.rule.eval;
 
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.IRuleTaskFactory;
 
 /**
  * Factory class is used for sequential {@link IRule} step execution. It

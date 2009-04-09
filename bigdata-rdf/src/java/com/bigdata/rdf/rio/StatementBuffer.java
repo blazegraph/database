@@ -861,7 +861,7 @@ public class StatementBuffer implements IStatementBuffer<Statement> {
              * position on the corresponding statement.
              */
 
-            for( int i=0; i<numStmts; i++) {
+            for (int i = 0; i < numStmts; i++) {
                 
                 final SPO spo = tmp[i];
                 
@@ -939,43 +939,56 @@ public class StatementBuffer implements IStatementBuffer<Statement> {
      * 
      * @see AbstractTripleStore#addStatements(AbstractTripleStore, boolean, IChunkedOrderedIterator, IElementFilter)
      */
-    protected long writeSPOs(SPO[] stmts, int numStmts) {
+    protected long writeSPOs(final SPO[] stmts, final int numStmts) {
 
         final IChunkedOrderedIterator<ISPO> itr = new ChunkedArrayIterator<ISPO>(
-                numStmts, stmts, null/*keyOrder*/);
-        
-        final long nwritten;
+                numStmts, stmts, null/* keyOrder */);
 
-        if (statementStore != null) {
+        final AbstractTripleStore sink = statementStore != null ? statementStore
+                : database;
 
-            // Writing statements on the secondary store.
+        if (log.isInfoEnabled()) {
 
-            if(log.isInfoEnabled()) {
-                
-                log.info("writing "+numStmts+" on statementStore: "+statementStore);
-                
-            }
-            
-            nwritten = database.addStatements(statementStore,
-                    false/* copyOnly */, itr, null /* filter */);
-
-        } else {
-
-            // Write statements on the primary database.
-
-            if(log.isInfoEnabled()) {
-                
-                log.info("writing "+numStmts+" on database: "+database);
-                
-            }
-
-            nwritten = database.addStatements(database, false/* copyOnly */,
-                    itr, null /*filter*/);
+            log.info("writing " + numStmts + " on "
+                    + (statementStore != null ? "statementStore" : "databasse")
+                    + ": " + statementStore);
 
         }
 
-        return nwritten;
-        
+        return database
+                .addStatements(sink, false/* copyOnly */, itr, null /* filter */);
+
+// if (statementStore != null) {
+//
+//            // Writing statements on the secondary store.
+//
+//            if (log.isInfoEnabled()) {
+//
+//                log.info("writing " + numStmts + " on statementStore: "
+//                        + statementStore);
+//
+//            }
+//
+//            nwritten = database.addStatements(statementStore,
+//                    false/* copyOnly */, itr, null /* filter */);
+//
+//        } else {
+//
+//            // Write statements on the primary database.
+//
+//            if (log.isInfoEnabled()) {
+//
+//                log.info("writing " + numStmts + " on database: " + database);
+//
+//            }
+//
+//            nwritten = database.addStatements(database, false/* copyOnly */,
+//                    itr, null /* filter */);
+//
+//        }
+//
+//        return nwritten;
+
     }
 
     /**
