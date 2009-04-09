@@ -69,7 +69,7 @@ import com.bigdata.rdf.lexicon.ITermIdFilter;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.load.AssignedSplits;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.spo.WriteJustificationsProc.WriteJustificationsProcConstructor;
+import com.bigdata.rdf.spo.JustIndexWriteProc.WriteJustificationsProcConstructor;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.AbstractRelation;
@@ -1128,7 +1128,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * which knows how to generate the statement identifiers. In turn, that
      * method will delegate each "chunk" to this method.
      */
-    public long insert(IChunkedOrderedIterator<ISPO> itr) {
+    public long insert(final IChunkedOrderedIterator<ISPO> itr) {
 
         try {
             
@@ -1170,7 +1170,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * @see AbstractTripleStore#removeStatements(IChunkedOrderedIterator, boolean)
      * @see SPOAccessPath#removeAll()
      */
-    public long delete(IChunkedOrderedIterator<ISPO> itr) {
+    public long delete(final IChunkedOrderedIterator<ISPO> itr) {
 
         try {
             
@@ -1210,7 +1210,8 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * 
      * @todo raise the filter into the caller?
      */
-    public long insert(ISPO[] a, int numStmts, IElementFilter<ISPO> filter) {
+    public long insert(final ISPO[] a, final int numStmts,
+            final IElementFilter<ISPO> filter) {
 
         if (a == null)
             throw new IllegalArgumentException();
@@ -1324,7 +1325,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * perhaps it does since you can only do this safely for explicit
      * statements).
      */
-    public long delete(ISPO[] stmts, int numStmts) {
+    public long delete(final ISPO[] stmts, final int numStmts) {
         
         final long begin = System.currentTimeMillis();
 

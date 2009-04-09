@@ -42,6 +42,7 @@ import com.bigdata.io.DataInputBuffer;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
 
 /**
  * Procedure for batch index on a single statement index (or index partition).
@@ -66,7 +67,7 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * @version $Id$
  */
 public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
-        IParallelizableIndexProcedure {
+        IParallelizableIndexProcedure, IMutableRelationIndexWriteProcedure {
 
     protected transient static final Logger log = Logger.getLogger(SPOIndexWriteProc.class);
 

@@ -8,14 +8,13 @@ import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ChunkedResolvingIterator;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
-import com.bigdata.striterator.ICloseableIterator;
-
 
 /**
  * Base class for {@link IBuffer} whose target is a mutation (insert, delete, or
  * update) of some {@link IMutableRelation}.
  * 
- * <strong>Note that this buffers {@link ISolution}s NOT relation elements.</strong>
+ * <strong>Note that this buffers chunks of {@link ISolution}s NOT relation
+ * elements.</strong>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -39,7 +38,8 @@ abstract public class AbstractSolutionBuffer<R> extends
     /**
      * @param capacity
      */
-    protected AbstractSolutionBuffer(int capacity, IMutableRelation<R> relation) {
+    protected AbstractSolutionBuffer(final int capacity,
+            final IMutableRelation<R> relation) {
 
         super(capacity, null/*filter*/);
 

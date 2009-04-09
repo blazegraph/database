@@ -12,6 +12,9 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by {@link SPORelation#insert(IChunkedOrderedIterator)}? (Still
+ *             used by copyStatements)
  */
 public class StatementWriter implements Callable<Long>{
 
@@ -44,9 +47,6 @@ public class StatementWriter implements Callable<Long>{
      *            indices as a side-effect.
      * 
      * @todo allow an optional {@link IElementFilter} here.
-     * 
-     * @deprecated by {@link SPORelation#insert(IChunkedOrderedIterator)}? (Still used by 
-     * copyStatements)
      */
     public StatementWriter(AbstractTripleStore database,
             AbstractTripleStore statementStore, boolean copyOnly,

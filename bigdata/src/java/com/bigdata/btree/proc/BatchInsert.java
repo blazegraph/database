@@ -155,7 +155,7 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure implements
      * @return Either <code>null</code> if the old values were not requested
      *         or a {@link ResultBuffer} containing the old values.
      */
-    public ResultBuffer apply(IIndex ndx) {
+    public ResultBuffer apply(final IIndex ndx) {
 
         int i = 0;
         
@@ -170,10 +170,10 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure implements
             final byte[] key = getKey(i);
             
             final byte[] val = getValue(i);
-            
-            final byte[] old = (byte[]) ndx.insert(key,val);
-            
-            if(returnOldValues) {
+
+            final byte[] old = (byte[]) ndx.insert(key, val);
+
+            if (returnOldValues) {
                 
                 ret[i] = old;
                 

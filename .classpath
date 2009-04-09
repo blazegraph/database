@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="bigdata-rdf/src/java"/>
+	<classpathentry kind="src" path="bigdata-jini/src/test"/>
+	<classpathentry kind="src" path="bigdata-sails/src/java"/>
+	<classpathentry kind="src" path="bigdata/src/java"/>
+	<classpathentry kind="src" path="bigdata-rdf/src/test"/>
+	<classpathentry kind="src" path="bigdata/src/test"/>
+	<classpathentry kind="src" path="bigdata-sails/src/test"/>
+	<classpathentry kind="src" path="bigdata-jini/src/java"/>
+	<classpathentry kind="src" path="bigdata/src/resources/logging"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/apache/commons-io-1.4.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4j-3_6.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/lucene/lucene-analyzers-2.2.0.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/unimi/colt-1.2.0.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/ctc_utils-5-4-2005.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/cweb-commons-1.1-b2-dev.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/cweb-extser-0.1-b2-dev.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/cweb-junit-ext-1.1-b3-dev.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/junit-3.8.1.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/lgpl-utils-1.0-b4-dev.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/apache/log4j-1.2.15.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4jni.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/lucene/lucene-core-2.2.0.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/unimi/fastutil-5.1.4.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/openrdf-sesame-2.2-onejar.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/slf4j-api-1.4.3.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/slf4j-log4j12-1.4.3.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/apache/zookeeper-3.1.0.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/classserver.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/jini-core.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/jini-ext.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/jsk-lib.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/jsk-platform.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/jsk-resources.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/reggie.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/start.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/sun-util.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/tools.jar"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

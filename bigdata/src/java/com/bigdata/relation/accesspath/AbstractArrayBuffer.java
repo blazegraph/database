@@ -57,7 +57,8 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
      * @param filter
      *            An optional filter for keeping elements out of the buffer.
      */
-    protected AbstractArrayBuffer(int capacity, IElementFilter<E> filter) {
+    protected AbstractArrayBuffer(final int capacity,
+            final IElementFilter<E> filter) {
         
         if (capacity <= 0)
             throw new IllegalArgumentException();
@@ -99,7 +100,7 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
      * 
      * @return <code>true</code> iff the buffer accepts the element.
      */
-    protected boolean accept(E e) {
+    protected boolean accept(final E e) {
 
         if (filter != null) {
 
