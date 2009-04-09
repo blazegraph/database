@@ -132,6 +132,11 @@ abstract public class OverflowManager extends IndexManager {
     final protected double tailSplitThreshold;
 
     /**
+     * @see Options#HOT_SPLIT_THRESHOLD
+     */
+    final protected double hotSplitThreshold;
+
+    /**
      * @see Options#SCATTER_SPLIT_ENABLED
      */
     final protected boolean scatterSplitEnabled;
@@ -528,6 +533,25 @@ abstract public class OverflowManager extends IndexManager {
                 + ".tailSplitThreshold";
         
         String DEFAULT_TAIL_SPLIT_THRESHOLD = ".4";
+
+        /**
+         * The minimum percentage (in [0:1]) of a nominal split before an index
+         * partition will be "hot split" (default
+         * {@value #DEFAULT_HOT_SPLIT_THRESHOLD}). Hot splits are taken by
+         * hosts which are more heavily utilized than their peers but not
+         * heavily utilized in terms of their own resources. This is basically
+         * an acceleration factor for index partition splits when a host has a
+         * relatively higher workload than its peers. The purpose of a "hot
+         * split" is to increase the potential concurrency by breaking an active
+         * index partition into two index partitions. If the writes on the index
+         * partition are evenly distributed, then this can double the
+         * concurrency if the host has spare cycles. Reasonable values are on
+         * the order of [.25:.75].
+         */
+        String HOT_SPLIT_THRESHOLD = OverflowManager.class.getName()
+                + ".hotSplitThreshold";
+        
+        String DEFAULT_HOT_SPLIT_THRESHOLD = ".4";
         
         /**
          * Boolean option indicates whether or not scatter splits are performed
@@ -697,7 +721,7 @@ abstract public class OverflowManager extends IndexManager {
                 .getName()
                 + ".movePercentCpuTimeThreshold";
 
-        String DEFAULT_MOVE_PERCENT_CPU_TIME_THRESHOLD = ".6";
+        String DEFAULT_MOVE_PERCENT_CPU_TIME_THRESHOLD = ".7";
         
         /**
          * The maximum #of optional compacting merge operations that will be
@@ -1167,6 +1191,26 @@ abstract public class OverflowManager extends IndexManager {
             if (tailSplitThreshold < 0 || tailSplitThreshold > 1) {
 
                 throw new RuntimeException(Options.TAIL_SPLIT_THRESHOLD
+                        + " must be in [0:1]");
+
+            }
+
+        }
+
+        // hotSplitThreshold
+        {
+
+            hotSplitThreshold = Double.parseDouble(properties.getProperty(
+                    Options.HOT_SPLIT_THRESHOLD,
+                    Options.DEFAULT_HOT_SPLIT_THRESHOLD));
+
+            if (INFO)
+                log.info(Options.HOT_SPLIT_THRESHOLD + "="
+                        + hotSplitThreshold);
+
+            if (hotSplitThreshold < 0 || hotSplitThreshold > 1) {
+
+                throw new RuntimeException(Options.HOT_SPLIT_THRESHOLD
                         + " must be in [0:1]");
 
             }

@@ -2303,13 +2303,6 @@ public class XHTMLRenderer {
             throws IOException {
 
         /*
-         * @todo make model parameters. for example, so you can see the events
-         * for the last 5 minutes, last hour, last day, etc.
-         */
-        final long fromTime = 0L;
-        final long toTime = Long.MAX_VALUE;
-        
-        /*
          * Map from the key for the event group to the basename of the variables
          * for that event group.
          */
@@ -2335,7 +2328,7 @@ public class XHTMLRenderer {
         int nvisited = 0;
         
         final Iterator<Event> itr = eventReportingService.rangeIterator(
-                fromTime, toTime);
+                model.fromTime, model.toTime);
         
         while (itr.hasNext()) {
 

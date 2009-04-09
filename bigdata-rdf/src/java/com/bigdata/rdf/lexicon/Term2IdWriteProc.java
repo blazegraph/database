@@ -47,6 +47,7 @@ import com.bigdata.btree.proc.IParallelizableIndexProcedure;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
 
 /**
  * This unisolated operation inserts terms into the <em>term:id</em> index,
@@ -107,7 +108,7 @@ import com.bigdata.rawstore.Bytes;
  * @version $Id$
  */
 public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
-        IParallelizableIndexProcedure {
+        IParallelizableIndexProcedure, IMutableRelationIndexWriteProcedure {
     
     protected static final Logger log = Logger.getLogger(Term2IdWriteProc.class);
 

@@ -979,6 +979,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
     class ResourceScores {
         
         final double percentCPUTime;
+//        final double bytesFree;
+//        final double bytesAvailable;
         final double majorPageFaultsPerSec;
         final double dataDirBytesFree;
         final double tmpDirBytesFree;
@@ -991,6 +993,14 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             majorPageFaultsPerSec = getHostCounter(
                     IRequiredHostCounters.Memory_majorFaultsPerSecond, .0d/* defaultValue */);
 
+//            // @todo not collected for Windows
+//            bytesFree = getHostCounter(IHostCounters.Memory_Bytes_Free,
+//                    Bytes.megabyte * 500/* defaultValue */);
+//
+//            // @todo not collected for Windows or Linux.
+//            bytesAvailable = getHostCounter(
+//                    IHostCounters.Memory_Bytes_Available, Bytes.gigabyte * 4/* defaultValue */);
+            
             dataDirBytesFree = getServiceCounter(
                     IDataServiceCounters.resourceManager
                             + ICounterSet.pathSeparator
@@ -1103,6 +1113,13 @@ public class PostProcessOldJournalTask implements Callable<Object> {
          * make these changes.
          * 
          * @todo config options for these triggers.
+         * 
+         * FIXME Review the move policy with an eye towards how it selects which
+         * index partition(s) to move. Notge that chooseMoves() is now invoked
+         * ONLY when the host is heavily utilized (on both the global and the
+         * local scale). CPU is the only fungable resource since things will
+         * just slow down if a host has 100% CPU while it can die if it runs out
+         * of DISK or RAM (including if it begins to swap heavily).
          */
         final ResourceScores resourceScores = new ResourceScores();
 
@@ -1842,11 +1859,16 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                 /*
                  * There must be enough data in the index partition to make it
-                 * worth while to split. 25% is a reasonable lower bound since
-                 * it does not take that long to generate that much data (50M if
-                 * you are using 200M index partitions).
+                 * worth while to split.
+                 * 
+                 * Note: Avoid hot splits which do not lead to increased
+                 * concurrency. For example, an index which is hot for
+                 * tailSplits is NOT a good candidate for a hot split since only
+                 * one of the resulting index partitions (the rightSibling) will
+                 * have a significant workload.
                  */
-                if (vmd.getPercentOfSplit() > .25) {
+                if (vmd.getPercentOfSplit() > resourceManager.hotSplitThreshold
+                        && vmd.percentTailSplits < .25) {
 
                     // this is an index that we will consider again below.
                     scores.add(score);

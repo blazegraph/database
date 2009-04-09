@@ -128,10 +128,8 @@ abstract public class AbstractKeyArrayIndexProcedure extends
 
     /**
      * The keys.
-     * 
-     * @todo make private again.
      */
-    protected IRandomAccessByteArray keys;
+    private IRandomAccessByteArray keys;
 
     /**
      * The values.

@@ -34,6 +34,7 @@ import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
 import com.bigdata.rdf.inf.Justification;
+import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
 
 /**
  * Procedure for writing {@link Justification}s on an index or index
@@ -42,9 +43,9 @@ import com.bigdata.rdf.inf.Justification;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class WriteJustificationsProc
+public class JustIndexWriteProc
         extends AbstractKeyArrayIndexProcedure
-        implements IParallelizableIndexProcedure {
+        implements IParallelizableIndexProcedure, IMutableRelationIndexWriteProcedure {
 
     /**
      * 
@@ -61,13 +62,13 @@ public class WriteJustificationsProc
      * De-serialization constructor.
      *
      */
-    public WriteJustificationsProc() {
+    public JustIndexWriteProc() {
         
         super();
 
     }
 
-    public WriteJustificationsProc(IDataSerializer keySer, int fromIndex,
+    public JustIndexWriteProc(IDataSerializer keySer, int fromIndex,
             int toIndex, byte[][] keys) {
 
         super(keySer, null, fromIndex, toIndex, keys, null/* vals */);
@@ -75,20 +76,20 @@ public class WriteJustificationsProc
     }
 
     public static class WriteJustificationsProcConstructor extends
-            AbstractIndexProcedureConstructor<WriteJustificationsProc> {
+            AbstractIndexProcedureConstructor<JustIndexWriteProc> {
 
         public static WriteJustificationsProcConstructor INSTANCE = new WriteJustificationsProcConstructor();
 
         private WriteJustificationsProcConstructor() {
         }
 
-        public WriteJustificationsProc newInstance(IDataSerializer keySer,
+        public JustIndexWriteProc newInstance(IDataSerializer keySer,
                 IDataSerializer valSer, int fromIndex, int toIndex,
                 byte[][] keys, byte[][] vals) {
 
             assert vals == null;
 
-            return new WriteJustificationsProc(keySer, fromIndex, toIndex, keys);
+            return new JustIndexWriteProc(keySer, fromIndex, toIndex, keys);
 
         }
 
@@ -98,7 +99,7 @@ public class WriteJustificationsProc
      * @return The #of justifications actually written on the index as a
      *         {@link Long}.
      */
-    public Object apply(IIndex ndx) {
+    public Object apply(final IIndex ndx) {
 
         long nwritten = 0;
         

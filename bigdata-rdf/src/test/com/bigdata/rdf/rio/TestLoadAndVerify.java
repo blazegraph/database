@@ -74,7 +74,7 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
      */
     public void test_loadAndVerify_small() throws Exception {
         
-        final String resource = "src/test/com/bigdata/rdf/rio/small.rdf";
+        final String resource = "bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf";
 
         doLoadAndVerifyTest( resource );
         
@@ -87,7 +87,7 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
      */
     public void test_loadAndVerify_sampleData() throws Exception {
         
-        final String resource = "src/test/com/bigdata/rdf/rio/sample data.rdf";
+        final String resource = "bigdata-rdf/src/test/com/bigdata/rdf/rio/sample data.rdf";
 
         doLoadAndVerifyTest( resource );
         

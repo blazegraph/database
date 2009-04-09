@@ -38,6 +38,7 @@ import com.bigdata.btree.proc.IParallelizableIndexProcedure;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
 
 /**
  * Unisolated write operation makes consistent assertions on the
@@ -48,7 +49,7 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * @version $Id$
  */
 public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
-        IParallelizableIndexProcedure {
+        IParallelizableIndexProcedure, IMutableRelationIndexWriteProcedure {
 
     /**
      * 

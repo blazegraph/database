@@ -53,8 +53,9 @@ abstract public class AbstractElementBuffer<R> extends AbstractArrayBuffer<R> {
      * @param filter
      *            An optional filter for keeping elements out of the buffer.
      */
-    protected AbstractElementBuffer(int capacity, IMutableRelation<R> relation,
-            IKeyOrder<R> keyOrder, IElementFilter<R> filter) {
+    protected AbstractElementBuffer(final int capacity,
+            final IMutableRelation<R> relation, final IKeyOrder<R> keyOrder,
+            final IElementFilter<R> filter) {
 
         super(capacity, filter);
 
@@ -71,7 +72,7 @@ abstract public class AbstractElementBuffer<R> extends AbstractArrayBuffer<R> {
      * Delegates to {@link #flush(IChunkedOrderedIterator)}
      */
     @Override
-    final protected long flush(int n, R[] a) {
+    final protected long flush(final int n, final R[] a) {
 
         final IChunkedOrderedIterator<R> itr = new ChunkedArrayIterator<R>(n,
                 a, null/* keyOrder(unknown) */);
