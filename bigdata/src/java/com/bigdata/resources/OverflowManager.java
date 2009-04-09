@@ -535,7 +535,7 @@ abstract public class OverflowManager extends IndexManager {
         String DEFAULT_TAIL_SPLIT_THRESHOLD = ".4";
 
         /**
-         * The minimum percentage (in [0:1]) of a nominal split before an index
+         * The minimum percentage (in [0:2]) of a nominal split before an index
          * partition will be "hot split" (default
          * {@value #DEFAULT_HOT_SPLIT_THRESHOLD}). Hot splits are taken by
          * hosts which are more heavily utilized than their peers but not
@@ -546,7 +546,9 @@ abstract public class OverflowManager extends IndexManager {
          * index partition into two index partitions. If the writes on the index
          * partition are evenly distributed, then this can double the
          * concurrency if the host has spare cycles. Reasonable values are on
-         * the order of [.25:.75].
+         * the order of [.25:.75]. Hot splits may be effectively disabled by
+         * raising the percent of split to GTE
+         * {@value #PERCENT_OF_SPLIT_THRESHOLD}.
          */
         String HOT_SPLIT_THRESHOLD = OverflowManager.class.getName()
                 + ".hotSplitThreshold";
@@ -1208,10 +1210,10 @@ abstract public class OverflowManager extends IndexManager {
                 log.info(Options.HOT_SPLIT_THRESHOLD + "="
                         + hotSplitThreshold);
 
-            if (hotSplitThreshold < 0 || hotSplitThreshold > 1) {
+            if (hotSplitThreshold < 0 || hotSplitThreshold > 2) {
 
                 throw new RuntimeException(Options.HOT_SPLIT_THRESHOLD
-                        + " must be in [0:1]");
+                        + " must be in [0:2]");
 
             }
 
