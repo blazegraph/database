@@ -148,7 +148,8 @@ public class BigdataSolutionResolverator
      *       materialized by a join against some non-RDF relation from a
      *       {@link Long} that is a term identifier.
      */
-    private IBindingSet getBindingSet(ISolution solution, Map<Long, BigdataValue> terms) {
+    private IBindingSet getBindingSet(final ISolution solution,
+            final Map<Long, BigdataValue> terms) {
 
         if (solution == null)
             throw new IllegalArgumentException();

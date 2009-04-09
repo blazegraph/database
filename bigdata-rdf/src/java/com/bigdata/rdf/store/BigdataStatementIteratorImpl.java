@@ -51,7 +51,8 @@ public class BigdataStatementIteratorImpl
      *            The source iterator (will be closed when this iterator is
      *            closed).
      */
-    public BigdataStatementIteratorImpl(AbstractTripleStore db, IChunkedOrderedIterator<ISPO> src) {
+    public BigdataStatementIteratorImpl(final AbstractTripleStore db,
+            final IChunkedOrderedIterator<ISPO> src) {
 
         super(db, src, new BlockingBuffer<BigdataStatement[]>(
                 db.getChunkOfChunksCapacity(), 

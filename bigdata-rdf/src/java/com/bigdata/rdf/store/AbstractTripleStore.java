@@ -2440,9 +2440,10 @@ abstract public class AbstractTripleStore extends
      * @param justifications
      *            Dump the justifications index also.
      */
-    final public StringBuilder dumpStore(AbstractTripleStore resolveTerms,
-            boolean explicit, boolean inferred, boolean axioms,
-            boolean justifications) {
+    final public StringBuilder dumpStore(
+            final AbstractTripleStore resolveTerms, final boolean explicit,
+            final boolean inferred, final boolean axioms,
+            final boolean justifications) {
 
         final StringBuilder sb = new StringBuilder();
         
@@ -2594,7 +2595,7 @@ abstract public class AbstractTripleStore extends
      * 
      * @param accessPath
      */
-    public StringBuilder dumpStatements(IAccessPath<ISPO> accessPath) {
+    public StringBuilder dumpStatements(final IAccessPath<ISPO> accessPath) {
                 
         final StringBuilder sb = new StringBuilder();
         
@@ -2609,10 +2610,6 @@ abstract public class AbstractTripleStore extends
             }
             
             return sb;
-            
-//        } catch(SailException ex) {
-//            
-//            throw new RuntimeException(ex);
             
         } finally {
             
@@ -2641,29 +2638,6 @@ abstract public class AbstractTripleStore extends
         return "usage summary: class=" + getClass().getSimpleName();
 
     }
-
-//    /**
-//     * Writes out some usage information on the named index. More information is
-//     * available for local indices. Information for scale-out indices is both
-//     * less detailed and more approximate.
-//     * 
-//     * @param name
-//     *            The index name.
-//     * 
-//     * @param ndx
-//     *            The index.
-//     */
-//    final public String usage(String name, IIndex ndx) {
-//
-//        if (ndx == null) {
-//
-//            return name + " : not used";
-//
-//        }
-//
-//        return name + " : " + ndx.getCounters().asXML(null/*filter*/);
-//
-//    }
 
     /*
      * IRawTripleStore
@@ -2805,26 +2779,25 @@ abstract public class AbstractTripleStore extends
 
     }
 
-    public IChunkedOrderedIterator<ISPO> bulkFilterStatements(final ISPO[] stmts,
-            final int numStmts, boolean present) {
-        
+    public IChunkedOrderedIterator<ISPO> bulkFilterStatements(
+            final ISPO[] stmts, final int numStmts, boolean present) {
+
         if (numStmts == 0) {
 
             return new EmptyChunkedIterator<ISPO>(SPOKeyOrder.SPO);
-            
+
         }
-        
-        return bulkFilterStatements(
-                new ChunkedArrayIterator<ISPO>(numStmts,
+
+        return bulkFilterStatements(new ChunkedArrayIterator<ISPO>(numStmts,
                 stmts, null/* keyOrder */), present);
         
     }
 
     public IChunkedOrderedIterator<ISPO> bulkFilterStatements(
             final IChunkedOrderedIterator<ISPO> itr, final boolean present) {
-        
-        return new ChunkedConvertingIterator(itr, new BulkFilterConverter(
-                getSPOIndex(), present));
+
+        return new ChunkedConvertingIterator<ISPO, ISPO>(itr,
+                new BulkFilterConverter(getSPOIndex(), present));
         
     }
 
@@ -2857,7 +2830,7 @@ abstract public class AbstractTripleStore extends
         
     }
     
-    public long addStatements(ISPO[] stmts, int numStmts) {
+    public long addStatements(final ISPO[] stmts, final int numStmts) {
 
         if (numStmts == 0)
             return 0;
@@ -2867,8 +2840,8 @@ abstract public class AbstractTripleStore extends
 
     }
 
-    public long addStatements(ISPO[] stmts, int numStmts,
-            IElementFilter<ISPO> filter) {
+    public long addStatements(final ISPO[] stmts, final int numStmts,
+            final IElementFilter<ISPO> filter) {
 
         if (numStmts == 0)
             return 0;
@@ -2891,7 +2864,7 @@ abstract public class AbstractTripleStore extends
      * <p>
      * Note: If {@link Options#STATEMENT_IDENTIFIERS} was specified, then
      * statement identifiers are assigned using the lexicon associated with
-     * <i>this</i> database. This is done in a pre-procerssing stage for each
+     * <i>this</i> database. This is done in a preprocessing stage for each
      * "chunk" reported by the source <i>itr</i>. This step sets the statement
      * identifier on the {@link SPO} so that it is present when we write on the
      * statement indices.
@@ -3018,14 +2991,14 @@ abstract public class AbstractTripleStore extends
 
     }
 
-    public long removeStatements(ISPO[] stmts, int numStmts) {
+    public long removeStatements(final ISPO[] stmts, final int numStmts) {
 
         return removeStatements(new ChunkedArrayIterator<ISPO>(numStmts, stmts,
                 null/* keyOrder */), true);
 
     }
 
-    public long removeStatements(IChunkedOrderedIterator<ISPO> itr) {
+    public long removeStatements(final IChunkedOrderedIterator<ISPO> itr) {
 
         return removeStatements(itr, true);
         

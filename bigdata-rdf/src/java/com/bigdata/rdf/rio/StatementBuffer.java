@@ -51,9 +51,11 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
+import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.striterator.ChunkedArrayIterator;
@@ -204,6 +206,11 @@ public class StatementBuffer implements IStatementBuffer<Statement> {
         return database;
         
     }
+
+    /**
+     * Optional {@link BlockingBuffer} used for asynchronous writes.
+     */
+    private final BlockingBuffer<ISPO[]> writeBuffer;
     
     protected final BigdataValueFactory valueFactory;
     
@@ -274,9 +281,10 @@ public class StatementBuffer implements IStatementBuffer<Statement> {
      * @param capacity
      *            The #of statements that the buffer can hold.
      */
-    public StatementBuffer(AbstractTripleStore database, int capacity) {
+    public StatementBuffer(final AbstractTripleStore database,
+            final int capacity) {
 
-        this(null, database, capacity);
+        this(null/* statementStore */, database, capacity, null/* writeBuffer */);
 
     }
 
@@ -301,8 +309,47 @@ public class StatementBuffer implements IStatementBuffer<Statement> {
      * @param capacity
      *            The #of statements that the buffer can hold.
      */
-    public StatementBuffer(TempTripleStore statementStore, AbstractTripleStore database, int capacity) {
+    public StatementBuffer(final TempTripleStore statementStore,
+            final AbstractTripleStore database, final int capacity) {
         
+        this(statementStore, database, capacity, null/* writeBuffer */);
+        
+    }
+     
+    /**
+     * Core impl.
+     * 
+     * @param statementStore
+     *            The store into which the statements will be inserted
+     *            (optional). When <code>null</code>, both statments and
+     *            terms will be inserted into the <i>database</i>. This
+     *            optional argument provides the ability to load statements into
+     *            a temporary store while the terms are resolved against the
+     *            main database. This facility is used during incremental
+     *            load+close operations.
+     * @param database
+     *            The database. When <i>statementStore</i> is <code>null</code>,
+     *            both terms and statements will be inserted into the
+     *            <i>database</i>.
+     * @param capacity
+     *            The #of statements that the buffer can hold.
+     * @param writeBuffer
+     *            When non-<code>null</code>, the {@link ISPO}[] chunks
+     *            will be written onto this buffer.
+     *            <p>
+     *            This option is NOT permitted when statementStore is also
+     *            specified. The statementStore is always a local triple store
+     *            and there is no reason to pipeline writes onto a local triple
+     *            store. Also, since, {@link SPORelation#newWriteBuffer()} is
+     *            not parameterized to accept a lexicon other than the one
+     *            associated with its container, it can not be used for truth
+     *            maintenance where the statementStore must use the database's
+     *            lexicon rather than its own.
+     */
+    public StatementBuffer(final TempTripleStore statementStore,
+            final AbstractTripleStore database, final int capacity,
+            final BlockingBuffer<ISPO[]> writeBuffer) {
+            
         if (database == null)
             throw new IllegalArgumentException();
 
@@ -316,6 +363,8 @@ public class StatementBuffer implements IStatementBuffer<Statement> {
         this.valueFactory = database.getValueFactory();
         
         this.capacity = capacity;
+
+        this.writeBuffer = writeBuffer;
         
         values = new BigdataValue[capacity * database.N];
         
@@ -375,7 +424,7 @@ public class StatementBuffer implements IStatementBuffer<Statement> {
 
         // flush anything left in the buffer.
         incrementalWrite();
-
+        
         // discard all buffer state (including bnodes and deferred statements).
         reset();
         
@@ -755,7 +804,8 @@ public class StatementBuffer implements IStatementBuffer<Statement> {
      * @param o
      * @param type
      */
-    public void add(Resource s, URI p, Value o, Resource c, StatementEnum type) {
+    public void add(final Resource s, final URI p, final Value o,
+            final Resource c, final StatementEnum type) {
         
         if (nearCapacity()) {
 
@@ -769,23 +819,13 @@ public class StatementBuffer implements IStatementBuffer<Statement> {
 
     }
     
-    public void add(Statement e) {
+    public void add(final Statement e) {
 
         add(e.getSubject(), e.getPredicate(), e.getObject(), e.getContext(),
                 (e instanceof BigdataStatement ? ((BigdataStatement) e)
                         .getStatementType() : null));
-        
-    }
 
-//    public void add(int n, Statement[] a) {
-//        
-//        for(int i=0; i<n; i++) {
-//            
-//            add(a[i]);
-//            
-//        }
-//        
-//    }
+    }
 
     /**
      * Adds the statements to each index (batch api, NO truth maintenance).
@@ -822,8 +862,6 @@ public class StatementBuffer implements IStatementBuffer<Statement> {
              */
 
             final SPO spo = new SPO(stmt);
-//            .s.termId, stmt.p.termId,
-//                    stmt.o.termId, stmt.type);
 
             if (DEBUG)
                 log.debug("adding: " + stmt.toString() + " (" + spo + ")");
@@ -955,9 +993,40 @@ public class StatementBuffer implements IStatementBuffer<Statement> {
 
         }
 
-        return database
-                .addStatements(sink, false/* copyOnly */, itr, null /* filter */);
+        if (writeBuffer != null) {
 
+            // make sure that the SPO[] chunk is dense.
+            final SPO[] a;
+
+            if (stmts.length != numStmts) {
+
+                a = new SPO[stmts.length];
+
+                System.arraycopy(stmts, 0/* srcPos */, a, 0/* dstPos */,
+                        numStmts);
+
+            } else {
+
+                a = stmts;
+
+            }
+
+            // add to the buffer (asynchronous write on the target).
+            writeBuffer.add(a);
+            
+            /*
+             * Note: When using the write buffer we do not know how many
+             * statements are written since the writes are asynchronous.
+             */
+            return 0L;
+            
+        } else {
+
+            // synchronous write on the target.
+            return database
+                    .addStatements(sink, false/* copyOnly */, itr, null /* filter */);
+        }
+        
 // if (statementStore != null) {
 //
 //            // Writing statements on the secondary store.
