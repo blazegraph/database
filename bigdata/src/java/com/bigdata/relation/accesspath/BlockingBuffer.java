@@ -39,6 +39,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.rdf.store.BigdataSolutionResolverator;
+import com.bigdata.rdf.store.BigdataStatementIteratorImpl;
 import com.bigdata.relation.rule.IQueryOptions;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.NestedSubqueryWithJoinThreadsTask;
@@ -62,10 +64,10 @@ import com.bigdata.striterator.ICloseableIterator;
  * <p>
  * Note: {@link BlockingBuffer} is used (a) for {@link IAccessPath} iterators
  * that exceed the fully-buffered read threashold; (b) for high-level query with
- * at least one join; (c) by the BigdataStatementIteratorImpl, which is used by
- * the RDF DB for high-level query with no joins; and by the
- * BigdataSolutionResolverator, which is used by the RDF DB high-level query
- * that produces binding sets.
+ * at least one join; (c) by the {@link BigdataStatementIteratorImpl}, which is
+ * used by the RDF DB for high-level query with no joins; and by the
+ * {@link BigdataSolutionResolverator}, which is used by the RDF DB high-level
+ * query that produces binding sets.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -179,7 +181,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
     private volatile Future future;
     
-    public void setFuture(Future future) {
+    public void setFuture(final Future future) {
     
         synchronized (this) {
         
@@ -192,6 +194,23 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             this.future = future;
 
         }
+        
+    }
+
+    /**
+     * The {@link Future} set by {@link #setFuture(Future)}.
+     * 
+     * @return The {@link Future} -or- <code>null</code> if no {@link Future}
+     *         has been set.
+     */
+    public Future getFuture() {
+        
+        /*
+         * Note: [future] is volatile so we do not need to be synchronized to
+         * read the reference (changes to the reference will be visible anyway).
+         */
+
+        return future;
         
     }
     
@@ -211,11 +230,9 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      *            The capacity of the buffer. When the generic type <i>&lt;E&gt;</i>
      *            is an array type, then this is the <i>chunkOfChunksCapacity</i>
      *            and small chunks will be automatically combined based on
-     *            availability and latency.
-     *            <p>
-     *            When zero (0) a {@link SynchronousQueue} will be used.
-     *            Otherwise an {@link ArrayBlockingQueue} of the given capacity
-     *            is used.
+     *            availability and latency. When zero (0) a
+     *            {@link SynchronousQueue} will be used. Otherwise an
+     *            {@link ArrayBlockingQueue} of the given capacity is used.
      */
     public BlockingBuffer(final int capacity) {
 
@@ -227,6 +244,29 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
     }
     
+    /**
+     * 
+     * @param capacity
+     *            The capacity of the buffer. When the generic type <i>&lt;E&gt;</i>
+     *            is an array type, then this is the <i>chunkOfChunksCapacity</i>
+     *            and small chunks will be automatically combined based on
+     *            availability and latency. When zero (0) a
+     *            {@link SynchronousQueue} will be used. Otherwise an
+     *            {@link ArrayBlockingQueue} of the given capacity is used.
+     * @param chunkCapacity
+     *            The target chunk size. When the elements stored in the buffer
+     *            are chunks (ie., arrays of some component type), elements will
+     *            be combined together to form larger chunks until this
+     *            chunkSize is satisifed, the {@link #iterator()} is exhausted,
+     *            or the <i>chunkTime</i> is reached.
+     * @param chunkTimeout
+     *            The maximum time to wait in nanoseconds for another chunk to
+     *            come along so that we can combine it with the current chunk
+     *            for {@link #next()}. A value of ZERO(0) disables chunk
+     *            combiner.
+     * @param chunkTimeoutUnit
+     *            The units in which the <i>chunkTimeout</i> is expressed.
+     */
     public BlockingBuffer(final int capacity, final int chunkSize,
             final long chunkTimeout, final TimeUnit chunkTimeoutUnit) {
 
@@ -259,7 +299,6 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      *            combiner.
      * @param chunkTimeoutUnit
      *            The units in which the <i>chunkTimeout</i> is expressed.
-     * 
      */
     public BlockingBuffer(final BlockingQueue<E> queue, final int chunkCapacity,
             final long chunkTimeout, final TimeUnit chunkTimeoutUnit) {

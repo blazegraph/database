@@ -418,21 +418,24 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
          * An array of the axioms in SPO order.
          */
         SPO[] stmts;
-        
+
         /**
          * @param database
          * @param capacity
          */
-        public MyStatementBuffer(AbstractTripleStore database, int capacity) {
+        public MyStatementBuffer(final AbstractTripleStore database,
+                final int capacity) {
 
             super(database, capacity);
-            
+
         }
 
         /**
-         * Save off a copy of the axioms in SPO order on {@link #stmts}.
+         * Overriden to save off a copy of the axioms in SPO order on
+         * {@link #stmts} where we can access them afterwards.
          */
-        protected long writeSPOs(SPO[] stmts, int numStmts) {
+        @Override
+        protected long writeSPOs(final SPO[] stmts, final int numStmts) {
             
             if (this.stmts == null) {
 
