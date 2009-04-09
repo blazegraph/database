@@ -4,7 +4,9 @@ import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.service.ILoadBalancerService;
 
 /**
@@ -20,22 +22,26 @@ public class RDFLoadTaskFactory<T extends Runnable> extends
      * 
      * @param db
      * @param bufferCapacity
+     * @param writeBuffer
+     *            An optional buffer for asynchronous writes on the statement
+     *            indices.
      * @param verifyData
      * @param deleteAfter
      *            if the file should be deleted once it has been loaded.
      * @param fallback
-     *            An attempt will be made to determine the interchange
-     *            syntax using {@link RDFFormat}. If no determination can
-     *            be made then the loader will presume that the files are in
-     *            the format specified by this parameter (if any). Files
-     *            whose format can not be determined will be logged as
-     *            errors.
+     *            An attempt will be made to determine the interchange syntax
+     *            using {@link RDFFormat}. If no determination can be made then
+     *            the loader will presume that the files are in the format
+     *            specified by this parameter (if any). Files whose format can
+     *            not be determined will be logged as errors.
      */
-    public RDFLoadTaskFactory(AbstractTripleStore db, int bufferCapacity,
-            boolean verifyData, boolean deleteafter, RDFFormat fallback) {
+    public RDFLoadTaskFactory(final AbstractTripleStore db,
+            final int bufferCapacity, final BlockingBuffer<ISPO[]> writeBuffer,
+            final boolean verifyData, final boolean deleteafter,
+            final RDFFormat fallback) {
 
         super(db, verifyData, deleteafter, fallback,
-                new LoadStatementBufferFactory(db, bufferCapacity));
+                new LoadStatementBufferFactory(db, bufferCapacity, writeBuffer));
 
     }
 

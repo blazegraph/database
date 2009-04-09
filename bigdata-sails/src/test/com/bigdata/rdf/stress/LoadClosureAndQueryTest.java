@@ -85,12 +85,14 @@ import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataSail.Options;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.relation.RelationSchema;
+import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.resources.OverflowManager;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.EmbeddedClient;
@@ -1013,8 +1015,15 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
 
         final AbstractTripleStore db = sail.getDatabase();
 
+        /*
+         * @todo should be a parameter for the experimental configuration. the
+         * writeBuffer must be closed during normal shutdown and we must await
+         * its Future. for abnormal shutdown the Future should be cancelled.
+         */
+        final BlockingBuffer<ISPO[]> writeBuffer = null;
+        
         final RDFLoadTaskFactory loadTaskFactory = //
-        new RDFLoadTaskFactory(db, bufferCapacity,
+        new RDFLoadTaskFactory(db, bufferCapacity, writeBuffer,
                 verifyRDFSourceData, false/*deleteAfter*/, fallback);
 
         final ConcurrentDataLoader service = new ConcurrentDataLoader(fed,

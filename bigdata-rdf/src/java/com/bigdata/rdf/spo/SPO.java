@@ -277,8 +277,8 @@ public class SPO implements ISPO, Comparable<SPO> {
      * @param o
      * @param type
      */
-    public SPO(BigdataResource s, BigdataURI p, BigdataValue o,
-            StatementEnum type) {
+    public SPO(final BigdataResource s, final BigdataURI p, final BigdataValue o,
+            final StatementEnum type) {
         
         this(s.getTermId(), p.getTermId(), o.getTermId(), type);
         
@@ -291,7 +291,7 @@ public class SPO implements ISPO, Comparable<SPO> {
      * 
      * @param stmt The statement.
      */
-    public SPO(BigdataStatement stmt) {
+    public SPO(final BigdataStatement stmt) {
         
         this(   stmt.getSubject().getTermId(),//
                 stmt.getPredicate().getTermId(),
@@ -317,7 +317,7 @@ public class SPO implements ISPO, Comparable<SPO> {
      *            The value associated with the key one of the statement
      *            indices.
      */
-    public static void decodeValue(ISPO spo, byte[] val) {
+    public static void decodeValue(final ISPO spo, final byte[] val) {
         
         final byte code = val[0];
         
@@ -349,7 +349,7 @@ public class SPO implements ISPO, Comparable<SPO> {
         
     }
 
-    public byte[] serializeValue(ByteArrayBuffer buf) {
+    public byte[] serializeValue(final ByteArrayBuffer buf) {
 
         return serializeValue(buf, isOverride(), type, sid);
         
@@ -380,7 +380,8 @@ public class SPO implements ISPO, Comparable<SPO> {
      * @return The value that would be written into a statement index for this
      *         {@link SPO}.
      */
-    static public byte[] serializeValue(ByteArrayBuffer buf, boolean override, StatementEnum type, long sid) {
+    static public byte[] serializeValue(final ByteArrayBuffer buf,
+            final boolean override, final StatementEnum type, final long sid) {
 
         buf.reset();
         

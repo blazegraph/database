@@ -117,10 +117,12 @@ public class RDFLoadAndValidateHelper {
 
     }
     
-    public void load(AbstractTripleStore db) throws InterruptedException {
+    public void load(final AbstractTripleStore db) throws InterruptedException {
 
-        final RDFLoadTaskFactory loadTaskFactory = new RDFLoadTaskFactory(
-                db, bufferCapacity, verifyData, false/*deleteAfter*/, fallback);
+        // Note: no write buffer for 'verify' since it is not doing any writes!
+        final RDFLoadTaskFactory loadTaskFactory = new RDFLoadTaskFactory(db,
+                bufferCapacity, null/* writeBuffer */, verifyData,
+                false/* deleteAfter */, fallback);
 
         final FileSystemLoader scanner = new FileSystemLoader(service,
                 nclients, clientNum);

@@ -76,10 +76,11 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.jini.start.BigdataZooDefs;
 import com.bigdata.journal.ITx;
-import com.bigdata.rdf.load.SplitFinder.ConfigurationOptions;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.ITripleStore;
@@ -91,7 +92,6 @@ import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.jini.JiniClient;
-import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.zookeeper.ZLock;
 import com.bigdata.zookeeper.ZooHelper;
@@ -186,6 +186,14 @@ public class RDFDataLoadMaster implements Callable<Void> {
          */
         String BUFFER_CAPACITY = "bufferCapacity";
 
+        /**
+         * When non-zero, {@link SPORelation#newWriteBuffer(int)} will be used
+         * to perform asynchronous writes on the statement indices and this
+         * value will be specified as the target chunk size for an asynchronous
+         * write.
+         */
+        String WRITE_BUFFER_CHUNK_SIZE = "writeBufferChunkSize";
+        
         /**
          * When <code>true</code>, the master will create the
          * {@link ITripleStore} identified by {@link #NAMESPACE } if it does not
@@ -385,9 +393,16 @@ public class RDFDataLoadMaster implements Callable<Void> {
 
         /**
          * The capacity of the buffers used to hold the parsed RDF data.
+         * 
+         * @see ConfigurationOptions#BUFFER_CAPACITY
          */
         public final int bufferCapacity;
 
+        /**
+         * @see ConfigurationOptions#WRITE_BUFFER_CHUNK_SIZE
+         */
+        public final int writeBufferChunkSize;
+        
         /**
          * When <code>true</code>, the master will create the
          * {@link ITripleStore} identified by {@link #namespace} if it does not
@@ -482,6 +497,10 @@ public class RDFDataLoadMaster implements Callable<Void> {
                     + "="
                     + bufferCapacity
                     + //
+                    ", " + ConfigurationOptions.WRITE_BUFFER_CHUNK_SIZE
+                    + "="
+                    + writeBufferChunkSize
+                    + //
                     ", " + ConfigurationOptions.CREATE + "="
                     + create
                     + //
@@ -532,6 +551,10 @@ public class RDFDataLoadMaster implements Callable<Void> {
             bufferCapacity = (Integer) config.getEntry(
                     ConfigurationOptions.COMPONENT,
                     ConfigurationOptions.BUFFER_CAPACITY, Integer.TYPE);
+
+            writeBufferChunkSize = (Integer) config.getEntry(
+                    ConfigurationOptions.COMPONENT,
+                    ConfigurationOptions.WRITE_BUFFER_CHUNK_SIZE, Integer.TYPE);
 
             create = (Boolean) config.getEntry(ConfigurationOptions.COMPONENT,
                     ConfigurationOptions.CREATE, Boolean.TYPE);

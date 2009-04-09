@@ -1,7 +1,9 @@
 package com.bigdata.rdf.load;
 
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.relation.accesspath.BlockingBuffer;
 
 /**
  * 
@@ -14,12 +16,24 @@ public class LoadStatementBufferFactory implements IStatementBufferFactory {
 
     private final int bufferCapacity;
 
-    public LoadStatementBufferFactory(AbstractTripleStore db,
-            int bufferCapacity) {
+    private final BlockingBuffer<ISPO[]> writeBuffer;
+    
+    /**
+     * 
+     * @param db
+     * @param bufferCapacity
+     * @param writeBuffer
+     *            An optional buffer for asynchronous writes on the statement
+     *            indices.
+     */
+    public LoadStatementBufferFactory(final AbstractTripleStore db,
+            final int bufferCapacity, final BlockingBuffer<ISPO[]> writeBuffer) {
 
         this.db = db;
        
         this.bufferCapacity = bufferCapacity;
+    
+        this.writeBuffer = writeBuffer;
         
     }
     
@@ -37,12 +51,13 @@ public class LoadStatementBufferFactory implements IStatementBufferFactory {
         return threadLocal.get();
         
     }
-    
+
     private ThreadLocal<StatementBuffer> threadLocal = new ThreadLocal<StatementBuffer>() {
 
         protected synchronized StatementBuffer initialValue() {
-            
-            return new StatementBuffer(db, bufferCapacity);
+
+            return new StatementBuffer(null/* statementStore */, db,
+                    bufferCapacity, writeBuffer);
             
         }
 

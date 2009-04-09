@@ -13,8 +13,10 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.load.RDFDataLoadMaster.JobState;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
+import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataServiceAwareProcedure;
 import com.bigdata.service.jini.JiniFederation;
@@ -129,10 +131,16 @@ public class RDFFileLoadTask implements Callable<Void>, Serializable,
 
         }
 
+        // optionally use asynchronous writes on the statement indices.
+        final BlockingBuffer<ISPO[]> writeBuffer = jobState.writeBufferChunkSize != 0 ? tripleStore
+                .getSPORelation().newWriteBuffer(jobState.writeBufferChunkSize)
+                : null;
+        
         // @todo factory method.
         final RDFLoadTaskFactory taskFactory = new RDFLoadTaskFactory(
-                tripleStore, jobState.bufferCapacity, jobState.parserValidates,
-                jobState.deleteAfter, jobState.fallback);
+                tripleStore, jobState.bufferCapacity, writeBuffer,
+                jobState.parserValidates, jobState.deleteAfter,
+                jobState.fallback);
 
         // Setup loader.
         final ConcurrentDataLoader loader = new ConcurrentDataLoader(fed,
@@ -179,11 +187,25 @@ public class RDFFileLoadTask implements Callable<Void>, Serializable,
 
             // Shutdown the loader.
             loader.shutdown();
+            
+            if (writeBuffer != null) {
+
+                // done with this buffer. 
+                writeBuffer.close();
+                
+                // await the completion of the task draining the buffer.
+                writeBuffer.getFuture().get();
+                
+            }
 
         } catch (Throwable t) {
 
             try {
                 loader.shutdownNow();
+                if (writeBuffer != null) {
+                    writeBuffer.getFuture()
+                            .cancel(true/*mayInterruptIfRunning*/);
+                }
             } catch (Throwable t2) {
                 log.warn(this, t2);
             }
