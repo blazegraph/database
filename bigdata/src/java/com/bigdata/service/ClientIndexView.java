@@ -33,6 +33,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -52,7 +53,8 @@ import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
 import com.bigdata.btree.filter.IFilterConstructor;
-import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.keys.KVO;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.AbstractKeyRangeIndexProcedure;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
@@ -70,7 +72,6 @@ import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
 import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
-import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
@@ -79,8 +80,14 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
+import com.bigdata.relation.accesspath.BlockingBuffer;
+import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.IBigdataClient.Options;
+import com.bigdata.service.ndx.IndexTaskCounters;
+import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
+import com.bigdata.service.ndx.pipeline.IndexWriteStats;
+import com.bigdata.service.ndx.pipeline.IndexWriteTask;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.TaskCounters;
 
@@ -410,7 +417,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
         this.batchOnly = fed.getClient().getBatchApiOnly();
 
         this.taskTimeout = fed.getClient().getTaskTimeout();
-
+        
     }
 
     /**
@@ -435,35 +442,6 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
     }
 
-    /**
-     * @todo Add counters and report to the load balancer (a version for
-     *       clients). average responseTime, average queueLength, latency due to
-     *       RMI (by also obtaining the response time of the data service
-     *       itself), #of procedures run and the execution time for those
-     *       procedures; #of splits; #of tuples in each split; total #of tuples.
-     * 
-     * @todo Report more informatiom, but since scale-out indices can be very
-     *       large, this method should report only on aspects of the clients
-     *       access to the scale-out index rather than attempting to aggregate
-     *       the data from the various index partitions.
-     */
-    synchronized public ICounterSet getCounters() {
-
-        if (counterSet == null) {
-
-            counterSet = new CounterSet();
-            
-            counterSet.addCounter("name", new OneShotInstrument<String>(name));
-
-            counterSet.addCounter("timestamp", new OneShotInstrument<Long>(timestamp));
-
-        }
-        
-        return counterSet;
-        
-    }
-    private CounterSet counterSet;
-    
     public ICounter getCounter() {
         
         throw new UnsupportedOperationException();
@@ -839,7 +817,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
             final IResultHandler resultHandler = new IdentityHandler();
 
             final SimpleDataServiceProcedureTask task = new SimpleDataServiceProcedureTask(
-                    key, ts, new Split(locator, 0, 0), proc, resultHandler);
+                    this, key, ts, new Split(locator, 0, 0), proc, resultHandler);
 
             // submit procedure and await completion.
             getThreadPool().submit(task).get(taskTimeout, TimeUnit.MILLISECONDS);
@@ -1000,7 +978,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
                 final Split split = new Split(locator, 0/* fromIndex */, 0/* toIndex */);
 
-                tasks.add(new KeyRangeDataServiceProcedureTask(fromKey, toKey,
+                tasks.add(new KeyRangeDataServiceProcedureTask(this, fromKey, toKey,
                         ts, split, proc, resultHandler));
 
                 nparts++;
@@ -1034,7 +1012,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
      */
     public void submit(final int fromIndex, final int toIndex,
             final byte[][] keys, final byte[][] vals,
-            final AbstractIndexProcedureConstructor ctor,
+            final AbstractKeyArrayIndexProcedureConstructor ctor,
             final IResultHandler aggregator) {
 
         if (ctor == null) {
@@ -1137,7 +1115,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
      */
     private void submit(final long ts, final int fromIndex, final int toIndex,
             final byte[][] keys, final byte[][] vals,
-            final AbstractIndexProcedureConstructor ctor,
+            final AbstractKeyArrayIndexProcedureConstructor ctor,
             final IResultHandler aggregator) {
 
         /*
@@ -1175,7 +1153,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
             }
 
-            tasks.add(new KeyArrayDataServiceProcedureTask(keys, vals, ts,
+            tasks.add(new KeyArrayDataServiceProcedureTask(this, keys, vals, ts,
                     split, proc, aggregator, ctor));
 
         }
@@ -1480,9 +1458,11 @@ public class ClientIndexView implements IScaleOutClientIndex {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected abstract class AbstractDataServiceProcedureTask implements
+    static protected abstract class AbstractDataServiceProcedureTask implements
             Callable<Void> {
 
+        protected final IScaleOutClientIndex ndx;
+        
         /**
          * The timestamp for the operation. This will be the timestamp for the
          * view (the outer class) unless the operation is read-only, in which
@@ -1491,14 +1471,17 @@ public class ClientIndexView implements IScaleOutClientIndex {
          * latter cases this will be a read-only transaction identifier).
          */
         protected final long ts;
+
         /**
          * The split assigned to this instance of the procedure.
          */
         protected final Split split;
+
         /**
          * The procedure to be executed against that {@link #split}.
          */
         protected final IIndexProcedure proc;
+
         /**
          * Used to aggregate results when a procedure can span more than one
          * index partition.
@@ -1506,7 +1489,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
         protected final IResultHandler resultHandler;
         private final TaskCounters taskCounters;
 //        protected final TaskCounters taskCountersByProc;
-//        protected final TaskCounters taskCountersByIndex;
+        private final TaskCounters taskCountersByIndex;
         
         private long nanoTime_submitTask;
         private long nanoTime_beginWork;
@@ -1524,7 +1507,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
          */
         public String toString() {
             
-            return "Index=" + ClientIndexView.this.getName() + ", Procedure "
+            return "index=" + ndx.getName() + ", ts=" + ts + ", procedure "
                     + proc.getClass().getName() + " : " + split;
             
         }
@@ -1538,10 +1521,13 @@ public class ClientIndexView implements IScaleOutClientIndex {
          * @param proc
          * @param resultHandler
          */
-        public AbstractDataServiceProcedureTask(final long ts,
+        public AbstractDataServiceProcedureTask(IScaleOutClientIndex ndx, final long ts,
                 final Split split, final IIndexProcedure proc,
                 final IResultHandler resultHandler) {
-            
+
+            if (ndx == null)
+                throw new IllegalArgumentException();
+
             if (split.pmd == null)
                 throw new IllegalArgumentException();
             
@@ -1554,6 +1540,8 @@ public class ClientIndexView implements IScaleOutClientIndex {
             if (proc == null)
                 throw new IllegalArgumentException();
 
+            this.ndx = ndx;
+            
             this.ts = ts;
             
             this.split = split;
@@ -1562,11 +1550,12 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
             this.resultHandler = resultHandler;
 
-            this.taskCounters = fed.getTaskCounters();
+            this.taskCounters = ndx.getFederation().getTaskCounters();
             
 //            this.taskCountersByProc = fed.getTaskCounters(proc);
 //            
-//            this.taskCountersByIndex = fed.getTaskCounters(ClientIndexView.this);
+            this.taskCountersByIndex = ndx.getFederation()
+                    .getIndexTaskCounters(ndx.getName()).synchronousCounters;
 
             nanoTime_submitTask = System.nanoTime();
             
@@ -1579,13 +1568,13 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
             taskCounters.taskSubmitCount.incrementAndGet();
 //            taskCountersByProc.taskSubmitCount.incrementAndGet();
-//            taskCountersByIndex.taskSubmitCount.incrementAndGet();
+            taskCountersByIndex.taskSubmitCount.incrementAndGet();
 
             nanoTime_beginWork = System.nanoTime();
             final long queueWaitingTime = nanoTime_beginWork - nanoTime_submitTask;
             taskCounters.queueWaitingNanoTime.addAndGet(queueWaitingTime);
 //            taskCountersByProc.queueWaitingTime.addAndGet(queueWaitingTime);
-//            taskCountersByIndex.queueWaitingTime.addAndGet(queueWaitingTime);
+            taskCountersByIndex.queueWaitingNanoTime.addAndGet(queueWaitingTime);
             
             try {
 
@@ -1593,13 +1582,13 @@ public class ClientIndexView implements IScaleOutClientIndex {
                 
                 taskCounters.taskSuccessCount.incrementAndGet();
 //                taskCountersByProc.taskSuccessCount.incrementAndGet();
-//                taskCountersByIndex.taskSuccessCount.incrementAndGet();
+                taskCountersByIndex.taskSuccessCount.incrementAndGet();
 
             } catch(Exception ex) {
 
                 taskCounters.taskFailCount.incrementAndGet();
 //                taskCountersByProc.taskFailCount.incrementAndGet();
-//                taskCountersByIndex.taskFailCount.incrementAndGet();
+                taskCountersByIndex.taskFailCount.incrementAndGet();
 
                 throw ex;
                 
@@ -1609,19 +1598,19 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
                 taskCounters.taskCompleteCount.incrementAndGet();
 //                taskCountersByProc.taskCompleteCount.incrementAndGet();
-//                taskCountersByIndex.taskCompleteCount.incrementAndGet();
+                taskCountersByIndex.taskCompleteCount.incrementAndGet();
 
                 // increment by the amount of time that the task was executing.
                 final long serviceNanoTime = nanoTime_finishedWork - nanoTime_beginWork;
                 taskCounters.serviceNanoTime.addAndGet(serviceNanoTime);
 //                taskCountersByProc.serviceNanoTime.addAndGet(serviceNanoTime);
-//                taskCountersByIndex.serviceNanoTime.addAndGet(serviceNanoTime);
+                taskCountersByIndex.serviceNanoTime.addAndGet(serviceNanoTime);
 
                 // increment by the total time from submit to completion.
                 final long queuingNanoTime = nanoTime_finishedWork - nanoTime_submitTask;
                 taskCounters.queuingNanoTime.addAndGet(queuingNanoTime);
 //                taskCountersByProc.queuingNanoTime.addAndGet(queuingNanoTime);
-//                taskCountersByIndex.queuingNanoTime.addAndGet(queuingNanoTime);
+                taskCountersByIndex.queuingNanoTime.addAndGet(queuingNanoTime);
 
             }
             
@@ -1648,14 +1637,14 @@ public class ClientIndexView implements IScaleOutClientIndex {
                 throw new InterruptedException();
             
             // resolve service UUID to data service.
-            final IDataService dataService = getDataService(locator);
+            final IDataService dataService = ndx.getDataService(locator);
 
             if (dataService == null)
                 throw new RuntimeException("DataService not found: " + locator);
             
             // the name of the index partition.
             final String name = DataService.getIndexPartitionName(//
-                    ClientIndexView.this.name, // the name of the scale-out index.
+                    ndx.getName(), // the name of the scale-out index.
                     split.pmd.getPartitionId() // the index partition identifier.
                     );
 
@@ -1679,7 +1668,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
                 if(cause != null) {
 
                     // notify the client so that it can refresh its cache.
-                    staleLocator(ts, locator, cause);
+                    ndx.staleLocator(ts, locator, cause);
                     
                     // retry the operation.
                     retry();
@@ -1768,11 +1757,12 @@ public class ClientIndexView implements IScaleOutClientIndex {
          * @param proc
          * @param resultHandler
          */
-        public SimpleDataServiceProcedureTask(final byte[] key, long ts,
-                final Split split, final ISimpleIndexProcedure proc,
+        public SimpleDataServiceProcedureTask(final IScaleOutClientIndex ndx,
+                final byte[] key, long ts, final Split split,
+                final ISimpleIndexProcedure proc,
                 final IResultHandler resultHandler) {
 
-            super(ts, split, proc, resultHandler);
+            super(ndx, ts, split, proc, resultHandler);
             
             if (key == null)
                 throw new IllegalArgumentException();
@@ -1837,12 +1827,12 @@ public class ClientIndexView implements IScaleOutClientIndex {
          * @param proc
          * @param resultHandler
          */
-        public KeyRangeDataServiceProcedureTask(final byte[] fromKey,
-                final byte[] toKey, final long ts, final Split split,
-                final IKeyRangeIndexProcedure proc,
+        public KeyRangeDataServiceProcedureTask(final IScaleOutClientIndex ndx,
+                final byte[] fromKey, final byte[] toKey, final long ts,
+                final Split split, final IKeyRangeIndexProcedure proc,
                 final IResultHandler resultHandler) {
 
-            super(ts, split, proc, resultHandler);
+            super(ndx, ts, split, proc, resultHandler);
             
             /*
              * Constrain the range to the index partition. This constraint will
@@ -1914,7 +1904,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
         protected final byte[][] keys;
         protected final byte[][] vals;
-        protected final AbstractIndexProcedureConstructor ctor;
+        protected final AbstractKeyArrayIndexProcedureConstructor ctor;
         
         /**
          * Variant used for {@link IKeyArrayIndexProcedure}s.
@@ -1935,13 +1925,13 @@ public class ClientIndexView implements IScaleOutClientIndex {
          *            This is used to re-split the data if necessary in response
          *            to stale locator information.
          */
-        public KeyArrayDataServiceProcedureTask(final byte[][] keys,
-                final byte[][] vals, final long ts, final Split split,
-                final IKeyArrayIndexProcedure proc,
+        public KeyArrayDataServiceProcedureTask(final IScaleOutClientIndex ndx,
+                final byte[][] keys, final byte[][] vals, final long ts,
+                final Split split, final IKeyArrayIndexProcedure proc,
                 final IResultHandler resultHandler,
-                final AbstractIndexProcedureConstructor ctor) {
+                final AbstractKeyArrayIndexProcedureConstructor ctor) {
             
-            super( ts, split, proc, resultHandler );
+            super( ndx, ts, split, proc, resultHandler );
             
             if (ctor == null)
                 throw new IllegalArgumentException();
@@ -1956,7 +1946,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
         /**
          * Submit using
-         * {@link ClientIndexView#submit(int, int, byte[][], byte[][], AbstractIndexProcedureConstructor, IResultHandler)}.
+         * {@link ClientIndexView#submit(int, int, byte[][], byte[][], AbstractKeyArrayIndexProcedureConstructor, IResultHandler)}.
          * This will recompute the split points and re-map the procedure across
          * the newly determined split points.
          */
@@ -2001,9 +1991,8 @@ public class ClientIndexView implements IScaleOutClientIndex {
     }
     
     /**
-     * Utility method to split a set of ordered keys into partitions based the
-     * index partitions defined for a scale-out index.
-     * <p>
+     * {@inheritDoc}
+     * 
      * Find the partition for the first key. Check the last key, if it is in the
      * same partition then then this is the simplest case and we can just send
      * the data along.
@@ -2022,23 +2011,6 @@ public class ClientIndexView implements IScaleOutClientIndex {
      * Note: Split points MUST respect the "row" identity for a sparse row
      * store, but we get that constraint by maintaining the index partition
      * boundaries in agreement with the split point constraints for the index.
-     * 
-     * @param ts
-     *            The timestamp for the {@link IMetadataIndex} view that will be
-     *            applied to choose the {@link Split}s.
-     * @param fromIndex
-     *            The index of the first key in <i>keys</i> to be processed
-     *            (inclusive).
-     * @param toIndex
-     *            The index of the last key in <i>keys</i> to be processed.
-     * @param keys
-     *            An array of keys. Each key is an interpreted as an unsigned
-     *            byte[]. All keys must be non-null. The keys must be in sorted
-     *            order.
-     * 
-     * @return The {@link Split}s that you can use to form requests based on
-     *         the identified first/last key and partition identified by this
-     *         process.
      * 
      * @see Arrays#sort(Object[], int, int, java.util.Comparator)
      * 
@@ -2095,7 +2067,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
                  * key.
                  */
 
-                assert validSplit( locator, currentIndex, toIndex, keys );
+                assert isValidSplit( locator, currentIndex, toIndex, keys );
                 
                 splits.add(new Split(locator, currentIndex, toIndex));
 
@@ -2194,6 +2166,25 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
     }
 
+    public LinkedList<Split> splitKeys(final long ts, final int fromIndex,
+            final int toIndex, final KVO[] a) {
+
+        /*
+         * Change the shape of the data so that we can split it.
+         */
+
+        final byte[][] keys = new byte[a.length][];
+
+        for (int i = 0; i < a.length; i++) {
+
+            keys[i] = a[i].key;
+
+        }
+
+        return splitKeys(ts, fromIndex, toIndex, keys);
+
+    }
+
     /**
      * Paranoia testing for generated splits.
      * 
@@ -2203,7 +2194,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
      * @param keys
      * @return
      */
-    private boolean validSplit(final PartitionLocator locator,
+    private boolean isValidSplit(final PartitionLocator locator,
             final int fromIndex, final int toIndex, final byte[][] keys) {
 
         assert fromIndex <= toIndex : "fromIndex=" + fromIndex + ", toIndex="
@@ -2297,6 +2288,110 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
         // notify the metadata index view that it has a stale locator.
         fed.getMetadataIndex(name, timestamp).staleLocator(locator);
+
+    }
+
+    /**
+     * Return a buffer which will apply the specified operation to chunks of
+     * key-value tuples ({@link KVO}s) written onto the buffer using a
+     * producer-consumer model. The caller acts as the producer. The consumer is
+     * a concurrent process running on the
+     * {@link IBigdataFederation#getExecutorService()}. Chunks written onto the
+     * buffer will be automatically combined in order to maximize the efficiency
+     * of the asynchronous operations. Once the buffer has been
+     * {@link IBlockingBuffer#close() closed}, the consumer will drain the
+     * buffer and terminate.
+     * <p>
+     * The returned buffer provides a streaming API which is highly efficient if
+     * you do not need to have synchronous notification or directly consume the
+     * returned values. The caller writes ordered {@link KVO}[] chunks onto the
+     * {@link BlockingBuffer}. Those chunks are dynamically combined and then
+     * split into per-index partition chunks which are written on internally
+     * managed {@link BlockingBuffer}s for each index partition which will be
+     * touched by a write operation. The splits are are slices of ordered chunks
+     * for a specific index partition. The {@link BlockingBuffer} uses a merge
+     * sort when it combines ordered chunks so that the combined chunks remain
+     * fully ordered. Once a chunk is ready, it is re-shaped for the CTOR and
+     * sent to the target data service using RMI.
+     * <p>
+     * {@link BlockingBuffer#getFuture()} may be used to obtain the
+     * {@link Future} of the consumer. You can use {@link Future#get()} to await
+     * the completion of the consumer, to cancel the consumer, etc. The
+     * {@link Future} evaluates to an {@link IndexWriteStats} object. Those
+     * statistics are also reported to the {@link ILoadBalancerService} via the
+     * {@link IBigdataFederation}.
+     * <p>
+     * Note: Each buffer returned by this method is independent.
+     * 
+     * @param <T>
+     *            The generic type of the procedure used to write on the index.
+     * @param <O>
+     *            The generic type for unserialized value objects.
+     * @param <R>
+     *            The type of the result from applying the index procedure to a
+     *            single {@link Split} of data.
+     * @param <A>
+     *            The type of the aggregated result.
+     * 
+     * @param indexWriteQueueCapacity
+     *            The capacity of the queue in front of the index. Chunks are
+     *            read off of this queue, split based on the separator keys for
+     *            the scale-out index, and then written onto a per-index
+     *            partition queue, whose capacity is specified by a different
+     *            argument.
+     * @param indexPartitionWriteQueueCapacity
+     *            The capacity of the queue in front of each index partition on
+     *            which the writes are scattered.
+     * @param resultHandler
+     *            Used to aggregate results.
+     * @param duplicateRemover
+     *            Used to filter out duplicates in an application specified
+     *            manner (optional).
+     * @param ctor
+     *            Used to create instances of the procedure that will execute a
+     *            write on an individual index partition.
+     * 
+     * @return A buffer on which the producer may write their data.
+     * 
+     * @see AbstractFederation#getIndexTaskCounters(String)
+     */
+    public <T extends IKeyArrayIndexProcedure, O, R, A> BlockingBuffer<KVO<O>[]> newWriteBuffer(
+            final int indexWriteQueueCapacity,
+            final int indexPartitionWriteQueueCapacity,
+            final IResultHandler<R, A> resultHandler,
+            final IDuplicateRemover<O> duplicateRemover,
+            final AbstractKeyArrayIndexProcedureConstructor<T> ctor) {
+
+        final BlockingBuffer<KVO<O>[]> writeBuffer = new BlockingBuffer<KVO<O>[]>(
+                // @todo array vs linked w/ capacity and fair vs unfair.
+                new ArrayBlockingQueue<KVO<O>[]>(indexWriteQueueCapacity), 
+                BlockingBuffer.DEFAULT_CONSUMER_CHUNK_SIZE,// @todo config
+                BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT,// @todo config
+                BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT_UNIT,//
+                true// ordered
+        );
+
+        final IndexWriteTask<T, O, R, A> task = new IndexWriteTask<T, O, R, A>(
+                this, indexPartitionWriteQueueCapacity, resultHandler,
+                duplicateRemover, ctor,
+                fed.getIndexTaskCounters(name).asynchronousStats, writeBuffer);
+
+        final Future<IndexWriteStats> future = fed.getExecutorService().submit(
+                task);
+
+        writeBuffer.setFuture(future);
+
+        return writeBuffer;
+
+    }
+
+    /**
+     * Return a new {@link CounterSet} backed by the {@link IndexTaskCounters}
+     * for this scale-out index.
+     */
+    public ICounterSet getCounters() {
+
+        return getFederation().getIndexTaskCounters(name).getCounters();
 
     }
 

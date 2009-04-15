@@ -98,7 +98,7 @@ public class SPO implements ISPO, Comparable<SPO> {
      * @throws IllegalStateException
      *             if the statement identifier is already set.
      */
-    public final void setStatementIdentifier(long id) {
+    public final void setStatementIdentifier(final long id) {
 
         if (id == NULL)
             throw new IllegalArgumentException();

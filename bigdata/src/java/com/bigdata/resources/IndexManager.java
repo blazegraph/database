@@ -1851,7 +1851,7 @@ abstract public class IndexManager extends StoreManager {
             t = new BTreeCounters();
 
             // put iff absent.
-            BTreeCounters oldval = indexCounters.putIfAbsent(name, t);
+            final BTreeCounters oldval = indexCounters.putIfAbsent(name, t);
 
             if (oldval != null) {
 
@@ -1866,6 +1866,8 @@ abstract public class IndexManager extends StoreManager {
             }
             
         }
+
+        assert t != null;
         
         return t;
         

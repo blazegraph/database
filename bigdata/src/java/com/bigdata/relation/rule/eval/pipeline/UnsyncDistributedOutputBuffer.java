@@ -61,29 +61,28 @@ class UnsyncDistributedOutputBuffer<E extends IBindingSet> extends
     }
     
     /**
-     * Maps the chunk of {@link IBindingSet}s across the index partition(s)
-     * for the sink join dimension.
+     * Maps the chunk of {@link IBindingSet}s across the index partition(s) for
+     * the sink join dimension.
      * 
      * @param a
      *            A chunk of {@link IBindingSet}s.
      * 
      * FIXME optimize locator lookup.
      * <p>
-     * Note: We always use a read-consistent view for the join evaluation so
-     * we are permitted to cache the locators just as much as we like.
+     * Note: We always use a read-consistent view for the join evaluation so we
+     * are permitted to cache the locators just as much as we like.
      * <p>
-     * When the buffer overflow()s, we generate the asBound() predicates,
-     * SORT them by their [fromKey] (or its predicate level equivalence),
-     * and process the sorted asBound() predicates. Since they are sorted
-     * and since they are all for the same predicate pattern (optionals will
-     * leave some variables unbound - does that cause a problem?) we know
-     * that the first partitionId is GE to the last partitionId of the last
-     * asBound predicate. We can test the rightSeparatorKey on the
-     * PartitionLocator and immediately determine whether the asBound
-     * predicate in fact starts and (and possibly ends) within the same
-     * index partition. We only need to do a locatorScan when the asBound
-     * predicate actually crosses into the next index partition, which could
-     * also be handled by an MDI#find(key).
+     * When the buffer overflow()s, we generate the asBound() predicates, SORT
+     * them by their [fromKey] (or its predicate level equivalence), and process
+     * the sorted asBound() predicates. Since they are sorted and since they are
+     * all for the same predicate pattern (optionals will leave some variables
+     * unbound - does that cause a problem?) we know that the first partitionId
+     * is GTE to the last partitionId of the last asBound predicate. We can test
+     * the rightSeparatorKey on the PartitionLocator and immediately determine
+     * whether the asBound predicate in fact starts and (and possibly ends)
+     * within the same index partition. We only need to do a locatorScan when
+     * the asBound predicate actually crosses into the next index partition,
+     * which could also be handled by an MDI#find(key).
      */
     protected void handleChunk(final E[] chunk) {
 

@@ -105,7 +105,6 @@ import com.bigdata.relation.rule.eval.Solution;
 import com.bigdata.relation.rule.eval.SolutionFilter;
 import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.AbstractScaleOutFederation;
-import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.DataService;
 import com.bigdata.service.EmbeddedFederation;
 import com.bigdata.service.IBigdataFederation;
@@ -829,14 +828,14 @@ public class RDFJoinNexus implements IJoinNexus {
          * create keys from a predicate.
          * 
          * Note: This MUST NOT layer on expander or backchain access path
-         * overlays. Those add overhead during construction and make the
-         * layering also hides the [fromKey] and [toKey].
+         * overlays. Those add overhead during construction and the layering
+         * also hides the [fromKey] and [toKey].
          */
         final AbstractAccessPath accessPath = (AbstractAccessPath) relation
                 .getAccessPath(predicate);
 
         // Note: assumes scale-out (EDS or JDS).
-        final ClientIndexView ndx = (ClientIndexView) accessPath.getIndex();
+        final IClientIndex ndx = (IClientIndex) accessPath.getIndex();
 
         return fed
                 .locatorScan(ndx.getIndexMetadata().getName(), timestamp,

@@ -28,8 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.keys;
 
-import com.bigdata.btree.BytesUtil;
-
 /**
  * A key-value pair. Comparison places the {@link KV} tuples into an order based
  * on the interpretation of their {@link #key}s as unsigned byte[]s. This may
@@ -38,23 +36,32 @@ import com.bigdata.btree.BytesUtil;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class KV implements Comparable<KV>{
-    
-    final public byte[] key;
-    final public byte[] val;
-    
-    public KV(byte[] key, byte[] val) {
+public class KV extends KVO<Void> { //implements Comparable<KV> {
+
+//    final public byte[] key;
+//
+//    final public byte[] val;
+
+    /**
+     * @param key
+     *            The unsigned byte[] key (required).
+     * @param val
+     *            The serialized representation of the value (optional).
+     */
+    public KV(final byte[] key, final byte[] val) {
+
+        super(key, val, null/* obj */);
         
-        this.key = key;
-        
-        this.val = val;
-        
+//        this.key = key;
+//
+//        this.val = val;
+
     }
 
-    public int compareTo(KV arg0) {
+//    public int compareTo(final KV arg0) {
+//
+//        return BytesUtil.compareBytes(key, arg0.key);
+//
+//    }
 
-        return BytesUtil.compareBytes(key, arg0.key);
-        
-    }
-    
 }

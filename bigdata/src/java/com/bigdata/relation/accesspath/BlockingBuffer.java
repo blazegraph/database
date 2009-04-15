@@ -39,6 +39,10 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
+import cern.colt.GenericSorting;
+import cern.colt.Swapper;
+import cern.colt.function.IntComparator;
+
 import com.bigdata.rdf.store.BigdataSolutionResolverator;
 import com.bigdata.rdf.store.BigdataStatementIteratorImpl;
 import com.bigdata.relation.rule.IQueryOptions;
@@ -147,26 +151,30 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      * The default capacity for the internal {@link Queue} on which elements (or
      * chunks of elements) are buffered.
      */
-    protected static transient final int DEFAULT_CAPACITY = 5000;
+    public static transient final int DEFAULT_PRODUCER_QUEUE_CAPACITY = 5000;
 
     /**
      * The default target chunk size for
      * {@link BlockingBuffer.BlockingIterator#next()}.
      */
-    protected static transient final int DEFAULT_CHUNK_SIZE = 10000;
+    public static transient final int DEFAULT_CONSUMER_CHUNK_SIZE = 10000;
 
     /**
      * The default timeout in milliseconds during which chunks of elements may
      * be combined by {@link BlockingBuffer.BlockingIterator#next()}.
      */
-    protected static transient final long DEFAULT_CHUNK_TIMEOUT = 20;
+    public static transient final long DEFAULT_CONSUMER_CHUNK_TIMEOUT = 20;
 
-    protected static transient final TimeUnit DEFAULT_CHUNK_TIMEOUT_UNIT = TimeUnit.MILLISECONDS;
+    /**
+     * The unit in which {@link #DEFAULT_CONSUMER_CHUNK_TIMEOUT} is expressed
+     * (milliseconds).
+     */
+    public static transient final TimeUnit DEFAULT_CONSUMER_CHUNK_TIMEOUT_UNIT = TimeUnit.MILLISECONDS;
 
     /**
      * The target chunk size for the chunk combiner.
      * 
-     * @see #DEFAULT_CHUNK_SIZE
+     * @see #DEFAULT_CONSUMER_CHUNK_SIZE
      */
     private final int chunkCapacity;
 
@@ -175,10 +183,19 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      * so that we can combine it with the current chunk for {@link #next()}. A
      * value of ZERO(0) disables chunk combiner.
      * 
-     * @see #DEFAULT_CHUNK_TIMEOUT
+     * @see #DEFAULT_CONSUMER_CHUNK_TIMEOUT
      */
     private final long chunkTimeout;
 
+    /**
+     * <code>true</code> iff the data in the buffered are chunks of elements
+     * presented in their natural sort order. When <code>true</code>, the
+     * {@link BlockingIterator} will apply a merge sort if it combines chunks so
+     * that the combined chunk remains in the natural order for the element
+     * type.
+     */
+    private final boolean ordered;
+    
     private volatile Future future;
     
     public void setFuture(final Future future) {
@@ -202,6 +219,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      * 
      * @return The {@link Future} -or- <code>null</code> if no {@link Future}
      *         has been set.
+     * 
+     * @todo There should be a generic type for this.
      */
     public Future getFuture() {
         
@@ -219,7 +238,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      */
     public BlockingBuffer() {
         
-        this(DEFAULT_CAPACITY);
+        this(DEFAULT_PRODUCER_QUEUE_CAPACITY);
         
     }
     
@@ -237,9 +256,9 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     public BlockingBuffer(final int capacity) {
 
        this(capacity,
-            DEFAULT_CHUNK_SIZE,
-            DEFAULT_CHUNK_TIMEOUT,
-            DEFAULT_CHUNK_TIMEOUT_UNIT
+            DEFAULT_CONSUMER_CHUNK_SIZE,
+            DEFAULT_CONSUMER_CHUNK_TIMEOUT,
+            DEFAULT_CONSUMER_CHUNK_TIMEOUT_UNIT
             ); 
 
     }
@@ -271,10 +290,11 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             final long chunkTimeout, final TimeUnit chunkTimeoutUnit) {
 
         this(capacity == 0 ? new SynchronousQueue<E>()
-                : new ArrayBlockingQueue<E>(capacity),
-                chunkSize,
-                chunkTimeout,
-                chunkTimeoutUnit
+                : new ArrayBlockingQueue<E>(capacity), //
+                chunkSize,//
+                chunkTimeout,//
+                chunkTimeoutUnit,//
+                false// ordered
                 ); 
 
     }
@@ -299,9 +319,16 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      *            combiner.
      * @param chunkTimeoutUnit
      *            The units in which the <i>chunkTimeout</i> is expressed.
+     * @param ordered
+     *            When <code>true</code> the data are asserted to be ordered
+     *            and a merge sort will be applied if chunks are combined such
+     *            that the combined chunks will also be ordered (this has no
+     *            effect unless the generic type of the buffer is an array
+     *            type).
      */
-    public BlockingBuffer(final BlockingQueue<E> queue, final int chunkCapacity,
-            final long chunkTimeout, final TimeUnit chunkTimeoutUnit) {
+    public BlockingBuffer(final BlockingQueue<E> queue,
+            final int chunkCapacity, final long chunkTimeout,
+            final TimeUnit chunkTimeoutUnit, final boolean ordered) {
     
         if (queue == null)
             throw new IllegalArgumentException();
@@ -332,6 +359,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         // convert to nanoseconds.
         this.chunkTimeout = TimeUnit.NANOSECONDS.convert(chunkTimeout,
                 chunkTimeoutUnit);
+
+        this.ordered = ordered;
         
         this.iterator = new BlockingIterator();
 
@@ -412,8 +441,10 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     
     /**
      * Closes the {@link BlockingBuffer} such that it will not accept new
-     * elements. The {@link IAsynchronousIterator} will drain any elements
-     * remaining in the {@link BlockingBuffer} (this does NOT close the
+     * elements (this is a NOP if unless the buffer is open). Once the buffer is
+     * closed, the {@link BlockingIterator} will drain any elements remaining in
+     * the {@link BlockingBuffer} and then report <code>false</code> for
+     * {@link BlockingIterator#hasNext()) (this does NOT close the
      * {@link BlockingIterator}).
      */
     synchronized public void close() {
@@ -515,9 +546,9 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      * @throws RuntimeException
      *             if the caller's {@link Thread} is interrupted. The
      *             {@link RuntimeException} will wrap the
-     *             {@link InterruptedException} as its cause.  
+     *             {@link InterruptedException} as its cause.
      */
-    public void add(E e) {
+    public void add(final E e) {
 
         assertOpen();
 
@@ -1285,8 +1316,49 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                 /*
                  * Combine chunk(s).
                  */
+
+                final E chunk = combineChunks(e, 1/* nchunks */, System
+                        .nanoTime(), chunkTimeout);
+
+                if (ordered) {
+
+                    /*
+                     * The data in the source chunk(s) are ordered so we apply a
+                     * merge sort IFF two or more chunks were combined together
+                     * such that the resulting chunk will remain ordered.
+                     * 
+                     * @todo Verify that this provides us with an efficient
+                     * sort. We are merging N arrays of sorted elements.
+                     * However, this merge sort does not directly take advantage
+                     * of the source chunk boundaries. It would be easy enough
+                     * to consider the current element for each source chunk in
+                     * turn and take the smallest, writing it onto an output
+                     * array. Since we know that we need to combine the chunks
+                     * anyway, this might be faster. However, the
+                     * combineChunks() method would have to be written
+                     * differently so that it returned an array of chunks to
+                     * which we could then apply the merge sort IFF the array
+                     * had more than one element and the data were known to be
+                     * ordered.
+                     */
+                    
+                    final int len0 = ((Object[]) e).length;
+
+                    final int len1 = ((Object[]) chunk).length;
+
+                    if (len1 != len0) {
+
+                        GenericSorting.mergeSort(
+                                0, // fromIndex
+                                len1, // toIndex
+                                new MyIntComparator((Comparable[]) chunk),
+                                new MySwapper((Object[]) chunk));
+
+                    }
+
+                }
                 
-                return combineChunks(e, 1/* nchunks */, System.nanoTime(), chunkTimeout);
+                return chunk;
                 
             }
 
@@ -1311,10 +1383,10 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
             nextE = null;
             
-            if(e.getClass().getComponentType() != null) {
+            if (e.getClass().getComponentType() != null) {
 
                 nchunks++;
-                nelements+= ((Object[])e).length;
+                nelements += ((Object[]) e).length;
                 
             } else {
                 
@@ -1373,8 +1445,9 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                  * or until the iterator is known to be exhausted.
                  */
 
-                return combineChunks(combineNextChunk(e), nchunks + 1, startTime, timeout);
-                
+                return combineChunks(combineNextChunk(e), nchunks + 1,
+                        startTime, timeout);
+
             }
             
             if (chunk.length < chunkCapacity && !isTimeout && !queue.isEmpty()) {
@@ -1448,5 +1521,59 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         }
 
     }
-    
+
+    /**
+     * Implementation for data in an array whose element type implements
+     * {@link Comparable}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    final static private class MyIntComparator implements IntComparator {
+
+        private final Comparable[] a;
+
+        public MyIntComparator(final Comparable[] a) {
+
+            this.a = a;
+
+        }
+
+        @SuppressWarnings("unchecked")
+        public int compare(int o1, int o2) {
+
+            return a[o1].compareTo(a[o2]);
+
+        }
+
+    }
+
+    /**
+     * Implementation swaps object references in an array.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    final static private class MySwapper implements Swapper {
+
+        private final Object[] a;
+
+        public MySwapper(final Object[] a) {
+
+            this.a = a;
+
+        }
+
+        public void swap(final int i, final int j) {
+
+            final Object t = a[i];
+
+            a[i] = a[j];
+
+            a[j] = t;
+
+        }
+
+    }
+
 }

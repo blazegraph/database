@@ -74,7 +74,7 @@ public abstract class BigdataValueImpl implements BigdataValue {
      *             if a different {@link BigdataValueFactoryImpl} has already been
      *             set.
      */
-    public final void setValueFactory(BigdataValueFactory valueFactory) {
+    public final void setValueFactory(final BigdataValueFactory valueFactory) {
 
         if (valueFactory == null)
             throw new IllegalArgumentException();

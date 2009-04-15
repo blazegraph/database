@@ -74,7 +74,7 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure implements
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class BatchInsertConstructor extends AbstractIndexProcedureConstructor<BatchInsert> {
+    public static class BatchInsertConstructor extends AbstractKeyArrayIndexProcedureConstructor<BatchInsert> {
 
         /**
          * Singleton requests the return of the old values that were overwritten
@@ -90,18 +90,28 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure implements
 
         private boolean returnOldValues;
         
-        private BatchInsertConstructor(boolean returnOldValues) {
-            
+        private BatchInsertConstructor(final boolean returnOldValues) {
+
             this.returnOldValues = returnOldValues;
-            
+
         }
-        
+
+        /**
+         * Values are required.
+         */
+        public final boolean sendValues() {
+
+            return true;
+
+        }
+
         public BatchInsert newInstance(IDataSerializer keySer,
                 IDataSerializer valSer, int fromIndex, int toIndex,
                 byte[][] keys, byte[][] vals) {
 
-            return new BatchInsert(keySer,valSer,fromIndex, toIndex, keys, vals, returnOldValues);
-            
+            return new BatchInsert(keySer, valSer, fromIndex, toIndex, keys,
+                    vals, returnOldValues);
+
         }
         
     }

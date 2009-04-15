@@ -715,17 +715,18 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      * @see LexiconKeyBuilder
      */
     @SuppressWarnings("unchecked")
-    final public KVO<BigdataValue>[] generateSortKeys(LexiconKeyBuilder keyBuilder,
-            BigdataValue[] terms, int numTerms) {
+    final public KVO<BigdataValue>[] generateSortKeys(
+            final LexiconKeyBuilder keyBuilder, final BigdataValue[] terms,
+            final int numTerms) {
 
-        final KVO<BigdataValue>[] a = (KVO<BigdataValue>[])new KVO[numTerms];
+        final KVO<BigdataValue>[] a = (KVO<BigdataValue>[]) new KVO[numTerms];
         
         for (int i = 0; i < numTerms; i++) {
 
             final BigdataValue term = terms[i];
 
             a[i] = new KVO<BigdataValue>(keyBuilder.value2Key(term),
-                    null/*val*/, term);
+                    null/* val */, term);
 
         }
         
@@ -752,7 +753,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
          * Note: comparison avoids possible overflow of <code>long</code> by
          * not computing the difference directly.
          */
-        public int compare(KVO<BigdataValue> term1, KVO<BigdataValue> term2) {
+        public int compare(final KVO<BigdataValue> term1,
+                final KVO<BigdataValue> term2) {
 
             final long id1 = term1.obj.getTermId();
             final long id2 = term2.obj.getTermId();
@@ -887,6 +889,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                  * a[] into a dense copy of the references in b[], but without
                  * duplicates and without terms that already have assigned term
                  * identifiers. Note that keys[] and a[] are correlated.
+                 * 
+                 * @todo Could be restated as an IDuplicateRemover, but note
+                 * that this case is specialized since it can drop terms whose
+                 * term identifier is known (they do not need to be written on
+                 * T2ID, but they still need to be written on the reverse index
+                 * to ensure a robust and consistent mapping).
                  */
                 final byte[][] keys = new byte[numTerms][];
                 a = new KVO[numTerms];
@@ -949,8 +957,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                              * Copy the assigned / discovered term identifiers
                              * onto the corresponding elements of the terms[].
                              */
-                            public void aggregate(Term2IdWriteProc.Result result,
-                                    Split split) {
+                            public void aggregate(
+                                    final Term2IdWriteProc.Result result,
+                                    final Split split) {
 
                                 for (int i = split.fromIndex, j = 0; i < split.toIndex; i++, j++) {
 

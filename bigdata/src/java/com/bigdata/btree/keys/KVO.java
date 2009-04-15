@@ -34,39 +34,81 @@ import com.bigdata.btree.BytesUtil;
  * A key-value-object tuple. Comparison places the {@link KVO} tuples into an
  * order based on the interpretation of their {@link #key}s as unsigned
  * byte[]s. This may be used to perform a correlated sort of keys and values.
- * Unlike {@link KV}, this class also pairs an unserialized {@link Object} with
- * the unsigned byte[] key and the serialized byte[] value.
+ * This class may also be used to pair an optional unserialized representation
+ * of the value {@link Object} with the unsigned byte[] key and the serialized
+ * byte[] value.
  * 
+ * @param <O>
+ *            The generic type of the unserialized value object.
+ *            
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class KVO<O> implements Comparable<KVO<O>>{
-    
-    public byte[] key;
-    public byte[] val;
-    public O obj;
-    
-    public KVO(final byte[] key, final byte[] val, O obj) {
-        
-        this.key = key;
-        
-        this.val = val;
-        
-        this.obj = obj;
-        
+
+    /**
+     * The unsigned byte[] key (required).
+     */
+    public final byte[] key;
+
+    /**
+     * The serialized byte[] value (optional).
+     */
+    public final byte[] val;
+
+    /**
+     * The unserialized object value (optional, even when {@link #val} is
+     * given).
+     */
+    public final O obj;
+
+    /**
+     * 
+     * @param key
+     *            The unsigned byte[] key (required).
+     * @param val
+     *            The serialized byte[] value (optional).
+     */
+    public KVO(final byte[] key, final byte[] val) {
+
+        this(key, val, null/* obj */);
+
     }
 
-    public int compareTo(KVO<O> arg0) {
+    /**
+     * 
+     * @param key
+     *            The unsigned byte[] key (required).
+     * @param val
+     *            The serialized byte[] value (optional).
+     * @param obj
+     *            The unserialized object value (optional, even when <i>val</i>
+     *            is given).
+     */
+    public KVO(final byte[] key, final byte[] val, final O obj) {
+
+        if (key == null)
+            throw new IllegalArgumentException();
+
+        this.key = key;
+
+        this.val = val;
+
+        this.obj = obj;
+
+    }
+
+    public int compareTo(final KVO<O> arg0) {
 
         return BytesUtil.compareBytes(key, arg0.key);
-        
+
     }
 
     public String toString() {
-        
+
         return "KVO{key=" + BytesUtil.toString(key) + ", val=" + val + ", obj="
                 + obj + "}";
-        
+
     }
-    
+
 }

@@ -172,7 +172,7 @@ public class DistributedJoinMasterTask extends JoinMasterTask implements
                  * since there will exclusive locks and is a bad idea.
                  */
 
-                JoinMasterTask.log.warn("Unisolated scale-out query");
+                log.warn("Unisolated scale-out query");
 
             }
 
@@ -408,8 +408,8 @@ public class DistributedJoinMasterTask extends JoinMasterTask implements
 
         final int size = factoryTaskFutures.size();
 
-        if (JoinMasterTask.DEBUG)
-            JoinMasterTask.log.debug("#futures=" + size);
+        if (DEBUG)
+            log.debug("#futures=" + size);
 
         int ndone = 0;
 
@@ -446,8 +446,8 @@ public class DistributedJoinMasterTask extends JoinMasterTask implements
             // future for the JoinTaskFactoryTask.
             final Future factoryTaskFuture = itr.next();
 
-            if (JoinMasterTask.DEBUG)
-                JoinMasterTask.log.debug("Waiting for factoryTask");
+            if (DEBUG)
+                log.debug("Waiting for factoryTask");
 
             // wait for the JoinTaskFactoryTask to finish.
             final Future<Void> joinTaskFuture;
@@ -482,7 +482,7 @@ public class DistributedJoinMasterTask extends JoinMasterTask implements
                  * @todo log iff unexpected exception class or get all
                  * traces from ExecutionExceptions class.
                  */
-                JoinMasterTask.log.error(ex, ex);
+                log.error(ex, ex);
 
                 continue;
 
@@ -502,8 +502,8 @@ public class DistributedJoinMasterTask extends JoinMasterTask implements
 
             ndone++;
 
-            if (JoinMasterTask.DEBUG)
-                JoinMasterTask.log.debug("ndone=" + ndone + " of " + size);
+            if (DEBUG)
+                log.debug("ndone=" + ndone + " of " + size);
 
         }
 
@@ -520,9 +520,8 @@ public class DistributedJoinMasterTask extends JoinMasterTask implements
 
         }
 
-        if (JoinMasterTask.DEBUG)
-            JoinMasterTask.log
-                    .debug("All factory tasks done: #futures=" + size);
+        if (DEBUG)
+            log.debug("All factory tasks done: #futures=" + size);
 
         return joinTaskFutures;
 

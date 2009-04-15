@@ -123,7 +123,7 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
      * @param namespace
      *            The namespace of the {@link LexiconRelation}.
      */
-    public static BigdataValueFactoryImpl getInstance(String namespace) {
+    public static BigdataValueFactoryImpl getInstance(final String namespace) {
         
         if (namespace == null)
             throw new IllegalArgumentException();

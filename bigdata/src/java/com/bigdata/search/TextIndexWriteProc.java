@@ -6,7 +6,7 @@ import java.io.ObjectOutput;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.compression.IDataSerializer;
-import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
 import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
@@ -27,7 +27,7 @@ public class TextIndexWriteProc extends AbstractKeyArrayIndexProcedure
     private static final long serialVersionUID = 9013449121306914750L;
 
     public static class IndexWriteProcConstructor extends
-            AbstractIndexProcedureConstructor<TextIndexWriteProc> {
+            AbstractKeyArrayIndexProcedureConstructor<TextIndexWriteProc> {
 
         /**
          * Variant which always overwrites any existing entry. Note that you
@@ -48,6 +48,15 @@ public class TextIndexWriteProc extends AbstractKeyArrayIndexProcedure
         
         private final boolean overwrite;
 
+        /**
+         * Values are required.
+         */
+        public final boolean sendValues() {
+        
+            return true;
+            
+        }
+        
         /**
          * 
          * @param overwrite

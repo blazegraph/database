@@ -34,6 +34,7 @@ import com.bigdata.service.IServiceShutdown;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.TaskCounters;
 import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
+import com.bigdata.util.concurrent.WriteTaskCounters;
 
 /**
  * Supports concurrent operations against named indices. Historical read and
@@ -882,7 +883,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
     }
     
     /** Counters for {@link #writeService}. */
-    protected final TaskCounters countersUN  = new TaskCounters();
+    protected final WriteTaskCounters countersUN  = new WriteTaskCounters();
     
     /** Counters for the {@link #txWriteService}. */
     protected final TaskCounters countersTX = new TaskCounters();

@@ -34,7 +34,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.compression.IDataSerializer;
-import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
 import com.bigdata.io.ByteArrayBuffer;
@@ -90,34 +90,12 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
 
     private transient final long NULL = IRawTripleStore.NULL;
     
-    /*
-     * This was directly supplying the key and value compression routines
-     * rather than using the defaults from the IndexMetadata.  This was an
-     * oversight back when I refactored the index procedures to be able to
-     * use the configured IndexMetadata.  In fact, the FastKeyCompression
-     * can no longer be used since it assumes that the term identifiers
-     * are non-negative, which is no longer true.
-     */
-//    @Override
-//    protected IDataSerializer getKeySerializer() {
-//
-//        return new FastRDFKeyCompression(IRawTripleStore.N);
-//
-//    }
-//
-//    @Override
-//    protected IDataSerializer getValSerializer() {
-//
-//        return new FastRDFValueCompression();
-//
-//    }
-
     public final boolean isReadOnly() {
-        
+
         return false;
-        
+
     }
-    
+
     /**
      * De-serialization constructor.
      */
@@ -132,24 +110,34 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
      * @param keys
      * @param vals
      */
-    protected SPOIndexWriteProc(IDataSerializer keySer,
-            IDataSerializer valSer,int fromIndex, int toIndex, byte[][] keys, byte[][] vals) {
+    protected SPOIndexWriteProc(IDataSerializer keySer, IDataSerializer valSer,
+            int fromIndex, int toIndex, byte[][] keys, byte[][] vals) {
 
-        super(keySer,valSer,fromIndex, toIndex, keys, vals);
+        super(keySer, valSer, fromIndex, toIndex, keys, vals);
 
         assert vals != null;
 
     }
 
     public static class IndexWriteProcConstructor extends
-            AbstractIndexProcedureConstructor<SPOIndexWriteProc> {
+            AbstractKeyArrayIndexProcedureConstructor<SPOIndexWriteProc> {
 
         public static IndexWriteProcConstructor INSTANCE = new IndexWriteProcConstructor();
+
+        private IndexWriteProcConstructor() {
+        }
+
+        /**
+         * Values are required.
+         */
+        public final boolean sendValues() {
         
-        private IndexWriteProcConstructor() {}
+            return true;
+            
+        }
         
         public SPOIndexWriteProc newInstance(IDataSerializer keySer,
-                IDataSerializer valSer,int fromIndex, int toIndex,
+                IDataSerializer valSer, int fromIndex, int toIndex,
                 byte[][] keys, byte[][] vals) {
 
             return new SPOIndexWriteProc(keySer,valSer,fromIndex, toIndex, keys, vals);
@@ -163,7 +151,7 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
      * @return The #of statements actually written on the index as an
      *         {@link Long}.
      */
-    public Object apply(IIndex ndx) {
+    public Object apply(final IIndex ndx) {
 
         // #of statements actually written on the index partition.
         long writeCount = 0;
@@ -171,10 +159,11 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
         final int n = getKeyCount();
 
         // used to generate the values that we write on the index.
-        final ByteArrayBuffer tmp = new ByteArrayBuffer(1+8/*max size*/);
-        
+        final ByteArrayBuffer tmp = new ByteArrayBuffer(1 + 8/* max size */);
+
         // true iff logging is enabled and this is the SPO index.
-        final boolean isSPO = INFO?ndx.getIndexMetadata().getName().endsWith(SPOKeyOrder.SPO.getIndexName()):false;
+        final boolean isSPO = INFO ? ndx.getIndexMetadata().getName().endsWith(
+                SPOKeyOrder.SPO.getIndexName()) : false;
         
         for (int i = 0; i < n; i++) {
 
@@ -224,12 +213,12 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
                  * Statement is NOT pre-existing.
                  */
 
-                ndx.insert(key, SPO
-                        .serializeValue(tmp, false/* override */,
-                        newType, new_sid/*MAY be NULL*/));
+                ndx.insert(key, SPO.serializeValue(tmp, false/* override */,
+                        newType, new_sid/* MAY be NULL */));
 
-                if(isSPO&&DEBUG) {
-                    log.debug("new SPO: key="+BytesUtil.toString(key)+", sid="+new_sid);
+                if (isSPO && DEBUG) {
+                    log.debug("new SPO: key=" + BytesUtil.toString(key)
+                            + ", sid=" + new_sid);
                 }
                 
                 writeCount++;
@@ -254,14 +243,17 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
 
                         assert newType != StatementEnum.Explicit;
                         
-                        // Note: No statement identifier since statement is not explicit.
-                        ndx.insert(key, SPO
-                                .serializeValue(tmp, false/*override*/, newType, NULL/*sid*/));
+                        // Note: No statement identifier since statement is not
+                        // explicit.
+                        ndx.insert(key, SPO.serializeValue(tmp,
+                                false/* override */, newType, NULL/* sid */));
 
-                        if(isSPO&&DEBUG) {
-                            log.debug("Downgrading SPO: key="+BytesUtil.toString(key)+", oldType="+oldType+", newType="+newType);
+                        if (isSPO && DEBUG) {
+                            log.debug("Downgrading SPO: key="
+                                    + BytesUtil.toString(key) + ", oldType="
+                                    + oldType + ", newType=" + newType);
                         }
-                        
+
                         writeCount++;
 
                     }
@@ -292,16 +284,19 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
                             
                             // Otherwise use the new sid.
                             sid = new_sid;
-                            
+
                         }
 
-                        ndx.insert(key, SPO
-                                .serializeValue(tmp, false/*override*/, maxType, sid));
+                        ndx.insert(key, SPO.serializeValue(tmp,
+                                false/* override */, maxType, sid));
 
-                        if(isSPO&&DEBUG) {
-                            log.debug("Changing statement type: key="+BytesUtil.toString(key)+", oldType="+oldType+", newType="+newType+", maxType="+maxType+", sid="+sid);
+                        if (isSPO && DEBUG) {
+                            log.debug("Changing statement type: key="
+                                    + BytesUtil.toString(key) + ", oldType="
+                                    + oldType + ", newType=" + newType
+                                    + ", maxType=" + maxType + ", sid=" + sid);
                         }
-                        
+
                         writeCount++;
 
                     }
@@ -312,10 +307,10 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
 
         }
 
-        if (isSPO&&INFO)
+        if (isSPO && INFO)
             log.info("Wrote " + writeCount + " SPOs on ndx="
                     + ndx.getIndexMetadata().getName());
-        
+
         return Long.valueOf(writeCount);
 
     }
@@ -335,7 +330,8 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
      * @throws RuntimeException
      *             if validation fails.
      */
-    protected long decodeStatementIdentifier(StatementEnum type, byte[] val) {
+    protected long decodeStatementIdentifier(final StatementEnum type,
+            final byte[] val) {
         
         final long sid;
 

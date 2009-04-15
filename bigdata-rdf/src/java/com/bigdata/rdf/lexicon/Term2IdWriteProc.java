@@ -41,7 +41,7 @@ import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
 import com.bigdata.io.DataInputBuffer;
@@ -225,13 +225,22 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
     }
 
     public static class Term2IdWriteProcConstructor extends
-            AbstractIndexProcedureConstructor<Term2IdWriteProc> {
+            AbstractKeyArrayIndexProcedureConstructor<Term2IdWriteProc> {
 
         private final boolean readOnly;
         private final boolean storeBlankNodes;
 //        private final boolean scaleOutTermIds;
         private final int scaleOutTermIdBitsToReverse;
-        
+
+        /**
+         * Values ARE NOT sent.
+         */
+        public final boolean sendValues() {
+            
+            return false;
+            
+        }
+
         public Term2IdWriteProcConstructor(boolean readOnly,
                 boolean storeBlankNodes, //boolean  scaleOutTermIds,
                 int scaleOutTermIdBitsToReverse) {

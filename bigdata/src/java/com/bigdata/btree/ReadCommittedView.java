@@ -29,7 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import com.bigdata.btree.filter.IFilterConstructor;
-import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
 import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.proc.ISimpleIndexProcedure;
@@ -320,7 +320,7 @@ public class ReadCommittedView implements ILocalBTreeView {
     }
 
     public void submit(int fromIndex, int toIndex, byte[][] keys,
-            byte[][] vals, AbstractIndexProcedureConstructor ctor,
+            byte[][] vals, AbstractKeyArrayIndexProcedureConstructor ctor,
             IResultHandler resultHandler) {
 
         getIndex().submit(fromIndex, toIndex, keys, vals, ctor, resultHandler);

@@ -46,7 +46,8 @@ import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
 import com.bigdata.btree.filter.IFilterConstructor;
-import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.keys.KVO;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
@@ -800,7 +801,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
                  * key.
                  */
 
-                assert validSplit( locator, currentIndex, toIndex, keys );
+                assert isValidSplit( locator, currentIndex, toIndex, keys );
                 
                 splits.add(new Split(locator, currentIndex, toIndex));
 
@@ -899,6 +900,25 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
 
     }
 
+    public LinkedList<Split> splitKeys(final long ts, final int fromIndex,
+            final int toIndex, final KVO[] a) {
+
+        /*
+         * Change the shape of the data so that we can split it.
+         */
+
+        final byte[][] keys = new byte[a.length][];
+
+        for (int i = 0; i < a.length; i++) {
+
+            keys[i] = a[i].key;
+
+        }
+
+        return splitKeys(ts, fromIndex, toIndex, keys);
+
+    }
+
     /**
      * Paranoia testing for generated splits.
      * 
@@ -908,7 +928,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
      * @param keys
      * @return
      */
-    private boolean validSplit(final PartitionLocator locator,
+    private boolean isValidSplit(final PartitionLocator locator,
             final int fromIndex, final int toIndex, final byte[][] keys) {
 
         assert fromIndex <= toIndex : "fromIndex=" + fromIndex + ", toIndex="
@@ -1123,7 +1143,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
      */
     public void submit(final int fromIndex, final int toIndex,
             final byte[][] keys, final byte[][] vals,
-            final AbstractIndexProcedureConstructor ctor,
+            final AbstractKeyArrayIndexProcedureConstructor ctor,
             final IResultHandler aggregator) {
 
         if (ctor == null) {
@@ -1250,7 +1270,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
      */
     abstract protected void submit(final long ts, final int fromIndex, final int toIndex,
             final byte[][] keys, final byte[][] vals,
-            final AbstractIndexProcedureConstructor ctor,
+            final AbstractKeyArrayIndexProcedureConstructor ctor,
             final IResultHandler aggregator);
     
 }

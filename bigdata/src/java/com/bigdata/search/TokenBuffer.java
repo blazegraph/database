@@ -326,10 +326,10 @@ public class TokenBuffer {
                             + termMetadata.occurrences.size());
                 }
                 
-                final byte[] val = textIndexer.getTokenValue(buf, termMetadata );
-                
+                final byte[] val = textIndexer.getTokenValue(buf, termMetadata);
+
                 // save in the correlated array.
-                a[n++] = new KV(key,val);
+                a[n++] = new KV(key, val);
 
             }
 

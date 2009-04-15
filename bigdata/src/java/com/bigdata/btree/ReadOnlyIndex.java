@@ -30,7 +30,7 @@ package com.bigdata.btree;
 import java.util.Iterator;
 
 import com.bigdata.btree.filter.IFilterConstructor;
-import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.journal.IResourceManager;
@@ -160,7 +160,7 @@ public class ReadOnlyIndex extends DelegateIndex {
      */
     @SuppressWarnings("unchecked")
     final public void submit(int fromIndex, int toIndex, byte[][] keys, byte[][] vals,
-            AbstractIndexProcedureConstructor ctor, IResultHandler aggregator) {
+            AbstractKeyArrayIndexProcedureConstructor ctor, IResultHandler aggregator) {
 
         Object result = ctor.newInstance(this,fromIndex, toIndex, keys, vals)
                 .apply(this);

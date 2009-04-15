@@ -14,8 +14,15 @@ import com.bigdata.service.IDataService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public abstract class AbstractIndexProcedureConstructor<T extends IKeyArrayIndexProcedure> {
+public abstract class AbstractKeyArrayIndexProcedureConstructor<T extends IKeyArrayIndexProcedure> {
 
+    /**
+     * Return <code>true</code> if the procedure requires values paired with
+     * the keys (otherwise the caller should specify <code>null</code> for the
+     * values byte[]).
+     */
+    abstract public boolean sendValues();
+    
     /**
      * Uses the {@link ITupleSerializer} reported by {@link IndexMetadata} for
      * the {@link IIndex}.
@@ -30,15 +37,16 @@ public abstract class AbstractIndexProcedureConstructor<T extends IKeyArrayIndex
      * @param keys
      *            The keys.
      * @param vals
-     *            The values.
+     *            The values (may be optional depending on the semantics of the
+     *            operation).
      * 
      * @return An instance of the procedure.
      * 
      * @todo we will need a different method signature to support
      *       hash-partitioned (vs range partitioned) indices.
      */
-    public T newInstance(IIndex ndx, int fromIndex, int toIndex, byte[][] keys,
-            byte[][] vals) {
+    public T newInstance(final IIndex ndx, final int fromIndex,
+            final int toIndex, final byte[][] keys, final byte[][] vals) {
 
         return newInstance(ndx.getIndexMetadata(), fromIndex, toIndex, keys, vals);
         
@@ -54,14 +62,15 @@ public abstract class AbstractIndexProcedureConstructor<T extends IKeyArrayIndex
      * @param vals
      * @return
      */
-    public T newInstance(IndexMetadata indexMetadata, int fromIndex, int toIndex,
-            byte[][] keys, byte[][] vals) {
-        
+    public T newInstance(final IndexMetadata indexMetadata,
+            final int fromIndex, final int toIndex, final byte[][] keys,
+            final byte[][] vals) {
+
         final ITupleSerializer tupleSer = indexMetadata.getTupleSerializer();
-        
+
         return newInstance(tupleSer.getLeafKeySerializer(), tupleSer
                 .getLeafValueSerializer(), fromIndex, toIndex, keys, vals);
-        
+
     }
 
     /**
@@ -72,9 +81,12 @@ public abstract class AbstractIndexProcedureConstructor<T extends IKeyArrayIndex
      * @param keys
      * @param vals
      * @return
+     * 
+     * @todo Why does this variant exist? Is it just to make life easier when
+     *       the {@link IndexMetadata} is not on hand locally?
      */
-    public T newInstance(int fromIndex, int toIndex, byte[][] keys,
-            byte[][] vals) {
+    public T newInstance(final int fromIndex, final int toIndex,
+            final byte[][] keys, final byte[][] vals) {
 
         return newInstance(
                 DefaultTupleSerializer.getDefaultLeafKeySerializer(),

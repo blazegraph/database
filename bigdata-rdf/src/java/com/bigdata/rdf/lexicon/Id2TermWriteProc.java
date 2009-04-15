@@ -32,7 +32,7 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
 import com.bigdata.rdf.model.BigdataValueSerializer;
@@ -93,9 +93,18 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
     }
     
     public static class Id2TermWriteProcConstructor extends
-            AbstractIndexProcedureConstructor<Id2TermWriteProc> {
+            AbstractKeyArrayIndexProcedureConstructor<Id2TermWriteProc> {
 
         public static Id2TermWriteProcConstructor INSTANCE = new Id2TermWriteProcConstructor();
+
+        /**
+         * Values are required.
+         */
+        public final boolean sendValues() {
+            
+            return true;
+            
+        }
 
         private Id2TermWriteProcConstructor() {}
         
