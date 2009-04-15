@@ -66,6 +66,7 @@ import com.bigdata.journal.AbstractTask;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.MovingAverageTask;
 import com.bigdata.util.concurrent.QueueStatisticsTask;
+import com.bigdata.util.concurrent.WriteTaskCounters;
 
 /**
  * This class coordinates a schedule among concurrent operations requiring
@@ -1930,11 +1931,13 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
              * accepted by submit() on the outer class and counts all time until
              * the task begins to execute with its locks held.
              */
-            if (callersTask instanceof AbstractTask) {
-                
+            if (callersTask instanceof AbstractTask
+                    && ((AbstractTask) callersTask).getTaskCounters() instanceof WriteTaskCounters) {
+
                 final long lockWaitingTime = System.nanoTime() - acceptTime;
 
-                ((AbstractTask) callersTask).getTaskCounters().lockWaitingNanoTime
+                ((WriteTaskCounters) ((AbstractTask) callersTask)
+                        .getTaskCounters()).lockWaitingNanoTime
                         .addAndGet(lockWaitingTime);
 
             }

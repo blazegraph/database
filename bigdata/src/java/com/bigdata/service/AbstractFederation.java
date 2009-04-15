@@ -32,7 +32,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
@@ -61,12 +63,13 @@ import com.bigdata.journal.TemporaryStoreFactory;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.service.IBigdataClient.Options;
+import com.bigdata.service.ndx.IndexTaskCounters;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
-import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
 import com.bigdata.util.concurrent.ShutdownHelper;
 import com.bigdata.util.concurrent.TaskCounters;
+import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
 import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
@@ -310,22 +313,70 @@ abstract public class AbstractFederation implements IBigdataFederation {
     /**
      * Counters that aggregate across all tasks submitted by the client against
      * the connected federation. Those counters are sampled by a
-     * {@link ThreadPoolExecutorStatisticsTask} and reported by the client to the
-     * {@link ILoadBalancerService}.
+     * {@link ThreadPoolExecutorStatisticsTask} and reported by the client to
+     * the {@link ILoadBalancerService}.
      */
     private final TaskCounters taskCounters = new TaskCounters();
 
     /**
-     * Returns the {@link TaskCounters}s that aggregate across all operations
-     * performed by the client against the connected federation. The
-     * {@link TaskCounters} will be sampled by a {@link ThreadPoolExecutorStatisticsTask} and
-     * the sampled data reported by the client to the
-     * {@link ILoadBalancerService}.
+     * Counters for each scale-out index accessed by the client.
+     */
+    private final Map<String, IndexTaskCounters> indexTaskCounters = new HashMap<String, IndexTaskCounters>();
+    
+    /**
+     * Return the {@link TaskCounters} which aggregate across all operations
+     * performed by the client against the connected federation. These
+     * {@link TaskCounters} are sampled by a
+     * {@link ThreadPoolExecutorStatisticsTask} and the sampled data are
+     * reported by the client to the {@link ILoadBalancerService}.
      */
     public TaskCounters getTaskCounters() {
 
         return taskCounters;
 
+    }
+    
+    /**
+     * Return the {@link IndexTaskCounters} for the specified scale-out index
+     * for this client. There is only a single instance per scale-out index and
+     * all operations by this client on that index are aggregated by that
+     * instance. These counters are reported by the client to the
+     * {@link ILoadBalancerService}.
+     * 
+     * @param name
+     *            The scale-out index name.
+     */
+    public IndexTaskCounters getIndexTaskCounters(final String name) {
+
+        if (name == null)
+            throw new IllegalArgumentException();
+
+        synchronized (indexTaskCounters) {
+
+            IndexTaskCounters t = indexTaskCounters.get(name);
+
+            if (t == null) {
+        
+                t = new IndexTaskCounters();
+                
+                indexTaskCounters.put(name, t);
+                
+                /*
+                 * Attach to the counters reported by the client to the LBS.
+                 * 
+                 * Note: The counters should not exist under this path since we
+                 * are just creating them now, but if they do then they are
+                 * replaced.
+                 */
+                getCounterSet().makePath(name)
+                        .attach(t.getCounters(), true/*replace*/);
+                
+            }
+            
+            return t;
+        
+        }
+        
     }
     
     /**
@@ -445,8 +496,8 @@ abstract public class AbstractFederation implements IBigdataFederation {
      *            The fully qualified name of the host on which the service is
      *            running.
      */
-    static public String getServiceCounterPathPrefix(UUID serviceUUID,
-            Class serviceIface, String hostname) {
+    static public String getServiceCounterPathPrefix(final UUID serviceUUID,
+            final Class serviceIface, final String hostname) {
 
         if (serviceUUID == null)
             throw new IllegalArgumentException();
@@ -1028,7 +1079,8 @@ abstract public class AbstractFederation implements IBigdataFederation {
             final ThreadPoolExecutorStatisticsTask threadPoolExecutorStatisticsTask = new ThreadPoolExecutorStatisticsTask(
                     relpath, threadPool, taskCounters);
 
-            threadPoolExecutorStatisticsTask.addCounters(getServiceCounterSet().makePath(relpath));
+            threadPoolExecutorStatisticsTask.addCounters(getServiceCounterSet()
+                    .makePath(relpath));
 
             addScheduledTask(threadPoolExecutorStatisticsTask, initialDelay,
                     delay, unit);

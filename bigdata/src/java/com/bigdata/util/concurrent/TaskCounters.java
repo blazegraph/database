@@ -1,13 +1,13 @@
 package com.bigdata.util.concurrent;
 
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.Instrument;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrencyManager;
-import com.bigdata.journal.ITx;
-import com.bigdata.journal.WriteExecutorService;
-import com.bigdata.resources.StaleLocatorException;
-import com.bigdata.service.IDataService;
+import com.bigdata.util.concurrent.IQueueCounters.ITaskCounters;
 
 /**
  * Class captures various data about the execution of {@link AbstractTask}s.
@@ -22,36 +22,28 @@ import com.bigdata.service.IDataService;
  * NOT guarenteed to be thread-safe for simple fields or even
  * <code>volatile</code> fields).
  * 
- * @todo add counters for commit waiting time, task checkpoint time (as part of
- *       task service time), and commit service time and report out those data
- *       as moving averages.
- * 
- * @todo for the client add counters for retry's as follow ups to a
- *       {@link StaleLocatorException}.
- * 
  * @see ThreadPoolExecutorStatisticsTask
  */
 public class TaskCounters {
 
     public String toString() {
-        return getClass().getSimpleName()+//
-        "{#submit="+taskSubmitCount+//
-        ",#complete="+taskCompleteCount+//
-        ",#fail="+taskFailCount+//
-        ",#success="+taskSuccessCount+//
-        ",#queueWaitingTime="+queueWaitingNanoTime+//
-        ",#lockWaitingTime="+lockWaitingNanoTime+//
-        ",#serviceTime="+serviceNanoTime+//
-        ",#commitWaitingTime="+commitWaitingNanoTime+//
-        ",#commitServiceTime="+commitServiceNanoTime+//
-        ",#queuingTime="+queuingNanoTime+//
-        "}"
-        ;
+        return getClass().getSimpleName() + //
+                "{#submit=" + taskSubmitCount + //
+                ",#complete=" + taskCompleteCount + //
+                ",#fail=" + taskFailCount + //
+                ",#success=" + taskSuccessCount + //
+                ",#queueWaitingTime=" + queueWaitingNanoTime + //
+//                ",#lockWaitingTime=" + lockWaitingNanoTime + //
+                ",#serviceTime=" + serviceNanoTime + //
+//                ",#commitWaitingTime=" + commitWaitingNanoTime + //
+//                ",#commitServiceTime=" + commitServiceNanoTime + //
+                ",#queuingTime=" + queuingNanoTime + //
+                "}";
     }
     
     /** #of tasks that have been submitted. */
     final public AtomicLong taskSubmitCount = new AtomicLong();
-    
+
     /** #of tasks that have been completed. */
     final public AtomicLong taskCompleteCount = new AtomicLong();
 
@@ -66,17 +58,6 @@ public class TaskCounters {
      * service.
      */
     final public AtomicLong queueWaitingNanoTime = new AtomicLong();
-    
-    /**
-     * Cumulative elapsed time in nanoseconds consumed by tasks while waiting
-     * for an resource lock.
-     * <p>
-     * Note: this value will only be non-zero for {@link ITx#UNISOLATED} tasks
-     * since they are the only tasks that wait for locks and then only when
-     * measuring the times on the {@link IDataService} rather than the client's
-     * thread pool.
-     */
-    final public AtomicLong lockWaitingNanoTime = new AtomicLong();
 
     /**
      * Cumulative elapsed time in nanoseconds consumed by tasks while assigned
@@ -85,52 +66,91 @@ public class TaskCounters {
      * Note: Since this is aggregated over concurrent tasks the reported elapsed
      * time MAY exceed the actual elapsed time during which those tasks were
      * executed.
+     * <p>
+     * Note: Service time on the client includes queuing time on the service.
      */
     final public AtomicLong serviceNanoTime = new AtomicLong();
 
     /**
      * Cumulative elapsed time in nanoseconds consumed by tasks from when they
      * are submitted until they are complete.
+     * <p>
+     * Note: Queueing time on the client includes queueing time on the service.
      */
     final public AtomicLong queuingNanoTime = new AtomicLong();
-    
-    /**
-     * Cumulative elapsed time in nanoseconds consumed by tasks awaiting group
-     * commit (iff the task is run on the {@link WriteExecutorService}).
-     */
-    final public AtomicLong commitWaitingNanoTime = new AtomicLong();
-    
-    /**
-     * Cumulative elapsed time in nanoseconds servicing group commit (iff the
-     * task is run on the {@link WriteExecutorService}).
-     */
-    final public AtomicLong commitServiceNanoTime = new AtomicLong();
-    
+
     /** Ctor */
     public TaskCounters() {
 
     }
 
     /**
-     * Adds counters to this set.
+     * Note: The elapsed time counters ({@link #queueWaitingNanoTime},
+     * {@link #serviceNanoTime}, and {@link #queuingNanoTime}) are reported as
+     * cumulative <i>milliseconds</i> by this method. These data are turned
+     * into moving averages by the {@link ThreadPoolExecutorStatisticsTask}.
      */
-    public void add(TaskCounters c) {
-
-        taskSubmitCount.addAndGet( c.taskSubmitCount.get() );
-
-        taskCompleteCount.addAndGet( c.taskCompleteCount.get() );
-
-        taskFailCount.addAndGet( c.taskFailCount.get() );
-
-        taskSuccessCount.addAndGet( c.taskSuccessCount.get() );
-
-        queueWaitingNanoTime.addAndGet( c.queueWaitingNanoTime.get() );
-
-        lockWaitingNanoTime.addAndGet( c.lockWaitingNanoTime.get() );
+    public CounterSet getCounters() {
         
-        serviceNanoTime.addAndGet( c.serviceNanoTime.get() );
+        final CounterSet counterSet = new CounterSet();
 
-        queuingNanoTime.addAndGet( c.queuingNanoTime.get() );
+        // count of all tasks submitted to the service.
+        counterSet.addCounter(ITaskCounters.TaskSubmitCount,
+                new Instrument<Long>() {
+                    public void sample() {
+                        setValue(taskSubmitCount.get());
+                    }
+                });
+
+        // count of all tasks completed by the service (failed + success).
+        counterSet.addCounter(ITaskCounters.TaskCompleteCount,
+                new Instrument<Long>() {
+                    public void sample() {
+                        setValue(taskCompleteCount.get());
+                    }
+                });
+
+        // count of all tasks which failed during execution.
+        counterSet.addCounter(ITaskCounters.TaskFailCount,
+                new Instrument<Long>() {
+                    public void sample() {
+                        setValue(taskFailCount.get());
+                    }
+                });
+
+        // count of all tasks which were successfully executed.
+        counterSet.addCounter(ITaskCounters.TaskSuccessCount,
+                new Instrument<Long>() {
+                    public void sample() {
+                        setValue(taskSuccessCount.get());
+                    }
+                });
+
+        counterSet.addCounter(ITaskCounters.QueueWaitingTime,
+                new Instrument<Long>() {
+                    public void sample() {
+                        setValue(TimeUnit.NANOSECONDS
+                                .toMillis(queueWaitingNanoTime.get()));
+                    }
+                });
+
+        counterSet.addCounter(ITaskCounters.ServiceTime,
+                new Instrument<Long>() {
+                    public void sample() {
+                        setValue(TimeUnit.NANOSECONDS.toMillis(serviceNanoTime
+                                .get()));
+                    }
+                });
+
+        counterSet.addCounter(ITaskCounters.QueuingTime,
+                new Instrument<Long>() {
+                    public void sample() {
+                        setValue(TimeUnit.NANOSECONDS.toMillis(queuingNanoTime
+                                .get()));
+                    }
+                });
+
+        return counterSet;
 
     }
 

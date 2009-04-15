@@ -164,7 +164,7 @@ public class JoinStats implements Serializable {
 
     }
 
-    synchronized void add(JoinStats o) {
+    synchronized void add(final JoinStats o) {
 
         if (this.orderIndex != o.orderIndex)
             throw new IllegalArgumentException();

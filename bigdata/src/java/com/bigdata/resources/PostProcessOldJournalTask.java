@@ -1862,10 +1862,23 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * worth while to split.
                  * 
                  * Note: Avoid hot splits which do not lead to increased
-                 * concurrency. For example, an index which is hot for
-                 * tailSplits is NOT a good candidate for a hot split since only
-                 * one of the resulting index partitions (the rightSibling) will
-                 * have a significant workload.
+                 * concurrency.
+                 * 
+                 * For example, an index which is hot for tailSplits is NOT a
+                 * good candidate for a hot split since only one of the
+                 * resulting index partitions (the rightSibling) will have a
+                 * significant workload.
+                 * 
+                 * FIXME However, there are other conditions under which hot
+                 * splits do not help. For instance, if the indices are all more
+                 * or less equally active but the workload is not high enough to
+                 * increase the CPU utilization. [This condition occurs when we
+                 * use a counter with some fast high bits to randomly distribute
+                 * writes.]
+                 * 
+                 * FIXME Even worse, there is nothing to prevent a split from
+                 * being hot split again. That is, this acceleration term does
+                 * not take history into account.
                  */
                 if (vmd.getPercentOfSplit() > resourceManager.hotSplitThreshold
                         && vmd.percentTailSplits < .25) {

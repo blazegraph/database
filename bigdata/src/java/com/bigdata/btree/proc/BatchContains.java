@@ -54,11 +54,17 @@ public class BatchContains extends AbstractKeyArrayIndexProcedure implements
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class BatchContainsConstructor extends AbstractIndexProcedureConstructor<BatchContains> {
+    public static class BatchContainsConstructor extends AbstractKeyArrayIndexProcedureConstructor<BatchContains> {
 
         public static final BatchContainsConstructor INSTANCE = new BatchContainsConstructor(); 
         
         private BatchContainsConstructor() {
+            
+        }
+        
+        public final boolean sendValues() {
+            
+            return false;
             
         }
  

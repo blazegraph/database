@@ -2156,7 +2156,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
             r.nextBytes(val);
             
-            data[i] = new KV(key,val);
+            data[i] = new KV(key, val);
 
         }
 

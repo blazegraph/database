@@ -30,7 +30,7 @@ package com.bigdata.rdf.spo;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.compression.IDataSerializer;
-import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
 import com.bigdata.rdf.inf.Justification;
@@ -76,10 +76,19 @@ public class JustIndexWriteProc
     }
 
     public static class WriteJustificationsProcConstructor extends
-            AbstractIndexProcedureConstructor<JustIndexWriteProc> {
+            AbstractKeyArrayIndexProcedureConstructor<JustIndexWriteProc> {
 
         public static WriteJustificationsProcConstructor INSTANCE = new WriteJustificationsProcConstructor();
 
+        /**
+         * Values ARE NOT used.
+         */
+        public final boolean sendValues() {
+        
+            return false;
+            
+        }
+        
         private WriteJustificationsProcConstructor() {
         }
 

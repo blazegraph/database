@@ -51,7 +51,7 @@ public class JoinTaskSink {
         
     }
     
-    protected void setFuture(Future f) {
+    protected void setFuture(final Future f) {
         
         if (future != null)
             throw new IllegalStateException();

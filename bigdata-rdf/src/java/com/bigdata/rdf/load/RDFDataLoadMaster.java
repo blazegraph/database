@@ -93,6 +93,7 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.jini.TaskMaster;
 import com.bigdata.zookeeper.ZLock;
 import com.bigdata.zookeeper.ZooHelper;
 import com.bigdata.zookeeper.ZooQueue;
@@ -104,6 +105,8 @@ import com.bigdata.zookeeper.ZooQueue;
  * @version $Id$
  * 
  * @todo pull a lot of stuff into an abstract base class for masters.
+ * 
+ * @see TaskMaster
  */
 public class RDFDataLoadMaster implements Callable<Void> {
 

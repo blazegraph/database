@@ -37,7 +37,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.filter.IFilterConstructor;
-import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
 import com.bigdata.btree.proc.IResultHandler;
@@ -774,7 +774,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
 
     @SuppressWarnings("unchecked")
     public void submit(int fromIndex, int toIndex, byte[][] keys,
-            byte[][] vals, AbstractIndexProcedureConstructor ctor,
+            byte[][] vals, AbstractKeyArrayIndexProcedureConstructor ctor,
             IResultHandler aggregator) {
 
         if (ctor == null)

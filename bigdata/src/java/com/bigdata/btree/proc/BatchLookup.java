@@ -50,11 +50,20 @@ public class BatchLookup extends AbstractKeyArrayIndexProcedure implements
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class BatchLookupConstructor extends AbstractIndexProcedureConstructor<BatchLookup> {
+    public static class BatchLookupConstructor extends AbstractKeyArrayIndexProcedureConstructor<BatchLookup> {
 
         public static final BatchLookupConstructor INSTANCE = new BatchLookupConstructor(); 
         
         private BatchLookupConstructor() {
+            
+        }
+        
+        /**
+         * Values ARE NOT sent.
+         */
+        public final boolean sendValues() {
+            
+            return false;
             
         }
         

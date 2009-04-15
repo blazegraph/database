@@ -34,7 +34,7 @@ import com.bigdata.service.Split;
  * 
  * @param <R>
  *            The type of the result from applying the procedure to a single
- *            index partition.
+ *            {@link Split} of data.
  * @param <A>
  *            The type of the aggregated result.
  * 

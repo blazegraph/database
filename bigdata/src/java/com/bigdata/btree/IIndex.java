@@ -25,7 +25,7 @@ package com.bigdata.btree;
 
 import java.io.Serializable;
 
-import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
@@ -135,7 +135,7 @@ public interface IIndex extends ISimpleBTree, IAutoboxBTree, IRangeQuery {
      *            reported to this object.
      */
     public void submit(int fromIndex, int toIndex, byte[][] keys,
-            byte[][] vals, AbstractIndexProcedureConstructor ctor,
+            byte[][] vals, AbstractKeyArrayIndexProcedureConstructor ctor,
             IResultHandler resultHandler);
 
 }

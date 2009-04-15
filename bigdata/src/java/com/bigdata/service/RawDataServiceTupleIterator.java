@@ -214,7 +214,7 @@ public class RawDataServiceTupleIterator<E> extends AbstractChunkedTupleIterator
     }
         
     @Override
-    protected void deleteBehind(int n, Iterator<byte[]> itr) {
+    protected void deleteBehind(final int n, final Iterator<byte[]> itr) {
 
         final byte[][] keys = new byte[n][];
         
@@ -228,7 +228,10 @@ public class RawDataServiceTupleIterator<E> extends AbstractChunkedTupleIterator
         
         try {
 
-            // Note: default key serializer is used.
+            /*
+             * Note: default key serializer is used : @todo why? because the
+             * IndexMetadata is not on hand locally?
+             */
             dataService.submit(timestamp, name,
                     BatchRemoveConstructor.RETURN_NO_VALUES
                             .newInstance(0/* fromIndex */, n/* toIndex */, keys,

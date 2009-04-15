@@ -36,7 +36,7 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.filter.IFilterConstructor;
-import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
 import com.bigdata.btree.proc.IResultHandler;
@@ -554,7 +554,7 @@ public class DataServiceIndex implements IClientIndex {
 
     @SuppressWarnings("unchecked")
     public void submit(int fromIndex, int toIndex, byte[][] keys, byte[][] vals,
-            AbstractIndexProcedureConstructor ctor, IResultHandler aggregator) {
+            AbstractKeyArrayIndexProcedureConstructor ctor, IResultHandler aggregator) {
 
         try {
 

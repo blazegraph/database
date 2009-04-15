@@ -38,7 +38,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.AbstractKeyRangeIndexProcedure;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
@@ -294,7 +294,7 @@ abstract public class AbstractScaleOutClientIndexView2 extends
      */
     protected void submit(final long ts, final int fromIndex, final int toIndex,
             final byte[][] keys, final byte[][] vals,
-            final AbstractIndexProcedureConstructor ctor,
+            final AbstractKeyArrayIndexProcedureConstructor ctor,
             final IResultHandler aggregator) {
 
         /*
@@ -805,7 +805,7 @@ abstract public class AbstractScaleOutClientIndexView2 extends
 
         protected final byte[][] keys;
         protected final byte[][] vals;
-        protected final AbstractIndexProcedureConstructor ctor;
+        protected final AbstractKeyArrayIndexProcedureConstructor ctor;
         
         /**
          * Variant used for {@link IKeyArrayIndexProcedure}s.
@@ -830,7 +830,7 @@ abstract public class AbstractScaleOutClientIndexView2 extends
                 final byte[][] vals, final long ts, final Split split,
                 final IKeyArrayIndexProcedure proc,
                 final IResultHandler resultHandler,
-                final AbstractIndexProcedureConstructor ctor) {
+                final AbstractKeyArrayIndexProcedureConstructor ctor) {
             
             super( ts, split, proc, resultHandler );
             
@@ -847,7 +847,7 @@ abstract public class AbstractScaleOutClientIndexView2 extends
 
         /**
          * Submit using
-         * {@link ClientIndexViewRefactorResourceQueues#submit(int, int, byte[][], byte[][], AbstractIndexProcedureConstructor, IResultHandler)}.
+         * {@link ClientIndexViewRefactorResourceQueues#submit(int, int, byte[][], byte[][], AbstractKeyArrayIndexProcedureConstructor, IResultHandler)}.
          * This will recompute the split points and re-map the procedure across
          * the newly determined split points.
          */

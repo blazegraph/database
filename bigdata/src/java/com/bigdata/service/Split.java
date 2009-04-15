@@ -87,7 +87,8 @@ public class Split {
      *       Perhaps the help when building an {@link IndexSegment} from the
      *       {@link Split}?
      */
-    public Split(final IPartitionMetadata pmd, final int fromIndex, final int toIndex) {
+    public Split(final IPartitionMetadata pmd, final int fromIndex,
+            final int toIndex) {
 
 //        assert pmd != null;
 

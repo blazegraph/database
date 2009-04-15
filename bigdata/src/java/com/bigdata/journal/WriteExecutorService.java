@@ -55,7 +55,7 @@ import com.bigdata.resources.OverflowManager;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.util.InnerCause;
-import com.bigdata.util.concurrent.TaskCounters;
+import com.bigdata.util.concurrent.WriteTaskCounters;
 
 /**
  * A custom {@link ThreadPoolExecutor} used by the {@link ConcurrencyManager} to
@@ -1174,7 +1174,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             assert groupCommit.get();
 
             // used to track the commit waiting and commit service times.
-            final TaskCounters taskCounters = r.getTaskCounters();
+            final WriteTaskCounters taskCounters = (WriteTaskCounters) r
+                    .getTaskCounters();
 
             assert taskCounters != null;
             

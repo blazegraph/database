@@ -172,7 +172,7 @@ public class ThroughputMaster
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public interface ConfigurationOptions {
+    public interface ConfigurationOptions extends TaskMaster.ConfigurationOptions {
 
 //        /**
 //         * #of scale-out indices to register.
@@ -442,11 +442,11 @@ public class ThroughputMaster
      * Extended to register a scale-out index in the specified namespace. 
      */
     @Override
-    protected void beginJob() throws Exception {
+    protected void beginJob(final JobState jobState) throws Exception {
 
-        super.beginJob();
+        super.beginJob(jobState);
 
-        final String name = getJobState().namespace;
+        final String name = jobState.namespace;
 
         if (fed.getIndex(name, ITx.UNISOLATED) == null) {
 

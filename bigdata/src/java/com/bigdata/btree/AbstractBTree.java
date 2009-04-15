@@ -50,7 +50,7 @@ import com.bigdata.btree.filter.Reverserator;
 import com.bigdata.btree.filter.TupleRemover;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
 import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.proc.ISimpleIndexProcedure;
@@ -175,6 +175,10 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     /**
      * Counters tracking various aspects of the btree.
+     * <p>
+     * Note: This is <code>volatile</code> to avoid the need for
+     * synchronization in order for changes in the reference to be visible to
+     * threads.
      */
     private volatile BTreeCounters btreeCounters = new BTreeCounters();
 
@@ -205,24 +209,12 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         if (btreeCounters == null)
             throw new IllegalArgumentException();
 
-//        /*
-//         * Note: synchronized to make the change visible if you are also
-//         * synchronized on [this].
-//         */
-//        synchronized (this) {
+        /*
+         * Note: synchronized NOT required since reference is volatile.
+         */
 
-            this.btreeCounters = btreeCounters; 
+        this.btreeCounters = btreeCounters;
 
-//            if (this.counterSet != null) {
-//                
-//                // reattach the counters.
-//                this.counterSet
-//                        .attach(btreeCounters.getCounters(), true/* replace */);
-//
-//            }
-            
-//        }
-        
     }
     
     /**
@@ -772,7 +764,10 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         if (root.dirty) {
 
 //            throw new IllegalStateException("Root node is dirty");
-            log.warn("Root is dirty - discarding writes");
+            log.warn("Root is dirty - discarding writes: name="
+                    + metadata.getName()
+                    + (this instanceof BTree ? ((BTree) this).getCheckpoint()
+                            .toString() : getClass().getSimpleName()));
 
         }
 
@@ -2530,7 +2525,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
     
     @SuppressWarnings("unchecked")
     public void submit(int fromIndex, int toIndex, byte[][] keys, byte[][] vals,
-            AbstractIndexProcedureConstructor ctor, IResultHandler aggregator) {
+            AbstractKeyArrayIndexProcedureConstructor ctor, IResultHandler aggregator) {
 
         Object result = ctor.newInstance(this, fromIndex, toIndex, keys, vals)
                 .apply(this);

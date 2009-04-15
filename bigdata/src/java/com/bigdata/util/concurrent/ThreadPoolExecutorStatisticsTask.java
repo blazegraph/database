@@ -554,7 +554,8 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
                      */
                     if(service instanceof WriteExecutorService) {
                         
-                        final long newValue = taskCounters.lockWaitingNanoTime.get();
+                        final long newValue = ((WriteTaskCounters) taskCounters).lockWaitingNanoTime
+                                .get();
 
                         final long delta = newValue - lockWaitingTime;
 
@@ -616,6 +617,8 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
 
                     final WriteExecutorService tmp = (WriteExecutorService) service;
 
+                    final WriteTaskCounters writeTaskCounters = (WriteTaskCounters) taskCounters;
+                    
                     final long groupCommitCount = tmp.getGroupCommitCount();
 
                     if (groupCommitCount > 0) {
@@ -623,7 +626,7 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
                         // Time waiting for the commit.
                         {
 
-                            final long newValue = taskCounters.commitWaitingNanoTime
+                            final long newValue = writeTaskCounters.commitWaitingNanoTime
                                     .get();
 
                             final long delta = newValue - commitWaitingTime;
@@ -642,7 +645,7 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
                         // Time servicing the commit.
                         {
 
-                            final long newValue = taskCounters.commitServiceNanoTime
+                            final long newValue = writeTaskCounters.commitServiceNanoTime
                                     .get();
 
                             final long delta = newValue - commitServiceTime;
@@ -852,13 +855,16 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
                  * Moving averages.
                  */
 
-                counterSet.addCounter(IThreadPoolExecutorTaskCounters.AverageQueueWaitingTime,
+                counterSet.addCounter(
+                        IThreadPoolExecutorTaskCounters.AverageQueueWaitingTime,
                         averageQueueWaitingTimeInst);
 
-                counterSet.addCounter(IThreadPoolExecutorTaskCounters.AverageServiceTime,
+                counterSet.addCounter(
+                        IThreadPoolExecutorTaskCounters.AverageServiceTime,
                         averageServiceTimeInst);
 
-                counterSet.addCounter(IThreadPoolExecutorTaskCounters.AverageQueuingTime,
+                counterSet.addCounter(
+                        IThreadPoolExecutorTaskCounters.AverageQueuingTime,
                         averageQueuingTimeInst);
 
             }

@@ -91,14 +91,17 @@ import com.bigdata.zookeeper.ZooHelper;
  * Utility class that can be used to execute a distributed job. The master
  * creates a set of tasks, submits each task to an {@link IDataService} for
  * execution, and awaits their {@link Future}s. There are a variety of
- * {@link ConfigurationOptions}. You specify a concrete instance of this class
- * using {@link ConfigurationOptions#MASTER_CLASS}. You specify the client task
- * using {@link TaskMaster#newClientTask(int)}.
+ * {@link ConfigurationOptions}. In order to execute a master, you specify a
+ * concrete instance of this class and {@link ConfigurationOptions} using the
+ * fully qualified class name of that master implementation class. You specify
+ * the client task using {@link TaskMaster#newClientTask(int)}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * @param <S> The generic type of the master's state.
- * @param <T> The generic type of the client task.
+ * @param <S>
+ *            The generic type of the master's state.
+ * @param <T>
+ *            The generic type of the client task.
  */
 abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callable<? extends Object>>
         implements Callable<Void> {
@@ -392,7 +395,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
          * 
          * @see #component
          */
-        public String getJobClassZPath(final JiniFederation fed) {
+        final public String getJobClassZPath(final JiniFederation fed) {
             
             return fed.getZooConfig().zroot + "/" + BigdataZooDefs.JOBS + "/"
                     + component;
@@ -403,7 +406,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
          * Return the zpath to the znode which corresponds to the job which is
          * being executed. The data for this znode is this {@link JobState}.
          */
-        public String getJobZPath(final JiniFederation fed) {
+        final public String getJobZPath(final JiniFederation fed) {
 
             return getJobClassZPath(fed) + "/" + jobName;
 
@@ -416,7 +419,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
          * @param clientNum
          *            The client number.
          */
-        public String getClientZPath(final JiniFederation fed,
+        final public String getClientZPath(final JiniFederation fed,
                 final int clientNum) {
 
             return getJobZPath(fed) + "/" + "client" + clientNum;
@@ -433,7 +436,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
          * @param clientNum
          *            The client number.
          */
-        public String getLockNodeZPath(final JiniFederation fed,
+        final public String getLockNodeZPath(final JiniFederation fed,
                 final int clientNum) {
 
             return getClientZPath(fed, clientNum) + "/" + "locknode";
@@ -560,7 +563,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
             final long begin = System.currentTimeMillis();
 
             // callback for overrides.
-            beginJob();
+            beginJob(getJobState());
 
             /*
              * Setup scheduled metadata dumps of the index partitions in the KB.
@@ -764,7 +767,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      * 
      * @throws Exception
      */
-    protected void beginJob() throws Exception {
+    protected void beginJob(final S JobState) throws Exception {
         
     }
     
@@ -1038,6 +1041,8 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
     protected void cancelAll(final Map<Integer, Future> futures,
             final boolean mayInterruptIfRunning) {
 
+        log.warn("Cancelling all futures: nfutures=" + futures.size());
+
         final Iterator<Future> itr = futures.values().iterator();
 
         while (itr.hasNext()) {
@@ -1238,7 +1243,8 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
          * @throws InterruptedException
          * @throws KeeperException
          */
-        protected U setupClientState() throws InterruptedException, KeeperException {
+        protected U setupClientState() throws InterruptedException,
+                KeeperException {
 
             if (!zlock.isLockHeld())
                 throw new InterruptedException("Lost ZLock");
@@ -1284,8 +1290,8 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
          * @throws InterruptedException
          * @throws KeeperException
          */
-        protected void writeClientState(U clientState) throws KeeperException,
-                InterruptedException {
+        protected void writeClientState(final U clientState)
+                throws KeeperException, InterruptedException {
 
             if (clientState == null)
                 throw new IllegalArgumentException();

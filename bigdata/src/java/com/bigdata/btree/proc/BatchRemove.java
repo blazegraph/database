@@ -86,7 +86,7 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure implements
      * @version $Id$
      */
     public static class BatchRemoveConstructor extends
-            AbstractIndexProcedureConstructor<BatchRemove> {
+            AbstractKeyArrayIndexProcedureConstructor<BatchRemove> {
 
         /**
          * Singleton requests the return of the values that were removed from
@@ -112,6 +112,15 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure implements
 
         private final boolean assertFound;
         private final boolean returnOldValues;
+
+        /**
+         * Values ARE NOT sent.
+         */
+        public final boolean sendValues() {
+            
+            return false;
+            
+        }
 
         private BatchRemoveConstructor(boolean assertFound, boolean returnOldValues) {
 

@@ -36,7 +36,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.filter.Reverserator;
 import com.bigdata.btree.filter.TupleRemover;
-import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
 import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.proc.ISimpleIndexProcedure;
@@ -1076,7 +1076,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
     
     @SuppressWarnings("unchecked")
     final public void submit(int fromIndex, int toIndex, byte[][] keys, byte[][] vals,
-            AbstractIndexProcedureConstructor ctor, IResultHandler aggregator) {
+            AbstractKeyArrayIndexProcedureConstructor ctor, IResultHandler aggregator) {
 
         final Object result = ctor.newInstance(this, fromIndex, toIndex, keys,
                 vals).apply(this);

@@ -63,7 +63,7 @@ import com.bigdata.sparse.SparseRowStore;
  * performing a datum {@link ISimpleBTree#lookup(Object)}. These procedures are
  * always directed to a single index partition. Since they are never mapped
  * across index partitions, there is no "aggregation" phase. Likewise, there is
- * no {@link AbstractIndexProcedureConstructor} since the procedure instance is
+ * no {@link AbstractKeyArrayIndexProcedureConstructor} since the procedure instance is
  * always created directly by the application.</dd>
  * 
  * <dt>A key range, <code>byte[] toKey, byte[] fromKey</code></dt>

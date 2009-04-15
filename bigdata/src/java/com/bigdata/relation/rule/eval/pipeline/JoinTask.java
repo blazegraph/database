@@ -236,7 +236,7 @@ abstract public class JoinTask implements Callable<Void> {
 
         halt = true;
 
-        final boolean first = firstCause.compareAndSet(null/* expect */, cause);
+        final boolean isFirstCause = firstCause.compareAndSet(null/* expect */, cause);
 
         if (WARN)
 
@@ -261,8 +261,8 @@ abstract public class JoinTask implements Callable<Void> {
                      */
 
                     log.warn("orderIndex=" + orderIndex + ", partitionId="
-                            + partitionId + ", firstCause=" + first + " : "
-                            + cause.getLocalizedMessage(), cause);
+                            + partitionId + ", isFirstCause=" + isFirstCause
+                            + " : " + cause.getLocalizedMessage(), cause);
 
                 }
 
@@ -307,12 +307,12 @@ abstract public class JoinTask implements Callable<Void> {
     final private List<AbstractUnsynchronizedArrayBuffer<IBindingSet>> unsyncBufferList = new LinkedList<AbstractUnsynchronizedArrayBuffer<IBindingSet>>();
 
     /**
-     * A factory for the per-{@link Thread} buffers used to accumulate
-     * chunks of output {@link IBindingSet}s across the
-     * {@link AccessPathTask}s for this {@link JoinTask}.
+     * A factory for the per-{@link Thread} buffers used to accumulate chunks
+     * of output {@link IBindingSet}s across the {@link AccessPathTask}s for
+     * this {@link JoinTask}.
      * <p>
-     * Note: This is not static because access is required to
-     * {@link JoinTask#newUnsyncOutputBuffer()}.
+     * Note: This is not <code>static</code> because access is required to be
+     * per- {@link JoinTask#newUnsyncOutputBuffer()}.
      */
     final protected ThreadLocal<AbstractUnsynchronizedArrayBuffer<IBindingSet>> threadLocalBufferFactory = new ThreadLocal<AbstractUnsynchronizedArrayBuffer<IBindingSet>>() {
 

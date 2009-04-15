@@ -46,7 +46,7 @@ public class BNodeContextFactory implements BigdataValueFactory {
      */
     private final BigdataValueFactory valueFactory;
 
-    BNodeContextFactory(BigdataValueFactory valueFactory) {
+    BNodeContextFactory(final BigdataValueFactory valueFactory) {
 
         this.valueFactory = valueFactory;
 

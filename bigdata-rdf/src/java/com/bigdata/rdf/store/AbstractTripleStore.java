@@ -2958,7 +2958,7 @@ abstract public class AbstractTripleStore extends
                     
                 }
 
-                //@todo raise the filter into the caller's iterator?
+                // @todo raise the filter into the caller's iterator?
                 final long numWritten = spoRelation.insert(a, numStmts, filter);
 
                 mutationCount += numWritten;
