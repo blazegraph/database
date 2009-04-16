@@ -216,6 +216,8 @@ A//
 //    }
 
     /**
+     * {@inheritDoc}
+     * 
      * Maps the chunk across the sinks for the index partitions on which the
      * element in that chunk must be written.
      * 

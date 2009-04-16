@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service.ndx.pipeline;
 
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
@@ -95,6 +96,28 @@ L>//
      */
     protected final HS stats;
 
+    /**
+     * The default timeout in nanoseconds before closing an idle output sink.
+     */
+    public static final long DEFAULT_IDLE_TIMEOUT = TimeUnit.MILLISECONDS.toNanos(2000);
+    
+    /**
+     * The timeout in nanoseconds before closing an idle output sink.
+     * 
+     * @todo config
+     */
+    private final long idleTimeout = DEFAULT_IDLE_TIMEOUT;
+    
+    /**
+     * The timeout in nanoseconds that we will wait for a chunk to become
+     * available. This is NOT the same as the chunk combiner timeout. It should
+     * generally be a small multiple of the chunk combiner timeout so that
+     * chunks may be readily combined while polling.
+     * 
+     * @todo config
+     */
+    private final long pollTimeout = TimeUnit.MILLISECONDS.toNanos(50);
+
     public AbstractSubtask(final M master, final L locator,
             final BlockingBuffer<E[]> buffer) {
 
@@ -139,15 +162,20 @@ L>//
              * the [subtask] Condition signal the master when it is
              * finished.
              */
+            final Thread t = Thread.currentThread();
+            long lastChunkNanos = System.nanoTime();
             while (true) {
 
                 master.halted();
 
+                if (t.isInterrupted()) {
+
+                    throw master.halt(new InterruptedException(toString()));
+
+                }
+
                 // nothing available w/in timeout?
-                if (!src.hasNext(
-                        // @todo config timeout
-                        BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT,
-                        BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT_UNIT)) {
+                if (!src.hasNext(pollTimeout, TimeUnit.NANOSECONDS)) {
 
                     // are we done? should we close our buffer?
                     master.lock.lockInterruptibly();
@@ -158,28 +186,46 @@ L>//
                                 log.info("No more data: " + this);
                             break;
                         }
-                        if (master.src.isExhausted()) {
+                        final long elapsedSinceLastChunk = System.nanoTime()
+                                - lastChunkNanos;
+                        final boolean idle = elapsedSinceLastChunk > idleTimeout;
+                        if (idle || master.src.isExhausted()) {
                             if (buffer.isEmpty()) {
-                                // close our buffer.
+                                /*
+                                 * Close out buffer. Since the buffer is empty
+                                 * the iterator will be exhausted and the
+                                 * subtask will quit the next time through the
+                                 * loop.
+                                 * 
+                                 * Note: This can happen either if the master
+                                 * is closed or if idle too long.
+                                 */
                                 buffer.close();
                                 if (log.isInfoEnabled())
-                                    log.info("Closed buffer: " + this);
+                                    log.info("Closed buffer: idle=" + idle
+                                            + " : " + this);
+                                if(!src.hasNext()) {
+                                    if (log.isInfoEnabled())
+                                        log.info("No more data: " + this);
+                                    break;
+                                }
                             }
                         }
+                        // poll the itr again.
+                        continue;
                     } finally {
                         master.lock.unlock();
                     }
-                    continue;
 
                 }
 
-                if (Thread.interrupted()) {
+                // update timestamp of the last chunk read.
+                lastChunkNanos = System.nanoTime();
+                
+                if (nextChunk(src.next())) {
 
-                    throw master.halt(new InterruptedException(toString()));
-
-                }
-
-                if (!nextChunk(src.next())) {
+                    if (log.isInfoEnabled())
+                        log.info("Eager termination.");
 
                     // Done (eager termination).
                     break;
@@ -199,7 +245,22 @@ L>//
 
         } catch (Throwable t) {
 
-            // halt processing.
+            if (log.isInfoEnabled()) {
+                // show stack trace @ INFO
+                log.warn(this, t);
+            } else {
+                // else only abbreviated warning.
+                log.warn(this + " : " + t);
+            }
+            
+            /*
+             * Halt processing.
+             * 
+             * Note: This is responsible for propagating any errors such that
+             * the master halts in a timely manner. This is necessary since no
+             * one is checking the Future for the sink tasks (except when we
+             * wait for them to complete before we reopen an output buffer).
+             */
             master.halt(t);
 
             throw new RuntimeException(t);

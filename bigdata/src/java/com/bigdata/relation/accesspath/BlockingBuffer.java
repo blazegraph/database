@@ -791,11 +791,10 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 //        }
 
         /**
-         * {@inheritDoc}
-         * 
-         * @see BlockingBuffer#iterator()
+         * Mark the iterator as being closed but DO NOT cancel the
+         * {@link Future}.
          */
-        public void close() {
+        private void _close() {
 
             if (DEBUG)
                 log.debug("");
@@ -805,6 +804,17 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
             open = false;
 
+        }
+        
+        /**
+         * {@inheritDoc}
+         * 
+         * @see BlockingBuffer#iterator()
+         */
+        public void close() {
+
+            _close();
+            
             if (future == null) {
 
                 /*
@@ -839,10 +849,10 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                 if (log.isInfoEnabled()) {
                     
                     /*
-                     * Log @ INFO with a stack trace so that you can see who
+                     * Log @ WARN with a stack trace so that you can see who
                      * closed the iterator.
                      */
-                    log.info(new RuntimeException("Cancelling future: "
+                    log.warn(this, new RuntimeException("Cancelling future: "
                             + future));
                 } else {
                     
@@ -920,14 +930,14 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                         log.info(e.getMessage());
 
                     // itr will not deliver any more elements.
-                    close();
+                    _close();
 
                 } catch (ExecutionException e) {
 
                     log.error(e, e);
 
                     // itr will not deliver any more elements.
-                    close();
+                    _close();
 
                     // rethrow exception.
                     throw new RuntimeException(e);
@@ -1076,8 +1086,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                 
                 if(!open) {
                     
-                    if (INFO)
-                        log.info("iterator is closed");
+                    if (DEBUG)
+                        log.debug("iterator is closed");
 
                     // check before returning a strong [false] (vs timeout).
                     checkFuture();
@@ -1104,8 +1114,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                 
                 if (nanos <= 0) {
 
-                    if (INFO)
-                        log.info("Timeout");
+                    if (DEBUG)
+                        log.debug("Timeout");
 
                     // weak false (timeout).
                     return false;
@@ -1174,7 +1184,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                             log.info(ex.getMessage());
 
                         // itr will not deliver any more elements.
-                        close();
+                        _close();
 
                         // strong false (interrupted, so itr is closed).
                         checkFuture();

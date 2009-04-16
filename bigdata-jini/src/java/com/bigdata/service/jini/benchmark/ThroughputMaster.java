@@ -64,6 +64,7 @@ import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.TaskMaster;
 import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
+import com.bigdata.service.ndx.pipeline.IndexWriteStats;
 
 /**
  * Utility class for benchmarking index operations on a federation. This test
@@ -692,7 +693,11 @@ public class ThroughputMaster
                 
                 // await their futures.
                 insert.getFuture().get();
+                
                 remove.getFuture().get();
+                
+                // Note: All operations on the same index counters
+                System.err.println(fed.getIndexTaskCounters(ndx.getName()));
                 
             }
             
