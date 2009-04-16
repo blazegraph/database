@@ -190,6 +190,9 @@ public class RDFFileLoadTask implements Callable<Void>, Serializable,
             
             if (writeBuffer != null) {
 
+                if (log.isInfoEnabled())
+                    log.info("Closing the write buffer.");
+                
                 // done with this buffer. 
                 writeBuffer.close();
                 
@@ -200,6 +203,8 @@ public class RDFFileLoadTask implements Callable<Void>, Serializable,
 
         } catch (Throwable t) {
 
+            log.error("Task failed: " + t, t);
+            
             try {
                 loader.shutdownNow();
                 if (writeBuffer != null) {

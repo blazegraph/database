@@ -81,7 +81,6 @@ import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.relation.accesspath.BlockingBuffer;
-import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.IBigdataClient.Options;
 import com.bigdata.service.ndx.IndexTaskCounters;
@@ -308,28 +307,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
         
     };
 
-    /**
-     * Return a {@link ThreadLocal} {@link AtomicInteger} whose value is the
-     * recursion depth of the current {@link Thread}. This is initially zero
-     * when the task is submitted by the application. The value incremented when
-     * a task results in a {@link StaleLocatorException} and is decremented when
-     * returning from the recursive handling of the
-     * {@link StaleLocatorException}.
-     * <p>
-     * The recursion depth is used:
-     * <ol>
-     * <li>to limit the #of retries due to {@link StaleLocatorException}s for
-     * a split of a task submitted by the application</li>
-     * <li> to force execution of retried tasks in the caller's thread.</li>
-     * </ol>
-     * The latter point is critical - if the retry tasks are run in the client
-     * {@link #getThreadPool() thread pool} then all threads in the pool can
-     * rapidly become busy awaiting retry tasks with the result that the client
-     * is essentially deadlocked.
-     * 
-     * @return The recursion depth.
-     */
-    protected AtomicInteger getRecursionDepth() {
+    public AtomicInteger getRecursionDepth() {
 
         return recursionDepth.get();
         
@@ -1745,7 +1723,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected class SimpleDataServiceProcedureTask extends AbstractDataServiceProcedureTask {
+    static protected class SimpleDataServiceProcedureTask extends AbstractDataServiceProcedureTask {
 
         protected final byte[] key;
         
@@ -1778,7 +1756,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
         @Override
         protected void retry() throws Exception {
             
-            if (ntries++ > fed.getClient().getMaxStaleLocatorRetries()) {
+            if (ntries++ > ndx.getFederation().getClient().getMaxStaleLocatorRetries()) {
 
                 throw new RuntimeException("Retry count exceeded: ntries="
                         + ntries);
@@ -1789,8 +1767,8 @@ public class ClientIndexView implements IScaleOutClientIndex {
              * Note: uses the metadata index for the timestamp against which the
              * procedure is running.
              */
-            final PartitionLocator locator = fed.getMetadataIndex(name, ts)
-                    .find(key);
+            final PartitionLocator locator = ndx.getFederation()
+                    .getMetadataIndex(ndx.getName(), ts).find(key);
 
             if (INFO)
                 log.info("Retrying: proc=" + proc.getClass().getName()
@@ -1815,7 +1793,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected class KeyRangeDataServiceProcedureTask extends AbstractDataServiceProcedureTask {
+    static protected class KeyRangeDataServiceProcedureTask extends AbstractDataServiceProcedureTask {
 
         final byte[] fromKey;
         final byte[] toKey;
@@ -1862,31 +1840,33 @@ public class ClientIndexView implements IScaleOutClientIndex {
              * is used to enforce this constrain.
              */
 
-            final int depth = getRecursionDepth().incrementAndGet();
+            final AtomicInteger recursionDepth = ndx.getRecursionDepth();
+            
+            final int depth = recursionDepth.incrementAndGet();
 
             try {
             
-                if (depth > fed.getClient().getMaxStaleLocatorRetries()) {
+                if (depth > ndx.getFederation().getClient().getMaxStaleLocatorRetries()) {
 
                     throw new RuntimeException("Retry count exceeded: ntries="
                             + depth);
                     
                 }
-                
+
                 /*
                  * Note: This MUST use the timestamp already assigned for this
                  * operation but MUST compute new splits against the updated
                  * locators.
                  */
-                ClientIndexView.this.submit(ts, fromKey, toKey,
+                ((ClientIndexView) ndx).submit(ts, fromKey, toKey,
                         (IKeyRangeIndexProcedure) proc, resultHandler);
-            
+
             } finally {
-                
-                final int tmp = getRecursionDepth().decrementAndGet();
-                
-                assert tmp >= 0 : "depth="+depth+", tmp="+tmp;
-                
+
+                final int tmp = recursionDepth.decrementAndGet();
+
+                assert tmp >= 0 : "depth=" + depth + ", tmp=" + tmp;
+
             }
             
         }
@@ -1900,7 +1880,8 @@ public class ClientIndexView implements IScaleOutClientIndex {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected class KeyArrayDataServiceProcedureTask extends AbstractDataServiceProcedureTask {
+    static protected class KeyArrayDataServiceProcedureTask extends
+            AbstractDataServiceProcedureTask {
 
         protected final byte[][] keys;
         protected final byte[][] vals;
@@ -1958,12 +1939,14 @@ public class ClientIndexView implements IScaleOutClientIndex {
              * avoid deadlock of the client's thread pool. The recursive depth
              * is used to enforce this constrain.
              */
-
-            final int depth = getRecursionDepth().incrementAndGet();
+            final AtomicInteger recursionDepth = ndx.getRecursionDepth();
+            
+            final int depth = recursionDepth.incrementAndGet();
 
             try {
             
-                if (depth > fed.getClient().getMaxStaleLocatorRetries()) {
+                if (depth > ndx.getFederation().getClient()
+                        .getMaxStaleLocatorRetries()) {
 
                     throw new RuntimeException("Retry count exceeded: ntries="
                             + depth);
@@ -1975,12 +1958,12 @@ public class ClientIndexView implements IScaleOutClientIndex {
                  * operation but MUST compute new splits against the updated
                  * locators.
                  */
-                ClientIndexView.this.submit(ts, split.fromIndex, split.toIndex,
+                ((ClientIndexView)ndx).submit(ts, split.fromIndex, split.toIndex,
                         keys, vals, ctor, resultHandler);
                 
             } finally {
                 
-                final int tmp = getRecursionDepth().decrementAndGet();
+                final int tmp = recursionDepth.decrementAndGet();
                 
                 assert tmp >= 0 : "depth="+depth+", tmp="+tmp;
                 
@@ -2291,70 +2274,6 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
     }
 
-    /**
-     * Return a buffer which will apply the specified operation to chunks of
-     * key-value tuples ({@link KVO}s) written onto the buffer using a
-     * producer-consumer model. The caller acts as the producer. The consumer is
-     * a concurrent process running on the
-     * {@link IBigdataFederation#getExecutorService()}. Chunks written onto the
-     * buffer will be automatically combined in order to maximize the efficiency
-     * of the asynchronous operations. Once the buffer has been
-     * {@link IBlockingBuffer#close() closed}, the consumer will drain the
-     * buffer and terminate.
-     * <p>
-     * The returned buffer provides a streaming API which is highly efficient if
-     * you do not need to have synchronous notification or directly consume the
-     * returned values. The caller writes ordered {@link KVO}[] chunks onto the
-     * {@link BlockingBuffer}. Those chunks are dynamically combined and then
-     * split into per-index partition chunks which are written on internally
-     * managed {@link BlockingBuffer}s for each index partition which will be
-     * touched by a write operation. The splits are are slices of ordered chunks
-     * for a specific index partition. The {@link BlockingBuffer} uses a merge
-     * sort when it combines ordered chunks so that the combined chunks remain
-     * fully ordered. Once a chunk is ready, it is re-shaped for the CTOR and
-     * sent to the target data service using RMI.
-     * <p>
-     * {@link BlockingBuffer#getFuture()} may be used to obtain the
-     * {@link Future} of the consumer. You can use {@link Future#get()} to await
-     * the completion of the consumer, to cancel the consumer, etc. The
-     * {@link Future} evaluates to an {@link IndexWriteStats} object. Those
-     * statistics are also reported to the {@link ILoadBalancerService} via the
-     * {@link IBigdataFederation}.
-     * <p>
-     * Note: Each buffer returned by this method is independent.
-     * 
-     * @param <T>
-     *            The generic type of the procedure used to write on the index.
-     * @param <O>
-     *            The generic type for unserialized value objects.
-     * @param <R>
-     *            The type of the result from applying the index procedure to a
-     *            single {@link Split} of data.
-     * @param <A>
-     *            The type of the aggregated result.
-     * 
-     * @param indexWriteQueueCapacity
-     *            The capacity of the queue in front of the index. Chunks are
-     *            read off of this queue, split based on the separator keys for
-     *            the scale-out index, and then written onto a per-index
-     *            partition queue, whose capacity is specified by a different
-     *            argument.
-     * @param indexPartitionWriteQueueCapacity
-     *            The capacity of the queue in front of each index partition on
-     *            which the writes are scattered.
-     * @param resultHandler
-     *            Used to aggregate results.
-     * @param duplicateRemover
-     *            Used to filter out duplicates in an application specified
-     *            manner (optional).
-     * @param ctor
-     *            Used to create instances of the procedure that will execute a
-     *            write on an individual index partition.
-     * 
-     * @return A buffer on which the producer may write their data.
-     * 
-     * @see AbstractFederation#getIndexTaskCounters(String)
-     */
     public <T extends IKeyArrayIndexProcedure, O, R, A> BlockingBuffer<KVO<O>[]> newWriteBuffer(
             final int indexWriteQueueCapacity,
             final int indexPartitionWriteQueueCapacity,

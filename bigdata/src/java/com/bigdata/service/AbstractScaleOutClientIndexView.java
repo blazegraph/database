@@ -32,6 +32,8 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 
 import org.apache.log4j.Level;
@@ -64,7 +66,6 @@ import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
 import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
-import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
@@ -73,8 +74,14 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
+import com.bigdata.relation.accesspath.BlockingBuffer;
+import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.IBigdataClient.Options;
+import com.bigdata.service.ndx.IndexTaskCounters;
+import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
+import com.bigdata.service.ndx.pipeline.IndexWriteStats;
+import com.bigdata.service.ndx.pipeline.IndexWriteTask;
 
 /**
  * Abstract base class for the {@link IScaleOutClientIndex} implementation(s).
@@ -383,35 +390,6 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
         throw new UnsupportedOperationException();
         
     }
-
-    /**
-     * @todo Add counters and report to the load balancer (a version for
-     *       clients). average responseTime, average queueLength, latency due to
-     *       RMI (by also obtaining the response time of the data service
-     *       itself), #of procedures run and the execution time for those
-     *       procedures; #of splits; #of tuples in each split; total #of tuples.
-     * 
-     * @todo Report more informatiom, but since scale-out indices can be very
-     *       large, this method should report only on aspects of the clients
-     *       access to the scale-out index rather than attempting to aggregate
-     *       the data from the various index partitions.
-     */
-    synchronized public ICounterSet getCounters() {
-
-        if (counterSet == null) {
-
-            counterSet = new CounterSet();
-            
-            counterSet.addCounter("name", new OneShotInstrument<String>(name));
-
-            counterSet.addCounter("timestamp", new OneShotInstrument<Long>(timestamp));
-
-        }
-        
-        return counterSet;
-        
-    }
-    private CounterSet counterSet;
     
     public ICounter getCounter() {
         
@@ -1273,4 +1251,44 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
             final AbstractKeyArrayIndexProcedureConstructor ctor,
             final IResultHandler aggregator);
     
+    public <T extends IKeyArrayIndexProcedure, O, R, A> BlockingBuffer<KVO<O>[]> newWriteBuffer(
+            final int indexWriteQueueCapacity,
+            final int indexPartitionWriteQueueCapacity,
+            final IResultHandler<R, A> resultHandler,
+            final IDuplicateRemover<O> duplicateRemover,
+            final AbstractKeyArrayIndexProcedureConstructor<T> ctor) {
+
+        final BlockingBuffer<KVO<O>[]> writeBuffer = new BlockingBuffer<KVO<O>[]>(
+                // @todo array vs linked w/ capacity and fair vs unfair.
+                new ArrayBlockingQueue<KVO<O>[]>(indexWriteQueueCapacity), 
+                BlockingBuffer.DEFAULT_CONSUMER_CHUNK_SIZE,// @todo config
+                BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT,// @todo config
+                BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT_UNIT,//
+                true// ordered
+        );
+
+        final IndexWriteTask<T, O, R, A> task = new IndexWriteTask<T, O, R, A>(
+                this, indexPartitionWriteQueueCapacity, resultHandler,
+                duplicateRemover, ctor,
+                fed.getIndexTaskCounters(name).asynchronousStats, writeBuffer);
+
+        final Future<IndexWriteStats> future = fed.getExecutorService().submit(
+                task);
+
+        writeBuffer.setFuture(future);
+
+        return writeBuffer;
+
+    }
+
+    /**
+     * Return a new {@link CounterSet} backed by the {@link IndexTaskCounters}
+     * for this scale-out index.
+     */
+    public ICounterSet getCounters() {
+
+        return getFederation().getIndexTaskCounters(name).getCounters();
+
+    }
+
 }

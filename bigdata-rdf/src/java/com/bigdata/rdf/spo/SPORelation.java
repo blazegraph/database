@@ -1185,6 +1185,12 @@ public class SPORelation extends AbstractRelation<ISPO> {
      */
     private class ChunkConsumerTask implements Callable<Void> {
         
+        /**
+         * The source which this task is draining.
+         * <p>
+         * Note: DO NOT close this iterator from within {@link #call()} - that
+         * would cause the task to interrupt itself!
+         */
         private final IAsynchronousIterator<ISPO[]> src;
         
         public ChunkConsumerTask(final IAsynchronousIterator<ISPO[]> src) {
@@ -1200,34 +1206,26 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
             long nchunks = 0;
             long nelements = 0;
-            
-            try {
 
-                while (src.hasNext()) {
+            while (src.hasNext()) {
 
-                    final ISPO[] chunk = src.next();
+                final ISPO[] chunk = src.next();
 
-                    nchunks++;
-                    nelements += chunk.length;
+                nchunks++;
+                nelements += chunk.length;
 
-                    if (DEBUG)
-                        log.debug("#chunks=" + nchunks + ", chunkSize="
-                                + chunk.length + ", nelements=" + nelements);
+                if (DEBUG)
+                    log.debug("#chunks=" + nchunks + ", chunkSize="
+                            + chunk.length + ", nelements=" + nelements);
 
-                    getContainer()
-                            .addStatements(chunk, chunk.length, null/* filter */);
-
-                }
-
-            } finally {
-
-                if (INFO)
-                    log.info("Done: #chunks=" + nchunks
-                            + ", #elements=" + nelements);
-
-                src.close();
+                getContainer()
+                        .addStatements(chunk, chunk.length, null/* filter */);
 
             }
+
+            if (INFO)
+                log.info("Done: #chunks=" + nchunks + ", #elements="
+                        + nelements);
 
             return null;
 

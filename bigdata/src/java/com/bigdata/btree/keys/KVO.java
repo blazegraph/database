@@ -111,4 +111,56 @@ public class KVO<O> implements Comparable<KVO<O>>{
 
     }
 
+    /**
+     * Return a dense array of the keys in a {@link KVO}[] chunk. The keys are
+     * copied by reference, not by value.
+     * 
+     * @param chunk
+     *            A chunk of {@link KVO} objects.
+     * 
+     * @return The keys.
+     */
+    static public byte[][] getKeys(final KVO[] chunk) {
+
+        if (chunk == null)
+            throw new IllegalArgumentException();
+        
+        final byte[][] keys = new byte[chunk.length][];
+        
+        for (int i = 0; i < chunk.length; i++) {
+
+            keys[i] = chunk[i].key;
+            
+        }
+        
+        return keys;
+        
+    }
+
+    /**
+     * Return a dense array of the values in a {@link KVO}[] chunk. The values
+     * are copied by reference, not by value.
+     * 
+     * @param chunk
+     *            A chunk of {@link KVO} objects.
+     * 
+     * @return The values.
+     */
+    static public byte[][] getVals(final KVO[] chunk) {
+
+        if (chunk == null)
+            throw new IllegalArgumentException();
+
+        final byte[][] vals = new byte[chunk.length][];
+
+        for (int i = 0; i < chunk.length; i++) {
+
+            vals[i] = chunk[i].val;
+
+        }
+
+        return vals;
+
+    }
+
 }

@@ -28,15 +28,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.accesspath;
 
-import java.util.Iterator;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import com.bigdata.relation.rule.IQueryOptions;
+import com.bigdata.relation.rule.IRule;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
- * Interface for iterators that are running asynchronously.
- *  
+ * Interface for iterators that are running asynchronously. Such iterators are
+ * the consumer side of a producer - consumer pattern. The producer writes on an
+ * {@link IBlockingBuffer} which is drained by the {@link IAsynchronousIterator}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
@@ -121,5 +123,22 @@ public interface IAsynchronousIterator<E> extends ICloseableIterator<E> {
      *             the buffer to be {@link BlockingBuffer#flush()}ed.
      */
     public E next(long timeout, TimeUnit unit);
+    
+    /**
+     * Notes that the iterator is closed and hence may no longer be read. It is
+     * safe to invoke this method even if the iterator is closed. However, if
+     * the producer is still running then it will be <em>cancelled</em>
+     * (interrupted) in order to prevent the {@link IBlockingBuffer} from
+     * filling up and deadlocking. For this reason, {@link #close()} has
+     * consequences NOT entailed by {@link ICloseableIterator}.
+     * <p>
+     * Note: Depending on the semantics of the producer, it MAY choose to treat
+     * an interrupt() as normal (but eager) termination. For example, rule
+     * execution treats an interrupt() as normal (but eager) termination with
+     * the consequence that queries may be safely interrupted once some limit
+     * has been satisified. However, the preferred way to treat LIMIT is using
+     * {@link IRule} with an {@link IQueryOptions} that specifies a LIMIT.
+     */
+    public void close();
     
 }

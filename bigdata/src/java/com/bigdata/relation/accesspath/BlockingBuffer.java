@@ -767,24 +767,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 //        }
 
         /**
-         * Notes that the iterator is closed and hence may no longer be read.
-         * <p>
-         * If the source is still running and we close the iterator then the
-         * source will block once the iterator fills up and it will fail to
-         * progress. To avoid this, and to have the source process terminate
-         * eagerly if the client closes the iterator, we cancel the future if it
-         * is not yet done.
-         * <p>
-         * Note: This means that processes writing on a BlockingBuffer MUST
-         * treat an interrupt() as normal (but eager) termination. The best
-         * example is rule execution. When the (nested) joins for a rule are
-         * executed, each join-task can write on this buffer. However, if the
-         * interrupt is noticed during an IO then the {@link FileChannel} for
-         * the backing store will be closed asynchronously. While it will be
-         * re-opened transparently, it is best to avoid that overhead. For most
-         * cases you can do this using either
-         * {@link IAccessPath#iterator(int, int)} or an {@link IRule} with an
-         * {@link IQueryOptions} that specifies a LIMIT.
+         * {@inheritDoc}
          * 
          * @see BlockingBuffer#iterator()
          */
@@ -829,13 +812,24 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
             } else if (!future.isDone()) {
 
-                if (DEBUG)
-                    log.debug("will cancel future: " + future);
+                if (log.isInfoEnabled()) {
+                    
+                    /*
+                     * Log @ INFO with a stack trace so that you can see who
+                     * closed the iterator.
+                     */
+                    log.info(new RuntimeException("Cancelling future: "
+                            + future));
+                } else {
+                    
+                    /*
+                     * Otherwise log @ WARN w/o a stack trace.
+                     */
+                    log.warn("Cancelling future: " + future);
+                    
+                }
 
                 future.cancel(true/* mayInterruptIfRunning */);
-
-                if (DEBUG)
-                    log.debug("did cancel future: " + future);
 
             }
 
