@@ -29,7 +29,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service.ndx.pipeline;
 
 import java.io.IOException;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -39,7 +38,6 @@ import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.accesspath.BlockingBuffer;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
@@ -53,40 +51,29 @@ import com.bigdata.util.InnerCause;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class IndexPartitionWriteTask<T extends IKeyArrayIndexProcedure, O, R, A>
-        implements Callable<IndexPartitionWriteStats> {
+public class IndexPartitionWriteTask<//
+H extends IndexWriteStats<L, HS>, //
+O extends Object, //
+E extends KVO<O>, //
+L extends PartitionLocator, //
+S extends IndexPartitionWriteTask, //
+HS extends IndexPartitionWriteStats,//
+M extends IndexWriteTask<H, O, E, S, L, HS, T, R, A>,//
+T extends IKeyArrayIndexProcedure,//
+R,//
+A//
+> extends AbstractSubtask<HS, M, E, L> {
+
+//public class IndexPartitionWriteTask<T extends IKeyArrayIndexProcedure, O, R, A>
+//    implements Callable<IndexPartitionWriteStats> {
 
     static protected transient final Logger log = Logger
             .getLogger(IndexPartitionWriteTask.class);
 
     /**
-     * The master.
-     */
-    private final IndexWriteTask<T, O, R, A> master;
-
-    /**
-     * The index partition locator.
-     */
-    public final PartitionLocator locator;
-
-    /**
      * The data service on which the index partition resides.
      */
     public final IDataService dataService;
-
-    /**
-     * The buffer on which the {@link IndexWriteTask} writes tuples to be
-     * written onto the index partition associated with this task.
-     */
-    protected final BlockingBuffer<KVO<O>[]> buffer;
-
-    /**
-     * The iterator draining the {@link #buffer}.
-     * <p>
-     * Note: DO NOT close this iterator from within {@link #call()} as that
-     * would cause this task to interrupt itself!
-     */
-    protected final IAsynchronousIterator<KVO<O>[]> src;
 
     /**
      * The timestamp associated with the index view.
@@ -103,12 +90,6 @@ public class IndexPartitionWriteTask<T extends IKeyArrayIndexProcedure, O, R, A>
      */
     private final String indexPartitionName;
 
-    /**
-     * The statistics for writes on this index partition for the
-     * {@link #master}.
-     */
-    private final IndexPartitionWriteStats stats;
-
     public String toString() {
 
         return getClass().getName() + "{indexPartition=" + indexPartitionName
@@ -116,31 +97,16 @@ public class IndexPartitionWriteTask<T extends IKeyArrayIndexProcedure, O, R, A>
 
     }
 
-    public IndexPartitionWriteTask(final IndexWriteTask<T, O, R, A> master,
-            final PartitionLocator locator, final IDataService dataService,
-            final BlockingBuffer<KVO<O>[]> buffer) {
+    public IndexPartitionWriteTask(final M master,
+            final L locator, final IDataService dataService,
+            final BlockingBuffer<E[]> buffer) {
 
-        if (master == null)
-            throw new IllegalArgumentException();
-
-        if (locator == null)
-            throw new IllegalArgumentException();
-
+        super(master,locator,buffer);
+        
         if (dataService == null)
             throw new IllegalArgumentException();
 
-        if (buffer == null)
-            throw new IllegalArgumentException();
-
-        this.master = master;
-
-        this.locator = locator;
-
         this.dataService = dataService;
-
-        this.buffer = buffer;
-
-        this.src = buffer.iterator();
 
         this.timestamp = master.ndx.getTimestamp();
 
@@ -149,111 +115,112 @@ public class IndexPartitionWriteTask<T extends IKeyArrayIndexProcedure, O, R, A>
         this.indexPartitionName = DataService.getIndexPartitionName(master.ndx
                 .getName(), partitionId);
 
-        this.stats = master.stats.getStats(partitionId);
-
     }
 
-    public IndexPartitionWriteStats call() throws Exception {
-
-        try {
-
-            /*
-             * Poll the iterator with a timeout to avoid deadlock with
-             * awaitAll().
-             * 
-             * Note: In order to ensure termination the subtask MUST poll
-             * the iterator with a timeout so that a subtask which was
-             * created in response to a StaleLocatorException during
-             * master.awaitAll() can close its own blocking buffer IF: (a)
-             * the top-level blocking buffer is closed; and (b) the
-             * subtask's blocking buffer is empty. This operation needs to
-             * be coordinated using the master's [lock], as does any
-             * operation which writes on the subtask's buffer. Otherwise we
-             * can wait forever for a subtask to complete. The subtask uses
-             * the [subtask] Condition signal the master when it is
-             * finished.
-             */
-            while (true) {
-
-                master.halted();
-
-                // nothing available w/in timeout?
-                if (!src.hasNext(
-                        // @todo config timeout
-                        BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT,
-                        BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT_UNIT)) {
-
-                    // are we done? should we close our buffer?
-                    master.lock.lockInterruptibly();
-                    try {
-                        if (!buffer.isOpen() && !src.hasNext()) {
-                            // We are done.
-                            if (log.isInfoEnabled())
-                                log.info("No more data: " + this);
-                            break;
-                        }
-                        if (master.src.isExhausted()) {
-                            if (buffer.isEmpty()) {
-                                // close our buffer.
-                                buffer.close();
-                                if (log.isInfoEnabled())
-                                    log.info("Closed buffer: " + this);
-                            }
-                        }
-                    } finally {
-                        master.lock.unlock();
-                    }
-                    continue;
-
-                }
-
-                if (Thread.interrupted()) {
-
-                    throw master.halt(new InterruptedException(toString()));
-
-                }
-
-                if (!nextChunk()) {
-
-                    // Done (handled a stale locator).
-                    break;
-
-                }
-
-            }
-
-            // normal completion.
-            master.removeOutputBuffer(this);
-
-            if (log.isInfoEnabled())
-                log.info("Done: " + stats);
-
-            // done.
-            return stats;
-
-        } catch (Throwable t) {
-
-            // halt processing.
-            master.halt(t);
-
-            throw new RuntimeException(t);
-
-        } finally {
-
-            master.lock.lock();
-            try {
-                master.subtask.signalAll();
-            } finally {
-                master.lock.unlock();
-            }
-
-        }
-
-    }
+//    public HS call() throws Exception {
+//
+//        try {
+//
+//            /*
+//             * Poll the iterator with a timeout to avoid deadlock with
+//             * awaitAll().
+//             * 
+//             * Note: In order to ensure termination the subtask MUST poll
+//             * the iterator with a timeout so that a subtask which was
+//             * created in response to a StaleLocatorException during
+//             * master.awaitAll() can close its own blocking buffer IF: (a)
+//             * the top-level blocking buffer is closed; and (b) the
+//             * subtask's blocking buffer is empty. This operation needs to
+//             * be coordinated using the master's [lock], as does any
+//             * operation which writes on the subtask's buffer. Otherwise we
+//             * can wait forever for a subtask to complete. The subtask uses
+//             * the [subtask] Condition signal the master when it is
+//             * finished.
+//             */
+//            while (true) {
+//
+//                master.halted();
+//
+//                // nothing available w/in timeout?
+//                if (!src.hasNext(
+//                        // @todo config timeout
+//                        BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT,
+//                        BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT_UNIT)) {
+//
+//                    // are we done? should we close our buffer?
+//                    master.lock.lockInterruptibly();
+//                    try {
+//                        if (!buffer.isOpen() && !src.hasNext()) {
+//                            // We are done.
+//                            if (log.isInfoEnabled())
+//                                log.info("No more data: " + this);
+//                            break;
+//                        }
+//                        if (master.src.isExhausted()) {
+//                            if (buffer.isEmpty()) {
+//                                // close our buffer.
+//                                buffer.close();
+//                                if (log.isInfoEnabled())
+//                                    log.info("Closed buffer: " + this);
+//                            }
+//                        }
+//                    } finally {
+//                        master.lock.unlock();
+//                    }
+//                    continue;
+//
+//                }
+//
+//                if (Thread.interrupted()) {
+//
+//                    throw master.halt(new InterruptedException(toString()));
+//
+//                }
+//
+//                if (!nextChunk()) {
+//
+//                    // Done (handled a stale locator).
+//                    break;
+//
+//                }
+//
+//            }
+//
+//            // normal completion.
+//            master.removeOutputBuffer(locator, this);
+//
+//            if (log.isInfoEnabled())
+//                log.info("Done: " + stats);
+//
+//            // done.
+//            return stats;
+//
+//        } catch (Throwable t) {
+//
+//            // halt processing.
+//            master.halt(t);
+//
+//            throw new RuntimeException(t);
+//
+//        } finally {
+//
+//            master.lock.lock();
+//            try {
+//                master.subtask.signalAll();
+//            } finally {
+//                master.lock.unlock();
+//            }
+//
+//        }
+//
+//    }
 
     /**
-     * Reads the next chunk from the buffer (there MUST be a chunk waiting
-     * in the buffer).
+     * Maps the chunk across the sinks for the index partitions on which the
+     * element in that chunk must be written.
+     * 
+     * @param sourceChunk
+     *            A chunk (in sorted order).
      * 
      * @return <code>true</code> iff a {@link StaleLocatorException} was
      *         handled, in which case the task should exit immediately.
@@ -263,11 +230,8 @@ public class IndexPartitionWriteTask<T extends IKeyArrayIndexProcedure, O, R, A>
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    private boolean nextChunk() throws ExecutionException,
-            InterruptedException, IOException {
-
-        // A chunk in sorted order.
-        final KVO<O>[] sourceChunk = src.next();
+    protected boolean nextChunk(final E[] sourceChunk)
+            throws ExecutionException, InterruptedException, IOException {
 
         /*
          * Remove duplicates in a caller specified manner (may be a NOP).
@@ -370,7 +334,7 @@ public class IndexPartitionWriteTask<T extends IKeyArrayIndexProcedure, O, R, A>
                     log.info("Stale locator: name=" + cause.getName()
                             + ", reason=" + cause.getReason());
 
-                master.handleStaleLocator(this, chunk, cause);
+                master.handleStaleLocator((S) this, (E[]) chunk, cause);
 
                 // done.
                 return true;

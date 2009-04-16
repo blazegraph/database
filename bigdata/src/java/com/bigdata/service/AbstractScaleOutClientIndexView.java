@@ -1267,13 +1267,13 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
                 true// ordered
         );
 
-        final IndexWriteTask<T, O, R, A> task = new IndexWriteTask<T, O, R, A>(
+        final IndexWriteTask.M<T, O, R, A> task = new IndexWriteTask.M<T, O, R, A>(
                 this, indexPartitionWriteQueueCapacity, resultHandler,
                 duplicateRemover, ctor,
                 fed.getIndexTaskCounters(name).asynchronousStats, writeBuffer);
 
-        final Future<IndexWriteStats> future = fed.getExecutorService().submit(
-                task);
+        final Future<? extends IndexWriteStats> future = fed
+                .getExecutorService().submit(task);
 
         writeBuffer.setFuture(future);
 

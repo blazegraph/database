@@ -37,13 +37,21 @@ import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.resources.StaleLocatorException;
 
 /**
+ * Abstract base class providing statistics for the {@link AbstractMasterTask}
+ * and a factory for the statistics for the subtasks.
+ * <p>
+ * Note: Since there are concurent threads which need to write on the counters
+ * on this class the practice is to be <code>synchronized</code> on this
+ * reference before you update those counters. Without this, the counters might
+ * not update correctly as thing like <code>a += 2</code> may not produce the
+ * correct result.
  * 
  * @param <L>
  *            The generic type of the key used to lookup subtasks in the interal
  *            map.
  * @param <HS>
  *            The generic type of the subtask statistics.
- *            
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -62,11 +70,23 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
     public long subtaskEndCount = 0L;
 
     /**
-     * The #of {@link StaleLocatorException}s that were handled.
+     * The #of distinct partitions for which the master has caused subtasks to
+     * be created.
+     * 
+     * @todo if {@link #partitions} is made into a weak value hash map then we
+     *       need to change how this is maintained and add another counter which
+     *       is the maximum #of partitions at any given time (high tide).
      */
-    public long staleLocatorCount = 0L;
+    public int partitionCount = 0;
+    
+    /**
+     * The #of redirects ({@link StaleLocatorException}s) that were handled.
+     */
+    public long redirectCount = 0L;
 
-    /** The #of chunks written on the {@link BlockingBuffer} by the producer. */
+    /**
+     * The #of chunks written on the {@link BlockingBuffer} by the producer.
+     */
     public long chunksIn = 0L;
 
     /**
@@ -80,11 +100,6 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
      * partitions (not including any eliminated duplicates).
      */
     public long elementsOut = 0L;
-    
-//    /**
-//     * The #of duplicates which were filtered out.
-//     */
-//    public long duplicateCount = 0L;
     
     /**
      * The #of chunks written onto index partitions using RMI.
@@ -123,6 +138,8 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
 
                 partitions.put(locator, t);
 
+                partitionCount++;
+                
             }
 
             return t;
@@ -168,24 +185,31 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
         
         final CounterSet t = new CounterSet();
         
-        t.addCounter("indexPartitionStartCount", new Instrument<Long>() {
+        t.addCounter("subtaskStartCount", new Instrument<Long>() {
             @Override
             protected void sample() {
                 setValue(subtaskStartCount);
             }
         });
 
-        t.addCounter("indexPartitionDoneCount", new Instrument<Long>() {
+        t.addCounter("subtaskEndCount", new Instrument<Long>() {
             @Override
             protected void sample() {
                 setValue(subtaskEndCount);
             }
         });
 
-        t.addCounter("staleLocatorCount", new Instrument<Long>() {
+        t.addCounter("partitionCount", new Instrument<Integer>() {
             @Override
             protected void sample() {
-                setValue(staleLocatorCount);
+                setValue(partitionCount);
+            }
+        });
+
+        t.addCounter("redirectCount", new Instrument<Long>() {
+            @Override
+            protected void sample() {
+                setValue(redirectCount);
             }
         });
 
@@ -216,13 +240,6 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
                 setValue(elementsOut);
             }
         });
-
-//        t.addCounter("duplicateCount", new Instrument<Long>() {
-//            @Override
-//            protected void sample() {
-//                setValue(duplicateCount);
-//            }
-//        });
 
         t.addCounter("elapsedNanos", new Instrument<Long>() {
             @Override
@@ -271,12 +288,10 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
 
     public String toString() {
 
-        return getClass().getName() + "{indexPartitionStartCount="
-                + subtaskStartCount + ", indexPartitionDoneCount="
-                + subtaskEndCount + ", staleLocatorCount="
-                + staleLocatorCount + ", chunkIn=" + chunksIn + ", elementIn="
-                + elementsIn 
-//                + ", duplicateCount=" + duplicateCount
+        return getClass().getName() + "{subtaskStartCount=" + subtaskStartCount
+                + ", subtaskEndCount=" + subtaskEndCount + ", partitionCount="
+                + partitionCount + ", redirectCount=" + redirectCount
+                + ", chunkIn=" + chunksIn + ", elementIn=" + elementsIn
                 + ", chunksOut=" + chunksOut + ", elementsOut=" + elementsOut
                 + ", elapsedNanos=" + elapsedNanos + ", averageNanos/write="
                 + getAverageNanosPerWrite() + ", averageElements/write="
