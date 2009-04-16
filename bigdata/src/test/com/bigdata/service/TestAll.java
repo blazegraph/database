@@ -95,6 +95,9 @@ public class TestAll extends TestCase {
         // test ability to re-open an embedded federation.
         suite.addTestSuite(TestRestartSafe.class);
 
+        // unit tests for the streaming index write API.
+        suite.addTest(com.bigdata.service.ndx.TestAll.suite());
+
         // unit tests for the distributed transaction service's snapshots.
         suite.addTestSuite(TestSnapshotHelper.class);
 
