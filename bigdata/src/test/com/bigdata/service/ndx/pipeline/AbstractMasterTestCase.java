@@ -31,7 +31,7 @@ package com.bigdata.service.ndx.pipeline;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -43,7 +43,7 @@ import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
- * Unit tests for the control logic used by {@link AbstractMasterTask} and
+ * Abstract base class for test suites for the {@link AbstractMasterTask} and
  * friends.
  * <p>
  * Note: There are a bunch of inner classes which have the same names as the
@@ -53,40 +53,58 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo test ability to halt when one of the subtasks has an error.
- * 
- * @todo test ability to handle a redirect (subtask learns that the target
- *       service no longer accepts data for some locator and instead must send
- *       the data somewhere else).
- * 
- * @todo test ability to close and reopen (well, open a new subtask for the same
- *       locator) during master.awaitAll().
  */
-public class TestMockMaster extends TestCase2 {
+public class AbstractMasterTestCase extends TestCase2 {
 
-    public TestMockMaster() {
+    /**
+     * 
+     */
+    public AbstractMasterTestCase() {
+       
     }
 
-    public TestMockMaster(String name) {
-        super(name);
+    /**
+     * @param arg0
+     */
+    public AbstractMasterTestCase(String arg0) {
+        super(arg0);
+       
     }
-    
+
+    /**
+     * The locator is a simple integer - you can think of this as being similar
+     * to the index partition identifier. Since the unit tests are not concerned
+     * with the real indices we do not need to differentiate between indices,
+     * just their partitions.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
     static class L {
         
-        private final int locator;
-        
+        protected final int locator;
+
         public L(int locator) {
+            
             this.locator = locator;
+            
         }
-        
+
         public int hashCode() {
+            
             return locator;
+            
         }
         
         public boolean equals(Object o) {
 
             return ((L) o).locator == locator;
+            
+        }
+        
+        public String toString() {
+            
+            return getClass().getName() + "{locator=" + locator + "}";
             
         }
         
@@ -102,8 +120,21 @@ public class TestMockMaster extends TestCase2 {
     
     static class H extends MockMasterStats<L, HS> {
         
+        @Override
+        protected HS newSubtaskStats(L locator) {
+
+            return new HS();
+            
+        }
+
     }
     
+    /**
+     * Concrete master impl w/o generic types.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
     static class M extends MockMaster<H, O, KVO<O>, S, L, HS> {
 
         private final ExecutorService executorService;
@@ -128,7 +159,7 @@ public class TestMockMaster extends TestCase2 {
          * Hash partitions the elements in the chunk using the hash of the key
          * into a fixed population of N partitions.
          */
-        protected void hashPartition(final KVO<O>[] chunk)
+        protected void hashPartition(final KVO<O>[] chunk,final boolean reopen)
                 throws InterruptedException {
 
             // #of partitions.
@@ -172,31 +203,47 @@ public class TestMockMaster extends TestCase2 {
         }
 
         /**
+         * A map used by {@link #keyRangePartition(KVO[], boolean)}. If there
+         * is an entry in the map corresponding to the integer value of the
+         * first byte of the key (which is interpreted as the partition locator)
+         * then the value stored under that entry is the integer value for the
+         * partition locator to which the tuple will be directed.
+         * <p>
+         * The map is empty by default. Some unit tests populate it as they
+         * force redirects.
+         */
+        final protected ConcurrentHashMap<Integer, Integer> redirects = new ConcurrentHashMap<Integer, Integer>();
+        
+        /**
          * Assigns elements from an ordered chunk to key-range partitions by
          * interpreting the first byte of the key as the partition identifier
          * (does not work if the key is empty).
          */
-        protected void keyRangePartition(final KVO<O>[] chunk)
-                throws InterruptedException {
+        protected void keyRangePartition(final KVO<O>[] chunk,
+                final boolean reopen) throws InterruptedException {
 
             // #of partitions (one per value that a byte can take on).
             final int N = 255;
-            
+
             // array of ordered containers for each partition.
             final List<KVO<O>>[] v = new List[N];
 
             for (KVO<O> e : chunk) {
 
-                final int i = e.key[0];
+                final int j = e.key[0];
+
+                final Integer redirect = redirects.get(j);
+
+                final int i = redirect == null ? j : redirect.intValue();
 
                 if (v[i] == null) {
 
                     v[i] = new LinkedList<KVO<O>>();
-                    
+
                 }
 
                 v[i].add(e);
-                
+
             }
 
             for (int i = 0; i < v.length; i++) {
@@ -211,7 +258,7 @@ public class TestMockMaster extends TestCase2 {
                 final KVO<O>[] a = t.toArray(new KVO[t.size()]);
 
                 addToOutputBuffer(new L(i), a, 0/* fromIndex */,
-                        a.length/* toIndex */, false/* reopen */);
+                        a.length/* toIndex */, reopen);
 
             }
 
@@ -220,18 +267,23 @@ public class TestMockMaster extends TestCase2 {
         /**
          * Adds the entire chunk to the sole partition.
          */
-        protected void onePartition(final KVO<O>[] chunk)
+        protected void onePartition(final KVO<O>[] chunk, final boolean reopen)
                 throws InterruptedException {
 
-            addToOutputBuffer(new L(1), chunk, 0, chunk.length, false/* reopen */);
+            addToOutputBuffer(new L(1), chunk, 0, chunk.length, reopen );
 
         }
 
+        /**
+         * This applies {@link #keyRangePartition(KVO[])} to map the chunk
+         * across the output buffers for the subtasks.
+         */
         @Override
-        protected void nextChunk(final KVO<O>[] chunk) throws InterruptedException {
+        protected void nextChunk(final KVO<O>[] chunk, final boolean reopen)
+                throws InterruptedException {
 
-            keyRangePartition(chunk);
-            
+            keyRangePartition(chunk, reopen);
+
         }
 
         protected BlockingBuffer<KVO<O>[]> newSubtaskBuffer() {
@@ -255,6 +307,12 @@ public class TestMockMaster extends TestCase2 {
 
     }
 
+    /**
+     * Concrete subtask impl w/o generic types.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
     static class S extends MockSubtask<H, O, KVO<O>, L, S, HS, M> {
 
         public S(M master, L locator, BlockingBuffer<KVO<O>[]> buffer) {
@@ -267,11 +325,14 @@ public class TestMockMaster extends TestCase2 {
         protected boolean nextChunk(KVO<O>[] chunk) throws Exception {
 
             synchronized (master.stats) {
-             
+
                 master.stats.chunksOut++;
                 master.stats.elementsOut += chunk.length;
-                
+
             }
+
+            stats.chunksOut++;
+            stats.elementsOut += chunk.length;
             
             // keep processing.
             return false;
@@ -289,126 +350,13 @@ public class TestMockMaster extends TestCase2 {
     final BlockingBuffer<KVO<O>[]> masterBuffer = new BlockingBuffer<KVO<O>[]>(
             masterQueueCapacity);
 
-    final ExecutorService executorService = Executors.newCachedThreadPool(DaemonThreadFactory.defaultThreadFactory());
-    
-    final M master = new M(masterStats, masterBuffer, executorService);
+    final ExecutorService executorService = Executors
+            .newCachedThreadPool(DaemonThreadFactory.defaultThreadFactory());
 
     protected void tearDown() {
-        
+
         executorService.shutdownNow();
-        
-    }
-    
-    /**
-     * Test verifies start/stop of the master.
-     * 
-     * @throws InterruptedException
-     * @throws ExecutionException
-     */
-    public void test_startStop() throws InterruptedException, ExecutionException {
 
-        // start the consumer.
-        final Future<H> future = executorService.submit(master);
-        masterBuffer.setFuture(future);
-
-        //        masterBuffer.add(null);
-
-        masterBuffer.close();
-
-        masterBuffer.getFuture().get();
-
-        assertEquals("elementsOut", 0, masterStats.elementsOut);
-
-    }
-
-    /**
-     * Unit test writes an empty chunk and then stops the master.
-     * 
-     * @throws InterruptedException
-     * @throws ExecutionException
-     */
-    public void test_startEmptyWriteStop() throws InterruptedException, ExecutionException {
-
-        // start the consumer.
-        final Future<H> future = executorService.submit(master);
-        masterBuffer.setFuture(future);
-
-        final KVO<O>[] a = new KVO[0];
-        
-        masterBuffer.add(a);
-
-        masterBuffer.close();
-
-        masterBuffer.getFuture().get();
-
-        assertEquals("elementsIn", 0, masterStats.elementsIn);
-        assertEquals("chunksIn", 0, masterStats.chunksIn);
-        assertEquals("elementsOut", 0, masterStats.elementsOut);
-        assertEquals("chunksOut", 0, masterStats.chunksOut);
-
-    }
-
-    /**
-     * Unit test writes a chunk and then stops the master.
-     * 
-     * @throws InterruptedException
-     * @throws ExecutionException
-     */
-    public void test_startWriteStop1() throws InterruptedException,
-            ExecutionException {
-
-        // start the consumer.
-        final Future<H> future = executorService.submit(master);
-        masterBuffer.setFuture(future);
-
-        final KVO<O>[] a = new KVO[] {
-                new KVO<O>(new byte[]{1},new byte[]{2},null/*val*/),
-                new KVO<O>(new byte[]{1},new byte[]{3},null/*val*/)
-        };
-
-        masterBuffer.add(a);
-
-        masterBuffer.close();
-
-        masterBuffer.getFuture().get();
-
-        assertEquals("elementsIn", a.length, masterStats.elementsIn);
-        assertEquals("chunksIn", 1, masterStats.chunksIn);
-        assertEquals("elementsOut", a.length, masterStats.elementsOut);
-        assertEquals("chunksOut", 1, masterStats.chunksOut);
-        
-    }
-
-    /**
-     * Unit test writes a chunk that is split onto two subtasks and then stops
-     * the master.
-     * 
-     * @throws InterruptedException
-     * @throws ExecutionException
-     */
-    public void test_startWriteStop2() throws InterruptedException,
-            ExecutionException {
-
-        // start the consumer.
-        final Future<H> future = executorService.submit(master);
-        masterBuffer.setFuture(future);
-
-        final KVO<O>[] a = new KVO[] {
-                new KVO<O>(new byte[]{1},new byte[]{2},null/*val*/),
-                new KVO<O>(new byte[]{2},new byte[]{3},null/*val*/)
-        };
-
-        masterBuffer.add(a);
-
-        masterBuffer.close();
-
-        masterBuffer.getFuture().get();
-
-        assertEquals("elementsIn", a.length, masterStats.elementsIn);
-        assertEquals("chunksIn", 1, masterStats.chunksIn);
-        assertEquals("elementsOut", a.length, masterStats.elementsOut);
-        assertEquals("chunksOut", 2, masterStats.chunksOut);
-        
     }
 
 }

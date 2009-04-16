@@ -192,7 +192,7 @@ L>//
             master.removeOutputBuffer(locator, this);
 
             if (log.isInfoEnabled())
-                log.info("Done: " + stats);
+                log.info("Done: " + locator);
 
             // done.
             return stats;

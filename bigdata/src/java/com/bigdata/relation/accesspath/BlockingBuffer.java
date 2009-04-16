@@ -179,6 +179,17 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     private final int chunkCapacity;
 
     /**
+     * The target chunk size for the chunk combiner.
+     * 
+     * @see #DEFAULT_CONSUMER_CHUNK_SIZE
+     */
+    public final int getChunkCapacity() {
+
+        return chunkCapacity;
+        
+    }
+    
+    /**
      * The maximum time to wait in nanoseconds for another chunk to come along
      * so that we can combine it with the current chunk for {@link #next()}. A
      * value of ZERO(0) disables chunk combiner.
@@ -187,6 +198,19 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      */
     private final long chunkTimeout;
 
+    /**
+     * The maximum time to wait in nanoseconds for another chunk to come along
+     * so that we can combine it with the current chunk for {@link #next()}. A
+     * value of ZERO(0) disables chunk combiner.
+     * 
+     * @see #DEFAULT_CONSUMER_CHUNK_TIMEOUT
+     */
+    public final long getChunkTimeout() {
+
+        return chunkTimeout;
+        
+    }
+    
     /**
      * <code>true</code> iff the data in the buffered are chunks of elements
      * presented in their natural sort order. When <code>true</code>, the

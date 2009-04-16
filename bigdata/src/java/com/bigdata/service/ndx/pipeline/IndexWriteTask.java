@@ -28,16 +28,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.ndx.pipeline;
 
-import it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap;
-
 import java.util.LinkedList;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
@@ -49,11 +43,9 @@ import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.resources.StaleLocatorException;
-import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IScaleOutClientIndex;
 import com.bigdata.service.Split;
-import com.bigdata.util.concurrent.AbstractHaltableProcess;
 
 /**
  * Task drains a {@link BlockingBuffer} containing {@link KVO}[] chunks, splits
@@ -69,10 +61,26 @@ import com.bigdata.util.concurrent.AbstractHaltableProcess;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @param <T>
- *            The generic type of the procedure used to write on the index.
+ * @param <H>
+ *            The generic type of the value returned by {@link Callable#call()}
+ *            for the master.
  * @param <O>
  *            The generic type for unserialized value objects.
+ * @param <E>
+ *            The generic type of the elements in the chunks stored in the
+ *            {@link BlockingBuffer}.
+ * @param <S>
+ *            The generic type of the subtask implementation class.
+ * @param <L>
+ *            The generic type of the key used to lookup a subtask in the
+ *            internal map (must be unique and must implement hashCode() and
+ *            equals() per their contracts).
+ * @param <HS>
+ *            The generic type of the value returned by {@link Callable#call() }
+ *            for the subtask.
+ * @param <T>
+ *            The generic type of the CTOR for the procedure used to write on
+ *            the index.
  * @param <R>
  *            The type of the result from applying the index procedure to a
  *            single {@link Split} of data.
@@ -87,18 +95,18 @@ import com.bigdata.util.concurrent.AbstractHaltableProcess;
  *       similar to the pipeline joins?], accumulated chunks, and merge sorted
  *       those chunks before performing a sustained index write. However, this
  *       might go too far and cause complications with periodic overflow.
- * 
- * @todo Things which use the ndx object : {@link IKeyArrayIndexProcedure}
- *       (CTOR), name, timestamp, executorService (local), Executor (remote),
- *       splitKeys, staleLocator, getDataService()
- * 
- * @todo alternative refactor for unit tests is to focus on the subtask
- *       relations to the master and their control logic. however, there is the
- *       additional twist of a stale locator which needs to be handled by this
- *       logic.
  */
-public class IndexWriteTask<T extends IKeyArrayIndexProcedure, O, R, A> extends
-        AbstractHaltableProcess implements Callable<IndexWriteStats> {
+abstract public class IndexWriteTask <//
+H extends IndexWriteStats<L, HS>, //
+O extends Object, //
+E extends KVO<O>, //
+S extends IndexPartitionWriteTask, //
+L extends PartitionLocator, //
+HS extends IndexPartitionWriteStats,//
+T extends IKeyArrayIndexProcedure,//
+R,//
+A//
+> extends AbstractMasterTask<H, E, S, L> {
 
     static protected transient final Logger log = Logger
             .getLogger(IndexWriteTask.class);
@@ -106,87 +114,13 @@ public class IndexWriteTask<T extends IKeyArrayIndexProcedure, O, R, A> extends
     // from the ctor.
     protected final IScaleOutClientIndex ndx;
 
-    public final int indexPartitionWriteQueueCapacity;
+    protected final int subtaskQueueCapacity;
 
-    public IResultHandler<R, A> resultHandler;
+    protected final IResultHandler<R, A> resultHandler;
 
-    public IDuplicateRemover<O> duplicateRemover;
+    protected final IDuplicateRemover<O> duplicateRemover;
 
-    public final AbstractKeyArrayIndexProcedureConstructor<T> ctor;
-
-    /**
-     * The top-level buffer on which the application is writing.
-     */
-    protected final BlockingBuffer<KVO<O>[]> buffer;
-    
-    /**
-     * The iterator draining the {@link #buffer}.
-     * <p>
-     * Note: DO NOT close this iterator from within {@link #call()} as that
-     * would cause this task to interrupt itself!
-     */
-    protected final IAsynchronousIterator<KVO<O>[]> src;
-
-    /**
-     * Map from the index partition identifier to the open subtask handling
-     * writes bound for that index partition.
-     * <p>
-     * Note: This map must be protected against several kinds of concurrent
-     * access using the {@link #lock}.
-     */
-    private final Int2ObjectLinkedOpenHashMap<IndexPartitionWriteTask<T,O,R,A>> subtasks;
-
-    /**
-     * Lock used to ensure consistency of the overall operation. There are
-     * several ways in which an inconsistency could arise. Some examples
-     * include:
-     * <ul>
-     * 
-     * <li>The client writes on the top-level {@link BlockingBuffer} while an
-     * index partition write is asynchronously handling a
-     * {@link StaleLocatorException}. This could cause a problem because we may
-     * be required to (re-)open an {@link IndexPartitionWriteTask}.</li>
-     * 
-     * <li>The client has closed the top-level {@link BlockingBuffer} but there
-     * are still writes buffered for the individual index partitions. This could
-     * cause a problem since we must wait until those buffered writes have been
-     * flushed. We can not simply monitor the remaining values in
-     * {@link #subtasks} since {@link StaleLocatorException}s could cause new
-     * {@link IndexPartitionWriteTask} to start.</li>
-     * 
-     * <li>...</li>
-     * 
-     * </ul>
-     * 
-     * The {@link #lock} is therefore used to make the following operations
-     * mutually exclusive while allowing them to complete:
-     * <dl>
-     * <dt>{@link #addToOutputBuffer(Split, KVO[], boolean)}</dt>
-     * <dd>Adding data to an output blocking buffer.</dd>
-     * <dt>{@link #handleStaleLocator(IndexPartitionWriteTask, KVO[], StaleLocatorException)}</dt>
-     * <dd>Handling a {@link StaleLocatorException}, which may require
-     * (re-)opening an {@link IndexPartitionWriteTask} even during
-     * {@link #awaitAll()}.</dd>
-     * <dt>{@link #cancelAll()}</dt>
-     * <dd>Cancelling the task and its subtask(s).</dd>
-     * <dt>{@link #awaitAll()}</dt>
-     * <dd>Awaiting the successful completion of the task and its subtask(s).</dd>
-     * </ol>
-     */
-    protected final ReentrantLock lock = new ReentrantLock();
-    
-    /**
-     * Condition is signaled by a subtask when it is finished. This is used by
-     * {@link #awaitAll()} to while waiting for subtasks to complete. If all
-     * subtasks in {@link #subtasks} are complete when this signal is received
-     * then the master may terminate.
-     */
-    protected final Condition subtask = lock.newCondition();
-    
-    /**
-     * The statistics for the index write operation.
-     */
-    public final IndexWriteStats stats;
+    protected final AbstractKeyArrayIndexProcedureConstructor<T> ctor;
 
     public String toString() {
         
@@ -196,17 +130,19 @@ public class IndexWriteTask<T extends IKeyArrayIndexProcedure, O, R, A> extends
     }
 
     public IndexWriteTask(final IScaleOutClientIndex ndx,
-            final int indexPartitionWriteQueueCapacity,
+            final int subtaskQueueCapacity,
             final IResultHandler<R, A> resultHandler,
             final IDuplicateRemover<O> duplicateRemover,
             final AbstractKeyArrayIndexProcedureConstructor<T> ctor,
-            final IndexWriteStats stats,
-            final BlockingBuffer<KVO<O>[]> buffer) {
+            final H stats,
+            final BlockingBuffer<E[]> buffer) {
 
+        super(stats, buffer);
+        
         if (ndx == null)
             throw new IllegalArgumentException();
 
-        if (indexPartitionWriteQueueCapacity <= 0)
+        if (subtaskQueueCapacity <= 0)
             throw new IllegalArgumentException();
 
 //        if (resultHandler == null)
@@ -226,477 +162,53 @@ public class IndexWriteTask<T extends IKeyArrayIndexProcedure, O, R, A> extends
 
         this.ndx = ndx;
 
-        this.indexPartitionWriteQueueCapacity = indexPartitionWriteQueueCapacity;
+        this.subtaskQueueCapacity = subtaskQueueCapacity;
 
         this.resultHandler = resultHandler;
 
         this.duplicateRemover = duplicateRemover;
 
         this.ctor = ctor;
-
-        this.buffer = buffer;
-        
-        this.src = buffer.iterator();
-
-        this.subtasks = new Int2ObjectLinkedOpenHashMap<IndexPartitionWriteTask<T,O,R,A>>();
-
-        this.stats = stats;
         
     }
 
-    public IndexWriteStats call() throws Exception {
+    protected void nextChunk(final E[] a, final boolean reopen)
+            throws InterruptedException {
 
-        try {
-
-            while (src.hasNext()) {
-
-                final KVO<O>[] a = src.next();
-                
-                synchronized (stats) {
-                    stats.chunksIn++;
-                    stats.elementsIn += a.length;
-                }
-
-                nextChunk(a);
-                
-                if (Thread.interrupted()) {
-                    
-                    throw halt(new InterruptedException(toString()));
-                    
-                }
-
-                if (log.isDebugEnabled())
-                    log.debug(stats);
-
-            }
-
-            awaitAll();
-
-            if (log.isInfoEnabled())
-                log.info("Done: job=" + this + ", stats=" + stats);
-
-        } catch (Throwable t) {
-
-            log.error("Cancelling: job=" + this + ", cause=" + t, t);
-
-            try {
-                cancelAll(true/* mayInterruptIfRunning */);
-            } catch (Throwable t2) {
-                log.error(t2);
-            }
-
-            throw new RuntimeException( t );
-
-        }
-        
-        // Done.
-        return stats;
-
-    }
-
-    private void nextChunk(final KVO<O> [] a) throws InterruptedException {
-        
         // Split the ordered chunk.
-        final LinkedList<Split> splits = ndx.splitKeys(ndx
-                .getTimestamp(), 0/* fromIndex */,
-                a.length/* toIndex */, a);
+        final LinkedList<Split> splits = ndx.splitKeys(ndx.getTimestamp(),
+                0/* fromIndex */, a.length/* toIndex */, a);
 
         // Break the chunk into the splits
         for (Split split : splits) {
 
             halted();
 
-            addToOutputBuffer(split, a, false/* reopen */);
-
-        }
-
-    }
-    
-    /**
-     * Await the completion of the writes on each index partition.
-     * <p>
-     * Note: This is tricky because a new buffer may be created at any time in
-     * response to a {@link StaleLocatorException}. Also, when we handle a
-     * {@link StaleLocatorException}, it is possible that new writes will be
-     * identified for an index partition whose buffer we already closed (this is
-     * handled by re-opening of the output buffer for an index partition if it
-     * is closed when we handle a {@link StaleLocatorException}).
-     * 
-     * @throws ExecutionException
-     *             This will report the first cause.
-     * @throws InterruptedException
-     *             If interrupted while awaiting the {@link #lock} or the child
-     *             tasks.
-     * 
-     * @todo unit tests for some of these subtle points.
-     * 
-     * FIXME The practice of removing the subtask from {@link #subtasks} when it
-     * completes means that we are not able to check its {@link Future} here.
-     * Perhaps only do this if it completes normally (but also ensure that we do
-     * not re-open an output buffer if the subtask failed)?
-     */
-    private void awaitAll() throws InterruptedException, ExecutionException {
-
-        lock.lockInterruptibly();
-        try {
-
-            // close buffer - nothing more may be written on the buffer.
-            buffer.close();
-
-            while (true) {
-
-                halted();
-                
-                final IndexPartitionWriteTask<T, O, R, A>[] sinks = subtasks
-                        .values().toArray(new IndexPartitionWriteTask[0]);
-
-                if (sinks.length == 0) {
-
-                    if (log.isInfoEnabled())
-                        log.info("All subtasks are done: " + this);
-                    
-                    // Done.
-                    return;
-
-                }
-
-                if (log.isDebugEnabled())
-                    log.debug("Waiting for " + sinks.length + " subtasks : "
-                            + this);
-
-                /*
-                 * Wait for the sinks to complete.
-                 */
-                for (IndexPartitionWriteTask<T, O, R, A> sink : sinks) {
-
-                    final Future<IndexPartitionWriteStats> f = (Future<IndexPartitionWriteStats>) sink.buffer
-                            .getFuture();
-
-                    if (f.isDone()) {
-
-                        // check the future (can throw exception).
-                        f.get();
-
-                    }
-                    
-                }
-
-                /*
-                 * Yield the lock and wait up to a timeout for a sink to
-                 * complete.
-                 * 
-                 * @todo config
-                 */
-                subtask.await(BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT,
-                        BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT_UNIT);
-
-            } // continue
-
-        } finally {
-            
-            lock.unlock();
-            
-        }
-
-    }
-
-    /**
-     * Cancel all running tasks, discarding any buffered data.
-     * <p>
-     * Note: This method does not wait on the cancelled tasks.
-     * <p>
-     * Note: The caller should have already invoked {@link #halt(Throwable)}.
-     */
-    private void cancelAll(final boolean mayInterruptIfRunning) {
-
-        lock.lock();
-        try {
-
-            log.warn("Cancelling job: " + this);
-            
-            /*
-             * Close the buffer (nothing more may be written).
-             * 
-             * Note: We DO NOT close the [src] iterator since that would cause
-             * this task to interrupt itself!
-             */
-            buffer.close();
-
-            for (IndexPartitionWriteTask<T, O, R, A> sink : subtasks.values()) {
-
-                final Future f = sink.buffer.getFuture();
-
-                if (!f.isDone()) {
-
-                    f.cancel(mayInterruptIfRunning);
-
-                }
-
-            }
-            
-        } finally {
-
-            lock.unlock();
-            
-        }
-        
-    }
-    
-    /**
-     * Return a {@link BlockingBuffer} which will write onto the indicated index
-     * partition. The buffer is created if it does not exist. The buffer will be
-     * drained by a concurrent thread running on the
-     * {@link IBigdataFederation#getExecutorService()}. Buffers returned via
-     * this method are automatically closed when the source iterator for this
-     * class is exhausted.
-     * <p>
-     * Note: The caller must own the {@link #lock}. This requirement arises
-     * because this method is invoked not only from within the thread consuming
-     * consuming the top-level buffer but also invoked concurrently from the
-     * thread(s) consuming the output buffer(s) when handling a
-     * {@link StaleLocatorException} for that output buffer.
-     * 
-     * @param locator
-     *            The index partition locator.
-     * @param reopen
-     *            <code>true</code> IFF a closed buffer should be re-opened
-     *            (in fact, this causes a new buffer to be created and the new
-     *            buffer will be drained by a new
-     *            {@link IndexPartitionWriteTask}).
-     * 
-     * @return The {@link BlockingBuffer} for that index partition.
-     * 
-     * @throws IllegalArgumentException
-     *             if the argument is <code>null</code>.
-     * @throws IllegalMonitorStateException
-     *             unless the caller owns the {@link #lock}.
-     * @throws RuntimeException
-     *             if {@link #halted()}
-     */
-    private BlockingBuffer<KVO<O>[]> getOutputBuffer(
-            final PartitionLocator locator, final boolean reopen) {
-
-        if (locator == null)
-            throw new IllegalArgumentException();
-
-        if(!lock.isHeldByCurrentThread())
-            throw new IllegalMonitorStateException();
-        
-        // operation not allowed if halted.
-        halted();
-        
-        final int partitionId = locator.getPartitionId();
-
-        IndexPartitionWriteTask<T,O,R,A> sink = subtasks.get(partitionId);
-
-        if (reopen && sink != null && !sink.buffer.isOpen()) {
-
-            // wait for the sink to terminate normally.
-            awaitSink(sink);
-            
-        }
-        
-        if (sink == null || reopen) {
-
-            /*
-             * Resolve the service UUID to a proxy for the data service.
-             * 
-             * Note: If the sink already exists then we use its reference for
-             * the dataService. This avoids a small overhead for service lookup
-             * but also helps to make the system more robust since we known that
-             * the reference is still valid unless we get an RMI error when we
-             * try to use it. However, this will still do a service lookup if a
-             * sink completes its processing and is removed from the map before
-             * we see another request for a sink writing on the same index
-             * partition.
-             */
-            final IDataService dataService = (sink == null ? ndx
-                    .getDataService(locator) : sink.dataService);
-
-            if (dataService == null)
-                throw new RuntimeException("DataService not found: " + locator);
-
-            final BlockingBuffer<KVO<O>[]> out = new BlockingBuffer<KVO<O>[]>(
-                    new ArrayBlockingQueue<KVO<O>[]>(
-                            indexPartitionWriteQueueCapacity), //
-                    BlockingBuffer.DEFAULT_CONSUMER_CHUNK_SIZE,// @todo config
-                    BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT,// @todo config
-                    BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT_UNIT,//
-                    true// ordered
-            );
-
-            sink = new IndexPartitionWriteTask<T, O, R, A>(this, locator,
-                    dataService, out);
-
-            final Future<IndexPartitionWriteStats> future = ndx.getFederation()
-                    .getExecutorService().submit(sink);
-
-            out.setFuture(future);
-
-            subtasks.put(partitionId, sink);
-            
-            stats.subtaskStartCount++;
-
-        }
-
-        return sink.buffer;
-
-    }
-
-    /**
-     * This is invoked when there is already a sink for that index partition but
-     * it has been closed. Poll the future until the existing sink is finished
-     * before putting the new sink into play. This ensures that we can verify
-     * the Future completes normally. Other sinks (except the one(s) that is
-     * waiting on this Future) will continue to drain normally.
-     */
-    private void awaitSink(final IndexPartitionWriteTask<T, O, R, A> sink) {
-
-        assert lock.isHeldByCurrentThread();
-        assert !sink.buffer.isOpen();
-        
-        final Future f = sink.buffer.getFuture();
-        final long begin = System.nanoTime();
-        long lastNotice = begin;
-        try {
-            
-            while (!f.isDone()) {
-
-                subtask.await( // @todo config
-                        BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT,
-                        BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT_UNIT);
-
-                final long now = System.nanoTime();
-                final long elapsed = now - lastNotice;
-
-                if (elapsed >= 1000) {
-                    log.warn("Waiting on sink: elapsed="
-                            + TimeUnit.NANOSECONDS.toMillis(elapsed)
-                            + ", sink=" + sink);
-                }
-                
-            }
-
-            // test the future.
-            f.get();
-            
-        } catch (Throwable t) {
-
-            halt(t);
-
-            throw new RuntimeException(t);
-
-        }
-
-    }
-    
-    /**
-     * Removes the output buffer (unless it has been replaced by another output
-     * buffer associated with a different sink).
-     * <p>
-     * Note: The {@link IndexPartitionWriteTask} invokes this method to remove
-     * its output buffer when it is done. However, it is possible for
-     * {@link #getOutputBuffer(PartitionLocator)} to replace the sink in the
-     * {@link #subtasks} map if <i>reopen</i> was true. When that occurs, the
-     * request by the old sink will be ignored.
-     * 
-     * @param sink
-     *            The sink.
-     */
-    protected void removeOutputBuffer(
-            final IndexPartitionWriteTask<T, O, R, A> sink) {
-
-        if (sink == null)
-            throw new IllegalArgumentException();
-
-        lock.lock();
-        try {
-
-            final IndexPartitionWriteTask<T, O, R, A> t = subtasks
-                    .get(sink.partitionId);
-
-            if (t == sink) {
-
-                /*
-                 * Remove map entry IFF it is for the same reference.
-                 */
-
-                subtasks.remove(sink.partitionId);
-                
-                if (log.isDebugEnabled())
-                    log.debug("Removed output buffer: " + sink.partitionId);
-
-            }
-
-            /*
-             * Note: increment counter regardless of whether or not the
-             * reference was the same since the specified sink is now done.
-             */
-            stats.subtaskEndCount++;
-
-        } finally {
-
-            lock.unlock();
+            addToOutputBuffer(split, a, reopen);
 
         }
 
     }
 
     /**
-     * Resolves the output buffer onto which the split must be written and adds
-     * the data to that output buffer.
-     * <p>
-     * Note: This is <code>synchronized</code> in order to make it MUTEX with
-     * {@link #handleStaleLocator(IndexPartitionWriteTask, KVO[], StaleLocatorException)}.
-     * <p>
-     * Note: <em>reopen</em> causes a new {@link BlockingBuffer} to be
-     * allocated. Therefore the existing {@link BlockingBuffer} MUST be not only
-     * closed but also completely drained before reopen is allowed. The is only
-     * legitimate within
-     * {@link #handleStaleLocator(IndexPartitionWriteTask, KVO[], StaleLocatorException)}
+     * Adds the {@link Split} of data from the chunk to the appropriate output
+     * buffer.
      * 
      * @param split
-     *            The {@link Split} identifies both the tuples to be dispatched
-     *            and the {@link PartitionLocator} on which they must be
-     *            written.
+     *            The split.
      * @param a
-     *            The array of tuples. Only those tuples addressed by the
-     *            <i>split</i> will be written onto the output buffer.
+     *            The chunk from which the split is drawn.
      * @param reopen
-     *            <code>true</code> IFF a closed buffer should be re-opened
-     *            (in fact, this causes a new buffer to be created and the new
-     *            buffer will be drained by a new
-     *            {@link IndexPartitionWriteTask}).
+     *            if the output buffer for the split should be reopened if it is
+     *            closed.
      * 
      * @throws InterruptedException
-     *             if the thread is interrupted.
      */
-    @SuppressWarnings("unchecked")
-    protected void addToOutputBuffer(final Split split, final KVO<O>[] a,
+    protected void addToOutputBuffer(final Split split, final E[] a,
             final boolean reopen) throws InterruptedException {
 
-        lock.lockInterruptibly();
-        try {
-            /*
-             * Make a dense chunk for this split.
-             */
-
-            final KVO<O>[] b = new KVO[split.ntuples];
-
-            for (int i = 0, j = split.fromIndex; i < split.ntuples; i++, j++) {
-
-                b[i] = a[j];
-
-            }
-
-            // add the dense split to the appropriate output buffer.
-            getOutputBuffer((PartitionLocator) split.pmd, reopen).add(b);
-
-        } finally {
-
-            lock.unlock();
-
-        }
+        addToOutputBuffer((L) split.pmd, a, split.fromIndex, split.toIndex,
+                false/* reopen */);
 
     }
 
@@ -725,10 +237,8 @@ public class IndexWriteTask<T extends IKeyArrayIndexProcedure, O, R, A> extends
      * @param cause
      *            The {@link StaleLocatorException}.
      */
-    protected void handleStaleLocator(
-            final IndexPartitionWriteTask<T, O, R, A> sink,
-            final KVO<O>[] chunk, final StaleLocatorException cause)
-            throws InterruptedException {
+    protected void handleStaleLocator(final S sink, final E[] chunk,
+            final StaleLocatorException cause) throws InterruptedException {
 
         if (sink == null)
             throw new IllegalArgumentException();
@@ -742,7 +252,7 @@ public class IndexWriteTask<T extends IKeyArrayIndexProcedure, O, R, A> extends
         lock.lockInterruptibly();
         try {
 
-            stats.staleLocatorCount++;
+            stats.redirectCount++;
 
             final long ts = ndx.getTimestamp();
 
@@ -750,77 +260,13 @@ public class IndexWriteTask<T extends IKeyArrayIndexProcedure, O, R, A> extends
              * Notify the client so it can refresh the information for this
              * locator.
              */
-            ndx.staleLocator(ts, sink.locator, cause);
+            ndx.staleLocator(ts, (L) sink.locator, cause);
 
             /*
-             * Close the output buffer for this sink - nothing more may written
-             * onto it now that we have seen the StaleLocatorException.
+             * Redirect the chunk and anything in the buffer to the appropriate
+             * output sinks.
              */
-            sink.buffer.close();
-
-            // Handle the chunk for which we got the stale locator exception.
-            {
-
-                final LinkedList<Split> splits = ndx.splitKeys(ts,
-                        0/* fromIndex */, chunk.length/* toIndex */, chunk);
-
-                for (Split split : splits) {
-
-                    /*
-                     * Note: In this case we may re-open an output buffer for
-                     * the index partition. The circumstances under which this
-                     * can occur are subtle. However, if data had already been
-                     * assigned to the output buffer for the index partition and
-                     * written through to the index partition and the output
-                     * buffer closed because awaitAll() was invoked before we
-                     * received the stale locator exception for an outstanding
-                     * RMI, then it is possible for the desired output buffer to
-                     * already be closed. In order for this condition to arise
-                     * either the stale locator exception must have been
-                     * received in response to a different index operation or
-                     * the the client is not caching the index partition
-                     * locators.
-                     */
-
-                    addToOutputBuffer(split, chunk, true/* reopen */);
-
-                }
-
-            }
-
-            /*
-             * Drain the rest of the buffered chunks from the sink, assigning
-             * them to the sink(s).
-             */
-            {
-
-                final IAsynchronousIterator<KVO<O>[]> itr = sink.src;
-
-                while (itr.hasNext()) {
-
-                    // next buffered chunk.
-                    final KVO<O>[] a = itr.next();
-
-                    // split the chunk.
-                    final LinkedList<Split> splits = ndx.splitKeys(ts,
-                            0/* fromIndex */, a.length/* toIndex */, a);
-
-                    for (Split split : splits) {
-
-                        /*
-                         * Map onto the output buffers.
-                         * 
-                         * Again, note that we can re-open the output buffer in
-                         * this case.
-                         */
-
-                        addToOutputBuffer(split, chunk, true/* reopen */);
-
-                    }
-
-                }
-
-            }
+            handleRedirect(sink, chunk);
 
             /*
              * Remove the buffer from the map
@@ -830,7 +276,7 @@ public class IndexWriteTask<T extends IKeyArrayIndexProcedure, O, R, A> extends
              * handle that code that modifies or traverses the [buffers] map
              * MUST be MUTEX or synchronized.
              */
-            subtasks.remove(sink.locator.getPartitionId());
+            removeOutputBuffer((L) sink.locator, sink);
 
         } finally {
 
@@ -840,4 +286,98 @@ public class IndexWriteTask<T extends IKeyArrayIndexProcedure, O, R, A> extends
 
     }
 
- }
+    @Override
+    protected S newSubtask(final L locator, final BlockingBuffer<E[]> out) {
+
+        final IDataService dataService = ndx.getDataService(locator);
+        
+        if (dataService == null)
+            throw new RuntimeException("DataService not found: "
+                    + locator.getDataServiceUUID());
+        
+        return (S) new IndexPartitionWriteTask(this, locator, dataService, out);
+        
+    }
+
+    /**
+     * @todo configure chunk size and timeout. could just take the values from
+     *       {@link AbstractMasterTask#buffer}.
+     */
+    @Override
+    protected BlockingBuffer<E[]> newSubtaskBuffer() {
+        
+        return new BlockingBuffer<E[]>(//
+                new ArrayBlockingQueue<E[]>(subtaskQueueCapacity), //
+                BlockingBuffer.DEFAULT_CONSUMER_CHUNK_SIZE,// 
+                BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT,//
+                BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT_UNIT,//
+                true // ordered
+        );
+        
+    }
+
+    @Override
+    protected Future<HS> submitSubtask(final S subtask) {
+
+        return ndx.getFederation().getExecutorService().submit(subtask);
+        
+    }
+
+    /**
+     * Concrete master hides most of the generic types leaving you with only
+     * those that are meaningfully parameterize for applications using the
+     * streaming write API.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @param <T>
+     *            The generic type of the CTOR for the procedure used to write
+     *            on the index.
+     * @param <O>
+     *            The generic type for unserialized value objects.
+     * @param <R>
+     *            The type of the result from applying the index procedure to a
+     *            single {@link Split} of data.
+     * @param <A>
+     *            The type of the aggregated result.
+     */
+    public static class M<T extends IKeyArrayIndexProcedure, O, R, A> extends
+            IndexWriteTask<//
+            IndexWriteStats<PartitionLocator, IndexPartitionWriteStats>, // H
+            O, // O
+            KVO<O>, // E
+            IndexPartitionWriteTask, // S
+            PartitionLocator, // L
+            IndexPartitionWriteStats, // HS
+            T, //
+            R, //
+            A  //
+            > {
+
+        /**
+         * @param ndx
+         * @param subtaskQueueCapacity
+         * @param resultHandler
+         * @param duplicateRemover
+         * @param ctor
+         * @param stats
+         * @param buffer
+         */
+        public M(
+                IScaleOutClientIndex ndx,
+                int subtaskQueueCapacity,
+                IResultHandler<R, A> resultHandler,
+                IDuplicateRemover<O> duplicateRemover,
+                AbstractKeyArrayIndexProcedureConstructor<T> ctor,
+                IndexWriteStats<PartitionLocator, IndexPartitionWriteStats> stats,
+                BlockingBuffer<KVO<O>[]> buffer) {
+            
+            super(ndx, subtaskQueueCapacity, resultHandler, duplicateRemover,
+                    ctor, stats, buffer);
+
+        }
+        
+    }
+
+}

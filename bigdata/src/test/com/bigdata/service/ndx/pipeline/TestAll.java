@@ -63,6 +63,12 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite(TestDefaultDuplicateRemover.class);
         
+        suite.addTestSuite(TestMasterTask.class);
+        
+        suite.addTestSuite(TestMasterTaskWithErrors.class);
+        
+        suite.addTestSuite(TestMasterTaskWithRedirect.class);
+        
         return suite;
         
     }

@@ -30,7 +30,6 @@ package com.bigdata.service.ndx.pipeline;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -194,7 +193,7 @@ L>//
                     
                 }
 
-                nextChunk(a);
+                nextChunk(a, false/* reopen */);
                 
             }
 
@@ -224,8 +223,82 @@ L>//
      * 
      * @param chunk
      *            A chunk.
+     * @param reopen
+     *            When <code>false</code> it is an error if the output buffer
+     *            has been closed. When <code>true</code> the output buffer
+     *            will be (re-)opened as necessary. This will be
+     *            <code>false</code> when invoked by {@link #call()} (since
+     *            the output buffers are not closed until the master's buffer is
+     *            closed) and should be <code>true</code> if you are handling
+     *            redirects.
      */
-    abstract protected void nextChunk(E[] chunk) throws InterruptedException;
+    abstract protected void nextChunk(E[] chunk, boolean reopen)
+            throws InterruptedException;
+    
+    /**
+     * Redirects a chunk to the appropriate sink(s) and then drains the
+     * sink, redirecting all chunks which can be read from that sink to the
+     * appropriate sink(s). The <i>sink</i> is closed so that no further
+     * data may be written on it.
+     * 
+     * @param sink
+     *            The sink whose output needs to be redirected.
+     * @param chunk
+     *            The chunk which the sink was processing when it discovered
+     *            that it need to redirect its outputs to a different sink
+     *            (that is, a chunk which it had already read from its
+     *            buffer and hence which needs to be redirected now).
+     *            
+     * @throws InterruptedException
+     */
+    protected void handleRedirect(final S sink, final E[] chunk)
+            throws InterruptedException {
+
+        synchronized (stats) {
+            stats.redirectCount++;
+        }
+        
+        /*
+         * Close the output buffer for this sink - nothing more may written
+         * onto it now that we have seen the StaleLocatorException.
+         */
+        sink.buffer.close();
+
+        /*
+         * Handle the chunk for which we got the stale locator exception.
+         * 
+         * Note: In this case we may re-open an output buffer for the index
+         * partition. The circumstances under which this can occur are
+         * subtle. However, if data had already been assigned to the output
+         * buffer for the index partition and written through to the index
+         * partition and the output buffer closed because awaitAll() was
+         * invoked before we received the stale locator exception for an
+         * outstanding RMI, then it is possible for the desired output
+         * buffer to already be closed. In order for this condition to arise
+         * either the stale locator exception must have been received in
+         * response to a different index operation or the the client is not
+         * caching the index partition locators.
+         */
+        nextChunk(chunk, true/* reopen */);
+
+        /*
+         * Drain the rest of the buffered chunks from the sink, assigning
+         * them to the sink(s). Again, we will 'reopen' the output buffer if
+         * it has been closed.
+         */
+        {
+
+            final IAsynchronousIterator<E[]> itr = sink.src;
+
+            while (itr.hasNext()) {
+
+                nextChunk(itr.next(), true/* reopen */);
+
+            }
+
+        }
+
+    }
     
     /**
      * Await the completion of the writes on each index partition.
@@ -255,7 +328,7 @@ L>//
         lock.lockInterruptibly();
         try {
 
-            // close buffer - nothing more may be written on the buffer.
+            // close buffer - nothing more may be written on the master.
             buffer.close();
 
             while (true) {
@@ -410,6 +483,9 @@ L>//
 
         if (sink == null || reopen) {
 
+            if (log.isDebugEnabled())
+                log.debug("Creating output buffer: " + locator);
+
             final BlockingBuffer<E[]> out = newSubtaskBuffer();
 
             sink = newSubtask(locator, out);
@@ -420,7 +496,11 @@ L>//
 
             subtasks.put(locator, sink);
 
-            stats.subtaskStartCount++;
+            synchronized(stats) {
+
+                stats.subtaskStartCount++;
+                
+            }
 
         }
 
@@ -525,7 +605,8 @@ L>//
      * @param sink
      *            The sink.
      */
-    protected void removeOutputBuffer(final L locator, final AbstractSubtask sink) {
+    protected void removeOutputBuffer(final L locator,
+            final AbstractSubtask sink) {
 
         if (sink == null)
             throw new IllegalArgumentException();

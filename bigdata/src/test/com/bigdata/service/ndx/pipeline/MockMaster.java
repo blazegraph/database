@@ -32,18 +32,21 @@ import com.bigdata.btree.keys.KVO;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 
 /**
+ * Class exists solely to make it easier to write the unit tests by aligning the
+ * various generic types across the master, the subtask, and their statistics
+ * objects.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class MockMaster<
-H extends MockMasterStats<L, HS>,
-O extends Object,
-E extends KVO<O>,
-S extends MockSubtask,
-L extends Object,
-HS extends MockSubtaskStats>
-        extends
-        AbstractMasterTask<H, E, S, L> {
+abstract public class MockMaster<//
+H extends MockMasterStats<L, HS>, //
+O extends Object, //
+E extends KVO<O>, //
+S extends MockSubtask, //
+L extends Object, //
+HS extends MockSubtaskStats//
+> extends AbstractMasterTask<H, E, S, L> {
 
     public MockMaster(H stats, BlockingBuffer<E[]> buffer) {
 
